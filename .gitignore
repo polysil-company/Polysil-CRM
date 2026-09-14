@@ -1,23 +1,10 @@
-infra/.env
-.env
-*.key
-*.pem
-__pycache__/
-*.pyc
-.venv/
-venv/
-val_out.txt
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-node_modules/
-*.egg-info/
-.coverage
-htmlcov/
-dist/
-build/
+# Repo-wide. Backend-specific ignores live in backend/.gitignore.
 
-# /astra-review writes its findings here. Read it, act on it, delete it.
-.astra-review.md
-.astra-spec.md
-.astra-spec.log
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Node (frontend, when it lands)
+node_modules/
