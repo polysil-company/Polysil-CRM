@@ -1,0 +1,10 @@
+# Repo-wide. Backend-specific ignores live in backend/.gitignore.
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Node (frontend, when it lands)
+node_modules/
