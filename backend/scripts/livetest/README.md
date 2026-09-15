@@ -15,3 +15,11 @@ python scripts/livetest/assign_edit_duplicates_admin.py       # assign, PATCH, d
 The dealer signs in by OTP; the drivers read the code from `notification_outbox`
 the way a real client would receive it. They read database credentials from
 `infra/.env`.
+
+## What the drivers leave behind
+
+Leads, notes, duplicate links and events stay in the database on purpose: they are
+the data to look at afterwards. The admin driver also adds one lost reason
+(`live_reason_<hex>`) and switches it off; nothing removes lookup items (ADR-033),
+so every run adds one. The suite tolerates them: it checks the seeded codes rather
+than counting rows, and picks an active reason when it needs one.

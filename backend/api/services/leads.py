@@ -143,6 +143,11 @@ def _iso(v: datetime | None) -> str | None:
     return None if v is None else v.isoformat()
 
 
+def _iso_req(v: datetime) -> str:
+    """For NOT NULL timestamp columns."""
+    return v.isoformat()
+
+
 async def _has_permission(db: AsyncSession, module: str, action: str) -> bool:
     return bool((await db.execute(text("SELECT app_has_permission(:m, :a)"),
                                   {"m": module, "a": action})).scalar_one())
@@ -152,9 +157,9 @@ async def _actor_name(db: AsyncSession) -> str:
     """The caller's display name, for `payload.actor_name`. Every lead event carries
     it at write time so the timeline needs no lookup a field officer may not make
     (FS-003 4, EC-4). The caller can always read their own app_user row."""
-    return (await db.execute(text(
+    return str((await db.execute(text(
         "SELECT full_name FROM app_user WHERE id = (SELECT app_current_user_id())"))
-    ).scalar_one()
+    ).scalar_one())
 
 
 async def _emit(db: AsyncSession, *, lead_id: Any, kind: str, actor_id: str,
@@ -466,7 +471,7 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef]) -> Lead:
         merged_into=MergedRef(id=str(row.merged_into_id), inquiry_no=row.merged_into_no)
         if row.merged_into_id and row.merged_into_no else None,
         first_contacted_at=_iso(row.first_contacted_at),
-        last_activity_at=_iso(row.last_activity_at), created_at=_iso(row.created_at),
+        last_activity_at=_iso_req(row.last_activity_at), created_at=_iso_req(row.created_at),
         created_by=UserRef(id=str(row.created_by), full_name=row.created_by_name)
         if row.created_by and row.created_by_name else None,
         duplicates=duplicates)
@@ -571,7 +576,7 @@ async def add_note(db: AsyncSession, caller: Caller, lead_id: str,
     ev = await _emit(db, lead_id=lead_id, kind="lead.note_added", actor_id=caller.user_id,
                      actor_name=actor, note=body.note)
     await _rescore(db, lead_id)
-    return TimelineEvent(id=str(ev.id), kind="lead.note_added", occurred_at=_iso(ev.occurred_at),
+    return TimelineEvent(id=str(ev.id), kind="lead.note_added", occurred_at=_iso_req(ev.occurred_at),
                          actor=UserRef(id=caller.user_id, full_name=actor),
                          payload={"actor_name": actor, "note": body.note})
 
@@ -606,7 +611,7 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
         actor = None
         if r.actor_id is not None:
             actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name") or "")
-        events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso(r.occurred_at),
+        events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso_req(r.occurred_at),
                                     actor=actor, payload=payload or {}))
     return TimelinePage(data=events, meta=PageMeta(limit=limit, next_cursor=next_cursor))
 
@@ -743,14 +748,15 @@ async def patch_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadP
         sets.append("estimated_value = :est"); params["est"] = body.estimated_value
         changed["estimated_value"] = _dec(body.estimated_value)
 
-    if "territory_id" in fields and body.territory_id != str(row.territory_id):
+    territory_id = body.territory_id  # None only when unsent: it is in _PATCH_REQUIRED
+    if territory_id is not None and territory_id != str(row.territory_id):
         # Rule 4: with an owner the unit is the owner's (path A, kept as-is, GAP-061);
         # with no owner it is routed by the new territory (path B).
         new_oou = str(row.owner_org_unit_id)
         if row.owner_user_id is None:
-            new_oou = await _covering_org_unit(db, body.territory_id)
+            new_oou = await _covering_org_unit(db, territory_id)
         await _assert_insert_in_scope(
-            db, caller, territory_id=body.territory_id,
+            db, caller, territory_id=territory_id,
             owner_user_id=str(row.owner_user_id) if row.owner_user_id else None,
             owner_org_unit_id=new_oou,
             assigned_partner_id=str(row.assigned_partner_id) if row.assigned_partner_id else None)
@@ -945,13 +951,21 @@ _LOOKUP_COLS: dict[str, frozenset[str]] = {
 
 async def create_lookup(db: AsyncSession, table: str, body: LookupCreate) -> LookupItem:
     extra = _LOOKUP_COLS[table]
-    cols, vals, params = ["code", "name"], [":code", ":name"], {"code": body.code, "name": body.name}
+    # created_by from the claim, as on every business row. The seed leaves it null.
+    cols = ["code", "name", "created_by"]
+    vals = [":code", ":name", "app_current_user_id()"]
+    params: dict[str, Any] = {"code": body.code, "name": body.name}
     if "sort_order" in extra and body.sort_order is not None:
-        cols.append("sort_order"); vals.append(":so"); params["so"] = body.sort_order
+        cols.append("sort_order")
+        vals.append(":so")
+        params["so"] = body.sort_order
     if "quality" in extra and body.quality is not None:
-        cols.append("quality"); vals.append(":q"); params["q"] = body.quality
+        cols.append("quality")
+        vals.append(":q")
+        params["q"] = body.quality
     if "kind" in extra:
-        cols.append("kind"); vals.append("CAST(:kind AS won_lost_kind)")
+        cols.append("kind")
+        vals.append("CAST(:kind AS won_lost_kind)")
         params["kind"] = body.kind or "lost"
     try:
         r = (await db.execute(text(
@@ -971,13 +985,17 @@ async def update_lookup(db: AsyncSession, table: str, item_id: str,
     sets: list[str] = []
     params: dict[str, Any] = {"id": item_id}
     if "is_active" in fields and body.is_active is not None:
-        sets.append("is_active = :active"); params["active"] = body.is_active
+        sets.append("is_active = :active")
+        params["active"] = body.is_active
     if "sort_order" in fields and "sort_order" in extra and body.sort_order is not None:
-        sets.append("sort_order = :so"); params["so"] = body.sort_order
+        sets.append("sort_order = :so")
+        params["so"] = body.sort_order
     if "quality" in fields and "quality" in extra and body.quality is not None:
-        sets.append("quality = :q"); params["q"] = body.quality
+        sets.append("quality = :q")
+        params["q"] = body.quality
     if not sets:
         raise ValidationFailed(fields={"body": "nothing to change"})
+    sets.append("updated_by = app_current_user_id()")
     r = (await db.execute(text(
         f"UPDATE {table} SET {', '.join(sets)} WHERE id = CAST(:id AS uuid) "
         "RETURNING id, code, name, is_active"), params)).one_or_none()

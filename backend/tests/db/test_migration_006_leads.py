@@ -66,12 +66,26 @@ async def test_the_merged_check_ties_the_pointer_to_the_stage(db: AsyncSession) 
     assert "merged_into_id IS NULL" in d and "'merged'" in d
 
 
-@pytest.mark.parametrize("table,n", [
-    ("lead_source", 9), ("mis_system", 5), ("won_lost_reason", 6), ("lead_score_rule", 10),
-])
-async def test_the_lookups_are_seeded(db: AsyncSession, table: str, n: int) -> None:
-    got = (await db.execute(text(f"SELECT count(*) FROM {table}"))).scalar_one()
-    assert got == n
+_SEEDED = {
+    "lead_source": ("code", ["whatsapp", "website", "employee", "dealer", "campaign",
+                             "agri_fair", "farmer_meeting", "qr_code", "form_link"]),
+    "mis_system": ("code", ["drip", "mini_sprinkler", "sprinkler", "automation", "other"]),
+    "won_lost_reason": ("code", ["price", "competitor", "no_response", "product_mismatch",
+                                 "financing_not_approved", "out_of_area"]),
+    "lead_score_rule": ("key", ["w_source", "w_value", "w_speed", "w_engagement", "value_cap",
+                                "speed_fast_hours", "speed_slow_hours", "engagement_cap",
+                                "threshold_hot", "threshold_warm"]),
+}
+
+
+@pytest.mark.parametrize("table", list(_SEEDED))
+async def test_the_lookups_are_seeded(db: AsyncSession, table: str) -> None:
+    # Every seeded code is present, once. Extra rows are allowed: the live drivers add
+    # lookup items through the API and, by ADR-033, nothing removes them.
+    col, codes = _SEEDED[table]
+    got = (await db.execute(text(f"SELECT {col} FROM {table}"))).scalars().all()
+    assert set(codes) <= set(got)
+    assert len(got) == len(set(got))
 
 
 async def test_scoring_keys_are_the_ones_the_function_reads(db: AsyncSession) -> None:

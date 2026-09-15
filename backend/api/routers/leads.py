@@ -395,7 +395,10 @@ async def mis_systems(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
 
 @lookups.get("/lost-reasons", response_model=Envelope[list[LookupItem]], responses=_ERRORS)
 async def lost_reasons(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
-    """The active reasons a lead can be marked lost with."""
+    """The reasons a lead can be marked lost with. Switched-off reasons are included
+    with `is_active` false, so the admin list and the form share one call; the form
+    shows active ones only, because losing with an inactive reason is refused.
+    """
     return Envelope(data=await service.list_lost_reasons(db))
 
 

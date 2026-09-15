@@ -37,6 +37,28 @@ class Env:
     district_name: str
 
 
+_SWEEP_LEFTOVERS = """
+DO $$
+DECLARE t uuid[];
+BEGIN
+  SELECT coalesce(array_agg(id), '{}') INTO t FROM territory
+   WHERE level = 'state' AND name LIKE 'gujarat\\_%' AND code LIKE 'Z%'
+     AND created_at < now() - interval '1 hour';
+  t := t || coalesce((SELECT array_agg(id) FROM territory WHERE parent_id = ANY(t)), '{}');
+  DELETE FROM activity_event WHERE lead_id IN (SELECT id FROM lead WHERE territory_id = ANY(t));
+  DELETE FROM lead_duplicate_link
+   WHERE lead_a_id IN (SELECT id FROM lead WHERE territory_id = ANY(t))
+      OR lead_b_id IN (SELECT id FROM lead WHERE territory_id = ANY(t));
+  DELETE FROM notification_outbox
+   WHERE recipient IN (SELECT mobile FROM lead WHERE territory_id = ANY(t));
+  DELETE FROM lead WHERE territory_id = ANY(t);
+  DELETE FROM inquiry_counter WHERE state_code IN (SELECT code FROM territory WHERE id = ANY(t));
+  DELETE FROM territory WHERE parent_id = ANY(t);
+  DELETE FROM territory WHERE id = ANY(t);
+END $$
+"""
+
+
 @pytest_asyncio.fixture
 async def env(sessions: Callable[[], AsyncSession], staff: Staff) -> AsyncIterator[Env]:
     """A state (with a code) over a district, committed. Depends on `staff` so it
@@ -45,6 +67,10 @@ async def env(sessions: Callable[[], AsyncSession], staff: Staff) -> AsyncIterat
     code = "Z" + tag[:2].upper()
     district_name = f"gondal_{tag}"
     s = sessions()
+    # A run killed mid-test (memory, a dropped tunnel) never reaches the teardown
+    # below, and a later run that draws the same code hits the inquiry_no unique
+    # index. Sweep anything of ours older than an hour, in one round trip.
+    await s.execute(text(_SWEEP_LEFTOVERS))
     state = (await s.execute(text(
         "INSERT INTO territory (level, name, code) VALUES ('state', :n, :c) RETURNING id"),
         {"n": f"gujarat_{tag}", "c": code})).scalar_one()
@@ -301,7 +327,10 @@ async def _to(client: httpx.AsyncClient, h: dict[str, str], lid: str, **body: ob
 
 
 async def _lost_reason(client: httpx.AsyncClient, h: dict[str, str]) -> str:
-    return (await client.get(f"{V1}/lookups/lost-reasons", headers=h)).json()["data"][0]["id"]
+    # The list carries switched-off reasons too (ADR-033: never deleted), and the
+    # live drivers leave one behind, sorted first. Pick an active one.
+    items = (await client.get(f"{V1}/lookups/lost-reasons", headers=h)).json()["data"]
+    return next(i["id"] for i in items if i["is_active"])
 
 
 async def test_transition_new_to_contacted_stamps_first_contact(
@@ -775,6 +804,13 @@ async def test_add_and_switch_off_a_lost_reason(
         r = await client.patch(f"{V1}/lookups/lost-reasons/{uuid.uuid4()}", json={"is_active": False},
                                headers={**h, **_key()})
         assert r.status_code == 404
+        # the actor columns carry the caller (001: updated_by is the application's job)
+        s = sessions()
+        row = (await s.execute(
+            text("SELECT created_by, updated_by FROM won_lost_reason WHERE code = :c"),
+            {"c": code})).one()
+        await s.rollback()
+        assert str(row.created_by) == staff.id and str(row.updated_by) == staff.id
     finally:
         await _drop_lookup(sessions, "won_lost_reason", code)
 

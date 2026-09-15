@@ -119,7 +119,9 @@ Switch a source on or off, reorder it, or retune its quality factor.
 
 **Lost Reasons**
 
-The active reasons a lead can be marked lost with.
+The reasons a lead can be marked lost with. Switched-off reasons are included
+with `is_active` false, so the admin list and the form share one call; the form
+shows active ones only, because losing with an inactive reason is refused.
 
 **Responses**
 
