@@ -44,6 +44,15 @@ GRANTS: dict[str, str] = {
 
 HAND_POLICIES: list[tuple[str, str]] = [
     ("idempotency_record", """CREATE POLICY idempotency_record_upd ON idempotency_record FOR UPDATE USING (user_id = (SELECT app_current_user_id())) WITH CHECK (user_id = (SELECT app_current_user_id()))"""),
+    # notification_outbox: narrow 005's broad INSERT (ISS-062). The system
+    # principal, or a lead_ack for the mobile of a lead the caller can see: the
+    # EXISTS runs under the caller's lead policies. The OTP path is a definer
+    # function and is unaffected. 005's form let any caller queue any template.
+    ("notification_outbox", """CREATE POLICY notification_outbox_ins ON notification_outbox FOR INSERT WITH CHECK (
+  (SELECT app_is_system())
+  OR (template_key = 'lead_ack'
+      AND EXISTS (SELECT 1 FROM lead l WHERE l.mobile = recipient))
+)"""),
     ("lead_source", """CREATE POLICY lead_source_sel ON lead_source FOR SELECT USING ((SELECT app_current_user_id()) IS NOT NULL)"""),
     ("lead_source", """CREATE POLICY lead_source_ins ON lead_source FOR INSERT WITH CHECK ((SELECT app_has_permission('masters', 'edit')))"""),
     ("lead_source", """CREATE POLICY lead_source_upd ON lead_source FOR UPDATE USING ((SELECT app_has_permission('masters', 'edit')))"""),
@@ -216,11 +225,17 @@ TABLES = [
 )""",
 ]
 
+# FS-003 rule 4 (ISS-067). The sales-line anchor a lead routes to when no org unit
+# covers its territory, so admins see it and no lead is invisible. Stable id, so
+# Settings.root_org_unit_id can name it; never the System principal's unit.
+ROOT_ORG_UNIT_ID = "73f0fdc5-8adb-50e6-b1b9-04005fe9e2ea"  # uuid5(DNS, "polysil.hq")
+
 SEEDS = [
     """INSERT INTO lead_source (code, name, quality, sort_order) VALUES ('whatsapp','WhatsApp',0.6,1),('website','Website',0.6,2),('employee','Employee',0.8,3),('dealer','Dealer',0.7,4),('campaign','Campaign',0.5,5),('agri_fair','Agri Fair',0.7,6),('farmer_meeting','Farmer Meeting',0.8,7),('qr_code','QR Code',0.5,8),('form_link','Form Link',0.5,9)""",
     """INSERT INTO mis_system (code, name) VALUES ('drip','Drip'),('mini_sprinkler','Mini Sprinkler'),('sprinkler','Sprinkler'),('automation','Automation'),('other','Other')""",
     """INSERT INTO won_lost_reason (kind, code, name, sort_order) VALUES ('lost','price','Price',1),('lost','competitor','Competitor',2),('lost','no_response','No response',3),('lost','product_mismatch','Product mismatch',4),('lost','financing_not_approved','Financing not approved',5),('lost','out_of_area','Out of area',6)""",
     """INSERT INTO lead_score_rule (key, value) VALUES ('w_source',25),('w_value',35),('w_speed',20),('w_engagement',20),('value_cap',500000),('speed_fast_hours',24),('speed_slow_hours',72),('engagement_cap',10),('threshold_hot',70),('threshold_warm',40)""",
+    f"""INSERT INTO org_unit (id, name, role_level) VALUES ('{ROOT_ORG_UNIT_ID}', 'Polysil HQ', 5) ON CONFLICT (id) DO NOTHING""",
 ]
 
 TRIGGERS = [
@@ -249,6 +264,10 @@ HAND_INDEXES = [
     """CREATE UNIQUE INDEX uq_lead_external ON lead (source_system, external_id) WHERE external_id IS NOT NULL""",
     """CREATE INDEX ix_lead_dup_b ON lead_duplicate_link (lead_b_id)""",
     """CREATE INDEX ix_lead_dup_resolved_by ON lead_duplicate_link (resolved_by)""",
+    # activity_event gains a lead arm in its read policy (below), and lead_timeline()
+    # reads (lead_id, occurred_at desc, id desc). Without this index that read is a
+    # seq scan + sort over the largest table in the system (rule 9; FS-003 5, 10).
+    """CREATE INDEX ix_activity_event_lead ON activity_event (lead_id, occurred_at DESC, id DESC) WHERE lead_id IS NOT NULL""",
 ]
 
 LEAD_POLICIES = [
@@ -382,7 +401,10 @@ BEGIN
     ON CONFLICT (state_code, financial_year)
     DO UPDATE SET last_value = inquiry_counter.last_value + 1
     RETURNING last_value INTO v_n;
-    RETURN 'POL/' || p_state_code || '/' || p_fy || '/' || lpad(v_n::text, 5, '0');
+    -- Five digits is a minimum width, not a cap: lpad truncates a longer value,
+    -- and 100000 would become 10000 and collide (cross-vendor P2).
+    RETURN 'POL/' || p_state_code || '/' || p_fy || '/'
+           || lpad(v_n::text, greatest(5, length(v_n::text)), '0');
 END $fn$""",
     """CREATE FUNCTION lead_visible(p_lead_id uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
@@ -435,13 +457,27 @@ BEGIN
 END $fn$""",
     """CREATE FUNCTION lead_merge(p_loser uuid, p_survivor uuid) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE v_actor text;
 BEGIN
     IF NOT app_has_permission('leads', 'edit') THEN
         RAISE EXCEPTION 'not permitted to edit leads' USING ERRCODE = '42501';
     END IF;
+    -- Staff only (FS-003 4 and 5.1). The route refuses partner users too, but
+    -- this function is granted on its own and touches rows the caller cannot
+    -- see, so it guards itself (cross-vendor P1).
+    IF (SELECT user_type::text FROM app_user WHERE id = app_current_user_id())
+       IS DISTINCT FROM 'staff' THEN
+        RAISE EXCEPTION 'only staff may merge leads' USING ERRCODE = '42501';
+    END IF;
     IF p_loser = p_survivor THEN
         RAISE EXCEPTION 'a lead cannot merge into itself' USING ERRCODE = 'LEADM';
     END IF;
+    -- Lock both participants in a fixed order before validating anything, so two
+    -- concurrent merges serialise: A->B while B->C either waits and re-points A
+    -- at C, or sees B already merged and refuses. Without this a chain
+    -- A->B->C can form and C's timeline loses A (cross-vendor P1).
+    PERFORM 1 FROM lead WHERE id = least(p_loser, p_survivor) FOR UPDATE;
+    PERFORM 1 FROM lead WHERE id = greatest(p_loser, p_survivor) FOR UPDATE;
     IF NOT lead_visible(p_loser) OR NOT lead_visible(p_survivor) THEN
         RAISE EXCEPTION 'lead not found' USING ERRCODE = 'LEADN';
     END IF;
@@ -462,11 +498,14 @@ BEGIN
     UPDATE lead_duplicate_link SET state = 'merged', resolved_by = app_current_user_id(),
            resolved_at = now()
      WHERE state = 'pending' AND (lead_a_id = p_loser OR lead_b_id = p_loser);
+    -- actor_name rides in the payload like every lead event the service writes,
+    -- since the timeline names actors from there (cross-vendor P2).
+    SELECT full_name INTO v_actor FROM app_user WHERE id = app_current_user_id();
     INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload)
     VALUES ('lead', p_survivor, p_survivor, 'lead.merged', app_current_user_id(),
-            jsonb_build_object('loser', p_loser, 'survivor', p_survivor)),
+            jsonb_build_object('loser', p_loser, 'survivor', p_survivor, 'actor_name', v_actor)),
            ('lead', p_loser, p_loser, 'lead.merged', app_current_user_id(),
-            jsonb_build_object('loser', p_loser, 'survivor', p_survivor));
+            jsonb_build_object('loser', p_loser, 'survivor', p_survivor, 'actor_name', v_actor));
     UPDATE lead SET stage = 'merged', merged_into_id = p_survivor WHERE id = p_loser;
 END $fn$""",
     """CREATE FUNCTION lead_close_links(p_lead_id uuid, p_state text) RETURNS void
@@ -523,13 +562,16 @@ BEGIN
     END IF;
     SELECT u.id INTO v_owner
       FROM app_user u
+      JOIN role r ON r.id = u.role_id
       JOIN org_unit ou ON ou.id = u.org_unit_id
       JOIN territory_closure tc ON tc.ancestor_id = ou.territory_id
                                AND tc.descendant_id = p_territory_id
      WHERE u.user_type = 'staff' AND u.is_active AND u.deleted_at IS NULL
+       AND r.level = 1
      ORDER BY tc.depth ASC,
               (SELECT count(*) FROM lead l
                 WHERE l.owner_user_id = u.id
+                  AND l.deleted_at IS NULL
                   AND l.stage NOT IN ('won', 'lost', 'merged', 'dormant')) ASC,
               u.id ASC
      LIMIT 1;
@@ -707,6 +749,9 @@ def upgrade() -> None:
     # activity_event gains the lead arm: drop 005's read policy, create the new one.
     op.execute("DROP POLICY activity_event_sel ON activity_event")
     _hand("activity_event")
+    # notification_outbox: drop 005's broad INSERT policy, create the narrowed one.
+    op.execute("DROP POLICY notification_outbox_ins ON notification_outbox")
+    _hand("notification_outbox")
 
     # The generator's parent-guard change, applied to the two tables that predate it.
     for table, sql in REAPPLY.items():
@@ -728,6 +773,14 @@ def downgrade() -> None:
         op.execute(f"DROP POLICY {table}_upd ON {table}")
         op.execute(sql["old"])
 
+    # notification_outbox back to 005's broad INSERT policy.
+    op.execute("DROP POLICY IF EXISTS notification_outbox_ins ON notification_outbox")
+    op.execute(
+        "CREATE POLICY notification_outbox_ins ON notification_outbox FOR INSERT WITH CHECK "
+        "((SELECT app_current_user_id()) IS NOT NULL OR (SELECT app_is_system()))"
+    )
+    # activity_event persists (migration 003), so its lead index is dropped by hand.
+    op.execute("DROP INDEX IF EXISTS ix_activity_event_lead")
     # activity_event back to 005's read policy (no lead arm).
     op.execute("DROP POLICY IF EXISTS activity_event_sel ON activity_event")
     op.execute(
@@ -751,6 +804,9 @@ def downgrade() -> None:
     for enum in ("lead_dup_state", "lead_dup_signal", "won_lost_kind", "lead_priority",
                  "inquiry_type", "lead_stage"):
         op.execute(f"DROP TYPE IF EXISTS {enum}")
+
+    # The anchor org unit, after the lead rows that pointed at it are gone.
+    op.execute(f"DELETE FROM org_unit WHERE id = '{ROOT_ORG_UNIT_ID}'")
 
     op.execute("DROP POLICY IF EXISTS idempotency_record_upd ON idempotency_record")
     op.execute(f"REVOKE UPDATE ON idempotency_record FROM {APP_ROLE}")

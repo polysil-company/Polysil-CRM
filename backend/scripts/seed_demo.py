@@ -146,6 +146,11 @@ def main() -> None:
             [("Gujarat", "state", None), ("Rajkot", "district", "Gujarat"),
              ("Gondal", "taluka", "Rajkot")],
         )
+        # The state needs a code: the inquiry number is POL/<state code>/<FY>/<n>
+        # (FS-003 rule 3), and a lead in a territory with no coded state ancestor is
+        # refused. Set it here so a freshly seeded database can create leads.
+        cur.execute("UPDATE territory SET code = 'GJ' WHERE id = %s AND code IS NULL",
+                    (territories["Gujarat"],))
         orgs = _org_tree(cur, territories)
 
         cur.execute("SELECT id, code FROM role")

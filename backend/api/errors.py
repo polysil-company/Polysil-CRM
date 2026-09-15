@@ -186,3 +186,24 @@ async def validation_error_handler(_: Request, exc: Exception) -> JSONResponse:
             }
         },
     )
+
+
+async def internal_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """A 500 in the same envelope as every other failure (ISS-072).
+
+    Without this, an unhandled error (a DBAPIError, the 42501 a mid-mutation RLS
+    refusal raises) reaches Starlette's default handler and the client gets plain
+    text, which breaks the one-shape contract of FS-001 section 4. The body carries
+    no detail on purpose: no SQLSTATE, no message, nothing an attacker can use. The
+    traceback goes to the log with the request path; Starlette re-raises after the
+    response is sent so the server log sees it too.
+    """
+    import structlog
+
+    structlog.get_logger().error("unhandled error", path=request.url.path,
+                                 error=type(exc).__name__)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"error": {"code": "internal_error",
+                           "message": "Something went wrong. Try again shortly."}},
+    )

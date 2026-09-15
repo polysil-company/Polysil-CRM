@@ -359,7 +359,8 @@ def f_permissions() -> None:
 def f_lead() -> None:
     e, n = [], {}
     e += title("Lead capture", sub="Public capture never touches `lead` directly.",
-               status="NOT BUILT. No spec, no table yet. FS-003.",
+               status="BUILT. FS-003: manual entry, lifecycle, assignment, duplicates, "
+                      "lookup admin. Other capture sources adapt onto it later.",
                status_colour=RED)
 
     for i, (eid, lbl) in enumerate([("web", "Website form"), ("qr", "QR code"),

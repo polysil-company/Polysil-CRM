@@ -8,8 +8,8 @@ any endpoint change, so it is always current rather than a snapshot.
 | Module | Endpoints | Doc |
 |---|---|---|
 | Auth | 6 | [`auth.md`](auth.md) |
-| Leads | 3 | [`leads.md`](leads.md) |
-| Lookups | 4 | [`lookups.md`](lookups.md) |
+| Leads | 14 | [`leads.md`](leads.md) |
+| Lookups | 13 | [`lookups.md`](lookups.md) |
 
 ---
 

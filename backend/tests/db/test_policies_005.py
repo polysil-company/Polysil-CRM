@@ -218,18 +218,32 @@ async def test_a_user_cannot_purge_and_is_not_the_principal(db: AsyncSession,
     assert r.rowcount == 0
 
 
-async def test_the_outbox_is_written_by_anyone_and_read_by_the_principal_only(
+async def test_the_outbox_is_written_only_for_a_visible_lead_ack_and_read_by_the_principal_only(
         db: AsyncSession, ids: Fixtures) -> None:
+    """ISS-062, closed by 006. 005 let any authenticated caller queue any template
+    to any number. Now an ordinary caller may queue only a lead_ack for the mobile
+    of a lead they can see (the allowed case is in test_functions_006); anything
+    else is refused. The system principal writes anything and is the only reader."""
     me = await make_staff(db, ids, email=ids.unique("a") + "@polysil.in")
     await _as(db, me)
     recipient = "9199" + uuid.uuid4().hex[:8]
+    with pytest.raises(Exception, match="row-level security"):
+        async with db.begin_nested():
+            await db.execute(text(
+                "INSERT INTO notification_outbox (channel, template_key, recipient, payload) "
+                "VALUES ('sms', 'auth.otp', :r, '{}')"), {"r": recipient})
+    assert await _count(db, "SELECT count(*) FROM notification_outbox WHERE recipient = :r",
+                        r=recipient) == 0
+    # The principal writes anything, and is the only reader.
+    await db.execute(text("SELECT set_config('app.current_user_id', :u, true)"), {"u": SYSTEM_ID})
     await db.execute(text(
         "INSERT INTO notification_outbox (channel, template_key, recipient, payload) "
         "VALUES ('sms', 'auth.otp', :r, '{}')"), {"r": recipient})
-    assert await _count(db, "SELECT count(*) FROM notification_outbox") == 0
-    await db.execute(text("SELECT set_config('app.current_user_id', :u, true)"), {"u": SYSTEM_ID})
     assert await _count(db, "SELECT count(*) FROM notification_outbox WHERE recipient = :r",
                         r=recipient) == 1
+    await db.execute(text("SELECT set_config('app.current_user_id', :u, true)"), {"u": str(me)})
+    assert await _count(db, "SELECT count(*) FROM notification_outbox WHERE recipient = :r",
+                        r=recipient) == 0
 
 
 async def test_the_catalog_is_readable_and_not_writable_without_masters_edit(

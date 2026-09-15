@@ -42,6 +42,79 @@ The lead sources for the new-lead form's source picker.
 
 ---
 
+## `POST /api/v1/lookups/lead-sources`
+
+**Add Lead Source**
+
+Add a lead source. `quality` (0 to 1) is its factor in the priority score.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LookupCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
+| `name` | string | yes | Display name. |
+| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `PATCH /api/v1/lookups/lead-sources/{item_id}`
+
+**Edit Lead Source**
+
+Switch a source on or off, reorder it, or retune its quality factor.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `item_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LookupUpdate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `is_active` | boolean | null |  |  |
+| `sort_order` | integer | null |  |  |
+| `quality` | number | string | null |  | Sources only. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/lookups/lost-reasons`
 
 **Lost Reasons**
@@ -59,6 +132,79 @@ The active reasons a lead can be marked lost with.
 
 ---
 
+## `POST /api/v1/lookups/lost-reasons`
+
+**Add Lost Reason**
+
+Add a reason a lead can be marked lost with. `kind` defaults to lost.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LookupCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
+| `name` | string | yes | Display name. |
+| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `PATCH /api/v1/lookups/lost-reasons/{item_id}`
+
+**Edit Lost Reason**
+
+Switch a reason on or off, or reorder it. Names never change in place.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `item_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LookupUpdate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `is_active` | boolean | null |  |  |
+| `sort_order` | integer | null |  |  |
+| `quality` | number | string | null |  | Sources only. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/lookups/mis-systems`
 
 **Mis Systems**
@@ -72,6 +218,158 @@ The micro-irrigation systems for the new-lead form.
 | `200` | `Envelope_list_LookupItem__` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/lookups/mis-systems`
+
+**Add Mis System**
+
+Add a micro-irrigation system to the list.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LookupCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
+| `name` | string | yes | Display name. |
+| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `PATCH /api/v1/lookups/mis-systems/{item_id}`
+
+**Edit Mis System**
+
+Switch a system on or off.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `item_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LookupUpdate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `is_active` | boolean | null |  |  |
+| `sort_order` | integer | null |  |  |
+| `quality` | number | string | null |  | Sources only. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/lookups/partners`
+
+**Partners**
+
+The partner picker for assigning a lead to a channel partner. You see only
+the partners in your own scope: a dealer its subtree, a district manager the
+partners in its territories, an admin all of them.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `q` | query | string | null |  | Name or code substring. |
+| `limit` | query | integer |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_PartnerPick__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/lookups/scoring`
+
+**Get Scoring**
+
+The priority-score weights, caps and thresholds. Readable by anyone signed
+in; changed only with `masters.edit`.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_ScoringItem__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `PATCH /api/v1/lookups/scoring`
+
+**Patch Scoring**
+
+Retune the score. Send only the keys that change. Caps and hour bands must
+stay positive; weights must not be negative. Takes effect on the next score
+computation (the next create, transition, note, assign or reopen).
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`ScoringPatch`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `values` | object | yes | Keys to change, each with its new value. Unknown keys are refused. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_ScoringItem__` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
 
 ---
@@ -105,11 +403,29 @@ talukas by passing `parent_id`, or search by name with `q`.
 
 ## Models
 
+**`Envelope_LookupItem_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | LookupItem | yes |  |
+
 **`Envelope_list_LookupItem__`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | LookupItem[] | yes |  |
+
+**`Envelope_list_PartnerPick__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PartnerPick[] | yes |  |
+
+**`Envelope_list_ScoringItem__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | ScoringItem[] | yes |  |
 
 **`Envelope_list_TerritoryPick__`**
 
@@ -122,3 +438,27 @@ talukas by passing `parent_id`, or search by name with `q`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
+
+**`LookupCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
+| `name` | string | yes | Display name. |
+| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+
+**`LookupUpdate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `is_active` | boolean | null |  |  |
+| `sort_order` | integer | null |  |  |
+| `quality` | number | string | null |  | Sources only. |
+
+**`ScoringPatch`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `values` | object | yes | Keys to change, each with its new value. Unknown keys are refused. |

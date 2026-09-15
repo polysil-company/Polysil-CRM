@@ -152,7 +152,7 @@ async def test_me_returns_what_the_navigation_needs(
     # the order a permissions UI reads in, and it is what array_agg ORDER BY on
     # the enum column gives.
     assert me["permissions"] == [
-        {"module": "leads", "actions": ["view", "create"], "scope": "org_subtree"}
+        {"module": "leads", "actions": ["view", "create", "edit"], "scope": "org_subtree"}
     ]
 
 

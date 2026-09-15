@@ -87,6 +87,18 @@ async def run_idempotent(db: AsyncSession, *, key: str, user_id: str, route: str
     on two different endpoints is two records (round 4 recommendation). The caller
     has already passed authentication, require() and validation before this runs.
     """
+    # The session must be clean on entry (FS-003 4, cross-vendor R-2; ISS-070):
+    # begin_nested() flushes pending ORM state first, so an object added before
+    # this call would be written outside the savepoint and survive a replay or a
+    # business-4xx rollback. Core statements leave no session state, so this only
+    # catches the ORM case the spec names; a Core write before this call is a
+    # code-review matter. Being inside an outer savepoint is fine: nested
+    # savepoints compose, and the tests use one to stand in for the request.
+    sync = db.sync_session
+    if sync.new or sync.dirty or sync.deleted:
+        raise RuntimeError("run_idempotent must be called on a clean session: "
+                           "pending ORM state would be flushed outside the savepoint")
+
     reserved = (await db.execute(
         _RESERVE, {"k": key, "u": user_id, "r": route, "h": payload_hash}
     )).scalar_one_or_none()

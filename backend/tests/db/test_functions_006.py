@@ -8,6 +8,7 @@ this proves the guards, the grants, and the merge flatten.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import pytest
 from sqlalchemy import text
@@ -159,18 +160,133 @@ async def test_assignable_with_edit_sees_the_subtree(db: AsyncSession, ids: Fixt
 
 # ── lead_auto_owner ──────────────────────────────────────────────────────────
 
-async def test_auto_owner_picks_the_fewest_open_in_the_covering_unit(db: AsyncSession,
-                                                                    ids: Fixtures) -> None:
+async def _field_officer(db: AsyncSession, ids: Fixtures, email: str, role_id: Any) -> str:
+    return str((await db.execute(text(
+        "INSERT INTO app_user (user_type, email, password_hash, full_name, role_id, org_unit_id) "
+        "VALUES ('staff', :e, 'x', 'Officer', :r, :o) RETURNING id"),
+        {"e": email, "r": role_id, "o": ids.org_unit_id})).scalar_one())
+
+
+async def test_auto_owner_picks_the_field_officer_with_the_fewest_open_leads(
+        db: AsyncSession, ids: Fixtures) -> None:
+    """Rule 5: only field officers (role level 1) are candidates, then the one with
+    the fewest open leads. A district manager in the same covering unit, even with
+    no leads at all, is never picked (ISS-069)."""
     await _grant(db, ids.portal_role_id, "leads", ["create"], "partner_subtree")
-    # two field officers in the org unit that covers the fixture territory
-    busy = await make_staff(db, ids, email=ids.unique("busy") + "@polysil.in")
-    free = await make_staff(db, ids, email=ids.unique("free") + "@polysil.in")
+    fo_role = (await db.execute(text(
+        "INSERT INTO role (code, name, level) VALUES (:c, 'Field Officer', 1) RETURNING id"),
+        {"c": ids.unique("field_officer")})).scalar_one()
+    manager = await make_staff(db, ids, email=ids.unique("dm") + "@polysil.in")  # level 2
+    busy = await _field_officer(db, ids, ids.unique("busy") + "@polysil.in", fo_role)
+    free = await _field_officer(db, ids, ids.unique("free") + "@polysil.in", fo_role)
     await _lead(db, ids, owner_user_id=busy)   # busy has one open lead
     dealer_user = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
     await _as(db, dealer_user)
     picked = (await db.execute(text("SELECT lead_auto_owner(:t)"),
                                {"t": ids.territory_id})).scalar_one()
-    assert str(picked) == str(free), "the officer with the fewest open leads"
+    assert str(picked) == str(free), "the field officer with the fewest open leads"
+    assert str(picked) != str(manager)
+
+
+async def test_auto_owner_is_null_when_no_field_officer_covers(
+        db: AsyncSession, ids: Fixtures) -> None:
+    """A unit staffed only by a manager assigns nobody; the lead waits unassigned."""
+    await _grant(db, ids.portal_role_id, "leads", ["create"], "partner_subtree")
+    await make_staff(db, ids, email=ids.unique("dm") + "@polysil.in")
+    dealer_user = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    await _as(db, dealer_user)
+    picked = (await db.execute(text("SELECT lead_auto_owner(:t)"),
+                               {"t": ids.territory_id})).scalar_one()
+    assert picked is None
+
+
+# ── notification_outbox INSERT is narrowed (ISS-062) ─────────────────────────
+
+async def test_outbox_insert_admits_only_lead_ack_for_a_visible_lead(
+        db: AsyncSession, ids: Fixtures) -> None:
+    await _grant(db, ids.staff_role_id, "leads", ["view", "create", "edit"], "own")
+    me = await make_staff(db, ids, email=ids.unique("o") + "@polysil.in")
+    mine = await _lead(db, ids, owner_user_id=me)
+    mobile = (await db.execute(text("SELECT mobile FROM lead WHERE id = :i"),
+                               {"i": mine})).scalar_one()
+    await _as(db, me)
+    # allowed: the acknowledgement for a lead I can see
+    await db.execute(text(
+        "INSERT INTO notification_outbox (channel, template_key, recipient, payload) "
+        "VALUES ('whatsapp', 'lead_ack', :m, '{}')"), {"m": mobile})
+    # refused: any other template, and lead_ack to a number that is not a visible lead's
+    for template, to in (("anything_else", mobile), ("lead_ack", "+915550000000")):
+        with pytest.raises(Exception, match="row-level security"):
+            async with db.begin_nested():
+                await db.execute(text(
+                    "INSERT INTO notification_outbox (channel, template_key, recipient, payload) "
+                    "VALUES ('whatsapp', :t, :m, '{}')"), {"t": template, "m": to})
+
+
+# ── cross-vendor round: allocator width, deleted work, merge guards ──────────
+
+async def test_the_inquiry_number_grows_past_five_digits(db: AsyncSession, ids: Fixtures) -> None:
+    """lpad truncates a six-digit counter to five and the number collides with an
+    issued one (cross-vendor P2). Five digits is a minimum width, not a cap."""
+    await _grant(db, ids.staff_role_id, "leads", ["create"], "global")
+    me = await make_staff(db, ids, email=ids.unique("w") + "@polysil.in")
+    fy = uuid.uuid4().hex[:6]
+    await db.execute(text(
+        "INSERT INTO inquiry_counter (state_code, financial_year, last_value) "
+        "VALUES ('ZZ', :fy, 99999)"), {"fy": fy})
+    await _as(db, me)
+    got = (await db.execute(text("SELECT lead_allocate_inquiry_no('ZZ', :fy)"),
+                            {"fy": fy})).scalar_one()
+    assert got == f"POL/ZZ/{fy}/100000"
+
+
+async def test_auto_owner_ignores_soft_deleted_leads(db: AsyncSession, ids: Fixtures) -> None:
+    """A deleted lead is not open work (cross-vendor P2): two deleted leads lose to
+    one live lead."""
+    await _grant(db, ids.portal_role_id, "leads", ["create"], "partner_subtree")
+    fo_role = (await db.execute(text(
+        "INSERT INTO role (code, name, level) VALUES (:c, 'Field Officer', 1) RETURNING id"),
+        {"c": ids.unique("fo")})).scalar_one()
+    busy = await _field_officer(db, ids, ids.unique("busy") + "@polysil.in", fo_role)
+    free = await _field_officer(db, ids, ids.unique("free") + "@polysil.in", fo_role)
+    for _ in range(2):
+        lid = await _lead(db, ids, owner_user_id=busy)
+        await db.execute(text("UPDATE lead SET deleted_at = now() WHERE id = :i"), {"i": lid})
+    await _lead(db, ids, owner_user_id=free)
+    dealer_user = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    await _as(db, dealer_user)
+    picked = (await db.execute(text("SELECT lead_auto_owner(:t)"),
+                               {"t": ids.territory_id})).scalar_one()
+    assert str(picked) == str(busy), "zero live leads beats one, whatever was deleted"
+
+
+async def test_merge_refuses_a_partner_user_inside_the_function(
+        db: AsyncSession, ids: Fixtures) -> None:
+    """Staff only, enforced by the definer itself and not only by the route, since
+    the function is granted on its own (cross-vendor P1)."""
+    await _grant(db, ids.portal_role_id, "leads", ["view", "edit", "create"], "partner_subtree")
+    a = await _lead(db, ids, assigned_partner_id=ids.dealer_id)
+    b = await _lead(db, ids, assigned_partner_id=ids.dealer_id)
+    dealer_user = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    await _as(db, dealer_user)
+    with pytest.raises(Exception, match="only staff"):
+        async with db.begin_nested():
+            await db.execute(text("SELECT lead_merge(:l, :s)"), {"l": a, "s": b})
+
+
+async def test_merge_events_name_the_actor(db: AsyncSession, ids: Fixtures) -> None:
+    """The timeline names actors from payload.actor_name; the definer's two
+    lead.merged events carry it like every service-written event (cross-vendor P2)."""
+    await _grant(db, ids.staff_role_id, "leads", ["view", "edit"], "global")
+    me = await make_staff(db, ids, email=ids.unique("m") + "@polysil.in")
+    a = await _lead(db, ids)
+    b = await _lead(db, ids)
+    await _as(db, me)
+    await db.execute(text("SELECT lead_merge(:l, :s)"), {"l": a, "s": b})
+    names = {r[0] for r in (await db.execute(text(
+        "SELECT payload->>'actor_name' FROM activity_event "
+        "WHERE kind = 'lead.merged' AND lead_id IN (:a, :b)"), {"a": a, "b": b})).all()}
+    assert names == {"Asha Patel"}
 
 
 # ── lead_merge / lead_close_links ────────────────────────────────────────────

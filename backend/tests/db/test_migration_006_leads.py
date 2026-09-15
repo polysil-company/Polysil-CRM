@@ -104,6 +104,7 @@ async def test_the_inquiry_counter_is_owner_only(db: AsyncSession) -> None:
 @pytest.mark.parametrize("name", [
     "ix_lead_name_trgm", "ix_lead_created_keyset", "ix_lead_org_stage",
     "ix_lead_territory_stage", "uq_lead_external", "ix_lead_dup_b",
+    "ix_activity_event_lead",
 ])
 async def test_the_hand_indexes_exist(db: AsyncSession, name: str) -> None:
     n = (await db.execute(text(
@@ -119,3 +120,19 @@ async def test_the_masters_are_audited(db: AsyncSession) -> None:
             "SELECT count(*) FROM pg_trigger WHERE tgname = :t"),
             {"t": f"trg_{table}_audit"})).scalar_one()
         assert n == 1, f"{table} has no audit trigger"
+
+
+# ── bootstrap: the root org-unit anchor (FS-003 rule 4, ISS-067) ─────────────
+
+async def test_the_root_org_unit_anchor_is_seeded_once(db: AsyncSession) -> None:
+    """Settings names the anchor and 006 seeds it, so a lead in a territory no sales
+    unit covers routes to Polysil HQ rather than failing a foreign key."""
+    from api.config import get_settings
+
+    root = get_settings().root_org_unit_id
+    assert root, "config must name the anchor"
+    rows = (await db.execute(text(
+        "SELECT name, role_level, territory_id FROM org_unit WHERE id = CAST(:r AS uuid)"),
+        {"r": root})).all()
+    assert len(rows) == 1
+    assert rows[0].name == "Polysil HQ" and rows[0].role_level == 5 and rows[0].territory_id is None

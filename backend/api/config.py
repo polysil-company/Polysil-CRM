@@ -74,13 +74,13 @@ class Settings(BaseSettings):
     # its claim and re-validates the row on every job. Nothing looks it up by name.
     system_user_id: str = "26809c63-290b-5bd9-9d6a-a717dc0b32e3"  # uuid5(DNS, "polysil.system")
 
-    # FS-003 rule 4 (GAP-046). owner_org_unit_id is never user-supplied: it is the
-    # sales-line unit whose territory covers the lead's territory. When no such unit
-    # exists this named anchor catches the lead, so a marketing-entered or
-    # partner-entered lead is never invisible to admins. Unset on the dev box, where
-    # the covering-unit lookup always resolves against the seeded org tree; a lead
-    # whose territory has no covering unit and no anchor is a clean 422, not a 500.
-    root_org_unit_id: str | None = None
+    # FS-003 rule 4 (GAP-046, ISS-067). owner_org_unit_id is never user-supplied: it
+    # is the sales-line unit whose territory covers the lead's territory. When no
+    # such unit exists this named anchor catches the lead, so a marketing-entered or
+    # partner-entered lead is never invisible to admins. Migration 006 seeds the row
+    # under this stable id (Polysil HQ, role_level 5); a database without it would
+    # fail the insert's foreign key, which the bootstrap test guards against.
+    root_org_unit_id: str | None = "73f0fdc5-8adb-50e6-b1b9-04005fe9e2ea"  # uuid5(DNS, "polysil.hq")
 
     # PROJECT-OVERVIEW section 5: Caddy terminates TLS and calls the API over
     # loopback on the same box. So request.client.host is Caddy, not the caller,

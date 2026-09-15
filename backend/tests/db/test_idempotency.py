@@ -228,3 +228,30 @@ async def test_two_concurrent_calls_run_the_work_once(
     assert ran == ["w"], f"the work ran more than once: {ran}"
     assert out_w.body == {"data": "winner"}
     assert out_l.replayed and out_l.body == {"data": "winner"}
+
+
+async def test_refuses_a_session_with_pending_orm_state(db: AsyncSession, ids: Fixtures) -> None:
+    """ISS-070 (FS-003 4, cross-vendor R-2): begin_nested() flushes pending ORM state
+    first, so an object added before the call would land outside the savepoint and
+    survive a replay or a business-4xx rollback. The helper refuses loudly."""
+    import sqlalchemy as sa
+    from sqlalchemy.orm import DeclarativeBase, mapped_column
+
+    class _Base(DeclarativeBase):
+        pass
+
+    class _Pending(_Base):   # a throwaway mapping over an existing table; never flushed
+        __tablename__ = "mis_system"
+        id = mapped_column(sa.Uuid, primary_key=True)
+        code = mapped_column(sa.String)
+        name = mapped_column(sa.String)
+
+    me = await make_staff(db, ids, email=ids.unique("clean") + "@polysil.in")
+    await _as(db, me)
+    db.add(_Pending(id=uuid.uuid4(), code="pending", name="pending"))
+    try:
+        with pytest.raises(RuntimeError, match="clean session"):
+            await run_idempotent(db, key="k-dirty", user_id=str(me), route="r",
+                                 payload_hash="h", work=_work())
+    finally:
+        db.expunge_all()

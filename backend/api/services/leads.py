@@ -16,33 +16,51 @@ import base64
 import binascii
 import json
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.authz.modules import SPECS
 from api.authz.predicate import Caller, scope_predicate
 from api.config import get_settings
 from api.domain import leads as domain
-from api.errors import NotFoundError, ValidationFailed
+from api.errors import ForbiddenError, NotFoundError, StageChangedError, ValidationFailed
 from api.integrations.messages import TEMPLATE_LEAD_ACK
 from api.schemas.leads import (
+    Assignee,
+    DismissResult,
+    DuplicatePage,
+    DuplicatePair,
     DuplicateRef,
     Lead,
+    LeadAssign,
     LeadCreate,
+    LeadMerge,
+    LeadNote,
     LeadPage,
+    LeadPatch,
+    LeadReopen,
+    LeadTransition,
+    LookupCreate,
     LookupItem,
+    LookupUpdate,
     MergedRef,
     OrgUnitRef,
     PageMeta,
+    PartnerPick,
     PartnerRef,
     ReasonRef,
+    ScoringItem,
+    ScoringPatch,
     TerritoryParent,
     TerritoryPick,
     TerritoryRef,
+    TimelineEvent,
+    TimelinePage,
     UserRef,
 )
 
@@ -125,6 +143,56 @@ def _iso(v: datetime | None) -> str | None:
     return None if v is None else v.isoformat()
 
 
+async def _has_permission(db: AsyncSession, module: str, action: str) -> bool:
+    return bool((await db.execute(text("SELECT app_has_permission(:m, :a)"),
+                                  {"m": module, "a": action})).scalar_one())
+
+
+async def _actor_name(db: AsyncSession) -> str:
+    """The caller's display name, for `payload.actor_name`. Every lead event carries
+    it at write time so the timeline needs no lookup a field officer may not make
+    (FS-003 4, EC-4). The caller can always read their own app_user row."""
+    return (await db.execute(text(
+        "SELECT full_name FROM app_user WHERE id = (SELECT app_current_user_id())"))
+    ).scalar_one()
+
+
+async def _emit(db: AsyncSession, *, lead_id: Any, kind: str, actor_id: str,
+                actor_name: str, **payload: Any) -> Any:
+    """Write one lead activity_event and return its (id, occurred_at) row. actor_id
+    must be the caller (the INSERT policy checks it); actor_name goes in the payload."""
+    return (await db.execute(text(
+        "INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload) "
+        "VALUES ('lead', :id, :id, :kind, :me, CAST(:p AS jsonb)) RETURNING id, occurred_at"),
+        {"id": lead_id, "kind": kind, "me": actor_id,
+         "p": json.dumps({"actor_name": actor_name, **payload})})).one()
+
+
+async def _load_config(db: AsyncSession) -> dict[str, Decimal]:
+    return {k: Decimal(v) for k, v in (await db.execute(
+        text("SELECT key, value FROM lead_score_rule"))).all()}
+
+
+async def _rescore(db: AsyncSession, lead_id: Any) -> None:
+    """Recompute score and priority from the lead's current factors and its events
+    (rule 7). Called after any mutation that changes a factor: contact, note, reopen.
+    Runs under the leads UPDATE policy, which the caller already satisfies."""
+    row = (await db.execute(text(
+        "SELECT l.estimated_value, l.created_at, l.first_contacted_at, src.quality, "
+        "(SELECT count(*) FROM activity_event ae WHERE ae.lead_id = l.id "
+        " AND ae.kind <> 'lead.created') AS events "
+        "FROM lead l JOIN lead_source src ON src.id = l.lead_source_id WHERE l.id = :id"),
+        {"id": lead_id})).one()
+    score, priority = domain.score(
+        source_quality=Decimal(row.quality), estimated_value=row.estimated_value,
+        created_at=row.created_at, first_contacted_at=row.first_contacted_at,
+        event_count=int(row.events), config=await _load_config(db))
+    await db.execute(text(
+        "UPDATE lead SET score = :s, priority = CAST(:p AS lead_priority), "
+        "last_activity_at = now() WHERE id = :id"),
+        {"s": score, "p": priority, "id": lead_id})
+
+
 # ── create ───────────────────────────────────────────────────────────────────
 
 async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lead:
@@ -187,8 +255,7 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lea
 
     # 6. the score (rule 7): domain maths over lead_score_rule rows. On create there
     # is no contact yet and no events, so speed and engagement are zero.
-    config = {k: Decimal(v) for k, v in (await db.execute(
-        text("SELECT key, value FROM lead_score_rule"))).all()}
+    config = await _load_config(db)
     score, priority = domain.score(
         source_quality=Decimal(src.quality),
         estimated_value=body.estimated_value,
@@ -213,17 +280,14 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lea
     })).scalar_one()
 
     # 8. the event (CLAUDE.md rule 7, FS-003 rule 14). actor_id must be the caller:
-    # the activity_event INSERT policy checks it.
-    await db.execute(text(
-        "INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload) "
-        "VALUES ('lead', :id, :id, 'lead.created', :me, CAST(:p AS jsonb))"),
-        {"id": lead_id, "me": caller.user_id,
-         "p": json.dumps({"stage": "new", "source": source_code, "inquiry_no": inquiry_no})})
+    # the activity_event INSERT policy checks it. actor_name rides in the payload so
+    # the timeline needs no user lookup (rule 16, EC-4).
+    actor = await _actor_name(db)
+    await _emit(db, lead_id=lead_id, kind="lead.created", actor_id=caller.user_id,
+                actor_name=actor, stage="new", source=source_code, inquiry_no=inquiry_no)
     if body.note:
-        await db.execute(text(
-            "INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload) "
-            "VALUES ('lead', :id, :id, 'lead.note', :me, CAST(:p AS jsonb))"),
-            {"id": lead_id, "me": caller.user_id, "p": json.dumps({"note": body.note})})
+        await _emit(db, lead_id=lead_id, kind="lead.note_added", actor_id=caller.user_id,
+                    actor_name=actor, note=body.note)
 
     # 9. the acknowledgement, through the outbox (CLAUDE.md rule 6, FS-003 rule 17).
     # recipient is E.164 with the plus, the provider's form.
@@ -233,9 +297,17 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lea
         {"tk": TEMPLATE_LEAD_ACK, "to": mobile,
          "p": json.dumps({"farmer_name": body.farmer_name, "inquiry_no": inquiry_no})})
 
-    # GAP-059: duplicate detection on create (rule 6, AC-LEAD-3) is the duplicates
-    # slice. The response carries an empty list until then; the shape is final so
-    # adding it is additive.
+    # 10. duplicates (rule 6, AC-LEAD-3): flag, never block. The response lists the
+    # pending links whose other lead the caller can see.
+    await _detect_duplicates(db, caller, str(lead_id), mobile=mobile, email=body.email,
+                             farmer_name=body.farmer_name, village=body.village,
+                             territory_id=str(body.territory_id))
+    # 11. score again now that every contributing event is written: the create-time
+    # note and a duplicate flag count toward engagement (cross-vendor P2). The
+    # rescore is an UPDATE under the leads edit policy, so a create-only caller
+    # keeps the pre-event score rather than failing the whole create.
+    if await _has_permission(db, "leads", "edit"):
+        await _rescore(db, str(lead_id))
     return await get_lead(db, caller, str(lead_id))
 
 
@@ -400,6 +472,550 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef]) -> Lead:
         duplicates=duplicates)
 
 
+# ── lifecycle: transition, reopen, notes, timeline ───────────────────────────
+
+async def _lock(db: AsyncSession, lead_id: str) -> Any:
+    """SELECT ... FOR UPDATE under the leads UPDATE policy (rule 19). A caller who
+    may see the row but not edit it gets zero rows, which the caller treats as 404
+    after require('leads','edit') has already passed. Returns the locked row."""
+    return (await db.execute(text(
+        "SELECT stage::text AS stage, first_contacted_at, lost_from_stage::text AS lost_from, "
+        "lost_reason_id, lost_note, territory_id, owner_user_id, owner_org_unit_id, "
+        "assigned_partner_id, deleted_at FROM lead WHERE id = :id FOR UPDATE"),
+        {"id": lead_id})).one_or_none()
+
+
+async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
+                          body: LeadTransition) -> Lead:
+    """Move a lead along the lifecycle (rules 8-10). Validated against the stage the
+    row holds under the lock, not the one the caller saw."""
+    row = await _lock(db, lead_id)
+    if row is None:
+        raise NotFoundError("No such lead.")
+    current = row.stage
+    if body.expected_stage and body.expected_stage != current:
+        raise StageChangedError(f"The lead is now {current}.", fields={"stage": current})
+    if current in domain.TERMINAL:
+        raise ValidationFailed("This lead is closed and cannot change stage.",
+                               code="stage_terminal", fields={"stage": current})
+    if not domain.can_transition(current, body.to_stage):
+        raise ValidationFailed(f"A {current} lead cannot move to {body.to_stage}.",
+                               code="invalid_transition", fields={"to_stage": body.to_stage})
+    if body.to_stage in domain.REQUIRES_QUOTATION:
+        raise ValidationFailed(
+            "This stage needs an accepted quotation, which this release does not have yet.",
+            code="quotation_required", fields={"to_stage": body.to_stage})
+
+    payload: dict[str, Any] = {"from": current, "to": body.to_stage}
+    if body.to_stage == "lost":
+        if not body.lost_reason_id:
+            raise ValidationFailed(fields={"lost_reason_id": "a lost reason is required"})
+        ok = (await db.execute(text(
+            "SELECT 1 FROM won_lost_reason WHERE id = :r AND kind = 'lost' "
+            "AND is_active AND deleted_at IS NULL"), {"r": body.lost_reason_id})).first()
+        if not ok:
+            raise ValidationFailed(fields={"lost_reason_id": "not an active lost reason"})
+        payload.update(lost_reason_id=body.lost_reason_id, lost_note=body.lost_note)
+
+    actor = await _actor_name(db)
+    await _emit(db, lead_id=lead_id, kind="lead.stage_changed", actor_id=caller.user_id,
+                actor_name=actor, **payload)
+    await db.execute(text("""
+        UPDATE lead SET
+            stage = CAST(:to AS lead_stage),
+            first_contacted_at = COALESCE(first_contacted_at,
+                CASE WHEN :to = 'contacted' THEN now() END),
+            lost_reason_id = CASE WHEN :to = 'lost' THEN CAST(:lr AS uuid) ELSE lost_reason_id END,
+            lost_note = CASE WHEN :to = 'lost' THEN :ln ELSE lost_note END,
+            lost_from_stage = CASE WHEN :to = 'lost' THEN CAST(:frm AS lead_stage)
+                                   ELSE lost_from_stage END
+         WHERE id = :id"""),
+        {"to": body.to_stage, "lr": body.lost_reason_id, "ln": body.lost_note,
+         "frm": current, "id": lead_id})
+    await _rescore(db, lead_id)
+    return await get_lead(db, caller, lead_id)
+
+
+async def reopen_lead(db: AsyncSession, caller: Caller, lead_id: str,
+                      body: LeadReopen) -> Lead:
+    """Bring a lost lead back to the stage it was lost from (rule 11). The reason and
+    note move to the timeline and are cleared on the row; reopen_count goes up."""
+    row = await _lock(db, lead_id)
+    if row is None:
+        raise NotFoundError("No such lead.")
+    if row.stage != "lost":
+        raise ValidationFailed("Only a lost lead can be reopened.", code="stage_terminal",
+                               fields={"stage": row.stage})
+    target = row.lost_from or "new"
+    actor = await _actor_name(db)
+    await _emit(db, lead_id=lead_id, kind="lead.reopened", actor_id=caller.user_id,
+                actor_name=actor, **{"from": "lost", "to": target,
+                                     "lost_reason_id": str(row.lost_reason_id)
+                                     if row.lost_reason_id else None,
+                                     "lost_note": row.lost_note, "note": body.note})
+    await db.execute(text(
+        "UPDATE lead SET stage = CAST(:t AS lead_stage), lost_reason_id = NULL, "
+        "lost_note = NULL, reopen_count = reopen_count + 1 WHERE id = :id"),
+        {"t": target, "id": lead_id})
+    await _rescore(db, lead_id)
+    return await get_lead(db, caller, lead_id)
+
+
+async def add_note(db: AsyncSession, caller: Caller, lead_id: str,
+                   body: LeadNote) -> TimelineEvent:
+    """Append a note to a lead's timeline (rule 16). It bumps last_activity_at and
+    counts toward engagement, so the score is recomputed."""
+    if await _lock(db, lead_id) is None:
+        raise NotFoundError("No such lead.")
+    actor = await _actor_name(db)
+    ev = await _emit(db, lead_id=lead_id, kind="lead.note_added", actor_id=caller.user_id,
+                     actor_name=actor, note=body.note)
+    await _rescore(db, lead_id)
+    return TimelineEvent(id=str(ev.id), kind="lead.note_added", occurred_at=_iso(ev.occurred_at),
+                         actor=UserRef(id=caller.user_id, full_name=actor),
+                         payload={"actor_name": actor, "note": body.note})
+
+
+async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int = 100,
+                   cursor: str | None = None) -> TimelinePage:
+    """A lead's history, newest first, keyset-paged by (occurred_at, id). Reads
+    through lead_timeline(), a definer function that answers only for a visible lead
+    and folds in the events of any lead merged into this one (rule 16)."""
+    limit = max(1, min(limit, _MAX_LIMIT))
+    if not (await db.execute(text("SELECT lead_visible(:id)"), {"id": lead_id})).scalar_one():
+        raise NotFoundError("No such lead.")
+    before_at, before_id = (None, None)
+    if cursor:
+        before_at, before_id = _decode_cursor(cursor)
+    rows = (await db.execute(text(
+        "SELECT id, kind, occurred_at, actor_id, payload "
+        "FROM lead_timeline(:id, :bat, :bid, :lim)"),
+        {"id": lead_id, "bat": before_at, "bid": before_id, "lim": limit + 1})).all()
+
+    next_cursor = None
+    if len(rows) > limit:
+        last = rows[limit - 1]
+        next_cursor = _encode_cursor(last.occurred_at, str(last.id))
+        rows = rows[:limit]
+
+    events: list[TimelineEvent] = []
+    for r in rows:
+        payload = r.payload
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+        actor = None
+        if r.actor_id is not None:
+            actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name") or "")
+        events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso(r.occurred_at),
+                                    actor=actor, payload=payload or {}))
+    return TimelinePage(data=events, meta=PageMeta(limit=limit, next_cursor=next_cursor))
+
+
+# ── assignment (rule 12) ─────────────────────────────────────────────────────
+
+async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
+                      body: LeadAssign) -> Lead:
+    """Set the owner and/or the partner. A field left out is unchanged; a field sent
+    null is cleared. The owner check is authz_user_assignable() (the service cannot
+    read the target's app_user row); the partner is checked by authz_visible(), the
+    same function the parent-guard trigger enforces underneath (rule 12).
+
+    GAP-061: owner_org_unit_id is not re-routed to the new owner's own sales unit
+    (rule 4 path A), because reading that unit needs users.view the assigner lacks.
+    The lead keeps its current unit, which stays in the assigner's scope; the new
+    owner sees it by owner_user_id. A definer that returns the owner's unit closes
+    this later."""
+    row = await _lock(db, lead_id)
+    if row is None:
+        raise NotFoundError("No such lead.")
+    if row.stage in domain.TERMINAL:
+        raise ValidationFailed("This lead is closed and cannot be reassigned.",
+                               code="stage_terminal", fields={"stage": row.stage})
+    fields = body.model_fields_set
+    if not ({"owner_user_id", "assigned_partner_id"} & fields):
+        raise ValidationFailed(fields={"owner_user_id": "provide an owner or a partner"})
+
+    sets: list[str] = []
+    params: dict[str, Any] = {"id": lead_id}
+    payload: dict[str, Any] = {}
+    if "owner_user_id" in fields:
+        if body.owner_user_id is not None:
+            if caller.scopes.get("leads") not in ("global", "org_subtree"):
+                raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
+            ok = (await db.execute(text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
+                                   {"u": body.owner_user_id})).scalar_one()
+            if not ok:
+                raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
+        sets.append("owner_user_id = CAST(:owner AS uuid)")
+        params["owner"] = body.owner_user_id
+        payload["owner_user_id"] = body.owner_user_id
+    if "assigned_partner_id" in fields:
+        if body.assigned_partner_id is not None:
+            vis = (await db.execute(
+                text("SELECT authz_visible('channel_partner', CAST(:p AS uuid))"),
+                {"p": body.assigned_partner_id})).scalar_one()
+            if not vis:
+                raise ValidationFailed(fields={"assigned_partner_id": "not in your scope"})
+        sets.append("assigned_partner_id = CAST(:partner AS uuid)")
+        params["partner"] = body.assigned_partner_id
+        payload["assigned_partner_id"] = body.assigned_partner_id
+
+    await _emit(db, lead_id=lead_id, kind="lead.assigned", actor_id=caller.user_id,
+                actor_name=await _actor_name(db), **payload)
+    await db.execute(text(f"UPDATE lead SET {', '.join(sets)} WHERE id = :id"), params)
+    await _rescore(db, lead_id)
+    return await get_lead(db, caller, lead_id)
+
+
+async def assignees(db: AsyncSession, caller: Caller) -> list[Assignee]:
+    """The staff the caller may assign a lead to (rule 12). staff_directory() is a
+    definer read: all active staff for a global caller, the org subtree for
+    org_subtree, nobody otherwise. Names and org units only."""
+    rows = (await db.execute(text(
+        "SELECT sd.id, sd.full_name, sd.org_unit_id, ou.name AS org_name "
+        "FROM staff_directory('leads') sd LEFT JOIN org_unit ou ON ou.id = sd.org_unit_id "
+        "ORDER BY sd.full_name"))).all()
+    return [Assignee(id=str(r.id), full_name=r.full_name,
+                     org_unit=OrgUnitRef(id=str(r.org_unit_id), name=r.org_name)
+                     if r.org_unit_id else None) for r in rows]
+
+
+# ── edit and delete ──────────────────────────────────────────────────────────
+
+_PATCH_REQUIRED = frozenset({"farmer_name", "mobile", "territory_id", "inquiry_type",
+                             "mis_system", "source"})
+
+
+async def patch_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadPatch) -> Lead:
+    """Correct the lead's own fields (FS-003 4). Not the stage, owner or partner.
+    Required fields cannot be cleared, which is also the qualification gate: a
+    qualified lead can never lose one. A territory move re-routes the owning unit
+    (rule 4) and must keep the row in the caller's scope (stage 4)."""
+    row = await _lock(db, lead_id)
+    if row is None:
+        raise NotFoundError("No such lead.")
+    if row.stage in domain.TERMINAL:
+        raise ValidationFailed("This lead is closed and cannot be edited.",
+                               code="stage_terminal", fields={"stage": row.stage})
+    fields = body.model_fields_set
+    if not fields:
+        raise ValidationFailed(fields={"body": "nothing to change"})
+    for f in fields & _PATCH_REQUIRED:
+        if getattr(body, f) is None:
+            raise ValidationFailed(fields={f: "cannot be cleared"})
+
+    sets: list[str] = []
+    params: dict[str, Any] = {"id": lead_id}
+    changed: dict[str, Any] = {}
+
+    if "farmer_name" in fields:
+        sets.append("farmer_name = :farmer_name"); params["farmer_name"] = body.farmer_name
+        changed["farmer_name"] = body.farmer_name
+    if "mobile" in fields:
+        try:
+            mobile = domain.normalise_mobile(body.mobile or "")
+        except domain.MobileError as exc:
+            raise ValidationFailed(fields={"mobile": str(exc)}) from exc
+        sets.append("mobile = :mobile"); params["mobile"] = mobile; changed["mobile"] = mobile
+    if "email" in fields:
+        sets.append("email = :email"); params["email"] = body.email; changed["email"] = body.email
+    if "village" in fields:
+        sets.append("village = :village"); params["village"] = body.village
+        changed["village"] = body.village
+    if "inquiry_type" in fields:
+        sets.append("inquiry_type = CAST(:it AS inquiry_type)"); params["it"] = body.inquiry_type
+        changed["inquiry_type"] = body.inquiry_type
+    if "mis_system" in fields:
+        mis = (await db.execute(text(
+            "SELECT id FROM mis_system WHERE code = :c AND is_active AND deleted_at IS NULL"),
+            {"c": body.mis_system})).scalar_one_or_none()
+        if mis is None:
+            raise ValidationFailed(fields={"mis_system": "not an active system"})
+        sets.append("mis_system_id = :mis"); params["mis"] = mis; changed["mis_system"] = body.mis_system
+    if "source" in fields:
+        src = (await db.execute(text(
+            "SELECT id FROM lead_source WHERE code = :c AND is_active AND deleted_at IS NULL"),
+            {"c": body.source})).scalar_one_or_none()
+        if src is None:
+            raise ValidationFailed(fields={"source": "not an active source"})
+        sets.append("lead_source_id = :src"); params["src"] = src; changed["source"] = body.source
+    if "estimated_value" in fields:
+        sets.append("estimated_value = :est"); params["est"] = body.estimated_value
+        changed["estimated_value"] = _dec(body.estimated_value)
+
+    if "territory_id" in fields and body.territory_id != str(row.territory_id):
+        # Rule 4: with an owner the unit is the owner's (path A, kept as-is, GAP-061);
+        # with no owner it is routed by the new territory (path B).
+        new_oou = str(row.owner_org_unit_id)
+        if row.owner_user_id is None:
+            new_oou = await _covering_org_unit(db, body.territory_id)
+        await _assert_insert_in_scope(
+            db, caller, territory_id=body.territory_id,
+            owner_user_id=str(row.owner_user_id) if row.owner_user_id else None,
+            owner_org_unit_id=new_oou,
+            assigned_partner_id=str(row.assigned_partner_id) if row.assigned_partner_id else None)
+        sets.append("territory_id = CAST(:territory AS uuid)"); params["territory"] = body.territory_id
+        changed["territory_id"] = body.territory_id
+        if new_oou != str(row.owner_org_unit_id):
+            sets.append("owner_org_unit_id = CAST(:oou AS uuid)"); params["oou"] = new_oou
+
+    if not sets:
+        return await get_lead(db, caller, lead_id)   # nothing actually changed
+
+    await _emit(db, lead_id=lead_id, kind="lead.updated", actor_id=caller.user_id,
+                actor_name=await _actor_name(db), changed=changed)
+    await db.execute(text(f"UPDATE lead SET {', '.join(sets)} WHERE id = :id"), params)
+    # Rule 6: an identity change re-runs duplicate detection on the row as it now is.
+    if changed.keys() & {"mobile", "farmer_name", "village", "email", "territory_id"}:
+        cur = (await db.execute(text(
+            "SELECT mobile, email, farmer_name, village, territory_id FROM lead WHERE id = :id"),
+            {"id": lead_id})).one()
+        await _detect_duplicates(db, caller, lead_id, mobile=cur.mobile, email=cur.email,
+                                 farmer_name=cur.farmer_name, village=cur.village,
+                                 territory_id=str(cur.territory_id))
+    # Score after every contributing event, a duplicate flag included (cross-vendor P2).
+    await _rescore(db, lead_id)
+    return await get_lead(db, caller, lead_id)
+
+
+async def delete_lead(db: AsyncSession, caller: Caller, lead_id: str) -> None:
+    """Soft delete (rule 18, 21). Needs leads.delete: the restrictive soft-delete
+    policy is checked against the updated row, so an edit-only caller gets 42501
+    (ISS-065). Its pending duplicate links, hidden ones included, are closed by
+    lead_close_links() so nobody's queue holds a pair they cannot act on (EC-15).
+    Already deleted is a no-op."""
+    row = await _lock(db, lead_id)
+    if row is None:
+        raise NotFoundError("No such lead.")
+    if row.deleted_at is not None:
+        return
+    await db.execute(text("SELECT lead_close_links(CAST(:id AS uuid), 'dismissed')"),
+                     {"id": lead_id})
+    await _emit(db, lead_id=lead_id, kind="lead.deleted", actor_id=caller.user_id,
+                actor_name=await _actor_name(db))
+    await db.execute(text("UPDATE lead SET deleted_at = now() WHERE id = :id"), {"id": lead_id})
+
+
+# ── duplicates (rules 6 and 13) ──────────────────────────────────────────────
+
+_NAME_GEO_THRESHOLD = 0.6   # GAP-047: an assumption until the client tunes it
+
+
+async def _detect_duplicates(db: AsyncSession, caller: Caller, lead_id: str, *, mobile: str,
+                             email: str | None, farmer_name: str, village: str | None,
+                             territory_id: str) -> None:
+    """Flag pending links to leads that look like this one (rule 6): exact mobile,
+    exact email, or name plus village by trigram within the same district, among
+    leads neither merged nor deleted. Runs under the caller's read scope, so only
+    visible candidates are found, which is exactly what the link policy admits.
+    Never blocks the write. Writing a link needs leads.edit; without it nothing is
+    flagged rather than the whole request failing with 42501."""
+    if not await _has_permission(db, "leads", "edit"):
+        return
+    matches: dict[str, tuple[str, Decimal]] = {}
+    for r in (await db.execute(text(
+            "SELECT id FROM lead WHERE id <> CAST(:me AS uuid) AND mobile = :m "
+            "AND stage <> 'merged' AND deleted_at IS NULL"),
+            {"me": lead_id, "m": mobile})).all():
+        matches.setdefault(str(r.id), ("mobile", Decimal("1.00")))
+    if email:
+        for r in (await db.execute(text(
+                "SELECT id FROM lead WHERE id <> CAST(:me AS uuid) AND email = :e "
+                "AND stage <> 'merged' AND deleted_at IS NULL"),
+                {"me": lead_id, "e": email})).all():
+            matches.setdefault(str(r.id), ("email", Decimal("1.00")))
+    district = (await db.execute(text(
+        "SELECT t.id FROM territory_closure tc JOIN territory t ON t.id = tc.ancestor_id "
+        "WHERE tc.descendant_id = CAST(:tid AS uuid) AND t.level = 'district' "
+        "ORDER BY tc.depth LIMIT 1"), {"tid": territory_id})).scalar_one_or_none()
+    if district is not None:
+        nv = f"{farmer_name} {village or ''}".strip()
+        for r in (await db.execute(text(
+                "SELECT id, similarity(farmer_name || ' ' || coalesce(village, ''), :nv) AS sim "
+                "FROM lead WHERE id <> CAST(:me AS uuid) AND stage <> 'merged' "
+                "AND deleted_at IS NULL "
+                "AND territory_id IN (SELECT descendant_id FROM territory_closure "
+                "                     WHERE ancestor_id = :d) "
+                "AND similarity(farmer_name || ' ' || coalesce(village, ''), :nv) >= :th"),
+                {"nv": nv, "me": lead_id, "d": district, "th": _NAME_GEO_THRESHOLD})).all():
+            matches.setdefault(str(r.id), ("name_geo", Decimal(str(round(float(r.sim), 2)))))
+    if not matches:
+        return
+    for other, (signal, score) in matches.items():
+        await db.execute(text(
+            "INSERT INTO lead_duplicate_link (lead_a_id, lead_b_id, signal, score, state, created_by) "
+            "VALUES (least(CAST(:x AS uuid), CAST(:y AS uuid)), "
+            "        greatest(CAST(:x AS uuid), CAST(:y AS uuid)), "
+            "        CAST(:s AS lead_dup_signal), :sc, 'pending', CAST(:me AS uuid)) "
+            "ON CONFLICT (lead_a_id, lead_b_id) DO NOTHING"),
+            {"x": lead_id, "y": other, "s": signal, "sc": score, "me": caller.user_id})
+    await _emit(db, lead_id=lead_id, kind="lead.duplicate_flagged", actor_id=caller.user_id,
+                actor_name=await _actor_name(db),
+                matches=[{"lead_id": o, "signal": s, "score": str(sc)}
+                         for o, (s, sc) in matches.items()])
+
+
+async def duplicates(db: AsyncSession, caller: Caller, *, limit: int = 50,
+                     cursor: str | None = None) -> DuplicatePage:
+    """The review queue: pending pairs where both leads are in scope (the link
+    policy), newest first, keyset-paged by (created_at, id)."""
+    limit = max(1, min(limit, _MAX_LIMIT))
+    where = ["dl.state = 'pending'"]
+    params: dict[str, Any] = {"lim": limit + 1}
+    if cursor:
+        c_ts, c_id = _decode_cursor(cursor)
+        where.append("(dl.created_at, dl.id) < (CAST(:cts AS timestamptz), CAST(:cid AS uuid))")
+        params.update(cts=c_ts, cid=c_id)
+    links = (await db.execute(text(
+        "SELECT dl.id, dl.signal, dl.score, dl.state, dl.created_at, dl.lead_a_id, dl.lead_b_id "
+        f"FROM lead_duplicate_link dl WHERE {' AND '.join(where)} "
+        "ORDER BY dl.created_at DESC, dl.id DESC LIMIT :lim"), params)).all()
+    next_cursor = None
+    if len(links) > limit:
+        last = links[limit - 1]
+        next_cursor = _encode_cursor(last.created_at, str(last.id))
+        links = links[:limit]
+    if not links:
+        return DuplicatePage(data=[], meta=PageMeta(limit=limit, next_cursor=None))
+    ids = list({str(x) for r in links for x in (r.lead_a_id, r.lead_b_id)})
+    rows = (await db.execute(text(_LEAD_SELECT + " WHERE l.id = ANY(:ids)"), {"ids": ids})).all()
+    by_id = {str(r.id): _row_to_lead(r, duplicates=[]) for r in rows}
+    pairs = [DuplicatePair(link_id=str(r.id), signal=r.signal, score=_dec(r.score), state=r.state,
+                           created_at=_iso(r.created_at) or "",
+                           lead_a=by_id[str(r.lead_a_id)], lead_b=by_id[str(r.lead_b_id)])
+             for r in links if str(r.lead_a_id) in by_id and str(r.lead_b_id) in by_id]
+    return DuplicatePage(data=pairs, meta=PageMeta(limit=limit, next_cursor=next_cursor))
+
+
+async def dismiss_duplicate(db: AsyncSession, caller: Caller, link_id: str) -> DismissResult:
+    """Mark a pending pair as not a duplicate. The link's UPDATE policy needs both
+    leads visible and leads.edit; zero rows is 404."""
+    row = (await db.execute(text(
+        "UPDATE lead_duplicate_link SET state = 'dismissed', resolved_by = CAST(:me AS uuid), "
+        "resolved_at = now() WHERE id = CAST(:id AS uuid) AND state = 'pending' "
+        "RETURNING lead_a_id, lead_b_id"), {"me": caller.user_id, "id": link_id})).one_or_none()
+    if row is None:
+        raise NotFoundError("No such pending duplicate pair.")
+    actor = await _actor_name(db)
+    for lid in (row.lead_a_id, row.lead_b_id):
+        await _emit(db, lead_id=lid, kind="lead.duplicate_dismissed", actor_id=caller.user_id,
+                    actor_name=actor, link_id=link_id)
+    return DismissResult(link_id=link_id)
+
+
+async def merge_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadMerge) -> Lead:
+    """Merge this lead (the loser) into the survivor (rule 13). Staff only. The work
+    is lead_merge(), one guarded definer step, because it must touch links and
+    merged leads the caller cannot see; its own errors carry custom SQLSTATEs that
+    are mapped here."""
+    if caller.partner_id is not None:
+        raise ForbiddenError("Only staff can merge leads.")
+    if body.into_lead_id == lead_id:
+        raise ValidationFailed("A lead cannot merge into itself.", code="merge_self",
+                               fields={"into_lead_id": "same lead"})
+    if await _lock(db, lead_id) is None:
+        raise NotFoundError("No such lead.")
+    try:
+        await db.execute(text("SELECT lead_merge(CAST(:loser AS uuid), CAST(:surv AS uuid))"),
+                         {"loser": lead_id, "surv": body.into_lead_id})
+    except DBAPIError as exc:
+        code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        if code == "LEADN":
+            raise NotFoundError("No such lead.") from exc
+        if code == "LEADT":
+            raise ValidationFailed("A won, lost or merged lead cannot be merged.",
+                                   code="merge_terminal", fields={"stage": "terminal"}) from exc
+        if code == "LEADM":
+            raise ValidationFailed("A lead cannot merge into itself.", code="merge_self") from exc
+        raise
+    return await get_lead(db, caller, body.into_lead_id)
+
+
+# ── lookup admin (rule 23; masters.edit) ─────────────────────────────────────
+#
+# The table name is one of these three constants chosen by the route, never
+# caller input, so it is safe to interpolate. Every write is audited by the
+# audit_row() trigger; rows are added and switched off, never renamed or deleted.
+_LOOKUP_COLS: dict[str, frozenset[str]] = {
+    "lead_source": frozenset({"sort_order", "quality"}),
+    "mis_system": frozenset(),
+    "won_lost_reason": frozenset({"sort_order", "kind"}),
+}
+
+
+async def create_lookup(db: AsyncSession, table: str, body: LookupCreate) -> LookupItem:
+    extra = _LOOKUP_COLS[table]
+    cols, vals, params = ["code", "name"], [":code", ":name"], {"code": body.code, "name": body.name}
+    if "sort_order" in extra and body.sort_order is not None:
+        cols.append("sort_order"); vals.append(":so"); params["so"] = body.sort_order
+    if "quality" in extra and body.quality is not None:
+        cols.append("quality"); vals.append(":q"); params["q"] = body.quality
+    if "kind" in extra:
+        cols.append("kind"); vals.append("CAST(:kind AS won_lost_kind)")
+        params["kind"] = body.kind or "lost"
+    try:
+        r = (await db.execute(text(
+            f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(vals)}) "
+            "RETURNING id, code, name, is_active"), params)).one()
+    except DBAPIError as exc:
+        if (getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)) == "23505":
+            raise ValidationFailed(fields={"code": "already exists"}) from exc
+        raise
+    return LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
+
+
+async def update_lookup(db: AsyncSession, table: str, item_id: str,
+                        body: LookupUpdate) -> LookupItem:
+    extra = _LOOKUP_COLS[table]
+    fields = body.model_fields_set
+    sets: list[str] = []
+    params: dict[str, Any] = {"id": item_id}
+    if "is_active" in fields and body.is_active is not None:
+        sets.append("is_active = :active"); params["active"] = body.is_active
+    if "sort_order" in fields and "sort_order" in extra and body.sort_order is not None:
+        sets.append("sort_order = :so"); params["so"] = body.sort_order
+    if "quality" in fields and "quality" in extra and body.quality is not None:
+        sets.append("quality = :q"); params["q"] = body.quality
+    if not sets:
+        raise ValidationFailed(fields={"body": "nothing to change"})
+    r = (await db.execute(text(
+        f"UPDATE {table} SET {', '.join(sets)} WHERE id = CAST(:id AS uuid) "
+        "RETURNING id, code, name, is_active"), params)).one_or_none()
+    if r is None:
+        raise NotFoundError("No such row.")
+    return LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
+
+
+# Caps and hour bands must stay positive or the score divides by zero (rule 7).
+_SCORING_POSITIVE = frozenset({"value_cap", "engagement_cap", "speed_fast_hours",
+                               "speed_slow_hours"})
+
+
+async def get_scoring(db: AsyncSession) -> list[ScoringItem]:
+    rows = (await db.execute(text("SELECT key, value FROM lead_score_rule ORDER BY key"))).all()
+    return [ScoringItem(key=r.key, value=str(r.value)) for r in rows]
+
+
+async def patch_scoring(db: AsyncSession, body: ScoringPatch) -> list[ScoringItem]:
+    known = {r.key for r in (await db.execute(text("SELECT key FROM lead_score_rule"))).all()}
+    # Validate what will be stored, not what was sent: the column is numeric(12,2),
+    # so "0.001" passes a raw positive check and lands as 0.00, after which every
+    # score divides by zero (cross-vendor P2). Half-up matches Postgres rounding.
+    stored = {k: v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+              for k, v in body.values.items()}
+    bad = {k: "unknown key" for k in stored if k not in known}
+    for k, v in stored.items():
+        if k in known and (v <= 0 if k in _SCORING_POSITIVE else v < 0):
+            bad[k] = ("must be positive (at two decimal places)" if k in _SCORING_POSITIVE
+                      else "must not be negative")
+    if bad:
+        raise ValidationFailed(fields=bad)
+    for k, v in stored.items():
+        await db.execute(text("UPDATE lead_score_rule SET value = :v WHERE key = :k"),
+                         {"v": v, "k": k})
+    return await get_scoring(db)
+
+
 # ── list ─────────────────────────────────────────────────────────────────────
 
 _MAX_LIMIT = 100
@@ -536,6 +1152,28 @@ async def list_lost_reasons(db: AsyncSession) -> list[LookupItem]:
         "WHERE kind = 'lost' AND deleted_at IS NULL ORDER BY sort_order, name"))).all()
     return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
             for r in rows]
+
+
+async def list_partners(db: AsyncSession, *, q: str | None = None,
+                        limit: int = 50) -> list[PartnerPick]:
+    """The partner picker for assignment (FS-003 4). channel_partner's own policies
+    scope it: a dealer sees its subtree, a manager the partners in its territories,
+    an admin all. q matches the name or the code."""
+    limit = max(1, min(limit, _MAX_LIMIT))
+    like = _contains(q) if q else None
+    rows = (await db.execute(text("""
+        SELECT cp.id, cp.code, cp.name, cp.partner_type::text AS ptype,
+               t.id AS tid, t.name AS tname, t.level::text AS tlevel
+          FROM channel_partner cp
+          LEFT JOIN territory t ON t.id = cp.territory_id
+         WHERE cp.is_active AND cp.deleted_at IS NULL
+           AND (CAST(:like AS text) IS NULL
+                OR cp.name ILIKE CAST(:like AS text) OR cp.code ILIKE CAST(:like AS text))
+         ORDER BY cp.name LIMIT :lim"""), {"like": like, "lim": limit})).all()
+    return [PartnerPick(
+        id=str(r.id), code=r.code, name=r.name, partner_type=r.ptype,
+        territory=TerritoryParent(id=str(r.tid), name=r.tname, level=r.tlevel) if r.tid else None)
+        for r in rows]
 
 
 async def list_territories(db: AsyncSession, *, level: str | None = None,

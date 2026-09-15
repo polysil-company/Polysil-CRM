@@ -17,6 +17,10 @@ Stage = Literal["new", "contacted", "qualified", "quoted", "negotiation",
                 "won", "lost", "merged", "dormant"]
 Priority = Literal["hot", "warm", "cold"]
 
+# Every id the client sends is validated to this shape, so a malformed id is a
+# 422 with the envelope rather than a driver error and a 500 (cross-vendor P2).
+UUID_RE = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+
 
 class LeadCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -29,7 +33,7 @@ class LeadCreate(BaseModel):
         examples=["9876543210"])]
     email: Annotated[str | None, Field(default=None, max_length=254,
         description="Optional. Used for duplicate matching.")]
-    territory_id: Annotated[str, Field(
+    territory_id: Annotated[str, Field(pattern=UUID_RE,
         description="The taluka or district the farmer is in, from GET /lookups/territories.")]
     village: Annotated[str | None, Field(default=None, max_length=200,
         description="Optional. Used for duplicate matching.")]
@@ -154,6 +158,18 @@ class TerritoryParent(BaseModel):
     level: str
 
 
+class PartnerPick(BaseModel):
+    """A row of GET /lookups/partners, for the partner picker on assign. Only the
+    partners you can see: a dealer its own subtree, a district manager the
+    partners in its territories, an admin all of them."""
+
+    id: str
+    code: str
+    name: str
+    partner_type: str = Field(description="distributor, dealer or sub_dealer.")
+    territory: TerritoryParent | None = None
+
+
 class TerritoryPick(BaseModel):
     """A row of GET /lookups/territories, for the territory picker on the new-lead form."""
 
@@ -162,3 +178,168 @@ class TerritoryPick(BaseModel):
     level: str = Field(description="state, district, taluka or village.")
     code: str | None = None
     parent: TerritoryParent | None = None
+
+
+# ── lifecycle ────────────────────────────────────────────────────────────────
+
+TransitionTarget = Literal["contacted", "qualified", "quoted", "negotiation", "won", "lost"]
+
+
+class LeadTransition(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    to_stage: Annotated[TransitionTarget, Field(
+        description="The stage to move to. Only the moves the lifecycle allows are "
+        "accepted; anything else is 422 invalid_transition.")]
+    lost_reason_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
+        description="Required when to_stage is lost: an active reason from "
+        "GET /lookups/lost-reasons.")]
+    lost_note: Annotated[str | None, Field(default=None, max_length=2000,
+        description="Optional free text kept with a lost lead and on its timeline.")]
+    expected_stage: Annotated[str | None, Field(default=None,
+        description="Optional. If given and the lead has already moved past it, the "
+        "call is refused with 409 stage_changed rather than acting on a stale view.")]
+
+
+class LeadReopen(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    note: Annotated[str | None, Field(default=None, max_length=2000,
+        description="Optional. Why the lead is being reopened; kept on the timeline.")]
+
+
+class LeadNote(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    note: Annotated[str, Field(min_length=1, max_length=2000,
+        description="The note text. Becomes a timeline entry and bumps the lead's "
+        "last-activity time.")]
+
+
+class TimelineEvent(BaseModel):
+    """One entry on a lead's timeline. `actor` is who did it; `payload` carries the
+    event's own detail (the stage change, the note text, and so on)."""
+
+    id: str
+    kind: str = Field(description="e.g. lead.created, lead.stage_changed, lead.note_added.")
+    occurred_at: str
+    actor: UserRef | None = Field(default=None, description="Who caused the event, if known.")
+    payload: dict[str, object] = Field(default_factory=dict)
+
+
+class TimelinePage(BaseModel):
+    data: list[TimelineEvent]
+    meta: PageMeta
+
+
+# ── assignment ───────────────────────────────────────────────────────────────
+
+class LeadAssign(BaseModel):
+    """Give the lead an owner, a partner, or both. A field sent as null clears it;
+    a field left out is unchanged. At least one must be sent."""
+
+    owner_user_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
+        description="A staff user from GET /leads/assignees, or null to unassign.")]
+    assigned_partner_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
+        description="A channel partner from GET /lookups/partners, or null to clear.")]
+
+
+class Assignee(BaseModel):
+    id: str
+    full_name: str
+    org_unit: OrgUnitRef | None = None
+
+
+# ── edit ─────────────────────────────────────────────────────────────────────
+
+class LeadPatch(BaseModel):
+    """Correct the lead's own fields. Send only what changes: a field left out is
+    unchanged. email, village and estimated_value may be sent null to clear them;
+    the others are required on a lead and cannot be cleared. The stage, owner and
+    partner have their own endpoints."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    farmer_name: Annotated[str | None, Field(default=None, min_length=1, max_length=200)]
+    mobile: Annotated[str | None, Field(default=None,
+        description="Any Indian form; stored as +91XXXXXXXXXX.")]
+    email: Annotated[str | None, Field(default=None, max_length=254)]
+    territory_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
+        description="Moving the lead re-routes its owning org unit; it must stay in your scope.")]
+    village: Annotated[str | None, Field(default=None, max_length=200)]
+    inquiry_type: InquiryType | None = None
+    mis_system: Annotated[str | None, Field(default=None, description="A code from the lookup.")]
+    source: Annotated[str | None, Field(default=None, description="A code from the lookup.")]
+    estimated_value: Annotated[Decimal | None, Field(default=None, ge=0,
+        description="Decimal string. Feeds the priority score.")]
+
+
+# ── duplicates ───────────────────────────────────────────────────────────────
+
+class DuplicatePair(BaseModel):
+    """A pending pair in the review queue. Both leads are in your scope; that is
+    the link table's own rule, so a pair never names a lead you could not open."""
+
+    link_id: str
+    signal: Literal["mobile", "email", "name_geo"] = Field(
+        description="What matched: the mobile, the email, or name plus village nearby.")
+    score: str | None = Field(default=None, description="Match strength, a decimal string.")
+    state: Literal["pending", "merged", "dismissed"]
+    created_at: str
+    lead_a: Lead
+    lead_b: Lead
+
+
+class DuplicatePage(BaseModel):
+    data: list[DuplicatePair]
+    meta: PageMeta
+
+
+class DismissResult(BaseModel):
+    link_id: str
+    state: Literal["dismissed"] = "dismissed"
+
+
+class LeadMerge(BaseModel):
+    into_lead_id: Annotated[str, Field(pattern=UUID_RE,
+        description="The survivor. This lead becomes its merged loser and keeps pointing at it.")]
+
+
+# ── lookup admin (masters.edit) ──────────────────────────────────────────────
+
+class LookupCreate(BaseModel):
+    """Add a row to a lookup list. Rows are added and switched off, never renamed
+    or deleted: a lead keeps the reason it was lost with (ADR-033)."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    code: Annotated[str, Field(min_length=1, max_length=50, pattern=r"^[a-z0-9_]+$",
+        description="Stable machine code, lowercase with underscores. Cannot change later.")]
+    name: Annotated[str, Field(min_length=1, max_length=100, description="Display name.")]
+    sort_order: Annotated[int | None, Field(default=None,
+        description="Sources and reasons only. Lower sorts first.")]
+    quality: Annotated[Decimal | None, Field(default=None, ge=0, le=1,
+        description="Sources only. The source-quality factor in the score, 0 to 1.")]
+    kind: Annotated[Literal["won", "lost"] | None, Field(default=None,
+        description="Reasons only. Defaults to lost.")]
+
+
+class LookupUpdate(BaseModel):
+    """Switch a row on or off, or reorder it. Names are never edited in place."""
+
+    is_active: bool | None = None
+    sort_order: int | None = None
+    quality: Annotated[Decimal | None, Field(default=None, ge=0, le=1,
+        description="Sources only.")]
+
+
+class ScoringItem(BaseModel):
+    key: str = Field(description="w_source, w_value, w_speed, w_engagement, value_cap, "
+                     "speed_fast_hours, speed_slow_hours, engagement_cap, threshold_hot, "
+                     "threshold_warm.")
+    value: str = Field(description="Decimal string.")
+
+
+class ScoringPatch(BaseModel):
+    values: dict[str, Decimal] = Field(
+        description="Keys to change, each with its new value. Unknown keys are refused.")

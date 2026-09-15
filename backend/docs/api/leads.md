@@ -117,6 +117,108 @@ the stored `201` and creates nothing; the same key with a different body is
 
 ---
 
+## `GET /api/v1/leads/assignees`
+
+**List Assignees**
+
+The owner picker: the staff you may assign a lead to. Every active staff user
+for a global assigner, your own org subtree for a district manager, nobody for
+other scopes. Names and org units only, no contact details.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_Assignee__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/leads/duplicates`
+
+**Duplicate Queue**
+
+The duplicate review queue: pending pairs where both leads are in your
+scope, newest first. From here, dismiss a pair or merge one lead into the other.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `limit` | query | integer |  |  |
+| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `DuplicatePage` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/leads/duplicates/{link_id}/dismiss`
+
+**Dismiss Duplicate**
+
+Mark a duplicate pair as not a duplicate. Both leads stay as they are; the
+pair leaves the queue and both timelines record the dismissal.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `link_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_DismissResult_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `DELETE /api/v1/leads/{lead_id}`
+
+**Delete**
+
+Soft-delete a lead. Needs the `leads.delete` permission. Afterwards the lead
+is hidden from everyone without that permission, and its pending duplicate
+pairs are closed so no one's review queue holds an entry they cannot act on.
+Always `204`, including on a repeat.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `204` | - | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/leads/{lead_id}`
 
 **Get Lead**
@@ -145,7 +247,294 @@ Every key is always present; `null` means "not set", never "not visible".
 
 ---
 
+## `PATCH /api/v1/leads/{lead_id}`
+
+**Patch**
+
+Correct the lead's own fields. Send only what changes; a field left out is
+unchanged. email, village and estimated_value may be sent null to clear them.
+The stage, owner and partner have their own endpoints so the timeline names
+the change. A closed lead (won, lost, merged) is `422 stage_terminal`.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LeadPatch`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `farmer_name` | string | null |  |  |
+| `mobile` | string | null |  | Any Indian form; stored as +91XXXXXXXXXX. |
+| `email` | string | null |  |  |
+| `territory_id` | string | null |  | Moving the lead re-routes its owning org unit; it must stay in your scope. |
+| `village` | string | null |  |  |
+| `inquiry_type` | `commercial` | `subsidised` | `industrial` | null |  |  |
+| `mis_system` | string | null |  | A code from the lookup. |
+| `source` | string | null |  | A code from the lookup. |
+| `estimated_value` | number | string | null |  | Decimal string. Feeds the priority score. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Lead_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/leads/{lead_id}/assign`
+
+**Assign**
+
+Give the lead an owner, a partner, or both.
+
+Who you may name depends on your scope: a global assigner may pick any active
+staff user, a district manager only someone in their own org subtree, and
+other scopes cannot set an owner at all. The partner must be one you can see.
+Send a field as `null` to clear it; leave it out to keep it.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LeadAssign`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `owner_user_id` | string | null |  | A staff user from GET /leads/assignees, or null to unassign. |
+| `assigned_partner_id` | string | null |  | A channel partner from GET /lookups/partners, or null to clear. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Lead_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/leads/{lead_id}/merge`
+
+**Merge**
+
+Merge this lead (the loser) into another (the survivor). Staff only.
+
+The loser is marked merged and points at the survivor; every pending
+duplicate pair of the loser is re-pointed at the survivor or closed; the
+survivor's timeline gains the loser's history. Returns the survivor. Neither
+lead may be won, lost or already merged (`422 merge_terminal`), and a lead
+cannot merge into itself (`422 merge_self`).
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LeadMerge`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `into_lead_id` | string | yes | The survivor. This lead becomes its merged loser and keeps pointing at it. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Lead_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/leads/{lead_id}/notes`
+
+**Add Note**
+
+Add a note to a lead. It becomes a timeline entry and bumps the lead's
+last-activity time. Returns the created event.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LeadNote`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `note` | string | yes | The note text. Becomes a timeline entry and bumps the lead's last-activity time. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_TimelineEvent_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/leads/{lead_id}/reopen`
+
+**Reopen**
+
+Bring a lost lead back. It returns to the stage it was lost from, its lost
+reason and note move to the timeline, and its reopen count goes up. Only a lost
+lead can be reopened; anything else is `422 stage_terminal`.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LeadReopen`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `note` | string | null |  | Optional. Why the lead is being reopened; kept on the timeline. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Lead_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/leads/{lead_id}/timeline`
+
+**Get Timeline**
+
+A lead's history, newest first, including the events of any lead merged into
+it. Keyset-paged: pass the previous page's `meta.next_cursor` as `cursor`.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | path | string | yes |  |
+| `limit` | query | integer |  |  |
+| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `TimelinePage` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/leads/{lead_id}/transition`
+
+**Transition**
+
+Move a lead along its lifecycle: contact it, qualify it, or mark it lost.
+
+Only the moves the lifecycle allows are accepted. Marking a lead **lost** needs
+a `lost_reason_id`. Stages from **quoted** onward are refused with
+`quotation_required` until quotations ship. Pass `expected_stage` to act only if
+the lead has not moved since you loaded it; if it has, you get `409 stage_changed`
+with the current stage in `fields.stage`.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | path | string | yes |  |
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`LeadTransition`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `to_stage` | `contacted` | `qualified` | `quoted` | `negotiation` | `won` | `lost` | yes | The stage to move to. Only the moves the lifecycle allows are accepted; anything else is 422 invalid_transition. |
+| `lost_reason_id` | string | null |  | Required when to_stage is lost: an active reason from GET /lookups/lost-reasons. |
+| `lost_note` | string | null |  | Optional free text kept with a lost lead and on its timeline. |
+| `expected_stage` | string | null |  | Optional. If given and the lead has already moved past it, the call is refused with 409 stage_changed rather than acting on a stale view. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Lead_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## Models
+
+**`DuplicatePage`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | DuplicatePair[] | yes |  |
+| `meta` | PageMeta | yes |  |
+
+**`Envelope_DismissResult_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | DismissResult | yes |  |
 
 **`Envelope_Lead_`**
 
@@ -153,11 +542,30 @@ Every key is always present; `null` means "not set", never "not visible".
 |---|---|---|---|
 | `data` | Lead | yes |  |
 
+**`Envelope_TimelineEvent_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | TimelineEvent | yes |  |
+
+**`Envelope_list_Assignee__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | Assignee[] | yes |  |
+
 **`ErrorResponse`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
+
+**`LeadAssign`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `owner_user_id` | string | null |  | A staff user from GET /leads/assignees, or null to unassign. |
+| `assigned_partner_id` | string | null |  | A channel partner from GET /lookups/partners, or null to clear. |
 
 **`LeadCreate`**
 
@@ -174,9 +582,57 @@ Every key is always present; `null` means "not set", never "not visible".
 | `estimated_value` | number | string | null |  | Optional rupee value, a decimal string. Feeds the priority score. |
 | `note` | string | null |  | Optional. Becomes the first entry on the lead's timeline. |
 
+**`LeadMerge`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `into_lead_id` | string | yes | The survivor. This lead becomes its merged loser and keeps pointing at it. |
+
+**`LeadNote`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `note` | string | yes | The note text. Becomes a timeline entry and bumps the lead's last-activity time. |
+
 **`LeadPage`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | Lead[] | yes |  |
+| `meta` | PageMeta | yes |  |
+
+**`LeadPatch`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `farmer_name` | string | null |  |  |
+| `mobile` | string | null |  | Any Indian form; stored as +91XXXXXXXXXX. |
+| `email` | string | null |  |  |
+| `territory_id` | string | null |  | Moving the lead re-routes its owning org unit; it must stay in your scope. |
+| `village` | string | null |  |  |
+| `inquiry_type` | `commercial` | `subsidised` | `industrial` | null |  |  |
+| `mis_system` | string | null |  | A code from the lookup. |
+| `source` | string | null |  | A code from the lookup. |
+| `estimated_value` | number | string | null |  | Decimal string. Feeds the priority score. |
+
+**`LeadReopen`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `note` | string | null |  | Optional. Why the lead is being reopened; kept on the timeline. |
+
+**`LeadTransition`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `to_stage` | `contacted` | `qualified` | `quoted` | `negotiation` | `won` | `lost` | yes | The stage to move to. Only the moves the lifecycle allows are accepted; anything else is 422 invalid_transition. |
+| `lost_reason_id` | string | null |  | Required when to_stage is lost: an active reason from GET /lookups/lost-reasons. |
+| `lost_note` | string | null |  | Optional free text kept with a lost lead and on its timeline. |
+| `expected_stage` | string | null |  | Optional. If given and the lead has already moved past it, the call is refused with 409 stage_changed rather than acting on a stale view. |
+
+**`TimelinePage`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | TimelineEvent[] | yes |  |
 | `meta` | PageMeta | yes |  |

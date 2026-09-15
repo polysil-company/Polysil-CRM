@@ -183,7 +183,8 @@ async def staff(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Staff]:
         {"c": f"api_dm_{tag}"})).scalar_one()
     await s.execute(text(
         "INSERT INTO role_permission (role_id, module, action, scope) VALUES "
-        "(:r, 'leads', 'view', 'org_subtree'), (:r, 'leads', 'create', 'org_subtree')"),
+        "(:r, 'leads', 'view', 'org_subtree'), (:r, 'leads', 'create', 'org_subtree'), "
+        "(:r, 'leads', 'edit', 'org_subtree')"),
         {"r": role})
     user = (await s.execute(text(
         "INSERT INTO app_user (user_type, email, password_hash, full_name, role_id, org_unit_id) "

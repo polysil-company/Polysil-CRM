@@ -18,7 +18,12 @@ from fastapi.responses import JSONResponse
 from api.config import get_settings
 from api.db.session import engine
 from api.deps import assert_runtime_role
-from api.errors import ApiError, api_error_handler, validation_error_handler
+from api.errors import (
+    ApiError,
+    api_error_handler,
+    internal_error_handler,
+    validation_error_handler,
+)
 from api.routers import auth, leads
 
 log = structlog.get_logger()
@@ -86,6 +91,9 @@ def create_app() -> FastAPI:
     # {"detail": [...]} - a second error shape the frontend would have to handle
     # and which the generated ErrorResponse type does not describe.
     app.add_exception_handler(RequestValidationError, validation_error_handler)
+    # And everything else, so a 500 is the envelope too rather than Starlette's
+    # plain-text default (ISS-072). The body carries no detail.
+    app.add_exception_handler(Exception, internal_error_handler)
 
     # Base path is /api/v1. The version is in the path rather than a header so a
     # breaking change can run alongside its predecessor (ADR-028).
