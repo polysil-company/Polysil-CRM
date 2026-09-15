@@ -1,0 +1,59 @@
+name: Alert issue
+description: >-
+  Keeps one open issue while something is failing. The first failure opens it, later
+  failures add a comment, and the next success closes it.
+
+inputs:
+  title:
+    description: Issue title. It identifies the alert, so keep it stable.
+    required: true
+  result:
+    description: >-
+      "failure" opens the issue or comments on it, "success" closes it, and anything
+      else leaves it as it is.
+    required: true
+  summary:
+    description: What failed, in one or two sentences of Markdown.
+    required: true
+  commit:
+    description: The commit that was checked.
+    required: false
+    default: ${{ github.sha }}
+
+runs:
+  using: composite
+  steps:
+    - name: Open, comment on or close the alert issue
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        TITLE: ${{ inputs.title }}
+        RESULT: ${{ inputs.result }}
+        SUMMARY: ${{ inputs.summary }}
+        COMMIT: ${{ inputs.commit }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        existing=$(gh issue list --state open --limit 200 --json number,title \
+          --jq 'map(select(.title == env.TITLE)) | .[0].number // empty')
+
+        case "$RESULT" in
+          failure)
+            body=$(printf '%s\n\nCommit: %s\nRun: %s\n' "$SUMMARY" "$COMMIT" "$RUN_URL")
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --body "$body"
+              echo "Commented on alert issue #$existing."
+            else
+              gh issue create --title "$TITLE" --body "$body"
+            fi
+            ;;
+          success)
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" --comment "Checks pass again on $COMMIT. Run: $RUN_URL"
+              echo "Closed alert issue #$existing."
+            fi
+            ;;
+          *)
+            echo "Result was \"$RESULT\", so the alert issue is left as it is."
+            ;;
+        esac
