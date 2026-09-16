@@ -323,6 +323,25 @@ partners in its territories, an admin all of them.
 
 ---
 
+## `GET /api/v1/lookups/roles`
+
+**List Roles**
+
+The sixteen roles a person can hold, for the role picker. The staff form
+filters out `is_portal` roles; a partner user's role is derived from its
+partner and never chosen. The system principal's role is never listed.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_RoleItem__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions, or a temporary password must be changed first (`password_change_required`). |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/lookups/scoring`
 
 **Get Scoring**
@@ -422,6 +441,12 @@ talukas by passing `parent_id`, or search by name with `q`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | PartnerPick[] | yes |  |
+
+**`Envelope_list_RoleItem__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | RoleItem[] | yes |  |
 
 **`Envelope_list_ScoringItem__`**
 

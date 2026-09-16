@@ -176,11 +176,13 @@ async def test_auto_owner_picks_the_field_officer_with_the_fewest_open_leads(
     fo_role = (await db.execute(text(
         "INSERT INTO role (code, name, level) VALUES (:c, 'Field Officer', 1) RETURNING id"),
         {"c": ids.unique("field_officer")})).scalar_one()
+    await _grant(db, fo_role, "leads", ["view", "edit"], "own")
     manager = await make_staff(db, ids, email=ids.unique("dm") + "@polysil.in")  # level 2
     busy = await _field_officer(db, ids, ids.unique("busy") + "@polysil.in", fo_role)
     free = await _field_officer(db, ids, ids.unique("free") + "@polysil.in", fo_role)
     await _lead(db, ids, owner_user_id=busy)   # busy has one open lead
-    dealer_user = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    dealer_user = await make_partner_user(db, ids,
+                                          mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, dealer_user)
     picked = (await db.execute(text("SELECT lead_auto_owner(:t)"),
                                {"t": ids.territory_id})).scalar_one()
@@ -193,7 +195,8 @@ async def test_auto_owner_is_null_when_no_field_officer_covers(
     """A unit staffed only by a manager assigns nobody; the lead waits unassigned."""
     await _grant(db, ids.portal_role_id, "leads", ["create"], "partner_subtree")
     await make_staff(db, ids, email=ids.unique("dm") + "@polysil.in")
-    dealer_user = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    dealer_user = await make_partner_user(db, ids,
+                                          mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, dealer_user)
     picked = (await db.execute(text("SELECT lead_auto_owner(:t)"),
                                {"t": ids.territory_id})).scalar_one()
@@ -247,13 +250,15 @@ async def test_auto_owner_ignores_soft_deleted_leads(db: AsyncSession, ids: Fixt
     fo_role = (await db.execute(text(
         "INSERT INTO role (code, name, level) VALUES (:c, 'Field Officer', 1) RETURNING id"),
         {"c": ids.unique("fo")})).scalar_one()
+    await _grant(db, fo_role, "leads", ["view", "edit"], "own")
     busy = await _field_officer(db, ids, ids.unique("busy") + "@polysil.in", fo_role)
     free = await _field_officer(db, ids, ids.unique("free") + "@polysil.in", fo_role)
     for _ in range(2):
         lid = await _lead(db, ids, owner_user_id=busy)
         await db.execute(text("UPDATE lead SET deleted_at = now() WHERE id = :i"), {"i": lid})
     await _lead(db, ids, owner_user_id=free)
-    dealer_user = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    dealer_user = await make_partner_user(db, ids,
+                                          mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, dealer_user)
     picked = (await db.execute(text("SELECT lead_auto_owner(:t)"),
                                {"t": ids.territory_id})).scalar_one()
@@ -267,7 +272,8 @@ async def test_merge_refuses_a_partner_user_inside_the_function(
     await _grant(db, ids.portal_role_id, "leads", ["view", "edit", "create"], "partner_subtree")
     a = await _lead(db, ids, assigned_partner_id=ids.dealer_id)
     b = await _lead(db, ids, assigned_partner_id=ids.dealer_id)
-    dealer_user = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    dealer_user = await make_partner_user(db, ids,
+                                          mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, dealer_user)
     with pytest.raises(Exception, match="only staff"):
         async with db.begin_nested():

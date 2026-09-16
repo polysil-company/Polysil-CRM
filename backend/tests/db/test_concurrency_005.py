@@ -23,6 +23,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.db
 
+# 007 binds a session to the token_version the credential was verified against
+# (FS-006 rule 6). The fixtures mint with the row's own, read in the same statement.
+_V = ", (SELECT token_version FROM app_user WHERE id = CAST(:u AS uuid)))"
+
+
 HOLD = 0.8
 
 
@@ -44,11 +49,11 @@ async def dealer_user(sessions: Callable[[], AsyncSession]) -> AsyncIterator[dic
     user = (await s.execute(text(
         "INSERT INTO app_user (user_type, mobile, full_name, role_id, partner_id) "
         "VALUES ('partner_user', :m, 'x', :r, :p) RETURNING id"),
-        {"m": "9166" + tag, "r": role, "p": dealer})).scalar_one()
+        {"m": "9166" + f"{uuid.uuid4().int % 10**8:08d}", "r": role, "p": dealer})).scalar_one()
     token = uuid.uuid4().hex
     await s.execute(text(
         "SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-        "interval '30 days', 'ua', '10.0.0.1', 'otp')"),
+        "interval '30 days', 'ua', '10.0.0.1', 'otp'" + _V),
         {"u": user, "h": token, "f": str(uuid.uuid4())})
     await s.commit()
     ids = {"dealer": str(dealer), "user": str(user), "token": token}

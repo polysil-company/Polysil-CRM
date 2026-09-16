@@ -16,8 +16,11 @@ The lettered suffix follows `Schema-Corrections.md` §5, which already uses `006
 slot, since `004` is `channel_partner`.
 
 Both statements below are `DROP` + `CREATE` rather than `CREATE OR REPLACE`:
-PostgreSQL refuses to replace a function whose return type has changed, and
-`auth_lookup_by_mobile` changes volatility, which is the same restriction.
+PostgreSQL refuses to replace a function whose return type has changed. (An
+earlier version of this note said a volatility change needs the same; it does
+not. `CREATE OR REPLACE` changes volatility, executed while writing 007, which
+flips two 006 functions to VOLATILE that way. A DROP also resets the ACL to
+PUBLIC-executable, so the re-grant below is load-bearing.)
 
 Revision ID: 003a_auth_fixups
 Revises: 003_identity

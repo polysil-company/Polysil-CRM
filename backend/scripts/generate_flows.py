@@ -322,7 +322,7 @@ def f_permissions() -> None:
               "district. The queue is the subset waiting on them.",
               w=440, colour=RED)
     e += note("sc4", 0, 700,
-              "THE STANCE CHANGED (ADR-039)\n\n"
+              "THE STANCE CHANGED  (ADR-039)\n\n"
               "Before: the API check was only there to return a clean\n"
               "403 instead of an empty list. RLS was the boundary.\n\n"
               "Now: two enforcers. The service owns security and\n"
@@ -831,8 +831,8 @@ def f_auth() -> None:
               "No provider adapter: the code reaches\n"
               "notification_outbox and stops (GAP-027). Half\n"
               "the user base signs in this way.\n\n"
-              "No staff-creation endpoint - the initial users are\n"
-              "seeded (GAP-015).\n\n"
+              "Staff creation, the forced password change, unlock and\n"
+              "sign-out-everywhere are FS-006 (canvas 10).\n\n"
               "app_anon does not exist on the dev box, so the\n"
               "containment above is documentation until the\n"
               "VPS arrives (GAP-021).", w=570, colour=YELLOW)
@@ -840,8 +840,115 @@ def f_auth() -> None:
     write("09-authentication", e)
 
 
+def f_admin() -> None:
+    e, n = [], {}
+    e += title("Administration: people, offices, territories, partners",
+               sub="One administrator creates everyone else. Two enforcers on every write. "
+                   "The database refuses the states the rules forbid.",
+               status="BUILT. FS-006: /users, /auth/password, /lookups/roles, /org-units, "
+                      "/territories, /partners, migration 007, the showcase seed.",
+               status_colour=GREEN)
+
+    steps = [
+        ("u1", "POST /users\nstaff: email + role + open office + temp password\n"
+               "partner user: mobile + active partner (role = its type)", BLUE),
+        ("u2", "first sign-in with the temporary password", BLUE),
+        ("u3", "get_db: must_change_password?\n-> 403 password_change_required\n"
+               "except GET /auth/me and POST /auth/password", RED),
+        ("u4", "POST /auth/password\nverify, then auth_set_own_password():\n"
+               "compare-and-set on the verified hash, revoke after", GREEN),
+        ("u5", "works leads; PATCH corrects; set-password / revoke / unlock\n"
+               "each a definer guarded on users.edit + scope", BLUE),
+        ("u6", "POST /users/{id}/handover\nlock both people FOR UPDATE in id order,\n"
+               "then the leads, 500 a call, lead.assigned each", VIOLET),
+        ("u7", "deactivate: revoke first, then the flag\nDELETE: soft, no open leads", YELLOW),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(steps):
+        els = node(eid, 0, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid])
+        prev = eid
+
+    trees = [
+        ("t1", "OFFICES  /org-units\ncreate, rename, move (closure rebuilt),\n"
+               "close, reopen", BLUE),
+        ("t2", "org_unit_close_guard(): active people anchored -> 23514\n"
+               "the cascade's office arm deactivates nobody now", RED),
+        ("t3", "TERRITORIES  /territories\nstate > district > taluka > village,\n"
+               "unique names per parent, codes per level", BLUE),
+        ("t4", "territory_code_guard(): a numbered state's code\n"
+               "is immutable (keyed on inquiry_counter)", RED),
+        ("t5", "PARTNERS  /partners\nscoped by the partners ScopeSpec;\n"
+               "a dealer edits contact details only", BLUE),
+        ("t6", "channel_partner_guarded_columns(): credit, terms,\n"
+               "tier, type, active, deleted refused for a partner caller;\n"
+               "retype refused while users are anchored", RED),
+        ("t7", "close a partner: the cascade signs its users out\n"
+               "reopen restores the row only (users_inactive)", YELLOW),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(trees):
+        els = node(eid, 620, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid], dashed=True)
+        prev = eid
+
+    e += note("nRed1", 1240, 0,
+              "THE ADMINISTRATOR FLOOR\n\n"
+              "A deferred CONSTRAINT TRIGGER counts active users\n"
+              "whose role holds users.edit, under one advisory\n"
+              "lock, whenever an administrator's row changes.\n\n"
+              "At COMMIT a raise is a 500. So every service path\n"
+              "runs SET CONSTRAINTS ... IMMEDIATE before returning\n"
+              "and answers 422. It then stays immediate for the\n"
+              "rest of the transaction (executed).", w=420, colour=RED)
+    e += note("nRed2", 1240, 300,
+              "THE PRINCIPAL IS NOT A PERSON\n\n"
+              "Never listed, never administered, never signed in.\n"
+              "The trigger refuses a hash, a flag or a role on its\n"
+              "row; auth_lookup_staff excludes it by id even with a\n"
+              "hash forced in as the owner.", w=420, colour=RED)
+    e += note("nRed3", 1240, 520,
+              "LOCK ORDER, ALWAYS\n\n"
+              "family locks (id order) > session rows > app_user\n"
+              "app_user before lead; both people before any lead.\n"
+              "A create into a closing anchor shares the anchor row.\n"
+              "Every locking read inside a trigger is a DEFINER:\n"
+              "as INVOKER it silently reads nothing.", w=420, colour=RED)
+    e += note("nGreen1", 1240, 760,
+              "A credential is bound to what was verified:\n"
+              "auth_create_session(..., p_token_version) mints\n"
+              "nothing if the version moved (ISS-077), and the\n"
+              "own-password change is a compare-and-set on the\n"
+              "hash it verified (409 password_changed_meanwhile).", w=420, colour=GREEN)
+    e += note("nYellow1", 0, 880,
+              "NOT DONE, ON PURPOSE\n\n"
+              "No invitation email: the admin passes a temporary\n"
+              "password out of band (GAP-064).\n"
+              "A dealer does not create its own users (GAP-062).\n"
+              "Reopening a partner restores no people (GAP-069).\n"
+              "Regional manager / state co-ordinator cannot own a\n"
+              "lead until the matrix says so (GAP-071).", w=520, colour=YELLOW)
+    e += note("nViolet1", 620, 880,
+              "THE SHOWCASE SEED  scripts/seed_showcase.py\n\n"
+              "0 owner: sweep test leftovers older than an hour\n"
+              "1 API: Gujarat's districts, talukas, villages, the offices\n"
+              "2 API: one of every role, ten partners with a user;\n"
+              "   every staff member completes the forced change\n"
+              "3 API: ~70 leads as field officers and two dealers (OTP\n"
+              "   read from the outbox: nothing sends it, GAP-027)\n"
+              "4 owner: backdate over 45 days, clamped to the FY,\n"
+              "   audit triggers off for one transaction", w=520, colour=VIOLET)
+    write("10-administration", e)
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
-    f_approval(); f_subsidy(); f_outbox(); f_money(); f_auth()
+    f_approval(); f_subsidy(); f_outbox(); f_money(); f_auth(); f_admin()
     print(f"\nwrote to {OUT}")

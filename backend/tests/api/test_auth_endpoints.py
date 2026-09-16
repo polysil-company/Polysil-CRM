@@ -469,7 +469,7 @@ async def test_otp_request_for_a_known_number_looks_the_same(
 async def test_no_message_is_queued_for_an_unknown_number(
         client: httpx.AsyncClient, sessions: Callable[[], AsyncSession]) -> None:
     """The response is identical; what happens behind it is not."""
-    mobile = "917777" + uuid.uuid4().hex[:6]
+    mobile = "917777" + f"{uuid.uuid4().int % 10**6:06d}"
     await client.post(f"{V1}/auth/otp/request", json={"mobile": mobile})
     s = sessions()
     queued = (await s.execute(
@@ -553,7 +553,7 @@ async def test_a_staff_number_is_not_reachable_through_the_otp_door(
     officer's number is legitimately useful - so the door is closed at the lookup.
     Otherwise this is a second, weaker way into every password account: no
     password, no argon2, and no lockout."""
-    mobile = "9196" + uuid.uuid4().hex[:8]
+    mobile = "9196" + f"{uuid.uuid4().int % 10**8:08d}"
     s = sessions()
     await s.execute(text("UPDATE app_user SET mobile = :m WHERE id = CAST(:i AS uuid)"),
                     {"m": mobile, "i": staff.id})

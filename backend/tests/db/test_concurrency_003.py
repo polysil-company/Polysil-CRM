@@ -33,6 +33,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = [pytest.mark.db, pytest.mark.concurrency]
 
+# 007 binds a session to the token_version the credential was verified against
+# (FS-006 rule 6). The fixtures mint with the row's own, read in the same statement.
+_V = ", (SELECT token_version FROM app_user WHERE id = CAST(:u AS uuid)))"
+
+
 # Long enough that the second connection is provably inside its call while the
 # first still holds the lock, short enough not to slow the suite.
 HOLD = 0.6
@@ -49,14 +54,14 @@ class Actor:
 async def actor(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Actor]:
     """A committed partner user, visible to every connection, removed afterwards."""
     tag = uuid.uuid4().hex[:10]
-    mobile = "9199" + tag[:8]
+    mobile = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     s = sessions()
     territory = (await s.execute(text(
         "INSERT INTO territory (level, name) VALUES ('district', :n) RETURNING id"),
         {"n": f"conc_{tag}"})).scalar_one()
     role = (await s.execute(text(
         "INSERT INTO role (code, name, level, is_portal) "
-        "VALUES (:c, 'Dealer', 1, true) RETURNING id"),
+        "VALUES (:c, 'Dealer', 2, true) RETURNING id"),
         {"c": f"conc_dealer_{tag}"})).scalar_one()
     partner = (await s.execute(text(
         "INSERT INTO channel_partner (partner_type, code, name, territory_id, price_tier) "
@@ -153,7 +158,7 @@ async def test_two_concurrent_claims_on_one_token_yield_one_winner(
     setup = sessions()
     await setup.execute(
         text("SELECT auth_create_session(CAST(:u AS uuid), :h, :f, interval '30 days', "
-             "'ua', '10.0.0.1', 'otp')"),
+             "'ua', '10.0.0.1', 'otp'" + _V),
         {"u": actor.user_id, "h": token, "f": str(uuid.uuid4())})
     await setup.commit()
 
@@ -186,7 +191,7 @@ async def test_two_concurrent_family_revocations_emit_one_event(
     for _ in range(3):
         await setup.execute(
             text("SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-                 "interval '30 days', 'ua', '10.0.0.1', NULL)"),
+                 "interval '30 days', 'ua', '10.0.0.1', NULL" + _V),
             {"u": actor.user_id, "h": uuid.uuid4().hex, "f": family})
     await setup.commit()
 
@@ -231,7 +236,7 @@ async def test_a_revocation_racing_a_rotation_leaves_nothing_live(
     setup = sessions()
     await setup.execute(
         text("SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-             "interval '30 days', 'ua', '10.0.0.1', 'password')"),
+             "interval '30 days', 'ua', '10.0.0.1', 'password'" + _V),
         {"u": actor.user_id, "h": first, "f": family})
     await setup.commit()
 
@@ -242,7 +247,7 @@ async def test_a_revocation_racing_a_rotation_leaves_nothing_live(
         await asyncio.sleep(HOLD)
         await rotator.execute(
             text("SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-                 "interval '30 days', 'ua', '10.0.0.1', NULL)"),
+                 "interval '30 days', 'ua', '10.0.0.1', NULL" + _V),
             {"u": actor.user_id, "h": second, "f": family})
         await rotator.commit()
 
@@ -280,7 +285,7 @@ async def test_a_token_version_bump_during_rotation_still_kills_the_successor(
                         {"u": actor.user_id})
     await setup.execute(
         text("SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-             "interval '30 days', 'ua', '10.0.0.1', 'password')"),
+             "interval '30 days', 'ua', '10.0.0.1', 'password'" + _V),
         {"u": actor.user_id, "h": first, "f": family})
     await setup.commit()
 
@@ -291,7 +296,7 @@ async def test_a_token_version_bump_during_rotation_still_kills_the_successor(
         await asyncio.sleep(HOLD)
         await rotator.execute(
             text("SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-                 "interval '30 days', 'ua', '10.0.0.1', NULL)"),
+                 "interval '30 days', 'ua', '10.0.0.1', NULL" + _V),
             {"u": actor.user_id, "h": second, "f": family})
         await rotator.commit()
 

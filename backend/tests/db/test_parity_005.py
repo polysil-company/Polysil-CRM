@@ -69,10 +69,13 @@ async def _grant(db: AsyncSession, role_id: str, module: str, actions: list[str]
             {"r": role_id, "m": module, "a": action, "s": scope})
 
 
-async def _role(db: AsyncSession, ids: Fixtures, code: str, *, portal: bool = False) -> str:
+async def _role(db: AsyncSession, ids: Fixtures, code: str, *, portal: bool = False,
+                level: int = 2) -> str:
+    """A portal role's level must be its partner type's seeded level (007's
+    role-family trigger): 3 at a distributor, 2 at a dealer, 1 at a sub-dealer."""
     return str((await db.execute(text(
-        "INSERT INTO role (code, name, level, is_portal) VALUES (:c, :n, 2, :p) RETURNING id"),
-        {"c": ids.unique(code), "n": code, "p": portal})).scalar_one())
+        "INSERT INTO role (code, name, level, is_portal) VALUES (:c, :n, :l, :p) RETURNING id"),
+        {"c": ids.unique(code), "n": code, "l": level, "p": portal})).scalar_one())
 
 
 async def _staff(db: AsyncSession, ids: Fixtures, role_id: str, org_unit_id: str) -> str:
@@ -87,7 +90,8 @@ async def _partner_user(db: AsyncSession, ids: Fixtures, role_id: str, partner_i
     return str((await db.execute(text(
         "INSERT INTO app_user (user_type, mobile, full_name, role_id, partner_id) "
         "VALUES ('partner_user', :m, 'x', :r, :p) RETURNING id"),
-        {"m": "9188" + uuid.uuid4().hex[:8], "r": role_id, "p": partner_id})).scalar_one())
+        {"m": "9188" + f"{uuid.uuid4().int % 10**8:08d}", "r": role_id,
+         "p": partner_id})).scalar_one())
 
 
 async def _org(db: AsyncSession, ids: Fixtures, name: str, parent: str | None = None,
@@ -171,10 +175,10 @@ async def users_org_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
 
 
 async def users_partner_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
-    role = await _role(db, ids, "dist", portal=True)
+    role = await _role(db, ids, "dist", portal=True, level=3)
     await _grant(db, role, "users", ["view"], "partner_subtree")
     me = await _partner_user(db, ids, role, ids.distributor_id)
-    below = await _partner_user(db, ids, role, ids.dealer_id)
+    below = str(await make_partner_user(db, ids, mobile="9188" + f"{uuid.uuid4().int % 10**8:08d}"))
     other_tree = await _partner(db, ids, "OTHER", ids.territory_id)
     outside = await _partner_user(db, ids, role, other_tree)
     return Witness(Caller(me, None, ids.distributor_id, {"users": "partner_subtree"}),
@@ -186,7 +190,7 @@ async def users_global(db: AsyncSession, ids: Fixtures) -> Witness:
     await _grant(db, role, "users", ["view"], "global")
     admin = await _staff(db, ids, role, ids.org_unit_id)
     a = await _staff(db, ids, role, await _org(db, ids, "elsewhere"))
-    b = await make_partner_user(db, ids, mobile="9188" + uuid.uuid4().hex[:8])
+    b = await make_partner_user(db, ids, mobile="9188" + f"{uuid.uuid4().int % 10**8:08d}")
     return Witness(Caller(admin, ids.org_unit_id, None, {"users": "global"}),
                    {str(a): True, str(b): True})
 
@@ -217,7 +221,7 @@ async def partners_territory(db: AsyncSession, ids: Fixtures) -> Witness:
 
 
 async def partners_partner_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
-    role = await _role(db, ids, "dist", portal=True)
+    role = await _role(db, ids, "dist", portal=True, level=3)
     await _grant(db, role, "partners", ["view"], "partner_subtree")
     me = await _partner_user(db, ids, role, ids.distributor_id)
     other_tree = await _partner(db, ids, "OTHER", ids.territory_id)
@@ -271,7 +275,7 @@ async def leads_territory(db: AsyncSession, ids: Fixtures) -> Witness:
 
 
 async def leads_partner_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
-    role = await _role(db, ids, "dist", portal=True)
+    role = await _role(db, ids, "dist", portal=True, level=3)
     await _grant(db, role, "leads", ["view"], "partner_subtree")
     me = await _partner_user(db, ids, role, ids.distributor_id)
     mine = await _lead(db, ids, assigned_partner_id=ids.dealer_id)        # dealer under distributor
@@ -429,7 +433,7 @@ async def test_a_partner_row_cannot_attach_under_an_out_of_scope_parent(
         db: AsyncSession, ids: Fixtures) -> None:
     """Enforcer 2 refuses with 42501; enforcer 1's parent lookup returns no row,
     which the service turns into a 422 naming parent_id."""
-    role = await _role(db, ids, "dist", portal=True)
+    role = await _role(db, ids, "dist", portal=True, level=3)
     await _grant(db, role, "partners", ["view", "create"], "partner_subtree")
     me = await _partner_user(db, ids, role, ids.distributor_id)
     other_tree = await _partner(db, ids, "OTHER", ids.territory_id)
@@ -455,7 +459,7 @@ async def test_a_partner_row_cannot_attach_under_an_out_of_scope_parent(
 
 async def test_a_user_cannot_be_anchored_at_an_out_of_scope_partner(
         db: AsyncSession, ids: Fixtures) -> None:
-    role = await _role(db, ids, "dist", portal=True)
+    role = await _role(db, ids, "dist", portal=True, level=3)
     await _grant(db, role, "users", ["view", "create"], "partner_subtree")
     await _grant(db, role, "partners", ["view"], "partner_subtree")
     me = await _partner_user(db, ids, role, ids.distributor_id)
@@ -470,11 +474,12 @@ async def test_a_user_cannot_be_anchored_at_an_out_of_scope_partner(
             await db.execute(text(
                 "INSERT INTO app_user (user_type, mobile, full_name, role_id, partner_id) "
                 "VALUES ('partner_user', :m, 'x', :r, :p)"),
-                {"m": "9188" + uuid.uuid4().hex[:8], "r": role, "p": other_tree})
+                {"m": "9188" + f"{uuid.uuid4().int % 10**8:08d}", "r": role, "p": other_tree})
     await db.execute(text(
         "INSERT INTO app_user (user_type, mobile, full_name, role_id, partner_id) "
         "VALUES ('partner_user', :m, 'x', :r, :p)"),
-        {"m": "9188" + uuid.uuid4().hex[:8], "r": role, "p": ids.dealer_id})
+        {"m": "9188" + f"{uuid.uuid4().int % 10**8:08d}", "r": ids.portal_role_id,
+         "p": ids.dealer_id})
 
 
 async def test_the_self_profile_reads_without_users_view_and_a_colleague_does_not(

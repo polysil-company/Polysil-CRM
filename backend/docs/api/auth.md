@@ -203,6 +203,48 @@ would be told a correct code was wrong, and the code would already be spent.
 
 ---
 
+## `POST /api/v1/auth/password`
+
+**Change Password**
+
+Change your own password. Staff only; a partner user signs in by OTP.
+
+The new password must be at least 12 characters. On success every session
+including this one is signed out, so sign in again with the new password. This
+is the one call, besides `GET /auth/me`, that works while a temporary password
+is in force (`must_change_password` on `/auth/me`).
+
+`409 password_changed_meanwhile` means an administrator reset the password
+while you were changing it; sign in with the password they gave you.
+**`Idempotency-Key` is required.**
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string | null |  |  |
+
+**Request body**
+
+**`OwnPasswordChange`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `current_password` | string | yes | The password in force now. |
+| `new_password` | string | yes | At least 12 characters. Every session, this one included, is signed out when it is accepted; sign in again with it. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `204` | - | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in, or credentials rejected. |
+| `409` | `ErrorResponse` | An administrator reset the password meanwhile, or the key was used for a different body. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `POST /api/v1/auth/refresh`
 
 **Refresh**
@@ -297,3 +339,10 @@ response on a slow connection does not sign the user out of everything.
 |---|---|---|---|
 | `mobile` | string | yes | Same number the code was requested for. |
 | `code` | string | yes | The six digits from the message. |
+
+**`OwnPasswordChange`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `current_password` | string | yes | The password in force now. |
+| `new_password` | string | yes | At least 12 characters. Every session, this one included, is signed out when it is accepted; sign in again with it. |

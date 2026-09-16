@@ -25,6 +25,7 @@ return nothing for a caller whose claim is not yet set, and every request would 
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Annotated, Any
 
@@ -37,7 +38,12 @@ from api.authz.predicate import Caller
 from api.config import Settings, get_settings
 from api.db.session import async_session_factory, enter_role
 from api.domain.auth import AccessClaims, decode_access_token
-from api.errors import ApiError, ForbiddenError, UnauthenticatedError
+from api.errors import (
+    ApiError,
+    ForbiddenError,
+    PasswordChangeRequiredError,
+    UnauthenticatedError,
+)
 
 log = structlog.get_logger()
 
@@ -53,7 +59,7 @@ log = structlog.get_logger()
 # held.
 _CLAIMS_QUERY = text(
     """
-    SELECT u.is_active, u.token_version
+    SELECT u.is_active, u.token_version, u.must_change_password
       FROM app_user u
       JOIN session s ON s.id = :sid AND s.user_id = u.id
      WHERE u.id = :sub
@@ -62,6 +68,24 @@ _CLAIMS_QUERY = text(
        AND s.expires_at > now()
     """
 )
+
+
+# The two routes a forced-change session may still reach: read who you are, and
+# change the password. Refresh and logout take the anonymous dependency and never
+# come through here, so the session keeps refreshing long enough to do it.
+_PASSWORD_CHANGE_ALLOWED = frozenset({("GET", "/auth/me"), ("POST", "/auth/password")})
+_API_PREFIX_RE = re.compile(r"^/api/v\d+")
+
+
+def _password_change_allowed(request: Request) -> bool:
+    """Compares the matched route's path template, not the URL: on this FastAPI
+    (0.141.1) the path in `request.scope["route"]` is router-relative inside a
+    dependency (`/auth/me`, executed); the prefix is stripped in case a later
+    version reports it mounted."""
+    route = request.scope.get("route")
+    path = getattr(route, "path", None) or request.url.path
+    path = _API_PREFIX_RE.sub("", path)
+    return (request.method.upper(), path) in _PASSWORD_CHANGE_ALLOWED
 
 
 def bearer_token(request: Request) -> str | None:
@@ -102,6 +126,12 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
         # or the user is gone. All of them are the same 401.
         if row is None or not row.is_active or row.token_version != claims.token_version:
             raise UnauthenticatedError()
+
+        # FS-006 rule 4: a temporary password is changed before anything else is
+        # done. Enforced here, not by the client, and before require() so the
+        # answer is password_change_required rather than insufficient_permission.
+        if row.must_change_password and not _password_change_allowed(request):
+            raise PasswordChangeRequiredError()
 
         # TRANSACTION-LOCAL. The third argument is the whole point: a plain SET
         # here leaks this user's identity onto whichever request next borrows this

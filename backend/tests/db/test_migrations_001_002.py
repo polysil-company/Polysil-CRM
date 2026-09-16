@@ -222,11 +222,15 @@ async def test_a_deep_multirow_insert_in_reverse_order(db: AsyncSession) -> None
 async def test_org_unit_closure_uses_the_same_function(db: AsyncSession) -> None:
     """One closure_maintain() serves all three trees; 004 wired partner_closure to
     it. A test on territory alone would not catch a wrong TG_ARGV."""
+    # Unique names: 007 makes a root's name unique among roots, and the seeded
+    # "Polysil HQ" and a demo "HQ" are already there.
+    tag = uuid.uuid4().hex[:8]
     parent = (await db.execute(text(
-        "INSERT INTO org_unit (name, role_level) VALUES ('hq', 5) RETURNING id"))).scalar_one()
+        "INSERT INTO org_unit (name, role_level) VALUES (:n, 5) RETURNING id"),
+        {"n": f"hq_{tag}"})).scalar_one()
     child = (await db.execute(text(
-        "INSERT INTO org_unit (name, role_level, parent_id) VALUES ('rajkot', 2, :p) "
-        "RETURNING id"), {"p": parent})).scalar_one()
+        "INSERT INTO org_unit (name, role_level, parent_id) VALUES (:n, 2, :p) "
+        "RETURNING id"), {"n": f"rajkot_{tag}", "p": parent})).scalar_one()
     await _closure_agrees(db, "org_unit", "org_closure")
     depth = await db.execute(text(
         "SELECT depth FROM org_closure WHERE ancestor_id = :a AND descendant_id = :d"),

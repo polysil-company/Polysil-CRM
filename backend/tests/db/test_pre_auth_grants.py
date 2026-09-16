@@ -14,17 +14,10 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.config import get_settings
+from tests.db.conftest import _anon_role
 from tests.db.test_migration_003_identity import PRE_AUTH
 
 pytestmark = pytest.mark.db
-
-
-def _anon_role() -> str:
-    role = get_settings().db_anon_role
-    if not role:
-        pytest.skip("DB_ANON_ROLE unset; pre-auth containment is not active on this box")
-    return role
 
 
 async def test_anon_holds_execute_on_all_eight(db: AsyncSession) -> None:

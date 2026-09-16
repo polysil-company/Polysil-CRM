@@ -265,14 +265,20 @@ def _tree(cur: psycopg.Cursor, table: str,
     return ids
 
 
+# Migration 006's anchor: uuid5(DNS, "polysil.hq"), the one org root every migrated
+# database carries. The seed's tree hangs under it, so the seed stands alone and the
+# showcase (scripts/seed_showcase.py) shares the root (FS-006 5).
+ROOT_ORG_UNIT_ID = "73f0fdc5-8adb-50e6-b1b9-04005fe9e2ea"
+
+
 def _org_tree(cur: psycopg.Cursor, territories: dict[str, str]) -> dict[str, str]:
     rows = [
-        ("HQ", 5, None, None),
         ("Gujarat State", 3, "HQ", "Gujarat"),
         ("Rajkot District", 2, "Gujarat State", "Rajkot"),
         ("Rajkot Field", 1, "Rajkot District", "Gondal"),
     ]
-    ids: dict[str, str] = {}
+    ids: dict[str, str] = {"HQ": ROOT_ORG_UNIT_ID}
+    _fold_old_root(cur)
     for name, level, parent, territory in rows:
         cur.execute("SELECT id FROM org_unit WHERE name = %s", (name,))
         found = cur.fetchone()
@@ -287,6 +293,26 @@ def _org_tree(cur: psycopg.Cursor, territories: dict[str, str]) -> dict[str, str
         )
         ids[name] = cur.fetchone()[0]
     return ids
+
+
+def _fold_old_root(cur: psycopg.Cursor) -> None:
+    """Earlier seeds created their own root named "HQ". Everything anchored on it,
+    soft-deleted rows included, moves to the anchor before the old row goes (an FK
+    refuses otherwise, executed), so a rerun on a dirty database does not abort."""
+    cur.execute("SELECT id FROM org_unit WHERE name = 'HQ' AND id <> %s", (ROOT_ORG_UNIT_ID,))
+    old = [r[0] for r in cur.fetchall()]
+    for old_id in old:
+        cur.execute("UPDATE org_unit SET parent_id = %s WHERE parent_id = %s",
+                    (ROOT_ORG_UNIT_ID, old_id))
+        cur.execute("UPDATE app_user SET org_unit_id = %s WHERE org_unit_id = %s",
+                    (ROOT_ORG_UNIT_ID, old_id))
+        cur.execute("UPDATE lead SET owner_org_unit_id = %s WHERE owner_org_unit_id = %s",
+                    (ROOT_ORG_UNIT_ID, old_id))
+        cur.execute(
+            "DELETE FROM org_unit ou WHERE ou.id = %s "
+            "AND NOT EXISTS (SELECT 1 FROM org_unit c WHERE c.parent_id = ou.id) "
+            "AND NOT EXISTS (SELECT 1 FROM app_user u WHERE u.org_unit_id = ou.id)",
+            (old_id,))
 
 
 if __name__ == "__main__":

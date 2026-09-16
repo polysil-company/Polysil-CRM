@@ -73,7 +73,7 @@ async def test_the_scope_is_the_view_rows_scope_not_a_mutations(
 async def test_a_partner_caller_carries_its_partner_and_no_org_unit(
         db: AsyncSession, ids: Fixtures) -> None:
     await _grant(db, ids.portal_role_id, "leads", ["view"], "partner_subtree")
-    me = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    me = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     caller = await _caller(db, me)
     assert caller.org_unit_id is None
     assert caller.partner_id == str(ids.dealer_id)

@@ -31,6 +31,14 @@ LIVE_TABLES: dict[str, str] = {
     "lead": "lead",
 }
 
+# Entity types with no denormalised reference column: the row is visible when the
+# entity itself is, resolved through entity_id. Both tables are readable by every
+# authenticated caller (org_unit_sel, territory_sel), so a closed office's event
+# stays visible. Kept out of ENTITY_REFS on purpose: activity_event carries no
+# org_unit_id or territory_id column, and a CHECK requiring one would not compile
+# (FS-006 5, plan review round 2 B-5).
+ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory")
+
 
 def check_sql() -> str:
     """The CHECK expression: every mapped entity type carries its reference."""
@@ -47,6 +55,9 @@ def read_policy_sql() -> str:
     for entity_type, table in LIVE_TABLES.items():
         arms.append(f"WHEN '{entity_type}' THEN EXISTS "
                     f"(SELECT 1 FROM {table} c WHERE c.id = {ENTITY_REFS[entity_type]})")
+    for entity_type in ENTITY_BY_ID:
+        arms.append(f"WHEN '{entity_type}' THEN EXISTS "
+                    f"(SELECT 1 FROM {entity_type} c WHERE c.id = entity_id)")
     return ("CASE entity_type\n    " + "\n    ".join(arms)
             + "\n    ELSE (SELECT app_is_system())\n  END")
 

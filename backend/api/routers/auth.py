@@ -16,9 +16,10 @@ from fastapi import APIRouter, Cookie, Header, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from api.config import get_settings
-from api.deps import AnonSession, Claims, DbSession, bearer_token
+from api.deps import AnonSession, Claims, DbSession, IdemKey, bearer_token
 from api.domain.auth import decode_access_token
 from api.errors import RefreshFailedError, error_response
+from api.idempotency import redacted_digest, run_idempotent
 from api.schemas.auth import (
     Envelope,
     ErrorResponse,
@@ -27,6 +28,7 @@ from api.schemas.auth import (
     OtpRequestBody,
     OtpRequestResponse,
     OtpVerifyBody,
+    OwnPasswordChange,
     TokenResponse,
 )
 from api.services import auth as service
@@ -308,3 +310,42 @@ async def me(db: DbSession, claims: Claims) -> Envelope[MeResponse]:
     role baked into a token goes stale while the database has already moved on.
     """
     return Envelope(data=await service.me(db, user_id=claims.sub))
+
+
+@router.post(
+    "/password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={**_ERRORS,
+               400: {"model": ErrorResponse, "description": "Idempotency-Key missing."},
+               409: {"model": ErrorResponse,
+                     "description": "An administrator reset the password meanwhile, or the "
+                                    "key was used for a different body."}},
+)
+async def change_password(
+    body: OwnPasswordChange, db: DbSession, claims: Claims, idem: IdemKey,
+) -> Response:
+    """Change your own password. Staff only; a partner user signs in by OTP.
+
+    The new password must be at least 12 characters. On success every session
+    including this one is signed out, so sign in again with the new password. This
+    is the one call, besides `GET /auth/me`, that works while a temporary password
+    is in force (`must_change_password` on `/auth/me`).
+
+    `409 password_changed_meanwhile` means an administrator reset the password
+    while you were changing it; sign in with the password they gave you.
+    **`Idempotency-Key` is required.**
+    """
+    payload_hash = redacted_digest(body.model_dump(mode="json"),
+                                   ["current_password", "new_password"])
+
+    async def work() -> tuple[int, dict]:
+        await service.change_own_password(
+            db, current_password=body.current_password, new_password=body.new_password)
+        return status.HTTP_204_NO_CONTENT, {}
+
+    outcome = await run_idempotent(
+        db, key=idem, user_id=claims.sub, route="POST /api/v1/auth/password",
+        payload_hash=payload_hash, work=work)
+    if outcome.status_code == status.HTTP_204_NO_CONTENT:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return JSONResponse(outcome.body, status_code=outcome.status_code)

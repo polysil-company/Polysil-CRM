@@ -223,4 +223,21 @@ class MeResponse(BaseModel):
     partner: PartnerRef | None = Field(
         default=None, description="Portal users only. Never set together with `org_unit`."
     )
+    must_change_password: bool = Field(
+        default=False,
+        description="True while a temporary password set by an administrator is in "
+        "force. Until the person changes it, every route except this one and "
+        "POST /auth/password answers 403 `password_change_required`; show the "
+        "change-password screen.")
     permissions: list[ModulePermission] = Field(default_factory=list)
+
+
+class OwnPasswordChange(BaseModel):
+    """POST /auth/password: a signed-in staff member changes their own password."""
+
+    current_password: Annotated[str, Field(
+        min_length=1, max_length=128, description="The password in force now.")]
+    new_password: Annotated[str, Field(
+        min_length=1, max_length=128,
+        description="At least 12 characters. Every session, this one included, is "
+        "signed out when it is accepted; sign in again with it.")]

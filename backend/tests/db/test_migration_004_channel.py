@@ -292,9 +292,10 @@ async def test_a_partner_user_must_point_at_a_real_partner(db: AsyncSession,
     await _refused(db,
         "INSERT INTO app_user (user_type, mobile, full_name, role_id, partner_id) "
         "VALUES ('partner_user', :m, 'x', :r, :p)",
-        {"m": "9199" + uuid.uuid4().hex[:8], "r": ids.portal_role_id, "p": str(uuid.uuid4())},
+        {"m": "9199" + f"{uuid.uuid4().int % 10**8:08d}", "r": ids.portal_role_id,
+         "p": str(uuid.uuid4())},
         "fk_app_user_partner_id")
-    await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
 
 
 async def test_the_partner_foreign_key_is_validated(db: AsyncSession) -> None:
@@ -309,7 +310,7 @@ async def test_the_partner_foreign_key_is_validated(db: AsyncSession) -> None:
 
 async def test_a_partner_with_users_cannot_be_hard_deleted(db: AsyncSession,
                                                            ids: Fixtures) -> None:
-    await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _refused(db, "DELETE FROM channel_partner WHERE id = :i", {"i": ids.dealer_id},
                    "fk_app_user_partner_id")
 

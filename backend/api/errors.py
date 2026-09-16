@@ -94,6 +94,26 @@ class ForbiddenError(ApiError):
     message = "You do not have permission to do this."
 
 
+class PasswordChangeRequiredError(ApiError):
+    """A temporary password is in force (FS-006 rule 4). Every authenticated route
+    except `GET /auth/me` and `POST /auth/password` answers this until the person
+    changes it; `insufficient_permission` stays what it is."""
+
+    status_code = status.HTTP_403_FORBIDDEN
+    code = "password_change_required"
+    message = "Change your temporary password before continuing."
+
+
+class PasswordChangedMeanwhileError(ApiError):
+    """The own-password change is a compare-and-set on the hash the service
+    verified; an administrator's reset that landed in between wins (rule 6)."""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "password_changed_meanwhile"
+    message = ("The password was changed by an administrator while you were changing it. "
+               "Sign in again.")
+
+
 class ValidationFailed(ApiError):
     """A field failed a business rule the schema could not catch: a mobile that is
     not Indian, a territory with no coded state, a parent out of scope. Same code

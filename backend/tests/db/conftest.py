@@ -11,9 +11,12 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
+import pytest
 import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.config import get_settings
 
 
 @dataclass
@@ -48,7 +51,7 @@ async def ids(db: AsyncSession) -> Fixtures:
         "RETURNING id"), {"c": unique("district_manager")})).scalar_one()
     portal_role = (await db.execute(text(
         "INSERT INTO role (code, name, level, is_portal) "
-        "VALUES (:c, 'Dealer', 1, true) RETURNING id"),
+        "VALUES (:c, 'Dealer', 2, true) RETURNING id"),
         {"c": unique("dealer")})).scalar_one()
 
     # Migration 004: a partner user must point at a channel_partner. One
@@ -92,3 +95,12 @@ async def make_partner_user(db: AsyncSession, ids: Fixtures, *, mobile: str,
          "p": ids.dealer_id, "a": is_active},
     )
     return row.scalar_one()
+
+
+def _anon_role() -> str:
+    """The pre-auth role, or a skip. Lives here because test_pre_auth_grants imports
+    PRE_AUTH from the identity test, and the reverse import would be circular."""
+    role = get_settings().db_anon_role
+    if not role:
+        pytest.skip("DB_ANON_ROLE unset; pre-auth containment is not active on this box")
+    return role

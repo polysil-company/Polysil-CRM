@@ -229,10 +229,12 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lea
     # 3. the state code for the inquiry number (rule 3): the code of the state-level
     # ancestor of the territory. No coded state ancestor refuses creation rather
     # than allocating under a made-up code.
-    state_code = (await db.execute(text(
-        "SELECT t.code FROM territory_closure tc JOIN territory t ON t.id = tc.ancestor_id "
-        "WHERE tc.descendant_id = :tid AND t.level = 'state' "
-        "ORDER BY tc.depth ASC LIMIT 1"), {"tid": str(body.territory_id)})).scalar_one_or_none()
+    # A definer read with a share lock on the state row (007), so a concurrent code
+    # edit either waits for this transaction and is then refused by the counter it
+    # finds, or commits first and this read returns the new code (FS-006 rule 15,
+    # cross-vendor P2-3).
+    state_code = (await db.execute(text("SELECT lead_state_code(CAST(:tid AS uuid))"),
+                                   {"tid": str(body.territory_id)})).scalar_one_or_none()
     if not state_code:
         raise ValidationFailed(
             "This territory has no coded state, so an inquiry number cannot be allocated.",
@@ -630,27 +632,33 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
     The lead keeps its current unit, which stays in the assigner's scope; the new
     owner sees it by owner_user_id. A definer that returns the owner's unit closes
     this later."""
+    fields = body.model_fields_set
+    if not ({"owner_user_id", "assigned_partner_id"} & fields):
+        raise ValidationFailed(fields={"owner_user_id": "provide an owner or a partner"})
+    # FS-006 rule 20: the candidate's app_user row is shared BEFORE the lead is
+    # locked, app_user then lead always, so an assign holding the lead can never
+    # wait on a handover that holds the person and wants the lead. An unassignable
+    # owner on a missing or closed lead therefore answers 422 before the 404 or
+    # stage_terminal would, which leaks nothing about the lead.
+    if "owner_user_id" in fields and body.owner_user_id is not None:
+        if caller.scopes.get("leads") not in ("global", "org_subtree"):
+            raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
+        ok = (await db.execute(text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
+                               {"u": body.owner_user_id})).scalar_one()
+        if not ok:
+            raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
+
     row = await _lock(db, lead_id)
     if row is None:
         raise NotFoundError("No such lead.")
     if row.stage in domain.TERMINAL:
         raise ValidationFailed("This lead is closed and cannot be reassigned.",
                                code="stage_terminal", fields={"stage": row.stage})
-    fields = body.model_fields_set
-    if not ({"owner_user_id", "assigned_partner_id"} & fields):
-        raise ValidationFailed(fields={"owner_user_id": "provide an owner or a partner"})
 
     sets: list[str] = []
     params: dict[str, Any] = {"id": lead_id}
     payload: dict[str, Any] = {}
     if "owner_user_id" in fields:
-        if body.owner_user_id is not None:
-            if caller.scopes.get("leads") not in ("global", "org_subtree"):
-                raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
-            ok = (await db.execute(text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
-                                   {"u": body.owner_user_id})).scalar_one()
-            if not ok:
-                raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
         sets.append("owner_user_id = CAST(:owner AS uuid)")
         params["owner"] = body.owner_user_id
         payload["owner_user_id"] = body.owner_user_id

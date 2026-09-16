@@ -115,6 +115,14 @@ def _hmac(key: str, message: str) -> str:
     return hmac.new(key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+def hmac_digest(key: str, message: str) -> str:
+    """The same keyed digest, for callers outside this module: the idempotency
+    digest of a password-bearing request replaces the password with this (FS-006
+    rule 5), so two bodies that differ only in the password still differ while
+    the stored record holds neither the plaintext nor an unkeyed fingerprint."""
+    return _hmac(key, message)
+
+
 def encode_access_token(
     claims: AccessClaims, secret: str, ttl: timedelta, *,
     algorithm: str = "HS256", now: datetime | None = None

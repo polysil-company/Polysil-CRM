@@ -36,6 +36,11 @@ from tests.conftest import Staff
 
 pytestmark = [pytest.mark.db, pytest.mark.rls]
 
+# 007 binds a session to the token_version the credential was verified against
+# (FS-006 rule 6). The fixtures mint with the row's own, read in the same statement.
+_V = ", (SELECT token_version FROM app_user WHERE id = CAST(:u AS uuid)))"
+
+
 # Enough round trips that PgBouncer hands at least one anonymous request a backend
 # an authenticated request has already used. One pass would be a coin toss.
 ROUNDS = 12
@@ -78,7 +83,7 @@ async def _token(staff: Staff, sessions: Callable[[], AsyncSession]) -> str:
     row = (await s.execute(
         text("SELECT session_id, token_version FROM auth_create_session("
              "CAST(:u AS uuid), :h, CAST(:f AS uuid), interval '30 days', "
-             "'probe', '10.0.0.1', 'password')"),
+             "'probe', '10.0.0.1', 'password'" + _V),
         {"u": staff.id, "h": uuid.uuid4().hex, "f": str(uuid.uuid4())})).one()
     await s.commit()
 

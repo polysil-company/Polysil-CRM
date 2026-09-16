@@ -23,6 +23,11 @@ from tests.db.conftest import Fixtures, make_partner_user, make_staff
 
 pytestmark = [pytest.mark.db, pytest.mark.rls]
 
+# 007 binds a session to the token_version the credential was verified against
+# (FS-006 rule 6). The fixtures mint with the row's own, read in the same statement.
+_V = ", (SELECT token_version FROM app_user WHERE id = CAST(:u AS uuid)))"
+
+
 REFUSED = (IntegrityError, InternalError, ProgrammingError, DBAPIError)
 SYSTEM_ID = get_settings().system_user_id
 
@@ -65,8 +70,8 @@ async def _count(db: AsyncSession, sql: str, **params: object) -> int:
 
 async def test_a_user_reads_their_own_row_and_no_other_without_users_view(
         db: AsyncSession, ids: Fixtures) -> None:
-    me = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
-    other = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    me = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
+    other = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, me)
     assert await _count(db, "SELECT count(*) FROM app_user WHERE id = :i", i=me) == 1
     assert await _count(db, "SELECT count(*) FROM app_user WHERE id = :i", i=other) == 0
@@ -117,7 +122,7 @@ async def test_a_user_cannot_change_their_own_role_or_anchor(db: AsyncSession,
 
 async def test_a_partner_user_reads_their_own_partner_without_partners_view(
         db: AsyncSession, ids: Fixtures) -> None:
-    me = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    me = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, me)
     assert await _count(db, "SELECT count(*) FROM channel_partner WHERE id = :i",
                         i=ids.dealer_id) == 1
@@ -132,7 +137,7 @@ async def test_a_dealer_with_partner_scope_reads_the_subtree_only(db: AsyncSessi
         "INSERT INTO channel_partner (parent_id, partner_type, code, name, territory_id, "
         "price_tier) VALUES (:p, 'sub_dealer', :c, 'x', :t, 'sub_dealer') RETURNING id"),
         {"p": ids.dealer_id, "c": ids.unique("SD"), "t": ids.territory_id})).scalar_one()
-    me = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    me = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, me)
     visible = set((await db.execute(text("SELECT id FROM channel_partner"))).scalars().all())
     assert {str(x) for x in visible} == {str(ids.dealer_id), str(sub)}
@@ -180,7 +185,7 @@ async def test_sessions_are_self_only(db: AsyncSession, ids: Fixtures) -> None:
     for u in (me, other):
         await db.execute(text(
             "SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-            "interval '1 day', 'test', '10.0.0.1', 'password')"),
+            "interval '1 day', 'test', '10.0.0.1', 'password'" + _V),
             {"u": u, "h": uuid.uuid4().hex, "f": str(uuid.uuid4())})
     await _as(db, me)
     assert await _count(db, "SELECT count(*) FROM session WHERE user_id = :u", u=me) == 1
@@ -195,7 +200,7 @@ async def test_the_principal_purges_other_users_expired_sessions(db: AsyncSessio
     other = await make_staff(db, ids, email=ids.unique("b") + "@polysil.in")
     await db.execute(text(
         "SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-        "interval '-1 day', 'test', '10.0.0.1', 'password')"),
+        "interval '-1 day', 'test', '10.0.0.1', 'password'" + _V),
         {"u": other, "h": uuid.uuid4().hex, "f": str(uuid.uuid4())})
     await _as(db, SYSTEM_ID)
     assert (await db.execute(text("SELECT app_is_system()"))).scalar_one() is True
@@ -210,7 +215,7 @@ async def test_a_user_cannot_purge_and_is_not_the_principal(db: AsyncSession,
     me = await make_staff(db, ids, email=ids.unique("a") + "@polysil.in")
     await db.execute(text(
         "SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-        "interval '-1 day', 'test', '10.0.0.1', 'password')"),
+        "interval '-1 day', 'test', '10.0.0.1', 'password'" + _V),
         {"u": other, "h": uuid.uuid4().hex, "f": str(uuid.uuid4())})
     await _as(db, me)
     assert (await db.execute(text("SELECT app_is_system()"))).scalar_one() is False
@@ -226,7 +231,7 @@ async def test_the_outbox_is_written_only_for_a_visible_lead_ack_and_read_by_the
     else is refused. The system principal writes anything and is the only reader."""
     me = await make_staff(db, ids, email=ids.unique("a") + "@polysil.in")
     await _as(db, me)
-    recipient = "9199" + uuid.uuid4().hex[:8]
+    recipient = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     with pytest.raises(Exception, match="row-level security"):
         async with db.begin_nested():
             await db.execute(text(
@@ -249,7 +254,7 @@ async def test_the_outbox_is_written_only_for_a_visible_lead_ack_and_read_by_the
 async def test_the_catalog_is_readable_and_not_writable_without_masters_edit(
         db: AsyncSession, ids: Fixtures) -> None:
     await _grant(db, ids.portal_role_id, "leads", ["view"], "partner_subtree")
-    me = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    me = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, me)
     assert await _count(db, "SELECT count(*) FROM role") > 0
     assert await _count(db, "SELECT count(*) FROM role_permission WHERE role_id = :r",
@@ -272,10 +277,10 @@ async def test_deleting_a_view_row_that_strands_mutations_is_refused_at_commit(
 async def test_deactivating_a_partner_signs_out_its_users(db: AsyncSession,
                                                           ids: Fixtures) -> None:
     """ISS-028, as a trigger. Direct users only (GAP-042)."""
-    me = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    me = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await db.execute(text(
         "SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-        "interval '1 day', 'test', '10.0.0.1', 'otp')"),
+        "interval '1 day', 'test', '10.0.0.1', 'otp'" + _V),
         {"u": me, "h": uuid.uuid4().hex, "f": str(uuid.uuid4())})
     before = (await db.execute(text("SELECT token_version FROM app_user WHERE id = :u"),
                                {"u": me})).scalar_one()
@@ -297,26 +302,27 @@ async def test_deactivating_a_partner_signs_out_its_users(db: AsyncSession,
                             "AND kind = 'partner.deactivated'", p=ids.dealer_id) == 1
 
 
-async def test_deactivating_an_org_unit_signs_out_its_users(db: AsyncSession,
-                                                            ids: Fixtures) -> None:
-    """The org_unit half of the cascade. The anchor event's first version read
-    NEW.is_active, which org_unit does not have, and every org-unit soft delete
-    failed (cross-vendor P1, executed)."""
+async def test_closing_an_office_with_active_users_is_refused(db: AsyncSession,
+                                                              ids: Fixtures) -> None:
+    """FS-006 rule 9, in the database: an office with active users cannot close;
+    move them first. The cascade's office arm (cross-vendor P1 on FS-002) therefore
+    never deactivates anyone: once the users are inactive the close goes through,
+    emits the anchor event, and touches nobody's session."""
     me = await make_staff(db, ids, email=ids.unique("ou") + "@polysil.in")
     await db.execute(text(
         "SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-        "interval '1 day', 'test', '10.0.0.1', 'password')"),
+        "interval '1 day', 'test', '10.0.0.1', 'password'" + _V),
         {"u": me, "h": uuid.uuid4().hex, "f": str(uuid.uuid4())})
+    await _refused(db, "UPDATE org_unit SET deleted_at = now() WHERE id = :o",
+                   {"o": ids.org_unit_id}, "active users are anchored here")
+    await db.execute(text("UPDATE app_user SET is_active = false WHERE id = :u"), {"u": me})
     await db.execute(text("UPDATE org_unit SET deleted_at = now() WHERE id = :o"),
                      {"o": ids.org_unit_id})
-    row = (await db.execute(text("SELECT is_active FROM app_user WHERE id = :u"),
-                            {"u": me})).scalar_one()
-    assert row is False
-    assert await _count(db, "SELECT count(*) FROM session WHERE user_id = :u "
-                            "AND revoked_at IS NULL", u=me) == 0
     assert await _count(db, "SELECT count(*) FROM activity_event WHERE entity_type = "
                             "'org_unit' AND entity_id = :o AND kind = 'org_unit.deactivated'",
                         o=ids.org_unit_id) == 1
+    assert await _count(db, "SELECT count(*) FROM session WHERE user_id = :u "
+                            "AND revoked_at IS NULL", u=me) == 1
 
 
 async def test_app_role_cannot_create_a_temp_table(db: AsyncSession, ids: Fixtures) -> None:
@@ -354,7 +360,7 @@ async def test_a_partner_cannot_move_itself_or_its_subtree(db: AsyncSession,
     to NULL, the closure was rewritten, and the distributor lost the dealer and
     everything under it. Now refused by authz_reparent_guard(), whichever way."""
     await _grant(db, ids.portal_role_id, "partners", ["view", "edit"], "partner_subtree")
-    me = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    me = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     other = (await db.execute(text(
         "INSERT INTO channel_partner (partner_type, code, name, territory_id, price_tier) "
         "VALUES ('distributor', :c, 'x', :t, 'distributor') RETURNING id"),
@@ -377,7 +383,7 @@ async def test_a_partner_can_edit_its_own_row_otherwise(db: AsyncSession, ids: F
     dealer cannot see (its ancestor), so every self-edit was 42501. ISS-061 records
     that this includes price_tier and credit_limit until column rules land."""
     await _grant(db, ids.portal_role_id, "partners", ["view", "edit"], "partner_subtree")
-    me = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    me = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, me)
     r = await db.execute(text("UPDATE channel_partner SET contact_name = 'Bhavesh' WHERE id = :i"),
                          {"i": ids.dealer_id})
@@ -417,18 +423,18 @@ async def test_a_manager_can_reparent_only_under_a_parent_they_can_see(
 async def test_forced_revocation_has_no_path_under_app_role_yet(db: AsyncSession,
                                                                 ids: Fixtures) -> None:
     """Code review F-4. A users.edit UPDATE branch on session had no SELECT branch
-    and affected zero rows, silently. The branch is gone. There is no forced
-    revocation path for an admin at all yet: a direct UPDATE touches nothing, and
-    auth_revoke_sessions() is granted to app_anon for logout, not to app_role
-    (executed: 42501). GAP-045 is the endpoint and the definer function that
-    checks users.edit. This pins the state so the gap cannot close by accident."""
+    and affected zero rows, silently. The branch is gone: a direct UPDATE touches
+    nothing, and auth_revoke_sessions() (the logout function) is granted to
+    app_anon, not to app_role (executed: 42501). The forced path an admin uses is
+    auth_revoke_user_sessions() from 007 (GAP-045 closed), guarded on users.edit and
+    scope; this pins that the logout function never became that path."""
     await _grant(db, ids.staff_role_id, "users", ["view", "edit"], "global")
     admin = await make_staff(db, ids, email=ids.unique("adm") + "@polysil.in")
-    victim = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    victim = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     family = str(uuid.uuid4())
     sid = (await db.execute(text(
         "SELECT session_id FROM auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-        "interval '1 day', 'test', '10.0.0.1', 'otp')"),
+        "interval '1 day', 'test', '10.0.0.1', 'otp'" + _V),
         {"u": victim, "h": uuid.uuid4().hex, "f": family})).scalar_one()
     await _as(db, admin)
     r = await db.execute(text("UPDATE session SET revoked_at = now() WHERE id = :s"), {"s": sid})
@@ -479,7 +485,7 @@ async def test_a_user_sees_their_own_sign_in_events_and_not_others(db: AsyncSess
     for u in (me, other):
         await db.execute(text(
             "SELECT auth_create_session(CAST(:u AS uuid), :h, CAST(:f AS uuid), "
-            "interval '1 day', 'test', '10.0.0.1', 'password')"),
+            "interval '1 day', 'test', '10.0.0.1', 'password'" + _V),
             {"u": u, "h": uuid.uuid4().hex, "f": str(uuid.uuid4())})
     await _as(db, me)
     assert await _count(db, "SELECT count(*) FROM activity_event WHERE entity_id = :u", u=me) >= 1

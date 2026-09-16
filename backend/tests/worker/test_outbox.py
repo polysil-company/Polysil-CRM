@@ -53,8 +53,14 @@ async def test_a_due_message_is_sent_and_marked(
     recipient = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     row_id = await _queue(sessions(), recipient=recipient)
     try:
-        assert await outbox_drain({}) >= 1
-        state, _, error = await _state(sessions(), row_id)
+        # The drain takes a bounded batch, and a development database can hold a
+        # backlog (the showcase seed queues one acknowledgement per lead), so drain
+        # until this row has been reached rather than assuming one pass suffices.
+        for _ in range(40):
+            assert await outbox_drain({}) >= 1
+            state, _, error = await _state(sessions(), row_id)
+            if state != "pending":
+                break
         assert state == "sent" and error is None
     finally:
         await _drop(sessions(), row_id)

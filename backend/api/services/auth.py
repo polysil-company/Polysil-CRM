@@ -26,6 +26,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.config import get_settings
+from api.domain import identity
 from api.domain.auth import (
     AccessClaims,
     RefreshFailure,
@@ -44,7 +45,9 @@ from api.errors import (
     ApiError,
     InvalidCredentialsError,
     InvalidOtpError,
+    PasswordChangedMeanwhileError,
     RefreshFailedError,
+    ValidationFailed,
 )
 from api.integrations import cache
 from api.schemas.auth import MeResponse, ModulePermission, OrgUnitRef, PartnerRef, RoleRef
@@ -114,6 +117,12 @@ class Bundle:
         )
 
 
+def hash_password(password: str) -> str:
+    """Argon2id, the one hasher. Callers run it in a worker thread: it is slow on
+    purpose and inline it stalls the event loop for every other request."""
+    return _hasher.hash(password)
+
+
 def _verify_password(stored: str, password: str) -> bool:
     try:
         _hasher.verify(stored, password)
@@ -133,12 +142,18 @@ async def _record(db: AsyncSession, identifier: str, ip: str | None,
 
 async def _mint(db: AsyncSession, *, user_id: str, family_id: str | None,
                 user_agent: str | None, ip: str | None,
-                door: str | None) -> Bundle | None:
+                door: str | None, token_version: int) -> Bundle | None:
     """One place issues a session, so the token and the row cannot disagree.
 
     `door` is `'password'` or `'otp'` for a sign-in and `None` for a rotation -
     the function emits the `activity_event` for the first two and nothing for the
     third, because a rotation is not a sign-in (rule 7, section 5).
+
+    `token_version` is the one the credential was verified against: the lookup
+    row's for a sign-in, the claim's for a rotation. The function mints only if
+    the row still carries it, so a password change or a revoke that lands
+    between verification and minting produces no session (FS-006 rule 6,
+    ISS-077).
     """
     settings = get_settings()
     refresh = new_refresh_token()
@@ -147,7 +162,7 @@ async def _mint(db: AsyncSession, *, user_id: str, family_id: str | None,
     row = (
         await db.execute(
             text("SELECT session_id, expires_at, token_version FROM auth_create_session("
-                 "CAST(:u AS uuid), :h, CAST(:f AS uuid), :ttl, :ua, CAST(:ip AS inet), :d)"),
+                 "CAST(:u AS uuid), :h, CAST(:f AS uuid), :ttl, :ua, CAST(:ip AS inet), :d, :v)"),
             {
                 "u": user_id,
                 "h": hash_refresh_token(refresh),
@@ -156,6 +171,7 @@ async def _mint(db: AsyncSession, *, user_id: str, family_id: str | None,
                 "ua": user_agent,
                 "ip": ip,
                 "d": door,
+                "v": token_version,
             },
         )
     ).one_or_none()
@@ -236,7 +252,8 @@ async def login(db: AsyncSession, *, email: str, password: str,
     # deactivation committing between them is visible to the second and not the
     # first. verify_otp already had this order; login did not.
     minted = await _mint(db, user_id=str(row.user_id), family_id=None,
-                         user_agent=user_agent, ip=ip, door="password")
+                         user_agent=user_agent, ip=ip, door="password",
+                         token_version=int(row.token_version))
     if minted is None:
         await _record(db, email, ip, False, "password")
         return Failure(InvalidCredentialsError())
@@ -310,9 +327,9 @@ async def verify_otp(db: AsyncSession, *, mobile: str, code: str,
     # re-entering it cannot work (EC-14). The pair costs one attempt, not two.
     cached = await cache.read_bundle(replay)
     if cached is not None:
-        bundle = Bundle.from_cache_entry(cached)
-        if await _session_is_real(db, bundle):
-            return bundle
+        replayed = Bundle.from_cache_entry(cached)
+        if await _session_is_real(db, replayed):
+            return replayed
         # Published before COMMIT and the COMMIT did not happen. Fall through and
         # mint properly rather than hand out tokens for a session that never was.
 
@@ -351,7 +368,8 @@ async def verify_otp(db: AsyncSession, *, mobile: str, code: str,
         return Failure(InvalidOtpError())
 
     bundle = await _mint(db, user_id=str(user.user_id), family_id=None,
-                         user_agent=user_agent, ip=ip, door="otp")
+                         user_agent=user_agent, ip=ip, door="otp",
+                         token_version=int(user.token_version))
     if bundle is None:
         await _record(db, mobile, ip, False, "otp")
         return Failure(InvalidOtpError())
@@ -409,9 +427,9 @@ async def refresh(db: AsyncSession, *, refresh_token: str,
     #    and creates nothing.
     cached = await cache.read_bundle(replay)
     if cached is not None:
-        bundle = Bundle.from_cache_entry(cached)
-        if await _session_is_real(db, bundle):
-            return bundle
+        replayed = Bundle.from_cache_entry(cached)
+        if await _session_is_real(db, replayed):
+            return replayed
         # Published before COMMIT, and the COMMIT did not happen. Fall through.
 
     # 2 and 3. The conditional claim and the user re-check, in one definer call.
@@ -426,7 +444,8 @@ async def refresh(db: AsyncSession, *, refresh_token: str,
     if claim.outcome == "claimed":
         bundle = await _mint(db, user_id=str(claim.user_id),
                              family_id=str(claim.family_id),
-                             user_agent=user_agent, ip=ip, door=None)
+                             user_agent=user_agent, ip=ip, door=None,
+                             token_version=int(claim.token_version))
         if bundle is None:
             return Failure(RefreshFailedError(code=RefreshFailure.REVOKED.value))
         # BEFORE the commit, while the claim's row lock is still held. That
@@ -523,7 +542,7 @@ _ME_QUERY = text(
     SELECT u.id, u.full_name, u.user_type::text AS user_type,
            r.code AS role_code, r.name AS role_name,
            o.id AS org_id, o.name AS org_name,
-           u.partner_id
+           u.partner_id, u.must_change_password
       FROM app_user u
       LEFT JOIN role r     ON r.id = u.role_id
       LEFT JOIN org_unit o ON o.id = u.org_unit_id
@@ -562,8 +581,40 @@ async def me(db: AsyncSession, *, user_id: str) -> MeResponse:
         role=RoleRef(code=row.role_code, name=row.role_name) if row.role_code else None,
         org_unit=OrgUnitRef(id=str(row.org_id), name=row.org_name) if row.org_id else None,
         partner=PartnerRef(id=str(row.partner_id)) if row.partner_id else None,
+        must_change_password=bool(row.must_change_password),
         permissions=[
             ModulePermission(module=p.module, actions=list(p.actions), scope=p.scope)
             for p in perms
         ],
     )
+
+
+# ── own password (FS-006 4) ──────────────────────────────────────────────────
+
+async def change_own_password(db: AsyncSession, *, current_password: str,
+                              new_password: str) -> None:
+    """A signed-in staff member changes their own password.
+
+    The current password is verified here against the caller's own row, which the
+    self policy admits. The write is `auth_set_own_password()`: a compare-and-set
+    on the hash just verified, so an administrator's reset that lands in between
+    wins and the caller learns it as a 409 (rule 6). The definer revokes every
+    session, this one included, after the set; the client signs in again.
+    """
+    row = (await db.execute(text(
+        "SELECT password_hash, user_type::text AS user_type FROM app_user "
+        "WHERE id = (SELECT app_current_user_id())"))).one_or_none()
+    if row is None or row.user_type != "staff" or row.password_hash is None:
+        raise ValidationFailed(
+            fields={"current_password": "this account signs in by OTP and has no password"})
+    if not await asyncio.to_thread(_verify_password, row.password_hash, current_password):
+        raise ValidationFailed(fields={"current_password": "wrong"})
+    problem = identity.password_problem(new_password)
+    if problem:
+        raise ValidationFailed(fields={"new_password": problem})
+    new_hash = await asyncio.to_thread(hash_password, new_password)
+    changed = (await db.execute(
+        text("SELECT auth_set_own_password(:expected, :new)"),
+        {"expected": row.password_hash, "new": new_hash})).scalar_one()
+    if not changed:
+        raise PasswordChangedMeanwhileError()

@@ -61,6 +61,14 @@ async def matrix(db: AsyncSession, ids: Fixtures) -> dict[str, str]:
         "DELETE FROM role_permission WHERE role_id IN "
         "(SELECT id FROM role WHERE code = ANY(CAST(:c AS text[])))"), {"c": list(ROLES)})
     await db.execute(text(as_sql(GRANTS)))
+    sub_dealer = (await db.execute(text(
+        "INSERT INTO channel_partner (parent_id, partner_type, code, name, territory_id, "
+        "price_tier) VALUES (:p, 'sub_dealer', :c, 'x', :t, 'sub_dealer') RETURNING id"),
+        {"p": ids.dealer_id, "c": ids.unique("SUB"), "t": ids.territory_id})).scalar_one()
+    # 007's role-family trigger holds a portal role to its partner type's seeded
+    # level, so each portal user is anchored on a partner of its own type.
+    anchors = {"distributor": ids.distributor_id, "dealer": ids.dealer_id,
+               "sub_dealer": str(sub_dealer)}
     users: dict[str, str] = {}
     for code in ROLES:
         tag = uuid.uuid4().hex[:8]
@@ -68,7 +76,9 @@ async def matrix(db: AsyncSession, ids: Fixtures) -> dict[str, str]:
             row = await db.execute(text(
                 "INSERT INTO app_user (user_type, mobile, full_name, role_id, partner_id) "
                 "SELECT 'partner_user', :m, :n, r.id, :p FROM role r WHERE r.code = :c "
-                "RETURNING id"), {"m": "9177" + tag, "n": code, "c": code, "p": ids.dealer_id})
+                "RETURNING id"),
+                {"m": "9177" + f"{uuid.uuid4().int % 10**8:08d}", "n": code, "c": code,
+                                  "p": anchors[code]})
         else:
             row = await db.execute(text(
                 "INSERT INTO app_user (user_type, email, full_name, role_id, org_unit_id) "

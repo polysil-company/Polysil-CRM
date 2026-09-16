@@ -18,7 +18,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "codebase-graph.md"
-ROUTE_RE = re.compile(r'@router\.(get|post|patch|put|delete)\(\s*["\']([^"\']+)')
+# Any router variable: leads mounts `lookups`, users `roles`, masters three of
+# its own. Matching `@router.` alone hid every one of those endpoints.
+ROUTE_RE = re.compile(r'@\w+\.(get|post|patch|put|delete)\(\s*["\']([^"\']*)')
 
 
 def py_files(*roots: str) -> list[Path]:

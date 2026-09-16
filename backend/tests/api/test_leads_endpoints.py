@@ -64,7 +64,9 @@ async def env(sessions: Callable[[], AsyncSession], staff: Staff) -> AsyncIterat
     """A state (with a code) over a district, committed. Depends on `staff` so it
     tears down first and clears the leads that pin the staff org unit."""
     tag = uuid.uuid4().hex[:8]
-    code = "Z" + tag[:2].upper()
+    # Four characters: with 007's (level, code) unique index a leftover from a
+    # killed run would otherwise collide on the INSERT, not only on inquiry_no.
+    code = "Z" + tag[:3].upper()
     district_name = f"gondal_{tag}"
     s = sessions()
     # A run killed mid-test (memory, a dropped tunnel) never reaches the teardown

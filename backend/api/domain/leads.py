@@ -7,9 +7,11 @@ service in api/services/leads.py calls these and owns the transaction.
 
 from __future__ import annotations
 
-import unicodedata
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
+
+from api.domain.identity import MobileError as MobileError
+from api.domain.identity import normalise_mobile as normalise_mobile
 
 # ── the stage machine (FS-003 3) ─────────────────────────────────────────────
 
@@ -46,48 +48,9 @@ def can_transition(frm: str, to: str) -> bool:
 
 # ── mobile normalisation (FS-003 6 rule 1, EC-13, GAP-052) ───────────────────
 
-class MobileError(ValueError):
-    """A mobile that is not an Indian number. The service turns it into a 422 with
-    fields.mobile."""
-
-
-def normalise_mobile(raw: str) -> str:
-    """Any Indian form a person types or pastes into +91XXXXXXXXXX.
-
-    First NFKC-normalise and keep only digit values and a leading plus, so spaces,
-    hyphens, brackets, dots, bidi marks and non-ASCII (Devanagari) digits all fall
-    away. Then the Indian rules: a leading +91, 91 or 0 is stripped, and the ten
-    digits must start 6 to 9. A foreign +<cc> number is refused (GAP-052).
-    """
-    if not raw:
-        raise MobileError("mobile is required")
-    s = unicodedata.normalize("NFKC", raw)
-    had_plus = False
-    seen_digit = False
-    digits: list[str] = []
-    for ch in s:
-        value = unicodedata.digit(ch, None)
-        if value is not None:
-            digits.append(str(value))
-            seen_digit = True
-        elif ch == "+" and not seen_digit:
-            had_plus = True
-    d = "".join(digits)
-
-    if had_plus:
-        if d.startswith("91") and len(d) == 12:
-            d = d[2:]
-        else:
-            # +<something else> is a foreign number, or a malformed +91 (GAP-052).
-            raise MobileError("only Indian mobile numbers are accepted")
-    elif d.startswith("91") and len(d) == 12:
-        d = d[2:]
-    elif d.startswith("0") and len(d) == 11:
-        d = d[1:]
-
-    if len(d) == 10 and d[0] in "6789":
-        return "+91" + d
-    raise MobileError("not an Indian mobile number")
+# Moved to api/domain/identity.py (FS-006) and re-exported above (the explicit
+# `import x as x` form) so the lead service and its tests keep importing from
+# here. A lead stores the E.164 form with the plus.
 
 
 # ── the Indian financial year (FS-003 6 rule 2, EC-5) ────────────────────────

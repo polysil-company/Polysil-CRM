@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -57,6 +57,23 @@ def payload_digest(payload: Any) -> str:
         raw = json.dumps(payload, sort_keys=True, separators=(",", ":"),
                          default=str).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def redacted_digest(payload: dict[str, Any], secret_fields: Iterable[str]) -> str:
+    """`payload_digest` with each named field replaced by its HMAC under the server
+    secret (FS-006 rule 5, IDEM-3). Two requests that differ only in a password
+    still get different digests, and the stored `request_hash` is neither the
+    plaintext nor an unkeyed fingerprint of it. A field absent from the payload
+    (a partner-user create carries no password) is left absent."""
+    from api.config import get_settings
+    from api.domain.auth import hmac_digest
+
+    secret = get_settings().jwt_secret.get_secret_value()
+    out = dict(payload)
+    for name in secret_fields:
+        if out.get(name) is not None:
+            out[name] = hmac_digest(secret, f"{name}:{out[name]}")
+    return payload_digest(out)
 
 
 _RESERVE = text(

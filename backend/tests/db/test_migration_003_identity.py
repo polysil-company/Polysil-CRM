@@ -16,9 +16,14 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError, InternalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.db.conftest import Fixtures, make_partner_user, make_staff
+from tests.db.conftest import Fixtures, _anon_role, make_partner_user, make_staff
 
 pytestmark = pytest.mark.db
+
+# 007 binds a session to the token_version the credential was verified against
+# (FS-006 rule 6). The fixtures mint with the row's own, read in the same statement.
+_V = ", (SELECT token_version FROM app_user WHERE id = CAST(:u AS uuid)))"
+
 
 LOCKOUT = timedelta(minutes=15)
 MAX_FAILURES = 5
@@ -30,7 +35,8 @@ PRE_AUTH = {
     "auth_lookup_staff": "p_email citext, p_max_failures integer, p_lockout interval",
     "auth_lookup_by_mobile": "p_mobile text",
     "auth_create_session": ("p_user_id uuid, p_refresh_hash text, p_family_id uuid, "
-                            "p_ttl interval, p_ua text, p_ip inet, p_door text"),
+                            "p_ttl interval, p_ua text, p_ip inet, p_door text, "
+                            "p_token_version integer"),
     "auth_record_attempt": ("p_identifier citext, p_ip inet, p_succeeded boolean, "
                             "p_kind login_kind"),
     "auth_issue_otp_challenge": "p_mobile text, p_ip inet, p_code text, p_daily_cap integer",
@@ -58,12 +64,20 @@ async def _lookup(db: AsyncSession, email: str):
 # ── the pre-auth surface ─────────────────────────────────────────────────────
 
 async def test_exactly_the_eight_pre_auth_functions_exist(db: AsyncSession) -> None:
+    """Keyed on the pre-auth role's privilege, not on the name prefix: 007 adds six
+    `auth_*` functions that are not pre-auth. Extension functions are excluded,
+    because app_anon inherits EXECUTE on 114 pgcrypto, pg_trgm and citext
+    functions through PUBLIC (executed: 122 rows, 8 after the exclusion)."""
+    role = _anon_role()
     got = {
         (r.proname, r.args)
         for r in (await db.execute(text(
             "SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args "
             "FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
-            "WHERE n.nspname = 'public' AND p.proname LIKE 'auth\\_%'"))).all()
+            "LEFT JOIN pg_depend d ON d.objid = p.oid AND d.deptype = 'e' "
+            "WHERE n.nspname = 'public' AND d.objid IS NULL "
+            "AND has_function_privilege(CAST(:role AS name), p.oid, 'EXECUTE')"),
+            {"role": role})).all()
     }
     assert got == set(PRE_AUTH.items())
 
@@ -251,7 +265,7 @@ async def test_staff_with_a_mobile_is_not_reachable_through_the_otp_door(
     """Round 3's B-5, and the reason the CHECK permits a mobile on staff but the
     lookup does not. Without the user_type filter this is a second, weaker door
     onto every password account - no password, no argon2, and no lockout."""
-    mobile = "9199" + uuid.uuid4().hex[:8]
+    mobile = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     await make_staff(db, ids, email=ids.unique("asha") + "@polysil.in", mobile=mobile)
     rows = (await db.execute(text("SELECT * FROM auth_lookup_by_mobile(:m)"),
                              {"m": mobile})).all()
@@ -264,7 +278,7 @@ async def test_partner_user_with_an_email_is_not_reachable_through_the_password_
     portal row, so it must fail as invalid_credentials rather than verify against
     a NULL hash."""
     email = ids.unique("bhavesh") + "@dealer.in"
-    await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8], email=email)
+    await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}", email=email)
     assert (await _lookup(db, email))[0]["user_id"] is None
 
 
@@ -274,7 +288,7 @@ async def test_a_soft_deleted_row_is_invisible_to_both_lookups(
     rows only, so without this filter a soft-deleted row makes an otherwise-unique
     lookup ambiguous again (Schema-Corrections 5a.4)."""
     email = ids.unique("gone") + "@polysil.in"
-    mobile = "9199" + uuid.uuid4().hex[:8]
+    mobile = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     uid = await make_staff(db, ids, email=email)
     await db.execute(text("UPDATE app_user SET deleted_at = now() WHERE id = :i"),
                      {"i": uid})
@@ -291,7 +305,7 @@ async def test_a_soft_deleted_number_can_be_reissued(db: AsyncSession,
                                                      ids: Fixtures) -> None:
     """EC-2. A table-level UNIQUE would forbid this, and rural number reuse needs
     it: a dealer's staff member leaves and the number goes to their replacement."""
-    mobile = "9199" + uuid.uuid4().hex[:8]
+    mobile = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     old = await make_partner_user(db, ids, mobile=mobile)
     await db.execute(text("UPDATE app_user SET deleted_at = now() WHERE id = :i"),
                      {"i": old})
@@ -308,7 +322,7 @@ async def test_a_consumer_cannot_hold_a_role(db: AsyncSession, ids: Fixtures) ->
         await db.execute(text(
             "INSERT INTO app_user (user_type, mobile, full_name, role_id, customer_id) "
             "VALUES ('consumer', :m, 'Ramesh', :r, :c)"),
-            {"m": "9199" + uuid.uuid4().hex[:8], "r": ids.staff_role_id,
+            {"m": "9199" + f"{uuid.uuid4().int % 10**8:08d}", "r": ids.staff_role_id,
              "c": str(uuid.uuid4())})
 
 
@@ -336,7 +350,7 @@ async def test_a_partner_user_cannot_hold_a_staff_role(db: AsyncSession,
         await db.execute(text(
             "INSERT INTO app_user (user_type, mobile, full_name, role_id, partner_id) "
             "VALUES ('partner_user', :m, 'Bhavesh', :r, :p)"),
-            {"m": "9199" + uuid.uuid4().hex[:8], "r": ids.staff_role_id,
+            {"m": "9199" + f"{uuid.uuid4().int % 10**8:08d}", "r": ids.staff_role_id,
              "p": str(uuid.uuid4())})
 
 
@@ -345,7 +359,7 @@ async def test_changing_user_type_bumps_token_version(db: AsyncSession,
     """Rule 27. The lookup filters stop the wrong door being opened; they do nothing
     about a session already behind it, so an OTP-minted session would otherwise
     survive a promotion to staff."""
-    uid = await make_partner_user(db, ids, mobile="9199" + uuid.uuid4().hex[:8])
+    uid = await make_partner_user(db, ids, mobile="9199" + f"{uuid.uuid4().int % 10**8:08d}")
     before = (await db.execute(text("SELECT token_version FROM app_user WHERE id = :i"),
                                {"i": uid})).scalar_one()
     await db.execute(text(
@@ -410,7 +424,7 @@ async def test_the_check_forbids_the_anchors_a_type_should_not_hold(
 async def _session(db: AsyncSession, user_id: str, *, door: str | None = "password",
                    ttl: timedelta = timedelta(days=30), family: str | None = None):
     return (await db.execute(
-        text("SELECT * FROM auth_create_session(:u, :h, :f, :t, 'ua', '10.0.0.1', :d)"),
+        text("SELECT * FROM auth_create_session(:u, :h, :f, :t, 'ua', '10.0.0.1', :d" + _V),
         {"u": user_id, "h": uuid.uuid4().hex, "f": family or str(uuid.uuid4()),
          "t": ttl, "d": door})).mappings().all()
 
@@ -476,7 +490,7 @@ async def _issue(db: AsyncSession, user_id: str) -> str:
     token_hash = uuid.uuid4().hex
     await db.execute(
         text("SELECT auth_create_session(:u, :h, :f, interval '30 days', "
-             "'ua', '10.0.0.1', 'password')"),
+             "'ua', '10.0.0.1', 'password'" + _V),
         {"u": user_id, "h": token_hash, "f": str(uuid.uuid4())})
     return token_hash
 
@@ -630,7 +644,7 @@ async def test_converting_to_consumer_bumps_token_version(db: AsyncSession,
     await db.execute(text(
         "UPDATE app_user SET user_type = 'consumer', role_id = NULL, org_unit_id = NULL, "
         "email = NULL, mobile = :m, customer_id = :c WHERE id = :i"),
-        {"m": "9199" + uuid.uuid4().hex[:8], "c": str(uuid.uuid4()), "i": uid})
+        {"m": "9199" + f"{uuid.uuid4().int % 10**8:08d}", "c": str(uuid.uuid4()), "i": uid})
     after = (await db.execute(text("SELECT token_version FROM app_user WHERE id = :i"),
                               {"i": uid})).scalar_one()
     assert after == before + 1
@@ -709,7 +723,7 @@ async def _issue_otp(db: AsyncSession, mobile: str, cap: int = 10) -> bool:
 async def test_a_code_reaches_the_outbox_and_the_ledger(db: AsyncSession,
                                                         ids: Fixtures) -> None:
     """Rule 6: outbound messages go to the outbox, never sent inside a request."""
-    mobile = "9199" + uuid.uuid4().hex[:8]
+    mobile = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     await make_partner_user(db, ids, mobile=mobile)
     assert await _issue_otp(db, mobile) is True
 
@@ -731,7 +745,7 @@ async def test_the_challenge_is_false_for_every_reason_alike(
     """Section 4's always-202. The caller cannot tell these apart, so a different
     response for an unknown number cannot become a "is this dealer registered"
     oracle."""
-    mobile = "9199" + uuid.uuid4().hex[:8]
+    mobile = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     if reason == "inactive":
         await make_partner_user(db, ids, mobile=mobile, is_active=False)
     elif reason == "staff":
@@ -744,7 +758,7 @@ async def test_the_challenge_is_false_for_every_reason_alike(
 
 
 async def test_the_daily_cap_holds(db: AsyncSession, ids: Fixtures) -> None:
-    mobile = "9199" + uuid.uuid4().hex[:8]
+    mobile = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     await make_partner_user(db, ids, mobile=mobile)
     for _ in range(10):
         assert await _issue_otp(db, mobile) is True
@@ -755,7 +769,7 @@ async def test_a_successful_verify_resets_the_cap(db: AsyncSession,
                                                   ids: Fixtures) -> None:
     """Section 7 states this as a mechanism. Rev 4 claimed the reset without ever
     writing a success row for it to key on."""
-    mobile = "9199" + uuid.uuid4().hex[:8]
+    mobile = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     await make_partner_user(db, ids, mobile=mobile)
     for _ in range(10):
         await _issue_otp(db, mobile)
@@ -769,7 +783,7 @@ async def test_a_stale_success_does_not_reopen_the_cap(db: AsyncSession,
                                                        ids: Fixtures) -> None:
     """greatest(), for the same reason as the lockout bound: a success older than
     the window must not widen it."""
-    mobile = "9199" + uuid.uuid4().hex[:8]
+    mobile = "9199" + f"{uuid.uuid4().int % 10**8:08d}"
     await make_partner_user(db, ids, mobile=mobile)
     await _attempt(db, mobile, succeeded=True, kind="otp", ago=timedelta(hours=30))
     for _ in range(10):
@@ -830,7 +844,7 @@ async def test_a_consumer_resolves_to_no_permission_on_every_seeded_module(
     consumer = (await db.execute(text(
         "INSERT INTO app_user (user_type, mobile, full_name, customer_id) "
         "VALUES ('consumer', :m, 'Ramesh', :c) RETURNING id"),
-        {"m": "9199" + uuid.uuid4().hex[:8], "c": str(uuid.uuid4())})).scalar_one()
+        {"m": "9199" + f"{uuid.uuid4().int % 10**8:08d}", "c": str(uuid.uuid4())})).scalar_one()
     await _as_user(db, consumer)
 
     modules = (await db.execute(text(
