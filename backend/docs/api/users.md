@@ -383,6 +383,14 @@ failed attempts stay on record. A partner user has nothing to unlock
 |---|---|---|---|
 | `data` | UserDetail | yes |  |
 
+**`ErrorBody`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
+| `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
+| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+
 **`ErrorResponse`**
 
 | Field | Type | Required | Notes |
@@ -396,11 +404,70 @@ failed attempts stay on record. A partner user has nothing to unlock
 | `to_user_id` | string | yes | An active staff member whose role can work leads, from GET /leads/assignees. Not the leaver. |
 | `deactivate` | boolean |  | Also deactivate the leaver once nothing remains. Refused while `remaining` is above zero, and never for your own row. Default `False`. |
 
+**`HandoverResult`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `leads_moved` | integer | yes | Open leads moved by this call, at most 500. |
+| `remaining` | integer | yes | Open leads the leaver still owns. Repeat the call with a new Idempotency-Key until it is 0. |
+| `deactivated` | boolean | yes |  |
+
+**`OrgUnitRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+
+**`PageMeta`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `limit` | integer | yes | The page size that was applied. |
+| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+
 **`PasswordSet`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `password` | string | yes | A new temporary password, at least 12 characters. Every session of the person is signed out; they sign in with it and must change it. |
+
+**`PasswordSetResult`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `must_change_password` | boolean |  | Default `True`. |
+| `sessions_revoked` | integer | yes |  |
+
+**`RevokeResult`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `sessions_revoked` | integer | yes | Sessions that were live and are now signed out. |
+
+**`RoleRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable identifier, e.g. district_manager. |
+| `name` | string | yes | Display name. |
+
+**`TerritoryRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes | state, district or taluka. |
+
+**`UnlockResult`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `was_locked` | boolean | yes | Whether a lockout was in force when you cleared it. |
 
 **`UserCreate`**
 
@@ -415,6 +482,30 @@ failed attempts stay on record. A partner user has nothing to unlock
 | `partner_id` | string | null |  | Partner users only: an active partner. |
 | `territory_ids` | string[] |  | Staff only. A role that reads any module at territory scope needs at least one, or the person sees nothing there. |
 | `password` | string | null |  | Staff only. A temporary password of at least 12 characters, told to the person out of band; they must change it at first sign-in. |
+
+**`UserDetail`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `user_type` | `staff` | `partner_user` | yes |  |
+| `full_name` | string | yes |  |
+| `email` | string | null | yes | Staff sign in with it. Stored lower-case. |
+| `mobile` | string | null | yes | Partner users sign in with it by OTP. 91XXXXXXXXXX, no plus. |
+| `role` | RoleRef | null | yes |  |
+| `org_unit` | OrgUnitRef | null | yes | The office a staff member is anchored on; null for a partner user. |
+| `partner` | api__schemas__users__PartnerRef | null | yes | The partner a partner user is anchored on; null for staff. |
+| `is_active` | boolean | yes |  |
+| `must_change_password` | boolean | yes | A temporary password set by an administrator is still in force. |
+| `last_login_at` | string | null | yes |  |
+| `open_leads` | integer | null | yes | Leads this staff member owns that are not won, lost or merged. Null for a partner user, who owns no leads. |
+| `territories` | TerritoryRef[] | yes | The territories a staff member reads at territory scope. |
+| `locked_until` | string | null |  | Staff only, and only when you hold users.edit: the end of a live sign-in lockout (five failed passwords in fifteen minutes), else null. |
+| `active_sessions` | integer | null |  | Live sessions, when you hold users.edit; null otherwise. |
+| `password_changed_at` | string | null | yes |  |
+| `created_at` | string | yes |  |
+| `deleted_at` | string | null | yes | Set once the person is soft-deleted. Deleted people are returned only to users.delete holders, and never in the list. |
+| `created_by` | UserRef | null | yes |  |
 
 **`UserPage`**
 
@@ -435,3 +526,34 @@ failed attempts stay on record. A partner user has nothing to unlock
 | `partner_id` | string | null |  | Partner users only: an active partner. Never your own. |
 | `territory_ids` | string[] | null |  | Staff only. Replaces the whole set. Never your own. |
 | `is_active` | boolean | null |  | false deactivates (every session is signed out first), true reactivates into an open office or active partner. Never your own. |
+
+**`UserRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+
+**`UserRow`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `user_type` | `staff` | `partner_user` | yes |  |
+| `full_name` | string | yes |  |
+| `email` | string | null | yes | Staff sign in with it. Stored lower-case. |
+| `mobile` | string | null | yes | Partner users sign in with it by OTP. 91XXXXXXXXXX, no plus. |
+| `role` | RoleRef | null | yes |  |
+| `org_unit` | OrgUnitRef | null | yes | The office a staff member is anchored on; null for a partner user. |
+| `partner` | api__schemas__users__PartnerRef | null | yes | The partner a partner user is anchored on; null for staff. |
+| `is_active` | boolean | yes |  |
+| `must_change_password` | boolean | yes | A temporary password set by an administrator is still in force. |
+| `last_login_at` | string | null | yes |  |
+| `open_leads` | integer | null | yes | Leads this staff member owns that are not won, lost or merged. Null for a partner user, who owns no leads. |
+
+**`api__schemas__users__PartnerRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | null |  | Null when the partner row is outside your partners scope. |

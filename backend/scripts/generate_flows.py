@@ -585,15 +585,17 @@ def f_subsidy() -> None:
 def f_outbox() -> None:
     e, n = [], {}
     e += title("Message delivery", sub="Never send inside a request handler.",
-               status="BUILT except the adapter. NO MESSAGE HAS EVER BEEN SENT.",
-               status_colour=RED)
+               status="BUILT (FS-007): the 11za adapter, WhatsApp only. The OTP goes out on "
+                      "WhatsApp (ADR-040). Delivery status and inbound are FS-007a.",
+               status_colour=GREEN)
 
     els = node("svc", 0, 60, "Service", w=220, h=64, colour=BLUE); n["svc"] = els[0]; e += els
     els = node("tx", 300, 40, "business row\n+ activity_event\n+ outbox row\nONE TRANSACTION",
                w=260, h=110, colour=GREEN); n["tx"] = els[0]; e += els
     e += edge("e1", n["svc"], n["tx"])
 
-    els = node("wk", 660, 60, "worker\nFOR UPDATE\nSKIP LOCKED", w=220, h=90, colour=VIOLET)
+    els = node("wk", 660, 60, "worker\none row per transaction\nLIMIT 1 FOR UPDATE\nSKIP LOCKED",
+               w=220, h=100, colour=VIOLET)
     n["wk"] = els[0]; e += els
     e += edge("e2", n["tx"], n["wk"], colour=VIOLET)
 
@@ -601,15 +603,16 @@ def f_outbox() -> None:
     n["port"] = els[0]; e += els
     e += edge("e3", n["wk"], n["port"], colour=YELLOW)
 
-    for i, (eid, lbl, c) in enumerate([("mock", "Mock\n(default)", GREY),
-                                       ("za", "11za\nWhatsApp", GREEN),
-                                       ("sms", "MSG91\nSMS", GREY),
-                                       ("mail", "Email", GREY)]):
+    for i, (eid, lbl, c) in enumerate([("mock", "Mock\n(default, local)", GREY),
+                                       ("za", "11za\nWhatsApp\nsendTemplate", GREEN),
+                                       ("sms", "SMS\nnot built (ADR-040)", GREY),
+                                       ("mail", "Email\nnot built", GREY)]):
         els = node(eid, 1280, i * 92, lbl, w=180, h=70, colour=c, size=14)
         n[eid] = els[0]; e += els
         e += edge(f"e_p_{eid}", n["port"], n[eid], colour=c, dashed=(eid != "za"))
 
-    els = node("cb", 960, 300, "status webhook\nsent -> delivered -> read", w=280, h=76, colour=BLUE)
+    els = node("cb", 960, 300, "status webhook (FS-007a)\nsent -> delivered -> read",
+               w=280, h=76, colour=BLUE)
     n["cb"] = els[0]; e += els
     e += edge("e_cb", n["cb"], n["tx"], colour=BLUE, dashed=True)
 
@@ -621,24 +624,54 @@ def f_outbox() -> None:
               "That is what prevents 'the order was\n"
               "cancelled but the customer got a\n"
               "confirmation'.", w=340, colour=GREEN)
-    e += note("n2", 660, 200,
-              "Retry with backoff.\n"
-              "Dead-letter after N.\n\n"
-              "A silently dead worker is worse\n"
-              "than a crashed API - the system\n"
-              "looks healthy while every reminder\n"
-              "and message stops. Heartbeat row,\n"
-              "asserted by nightly CI.", w=290, colour=VIOLET)
+    e += note("n2", 660, 210,
+              "ONE ROW PER TRANSACTION (rule 7).\n"
+              "Fifty FOR UPDATE locks do not survive\n"
+              "the first commit, so a batch and a\n"
+              "per-row commit cannot coexist. A crash\n"
+              "resends at most one message.\n\n"
+              "A transient failure (timeout, 429, 5xx,\n"
+              "a token error) charges NOTHING: the row\n"
+              "waits a minute, and the third inside a\n"
+              "window opens a shared breaker in Redis.\n"
+              "Only the provider's refusal of a message\n"
+              "spends one of its five attempts.\n\n"
+              "Dead on claim, uncharged: too old for its\n"
+              "template (OTP: ttl - 60 s, ack: 24 h), a\n"
+              "newer code for the number, a withdrawn\n"
+              "lead, a second ack inside a day, a channel\n"
+              "with no adapter. The payload is cleared\n"
+              "when a row leaves pending.", w=330, colour=VIOLET)
+    e += note("n4", 300, 420,
+              "THE OTP IS A WHATSAPP AUTHENTICATION\n"
+              "TEMPLATE (ADR-040). The sign-in request\n"
+              "is the opt-in; the screen says so.\n\n"
+              "A resend supersedes the earlier code's\n"
+              "row inside the definer (SKIP LOCKED, so\n"
+              "it never waits behind a send: that wait\n"
+              "would name registered numbers). The\n"
+              "worker retires a stale row on every\n"
+              "claim. Verification re-reads the\n"
+              "challenge under the number's lock, or\n"
+              "an older code could sign in and burn\n"
+              "the newer one (reproduced in review).", w=340, colour=RED)
     e += note("n3", 1280, 400,
               "PROVIDER PORT (ADR-020)\n\n"
-              "Everything ships against the mock in W2.\n"
-              "The 11za adapter is ~1 day and drops in\n"
-              "as a config change. Nothing outside\n"
-              "api/integrations/whatsapp/ knows which\n"
-              "provider is in use.\n\n"
-              "11za: authToken is in the request BODY,\n"
-              "not a header - so it must be scrubbed\n"
-              "from logs and Sentry breadcrumbs.", w=420, colour=YELLOW)
+              "Nothing outside api/integrations/whatsapp/\n"
+              "knows which provider is in use; the worker\n"
+              "maps outcomes (accepted, transient, refused,\n"
+              "permanent) onto rows. One HTTP client per\n"
+              "worker process, a total deadline per send.\n\n"
+              "11za: authToken is in the request BODY.\n"
+              "The body is built inside send() and exists\n"
+              "nowhere else; every error is scrubbed of\n"
+              "the token and of every value sent; a\n"
+              "transport exception leaves as its class\n"
+              "name. sendTemplate returns NO message id\n"
+              "(only IsSuccess); classify on the body.\n"
+              "tags carries our row id for FS-007a.\n\n"
+              "dev.py whatsapp-check: the two templates\n"
+              "exist, are approved, take our values.", w=420, colour=YELLOW)
     write("07-message-delivery", e)
 
 

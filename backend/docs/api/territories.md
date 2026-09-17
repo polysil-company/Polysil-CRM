@@ -162,11 +162,38 @@ already carry it.
 |---|---|---|---|
 | `data` | Territory | yes |  |
 
+**`ErrorBody`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
+| `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
+| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+
 **`ErrorResponse`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
+
+**`PageMeta`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `limit` | integer | yes | The page size that was applied. |
+| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+
+**`Territory`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | `state` | `district` | `taluka` | `village` | yes |  |
+| `code` | string | null | yes | A state's code numbers its leads (POL/<code>/<FY>/<n>); optional elsewhere. |
+| `parent` | TerritoryRef | null | yes | Null for a state. |
+| `code_locked` | boolean | yes | True once a lead has been numbered under this state: the code can no longer change. |
+| `created_at` | string | yes |  |
 
 **`TerritoryCreate`**
 
@@ -190,3 +217,11 @@ already carry it.
 |---|---|---|---|
 | `name` | string | null |  |  |
 | `code` | string | null |  | Refused on a state once a lead has been numbered under it. |
+
+**`TerritoryRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes | state, district or taluka. |

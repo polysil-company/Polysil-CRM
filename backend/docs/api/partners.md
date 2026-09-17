@@ -247,11 +247,50 @@ many, and each is reactivated through `PATCH /users/{id}`.
 |---|---|---|---|
 | `data` | Partner | yes |  |
 
+**`ErrorBody`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
+| `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
+| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+
 **`ErrorResponse`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
+
+**`PageMeta`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `limit` | integer | yes | The page size that was applied. |
+| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+
+**`Partner`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+| `partner_type` | `distributor` | `dealer` | `sub_dealer` | yes |  |
+| `price_tier` | string | yes | Always the partner type (ADR-030). |
+| `parent` | PartnerParent | null | yes |  |
+| `territory` | TerritoryRef | null | yes |  |
+| `contact_name` | string | null | yes |  |
+| `mobile` | string | null | yes | 91XXXXXXXXXX, no plus. |
+| `email` | string | null | yes |  |
+| `address` | string | null | yes |  |
+| `gstin` | string | null | yes |  |
+| `pan` | string | null | yes |  |
+| `is_gst_registered` | boolean | yes |  |
+| `credit_limit` | string | null | yes | Rupees, a decimal string. Stored, not enforced (H12). Staff readers only. |
+| `payment_terms_days` | integer | null | yes | Staff readers only. |
+| `is_active` | boolean | yes |  |
+| `users` | integer | yes | Active partner users anchored here. |
+| `created_at` | string | yes |  |
 
 **`PartnerCreate`**
 
@@ -279,6 +318,14 @@ many, and each is reactivated through `PATCH /users/{id}`.
 | `data` | Partner[] | yes |  |
 | `meta` | PageMeta | yes |  |
 
+**`PartnerParent`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `partner_type` | string | yes |  |
+
 **`PartnerPatch`**
 
 | Field | Type | Required | Notes |
@@ -294,3 +341,36 @@ many, and each is reactivated through `PATCH /users/{id}`.
 | `territory_id` | string | null |  | Staff only. |
 | `credit_limit` | number | string | null |  | Staff only. |
 | `payment_terms_days` | integer | null |  | Staff only. |
+
+**`PartnerStateChange`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+| `partner_type` | `distributor` | `dealer` | `sub_dealer` | yes |  |
+| `price_tier` | string | yes | Always the partner type (ADR-030). |
+| `parent` | PartnerParent | null | yes |  |
+| `territory` | TerritoryRef | null | yes |  |
+| `contact_name` | string | null | yes |  |
+| `mobile` | string | null | yes | 91XXXXXXXXXX, no plus. |
+| `email` | string | null | yes |  |
+| `address` | string | null | yes |  |
+| `gstin` | string | null | yes |  |
+| `pan` | string | null | yes |  |
+| `is_gst_registered` | boolean | yes |  |
+| `credit_limit` | string | null | yes | Rupees, a decimal string. Stored, not enforced (H12). Staff readers only. |
+| `payment_terms_days` | integer | null | yes | Staff readers only. |
+| `is_active` | boolean | yes |  |
+| `users` | integer | yes | Active partner users anchored here. |
+| `created_at` | string | yes |  |
+| `users_inactive` | integer | yes | Partner users anchored here who are inactive. Reopening restores none of them. |
+
+**`TerritoryRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes | state, district or taluka. |

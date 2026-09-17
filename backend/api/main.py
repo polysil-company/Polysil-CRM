@@ -74,14 +74,17 @@ def create_app() -> FastAPI:
         It does report whether pre-auth containment is active, because an unset
         db_anon_role is a weakness that is otherwise invisible (GAP-021).
         """
-        return JSONResponse(
-            {
-                "status": "ok",
-                "environment": settings.environment,
-                "pre_auth_containment": bool(settings.db_anon_role),
-                "runtime_role": settings.db_app_role,
-            }
-        )
+        body: dict[str, object] = {
+            "status": "ok",
+            "environment": settings.environment,
+            "pre_auth_containment": bool(settings.db_anon_role),
+            "runtime_role": settings.db_app_role,
+        }
+        # FS-007 rule 16: which provider this box talks to, outside production
+        # only; the endpoint is unauthenticated and already says enough.
+        if settings.environment != "production":
+            body["whatsapp"] = settings.whatsapp_provider
+        return JSONResponse(body)
 
     # Every ApiError becomes {"error": {"code", "message"}} (FS-001 section 4).
     # Registered for the base class so a new error type inherits the envelope

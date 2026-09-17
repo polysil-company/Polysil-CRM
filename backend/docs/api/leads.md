@@ -523,12 +523,50 @@ with the current stage in `fields.stage`.
 
 ## Models
 
+**`Assignee`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+| `org_unit` | OrgUnitRef | null |  |  |
+
+**`DismissResult`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `link_id` | string | yes |  |
+| `state` | string |  | Default `dismissed`. |
+
 **`DuplicatePage`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | DuplicatePair[] | yes |  |
 | `meta` | PageMeta | yes |  |
+
+**`DuplicatePair`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `link_id` | string | yes |  |
+| `signal` | `mobile` | `email` | `name_geo` | yes | What matched: the mobile, the email, or name plus village nearby. |
+| `score` | string | null |  | Match strength, a decimal string. |
+| `state` | `pending` | `merged` | `dismissed` | yes |  |
+| `created_at` | string | yes |  |
+| `lead_a` | Lead | yes |  |
+| `lead_b` | Lead | yes |  |
+
+**`DuplicateRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `link_id` | string | yes |  |
+| `lead_id` | string | yes |  |
+| `inquiry_no` | string | yes |  |
+| `signal` | `mobile` | `email` | `name_geo` | yes |  |
+| `score` | string | null |  | Match strength, a decimal string. |
+| `state` | `pending` | `merged` | `dismissed` | yes |  |
 
 **`Envelope_DismissResult_`**
 
@@ -554,11 +592,50 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `data` | Assignee[] | yes |  |
 
+**`ErrorBody`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
+| `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
+| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+
 **`ErrorResponse`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
+
+**`Lead`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `inquiry_no` | string | yes |  |
+| `stage` | `new` | `contacted` | `qualified` | `quoted` | `negotiation` | `won` | `lost` | `merged` | `dormant` | yes |  |
+| `inquiry_type` | `commercial` | `subsidised` | `industrial` | yes |  |
+| `mis_system` | string | yes | The code. |
+| `source` | string | yes | The code. |
+| `farmer_name` | string | yes |  |
+| `mobile` | string | yes | E.164, e.g. +919876543210. |
+| `email` | string | null | yes |  |
+| `territory` | TerritoryRef | yes |  |
+| `village` | string | null | yes |  |
+| `owner` | UserRef | null | yes | The staff owner, or null if unassigned. |
+| `owner_org_unit` | OrgUnitRef | yes |  |
+| `assigned_partner` | api__schemas__leads__PartnerRef | null | yes |  |
+| `score` | string | null | yes | Decimal string, or null before scoring. |
+| `priority` | `hot` | `warm` | `cold` | null | yes |  |
+| `estimated_value` | string | null | yes |  |
+| `lost_reason` | ReasonRef | null | yes |  |
+| `lost_note` | string | null | yes |  |
+| `reopen_count` | integer | yes |  |
+| `merged_into` | MergedRef | null | yes | Set on a merged lead; links to the survivor. |
+| `first_contacted_at` | string | null | yes |  |
+| `last_activity_at` | string | yes |  |
+| `created_at` | string | yes |  |
+| `created_by` | UserRef | null | yes |  |
+| `duplicates` | DuplicateRef[] |  | Pending duplicate links whose other lead you can also see. |
 
 **`LeadAssign`**
 
@@ -630,9 +707,71 @@ with the current stage in `fields.stage`.
 | `lost_note` | string | null |  | Optional free text kept with a lost lead and on its timeline. |
 | `expected_stage` | string | null |  | Optional. If given and the lead has already moved past it, the call is refused with 409 stage_changed rather than acting on a stale view. |
 
+**`MergedRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `inquiry_no` | string | yes |  |
+
+**`OrgUnitRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+
+**`PageMeta`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `limit` | integer | yes | The page size that was applied. |
+| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+
+**`ReasonRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+
+**`TerritoryRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes | state, district or taluka. |
+
+**`TimelineEvent`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
+| `occurred_at` | string | yes |  |
+| `actor` | UserRef | null |  | Who caused the event, if known. |
+| `payload` | object |  |  |
+
 **`TimelinePage`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | TimelineEvent[] | yes |  |
 | `meta` | PageMeta | yes |  |
+
+**`UserRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+
+**`api__schemas__leads__PartnerRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `partner_type` | string | yes | distributor, dealer or sub_dealer. |

@@ -298,6 +298,8 @@ async def request_otp(db: AsyncSession, *, mobile: str, ip: str | None) -> None:
     # False covers capped, unknown and inactive alike, and the caller cannot tell
     # which. Only store the challenge when a message is actually queued, or a
     # number nobody can reach would still accept a guessed code.
+    # GAP-075: the store runs only when a code was issued, so a registered number
+    # answers a few milliseconds slower than an unknown one. The body is identical.
     if issued:
         await cache.store_otp(mobile, hash_otp(code), settings.otp_ttl)
 
@@ -362,6 +364,16 @@ async def verify_otp(db: AsyncSession, *, mobile: str, code: str,
         shared = Bundle.from_cache_entry(cached)
         if await _session_is_real(db, shared):
             return shared
+
+    # FS-007 rule 1b. The challenge is re-read now that the number's lock is held:
+    # a resend that landed between the first match and here replaced it, and the
+    # older code must not sign in and burn the newer one (reproduced in-process
+    # by the cross-vendor review). The lock is held through the burn below,
+    # because the dependency commits after this function returns.
+    current = await cache.read_otp(mobile)
+    if current is None or not _matches(current.get("hash", ""), code):
+        await _spend_guess(db, mobile, ip, budget)
+        return Failure(InvalidOtpError())
 
     if user is None or not user.is_active:
         await _spend_guess(db, mobile, ip, budget)

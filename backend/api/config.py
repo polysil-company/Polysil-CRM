@@ -11,7 +11,7 @@ from datetime import timedelta
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import PostgresDsn, RedisDsn, SecretStr, field_validator
+from pydantic import PostgresDsn, RedisDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -80,7 +80,8 @@ class Settings(BaseSettings):
     # partner-entered lead is never invisible to admins. Migration 006 seeds the row
     # under this stable id (Polysil HQ, role_level 5); a database without it would
     # fail the insert's foreign key, which the bootstrap test guards against.
-    root_org_unit_id: str | None = "73f0fdc5-8adb-50e6-b1b9-04005fe9e2ea"  # uuid5(DNS, "polysil.hq")
+    # uuid5(DNS, "polysil.hq")
+    root_org_unit_id: str | None = "73f0fdc5-8adb-50e6-b1b9-04005fe9e2ea"
 
     # PROJECT-OVERVIEW section 5: Caddy terminates TLS and calls the API over
     # loopback on the same box. So request.client.host is Caddy, not the caller,
@@ -129,6 +130,19 @@ class Settings(BaseSettings):
     whatsapp_base_url: str = "https://api.11za.in"
     whatsapp_auth_token: SecretStr | None = None
     whatsapp_origin_website: str | None = None
+    # FS-007 section 5.1. The template names on the client's account, and the
+    # language until question 3.2 is answered (GAP-022).
+    whatsapp_template_otp: str = "polysil_auth_otp"
+    whatsapp_template_lead_ack: str = "polysil_lead_ack"
+    whatsapp_template_language: str = "en"
+    # A total deadline per send: httpx's timeout bounds each socket operation, not
+    # the request. Re-sized from the smoke's slowest sends.
+    whatsapp_send_timeout: float = 10.0
+    # FS-007 rule 7: how long one drain keeps claiming rows. Under the ten-second
+    # tick, eight seconds lets at most two drains overlap.
+    outbox_drain_budget: float = 8.0
+    # FS-007 rule 12: rows that are not pending are purged after this.
+    outbox_retention: timedelta = timedelta(days=90)
 
     sms_provider: Literal["msg91", "mock"] = "mock"
     msg91_key: SecretStr | None = None
@@ -170,6 +184,17 @@ class Settings(BaseSettings):
                 "Set POLYSIL_ALLOW_DIRECT_DB=1 only for a throwaway test database."
             )
         return v
+
+    @model_validator(mode="after")
+    def _messaging_is_configured(self) -> Settings:
+        """FS-007 rule 11. A misconfigured provider must be loud: the symptom of a
+        mock in production is "no farmer ever hears from us" and no error, and a
+        provider without its token fails every send in the same silence."""
+        if self.whatsapp_provider == "11za" and self.whatsapp_auth_token is None:
+            raise ValueError("whatsapp_provider is 11za but whatsapp_auth_token is unset")
+        if self.environment == "production" and self.whatsapp_provider == "mock":
+            raise ValueError("whatsapp_provider is mock in production; no message would leave")
+        return self
 
 
 @lru_cache

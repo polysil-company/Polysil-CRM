@@ -308,6 +308,14 @@ response on a slow connection does not sign the user out of everything.
 |---|---|---|---|
 | `data` | TokenResponse | yes |  |
 
+**`ErrorBody`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
+| `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
+| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+
 **`ErrorResponse`**
 
 | Field | Type | Required | Notes |
@@ -327,11 +335,48 @@ response on a slow connection does not sign the user out of everything.
 | `email` | string | yes | Staff email address. Case-insensitive: stored as citext. Surrounding whitespace is trimmed. |
 | `password` | string | yes | Sent exactly as typed, including any leading or trailing spaces. Minimum length is enforced when the password is set, not here - an existing password shorter than the current policy must still be able to sign in. The upper bound only stops an Argon2 denial-of-service. |
 
+**`MeResponse`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+| `user_type` | `staff` | `partner_user` | `consumer` | yes |  |
+| `role` | RoleRef | null |  | Null for a consumer, which holds no role. |
+| `org_unit` | OrgUnitRef | null |  | Staff only. Never set together with `partner`. |
+| `partner` | api__schemas__auth__PartnerRef | null |  | Portal users only. Never set together with `org_unit`. |
+| `must_change_password` | boolean |  | True while a temporary password set by an administrator is in force. Until the person changes it, every route except this one and POST /auth/password answers 403 `password_change_required`; show the change-password screen. Default `False`. |
+| `permissions` | ModulePermission[] |  |  |
+
+**`ModulePermission`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `module` | string | yes | e.g. leads, orders, subsidy. |
+| `actions` | string[] | yes | Any of view, create, edit, approve, delete. |
+| `scope` | string | null |  | One of own, org_subtree, territory, partner_subtree, global. Taken from the module's `view` row, which the others inherit. |
+
+**`OrgUnitRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+
 **`OtpRequestBody`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `mobile` | string | yes | E.164 without the leading plus, e.g. 919876543210. |
+
+**`OtpRequestResponse`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `sent` | boolean |  | Default `True`. |
+| `channel` | `whatsapp` | `sms` |  | Where the code arrives. A deployment-wide constant, never a per-number value: render it in the wording, do not branch on it. Default `whatsapp`. |
+| `expires_in` | integer | yes | Seconds the code remains valid, for the countdown on the verify screen. |
+| `resend_after` | integer | yes | Seconds before offering a resend. Deliberately longer than `expires_in` would suggest: three resends a minute apart exhaust the per-phone burst limit, after which the UI would claim 'code sent' for another eleven minutes with nothing being sent. |
 
 **`OtpVerifyBody`**
 
@@ -346,3 +391,35 @@ response on a slow connection does not sign the user out of everything.
 |---|---|---|---|
 | `current_password` | string | yes | The password in force now. |
 | `new_password` | string | yes | At least 12 characters. Every session, this one included, is signed out when it is accepted; sign in again with it. |
+
+**`RoleRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable identifier, e.g. district_manager. |
+| `name` | string | yes | Display name. |
+
+**`TokenResponse`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `access_token` | string | yes | JWT. Send as `Authorization: Bearer <token>`. |
+| `token_type` | string |  | Default `Bearer`. |
+| `expires_in` | integer | yes | Seconds until the access token expires. Refresh before this, not after: a 401 mid-action loses the user's work. |
+
+**`ValidationError`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `loc` | string | integer[] | yes |  |
+| `msg` | string | yes |  |
+| `type` | string | yes |  |
+| `input` | any |  |  |
+| `ctx` | object |  |  |
+
+**`api__schemas__auth__PartnerRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | null |  | Null until the channel module lands; the id is stable now. |

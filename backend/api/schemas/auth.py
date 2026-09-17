@@ -21,6 +21,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from api.integrations.messages import OTP_CHANNEL
+
 # E.164 without the plus, which is what the client sends and what app_user.mobile
 # stores. Indian numbers are 12 digits (91 + 10); the range is wider so a future
 # country code is not a schema change.
@@ -132,6 +134,11 @@ class OtpRequestResponse(BaseModel):
     """
 
     sent: Literal[True] = True
+    channel: Literal["whatsapp", "sms"] = Field(
+        default=OTP_CHANNEL,
+        description="Where the code arrives. A deployment-wide constant, never a "
+        "per-number value: render it in the wording, do not branch on it.",
+    )
     expires_in: int = Field(
         description="Seconds the code remains valid, for the countdown on the "
         "verify screen.",

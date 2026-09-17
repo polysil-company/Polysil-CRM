@@ -91,3 +91,24 @@ def test_db_anon_role_defaults_to_unset(monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_db_anon_role_is_honoured_when_set(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _settings(monkeypatch, DB_ANON_ROLE="app_anon").db_anon_role == "app_anon"
+
+
+def test_the_mock_provider_is_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert _settings(monkeypatch).whatsapp_provider == "mock"
+
+
+def test_the_real_provider_needs_its_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FS-007 rule 11: a provider without its token fails every send in silence."""
+    with pytest.raises(ValueError, match="token"):
+        _settings(monkeypatch, WHATSAPP_PROVIDER="11za")
+    assert _settings(monkeypatch, WHATSAPP_PROVIDER="11za",
+                     WHATSAPP_AUTH_TOKEN="x").whatsapp_provider == "11za"
+
+
+def test_production_refuses_the_mock_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FS-007 rule 11: the symptom of a mock in production is "no farmer ever
+    hears from us" and no error."""
+    with pytest.raises(ValueError, match="mock"):
+        _settings(monkeypatch, ENVIRONMENT="production")
+    assert _settings(monkeypatch, ENVIRONMENT="production", WHATSAPP_PROVIDER="11za",
+                     WHATSAPP_AUTH_TOKEN="x").environment == "production"

@@ -219,11 +219,33 @@ else is restored.
 |---|---|---|---|
 | `data` | OrgUnit | yes |  |
 
+**`ErrorBody`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
+| `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
+| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+
 **`ErrorResponse`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
+
+**`OrgUnit`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `role_level` | integer | yes | 1 field up to 5 head office; the level of the role that runs it. |
+| `parent` | OrgUnitParent | null | yes | Null at a root. |
+| `territory` | TerritoryRef | null | yes | The territory a sales-line office covers; null for an HQ unit. |
+| `is_open` | boolean | yes |  |
+| `closed_at` | string | null | yes |  |
+| `active_users` | integer | yes | Active, non-deleted people anchored here. An office with any cannot be closed. |
+| `created_at` | string | yes |  |
 
 **`OrgUnitCreate`**
 
@@ -241,6 +263,13 @@ else is restored.
 | `data` | OrgUnit[] | yes |  |
 | `meta` | PageMeta | yes |  |
 
+**`OrgUnitParent`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+
 **`OrgUnitPatch`**
 
 | Field | Type | Required | Notes |
@@ -248,3 +277,18 @@ else is restored.
 | `name` | string | null |  |  |
 | `parent_id` | string | null |  |  |
 | `territory_id` | string | null |  |  |
+
+**`PageMeta`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `limit` | integer | yes | The page size that was applied. |
+| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+
+**`TerritoryRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes | state, district or taluka. |

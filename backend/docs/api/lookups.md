@@ -460,6 +460,14 @@ talukas by passing `parent_id`, or search by name with `q`.
 |---|---|---|---|
 | `data` | TerritoryPick[] | yes |  |
 
+**`ErrorBody`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
+| `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
+| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+
 **`ErrorResponse`**
 
 | Field | Type | Required | Notes |
@@ -476,6 +484,15 @@ talukas by passing `parent_id`, or search by name with `q`.
 | `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
 | `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
 
+**`LookupItem`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+| `is_active` | boolean |  | Default `True`. |
+
 **`LookupUpdate`**
 
 | Field | Type | Required | Notes |
@@ -484,8 +501,53 @@ talukas by passing `parent_id`, or search by name with `q`.
 | `sort_order` | integer | null |  |  |
 | `quality` | number | string | null |  | Sources only. |
 
+**`PartnerPick`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+| `partner_type` | string | yes | distributor, dealer or sub_dealer. |
+| `territory` | TerritoryParent | null |  |  |
+
+**`RoleItem`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Send this as `role` on POST /users. |
+| `name` | string | yes |  |
+| `level` | integer | yes | 1 field officer up to 5 head office. |
+| `is_functional` | boolean | yes |  |
+| `is_portal` | boolean | yes | A partner user's role. Filter these out of the staff form; the server refuses one on a staff member regardless. |
+
+**`ScoringItem`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `key` | string | yes | w_source, w_value, w_speed, w_engagement, value_cap, speed_fast_hours, speed_slow_hours, engagement_cap, threshold_hot, threshold_warm. |
+| `value` | string | yes | Decimal string. |
+
 **`ScoringPatch`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `values` | object | yes | Keys to change, each with its new value. Unknown keys are refused. |
+
+**`TerritoryParent`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes |  |
+
+**`TerritoryPick`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes | state, district, taluka or village. |
+| `code` | string | null |  |  |
+| `parent` | TerritoryParent | null |  |  |

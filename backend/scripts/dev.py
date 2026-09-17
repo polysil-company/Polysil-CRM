@@ -6,6 +6,7 @@
     python scripts/dev.py status    what is running, and is the database reachable
     python scripts/dev.py psql      open a shell against the database through PgBouncer
     python scripts/dev.py validate  run the reference-SQL checks
+    python scripts/dev.py whatsapp-check  the account's templates against what this system sends
     python scripts/dev.py check     up + validate, the W0/W1 gate
 
 Everything reaches the database at 127.0.0.1:6432 (PgBouncer). Whether that is
@@ -174,8 +175,17 @@ def cmd_check() -> None:
     cmd_validate()
 
 
+def cmd_whatsapp_check() -> None:
+    """FS-007 rule 13: the templates this system sends exist on the account, are
+    approved and take the values we send. A deploy gate; the worker repeats it at
+    startup as an error log. Prints sanitised lines only."""
+    sys.exit(subprocess.run([sys.executable, "-m", "api.integrations.whatsapp.check"],
+                            cwd=ROOT, check=False).returncode)
+
+
 COMMANDS = {"up": cmd_up, "down": cmd_down, "status": cmd_status,
-            "psql": cmd_psql, "validate": cmd_validate, "check": cmd_check}
+            "psql": cmd_psql, "validate": cmd_validate, "check": cmd_check,
+            "whatsapp-check": cmd_whatsapp_check}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "up"

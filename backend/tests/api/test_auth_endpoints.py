@@ -456,14 +456,16 @@ async def test_otp_request_is_identical_for_an_unknown_number(
     turns this into a "is this dealer registered" oracle."""
     r = await client.post(f"{V1}/auth/otp/request", json={"mobile": mobile})
     assert r.status_code == 202
-    assert r.json()["data"] == {"sent": True, "expires_in": 300, "resend_after": 300}
+    assert r.json()["data"] == {"sent": True, "channel": "whatsapp", "expires_in": 300,
+                                "resend_after": 300}
 
 
 async def test_otp_request_for_a_known_number_looks_the_same(
         client: httpx.AsyncClient, dealer: Dealer) -> None:
     r = await client.post(f"{V1}/auth/otp/request", json={"mobile": dealer.mobile})
     assert r.status_code == 202
-    assert r.json()["data"] == {"sent": True, "expires_in": 300, "resend_after": 300}
+    assert r.json()["data"] == {"sent": True, "channel": "whatsapp", "expires_in": 300,
+                                "resend_after": 300}
 
 
 async def test_no_message_is_queued_for_an_unknown_number(

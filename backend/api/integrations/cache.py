@@ -22,15 +22,22 @@ from datetime import timedelta
 from functools import lru_cache
 from typing import Any
 
+import structlog
 from redis.asyncio import Redis
 
 from api.config import get_settings
+
+log = structlog.get_logger()
 
 
 @lru_cache
 def get_redis() -> Redis:
     settings = get_settings()
-    return Redis.from_url(str(settings.redis_url), decode_responses=True)
+    # FS-007 section 5.1: a stalled Redis must fail open in the worker, and a
+    # client with no socket timeouts waits forever. One second is generous on a
+    # loopback connection.
+    return Redis.from_url(str(settings.redis_url), decode_responses=True,
+                          socket_connect_timeout=1.0, socket_timeout=1.0)
 
 
 def _otp_key(mobile: str) -> str:
@@ -142,3 +149,45 @@ async def read_bundle(key: str) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return loaded
+
+
+# ── the outbox breaker (FS-007 rule 8) ───────────────────────────────────────
+#
+# Shared across workers and time-based, so an outage costs no message an
+# attempt and the drain stops hammering a dead provider. Every failure here is
+# the same decision: fail open. The OTP challenge itself lives in Redis, so
+# sign-in is already down when Redis is; the acknowledgement path has no reason
+# to stop.
+
+BREAKER_COUNT = "wa:breaker:count"
+BREAKER_OPEN = "wa:breaker:open"
+BREAKER_WINDOW = timedelta(seconds=60)
+BREAKER_THRESHOLD = 3
+
+
+async def breaker_is_open() -> bool:
+    try:
+        return bool(await get_redis().exists(BREAKER_OPEN))
+    except Exception as exc:
+        log.warning("outbox.breaker_unavailable", kind=type(exc).__name__)
+        return False
+
+
+async def breaker_note_transient() -> bool:
+    """One transient failure. Opens the breaker at the third inside one fixed
+    window (hit_rate_limit is a fixed window) and says so. Called after the row's
+    own UPDATE has committed, never before."""
+    try:
+        if await hit_rate_limit(BREAKER_COUNT, BREAKER_THRESHOLD - 1, BREAKER_WINDOW):
+            await get_redis().setex(BREAKER_OPEN, int(BREAKER_WINDOW.total_seconds()), "1")
+            return True
+    except Exception as exc:
+        log.warning("outbox.breaker_unavailable", kind=type(exc).__name__)
+    return False
+
+
+async def breaker_reset() -> None:
+    try:
+        await get_redis().delete(BREAKER_COUNT, BREAKER_OPEN)
+    except Exception as exc:
+        log.warning("outbox.breaker_unavailable", kind=type(exc).__name__)

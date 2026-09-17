@@ -65,6 +65,23 @@ def type_of(prop: dict, schema: dict) -> str:
     return t
 
 
+def _prop_refs(prop: dict) -> list[str]:
+    """Every component a property points at: directly, through `items`, or
+    through the arms of anyOf, oneOf and allOf."""
+    out: list[str] = []
+    candidates = [prop, prop.get("items", {}),
+                  *prop.get("anyOf", []), *prop.get("oneOf", []), *prop.get("allOf", [])]
+    for cand in candidates:
+        if not isinstance(cand, dict):
+            continue
+        if cand.get("$ref"):
+            out.append(str(cand["$ref"]).split("/")[-1])
+        items = cand.get("items", {})
+        if isinstance(items, dict) and items.get("$ref"):
+            out.append(str(items["$ref"]).split("/")[-1])
+    return out
+
+
 def render_model(name: str, schema: dict, depth: int = 0) -> list[str]:
     """Render a component schema as a markdown table."""
     comp = schema.get("components", {}).get("schemas", {}).get(name)
@@ -175,6 +192,19 @@ def main() -> None:
                     used_models.add(model)
                 lines.append(f"| `{code}` | {f'`{model}`' if model != '-' else '-'} | {resp.get('description','')} |")
             lines += ["", "---", ""]
+
+        # A model nested inside another (an envelope's `data`, a list's items) is
+        # part of the contract too: walk the references until nothing new appears.
+        # Without this the OTP request's response model was never expanded, and the
+        # one field FS-007 added to the API was in no generated doc.
+        schemas = schema.get("components", {}).get("schemas", {})
+        frontier = list(used_models)
+        while frontier:
+            for prop in schemas.get(frontier.pop(), {}).get("properties", {}).values():
+                for ref in _prop_refs(prop):
+                    if ref not in used_models:
+                        used_models.add(ref)
+                        frontier.append(ref)
 
         if used_models:
             lines += ["## Models", ""]
