@@ -32,6 +32,7 @@ from api.integrations.whatsapp.provider import (
     ProviderResult,
     mask,
     scrub,
+    scrub_body,
     to_sendto,
 )
 
@@ -105,7 +106,7 @@ class ElevenZaProvider:
                         kind=type(exc).__name__)
             return ProviderResult(Outcome.TRANSIENT, None, type(exc).__name__)
 
-        self.last_response = (response.status_code, scrub(response.text, secrets))
+        self.last_response = (response.status_code, scrub_body(response.text, secrets))
         result = classify(response.status_code, response.text, secrets)
         log.info("outbox.provider_response", recipient=mask(msg.recipient),
                  status=response.status_code, outcome=str(result.outcome))
@@ -123,7 +124,7 @@ class ElevenZaProvider:
                                   json={"authToken": token, "limit": LIST_PAGE, "page": page,
                                         "search": ""}),
                 timeout=self._settings.whatsapp_send_timeout)
-            self.last_response = (response.status_code, scrub(response.text, [token]))
+            self.last_response = (response.status_code, scrub_body(response.text, [token]))
             rows = _template_rows(response.text)
             out.extend(rows)
             if len(rows) < LIST_PAGE:
@@ -149,6 +150,11 @@ def classify(status: int, text: str, secrets: list[str]) -> ProviderResult:
         message = str(body.get("Message") or body.get("message") or body.get("msg") or "")
         code = _int(body.get("Status", body.get("status"))) or status
         error = scrub(message or f"HTTP {status}", secrets)
+        # A 429 or a 5xx on the wire is an outage whatever the body says about
+        # itself (cross-vendor review of the code, P2): charging it would march
+        # rows to dead through the breaker's blind spot.
+        if status == 429 or status >= 500:
+            return ProviderResult(Outcome.TRANSIENT, None, error)
         lower = message.lower()
         if code in (401, 403) or any(w in lower for w in _TOKEN_WORDS):
             return ProviderResult(Outcome.TRANSIENT, None, error)

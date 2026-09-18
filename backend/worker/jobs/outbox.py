@@ -271,14 +271,18 @@ async def _handle(session: AsyncSession, row: Any, provider: MessageProvider,
 
 async def _charge_after_error(row_id: Any, error: str, settings: Settings) -> None:
     """The row whose handling raised: its own transaction, the same charge a
-    refusal takes, dead at the fifth."""
+    refusal takes, dead at the fifth. Only while the row is still pending: the
+    failed transaction's lock is gone, another drain may have sent the row
+    meanwhile, and a charge by id alone would turn a sent row dead (cross-vendor
+    review of the code, P2, reproduced)."""
     async with async_session_factory() as session, session.begin():
         await claim_as_principal(session, settings)
         await session.execute(
             text("UPDATE notification_outbox SET attempts = attempts + 1, error = :e, "
                  "state = CASE WHEN attempts + 1 >= :m THEN 'dead' ELSE state END, "
                  "payload = CASE WHEN attempts + 1 >= :m THEN '{}'::jsonb ELSE payload END, "
-                 "next_attempt_at = now() + make_interval(secs => :s) WHERE id = :i"),
+                 "next_attempt_at = now() + make_interval(secs => :s) "
+                 "WHERE id = :i AND state = 'pending'"),
             {"e": error[:500], "m": MAX_ATTEMPTS, "s": BACKOFF_SECONDS[1], "i": row_id},
         )
 

@@ -159,6 +159,10 @@ class Settings(BaseSettings):
         # pydantic-settings at a path that does not exist on Windows warns on
         # every import.
         extra="ignore",
+        # A refused configuration (FS-007 rule 11) is printed by whoever started
+        # the process; the raw input would put the token in that traceback
+        # (cross-vendor review of the code, P2).
+        hide_input_in_errors=True,
     )
 
     @field_validator("database_url")

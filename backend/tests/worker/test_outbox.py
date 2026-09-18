@@ -29,7 +29,13 @@ from api.integrations.messages import (
     render,
 )
 from api.integrations.whatsapp.provider import OutboundMessage, Outcome, ProviderResult
-from worker.jobs.outbox import BACKOFF_SECONDS, MAX_ATTEMPTS, outbox_drain, purge_expired_sessions
+from worker.jobs.outbox import (
+    BACKOFF_SECONDS,
+    MAX_ATTEMPTS,
+    _charge_after_error,
+    outbox_drain,
+    purge_expired_sessions,
+)
 
 pytestmark = pytest.mark.db
 
@@ -548,5 +554,20 @@ async def test_the_age_is_the_databases_arithmetic(sessions: Callable[[], AsyncS
     try:
         state, *_ = await _drain_until(sessions, row_id, FakeProvider(ACCEPTED))
         assert state == "sent"
+    finally:
+        await _drop(sessions(), row_id)
+
+
+async def test_the_charge_after_an_error_leaves_a_sent_row_alone(
+        sessions: Callable[[], AsyncSession]) -> None:
+    """Cross-vendor P2: the failed transaction's lock is gone before the charge
+    runs, so another drain may have sent the row; a charge by id alone turned a
+    sent row dead at the fifth attempt."""
+    row_id = await _queue(sessions(), recipient=_mobile(), state="sent",
+                          sent_at="now()", attempts=MAX_ATTEMPTS - 1)
+    try:
+        await _charge_after_error(row_id, "RuntimeError", get_settings())
+        state, attempts, error, _, _ = await _state(sessions(), row_id)
+        assert (state, attempts, error) == ("sent", MAX_ATTEMPTS - 1, None)
     finally:
         await _drop(sessions(), row_id)

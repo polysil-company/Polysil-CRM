@@ -209,3 +209,44 @@ async def test_the_workers_supersede_lookup_uses_its_own_index(db: AsyncSession)
         "AND o.id <> gen_random_uuid())"),
         {"r": "919999999999"})).scalars().all()
     assert any("ix_notification_outbox_otp_recipient" in line for line in plan), plan
+
+
+# ── cross-vendor review of the code, P1: issuance order under the lock ───────
+
+async def test_two_overlapping_requests_leave_the_later_issued_code_newest(
+        sessions: Callable[[], AsyncSession], dealer: Dealer) -> None:
+    """now() is the transaction's start. Session A starts first, session B issues
+    first; A then issues under the lock. A's row must carry the later stamp, or
+    the worker's "a newer code exists" check would retire the current challenge
+    (reproduced by the review through PgBouncer)."""
+    a, b = sessions(), sessions()
+    t0 = (await a.execute(text("SELECT now()"))).scalar_one()   # A's transaction has begun
+    try:
+        assert (await b.execute(ISSUE, {"m": dealer.mobile, "c": "777777",
+                                        "cap": 1000})).scalar_one()
+        await b.commit()
+        assert (await a.execute(ISSUE, {"m": dealer.mobile, "c": "888888",
+                                        "cap": 1000})).scalar_one()
+        await a.commit()
+        rows = (await b.execute(text(
+            "SELECT payload ->> 'code', state::text, error FROM notification_outbox "
+            "WHERE recipient = :m AND template_key = 'auth.otp' AND created_at >= :t "
+            "ORDER BY created_at"), {"m": dealer.mobile, "t": t0})).all()
+        assert [tuple(r) for r in rows] == [(None, "dead", "superseded"),
+                                            ("888888", "pending", None)], rows
+        newer = (await b.execute(text(
+            "SELECT EXISTS (SELECT 1 FROM notification_outbox o WHERE o.template_key = 'auth.otp' "
+            "AND o.recipient = :r AND o.created_at > (SELECT created_at FROM notification_outbox "
+            "WHERE recipient = :r AND state = 'pending' AND template_key = 'auth.otp' "
+            "AND created_at >= :t))"), {"r": dealer.mobile, "t": t0})).scalar_one()
+        await b.rollback()
+        assert newer is False, "the current challenge looks superseded to the worker"
+    finally:
+        c = sessions()
+        await c.execute(text(
+            "DELETE FROM notification_outbox WHERE recipient = :m AND created_at >= :t"),
+            {"m": dealer.mobile, "t": t0})
+        await c.execute(text(
+            "DELETE FROM login_attempt WHERE identifier = :m AND kind = 'otp_issue' "
+            "AND attempted_at >= :t"), {"m": dealer.mobile, "t": t0})
+        await c.commit()

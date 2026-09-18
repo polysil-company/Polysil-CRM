@@ -46,7 +46,12 @@ def _placeholders(row: dict[str, object]) -> int | None:
 async def check_templates(provider: MessageProvider, settings: Settings) -> list[str]:
     """The problems found, each one line, scrubbed. Empty means the account is
     ready for what this system sends."""
-    rows = await provider.list_templates()
+    token = settings.whatsapp_auth_token
+    secrets = [token.get_secret_value()] if token else []
+    # Scrubbed before anything is lower- or upper-cased: a case-changed token would
+    # survive a case-sensitive scrub at the end (cross-vendor review of the code, P2).
+    rows = [{str(k): (scrub(v, secrets) if isinstance(v, str) else v) for k, v in r.items()}
+            for r in await provider.list_templates()]
     by_name = {str(_first(r, "name", "templateName", "Name") or "").lower(): r for r in rows}
     problems: list[str] = []
     for key, spec in TEMPLATES.items():
@@ -66,17 +71,20 @@ async def check_templates(provider: MessageProvider, settings: Settings) -> list
             problems.append(f"{key}: {name!r} is in {language!r}, this system sends "
                             f"{settings.whatsapp_template_language!r}")
         count = _placeholders(row)
-        if count is not None and count != len(spec.params):
+        if count is None:
+            # Fail closed: a count the listing does not carry is not a match
+            # (cross-vendor review of the code, P2). W10 says which field carries it.
+            problems.append(f"{key}: {name!r}: the listing carries no placeholder count "
+                            f"(W10); fields: {sorted(row)}")
+        elif count != len(spec.params):
             problems.append(f"{key}: {name!r} takes {count} values, this system sends "
                             f"{len(spec.params)}")
         category = str(_first(row, "category", "Category") or "").upper()
         if category and spec.button and category != "AUTHENTICATION":
             problems.append(f"{key}: {name!r} is a {category} template, not AUTHENTICATION")
     # The listing's values are the provider's text and may echo anything, and the
-    # worker logs this list at startup: scrubbed here, for every caller (code
-    # review F-1, executed with a token in the language field).
-    token = settings.whatsapp_auth_token
-    secrets = [token.get_secret_value()] if token else []
+    # worker logs this list at startup: scrubbed once more here, for every caller
+    # (code review F-1, executed with a token in the language field).
     return [scrub(p, secrets) for p in problems]
 
 

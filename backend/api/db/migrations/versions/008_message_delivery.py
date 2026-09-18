@@ -175,9 +175,19 @@ AUTH_ISSUE_OTP_008 = """CREATE OR REPLACE FUNCTION auth_issue_otp_challenge(p_mo
 
         -- ADR-040: the code goes out on WhatsApp. The request itself is the
         -- opt-in, stated on the sign-in screen.
-        INSERT INTO notification_outbox (channel, template_key, recipient, payload)
+        --
+        -- created_at is stamped with clock_timestamp(), not the default now():
+        -- now() is the transaction's start, and of two overlapping requests the
+        -- one that started first can take the number's lock second. Its row
+        -- would then carry the earlier stamp while being the newer code, and
+        -- the worker's "a newer code exists" check would retire the current
+        -- challenge (cross-vendor review of the code, P1, executed through
+        -- PgBouncer). Under the advisory lock, clock_timestamp() is issuance
+        -- order.
+        INSERT INTO notification_outbox (channel, template_key, recipient, payload,
+                                         created_at, next_attempt_at)
         VALUES ('whatsapp', 'auth.otp', p_mobile,
-                jsonb_build_object('code', p_code));
+                jsonb_build_object('code', p_code), clock_timestamp(), clock_timestamp());
 
         RETURN true;
     END $fn$"""

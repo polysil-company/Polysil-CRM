@@ -33,6 +33,7 @@ from api.integrations.whatsapp.provider import (
     Outcome,
     ProviderResult,
     scrub,
+    scrub_body,
     to_sendto,
 )
 
@@ -355,3 +356,92 @@ def test_get_provider_needs_a_client_for_the_real_thing() -> None:
                       MockProvider)
     with pytest.raises(ValueError, match="HTTP client"):
         get_provider(_settings())
+
+
+# ── the cross-vendor review of the code ──────────────────────────────
+
+SLASHED = "U2FsdGVkX1/abc+def/ghi="   # a base64 token carries slashes
+
+
+async def test_a_json_escaped_token_is_scrubbed_from_the_diagnostics() -> None:
+    """P1: a provider that writes `/` as `\\/` hid the token from a literal
+    scrub of the raw text; `last_response`, and so the smoke script, kept it."""
+    def _echo(request: httpx.Request) -> httpx.Response:
+        escaped = SLASHED.replace("/", "\\/")
+        return httpx.Response(400, content=('{"IsSuccess": false, "Status": 400, '
+                                            '"Message": "bad: authToken=' + escaped + '"}'),
+                              headers={"content-type": "application/json"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_echo)) as client:
+        provider = ElevenZaProvider(_settings(whatsapp_auth_token=SLASHED), client)
+        result = await provider.send(OTP)
+    assert result.error is not None and SLASHED not in result.error
+    assert provider.last_response is not None
+    text = provider.last_response[1]
+    assert SLASHED not in text and SLASHED.replace("/", "\\/") not in text, text
+
+
+def test_scrub_covers_every_form_of_a_secret() -> None:
+    body = json.dumps({"m": "x " + SLASHED + " y"})           # plain
+    escaped = body.replace("/", "\\/")                       # a PHP-style encoder
+    assert SLASHED not in scrub(body, [SLASHED])
+    assert SLASHED.replace("/", "\\/") not in scrub(escaped, [SLASHED])
+    assert "%2F" not in scrub(SLASHED.replace("/", "%2F"), [SLASHED])
+    assert SLASHED not in scrub_body(escaped, [SLASHED])
+
+
+async def test_the_smoke_script_prints_no_escaped_token(capsys: pytest.CaptureFixture[str]) -> None:
+    smoke = _smoke_module()
+
+    def _echo(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, content=('{"IsSuccess": false, "Status": 400, "Message": "'
+                                            + request.content.decode().replace("/", "\\/") + '"}'),
+                              headers={"content-type": "application/json"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_echo)) as client:
+        code = await smoke.run(_settings(whatsapp_auth_token=SLASHED), client,
+                               to="919876543210", template=TEMPLATE_AUTH_OTP)
+    out = capsys.readouterr()
+    assert code == 1
+    assert _clean(out.out + out.err, SLASHED, SLASHED.replace("/", "\\/"), "123456"), out.out
+
+
+@pytest.mark.parametrize("status", [429, 503])
+async def test_a_transient_http_status_wins_over_the_body(status: int) -> None:
+    """P2: a 429 or a 5xx whose body says `Status: 400` is still the outage it is."""
+    result, _ = await _send(lambda r: _json(status, {"IsSuccess": False, "Status": 400,
+                                                     "Message": "temporarily unavailable"}))
+    assert result.outcome is Outcome.TRANSIENT
+
+
+@pytest.mark.parametrize("field", ["status", "category"])
+async def test_a_case_changed_token_in_the_listing_is_scrubbed(field: str) -> None:
+    """P2: the check lower-cases status and upper-cases category before it reads
+    them; a scrub only at the end missed the case-changed token."""
+    def _listing(request: httpx.Request) -> httpx.Response:
+        row = {"name": "polysil_auth_otp", "status": "APPROVED", "language": "en",
+               "category": "AUTHENTICATION", "placeholders": 1}
+        row[field] = "MiXed " + TOKEN
+        return _json(200, {"IsSuccess": True, "data": [row]})
+
+    settings = _settings()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_listing)) as client:
+        problems = await check_templates(ElevenZaProvider(settings, client), settings)
+    assert problems and all(_clean(p, TOKEN) for p in problems), problems
+
+
+async def test_a_listing_without_a_placeholder_count_fails_the_gate() -> None:
+    """P2: an unreadable count was a silent pass; the gate exists for that count."""
+    settings = _settings()
+    problems = await check_templates(_Listing([
+        {"name": "polysil_auth_otp", "status": "APPROVED"},
+        {"name": "polysil_lead_ack", "status": "APPROVED"},
+    ]), settings)
+    assert len(problems) == 2 and all("placeholder count" in p for p in problems), problems
+
+
+def test_a_refused_configuration_does_not_print_the_token() -> None:
+    """P2: pydantic's validation error carried the raw settings, token included."""
+    with pytest.raises(ValueError) as exc:
+        _settings(environment="production", whatsapp_provider="mock")
+    assert TOKEN not in str(exc.value) and "mock" in str(exc.value)
