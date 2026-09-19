@@ -509,14 +509,22 @@ def f_approval() -> None:
 
 def f_subsidy() -> None:
     e, n = [], {}
-    e += title("Subsidy - three different calculations",
-               sub="The systems do not share a model. Generalising one across all three is silently wrong.",
-               status="NOT BUILT. domain/subsidy/ is an empty package. 12 days, W6-W7.",
-               status_colour=RED)
+    e += title("Subsidy - three calculations, one pipeline",
+               sub="The rounding policy is what makes one pipeline reproduce three workbooks. "
+                   "It is data, not code.",
+               status="BUILT (FS-008). All three workbooks reproduce to the paisa. "
+                      "Applications and stages are FS-009.",
+               status_colour=GREEN)
 
-    cols = [("drip", 0, "DRIP", "quantities TYPED\nhead unit YES\nblocks A-G (7)\nJantri 2-D bilinear\n2 crops"),
-            ("mini", 380, "MINI SPRINKLER", "quantities TYPED\nhead unit YES\nblocks A-G (7)\nJantri 2-D, own\nbreakpoints\n1 crop"),
-            ("spr", 760, "SPRINKLER", "quantities BY AREA\nhead unit NONE\nblocks A + B only\nJantri 1-D EXACT\n1 crop")]
+    cols = [("drip", 0, "DRIP",
+             "quantities TYPED\nhead unit YES\nblocks A-G (7)\nJantri 2-D bilinear\n"
+             "2 crops\nrounds EVERY block"),
+            ("mini", 380, "MINI SPRINKLER",
+             "quantities TYPED\nhead unit YES\nblocks A-G (7)\nJantri 2-D, own rows\n"
+             "1 crop\nrounds ONE block"),
+            ("spr", 760, "SPRINKLER",
+             "quantities BY AREA\nhead unit NONE\nblocks A + B only\nJantri 1-D EXACT\n"
+             "1 crop\nrounds all but B")]
     for eid, x, hdr, body in cols:
         els = node(eid + "_h", x, 40, hdr, w=320, h=54, colour=VIOLET, size=17)
         n[eid + "_h"] = els[0]; e += els
@@ -524,61 +532,79 @@ def f_subsidy() -> None:
         n[eid] = els[0]; e += els
         e += edge(f"e_{eid}", n[eid + "_h"], n[eid], colour=VIOLET)
 
-    els = node("pipe", 200, 380, "COST PIPELINE\nper system_type", w=300, h=76, colour=BLUE)
-    n["pipe"] = els[0]; e += els
-    els = node("jan", 620, 380, "JANTRI unit cost\nper system_type", w=300, h=76, colour=BLUE)
-    n["jan"] = els[0]; e += els
+    els = node("mast", 380, 330, "MASTERS IN FORCE on as_of\neffective_from <= d < effective_to",
+               w=380, h=70, colour=YELLOW)
+    n["mast"] = els[0]; e += els
 
-    els = node("sub", 400, 520, "subsidy = MIN(cost, jantri) x pct", w=380, h=70, colour=GREEN)
+    els = node("pipe", 130, 450, "COST PIPELINE\nblocks, at the cells\nthis system rounds",
+               w=300, h=86, colour=BLUE)
+    n["pipe"] = els[0]; e += els
+    els = node("jan", 620, 450, "JANTRI unit cost\ninterpolated, or\nlooked up exactly",
+               w=300, h=86, colour=BLUE)
+    n["jan"] = els[0]; e += els
+    e += edge("e_m_p", n["mast"], n["pipe"], colour=YELLOW)
+    e += edge("e_m_j", n["mast"], n["jan"], colour=YELLOW)
+
+    els = node("sub", 370, 600, "subsidy = MIN(cost, jantri+sump) x pct", w=400, h=64, colour=GREEN)
     n["sub"] = els[0]; e += els
     e += edge("e_p_s", n["pipe"], n["sub"], colour=GREEN)
     e += edge("e_j_s", n["jan"], n["sub"], colour=GREEN)
 
-    els = node("cat", 400, 650, "8 farmer categories\n70 / 80 / 85 / 90 / 55 / 45 %", w=380, h=76, colour=GREEN)
+    els = node("cat", 370, 710, "8 categories x 2 variants\n70 / 80 / 85 / 90, and 55 / 45",
+               w=400, h=70, colour=GREEN)
     n["cat"] = els[0]; e += els
     e += edge("e_s_c", n["sub"], n["cat"], colour=GREEN)
 
-    els = node("fs", 400, 780, "FARMER SHARE", w=380, h=64, colour=GREEN)
+    els = node("fs", 370, 830, "FARMER SHARE\nrounded terms, then derived", w=400, h=70,
+               colour=GREEN)
     n["fs"] = els[0]; e += els
     e += edge("e_c_f", n["cat"], n["fs"], colour=GREEN)
 
-    els = node("st", 400, 900, "Stages 1-17  -  manual entry\nno government integration", w=380, h=80, colour=VIOLET)
+    els = node("st", 370, 950, "Applications, stages 1-17\nFS-009, not built", w=400, h=70,
+               colour=VIOLET)
     n["st"] = els[0]; e += els
     e += edge("e_f_st", n["fs"], n["st"], colour=VIOLET)
 
-    e += note("n1", 1120, 110,
-              "SPRINKLER IS THE ONE THAT CAUGHT US OUT.\n\n"
-              "BOQ!H16 = VLOOKUP(..., MATCH(area, ..., 0))\n"
-              "Quantities are looked up BY AREA, not typed.\n"
-              "MATCH(...,0) is an EXACT match - no\n"
-              "interpolation. An untabulated area gives #N/A.\n\n"
-              "OPEN QUESTION (blocks W6): what should\n"
-              "happen for, say, 1.1 Ha? Cannot be guessed.\n\n"
-              "Also: 2.0 -> 2.01 Ha jumps 41 -> 34 pipes,\n"
-              "because the pipe size changes 75mm -> 90mm.", w=430, colour=RED)
-    e += note("n2", 1120, 420,
-              "MATRIX VALUES ARE IMPORTED, NEVER TRANSCRIBED.\n\n"
-              "0.6 Ha is 16533.333333, not 16,533.\n"
-              "Rounding that at load moves the subsidy by\n"
-              "Rs 0.23 at 70% - and Jantri is a CAP, so the\n"
-              "error propagates into every capped case.\n\n"
-              "Rounding is a CALCULATION concern.\n"
-              "Storage keeps full precision.", w=430, colour=RED)
-    e += note("n3", 1120, 660,
-              "FOUR AMBIGUITIES live as named rows in\n"
-              "subsidy_parameter, per system - never as\n"
-              "inline arithmetic:\n\n"
-              "  max_area_scaling     (above 5 Ha)\n"
-              "  per_ha_cap           (Rs 70,000)\n"
-              "  inspection_floor     (Rs 200)\n"
-              "  min_area_prorate     (below 0.2 Ha)\n\n"
-              "Answering one is a data change and a\n"
-              "fixture re-run, not archaeology.", w=430, colour=YELLOW)
-    e += note("n4", 1120, 900,
-              "Stage 18 (dealer commission + TOD) is\n"
-              "DEFERRED. Stages 1-17 are the tracked\n"
-              "workflow. Commission is calculated outside\n"
-              "the system in Phase 1, as it is today.", w=420, colour=GREY)
+    e += note("n1", 1120, 40,
+              "THE WORKBOOKS ARE THE SPEC, AND THEY HAVE DEFECTS.\n\n"
+              "Two inspection floors are a malformed nested IF\n"
+              "that returns FALSE at exact equality. The Mini\n"
+              "sump term points at an empty cell. The 2-D\n"
+              "interpolation goes NEGATIVE past its largest row.\n\n"
+              "Each is reproduced or diverged from deliberately.\n"
+              "Every divergence carries a warning code and a gap.\n"
+              "Do not 'fix' one without reading its rule first.", w=430, colour=RED)
+    e += note("n2", 1120, 290,
+              "ROUNDING IS PER SYSTEM AND PER CELL.\n\n"
+              "Drip rounds every block. Mini rounds exactly one\n"
+              "(insurance) plus two kinds of line. Sprinkler\n"
+              "rounds every block but the inspection.\n\n"
+              "Five booleans could not express the middle one.\n"
+              "subsidy_system carries two arrays of named cells\n"
+              "instead, checked against what the engine knows.", w=430, colour=RED)
+    e += note("n3", 1120, 540,
+              "SPACING: the larger of the STANDARD and the\n"
+              "DESIGNED. The standard is the INTER-CROP's when\n"
+              "the block has one, not the main crop's.\n"
+              "On the client's own sample that is Rs 78,780.\n\n"
+              "Outside the tabulated rows the engine CLAMPS and\n"
+              "warns; the workbook extrapolates, to a negative\n"
+              "unit cost at 20 m. A parameter restores the\n"
+              "workbook. GAP-078, GAP-081.", w=430, colour=RED)
+    e += note("n4", 1120, 800,
+              "STILL THE CLIENT'S TO ANSWER (GAP-076 to 085):\n\n"
+              "  an off-step Sprinkler area (refused today)\n"
+              "  what the Mini sump should do\n"
+              "  which category each capped row means\n"
+              "  the head-unit divisor with no group\n\n"
+              "Each is a named row in subsidy_parameter or a\n"
+              "null column, so answering one is a data change\n"
+              "and a fixture re-run, never archaeology.", w=430, colour=YELLOW)
+    e += note("n5", 1120, 1020,
+              "Nothing is stored. /subsidy/calculate is a preview,\n"
+              "safe on every keystroke, and takes no idempotency\n"
+              "key. FS-009 stores the calculation on the\n"
+              "application with everything needed to reproduce it.", w=430, colour=GREY)
     write("06-subsidy", e)
 
 

@@ -24,7 +24,7 @@ from api.errors import (
     internal_error_handler,
     validation_error_handler,
 )
-from api.routers import auth, leads, masters, users
+from api.routers import auth, leads, masters, subsidy, users
 
 log = structlog.get_logger()
 
@@ -108,6 +108,7 @@ def create_app() -> FastAPI:
     app.include_router(masters.org_units, prefix=API_PREFIX)
     app.include_router(masters.territories, prefix=API_PREFIX)
     app.include_router(masters.partners, prefix=API_PREFIX)
+    app.include_router(subsidy.router, prefix=API_PREFIX)
 
     return app
 

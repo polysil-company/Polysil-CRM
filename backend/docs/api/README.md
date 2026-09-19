@@ -12,6 +12,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Lookups | 14 | [`lookups.md`](lookups.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 6 | [`partners.md`](partners.md) |
+| Subsidy | 4 | [`subsidy.md`](subsidy.md) |
 | Territories | 4 | [`territories.md`](territories.md) |
 | Users | 9 | [`users.md`](users.md) |
 

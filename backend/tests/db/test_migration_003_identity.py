@@ -111,7 +111,10 @@ async def test_the_extension_grants_we_cannot_revoke_are_only_extension_grants(
 
     If a future extension shipped a function that read application data, the
     exclusion in the previous test would quietly cover it. This one fails when the
-    unrevokable set grows beyond the three extensions 001 installs.
+    unrevokable set grows beyond the extensions the migrations install, which is
+    what it did the day 009 added `btree_gist` for the subsidy masters' exclusion
+    constraints. Adding a name here is a decision, not a formality: it says the
+    extension's public functions are safe for anyone to execute.
     """
     extensions = (await db.execute(text(
         "SELECT DISTINCT e.extname FROM pg_proc p "
@@ -120,7 +123,7 @@ async def test_the_extension_grants_we_cannot_revoke_are_only_extension_grants(
         "  JOIN pg_extension e ON e.oid = d.refobjid "
         " WHERE n.nspname = 'public' "
         "   AND has_function_privilege('public', p.oid, 'EXECUTE')"))).scalars().all()
-    assert set(extensions) <= {"pgcrypto", "pg_trgm", "citext"}, extensions
+    assert set(extensions) <= {"pgcrypto", "pg_trgm", "citext", "btree_gist"}, extensions
 
 
 async def test_a_function_added_later_reopens_the_hole_and_this_suite_catches_it(
