@@ -390,3 +390,117 @@ async def test_calculate_takes_no_idempotency_key(
                                headers={**h, "Idempotency-Key": uuid.uuid4().hex})
     assert first.status_code == 200 and second.status_code == 200
     assert first.json()["data"] == second.json()["data"]
+
+
+# ── the two checks the product master makes possible (GAP-080) ───────────────
+
+@pytest_asyncio.fixture
+async def catalogue_rows(sessions: Callable[[], AsyncSession]) -> AsyncIterator[dict[str, str]]:
+    """One product per shape the checks care about: head-unit only, field only,
+    and one the scheme does not fund at all."""
+    tag = uuid.uuid4().hex[:8]
+    s = sessions()
+    made: dict[str, str] = {}
+    for key, category, eligible in (("head", "head", True), ("field", "field", True),
+                                    ("marketing", "both", False)):
+        made[key] = str((await s.execute(text(
+            "INSERT INTO product (description, product_category_id, quotation_category, uom_id, "
+            "  is_subsidy_eligible) "
+            "SELECT CAST(:d AS citext), c.id, CAST(:q AS quotation_category), u.id, :e "
+            "FROM product_category c, uom u "
+            "WHERE c.id = (SELECT id FROM product_category ORDER BY sort_order LIMIT 1) "
+            "AND u.id = (SELECT id FROM uom LIMIT 1) RETURNING id"),
+            {"d": f"SUBSIDY CHECK {key.upper()} {tag}", "q": category, "e": eligible},
+        )).scalar_one())
+    await s.commit()
+    try:
+        yield made
+    finally:
+        c = sessions()
+        await c.execute(text("DELETE FROM product WHERE id = ANY(CAST(:ids AS uuid[]))"),
+                        {"ids": list(made.values())})
+        await c.commit()
+
+
+def _with_product(body: dict[str, Any], where: str, product_id: str) -> dict[str, Any]:
+    line = dict(body[where][0] if where == "head_lines" else body["crops"][0]["lines"][0])
+    line["product_id"] = product_id
+    if where == "head_lines":
+        return {**body, "head_lines": [line, *body["head_lines"][1:]]}
+    crops = [{**body["crops"][0], "lines": [line, *body["crops"][0]["lines"][1:]]},
+             *body["crops"][1:]]
+    return {**body, "crops": crops}
+
+
+async def test_a_head_unit_product_is_refused_inside_a_crop_block(
+        client: httpx.AsyncClient, viewer: Admin, catalogue_rows: dict[str, str]) -> None:
+    """FS-010 rule 2, and the reason the flag exists beside the category: the block
+    an item belongs in changes the group cost share, so a head item costed inside
+    a crop block asks the scheme to fund the wrong figure."""
+    h = await _auth(client, viewer.user)
+    body = _with_product(_body("drip"), "crops", catalogue_rows["head"])
+    r = await client.post(f"{V1}/subsidy/calculate", json=body, headers=h)
+    assert r.status_code == 422, r.text
+    assert "crops[0].lines[0].product_id" in r.json()["error"]["fields"]
+
+
+async def test_a_field_product_is_refused_in_the_head_unit(
+        client: httpx.AsyncClient, viewer: Admin, catalogue_rows: dict[str, str]) -> None:
+    h = await _auth(client, viewer.user)
+    body = _with_product(_body("drip"), "head_lines", catalogue_rows["field"])
+    r = await client.post(f"{V1}/subsidy/calculate", json=body, headers=h)
+    assert r.status_code == 422, r.text
+    assert "head_lines[0].product_id" in r.json()["error"]["fields"]
+
+
+async def test_an_item_the_scheme_does_not_fund_is_refused_anywhere(
+        client: httpx.AsyncClient, viewer: Admin, catalogue_rows: dict[str, str]) -> None:
+    """Executed on the client's file: all fifteen marketing items are marked usable
+    in either block, so the category alone would let a company umbrella through the
+    head-unit check and the scheme would be asked to fund 70 to 90 % of it."""
+    h = await _auth(client, viewer.user)
+    for where, path in (("head_lines", "head_lines[0].product_id"),
+                        ("crops", "crops[0].lines[0].product_id")):
+        body = _with_product(_body("drip"), where, catalogue_rows["marketing"])
+        r = await client.post(f"{V1}/subsidy/calculate", json=body, headers=h)
+        assert r.status_code == 422, r.text
+        assert "not eligible for subsidy" in r.json()["error"]["fields"][path]
+
+
+async def test_a_product_that_belongs_in_either_block_passes_both(
+        client: httpx.AsyncClient, viewer: Admin, catalogue_rows: dict[str, str],
+        sessions: Callable[[], AsyncSession]) -> None:
+    """`both` is 111 of the client's 1,094 rows, and the check has nothing to say
+    about them. A stated limit, not a silent one."""
+    s = sessions()
+    await s.execute(text(
+        "UPDATE product SET is_subsidy_eligible = true, quotation_category = 'both' "
+        "WHERE id = CAST(:p AS uuid)"), {"p": catalogue_rows["marketing"]})
+    await s.commit()
+    h = await _auth(client, viewer.user)
+    for where in ("head_lines", "crops"):
+        body = _with_product(_body("drip"), where, catalogue_rows["marketing"])
+        r = await client.post(f"{V1}/subsidy/calculate", json=body, headers=h)
+        assert r.status_code == 200, r.text
+
+
+async def test_the_rate_still_comes_from_the_request_not_the_catalogue(
+        client: httpx.AsyncClient, viewer: Admin, catalogue_rows: dict[str, str]) -> None:
+    """A subsidy quotation is costed at the scheme's figures, so naming a product
+    must not change a single number. The Drip workbook reproduces either way."""
+    h = await _auth(client, viewer.user)
+    plain = await client.post(f"{V1}/subsidy/calculate", json=_body("drip"), headers=h)
+    named = await client.post(f"{V1}/subsidy/calculate", headers=h,
+                              json=_with_product(_body("drip"), "crops",
+                                                 catalogue_rows["field"]))
+    assert plain.status_code == named.status_code == 200, named.text
+    assert plain.json()["data"] == named.json()["data"]
+
+
+async def test_an_unknown_product_id_names_the_line(
+        client: httpx.AsyncClient, viewer: Admin) -> None:
+    h = await _auth(client, viewer.user)
+    body = _with_product(_body("drip"), "crops", str(uuid.uuid4()))
+    r = await client.post(f"{V1}/subsidy/calculate", json=body, headers=h)
+    assert r.status_code == 422
+    assert "No such product" in r.json()["error"]["fields"]["crops[0].lines[0].product_id"]

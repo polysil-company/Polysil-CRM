@@ -347,6 +347,7 @@ treated as no crop at all.
 | `uom` | string | yes | Unit of measure, for the document. |
 | `rate` | number | string | yes | Rate per unit in rupees, at most two decimals. |
 | `qty` | number | string | yes | Quantity, at most three decimals. |
+| `product_id` | string | null |  | The catalogue row this line is, when the designer picked it from the product list. Optional, and additive: the rate and description still come from this request, because a subsidy quotation is costed at the scheme's figures rather than at ours. What it buys is the two checks the catalogue makes possible - a head-unit item cannot appear in a crop block, and an item marked not subsidy-eligible cannot appear at all. |
 
 **`MastersOut`**
 

@@ -1,4 +1,7 @@
-"""Rounding, the way the workbooks round (FS-008 rules 2, 4, 25).
+"""The rounding *policy* of each workbook (FS-008 rules 2, 4, 25).
+
+`round2` itself lives in `api/domain/money.py`, shared, because the commercial
+engine needs the same rounding and neither engine may import the other.
 
 Every intermediate value is an exact `Decimal`. The workbooks round at specific
 cells and nowhere else, and the three of them round at different cells: Drip
@@ -12,21 +15,23 @@ the seeds the loader writes and the tests read.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 
-CENT = Decimal("0.01")
-ZERO = Decimal("0")
-HUNDRED = Decimal("100")
+from api.domain.money import CENT, HUNDRED, ZERO, as_pct, round2
 
-
-def round2(value: Decimal) -> Decimal:
-    """Excel's `ROUND(x, 2)`: half away from zero, which is half-up for money."""
-    return value.quantize(CENT, rounding=ROUND_HALF_UP)
-
-
-def as_pct(whole: Decimal) -> Decimal:
-    """A category's `70` as the ratio the arithmetic multiplies by."""
-    return whole / HUNDRED
+__all__ = [
+    "BLOCK_KEYS",
+    "CENT",
+    "DRIP_ROUNDING",
+    "HUNDRED",
+    "LINE_KINDS",
+    "MINI_SPRINKLER_ROUNDING",
+    "SPRINKLER_ROUNDING",
+    "ZERO",
+    "RoundingPolicy",
+    "as_pct",
+    "round2",
+]
 
 
 # The cells a workbook may round, in the order the summary sheet lists them.

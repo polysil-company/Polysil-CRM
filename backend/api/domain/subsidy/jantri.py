@@ -35,6 +35,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
+ZERO = Decimal(0)
+ONE = Decimal(1)
 ONE_METRE = Decimal("1")
 
 
@@ -127,18 +129,46 @@ def spacing_bracket(spacings: tuple[Decimal, ...],
     return hi, (spacings[i + 1] if i + 1 < len(spacings) else None)
 
 
+def _lerp(lo: Decimal, hi: Decimal, num: Decimal, den: Decimal) -> Decimal:
+    """`lo + (hi - lo) * num/den`, with the division left to the caller.
+
+    The caller carries `den` and divides once, at the end. Dividing at each step
+    instead costs a hair of precision every time, and a hair decides a half-paisa:
+    area 0.462 Ha at 1.45 m used to interpolate to 62971.24999999999999999999999
+    where the exact value is 62971.25, and the 70 % subsidy then rounded down to
+    44079.87 instead of 44079.88 (cross-vendor review, September).
+
+    Every term here stays exact. The cells are six-digit rupee figures and the
+    weights are short decimals, so no product reaches the 28 significant digits
+    at which `Decimal` starts rounding.
+    """
+    return lo * den + (hi - lo) * num
+
+
 def bilinear(matrix: Matrix2D, *, area: Decimal, spacing: Decimal,
              outside: OutsideTable = OutsideTable.CLAMP, scale_above_max: bool = True) -> Jantri:
     """Rule 6, with the guards of rules 7 and 8. `scale_above_max` is the regular
     table's `* area / 5`; the 7-year tables are only ever called inside their
     window, so their callers pass False."""
+    num, den, used_spacing, used_area, warnings = _ratio(
+        matrix, area=area, spacing=spacing, outside=outside, scale_above_max=scale_above_max)
+    return Jantri(num / den, used_spacing, used_area, warnings)
+
+
+def _ratio(matrix: Matrix2D, *, area: Decimal, spacing: Decimal, outside: OutsideTable,
+           scale_above_max: bool) -> tuple[Decimal, Decimal, Decimal, Decimal, tuple[str, ...]]:
+    """The unit cost as an exact numerator over an exact denominator.
+
+    Every path returns a pair rather than a quotient, so `bilinear` divides once
+    however many weights the value passed through. See `_lerp`.
+    """
     if scale_above_max and area > matrix.max_area:
-        base = bilinear(matrix, area=matrix.max_area, spacing=spacing, outside=outside,
-                        scale_above_max=False)
+        num, den, used_spacing, _, so_far = _ratio(
+            matrix, area=matrix.max_area, spacing=spacing, outside=outside,
+            scale_above_max=False)
         note = (f"area_above_table: {area} Ha is above the largest tabulated "
                 f"{matrix.max_area} Ha; the unit cost was scaled by area / {matrix.max_area}")
-        return Jantri(base.unit_cost * area / matrix.max_area, base.spacing_used, area,
-                      (*base.warnings, note))
+        return num * area, den * matrix.max_area, used_spacing, area, (*so_far, note)
 
     a_lo, a_hi = area_bracket(matrix.areas, area)
     s_hi, s_lo = spacing_bracket(matrix.spacings, spacing)
@@ -156,19 +186,20 @@ def bilinear(matrix: Matrix2D, *, area: Decimal, spacing: Decimal,
     # the lower column. Below 1 m the row is the smallest one. Both guards can
     # fire at once, and both are reported (code review F-10).
     if spacing < ONE_METRE or below_area:
-        return Jantri(matrix.at(s_hi, a_lo), s_hi, a_lo, tuple(warnings))
+        return matrix.at(s_hi, a_lo), ONE, s_hi, a_lo, tuple(warnings)
 
-    # The area weight along each of the two rows. Past the last column the
-    # workbook's C20 is 0 and the term vanishes.
+    # The area weight along each of the two rows, still over its denominator.
+    # Past the last column the workbook's C20 is 0 and the term vanishes.
     if a_hi is None:
-        t = Decimal(0)
+        t_den = ONE
         along = {s_hi: matrix.at(s_hi, a_lo)}
         if s_lo is not None:
             along[s_lo] = matrix.at(s_lo, a_lo)
     else:
-        t = (area - a_lo) / (a_hi - a_lo)
+        t_num, t_den = area - a_lo, a_hi - a_lo
+
         def between(s: Decimal) -> Decimal:
-            return matrix.at(s, a_lo) + (matrix.at(s, a_hi) - matrix.at(s, a_lo)) * t
+            return _lerp(matrix.at(s, a_lo), matrix.at(s, a_hi), t_num, t_den)
 
         along = {s_hi: between(s_hi)}
         if s_lo is not None:
@@ -179,17 +210,19 @@ def bilinear(matrix: Matrix2D, *, area: Decimal, spacing: Decimal,
         # At or below the smallest row (and at least 1 m). The workbook's next row
         # is 0, so its weight extrapolates toward zero.
         if outside is OutsideTable.EXTRAPOLATE and spacing < s_hi:
-            w = (s_hi - spacing) / s_hi
-            return Jantri(v_hi + (Decimal(0) - v_hi) * w, spacing, area, tuple(warnings))
-        return Jantri(v_hi, s_hi, area, tuple(warnings))
+            return (_lerp(v_hi, ZERO, s_hi - spacing, s_hi), t_den * s_hi,
+                    spacing, area, tuple(warnings))
+        return v_hi, t_den, s_hi, area, tuple(warnings)
 
-    w = (s_hi - spacing) / (s_hi - s_lo)
+    w_num, w_den = s_hi - spacing, s_hi - s_lo
     if spacing > s_hi:
         # Above the largest row the weight is negative and the workbook keeps going.
         if outside is OutsideTable.EXTRAPOLATE:
-            return Jantri(v_hi + (along[s_lo] - v_hi) * w, spacing, area, tuple(warnings))
-        return Jantri(v_hi, s_hi, area, tuple(warnings))
-    return Jantri(v_hi + (along[s_lo] - v_hi) * w, spacing, area, tuple(warnings))
+            return (_lerp(v_hi, along[s_lo], w_num, w_den), t_den * w_den,
+                    spacing, area, tuple(warnings))
+        return v_hi, t_den, s_hi, area, tuple(warnings)
+    return (_lerp(v_hi, along[s_lo], w_num, w_den), t_den * w_den,
+            spacing, area, tuple(warnings))
 
 
 def lookup_1d(table: Mapping[Decimal, Decimal], area: Decimal) -> Decimal | None:

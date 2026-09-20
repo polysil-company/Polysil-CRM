@@ -20,7 +20,6 @@ import time
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,17 +58,11 @@ from api.schemas.subsidy import (
     SystemType,
     TotalOut,
 )
+from api.services.clock import today_ist
 
-IST = ZoneInfo("Asia/Kolkata")
 _SYSTEMS: tuple[SystemType, ...] = ("drip", "mini_sprinkler", "sprinkler")
 CACHE_TTL_SECONDS = 60.0
 BLOCK_FIELDS = tuple(Blocks.model_fields)
-
-
-def today_ist() -> dt.date:
-    """Rule 23. Computed here, never `current_date`: the server clock is UTC and
-    between 18:30 and 24:00 UTC the two are different days."""
-    return dt.datetime.now(tz=IST).date()
 
 
 @dataclass(frozen=True)
@@ -332,6 +325,55 @@ def _validate(req: CalculateRequest, resolved: ResolvedMasters) -> None:
         raise ValidationFailed(fields=fields)
 
 
+# The two checks the product master makes possible (GAP-080, FS-010 rule 2).
+#
+# Neither reads a rate. A subsidy quotation is costed at the scheme's own figures,
+# so the line still carries the rate the designer typed; what the catalogue adds is
+# the ability to say that a line is not a thing that belongs in this block, or not
+# a thing the scheme funds at all. Executed on the client's file: all fifteen
+# marketing items are marked usable in either block, so without the eligibility
+# flag a company umbrella passes the head-unit check and the scheme is asked to
+# fund 70 to 90 % of it.
+#
+# The block check covers 983 of 1,094 rows. The 111 marked `both` get none, and 91
+# of those are drip components where the block changes the group cost share. A
+# stated limit, not an implied guarantee.
+async def _check_products(db: AsyncSession, req: CalculateRequest) -> None:
+    wanted: dict[str, list[str]] = {}
+    for i, crop in enumerate(req.crops):
+        for j, line in enumerate(crop.lines):
+            if line.product_id:
+                wanted.setdefault(line.product_id, []).append(f"crops[{i}].lines[{j}].product_id")
+    for j, line in enumerate(req.head_lines):
+        if line.product_id:
+            wanted.setdefault(line.product_id, []).append(f"head_lines[{j}].product_id")
+    if not wanted:
+        return
+
+    rows = {str(r[0]): (r[1], r[2], r[3]) for r in (await db.execute(text(
+        "SELECT id::text, description::text, quotation_category::text, is_subsidy_eligible "
+        "FROM product WHERE id = ANY(CAST(:ids AS uuid[])) AND deleted_at IS NULL AND is_active"),
+        {"ids": list(wanted)})).all()}
+
+    fields: dict[str, str] = {}
+    for product_id, paths in wanted.items():
+        found = rows.get(product_id)
+        for path in paths:
+            if found is None:
+                fields[path] = "No such product, or it is no longer sold."
+                continue
+            name, category, eligible = found
+            if not eligible:
+                fields[path] = f"{name} is not eligible for subsidy."
+            elif category != "both":
+                block = "head_lines" if path.startswith("head_lines") else "a crop block"
+                wants = "head_lines" if category == "head" else "a crop block"
+                if (category == "head") != path.startswith("head_lines"):
+                    fields[path] = f"{name} belongs in {wants}, not in {block}."
+    if fields:
+        raise ValidationFailed(fields=fields)
+
+
 async def calculate(db: AsyncSession, req: CalculateRequest) -> CalculateResponse:
     as_of = req.as_of or today_ist()
     if as_of > today_ist():
@@ -339,6 +381,7 @@ async def calculate(db: AsyncSession, req: CalculateRequest) -> CalculateRespons
 
     resolved = await resolve(db, req.scheme, req.system_type, as_of)
     _validate(req, resolved)
+    await _check_products(db, req)
 
     crops = tuple(CropInput(c.crop, c.inter_crop, c.area, c.crop_spacing, c.lateral_spacing,
                             _lines(c.lines)) for c in req.crops)

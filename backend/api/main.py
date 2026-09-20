@@ -13,9 +13,10 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.config import get_settings
+from api.config import LOCALHOST_ORIGIN, get_settings
 from api.db.session import engine
 from api.deps import assert_runtime_role
 from api.errors import (
@@ -24,7 +25,7 @@ from api.errors import (
     internal_error_handler,
     validation_error_handler,
 )
-from api.routers import auth, leads, masters, subsidy, users
+from api.routers import auth, leads, masters, pricing, products, subsidy, users
 
 log = structlog.get_logger()
 
@@ -74,17 +75,52 @@ def create_app() -> FastAPI:
         It does report whether pre-auth containment is active, because an unset
         db_anon_role is a weakness that is otherwise invisible (GAP-021).
         """
+        # Read at request time, not from the instance this factory closed over.
+        # The settings are an lru_cache, and a test that clears it leaves the app
+        # holding an object nobody can reach any more - so this endpoint reported
+        # a configuration that was no longer the live one, which is the one thing
+        # it exists to do.
+        live = get_settings()
         body: dict[str, object] = {
             "status": "ok",
-            "environment": settings.environment,
-            "pre_auth_containment": bool(settings.db_anon_role),
-            "runtime_role": settings.db_app_role,
+            "environment": live.environment,
+            "pre_auth_containment": bool(live.db_anon_role),
+            "runtime_role": live.db_app_role,
         }
         # FS-007 rule 16: which provider this box talks to, outside production
         # only; the endpoint is unauthenticated and already says enough.
-        if settings.environment != "production":
-            body["whatsapp"] = settings.whatsapp_provider
+        if live.environment != "production":
+            body["whatsapp"] = live.whatsapp_provider
         return JSONResponse(body)
+
+    # ── the browser's permission to call us at all ───────────────────────────
+    #
+    # Only added when something is configured, so the default build has no CORS
+    # surface and a same-origin or dev-server-proxied frontend never needs one.
+    #
+    # `allow_origin_regex` rather than a pinned port: a frontend developer's dev
+    # server moves between 3000, 5173 and whatever is free, and pinning one means
+    # asking them every time. Credentials forbid `*`, but a regex echoes back the
+    # origin it matched, which is what the browser requires.
+    #
+    # **The cookie has to agree with this.** A cross-origin frontend also needs
+    # `refresh_cookie_samesite = "none"`, or sign-in works and the session dies at
+    # the first refresh (`_set_refresh_cookie`).
+    origins = list(settings.cors_allow_origins)
+    localhost = LOCALHOST_ORIGIN.pattern if settings.cors_allow_localhost else None
+    if origins or localhost:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_origin_regex=localhost,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+            # Named rather than "*", because with credentials the browser will not
+            # accept a wildcard, and because Idempotency-Key is ours and would
+            # otherwise be stripped from every mutation.
+            allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+            max_age=600,
+        )
 
     # Every ApiError becomes {"error": {"code", "message"}} (FS-001 section 4).
     # Registered for the base class so a new error type inherits the envelope
@@ -109,6 +145,10 @@ def create_app() -> FastAPI:
     app.include_router(masters.territories, prefix=API_PREFIX)
     app.include_router(masters.partners, prefix=API_PREFIX)
     app.include_router(subsidy.router, prefix=API_PREFIX)
+    app.include_router(products.router, prefix=API_PREFIX)
+    app.include_router(products.tax_rates, prefix=API_PREFIX)
+    app.include_router(pricing.price_lists, prefix=API_PREFIX)
+    app.include_router(pricing.router, prefix=API_PREFIX)
 
     return app
 

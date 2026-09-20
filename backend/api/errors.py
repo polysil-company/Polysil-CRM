@@ -142,6 +142,21 @@ class StageChangedError(ApiError):
     message = "The lead has moved to a different stage since you loaded it."
 
 
+class ConflictError(ApiError):
+    """A refusal that is about the state of another row, not about this request's
+    fields (FS-010 section 4). The caller fixes it by acting on that other row: a
+    published list is corrected by publishing a new one, a duplicate description
+    by editing the product that already holds it.
+
+    409 rather than 422, and the code says which case it is. `fields` still
+    travels where a field is implicated, so a form can highlight it.
+    """
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "conflict"
+    message = "That cannot be done in the current state."
+
+
 class IdempotencyConflictError(ApiError):
     """Same key, different body. AC-IDEM-3. Replaying it would be worse than
     refusing: the caller believes one request happened and a different one did.

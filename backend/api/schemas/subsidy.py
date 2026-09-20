@@ -17,6 +17,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from api.schemas.leads import UUID_RE
+
 SystemType = Literal["drip", "mini_sprinkler", "sprinkler"]
 Nozzle = Literal["plastic", "brass"]
 
@@ -24,7 +26,17 @@ MAX_LINES = 200
 MAX_CROPS = 10
 
 
+# A bound on every decimal field, checked before anything quantizes it. A rate of
+# 1E26 is finite and passes `gt=0`, and quantizing it exceeds the default decimal
+# context: `InvalidOperation` escapes as a 500 where the contract promises a
+# field-level 422 (cross-vendor review, September). The figure is the same
+# ceiling the pricing engine applies to a line total.
+MAX_MAGNITUDE = Decimal("99999999.99")
+
+
 def _places(value: Decimal, places: int, what: str) -> Decimal:
+    if not value.is_finite() or value.copy_abs() > MAX_MAGNITUDE:
+        raise ValueError(f"{what} may not exceed {MAX_MAGNITUDE:f}")
     if value != value.quantize(Decimal(1).scaleb(-places)):
         raise ValueError(f"{what} carries at most {places} decimals")
     return value
@@ -38,13 +50,21 @@ class Line(BaseModel):
     `product_id` and the rate comes from the price list in force.
     """
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     description: str = Field(min_length=1, max_length=300,
                              description="The item, as it prints on the quotation.")
     uom: str = Field(min_length=1, max_length=20, description="Unit of measure, for the document.")
     rate: Decimal = Field(ge=0, description="Rate per unit in rupees, at most two decimals.")
     qty: Decimal = Field(ge=0, description="Quantity, at most three decimals.")
+    product_id: str | None = Field(
+        default=None, pattern=UUID_RE,
+        description="The catalogue row this line is, when the designer picked it from the "
+                    "product list. Optional, and additive: the rate and description still "
+                    "come from this request, because a subsidy quotation is costed at the "
+                    "scheme's figures rather than at ours. What it buys is the two checks "
+                    "the catalogue makes possible - a head-unit item cannot appear in a crop "
+                    "block, and an item marked not subsidy-eligible cannot appear at all.")
 
     @field_validator("rate")
     @classmethod
@@ -61,7 +81,7 @@ class CropRequest(BaseModel):
     """One crop block: its area, its spacings and its field-unit lines. Head-unit
     lines belong to the quotation, not here (rule 12)."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     crop: str | None = Field(default=None, max_length=120,
                              description="From GET /subsidy/crops. Null means no crop chosen, "
@@ -86,12 +106,14 @@ class CropRequest(BaseModel):
 
 
 class Sump(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     rate_per_ha: Decimal = Field(default=Decimal("0"), ge=0,
                                  description="Zero or absent means no sump.")
 
 
 class CalculateRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     scheme: str = Field(default="GGRC", max_length=30, description="Subsidy scheme code.")
     system_type: SystemType = Field(description="Which of the three calculation models to run.")

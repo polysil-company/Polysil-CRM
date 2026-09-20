@@ -705,25 +705,35 @@ def f_money() -> None:
     e, n = [], {}
     e += title("Where money is decided",
                sub="Three pure functions. Two places where a bug is a legal problem.",
-               status="NOT BUILT. No GST engine, no pricing, no orders.",
-               status_colour=RED)
+               status="GST ENGINE AND SUBSIDY BUILT (FS-008, FS-010). Discounts and "
+                      "balances are not: no orders, no receipts.",
+               status_colour=YELLOW)
 
-    els = node("gst", 0, 60, "GST ENGINE", w=300, h=56, colour=RED); n["gst"] = els[0]; e += els
+    els = node("gst", 0, 60, "GST ENGINE", w=300, h=56, colour=GREEN); n["gst"] = els[0]; e += els
     e += note("gstn", 0, 130,
-              "Per line, half-up, 2dp.\n"
-              "Intra-state -> CGST + SGST\n"
-              "Inter-state -> IGST\n\n"
-              "Invoice total = SUM of rounded lines,\n"
-              "never a recomputation on the total.\n"
-              "Those differ by paise, and paise are\n"
-              "what an auditor checks.\n\n"
+              "BUILT: api/domain/pricing/tax.py\n\n"
+              "ROUND IN PRINT ORDER:\n"
+              "  gross    = round2(rate x qty)\n"
+              "  discount = round2(gross x pct/100)\n"
+              "  taxable  = gross - discount\n"
+              "One-shot rounding differs on 21 of 105\n"
+              "inputs and prints three figures that do\n"
+              "not add up.\n\n"
+              "Intra-state -> CGST + SGST, EACH at half\n"
+              "the slab and rounded on its own, so the\n"
+              "two are always equal.\n"
+              "Inter-state -> IGST at the full slab.\n\n"
+              "Document total = SUM of rounded lines,\n"
+              "never a recomputation. Those differ by\n"
+              "paise, and paise are what an auditor\n"
+              "checks.\n\n"
               "Rate comes from the item's HSN, so one\n"
               "quotation carries several rates:\n"
               "  material          5%\n"
               "  installation      5%\n"
               "  insurance        18%\n"
               "  inspection       18%\n"
-              "  farmer education  0%", w=340, colour=RED)
+              "  farmer education  0%", w=340, colour=GREEN)
 
     els = node("disc", 420, 60, "DISCOUNT CASCADE", w=340, h=56, colour=YELLOW)
     n["disc"] = els[0]; e += els
@@ -738,13 +748,23 @@ def f_money() -> None:
               "A percentage edited later must never\n"
               "restate a historical order.", w=350, colour=YELLOW)
 
-    els = node("sub", 880, 60, "SUBSIDY", w=300, h=56, colour=VIOLET); n["sub"] = els[0]; e += els
+    els = node("sub", 880, 60, "SUBSIDY", w=300, h=56, colour=GREEN); n["sub"] = els[0]; e += els
     e += note("subn", 880, 130,
+              "BUILT: api/domain/subsidy/\n\n"
               "Per system. Capped by Jantri.\n"
               "Eight categories.\n\n"
               "Matrix values imported at FULL precision\n"
               "and never rounded at load.\n\n"
-              "See flow 06.", w=330, colour=VIOLET)
+              "THE TWO ENGINES ARE ALLOWED TO DIFFER,\n"
+              "and a subsidy quotation NEVER calls\n"
+              "tax.py. A pump is 18% commercially and\n"
+              "5% inside a subsidy block. Both have a\n"
+              "test so nobody harmonises them later.\n\n"
+              "INTERPOLATE ONCE. Two chained divisions\n"
+              "put 0.462 Ha at 1.45 m on 62971.2499..\n"
+              "where the exact value is 62971.25, and\n"
+              "the 70% share then rounded DOWN.\n\n"
+              "See flow 06.", w=330, colour=GREEN)
 
     els = node("bal", 420, 520, "OUTSTANDING BALANCE", w=340, h=56, colour=GREEN)
     n["bal"] = els[0]; e += els
@@ -776,6 +796,128 @@ def f_money() -> None:
               "price_list_item_id, discount amounts,\n"
               "subsidy result, matrix version.", w=380, colour=INK)
     write("08-money", e)
+
+
+def f_pricing() -> None:
+    e, n = [], {}
+    e += title("Pricing a line: which rate, which tax, and what may change",
+               sub="Per product, not per document. One snapshot per document. "
+                   "A published rate is never corrected, only superseded.",
+               status="BUILT. FS-010: /products, /tax-rates, /price-lists, "
+                      "/pricing/quote-lines, migrations 010 and 011.",
+               status_colour=GREEN)
+
+    steps = [
+        ("p1", "POST /pricing/quote-lines\nproduct ids, quantities, discounts,\n"
+               "and WHERE THE GOODS ARE DELIVERED", BLUE),
+        ("p2", "the caller's scope\npartner -> their own tier, from their own row\n"
+               "no partner -> the farmer tier\na partner_id in the body is REFUSED for a partner",
+         RED),
+        ("p3", "the seller's registration in force\n-> its state\n"
+               "ship-to territory -> up the closure -> its state", BLUE),
+        ("p4", "ONE statement reads every applicable rate\n"
+               "for every line, published and in force", GREEN),
+        ("p5", "per product: the most specific list wins\n"
+               "state+tier > STATE > tier > neither", VIOLET),
+        ("p6", "tax.py: gross, discount, taxable, then the split\n"
+               "same state -> CGST + SGST at half the slab each\n"
+               "different state -> IGST at the full slab", GREEN),
+        ("p7", "200 OK. Every printed figure, in print order.\n"
+               "Nothing stored. Nothing locked.", GREEN),
+    ]
+    y = 60
+    for eid, label, colour in steps:
+        els = node(eid, 300, y, label, w=520, h=86, colour=colour)
+        n[eid] = els[0]
+        e += els
+        y += 150
+    order = [s[0] for s in steps]
+    for a, b in zip(order, order[1:], strict=False):
+        e += edge(f"e_{a}_{b}", n[a], n[b])
+
+    e += note("nRed1", 880, 210,
+              "THE TIER COMES FROM THE ROW, NEVER THE REQUEST\n\n"
+              "A restrictive policy on price_list enforces it, not\n"
+              "a permissive one. Written permissively, a staff caller\n"
+              "has no partner, the comparison is NULL for every tier\n"
+              "row, and STAFF RESOLVE NOTHING BUT THE BASE LIST -\n"
+              "which breaks this endpoint the day a tier list exists.\n\n"
+              "Permissive policies also OR together, so a later one\n"
+              "would defeat the rule entirely.", w=460, colour=RED)
+
+    e += note("nRed2", 880, 510,
+              "THE PLACE OF SUPPLY IS THE SHIP-TO\n\n"
+              "For goods it is where delivery ends, resolved UP to\n"
+              "its state through territory_closure. Defaulting to the\n"
+              "dealer's own state under-collects the inter-state tax,\n"
+              "which is a credit note rather than a rounding argument.",
+              w=460, colour=RED)
+
+    e += note("nGreen1", 880, 660,
+              "ONE STATEMENT, ONE SNAPSHOT\n\n"
+              "A query per line takes a fresh snapshot each time, so\n"
+              "a document could carry old rates on its first hundred\n"
+              "lines and new ones on its last hundred while a list\n"
+              "was being published underneath it.", w=460, colour=GREEN)
+
+    e += note("nViolet1", 880, 810,
+              "PER PRODUCT, NOT PER DOCUMENT\n\n"
+              "So a state list holding three corrections sits OVER a\n"
+              "complete base list and overrides only those three.\n"
+              "Per document would refuse a forty-line quotation\n"
+              "because one product is missing a rate.\n\n"
+              "When a document draws from more than one list it SAYS\n"
+              "SO: mixed_price_lists. Right if a state list is a\n"
+              "discount layer, a mispricing if it replaces the base,\n"
+              "and nobody has told us which (GAP-087).", w=460, colour=VIOLET)
+
+    e += note("nGreen2", 0, 810,
+              "WHAT THE RESPONSE CARRIES, AND WHY\n\n"
+              "gross, cgst_rate and sgst_rate are RETURNED so\n"
+              "nothing on the screen re-derives them and lands on\n"
+              "a different paisa.\n\n"
+              "intra_state is returned so the document does not\n"
+              "re-derive which tax applies.\n\n"
+              "price_list_item_id and gst_rate_id are returned so\n"
+              "FS-005 can RE-RESOLVE AND COMPARE at save. That\n"
+              "closes the preview-to-save window with no lock,\n"
+              "because a published list never changes its rates\n"
+              "and a published item is never deleted.", w=460, colour=GREEN)
+
+    e += note("nYellow1", 0, 1180,
+              "PUBLISHING: CLOSE FIRST, PUBLISH SECOND\n\n"
+              "In one transaction. The other order RAISES the\n"
+              "exclusion constraint, because for that instant two\n"
+              "published lists cover the same scope and the same day.\n\n"
+              "It refuses a list that does not price every active\n"
+              "product, unless the caller overrides. A successor\n"
+              "built over March and half filled would, on 1 April,\n"
+              "leave every other product falling through or\n"
+              "refusing to price.", w=460, colour=YELLOW)
+
+    e += note("nRed3", 480, 1180,
+              "WHAT THE DATABASE REFUSES, NOT THE SERVICE\n\n"
+              "A published list cannot return to draft: that route\n"
+              "made its rates editable again through the draft-only\n"
+              "item policies.\n\n"
+              "A dated master's VALUE cannot be edited in place -\n"
+              "a category percentage, a parameter, a rate, a slab,\n"
+              "a classification. effective_to and is_active still\n"
+              "move, because closing a row IS an update.\n\n"
+              "Both are triggers in migration 011. Found by a\n"
+              "cross-vendor review, not by us.", w=460, colour=RED)
+
+    e += note("nYellow2", 960, 1180,
+              "STILL A STAND-IN\n\n"
+              "Every price and every tax code on this box is ours,\n"
+              "not the client's, and every line that uses one comes\n"
+              "back with provisional_fields and a warning. SHOW IT.\n"
+              "Fine for testing, not for a quotation anyone sends.\n\n"
+              "The seller's registration is the default one rather\n"
+              "than the supplying warehouse's, because warehouses\n"
+              "do not exist yet (GAP-088).", w=460, colour=YELLOW)
+
+    write("11-pricing", e)
 
 
 def f_auth() -> None:
@@ -1009,5 +1151,6 @@ def f_admin() -> None:
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
-    f_approval(); f_subsidy(); f_outbox(); f_money(); f_auth(); f_admin()
+    f_approval(); f_subsidy(); f_outbox(); f_money(); f_pricing()
+    f_auth(); f_admin()
     print(f"\nwrote to {OUT}")

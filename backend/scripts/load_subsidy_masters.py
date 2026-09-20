@@ -97,6 +97,22 @@ class Loader:
             (*args, self.frm))
         return (str(rows[0][0]), rows[0][1]) if rows else None
 
+    def _next_start(self, table: str, where: str, args: Sequence[Any]) -> dt.date | None:
+        """The start date of the next revision already on file, if any.
+
+        A revision inserted open-ended overlaps every version that starts later, so
+        loading a September table into a scheme that already holds June and November
+        aborted on the exclusion constraint - even though September to November is a
+        perfectly good window, and loading history before the earliest version failed
+        the same way (cross-vendor review, September). Bounding the insert here makes
+        both work, and an unbounded revision is still unbounded when nothing follows
+        it.
+        """
+        rows = self._all(
+            f"SELECT min(effective_from) FROM {table} WHERE {where} AND effective_from > %s",
+            (*args, self.frm))
+        return rows[0][0] if rows and rows[0][0] else None
+
     def _close_previous(self, table: str, where: str, args: Sequence[Any]) -> None:
         """A row still open at the load date is closed at that date, so the new row
         starts where the old one ends and the exclusion constraint is satisfied."""
@@ -130,23 +146,28 @@ class Loader:
                     f"{label}: the matrix in force from {frm} differs from the workbook. A revised "
                     f"table is a new matrix: rerun with --effective-from after {frm}.")
             self._close_previous("unit_cost_matrix", where, args)
-        self._insert_matrix(system, variant, dim, source, cells, label)
+        self._insert_matrix(system, variant, dim, source, cells, label,
+                            until=self._next_start("unit_cost_matrix", where, args))
 
     def _insert_matrix(self, system: str, variant: str, dim: int, source: str,
-                       cells: list[tuple[Decimal | None, Decimal, Decimal]], label: str) -> None:
+                       cells: list[tuple[Decimal | None, Decimal, Decimal]], label: str,
+                       *, until: dt.date | None = None) -> None:
         if self.dry_run:
-            self.written.append(f"{label}: would write {len(cells)} cells from {self.frm}")
+            window = f" to {until}" if until else ""
+            self.written.append(f"{label}: would write {len(cells)} cells from {self.frm}{window}")
             return
         mid = self._one(
             "INSERT INTO unit_cost_matrix (scheme_id, system_type, variant, dimensionality, "
-            "effective_from, source) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-            (self.scheme_id, system, variant, dim, self.frm, source))
+            "effective_from, effective_to, source) VALUES (%s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING id",
+            (self.scheme_id, system, variant, dim, self.frm, until, source))
         with self.conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO unit_cost_cell (matrix_id, lateral_spacing, area_breakpoint, "
                 "unit_cost) VALUES (%s, %s, %s, %s)",
                 [(mid, s, a, c) for s, a, c in cells])
-        self.written.append(f"{label}: {len(cells)} cells from {self.frm}")
+        window = f" to {until}" if until else ""
+        self.written.append(f"{label}: {len(cells)} cells from {self.frm}{window}")
 
     # ── the Sprinkler quantity matrix ────────────────────────────────────────
 
@@ -166,17 +187,20 @@ class Loader:
             if frm == self.frm:
                 raise SystemExit(f"{label}: differs from the workbook; use --effective-from")
             self._close_previous("quantity_matrix", where, args)
+        until = self._next_start("quantity_matrix", where, args)
+        window = f" to {until}" if until else ""
         if self.dry_run:
-            self.written.append(f"{label}: would write {len(cells)} cells from {self.frm}")
+            self.written.append(f"{label}: would write {len(cells)} cells from {self.frm}{window}")
             return
         mid = self._one(
-            "INSERT INTO quantity_matrix (scheme_id, system_type, effective_from, source) "
-            "VALUES (%s, %s, %s, %s) RETURNING id", (self.scheme_id, "sprinkler", self.frm, source))
+            "INSERT INTO quantity_matrix (scheme_id, system_type, effective_from, effective_to, "
+            "source) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (self.scheme_id, "sprinkler", self.frm, until, source))
         with self.conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO quantity_matrix_cell (matrix_id, component_code, area_breakpoint, qty)"
                 " VALUES (%s, %s, %s, %s)", [(mid, c, a, q) for c, a, q in cells])
-        self.written.append(f"{label}: {len(cells)} cells from {self.frm}")
+        self.written.append(f"{label}: {len(cells)} cells from {self.frm}{window}")
 
     # ── crops ────────────────────────────────────────────────────────────────
 
@@ -214,13 +238,14 @@ class Loader:
             self._close_previous("crop_lateral_spacing", "scheme_id = %s AND crop = %s",
                                  (self.scheme_id, crop))
         for crop, spacing, order in changed:
+            where = "scheme_id = %s AND crop = %s"
             if crop in live:
-                self._close_previous("crop_lateral_spacing", "scheme_id = %s AND crop = %s",
-                                     (self.scheme_id, crop))
+                self._close_previous("crop_lateral_spacing", where, (self.scheme_id, crop))
             self._write(
                 "INSERT INTO crop_lateral_spacing (scheme_id, crop, standard_spacing, sort_order, "
-                "effective_from) VALUES (%s, %s, %s, %s, %s)",
-                (self.scheme_id, crop, spacing, order, self.frm))
+                "effective_from, effective_to) VALUES (%s, %s, %s, %s, %s, %s)",
+                (self.scheme_id, crop, spacing, order, self.frm,
+                 self._next_start("crop_lateral_spacing", where, (self.scheme_id, crop))))
         self.written.append(f"crop_lateral_spacing: {len(changed)} of {len(rows)} crops"
                             + (f", {len(gone)} closed" if gone else ""))
 

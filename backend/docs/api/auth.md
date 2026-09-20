@@ -82,6 +82,10 @@ identifies it when the access token has already expired - which is the usual
 case for a tab left open for an hour. Send whichever you have; sending both is
 fine, and the Bearer token wins.
 
+The one exception to always-204 is a browser request carrying an `Origin` that
+is not allowed, which is `403 origin_not_allowed`. Your own origin is allowed,
+so you will not see it; a site trying to sign your users out will.
+
 To sign out everywhere, an administrator bumps the user's token version; that
 is not exposed here.
 

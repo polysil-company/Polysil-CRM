@@ -190,3 +190,69 @@ def test_the_spacing_weight_is_exact_at_a_row_and_halfway_between_two() -> None:
 def test_the_seven_year_table_has_no_one_metre_row_and_floors_are_the_callers() -> None:
     assert DRIP7.smallest_spacing == D("1.2") and DRIP.smallest_spacing == D("1")
     assert MINI7.spacings == (D("9"), D("8")) and MINI.spacings == (D("9"), D("8"), D("7.5"))
+
+
+def test_interpolation_is_exact_where_the_exact_answer_terminates() -> None:
+    """The half-paisa boundary the cross-vendor review found.
+
+    Two chained divisions, one per axis, each rounding at 28 significant digits,
+    left area 0.462 Ha at 1.45 m on 62971.24999999999999999999999 where the exact
+    value is 62971.25. The 70 % subsidy then rounded down: 44079.87 rather than
+    44079.88. One rupee a hundred times is a reconciliation.
+
+    Both weights are now carried as exact ratios and divided once, so a value
+    whose exact answer terminates inside 28 digits comes out exact.
+    """
+    from api.domain.money import round2
+
+    got = bilinear(DRIP, area=D("0.462"), spacing=D("1.45")).unit_cost
+    assert got == D("62971.25"), got
+    assert round2(got * D("0.7")) == D("44079.88")
+
+
+def test_interpolation_matches_exact_rational_arithmetic() -> None:
+    """The defect class, checked against an oracle sharing none of its arithmetic.
+
+    `Fraction` is exact, so it says what the bilinear answer *is*. Wherever that
+    exact answer terminates inside the decimal context the engine must return it
+    to the digit: those are the values that can sit on a half-paisa, and a hair
+    either way is a rupee on the quotation.
+
+    The grid is deliberate. Over 3,445 terminating values in it, the chained-
+    division arithmetic this replaced was wrong on 160 - so a sparser sweep passes
+    against the defect and proves nothing. Keep the thousandth-hectare step.
+    """
+    from fractions import Fraction
+
+    F = Fraction  # noqa: N806 - the oracle reads better short
+
+    def exact(area: Decimal, spacing: Decimal) -> F:
+        a_lo, a_hi = area_bracket(DRIP.areas, area)
+        s_hi, s_lo = spacing_bracket(DRIP.spacings, spacing)
+        assert a_hi is not None and s_lo is not None, "the sweep stays inside the table"
+        t = (F(area) - F(a_lo)) / (F(a_hi) - F(a_lo))
+        w = (F(s_hi) - F(spacing)) / (F(s_hi) - F(s_lo))
+
+        def along(s: Decimal) -> F:
+            return F(DRIP.at(s, a_lo)) + (F(DRIP.at(s, a_hi)) - F(DRIP.at(s, a_lo))) * t
+
+        return along(s_hi) + (along(s_lo) - along(s_hi)) * w
+
+    terminating = 0
+    for thousandths in range(200, 700, 3):          # 0.200 to 0.699 Ha
+        area = D(thousandths).scaleb(-3)
+        for hundredths in range(105, 300, 5):       # 1.05 to 2.95 m
+            spacing = D(hundredths).scaleb(-2)
+            want = exact(area, spacing)
+            got = bilinear(DRIP, area=area, spacing=spacing).unit_cost
+            # A fraction terminates as a decimal when its denominator is 2s and 5s.
+            den = want.denominator
+            for factor in (2, 5):
+                while den % factor == 0:
+                    den //= factor
+            if den == 1:
+                terminating += 1
+                assert F(got) == want, (area, spacing, got, want)
+            else:
+                assert abs(F(got) - want) < F(1, 10**20), (area, spacing)
+    assert terminating > 3000, terminating

@@ -98,6 +98,24 @@ async def admin(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Admin]:
         }
 
         async def drop_created_masters() -> None:
+            # FS-010's tables first, and by hand: `price_list_item` carries no
+            # created_by, so it cannot be a leaf rule - it is reached through the
+            # list that owns it. Everything else here is an ordinary child.
+            for stmt in (
+                "DELETE FROM price_list_item i USING price_list l WHERE l.id = i.price_list_id "
+                "AND l.created_by = ANY(CAST(:ids AS uuid[]))",
+                "DELETE FROM price_list_item i USING product p WHERE p.id = i.product_id "
+                "AND p.created_by = ANY(CAST(:ids AS uuid[]))",
+                "DELETE FROM price_list WHERE created_by = ANY(CAST(:ids AS uuid[]))",
+                "DELETE FROM product_hsn WHERE created_by = ANY(CAST(:ids AS uuid[]))",
+                "DELETE FROM product_hsn h USING product p WHERE p.id = h.product_id "
+                "AND p.created_by = ANY(CAST(:ids AS uuid[]))",
+                "DELETE FROM gst_rate WHERE created_by = ANY(CAST(:ids AS uuid[]))",
+                "DELETE FROM seller_gstin WHERE created_by = ANY(CAST(:ids AS uuid[]))",
+                "DELETE FROM product WHERE created_by = ANY(CAST(:ids AS uuid[]))",
+            ):
+                await c.execute(text(stmt), {"ids": everyone})
+
             # what the tests created through the API carries created_by: leaves first,
             # repeated until nothing goes (a two-level chain needs two passes; F-6)
             for table, free in leaves.items():

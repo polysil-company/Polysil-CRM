@@ -212,6 +212,25 @@ def main() -> None:
             ("919876543210", "Bhavesh Shah", role_ids["dealer"], str(partner)),
         )
 
+        # The seller's own GST registration. Migration 010 seeds one too, but by
+        # selecting the Gujarat territory - which no migration creates, so on a
+        # fresh database that INSERT matches zero rows and the default registration
+        # the pricing endpoint resolves is permanently absent. Nothing errors; a
+        # quotation just answers 404 forever. Seeded here as well, after the
+        # territory exists, and idempotent on the number.
+        cur.execute(
+            """
+            INSERT INTO seller_gstin (gstin, legal_name, state_territory_id, is_default,
+                                      effective_from)
+            VALUES ('24AAAAA0000A1Z5', 'Polysil Irrigation Systems Limited', %s, true,
+                    DATE '2026-04-01')
+            ON CONFLICT (gstin) DO UPDATE
+               SET state_territory_id = EXCLUDED.state_territory_id, is_active = true,
+                   deleted_at = NULL
+            """,
+            (territories["Gujarat"],),
+        )
+
         conn.commit()
 
         # The demo dealer now exists with the id Bhavesh's row has always carried, so

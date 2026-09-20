@@ -21,3 +21,7 @@ build/
 .astra-review.md
 .astra-spec.md
 .astra-spec.log
+
+# Staging secrets. Uploaded to the box by scripts/deploy_staging.py.
+infra/.env.staging
+infra/.staging-password

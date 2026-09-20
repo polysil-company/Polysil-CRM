@@ -10,6 +10,8 @@ the endpoint is *for* - rather than describing the code.
 
 from __future__ import annotations
 
+import ipaddress
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Header, Request, Response, status
@@ -18,7 +20,7 @@ from fastapi.responses import JSONResponse
 from api.config import get_settings
 from api.deps import AnonSession, Claims, DbSession, IdemKey, bearer_token
 from api.domain.auth import decode_access_token
-from api.errors import RefreshFailedError, error_response
+from api.errors import ForbiddenError, RefreshFailedError, error_response
 from api.idempotency import redacted_digest, run_idempotent
 from api.schemas.auth import (
     Envelope,
@@ -56,6 +58,12 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
 
     `secure` follows the environment, because a cookie marked Secure is simply not
     stored over plain HTTP and local development would silently never authenticate.
+
+    `samesite` follows configuration for a reason worth knowing: a `Lax` cookie is
+    not attached to a cross-site background request, so a frontend on another
+    origin signs in successfully and then loses the session at its first refresh,
+    with nothing in any log to say why. Cross-site needs `None`, which needs
+    `Secure`, which the settings refuse to combine with plain HTTP.
     """
     settings = get_settings()
     response.set_cookie(
@@ -64,7 +72,7 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         max_age=int(settings.refresh_token_ttl.total_seconds()),
         httponly=True,
         secure=settings.environment != "local",
-        samesite="lax",
+        samesite=settings.refresh_cookie_samesite,
         path="/api/v1/auth",
     )
 
@@ -73,27 +81,73 @@ def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(REFRESH_COOKIE, path="/api/v1/auth")
 
 
-_LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
+def _cross_site(request: Request) -> bool:
+    """Whether this is a browser request from an origin that may not spend a cookie.
+
+    CORS does not stop it. CORS decides whether a page may *read* a response; a
+    simple POST is sent either way, and a cookie-authenticated endpoint has already
+    acted by the time the browser discards the answer. With
+    `refresh_cookie_samesite = "none"`, which a frontend on another origin needs,
+    any site could therefore force a sign-out or rotate someone's session by
+    submitting a form (cross-vendor review, September).
+
+    A browser always sends `Origin` on a POST; curl and a mobile app send none. So
+    an absent header is allowed and a present one has to be ours, same-origin
+    included - the API's own pages call these endpoints too. The comparison is on
+    the authority only, because with `--no-proxy-headers` the request's own scheme
+    is the internal one and the browser's is the public one.
+    """
+    origin = request.headers.get("origin")
+    if origin is None:
+        return False
+    host = request.headers.get("host")
+    if host and origin.partition("://")[2] == host:
+        return False
+    return not get_settings().origin_allowed(origin)
+
+
+Network = ipaddress.IPv4Network | ipaddress.IPv6Network
+
+
+@lru_cache(maxsize=1)
+def _trusted_networks(peers: tuple[str, ...]) -> tuple[Network, ...]:
+    """Parsed once. The settings validator has already refused anything unparseable."""
+    return tuple(ipaddress.ip_network(p, strict=False) for p in peers)
+
+
+def _is_trusted_peer(peer: str) -> bool:
+    if peer == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    return any(address in net for net in _trusted_networks(get_settings().trusted_proxy_peers))
 
 
 def _client_ip(request: Request) -> str | None:
     """The caller's address, not the reverse proxy's.
 
-    `request.client.host` is whoever opened the TCP connection, which behind Caddy
-    is always loopback. Taken literally, every rate-limit bucket in the system
-    collapses into one and `login_attempt.ip` records the proxy on every row.
+    `request.client.host` is whoever opened the TCP connection, which behind a
+    reverse proxy is the proxy. Taken literally, every rate-limit bucket in the
+    system collapses into one and `login_attempt.ip` records the proxy on every row.
 
     The rightmost `X-Forwarded-For` entry is the one the trusted proxy appended -
     the address it actually saw - so it is the one to believe. Entries further
     left are supplied by the client and are not evidence of anything.
 
-    Trusted only when the peer is loopback, and only for as many hops as
-    `trusted_proxy_hops` allows. A header from a non-loopback peer is ignored
-    outright, or anyone could pick their own rate-limit bucket.
+    **Trusted only from a peer named in `trusted_proxy_peers`**, and only for as
+    many hops as `trusted_proxy_hops` allows. A header from any other peer is
+    ignored outright, or anyone could pick their own rate-limit bucket.
+
+    That list used to be loopback alone, which is right when the proxy runs on the
+    host and wrong the moment it runs in a container: the peer is then 172.x, the
+    header is ignored, and the collapse above happens silently while the endpoint
+    still answers 202 (ISS-084).
     """
     peer = request.client.host if request.client else None
     hops = get_settings().trusted_proxy_hops
-    if peer is None or hops <= 0 or peer not in _LOOPBACK:
+    if peer is None or hops <= 0 or not _is_trusted_peer(peer):
         return peer
 
     forwarded = request.headers.get("x-forwarded-for")
@@ -238,6 +292,9 @@ async def refresh(
     tokens rather than triggering the reuse alarm - that window exists so a lost
     response on a slow connection does not sign the user out of everything.
     """
+    if _cross_site(request):
+        return error_response(ForbiddenError(
+            "This origin may not use a cookie credential.", code="origin_not_allowed"))
     if polysil_refresh is None:
         # Nothing has been written, so raising here is safe - but returning keeps
         # one shape for every failure on this endpoint.
@@ -273,9 +330,17 @@ async def logout(
     case for a tab left open for an hour. Send whichever you have; sending both is
     fine, and the Bearer token wins.
 
+    The one exception to always-204 is a browser request carrying an `Origin` that
+    is not allowed, which is `403 origin_not_allowed`. Your own origin is allowed,
+    so you will not see it; a site trying to sign your users out will.
+
     To sign out everywhere, an administrator bumps the user's token version; that
     is not exposed here.
     """
+    if _cross_site(request):
+        raise ForbiddenError("This origin may not use a cookie credential.",
+                             code="origin_not_allowed")
+
     # Bearer wins whenever it is present, even alongside a cookie - which is the
     # ordinary shape, not a rare one. Deriving both would hand the database two
     # ids, and it refuses that by contract (EC-18).

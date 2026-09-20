@@ -7,12 +7,18 @@ profile choice, and nothing here knows the difference.
 
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import PostgresDsn, RedisDsn, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+# Any port on the developer's own machine. One definition: the CORS middleware
+# matches origins with it, and the refresh endpoints decide with it who may
+# spend a cookie. Two copies would drift, and the drift shows up as an attack.
+LOCALHOST_ORIGIN = re.compile(r"http://(localhost|127\.0\.0\.1)(:\d+)?")
 
 
 class Settings(BaseSettings):
@@ -90,10 +96,51 @@ class Settings(BaseSettings):
     # (the endpoint still answers 202, so nobody can tell). login_attempt.ip would
     # be useless for the one investigation it exists for, too.
     #
-    # So X-Forwarded-For is trusted, but only when the immediate peer is loopback.
-    # That cannot be spoofed from outside the box: an attacker would already have
-    # to be on it. Set to 0 to trust nothing, if the API is ever exposed directly.
+    # So X-Forwarded-For is trusted, but only from a peer we have named. Set to 0
+    # to trust nothing, if the API is ever exposed directly.
     trusted_proxy_hops: int = 1
+
+    # Which peers may set that header. Loopback alone is right when the proxy runs
+    # on the host, and wrong the moment it runs in a container: a reverse proxy on
+    # another Docker network arrives as 172.x, the header is then ignored, and
+    # **every login and every one-time code collapses into one rate-limit bucket**
+    # under the proxy's address. The endpoint still answers 202 once that trips, so
+    # nobody can tell from the outside that codes have stopped (ISS-084).
+    #
+    # Entries are addresses or CIDR blocks. Widening this is a real decision: any
+    # peer named here can choose its own rate-limit bucket, so it must only ever
+    # list proxies we run.
+    # `NoDecode` so the env source hands the raw string to the validator below
+    # rather than insisting it be JSON.
+    trusted_proxy_peers: Annotated[tuple[str, ...], NoDecode] = ("127.0.0.1", "::1")
+
+    # ── the browser contract ─────────────────────────────────────────────────
+    #
+    # Two settings that have to agree, or sign-in works and staying signed in does
+    # not. A frontend on another origin needs both: the CORS allowance to make the
+    # call at all, and a refresh cookie the browser will send back on it.
+    #
+    # `SameSite=Lax` is right when the frontend is same-origin or proxied through
+    # its own dev server, and it silently breaks a cross-site refresh: a Lax cookie
+    # is not attached to a background request, so login succeeds and the session
+    # dies at the first refresh. `None` is the cross-site answer and requires
+    # `Secure`, which means HTTPS, which is why this is not the default.
+    cors_allow_origins: Annotated[tuple[str, ...], NoDecode] = ()
+    # Any port on the developer's own machine, so nobody has to tell us which one.
+    # Credentials require echoing a specific origin rather than `*`, and a regex
+    # does exactly that for the origin it matched.
+    cors_allow_localhost: bool = True
+    refresh_cookie_samesite: Literal["lax", "none"] = "lax"
+
+    def origin_allowed(self, origin: str) -> bool:
+        """Whether a browser at this origin may use a cookie credential here.
+
+        One answer for two questions that have to agree: which origins CORS
+        echoes back, and which origins may spend the refresh cookie. Read from
+        two places and they drift, and the drift is only visible as an attack.
+        """
+        return origin in self.cors_allow_origins or (
+            self.cors_allow_localhost and LOCALHOST_ORIGIN.fullmatch(origin) is not None)
 
     login_max_failures: int = 5
     login_lockout: timedelta = timedelta(minutes=15)
@@ -164,6 +211,55 @@ class Settings(BaseSettings):
         # (cross-vendor review of the code, P2).
         hide_input_in_errors=True,
     )
+
+    @field_validator("trusted_proxy_peers", "cors_allow_origins", mode="before")
+    @classmethod
+    def _accept_a_comma_separated_list(cls, v: object) -> object:
+        """A list in an env file is JSON to pydantic and commas to a person.
+
+        Without this, `TRUSTED_PROXY_PEERS=127.0.0.1,::1` fails at startup with a
+        JSON parse error that names neither the format it wanted nor the one it
+        got. Commas are what anyone editing `.env.staging` will reach for, so both
+        are accepted and the failure is reserved for a value that is actually wrong.
+        """
+        if not isinstance(v, str):
+            return v
+        text = v.strip()
+        if text.startswith("["):
+            import json
+
+            return tuple(json.loads(text))
+        return tuple(part.strip() for part in text.split(",") if part.strip())
+
+    @field_validator("trusted_proxy_peers")
+    @classmethod
+    def _peers_are_addresses(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        """Refuse a peer list that is not addresses, rather than silently trusting
+        nobody. A typo here does not fail loudly on its own: the header is simply
+        never believed, and the symptom is a rate-limit bucket everyone shares."""
+        import ipaddress
+
+        for entry in v:
+            try:
+                ipaddress.ip_network(entry, strict=False)
+            except ValueError as exc:
+                raise ValueError(
+                    f"trusted_proxy_peers entry {entry!r} is not an address or CIDR block"
+                ) from exc
+        return v
+
+    @model_validator(mode="after")
+    def _cross_site_needs_a_secure_cookie(self) -> Settings:
+        """`SameSite=None` without `Secure` is refused by every current browser, so
+        the session would die at the first refresh with nothing in the log. Secure
+        follows the environment, so this is really a check that cross-site is not
+        being asked for over plain HTTP."""
+        if self.refresh_cookie_samesite == "none" and self.environment == "local":
+            raise ValueError(
+                "refresh_cookie_samesite='none' needs Secure, which needs HTTPS. "
+                "Proxy the API through the frontend's dev server instead, or run "
+                "against the staging deployment.")
+        return self
 
     @field_validator("database_url")
     @classmethod
