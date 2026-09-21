@@ -1,0 +1,52 @@
+# Weekly dependency updates, raised as pull requests into integration so they pass the
+# same checks as any other change.
+#
+# Dependabot reads this file from main, so updates start once it reaches main. Security
+# updates ignore target-branch and always open against main: change their base branch
+# to integration before merging. See docs/CI-CD.md.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /Frontend
+    target-branch: integration
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Kolkata
+    # Wait a week after a release, so the community has time to catch a compromised one.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /backend
+    target-branch: integration
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Kolkata
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      backend-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: integration
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Kolkata
+    groups:
+      github-actions:
+        patterns: ["*"]

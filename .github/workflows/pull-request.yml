@@ -1,0 +1,29 @@
+# Checks every pull request into integration or main before it merges.
+#
+# Draft pull requests get the fast checks. Marking one ready for review also runs the
+# slower frontend suites. Our GitHub plan can't block a failing pull request from
+# merging, so the rule is a team agreement: merge only when "CI passed" is green.
+# See docs/CI-CD.md.
+
+name: Pull request checks
+
+on:
+  pull_request:
+    branches: [integration, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  # A new push to the pull request cancels the run for the previous push.
+  group: pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/checks.yml
+    with:
+      scope: changed
+      slow-suites: ${{ !github.event.pull_request.draft }}
