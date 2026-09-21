@@ -280,13 +280,23 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: appuser
+          # `postgres`, not `appuser`. POSTGRES_USER creates a **superuser**, and a
+          # superuser bypasses RLS unconditionally - even on a table with FORCE ROW
+          # LEVEL SECURITY. Running the suite as one would enforce no policy at all
+          # and pass every security test vacuously, which is the worst possible way
+          # for this particular suite to be green.
+          #
+          # So the superuser is `postgres` and the application's `appuser` is made
+          # below as an ordinary login role, which is what it is on every real
+          # cluster. Caught by the reference SQL check, which is why it runs before
+          # pytest.
+          POSTGRES_USER: postgres
           # Local to this runner, thrown away when the job ends. Not a secret and
           # not worth pretending to be one.
           POSTGRES_PASSWORD: ci-postgres
-          POSTGRES_DB: appdb
+          POSTGRES_DB: postgres
         options: >-
-          --health-cmd "pg_isready -U appuser -d appdb"
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 3s --health-retries 20
         ports:
           - 5432:5432
@@ -349,15 +359,31 @@ jobs:
       #
       # Direct to Postgres, not through the pooler: this is the one thing in the
       # whole setup that is not application traffic.
-      - name: Create the cluster roles
+      - name: Create the login role, the database and the cluster roles
         env:
           PGPASSWORD: ci-postgres
         run: |
-          psql -h 127.0.0.1 -p 5432 -U appuser -d appdb \
+          psql -h 127.0.0.1 -p 5432 -U postgres -d postgres \
+            -c "CREATE ROLE appuser LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD 'ci-postgres';" \
+            -c "CREATE DATABASE appdb OWNER appuser;" \
             -c "CREATE ROLE app_role NOLOGIN;" \
             -c "CREATE ROLE app_anon NOLOGIN;" \
             -c "GRANT app_role TO appuser;" \
             -c "GRANT app_anon TO appuser;"
+
+      # NOSUPERUSER above is the whole point, so it is asserted rather than
+      # assumed: a superuser here would silently disable every policy in the suite.
+      - name: The application role is not a superuser
+        env:
+          PGPASSWORD: ci-postgres
+        run: |
+          super=$(psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc \
+            "SELECT rolsuper FROM pg_roles WHERE rolname = 'appuser'")
+          echo "appuser rolsuper = $super"
+          if [ "$super" != "f" ]; then
+            echo "::error title=RLS would not be enforced::appuser is a superuser, so every row-level policy is bypassed and the security tests would pass without enforcing anything."
+            exit 1
+          fi
 
       # scripts/seed_demo.py reads these three from infra/.env and nowhere else.
       - name: Write the environment file the seed reads
