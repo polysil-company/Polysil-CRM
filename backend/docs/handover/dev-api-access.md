@@ -26,19 +26,40 @@ is the same thing as readable prose, one file per module.
 
 ## Signing in
 
-Three staff users and one dealer. Ask us for the password; it is not written
-down here, and it is not in the repository either.
+**Twenty staff accounts and a dealer, all on one password.** Ask us for it; it is
+not written down here and it is not in the repository. Every one of them is ready
+to sign in — nobody is on a temporary password and nothing asks you to change one.
+
+Sign in as any of them, as often as you like. They see genuinely different data,
+because the rules are enforced in the database rather than in the screens.
+
+**The four to start with**, because the difference between them is the thing most
+likely to surprise you later:
+
+| Who | Role | Leads they see |
+|---|---|---|
+| `admin@polysil.in` | admin_sales, global | 74 |
+| `gujarat@polysil.in` | state_manager | the state |
+| `asha@polysil.in` | district_manager, Rajkot | 34 |
+| `ravi@polysil.in` | field_officer, Gondal | 23, **his own** |
+
+Same endpoint, same query, three different answers. **A short list is not a bug.**
+
+The rest, when you need a particular screen:
+
+| Role | Account |
+|---|---|
+| md_ceo, board | `md@polysil.in`, `board@polysil.in` |
+| regional_manager | `west@polysil.in` |
+| state_coordinator (subsidy stages) | `coordinator@polysil.in` |
+| district_manager | `amreli@polysil.in`, `junagadh@polysil.in` |
+| field_officer | `mehul@`, `pooja@`, `rina@`, `sanjay@`, `vipul@polysil.in` |
+| account_manager, dispatch_manager, qc_manager | `accounts@`, `dispatch@`, `quality@polysil.in` |
+| marketing, support | `marketing@polysil.in`, `support@polysil.in` |
 
 | Who | How | What they see |
 |---|---|---|
-| `admin@polysil.in` | email and password | everything, globally |
-| `asha@polysil.in` | email and password | a district manager: her district only |
-| `ravi@polysil.in` | email and password | a field officer: **his own records only** |
 | `919876543210` | mobile and a one-time code | a dealer, through the partner portal |
-
-**Use all four while you build.** The three staff users see genuinely different
-data, because the rules are enforced in the database rather than in the screens.
-A list that looks empty for Ravi and full for the admin is working correctly.
 
 ```http
 POST /api/v1/auth/login
@@ -150,10 +171,23 @@ user's scope.
 ## The data on this box
 
 Real: the client's 1,092 products with their categories and units, the subsidy
-unit-cost tables, the 79 crops and their spacings.
+unit-cost tables, the 79 crops and their spacings, and Gujarat's own 33 districts
+with the client's abbreviations.
 
-Invented: all prices and tax codes, marked as above. A handful of demo users,
-offices and territories.
+Invented, and enough of it to build against:
+
+| | |
+|---|---|
+| Leads | **75**, worked into a funnel over the last 45 days: new, contacted, qualified, lost, and a merged pair |
+| People | 20 staff across every role level, plus dealer users |
+| Offices | 20, in a real hierarchy from HQ down to field |
+| Territories | 93: the state, 33 districts, talukas and villages |
+| Partners | 12, distributors with dealers under them |
+| Prices and tax codes | all of them ours, marked per field |
+
+Farmers, villages, dealers and leads are fictional. Every lead is numbered
+`POL/GJ/<financial year>/<n>` the way a real one is, and carries its own timeline,
+so a detail screen and a 360° view have something to show.
 
 **It is a development box, so treat the data as disposable.** It is separate from
 the database we develop against, so you cannot break our work, and we can reset

@@ -130,9 +130,14 @@ services:
       REFRESH_COOKIE_SAMESITE: ${REFRESH_COOKIE_SAMESITE:-lax}
       CORS_ALLOW_LOCALHOST: ${CORS_ALLOW_LOCALHOST:-true}
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-}
+    networks:
+      # Ours, where PgBouncer and Redis are, and the proxy's, so the Caddy that
+      # owns 80 and 443 can reach this container by name. Both, every deploy.
+      default:
+      proxy:
     ports:
-      # Loopback only. Reached over an SSH tunnel today; over the reverse proxy
-      # on the Docker network, not this port, once the subdomain is live.
+      # Loopback only, and still useful: this is the SSH-tunnel path, and it is
+      # what answers when the proxy in front is the thing that is broken.
       - "127.0.0.1:${API_HOST_PORT:-8100}:8000"
     logging: *logging
     mem_limit: 768m
@@ -211,6 +216,19 @@ volumes:
 networks:
   default:
     name: polysil-staging_default
+  # The reverse proxy that already owns 80 and 443 lives here, on another
+  # project's network. The API joins it so the proxy can reach the container by
+  # name.
+  #
+  # **This belongs in the file rather than in a `docker network connect` run by
+  # hand.** It was done by hand once, and the next `deploy` recreated the
+  # container, dropped the endpoint and answered 502 to everyone - with the
+  # health check still green, because the health check asks the box and the box
+  # was fine. An additive attachment that has to be reapplied after every deploy
+  # is a step that will be forgotten.
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-distributed-file-system_default}
   # Created and owned by another project. `external` means compose never
   # creates, configures or removes it - it only attaches pgbouncer to it.
   rrdogfood:

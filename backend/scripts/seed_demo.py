@@ -32,7 +32,31 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.generate_permission_seed import load_grants  # noqa: E402
 
-DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", "polysil-demo-2026")
+PUBLIC_DEFAULT = "polysil-demo-2026"
+DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", PUBLIC_DEFAULT)
+
+
+def guard_passwords(script: str) -> None:
+    """Refuse to write a known password anywhere it could matter.
+
+    The check is the password, not a file. It used to be `infra/.env` naming
+    `ENVIRONMENT=local`, which the staging deploy satisfied by writing that file
+    for itself with no `ENVIRONMENT` line in it: the gate was one line in a file
+    the caller controls, and the caller was us (ISS-083). Its "no harm today, the
+    box is loopback-only" note stopped being true the day the API got a domain.
+
+    What actually matters is whether the password being written is the one
+    published in this file. A generated password on a staging box is fine; the
+    default anywhere but a laptop is not; production is never.
+    """
+    environment = os.environ.get("ENVIRONMENT") or env().get("ENVIRONMENT") or "local"
+    if environment == "production":
+        raise SystemExit(f"{script}: never against production.")
+    if DEMO_PASSWORD == PUBLIC_DEFAULT and environment != "local":
+        raise SystemExit(
+            f"{script}: DEMO_PASSWORD is still the password published in this script and "
+            f"ENVIRONMENT is {environment!r}. Set DEMO_PASSWORD to something generated "
+            f"(infra/.env.staging) and run it again.")
 
 # RBAC.md section 2. Sixteen: six in the line hierarchy, six functional, three
 # portal, one board.
@@ -86,8 +110,7 @@ def env() -> dict[str, str]:
 
 def main() -> None:
     e = env()
-    if e.get("ENVIRONMENT", "local") != "local":
-        raise SystemExit("seed_demo is local only: the passwords in it are public")
+    guard_passwords("seed_demo")
 
     hasher = PasswordHasher()
     pw = hasher.hash(DEMO_PASSWORD)

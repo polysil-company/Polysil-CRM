@@ -3,7 +3,7 @@
 
     python scripts/deploy_staging.py provision   # the role, the database, the grants
     python scripts/deploy_staging.py deploy      # sync, build, up, alembic upgrade head
-    python scripts/deploy_staging.py seed        # demo users, subsidy masters, products
+    python scripts/deploy_staging.py seed        # demo users, masters, showcase dataset
     python scripts/deploy_staging.py status      # containers, health, resource use
     python scripts/deploy_staging.py logs [svc]
     python scripts/deploy_staging.py down
@@ -267,19 +267,29 @@ def migrate(env: dict[str, str]) -> None:
 # compose already handed it, and the credentials never reach the box's disk a
 # second time.
 #
-# The seed also refuses to run when that file names an ENVIRONMENT other than
-# local, because the passwords it writes are published in the script. No
-# ENVIRONMENT line is written: this box is loopback-only and the demo users are
-# the reason it exists. ISS-083.
+# The file names `ENVIRONMENT=staging`, honestly, because the guard no longer asks
+# a file where it is running. It asks whether the password being written is the one
+# published in the script and refuses that anywhere but a laptop; DEMO_PASSWORD
+# comes from infra/.env.staging and is generated. ISS-083 closed.
 SEED_DEMO = (
     "set -e; umask 077; "
-    "printf 'DB_USER=%s\\nDB_PASSWORD=%s\\nDB_NAME=%s\\n' "
+    "printf 'DB_USER=%s\\nDB_PASSWORD=%s\\nDB_NAME=%s\\nENVIRONMENT=staging\\n' "
     '"$DB_USER" "$DB_PASSWORD" "$DB_NAME" > /app/infra/.env; '
     "python scripts/seed_demo.py"
 )
 
+# The showcase dataset: 33 districts, 17 offices, 19 staff across every role level,
+# 10 partners and 55 leads over four stages and 45 days. It seeds through the API
+# in-process, so it needs the same file and nothing else.
+#
+# Without it a frontend builds against two leads and one district, and never sees a
+# district manager seeing more than a field officer - which is the behaviour most
+# likely to surprise them later.
+SEED_SHOWCASE = SEED_DEMO.replace("python scripts/seed_demo.py",
+                                  "python scripts/seed_showcase.py")
 
-def seed(env: dict[str, str], *, masters: bool = True) -> None:
+
+def seed(env: dict[str, str], *, masters: bool = True, showcase: bool = True) -> None:
     guard(env)
     run_remote(env, compose(env, "run", "--rm", "--entrypoint", "sh", "tools",
                             "-c", SEED_DEMO, profile="tools"))
@@ -287,6 +297,9 @@ def seed(env: dict[str, str], *, masters: bool = True) -> None:
         for script in ("scripts/load_subsidy_masters.py", "scripts/load_product_master.py"):
             run_remote(env, compose(env, "run", "--rm", "tools", "python", script,
                                     profile="tools"))
+    if showcase:
+        run_remote(env, compose(env, "run", "--rm", "--entrypoint", "sh", "tools",
+                                "-c", SEED_SHOWCASE, profile="tools"))
 
 
 def health(env: dict[str, str], *, attempts: int = 30) -> bool:
@@ -335,6 +348,8 @@ def main(argv: list[str] | None = None) -> int:
                                  "seed", "status", "logs", "down"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
     parser.add_argument("--seed", action="store_true", help="deploy: run the seeds too")
+    parser.add_argument("--no-showcase", action="store_true",
+                        help="seed: skip the showcase dataset, demo users and masters only")
     parser.add_argument("--no-masters", action="store_true",
                         help="seed: the demo users only, not the workbooks")
     args = parser.parse_args(argv)
@@ -355,7 +370,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.step == "migrate":
         migrate(env)
     elif args.step == "seed":
-        seed(env, masters=not args.no_masters)
+        seed(env, masters=not args.no_masters, showcase=not args.no_showcase)
     elif args.step == "status":
         status(env)
     elif args.step == "logs":

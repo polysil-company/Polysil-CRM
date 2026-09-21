@@ -3,9 +3,9 @@
 
     python scripts/seed_showcase.py
 
-`ENVIRONMENT=local` only, and `seed_demo.py` first (it creates the roles, the
-permission matrix and the administrator this script signs in as). Idempotent by
-code, email, mobile and lead mobile: a second run changes no counts.
+Run `seed_demo.py` first: it creates the roles, the permission matrix and the
+administrator this script signs in as. Idempotent by code, email, mobile and lead
+mobile, so a second run changes no counts.
 
 Four passes, and which connection does what:
 
@@ -21,14 +21,23 @@ Four passes, and which connection does what:
              financial year, with the audit and updated_at triggers off for the
              duration of one transaction
 
-The data lives in scripts/showcase_data.py. Passwords here are public and the
-script refuses to run outside a local environment for that reason.
+The data lives in scripts/showcase_data.py.
+
+**Every person it creates ends on one password**, the same `DEMO_PASSWORD` the
+demo seed uses, with the forced first change already completed through the API.
+So whoever is building against this can sign in as any of the nineteen and see
+what that role sees, without changing a password first. The temporary password
+each person holds in between is generated per run.
+
+It refuses to write the published default password anywhere but a laptop;
+`guard_passwords` in seed_demo.py is the check.
 """
 from __future__ import annotations
 
 import asyncio
 import os
 import random
+import secrets
 import sys
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -43,11 +52,19 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("ENVIRONMENT", "local")
 
 from scripts import showcase_data as data  # noqa: E402
-from scripts.seed_demo import DEMO_PASSWORD, ROOT_ORG_UNIT_ID, env  # noqa: E402
+from scripts.seed_demo import (  # noqa: E402
+    DEMO_PASSWORD,
+    ROOT_ORG_UNIT_ID,
+    env,
+    guard_passwords,
+)
 
 V1 = "/api/v1"
 ADMIN_EMAIL = "admin@polysil.in"
-TEMP_PASSWORD = "polysil-temp-2026!!"     # used once per person, then changed
+# Generated per run, never published. Each person holds it for the one request
+# between being created and completing the forced change, and it is the only
+# credential in this script that was ever a reason to keep it off a real box.
+TEMP_PASSWORD = "Tmp-" + secrets.token_urlsafe(18) + "-1a"
 SHOWCASE_PASSWORD = DEMO_PASSWORD         # every showcase person ends with the demo password
 LEAD_MOBILE_BASE = 9_800_100_000          # 98001xxxxx: never a real number in the demo
 DEALER_LEADS = {"DLR-GONDAL": 6, "DLR-KESHOD": 4}   # created from the portal
@@ -106,8 +123,7 @@ async def _login(client: httpx.AsyncClient, email: str, password: str) -> Api | 
 
 def _owner() -> psycopg.Connection:
     e = env()
-    if e.get("ENVIRONMENT", "local") != "local":
-        raise SystemExit("seed_showcase is local only: the passwords in it are public")
+    guard_passwords("seed_showcase")
     return psycopg.connect(host="127.0.0.1", port=6432, user=e["DB_USER"],
                            password=e["DB_PASSWORD"], dbname=e["DB_NAME"])
 
@@ -125,6 +141,18 @@ def _delete_leaves(cur: psycopg.Cursor, table: str, where: str) -> int:
 
 
 def pass_0_reset() -> None:
+    """Sweep what the test fixtures left behind. **Local only.**
+
+    Everything below matches a pytest fixture's naming (`api_`, `staff_`,
+    `target_`, `API-`, a `Z` state code) and nothing a person would type, so on a
+    box where the suite never runs it finds nothing. That is an argument, not a
+    guarantee, and this is a delete pointed at a database someone else is building
+    against: the frontend track's own data is not ours to reason about. It does
+    not run outside local (GAP-098).
+    """
+    if (os.environ.get("ENVIRONMENT") or env().get("ENVIRONMENT") or "local") != "local":
+        print("pass 0: skipped, not a local database")
+        return
     old = "created_at < now() - interval '1 hour'"
     with _owner() as conn:
         cur = conn.cursor()
@@ -174,6 +202,21 @@ def pass_0_reset() -> None:
                         "(created_by = ANY(%s) OR updated_by = ANY(%s)) AND NOT (id = ANY(%s))",
                         (users, users, users))
             for stmt in (
+                # FS-010's tables first. A product carries created_by, so a user
+                # the endpoint tests made and left behind cannot be deleted while
+                # their products exist; price_list_item has no created_by of its
+                # own and is reached through the list or the product that owns it.
+                "DELETE FROM price_list_item i USING price_list l WHERE l.id = i.price_list_id "
+                "AND (l.created_by = ANY(%s) OR l.created_by = ANY(%s))",
+                "DELETE FROM price_list_item i USING product p "
+                "WHERE p.id = i.product_id AND (p.created_by = ANY(%s) OR p.created_by = ANY(%s))",
+                "DELETE FROM price_list WHERE created_by = ANY(%s) OR created_by = ANY(%s)",
+                "DELETE FROM product_hsn h USING product p WHERE p.id = h.product_id "
+                "AND (p.created_by = ANY(%s) OR p.created_by = ANY(%s))",
+                "DELETE FROM product_hsn WHERE created_by = ANY(%s) OR created_by = ANY(%s)",
+                "DELETE FROM gst_rate WHERE created_by = ANY(%s) OR created_by = ANY(%s)",
+                "DELETE FROM seller_gstin WHERE created_by = ANY(%s) OR created_by = ANY(%s)",
+                "DELETE FROM product WHERE created_by = ANY(%s) OR created_by = ANY(%s)",
                 "DELETE FROM activity_event WHERE entity_id = ANY(%s) OR actor_id = ANY(%s)",
                 "DELETE FROM session WHERE user_id = ANY(%s) OR user_id = ANY(%s)",
                 "DELETE FROM user_territory WHERE user_id = ANY(%s) OR user_id = ANY(%s)",

@@ -348,7 +348,7 @@ async def test_a_draft_is_filled_then_published_and_refuses_what_it_should(
                                                "rate": "1.00"}]})
     assert frozen.status_code == 409
     assert frozen.json()["error"]["code"] == "price_list_published"
-    # No cleanup call here. There is no DELETE route for a price list (GAP-097),
+    # No cleanup call here. There is no DELETE route for a price list (GAP-100),
     # and the line that used to sit here asked for one and never checked the
     # answer - a cleanup that read as if it worked and did nothing. The admin
     # fixture's teardown removes what this test created.

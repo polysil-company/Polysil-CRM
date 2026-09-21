@@ -1003,7 +1003,7 @@ async def publish(db: AsyncSession, list_id: str, body: sch.PublishRequest) -> s
         #
         # Refused rather than split. Splitting would resume the old rates after the
         # correction expires, and nobody has said that is what a bounded list
-        # means (GAP-099).
+        # means (GAP-102).
         if row.effective_to is not None and (
                 other.effective_to is None or other.effective_to > row.effective_to):
             covered = other.effective_to.isoformat() if other.effective_to else "with no end"
