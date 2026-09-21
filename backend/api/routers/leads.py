@@ -18,6 +18,7 @@ from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.idempotency import payload_digest, run_idempotent
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import (
+    UUID_RE,
     Assignee,
     DismissResult,
     DuplicatePage,
@@ -39,7 +40,6 @@ from api.schemas.leads import (
     TerritoryPick,
     TimelineEvent,
     TimelinePage,
-    UUID_RE,
 )
 from api.services import leads as service
 
@@ -65,7 +65,8 @@ _ERRORS: dict[int | str, dict[str, object]] = {
     response_model=Envelope[Lead],
     status_code=status.HTTP_201_CREATED,
     responses={**_ERRORS, 400: {"model": ErrorResponse, "description": "Idempotency-Key missing."},
-               409: {"model": ErrorResponse, "description": "The key was used for a different body."}},
+               409: {"model": ErrorResponse,
+                     "description": "The key was used for a different body."}},
     dependencies=[Depends(require("leads", "create"))],
 )
 async def create_lead(

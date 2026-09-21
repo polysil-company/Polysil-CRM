@@ -52,11 +52,22 @@ extend-exclude = [
     "scripts/generate_flows.py",
     "scripts/generate_graph.py",
     "scripts/validate_reference_sql.py",
+    # The live drivers are hand-run smoke scripts against a running server: not
+    # shipped, not imported, and read by a person watching output scroll past.
+    # Same reason as the generators above.
+    "scripts/livetest",
 ]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF"]
 ignore = ["A003"]
+
+[tool.ruff.lint.per-file-ignores]
+# `ValidationFailed` is the name the whole codebase and the API contract use, and
+# it reads correctly at every call site: `raise ValidationFailed(fields=...)`.
+# N818 wants an `Error` suffix. Renaming one class to satisfy a naming rule, across
+# every service and every test, buys nothing a reader would notice.
+"api/errors.py" = ["N818"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["api", "worker"]

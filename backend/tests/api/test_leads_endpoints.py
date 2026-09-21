@@ -107,7 +107,8 @@ async def env(sessions: Callable[[], AsyncSession], staff: Staff) -> AsyncIterat
 
 
 async def _auth(client: httpx.AsyncClient, staff: Staff) -> dict[str, str]:
-    r = await client.post(f"{V1}/auth/login", json={"email": staff.email, "password": staff.password})
+    r = await client.post(f"{V1}/auth/login",
+                          json={"email": staff.email, "password": staff.password})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['data']['access_token']}"}
 
@@ -470,7 +471,8 @@ async def _target_staff(sessions, staff: Staff) -> str:
 
 async def _drop_staff(sessions, uid: str) -> None:
     s = sessions()
-    await s.execute(text("UPDATE lead SET owner_user_id = NULL WHERE owner_user_id = :u"), {"u": uid})
+    await s.execute(text("UPDATE lead SET owner_user_id = NULL WHERE owner_user_id = :u"),
+                    {"u": uid})
     await s.execute(text("DELETE FROM app_user WHERE id = :u"), {"u": uid})
     await s.commit()
 
@@ -629,7 +631,8 @@ async def test_patch_moves_territory_within_scope(
                              "(SELECT id FROM lead WHERE territory_id = :t)"), {"t": district2})
         await c.execute(text("DELETE FROM lead WHERE territory_id = :t"), {"t": district2})
         if mobile:
-            await c.execute(text("DELETE FROM notification_outbox WHERE recipient = :m"), {"m": mobile})
+            await c.execute(
+                text("DELETE FROM notification_outbox WHERE recipient = :m"), {"m": mobile})
         await c.execute(text("DELETE FROM territory WHERE id = :t"), {"t": district2})
         await c.commit()
 
@@ -673,7 +676,8 @@ async def test_create_flags_a_duplicate_by_mobile(
     assert r.status_code == 201, r.text
     dups = r.json()["data"]["duplicates"]
     assert [d["lead_id"] for d in dups] == [a]
-    assert dups[0]["signal"] == "mobile" and dups[0]["score"] == "1.00" and dups[0]["state"] == "pending"
+    assert dups[0]["signal"] == "mobile" and dups[0]["score"] == "1.00"
+    assert dups[0]["state"] == "pending"
     # the pair is visible from the other side too, and both timelines were flagged
     got = (await client.get(f"{V1}/leads/{a}", headers=h)).json()["data"]
     assert len(got["duplicates"]) == 1
@@ -686,7 +690,8 @@ async def test_create_flags_a_duplicate_by_name_and_village(
         client: httpx.AsyncClient, staff: Staff, env: Env) -> None:
     h = await _auth(client, staff)
     await _make(client, h, env, farmer_name="Kanubhai Desai", village="Virpur")
-    r = await client.post(f"{V1}/leads", json=_body(env, farmer_name="Kanubhai Desai", village="Virpur"),
+    r = await client.post(f"{V1}/leads",
+                          json=_body(env, farmer_name="Kanubhai Desai", village="Virpur"),
                           headers={**h, **_key()})
     assert r.status_code == 201, r.text
     dups = r.json()["data"]["duplicates"]
@@ -710,7 +715,8 @@ async def test_duplicate_queue_lists_the_pair_and_dismiss_clears_it(
     assert r.status_code == 200 and r.json()["data"]["state"] == "dismissed"
     q = await client.get(f"{V1}/leads/duplicates", headers=h)
     assert all({p["lead_a"]["id"], p["lead_b"]["id"]} != {a, b} for p in q.json()["data"])
-    kinds = [e["kind"] for e in (await client.get(f"{V1}/leads/{a}/timeline", headers=h)).json()["data"]]
+    timeline = (await client.get(f"{V1}/leads/{a}/timeline", headers=h)).json()["data"]
+    kinds = [e["kind"] for e in timeline]
     assert "lead.duplicate_dismissed" in kinds
     # dismissing again is not a pending pair any more
     r = await client.post(f"{V1}/leads/duplicates/{pair['link_id']}/dismiss",
@@ -747,11 +753,13 @@ async def test_merge_refusals(
         client: httpx.AsyncClient, staff: Staff, env: Env) -> None:
     h = await _auth(client, staff)
     a = await _make(client, h, env)
-    r = await client.post(f"{V1}/leads/{a}/merge", json={"into_lead_id": a}, headers={**h, **_key()})
+    r = await client.post(f"{V1}/leads/{a}/merge", json={"into_lead_id": a},
+                          headers={**h, **_key()})
     assert r.status_code == 422 and r.json()["error"]["code"] == "merge_self"
     lost = await _make(client, h, env)
     await _to(client, h, lost, to_stage="lost", lost_reason_id=await _lost_reason(client, h))
-    r = await client.post(f"{V1}/leads/{a}/merge", json={"into_lead_id": lost}, headers={**h, **_key()})
+    r = await client.post(f"{V1}/leads/{a}/merge", json={"into_lead_id": lost},
+                          headers={**h, **_key()})
     assert r.status_code == 422 and r.json()["error"]["code"] == "merge_terminal"
     r = await client.post(f"{V1}/leads/{a}/merge", json={"into_lead_id": str(uuid.uuid4())},
                           headers={**h, **_key()})
@@ -764,7 +772,8 @@ async def _grant_masters(sessions, staff: Staff) -> None:
     s = sessions()
     await s.execute(text(
         "INSERT INTO role_permission (role_id, module, action, scope) VALUES "
-        "(:r, 'masters', 'view', 'global'), (:r, 'masters', 'edit', 'global')"), {"r": staff.role_id})
+        "(:r, 'masters', 'view', 'global'), (:r, 'masters', 'edit', 'global')"),
+        {"r": staff.role_id})
     await s.commit()
 
 
@@ -788,7 +797,8 @@ async def test_add_and_switch_off_a_lost_reason(
     code = "site_unsuitable_" + uuid.uuid4().hex[:6]
     try:
         h = await _auth(client, staff)
-        r = await client.post(f"{V1}/lookups/lost-reasons", json={"code": code, "name": "Site unsuitable"},
+        r = await client.post(f"{V1}/lookups/lost-reasons",
+                              json={"code": code, "name": "Site unsuitable"},
                               headers={**h, **_key()})
         assert r.status_code == 201, r.text
         item = r.json()["data"]
@@ -803,7 +813,8 @@ async def test_add_and_switch_off_a_lost_reason(
         r = await client.patch(f"{V1}/lookups/lost-reasons/{item['id']}", json={"is_active": False},
                                headers={**h, **_key()})
         assert r.status_code == 200 and r.json()["data"]["is_active"] is False
-        r = await client.patch(f"{V1}/lookups/lost-reasons/{uuid.uuid4()}", json={"is_active": False},
+        r = await client.patch(f"{V1}/lookups/lost-reasons/{uuid.uuid4()}",
+                               json={"is_active": False},
                                headers={**h, **_key()})
         assert r.status_code == 404
         # the actor columns carry the caller (001: updated_by is the application's job)
@@ -824,7 +835,8 @@ async def test_add_a_source_with_quality_and_a_system(
     try:
         h = await _auth(client, staff)
         r = await client.post(f"{V1}/lookups/lead-sources",
-                              json={"code": src, "name": "Radio", "quality": "0.9", "sort_order": 99},
+                              json={"code": src, "name": "Radio",
+                                    "quality": "0.9", "sort_order": 99},
                               headers={**h, **_key()})
         assert r.status_code == 201, r.text
         r = await client.post(f"{V1}/lookups/mis-systems", json={"code": mis, "name": "Fogger"},
@@ -869,7 +881,8 @@ async def test_create_queues_exactly_one_acknowledgement(
     """Rule 17: one lead_ack WhatsApp to the farmer, recipient in E.164, payload
     carrying the inquiry number (ISS-071)."""
     h = await _auth(client, staff)
-    created = (await client.post(f"{V1}/leads", json=_body(env), headers={**h, **_key()})).json()["data"]
+    made = await client.post(f"{V1}/leads", json=_body(env), headers={**h, **_key()})
+    created = made.json()["data"]
     rows = (await sessions().execute(text(
         "SELECT channel::text, payload->>'inquiry_no', payload->>'farmer_name' "
         "FROM notification_outbox WHERE recipient = :m AND template_key = 'lead_ack'"),
@@ -933,7 +946,8 @@ async def test_an_uncovered_territory_routes_to_the_hq_anchor(
                              "(SELECT id FROM lead WHERE territory_id = :t)"), {"t": district2})
         await c.execute(text("DELETE FROM lead WHERE territory_id = :t"), {"t": district2})
         if mobile:
-            await c.execute(text("DELETE FROM notification_outbox WHERE recipient = :m"), {"m": mobile})
+            await c.execute(
+                text("DELETE FROM notification_outbox WHERE recipient = :m"), {"m": mobile})
         await c.execute(text("DELETE FROM territory WHERE id = :t"), {"t": district2})
         await c.commit()
 
@@ -1006,7 +1020,8 @@ async def test_create_with_a_note_scores_the_engagement(
     noted = (await client.post(f"{V1}/leads", json=_body(env, farmer_name="Zzzz Yyyy",
                                                           note="met at the mandi"),
                                headers={**h, **_key()})).json()["data"]
-    expected = (cfg["w_engagement"] * (Decimal(1) / cfg["engagement_cap"])).quantize(Decimal("0.01"))
+    expected = (cfg["w_engagement"]
+                * (Decimal(1) / cfg["engagement_cap"])).quantize(Decimal("0.01"))
     assert Decimal(noted["score"]) - Decimal(plain["score"]) == expected
 
 

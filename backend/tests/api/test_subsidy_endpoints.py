@@ -26,8 +26,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.services.subsidy import clear_cache
 from tests.api.conftest import V1, Admin, _auth
+from tests.domain.subsidy_masters import needs_samples
 
-pytestmark = pytest.mark.db
+# Two things have to be present, and neither is in every checkout.
+#
+# The sample quotations carry the client's own component rates, so they are kept
+# out of the shared snapshot, and `needs_samples` is how the domain suite already
+# handles that. These tests also need the masters **loaded into PostgreSQL** by
+# `scripts/load_subsidy_masters.py`, which reads the client's workbooks - so on a
+# fresh database, CI included, there is nothing for them to read.
+#
+# Skipping is the honest answer to both. Without this the whole module fails on a
+# clean clone and reads as a broken suite rather than an absent fixture.
+pytestmark = [pytest.mark.db, needs_samples]
 
 FIXTURES = pathlib.Path(__file__).resolve().parents[1] / "fixtures" / "subsidy"
 D = Decimal

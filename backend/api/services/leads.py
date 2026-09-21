@@ -578,7 +578,8 @@ async def add_note(db: AsyncSession, caller: Caller, lead_id: str,
     ev = await _emit(db, lead_id=lead_id, kind="lead.note_added", actor_id=caller.user_id,
                      actor_name=actor, note=body.note)
     await _rescore(db, lead_id)
-    return TimelineEvent(id=str(ev.id), kind="lead.note_added", occurred_at=_iso_req(ev.occurred_at),
+    return TimelineEvent(id=str(ev.id), kind="lead.note_added",
+                         occurred_at=_iso_req(ev.occurred_at),
                          actor=UserRef(id=caller.user_id, full_name=actor),
                          payload={"actor_name": actor, "note": body.note})
 
@@ -722,21 +723,28 @@ async def patch_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadP
     changed: dict[str, Any] = {}
 
     if "farmer_name" in fields:
-        sets.append("farmer_name = :farmer_name"); params["farmer_name"] = body.farmer_name
+        sets.append("farmer_name = :farmer_name")
+        params["farmer_name"] = body.farmer_name
         changed["farmer_name"] = body.farmer_name
     if "mobile" in fields:
         try:
             mobile = domain.normalise_mobile(body.mobile or "")
         except domain.MobileError as exc:
             raise ValidationFailed(fields={"mobile": str(exc)}) from exc
-        sets.append("mobile = :mobile"); params["mobile"] = mobile; changed["mobile"] = mobile
+        sets.append("mobile = :mobile")
+        params["mobile"] = mobile
+        changed["mobile"] = mobile
     if "email" in fields:
-        sets.append("email = :email"); params["email"] = body.email; changed["email"] = body.email
+        sets.append("email = :email")
+        params["email"] = body.email
+        changed["email"] = body.email
     if "village" in fields:
-        sets.append("village = :village"); params["village"] = body.village
+        sets.append("village = :village")
+        params["village"] = body.village
         changed["village"] = body.village
     if "inquiry_type" in fields:
-        sets.append("inquiry_type = CAST(:it AS inquiry_type)"); params["it"] = body.inquiry_type
+        sets.append("inquiry_type = CAST(:it AS inquiry_type)")
+        params["it"] = body.inquiry_type
         changed["inquiry_type"] = body.inquiry_type
     if "mis_system" in fields:
         mis = (await db.execute(text(
@@ -744,16 +752,21 @@ async def patch_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadP
             {"c": body.mis_system})).scalar_one_or_none()
         if mis is None:
             raise ValidationFailed(fields={"mis_system": "not an active system"})
-        sets.append("mis_system_id = :mis"); params["mis"] = mis; changed["mis_system"] = body.mis_system
+        sets.append("mis_system_id = :mis")
+        params["mis"] = mis
+        changed["mis_system"] = body.mis_system
     if "source" in fields:
         src = (await db.execute(text(
             "SELECT id FROM lead_source WHERE code = :c AND is_active AND deleted_at IS NULL"),
             {"c": body.source})).scalar_one_or_none()
         if src is None:
             raise ValidationFailed(fields={"source": "not an active source"})
-        sets.append("lead_source_id = :src"); params["src"] = src; changed["source"] = body.source
+        sets.append("lead_source_id = :src")
+        params["src"] = src
+        changed["source"] = body.source
     if "estimated_value" in fields:
-        sets.append("estimated_value = :est"); params["est"] = body.estimated_value
+        sets.append("estimated_value = :est")
+        params["est"] = body.estimated_value
         changed["estimated_value"] = _dec(body.estimated_value)
 
     territory_id = body.territory_id  # None only when unsent: it is in _PATCH_REQUIRED
@@ -768,10 +781,12 @@ async def patch_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadP
             owner_user_id=str(row.owner_user_id) if row.owner_user_id else None,
             owner_org_unit_id=new_oou,
             assigned_partner_id=str(row.assigned_partner_id) if row.assigned_partner_id else None)
-        sets.append("territory_id = CAST(:territory AS uuid)"); params["territory"] = body.territory_id
+        sets.append("territory_id = CAST(:territory AS uuid)")
+        params["territory"] = body.territory_id
         changed["territory_id"] = body.territory_id
         if new_oou != str(row.owner_org_unit_id):
-            sets.append("owner_org_unit_id = CAST(:oou AS uuid)"); params["oou"] = new_oou
+            sets.append("owner_org_unit_id = CAST(:oou AS uuid)")
+            params["oou"] = new_oou
 
     if not sets:
         return await get_lead(db, caller, lead_id)   # nothing actually changed
@@ -857,7 +872,8 @@ async def _detect_duplicates(db: AsyncSession, caller: Caller, lead_id: str, *, 
         return
     for other, (signal, score) in matches.items():
         await db.execute(text(
-            "INSERT INTO lead_duplicate_link (lead_a_id, lead_b_id, signal, score, state, created_by) "
+            "INSERT INTO lead_duplicate_link "
+            "(lead_a_id, lead_b_id, signal, score, state, created_by) "
             "VALUES (least(CAST(:x AS uuid), CAST(:y AS uuid)), "
             "        greatest(CAST(:x AS uuid), CAST(:y AS uuid)), "
             "        CAST(:s AS lead_dup_signal), :sc, 'pending', CAST(:me AS uuid)) "
