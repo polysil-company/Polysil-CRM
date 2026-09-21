@@ -1,0 +1,274 @@
+# Every app's checks, defined in one place.
+#
+# Nothing triggers this workflow directly. pull-request.yml, after-merge.yml and
+# nightly.yml call it and say how much to run. docs/CI-CD.md explains the setup.
+
+name: Checks
+
+on:
+  workflow_call:
+    inputs:
+      scope:
+        description: "changed = only the apps the change touches; all = every app in the repository."
+        type: string
+        default: changed
+      slow-suites:
+        description: Also run the slower frontend suites (Storybook accessibility and Playwright).
+        type: boolean
+        default: true
+      ref:
+        description: Branch or commit to check out. Empty means the commit that triggered the run.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Find the apps to check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ steps.detect.outputs.frontend }}
+      backend: ${{ steps.detect.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Compare with the target branch or the previous commit
+        id: detect
+        env:
+          SCOPE: ${{ inputs.scope }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          has_frontend=false
+          has_backend=false
+          if [ -f Frontend/package.json ]; then has_frontend=true; fi
+          if [ -f backend/pyproject.toml ]; then has_backend=true; fi
+
+          # The commit to compare with. Empty means every app is checked.
+          base=""
+          if [ "$SCOPE" = "changed" ]; then
+            case "$EVENT" in
+              pull_request)
+                # A pull request is checked out as a merge commit; its first parent is the target branch.
+                base="HEAD^1"
+                ;;
+              push)
+                if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+                  base="$BEFORE"
+                fi
+                ;;
+            esac
+          fi
+
+          if [ -z "$base" ]; then
+            frontend=$has_frontend
+            backend=$has_backend
+            echo "Checking every app in the repository."
+          else
+            changed_files=$(git diff --name-only "$base" HEAD)
+            echo "Changed files:"
+            echo "$changed_files"
+            frontend=false
+            backend=false
+            # A change under .github/ can break any app's checks, so it checks every app.
+            if grep -qE '^(Frontend/|\.github/)' <<< "$changed_files"; then frontend=$has_frontend; fi
+            if grep -qE '^(backend/|\.github/)' <<< "$changed_files"; then backend=$has_backend; fi
+          fi
+
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Apps checked in this run"
+            echo ""
+            echo "| App | Checked |"
+            echo "| --- | --- |"
+            echo "| Frontend (\`Frontend/\`) | $frontend |"
+            echo "| Backend (\`backend/\`) | $backend |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  frontend-checks:
+    name: "Frontend: checks and build"
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: Frontend
+    env:
+      HUSKY: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+      # The feature environment: mocked API, no secrets needed.
+      NEXT_PUBLIC_APP_ENV: feature
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          # The changelog check compares a pull request with its target branch.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: Frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Unit and component tests
+        run: npm test
+
+      - name: Unused files, exports and dependencies
+        run: npm run knip
+
+      - name: This pull request has a changelog entry
+        # Dependabot can't write entries. When an update changes behaviour, the reviewer adds one.
+        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: npm run changelog:check -- --base "origin/$BASE_REF"
+
+      - name: Changelog entries are valid
+        if: github.event_name != 'pull_request' || github.actor == 'dependabot[bot]'
+        run: npm run changelog:check
+
+      - name: CHANGELOG.md is up to date
+        run: npm run changelog:build -- --check
+
+      - name: Production build
+        run: npm run build
+
+  frontend-storybook:
+    name: "Frontend: Storybook accessibility"
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' && inputs.slow-suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: Frontend
+    env:
+      HUSKY: "0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: Frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Render every story and check it for accessibility violations
+        run: npm run test:storybook
+
+  frontend-e2e:
+    name: "Frontend: Playwright smoke tests"
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' && inputs.slow-suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: Frontend
+    env:
+      HUSKY: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_ENV: feature
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: Frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Build and start the app with the mocked API, then test it
+        run: npm run test:e2e
+
+      - name: Keep the Playwright report when tests fail
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: Frontend/playwright-report/
+          retention-days: 7
+
+  backend-lint:
+    name: "Backend: lint"
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install the backend with its development tools
+        run: python -m pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Database-backed tests are not wired in yet
+        run: echo "::notice title=Backend tests::The backend test suite needs Postgres behind PgBouncer, so CI doesn't run it yet. See docs/CI-CD.md, section Backend."
+
+  ci-passed:
+    name: CI passed
+    needs: [changes, frontend-checks, frontend-storybook, frontend-e2e, backend-lint]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every check that ran passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$RESULTS"
+          if jq -e 'to_entries | any(.value.result == "failure" or .value.result == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            echo "::error::A check failed or was cancelled. Open that job for details."
+            exit 1
+          fi
+          echo "Every check that ran passed. Skipped checks had nothing to check."
