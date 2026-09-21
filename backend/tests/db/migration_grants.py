@@ -1,0 +1,71 @@
+"""Grants and hand-written policies, unioned across every migration that declares them.
+
+Each migration owns the tables it creates, but a later one adds to an earlier one:
+006 grants `idempotency_record` UPDATE (which 005 created) and re-creates
+`activity_event_sel`. Reading `mig005` alone then makes three tests red the day 006
+lands (plan review round 2 B-5, cross-vendor R-2). Two rules make the union correct:
+
+  * grants union as verb SETS per table, so 006 adding UPDATE to a table 005 also
+    grants does not drop 005's verbs;
+  * policies are last-declaration-wins keyed on (table, policy name), so a policy a
+    later migration re-creates (006 rewrites `activity_event_sel`) is counted once,
+    with the later text.
+
+A module named here that does not exist yet is skipped, so this reads as 005 alone
+until 006 is written.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import re
+from pathlib import Path
+from types import ModuleType
+
+_VERSIONS = Path(__file__).resolve().parents[2] / "api/db/migrations/versions"
+
+# In apply order. Each may define GRANTS: dict[str, str] and HAND_POLICIES:
+# list[tuple[str, str]]. Add a migration here when it grants or hand-writes a policy.
+_MODULE_NAMES = ("005_authorization", "006_leads", "007_administration",
+                 "008_message_delivery", "009_subsidy_masters",
+                 "010_products_and_pricing")
+
+_NAME = re.compile(r"CREATE POLICY (\w+)")
+
+
+def _load(name: str) -> ModuleType | None:
+    path = _VERSIONS / f"{name}.py"
+    if not path.exists():
+        return None
+    spec = importlib.util.spec_from_file_location(f"mig_grants_{name}", path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _modules() -> list[ModuleType]:
+    return [m for name in _MODULE_NAMES if (m := _load(name)) is not None]
+
+
+def grants() -> dict[str, set[str]]:
+    """table -> the set of verbs app_role holds, unioned across migrations."""
+    out: dict[str, set[str]] = {}
+    for mod in _modules():
+        for table, verbs in getattr(mod, "GRANTS", {}).items():
+            out.setdefault(table, set()).update(v.strip() for v in verbs.split(","))
+    return out
+
+
+def hand_policies() -> list[tuple[str, str]]:
+    """(table, CREATE POLICY statement), last-declaration-wins by (table, name)."""
+    latest: dict[tuple[str, str], str] = {}
+    order: list[tuple[str, str]] = []
+    for mod in _modules():
+        for table, stmt in getattr(mod, "HAND_POLICIES", []):
+            match = _NAME.search(stmt)
+            key = (table, match.group(1)) if match else (table, stmt)
+            if key not in latest:
+                order.append(key)
+            latest[key] = stmt
+    return [(table, latest[key]) for key in order for (table, _) in [key]]

@@ -1,0 +1,27 @@
+infra/.env
+.env
+*.key
+*.pem
+__pycache__/
+*.pyc
+.venv/
+venv/
+val_out.txt
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+node_modules/
+*.egg-info/
+.coverage
+htmlcov/
+dist/
+build/
+
+# /astra-review writes its findings here. Read it, act on it, delete it.
+.astra-review.md
+.astra-spec.md
+.astra-spec.log
+
+# Staging secrets. Uploaded to the box by scripts/deploy_staging.py.
+infra/.env.staging
+infra/.staging-password

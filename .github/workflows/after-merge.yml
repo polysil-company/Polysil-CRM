@@ -1,4 +1,4 @@
-# Runs when commits reach integration or main.
+# Runs when commits reach integration, staging or main.
 #
 # 1. Confirms they arrived through a merged pull request, not a direct push.
 # 2. Runs the checks again on the merged result: two passing pull requests can still
@@ -13,7 +13,7 @@ name: After merge
 
 on:
   push:
-    branches: [integration, main]
+    branches: [integration, staging, main]
 
 concurrency:
   # Runs for the same branch wait for each other instead of cancelling.

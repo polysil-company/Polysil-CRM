@@ -1,0 +1,1356 @@
+{
+  "drip": {
+    "regular": {
+      "source": "'New Subsidy Calculation C1'!C4:I17",
+      "areas": [
+        "0.2",
+        "0.4",
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "rows": [
+        {
+          "spacing": 12,
+          "costs": [
+            22083,
+            26339,
+            37547,
+            57184,
+            87416,
+            115791,
+            134248
+          ]
+        },
+        {
+          "spacing": 10,
+          "costs": [
+            22538,
+            27239,
+            39779,
+            61641,
+            94998,
+            124752,
+            145441
+          ]
+        },
+        {
+          "spacing": 9,
+          "costs": [
+            22862,
+            27871,
+            41346,
+            64756,
+            99707,
+            131026,
+            154095
+          ]
+        },
+        {
+          "spacing": 8,
+          "costs": [
+            22945,
+            28034,
+            41653,
+            66316,
+            100863,
+            132539,
+            155956
+          ]
+        },
+        {
+          "spacing": 6,
+          "costs": [
+            23867,
+            29843,
+            46175,
+            75187,
+            115173,
+            152078,
+            202225
+          ]
+        },
+        {
+          "spacing": 5,
+          "costs": [
+            24734,
+            31557,
+            51162,
+            89426,
+            128743,
+            178790,
+            224187
+          ]
+        },
+        {
+          "spacing": 4,
+          "costs": [
+            25716,
+            33471,
+            55853,
+            98751,
+            142931,
+            197604,
+            254118
+          ]
+        },
+        {
+          "spacing": 3,
+          "costs": [
+            27931,
+            37821,
+            66631,
+            123490,
+            181193,
+            252542,
+            314057
+          ]
+        },
+        {
+          "spacing": "2.5",
+          "costs": [
+            30003,
+            41922,
+            76790,
+            143676,
+            219627,
+            298145,
+            373338
+          ]
+        },
+        {
+          "spacing": 2,
+          "costs": [
+            32462,
+            47509,
+            91916,
+            169469,
+            258897,
+            352976,
+            433050
+          ]
+        },
+        {
+          "spacing": "1.8",
+          "costs": [
+            33824,
+            50183,
+            98549,
+            182641,
+            283444,
+            382115,
+            476053
+          ]
+        },
+        {
+          "spacing": "1.5",
+          "costs": [
+            36555,
+            55572,
+            111818,
+            210645,
+            325465,
+            444570,
+            543028
+          ]
+        },
+        {
+          "spacing": "1.2",
+          "costs": [
+            40659,
+            63651,
+            133871,
+            253077,
+            392424,
+            529466,
+            649752
+          ]
+        },
+        {
+          "spacing": 1,
+          "costs": [
+            44751,
+            71732,
+            153773,
+            292592,
+            452334,
+            612642,
+            752118
+          ]
+        }
+      ]
+    },
+    "seven_year": {
+      "source": "'7 Year Jantri Calculation C1'!C4:I16",
+      "areas": [
+        "0.2",
+        "0.4",
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "rows": [
+        {
+          "spacing": 12,
+          "costs": [
+            10526,
+            18009,
+            24586,
+            39098,
+            60704,
+            75521,
+            96166
+          ]
+        },
+        {
+          "spacing": 10,
+          "costs": [
+            10854,
+            18652,
+            26181,
+            42226,
+            65487,
+            82025,
+            104292
+          ]
+        },
+        {
+          "spacing": 9,
+          "costs": [
+            11091,
+            19114,
+            27304,
+            44469,
+            68853,
+            86606,
+            110024
+          ]
+        },
+        {
+          "spacing": 8,
+          "costs": [
+            11330,
+            19711,
+            28777,
+            47314,
+            73272,
+            92615,
+            117529
+          ]
+        },
+        {
+          "spacing": 6,
+          "costs": [
+            12400,
+            21693,
+            34687,
+            57987,
+            93688,
+            113618,
+            142566
+          ]
+        },
+        {
+          "spacing": 5,
+          "costs": [
+            13144,
+            23486,
+            39378,
+            67199,
+            97110,
+            123409,
+            165815
+          ]
+        },
+        {
+          "spacing": 4,
+          "costs": [
+            14602,
+            24326,
+            41534,
+            72799,
+            113560,
+            148684,
+            176964
+          ]
+        },
+        {
+          "spacing": 3,
+          "costs": [
+            15792,
+            26190,
+            47751,
+            82654,
+            127306,
+            160103,
+            200455
+          ]
+        },
+        {
+          "spacing": "2.5",
+          "costs": [
+            20201,
+            35000,
+            71733,
+            131824,
+            201464,
+            279770,
+            343433
+          ]
+        },
+        {
+          "spacing": 2,
+          "costs": [
+            23932,
+            41303,
+            83085,
+            161263,
+            234280,
+            325469,
+            399494
+          ]
+        },
+        {
+          "spacing": "1.8",
+          "costs": [
+            24569,
+            42992,
+            91560,
+            173298,
+            260868,
+            355323,
+            442484
+          ]
+        },
+        {
+          "spacing": "1.5",
+          "costs": [
+            28003,
+            50116,
+            109531,
+            207860,
+            313909,
+            425189,
+            530905
+          ]
+        },
+        {
+          "spacing": "1.2",
+          "costs": [
+            31436,
+            57241,
+            127501,
+            242422,
+            366950,
+            495055,
+            619326
+          ]
+        }
+      ]
+    }
+  },
+  "mini_sprinkler": {
+    "regular": {
+      "source": "'New Subsidy Calculation'!M4:S6",
+      "areas": [
+        "0.2",
+        "0.4",
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "rows": [
+        {
+          "spacing": 9,
+          "costs": [
+            35052,
+            51084,
+            97488,
+            179119,
+            280423,
+            384480,
+            462776
+          ]
+        },
+        {
+          "spacing": 8,
+          "costs": [
+            37321,
+            56495,
+            109518,
+            202885,
+            316982,
+            432589,
+            522594
+          ]
+        },
+        {
+          "spacing": "7.5",
+          "costs": [
+            39239,
+            59309,
+            117307,
+            217648,
+            339537,
+            462914,
+            560457
+          ]
+        }
+      ]
+    },
+    "seven_year": {
+      "source": "'7 Year Jantri Calculation'!M4:S5",
+      "areas": [
+        "0.2",
+        "0.4",
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "rows": [
+        {
+          "spacing": 9,
+          "costs": [
+            23306,
+            46611,
+            "99003.5",
+            "182347.5",
+            "279678.5",
+            362764,
+            446563
+          ]
+        },
+        {
+          "spacing": 8,
+          "costs": [
+            23764,
+            47528,
+            103873,
+            187929,
+            290935,
+            380031,
+            469890
+          ]
+        }
+      ]
+    }
+  },
+  "sprinkler": {
+    "regular": {
+      "source": "'Farmer Share Calculation'!L2:M26",
+      "rows": [
+        {
+          "area": "0.4",
+          "cost": "13209.0"
+        },
+        {
+          "area": "0.6",
+          "cost": "16533.333333333332"
+        },
+        {
+          "area": "0.8",
+          "cost": "19857.666666666668"
+        },
+        {
+          "area": "1.0",
+          "cost": "23182.0"
+        },
+        {
+          "area": "1.2",
+          "cost": "25190.8"
+        },
+        {
+          "area": "1.4",
+          "cost": "27199.6"
+        },
+        {
+          "area": "1.6",
+          "cost": "29208.4"
+        },
+        {
+          "area": "1.8",
+          "cost": "31217.2"
+        },
+        {
+          "area": "2.0",
+          "cost": "33226.0"
+        },
+        {
+          "area": "2.01",
+          "cost": "33297.63"
+        },
+        {
+          "area": "2.2",
+          "cost": "34658.6"
+        },
+        {
+          "area": "2.4",
+          "cost": "36091.2"
+        },
+        {
+          "area": "2.6",
+          "cost": "37523.8"
+        },
+        {
+          "area": "2.8",
+          "cost": "38956.4"
+        },
+        {
+          "area": "3.0",
+          "cost": "40389.0"
+        },
+        {
+          "area": "3.2",
+          "cost": "42492.200000000004"
+        },
+        {
+          "area": "3.4",
+          "cost": "44595.4"
+        },
+        {
+          "area": "3.6",
+          "cost": "46698.6"
+        },
+        {
+          "area": "3.8",
+          "cost": "48801.799999999996"
+        },
+        {
+          "area": "4.0",
+          "cost": "50905.0"
+        },
+        {
+          "area": "4.2",
+          "cost": "52161.200000000004"
+        },
+        {
+          "area": "4.4",
+          "cost": "53417.4"
+        },
+        {
+          "area": "4.6",
+          "cost": "54673.6"
+        },
+        {
+          "area": "4.8",
+          "cost": "55929.8"
+        },
+        {
+          "area": "5.0",
+          "cost": "57186.0"
+        }
+      ]
+    },
+    "seven_year": {
+      "source": "'Farmer Share Calculation'!L30:M54",
+      "rows": [
+        {
+          "area": "0.4",
+          "cost": "13211.0"
+        },
+        {
+          "area": "0.6",
+          "cost": "16872.0"
+        },
+        {
+          "area": "0.8",
+          "cost": "20533.0"
+        },
+        {
+          "area": "1.0",
+          "cost": "24194.0"
+        },
+        {
+          "area": "1.2",
+          "cost": "26287.0"
+        },
+        {
+          "area": "1.4",
+          "cost": "28379.0"
+        },
+        {
+          "area": "1.6",
+          "cost": "30472.0"
+        },
+        {
+          "area": "1.8",
+          "cost": "32564.0"
+        },
+        {
+          "area": "2.0",
+          "cost": "34657.0"
+        },
+        {
+          "area": "2.01",
+          "cost": "34778.0"
+        },
+        {
+          "area": "2.2",
+          "cost": "37081.0"
+        },
+        {
+          "area": "2.4",
+          "cost": "39506.0"
+        },
+        {
+          "area": "2.6",
+          "cost": "41930.0"
+        },
+        {
+          "area": "2.8",
+          "cost": "44355.0"
+        },
+        {
+          "area": "3.0",
+          "cost": "46779.0"
+        },
+        {
+          "area": "3.2",
+          "cost": "49222.0"
+        },
+        {
+          "area": "3.4",
+          "cost": "51665.0"
+        },
+        {
+          "area": "3.6",
+          "cost": "54109.0"
+        },
+        {
+          "area": "3.8",
+          "cost": "56552.0"
+        },
+        {
+          "area": "4.0",
+          "cost": "58995.0"
+        },
+        {
+          "area": "4.2",
+          "cost": "60554.0"
+        },
+        {
+          "area": "4.4",
+          "cost": "62113.0"
+        },
+        {
+          "area": "4.6",
+          "cost": "63671.0"
+        },
+        {
+          "area": "4.8",
+          "cost": "65230.0"
+        },
+        {
+          "area": "5.0",
+          "cost": "66789.0"
+        }
+      ]
+    },
+    "quantities": {
+      "source": "'SPRINKLER 13.06.2026'!B7:AC16",
+      "areas": [
+        "0.4",
+        "0.6",
+        "0.8",
+        "1.0",
+        "1.2",
+        "1.4",
+        "1.6",
+        "1.8",
+        "2.0",
+        "2.01",
+        "2.2",
+        "2.4",
+        "2.6",
+        "2.8",
+        "3.0",
+        "3.2",
+        "3.4",
+        "3.6",
+        "3.8",
+        "4.0",
+        "4.2",
+        "4.4",
+        "4.6",
+        "4.8",
+        "5.0"
+      ],
+      "components": [
+        {
+          "row": 7,
+          "code": "pipe",
+          "component": "SPRI. HDPE PIPE 6M SS C CLAMP COUPLER",
+          "description": "HDPE 17425 SPRINKLER PIPE 75 MM X 2.5 KG WITH SS C CLAMP COUPLER",
+          "uom": "NO",
+          "qty": [
+            "14.0",
+            "19.0",
+            "24.0",
+            "30.0",
+            "33.0",
+            "35.0",
+            "37.0",
+            "39.0",
+            "41.0",
+            "34.0",
+            "36.0",
+            "38.0",
+            "38.0",
+            "39.0",
+            "41.0",
+            "44.0",
+            "45.0",
+            "47.0",
+            "48.0",
+            "52.0",
+            "53.0",
+            "54.0",
+            "55.0",
+            "56.0",
+            "58.0"
+          ]
+        },
+        {
+          "row": 8,
+          "code": "coupler",
+          "component": "Sprinkler coupler with foot assly",
+          "description": "Sprinkler Coupler with Foot Batten\nAssembly Quick Action 75MM",
+          "uom": "NO",
+          "qty": [
+            "5.0",
+            "5.0",
+            "5.0",
+            "5.0",
+            "5.0",
+            "6.0",
+            "7.0",
+            "8.0",
+            "9.0",
+            "9.0",
+            "9.0",
+            "9.0",
+            "10.0",
+            "11.0",
+            "11.0",
+            "11.0",
+            "12.0",
+            "13.0",
+            "14.0",
+            "14.0",
+            "14.0",
+            "15.0",
+            "15.0",
+            "16.0",
+            "16.0"
+          ]
+        },
+        {
+          "row": 9,
+          "code": "nozzle_brass",
+          "component": "Sprinkler Nozzle",
+          "description": "Sprinkler Nozzles (1.7 to 2.8 kg/cm2) 5 to 40 Litre/Minute Capacity(Brass)",
+          "uom": "NO",
+          "qty": [
+            "5.0",
+            "5.0",
+            "5.0",
+            "5.0",
+            "5.0",
+            "6.0",
+            "7.0",
+            "8.0",
+            "9.0",
+            "9.0",
+            "9.0",
+            "9.0",
+            "10.0",
+            "11.0",
+            "11.0",
+            "11.0",
+            "12.0",
+            "13.0",
+            "14.0",
+            "14.0",
+            "14.0",
+            "15.0",
+            "15.0",
+            "16.0",
+            "16.0"
+          ]
+        },
+        {
+          "row": 10,
+          "code": "nozzle_plastic",
+          "component": "Sprinkler Nozzle",
+          "description": "Sprinkler Nozzles (1.7 to 2.8 kg/cm2) 5 to 40 Litre/Minute Capacity(Plastic)",
+          "uom": "NO",
+          "qty": [
+            "5.0",
+            "5.0",
+            "5.0",
+            "5.0",
+            "5.0",
+            "6.0",
+            "7.0",
+            "8.0",
+            "9.0",
+            "9.0",
+            "9.0",
+            "9.0",
+            "10.0",
+            "11.0",
+            "11.0",
+            "11.0",
+            "12.0",
+            "13.0",
+            "14.0",
+            "14.0",
+            "14.0",
+            "15.0",
+            "15.0",
+            "16.0",
+            "16.0"
+          ]
+        },
+        {
+          "row": 11,
+          "code": "riser",
+          "component": "Riser Pipe",
+          "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+          "uom": "NO",
+          "qty": [
+            "5.0",
+            "5.0",
+            "5.0",
+            "5.0",
+            "5.0",
+            "6.0",
+            "7.0",
+            "8.0",
+            "9.0",
+            "9.0",
+            "9.0",
+            "9.0",
+            "10.0",
+            "11.0",
+            "11.0",
+            "11.0",
+            "12.0",
+            "13.0",
+            "14.0",
+            "14.0",
+            "14.0",
+            "15.0",
+            "15.0",
+            "16.0",
+            "16.0"
+          ]
+        },
+        {
+          "row": 12,
+          "code": "pcn",
+          "component": "Pump connecting coupler",
+          "description": "SPRINKLER PCN (NIPPLE) 75MM WITH SS C CLAMP",
+          "uom": "NO",
+          "qty": [
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0"
+          ]
+        },
+        {
+          "row": 13,
+          "code": "bend",
+          "component": "Bend",
+          "description": "SPRINKLER BEND 75MM  WITH SS C CLAMP",
+          "uom": "NO",
+          "qty": [
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0"
+          ]
+        },
+        {
+          "row": 14,
+          "code": "tee",
+          "component": "Tee",
+          "description": "SPRINKLER TEE 75MM WITH SS C CLAMP",
+          "uom": "NO",
+          "qty": [
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0",
+            "1.0"
+          ]
+        },
+        {
+          "row": 15,
+          "code": "end_plug",
+          "component": "End plug",
+          "description": "SPRINKLER END PLUG 75MM (FOR SPR. C CLAMP PIPE)",
+          "uom": "NO",
+          "qty": [
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0",
+            "2.0"
+          ]
+        },
+        {
+          "row": 16,
+          "code": "transport",
+          "component": "Secondary transportation",
+          "description": "",
+          "uom": "RS/HA",
+          "qty": [
+            "0.4",
+            "0.6",
+            "0.8",
+            "1.0",
+            "1.2",
+            "1.4",
+            "1.6",
+            "1.8",
+            "2.0",
+            "2.01",
+            "2.2",
+            "2.4",
+            "2.6",
+            "2.8",
+            "3.0",
+            "3.2",
+            "3.4",
+            "3.6",
+            "3.8",
+            "4.0",
+            "4.2",
+            "4.4",
+            "4.6",
+            "4.8",
+            "5.0"
+          ]
+        }
+      ]
+    },
+    "pipe_size_bands": {
+      "75": "areas up to 2.0",
+      "90": "areas from 2.01",
+      "source": "'SPRINKLER 13.06.2026'!E6, N6"
+    }
+  },
+  "crops": {
+    "source": "'New Subsidy Calculation C1'!B59:C137",
+    "rows": [
+      {
+        "crop": "Select Crop here",
+        "standard_spacing": 0
+      },
+      {
+        "crop": "Aloevera",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Amla",
+        "standard_spacing": 6
+      },
+      {
+        "crop": "Ardusoa",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Banana",
+        "standard_spacing": "1.5"
+      },
+      {
+        "crop": "Ber",
+        "standard_spacing": 6
+      },
+      {
+        "crop": "Bhindi",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Lady Finger",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Bitter Gourd",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Bottle Gourd",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Brinjal",
+        "standard_spacing": "1.8"
+      },
+      {
+        "crop": "Cabbage",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Capsicum",
+        "standard_spacing": "1.8"
+      },
+      {
+        "crop": "Cashewnut",
+        "standard_spacing": 8
+      },
+      {
+        "crop": "Castor",
+        "standard_spacing": "1.8"
+      },
+      {
+        "crop": "Cauliflower",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Chillies",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Citrus",
+        "standard_spacing": 6
+      },
+      {
+        "crop": "Coconut",
+        "standard_spacing": 6
+      },
+      {
+        "crop": "Corriander",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Cotton",
+        "standard_spacing": "1.4"
+      },
+      {
+        "crop": "Cowpea",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Cucumber",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Cumin",
+        "standard_spacing": "1.5"
+      },
+      {
+        "crop": "Custard Apple",
+        "standard_spacing": 5
+      },
+      {
+        "crop": "Dragon Fruit",
+        "standard_spacing": 4
+      },
+      {
+        "crop": "Date Palm",
+        "standard_spacing": 8
+      },
+      {
+        "crop": "Drumstick",
+        "standard_spacing": 5
+      },
+      {
+        "crop": "Suran",
+        "standard_spacing": "1.5"
+      },
+      {
+        "crop": "Eucalyptus",
+        "standard_spacing": 3
+      },
+      {
+        "crop": "Fennel",
+        "standard_spacing": "1.8"
+      },
+      {
+        "crop": "Fenugreek",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Galardia",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Garlic",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Ginger",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Green Gram",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Groundnut",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Guar",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Guava",
+        "standard_spacing": 6
+      },
+      {
+        "crop": "Indian Bean",
+        "standard_spacing": "1.8"
+      },
+      {
+        "crop": "Jamun",
+        "standard_spacing": 5
+      },
+      {
+        "crop": "Jasmine",
+        "standard_spacing": "1.5"
+      },
+      {
+        "crop": "Kolu",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Lemon",
+        "standard_spacing": 6
+      },
+      {
+        "crop": "Maize",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Mango",
+        "standard_spacing": 5
+      },
+      {
+        "crop": "Marygold",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Melia Dubia",
+        "standard_spacing": 4
+      },
+      {
+        "crop": "Mehogni",
+        "standard_spacing": 3
+      },
+      {
+        "crop": "Oil Palm",
+        "standard_spacing": 9
+      },
+      {
+        "crop": "Onion",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Orange",
+        "standard_spacing": 6
+      },
+      {
+        "crop": "Palmarosa",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Papaya",
+        "standard_spacing": "2.5"
+      },
+      {
+        "crop": "Parval",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Pointed Gourd",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Pomegranate",
+        "standard_spacing": 5
+      },
+      {
+        "crop": "Pomelo",
+        "standard_spacing": 3
+      },
+      {
+        "crop": "Potato",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Pumpkin",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Redgram/Pigeonpea",
+        "standard_spacing": "1.8"
+      },
+      {
+        "crop": "Ridgegourd",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Rose",
+        "standard_spacing": "3.2"
+      },
+      {
+        "crop": "Sakar Teti",
+        "standard_spacing": "1.5"
+      },
+      {
+        "crop": "Sandalwood",
+        "standard_spacing": 3
+      },
+      {
+        "crop": "Sapota",
+        "standard_spacing": 5
+      },
+      {
+        "crop": "Saru",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Sesamum",
+        "standard_spacing": "1.35"
+      },
+      {
+        "crop": "Small Gourd",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Smoothgourd",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Spine Gourd",
+        "standard_spacing": "1.8"
+      },
+      {
+        "crop": "Strawberry",
+        "standard_spacing": "1.5"
+      },
+      {
+        "crop": "Sugarcane",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Teak",
+        "standard_spacing": 4
+      },
+      {
+        "crop": "Tindola",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Tomato",
+        "standard_spacing": "1.5"
+      },
+      {
+        "crop": "Turmeric",
+        "standard_spacing": "1.2"
+      },
+      {
+        "crop": "Watermelon",
+        "standard_spacing": 2
+      },
+      {
+        "crop": "Wheat",
+        "standard_spacing": "1.2"
+      }
+    ]
+  }
+}
