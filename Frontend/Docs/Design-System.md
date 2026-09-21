@@ -73,7 +73,7 @@ They use the semantic tokens below.
 | `bg-overlay` | Dialog and sheet backdrop | 32% sand-950 | 55% black |
 | `text-foreground` | Primary text | sand-950 | ink-50 |
 | `text-muted-foreground` | Secondary text, labels | sand-600 | 68% L |
-| `text-subtle-foreground` | Placeholders, meta, disabled | 56% L | 60% L |
+| `text-subtle-foreground` | Placeholders, meta, disabled | 50% L (as muted) | 60% L |
 
 ### Interaction fills (translucent — they work on any surface)
 
@@ -89,6 +89,10 @@ They use the semantic tokens below.
 |---|---|---|
 | `bg-primary` / `hover:bg-primary-hover` | The main action on a surface | Decoration, large areas |
 | `bg-primary-soft` + `text-primary-soft-foreground` | Selected-but-quiet states, active tab count | Body text backgrounds |
+| `text-primary-text` | Teal as text: links, an unread time | Fills — `text-primary` is for icons, spinners and charts, which need only 3:1 |
+
+In light mode `text-subtle-foreground` is as dark as `text-muted-foreground`: a lighter grey fails
+4.5:1 on tinted rows and hover states. Separate the two tiers with size and weight, not colour.
 | `bg-secondary` / `hover:bg-secondary-hover` | Secondary actions | — |
 | `bg-destructive` | Irreversible actions (delete) | Error *messages* (use `danger`) |
 | `bg-highlight`, `bg-row-selected` | Selection only | Status, emphasis |

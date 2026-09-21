@@ -130,7 +130,7 @@ function ConversationRow({
             suppressHydrationWarning
             className={cn(
               "shrink-0 text-xs tabular-nums",
-              unread ? "font-medium text-primary" : "text-subtle-foreground",
+              unread ? "font-medium text-primary-text" : "text-subtle-foreground",
             )}
           >
             {formatConversationTime(conversation.updatedAt, now)}

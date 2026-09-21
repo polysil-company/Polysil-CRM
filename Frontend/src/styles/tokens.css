@@ -147,7 +147,10 @@
 
   /* Text emphasis */
   --muted-foreground: var(--sand-600); /* secondary text */
-  --subtle-foreground: oklch(0.56 0.009 85); /* placeholders, meta, disabled */
+  /* Placeholders, meta, disabled. As dark as muted in light mode: any lighter grey
+     fails WCAG AA (4.5:1) on tinted rows — 56% L measured 3.8:1. Hierarchy comes
+     from size and weight instead. */
+  --subtle-foreground: var(--sand-600);
 
   /* Translucent fills — adapt to whatever surface they sit on */
   --muted: oklch(0.3 0.01 85 / 5%);
@@ -161,6 +164,9 @@
   --primary-foreground: var(--sand-0);
   --primary-soft: var(--teal-50);
   --primary-soft-foreground: var(--teal-700);
+  /* Teal as text (links, an unread time). --primary is a fill: as text, teal-600
+     reaches only 4.2:1 on the canvas. */
+  --primary-text: var(--teal-700);
   --secondary: oklch(0.3 0.01 85 / 6%);
   --secondary-hover: oklch(0.3 0.01 85 / 10%);
   --secondary-foreground: var(--sand-950);
@@ -269,6 +275,7 @@
   --primary-foreground: var(--ink-950);
   --primary-soft: oklch(0.74 0.12 185 / 12%);
   --primary-soft-foreground: var(--teal-300);
+  --primary-text: var(--teal-400);
   --secondary: oklch(1 0 0 / 7%);
   --secondary-hover: oklch(1 0 0 / 11%);
   --secondary-foreground: var(--ink-50);
@@ -463,6 +470,7 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-soft: var(--primary-soft);
   --color-primary-soft-foreground: var(--primary-soft-foreground);
+  --color-primary-text: var(--primary-text);
   --color-secondary: var(--secondary);
   --color-secondary-hover: var(--secondary-hover);
   --color-secondary-foreground: var(--secondary-foreground);
