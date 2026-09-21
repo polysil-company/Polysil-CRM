@@ -408,7 +408,10 @@ jobs:
       # those files are not in this repository on purpose. The run prints what it
       # skipped and why.
       - name: Pytest
-        run: pytest -q -p no:cacheprovider -rs
+        # -ra, not -rs. `-rs` reports skips and *replaces* the default failure
+        # summary, so the first failing run said what it skipped and not what it
+        # failed, and the names had to be dug out of the raw log.
+        run: pytest -q -p no:cacheprovider -ra
 
   ci-passed:
     name: CI passed

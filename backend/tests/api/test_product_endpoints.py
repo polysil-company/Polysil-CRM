@@ -158,6 +158,24 @@ def _window() -> dict[str, str]:
     return {"effective_from": f"{year}-01-01", "effective_to": f"{year}-07-01"}
 
 
+async def _category_and_uom(sessions: Callable[[], AsyncSession]) -> tuple[str, str]:
+    """A category code and a unit code, from the tables migration 010 seeds.
+
+    Not read off an existing product: that assumed `load_product_master.py` had
+    run, which needs the client's workbook. A checkout without it has the seeded
+    categories and units and no products at all, and three tests here failed in
+    CI on `data[0]` of an empty list.
+    """
+    s = sessions()
+    category = (await s.execute(text(
+        "SELECT code::text FROM product_category WHERE deleted_at IS NULL "
+        "ORDER BY sort_order LIMIT 1"))).scalar_one()
+    uom = (await s.execute(text(
+        "SELECT code::text FROM uom WHERE deleted_at IS NULL ORDER BY code LIMIT 1"
+    ))).scalar_one()
+    return str(category), str(uom)
+
+
 def _quote(cat: Catalogue, **over: object) -> dict[str, object]:
     body: dict[str, object] = {
         "as_of": AS_OF,
@@ -209,12 +227,10 @@ async def test_the_search_treats_an_underscore_as_an_underscore(
 
 
 async def test_creating_a_product_and_replaying_the_key(
-        client: httpx.AsyncClient, trader: Admin) -> None:
+        client: httpx.AsyncClient, trader: Admin,
+        sessions: Callable[[], AsyncSession]) -> None:
     h = await _auth(client, trader.user)
-    category = (await client.get(f"{V1}/products", params={"limit": 1},
-                                 headers=h)).json()["data"][0]["product_category"]
-    uom = (await client.get(f"{V1}/products", params={"limit": 1},
-                            headers=h)).json()["data"][0]["uom"]
+    category, uom = await _category_and_uom(sessions)
     body = {"description": f"NEW PRODUCT {uuid.uuid4().hex[:8]}",
             "product_category": category, "quotation_category": "field", "uom": uom}
     key = _key()
@@ -313,11 +329,24 @@ async def test_the_tax_rate_list_reads_for_any_signed_in_principal(
 # ── price lists ──────────────────────────────────────────────────────────────
 
 async def test_a_draft_is_filled_then_published_and_refuses_what_it_should(
-        client: httpx.AsyncClient, trader: Admin, catalogue: Catalogue) -> None:
+        client: httpx.AsyncClient, trader: Admin, catalogue: Catalogue,
+        sessions: Callable[[], AsyncSession]) -> None:
     """The whole sequence, and the refusal that matters most: publishing a list
     that does not price every active product would, on the day it starts, leave
-    every other product falling through or refusing to price."""
+    every other product falling through or refusing to price.
+
+    The unpriced product is made here rather than assumed. Relying on the client's
+    catalogue being loaded made this pass locally and fail in CI, where there are
+    no products beyond the ones a test creates - and it failed by *publishing
+    successfully*, which is the refusal this test exists for going untested.
+    """
     h = await _auth(client, trader.user)
+    category, uom = await _category_and_uom(sessions)
+    unpriced = await client.post(f"{V1}/products", headers={**h, **_key()}, json={
+        "description": f"NEVER PRICED {uuid.uuid4().hex[:8]}",
+        "product_category": category, "quotation_category": "field", "uom": uom})
+    assert unpriced.status_code == 201, unpriced.text
+
     created = await client.post(f"{V1}/price-lists", headers={**h, **_key()},
                                 json={"name": f"draft {uuid.uuid4().hex[:6]}",
                                       "channel_tier": "sub_dealer", **_window()})
@@ -330,7 +359,7 @@ async def test_a_draft_is_filled_then_published_and_refuses_what_it_should(
                               json={"items": [{"product_id": catalogue.product_id,
                                                "rate": "99.50"}]})
     assert filled.status_code == 200, filled.text
-    assert filled.json()["unpriced"] > 0, "one rate in a catalogue of many"
+    assert filled.json()["unpriced"] >= 1, "the product created above carries no rate here"
 
     refused = await client.post(f"{V1}/price-lists/{list_id}/publish", headers={**h, **_key()},
                                 json={"allow_unpriced": False})
@@ -644,13 +673,14 @@ async def test_a_bounded_list_that_would_strand_the_scope_is_refused(
 
 
 async def test_a_second_item_code_is_a_409_naming_it(
-        client: httpx.AsyncClient, trader: Admin) -> None:
+        client: httpx.AsyncClient, trader: Admin,
+        sessions: Callable[[], AsyncSession]) -> None:
     """The one duplicate the contract promises that no test exercised."""
     h = await _auth(client, trader.user)
-    sample = (await client.get(f"{V1}/products", params={"limit": 1}, headers=h)).json()["data"][0]
+    category, uom = await _category_and_uom(sessions)
     code = f"IC-{uuid.uuid4().hex[:8]}"
-    body = {"product_category": sample["product_category"], "quotation_category": "field",
-            "uom": sample["uom"], "item_code": code}
+    body = {"product_category": category, "quotation_category": "field",
+            "uom": uom, "item_code": code}
 
     first = await client.post(f"{V1}/products", headers={**h, **_key()},
                               json={**body, "description": f"ITEM ONE {uuid.uuid4().hex[:8]}"})

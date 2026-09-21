@@ -14,6 +14,12 @@ BASE = {
 
 def _settings(monkeypatch: pytest.MonkeyPatch, **over: str) -> Settings:
     monkeypatch.delenv("POLYSIL_ALLOW_DIRECT_DB", raising=False)
+    # And the two role variables, for the same reason `_env_file=None` is below:
+    # these tests describe Settings' own defaults. The env file was covered and
+    # the process environment was not, so CI - which exports DB_ANON_ROLE so the
+    # pre-auth grant test runs rather than skips - failed the defaults test.
+    for name in ("DB_ANON_ROLE", "DB_APP_ROLE"):
+        monkeypatch.delenv(name, raising=False)
     for k, v in {**BASE, **over}.items():
         monkeypatch.setenv(k, v)
     # _env_file=None: these tests describe Settings' own defaults, not whatever the

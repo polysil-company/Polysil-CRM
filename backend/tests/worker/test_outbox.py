@@ -243,7 +243,13 @@ async def test_the_budget_stops_the_loop(sessions: Callable[[], AsyncSession],
     monkeypatch.setattr(get_settings(), "outbox_drain_budget", 0.05)
     try:
         handled = await outbox_drain({"provider": FakeProvider(ACCEPTED)})
-        assert handled == 1, "a fifty-millisecond budget admits one claim"
+        # Not `== 1`. That encoded the development database being 150 ms away,
+        # where one claim fills a fifty-millisecond budget; against a local
+        # container two fit and the test failed for being fast. What the budget
+        # promises is that it stops the loop before the work runs out.
+        assert 1 <= handled < len(rows), (
+            f"the budget admitted {handled} of {len(rows)} and should have stopped "
+            f"after at least one and before the last")
     finally:
         await _drop(sessions(), *rows)
 
