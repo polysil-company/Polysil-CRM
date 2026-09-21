@@ -40,7 +40,8 @@ export function AppShell({ children }: { children: React.ReactNode }): React.JSX
         Skip to content
       </a>
       <div className="flex h-dvh overflow-hidden bg-background">
-        <AppSidebar className="hidden w-sidebar shrink-0 vt-app-sidebar lg:flex" />
+        {/* Width is the one animated layout property: a single element, 200ms, so the panel follows the rail. */}
+        <AppSidebar className="hidden w-sidebar shrink-0 transition-[width] duration-base ease-in-out vt-app-sidebar motion-reduce:transition-none lg:flex sidebar-collapsed:w-sidebar-rail" />
         <div className="flex min-w-0 flex-1 flex-col lg:py-2 lg:pr-2">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-panel text-panel-foreground lg:rounded-2xl lg:shadow-panel">
             <AppHeader className="vt-app-header" />

@@ -1,6 +1,14 @@
+import { authHandlers } from "./auth";
 import { dashboardHandlers } from "./dashboard";
 import { leadHandlers } from "./leads";
-import { sessionHandlers } from "./session";
+import { messageHandlers } from "./messages";
+import { notificationHandlers } from "./notifications";
 
 /** Every mock endpoint. A new API integration adds its handlers here first. */
-export const handlers = [...sessionHandlers, ...leadHandlers, ...dashboardHandlers];
+export const handlers = [
+  ...authHandlers,
+  ...leadHandlers,
+  ...dashboardHandlers,
+  ...notificationHandlers,
+  ...messageHandlers,
+];

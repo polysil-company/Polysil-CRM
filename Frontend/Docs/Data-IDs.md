@@ -33,7 +33,8 @@ ID tells you *which functionality*, and the request ID tells you *which request*
 | `ACCT` | Accounts — payments, ledgers, financial approval queue |
 | `DISP` | Dispatch — stock, dispatch and delivery queue |
 | `ADMN` | Administration — users, roles, thresholds, handover |
-| `NOTIF` | Notifications — WhatsApp and email |
+| `NOTIF` | Notifications — in-app bell, WhatsApp and email |
+| `MSG` | Messages — direct conversations between staff |
 | `BOT` | AI assistant |
 | `SITE` | Public website |
 | `REPO` | Repository tooling — changelog, lint rules, git hooks, CI |
@@ -120,11 +121,16 @@ The registry file is the source of truth; this snapshot helps reading.
 | APP-002 | Theme — light, dark and system preference | frontend | in-progress |
 | APP-003 | Route transitions, page skeletons and route-level error boundaries | frontend | in-progress |
 | APP-004 | Mock scenarios for previewing loading, empty, error and contract states | frontend | in-progress |
+| APP-005 | Collapsible desktop sidebar and page titles in the top bar | frontend | in-progress |
 | OBS-001 | Logger utility with runtime log level | frontend | in-progress |
 | OBS-002 | API client — request IDs, error normalisation, response contract validation | shared | in-progress |
 | DS-001 | Design tokens and component library | frontend | in-progress |
-| AUTH-001 | Phone-number sign-in | shared | planned |
-| AUTH-002 | Current session — user, role, channel partner type, region scope (`GET /me`) | shared | mocked |
+| AUTH-001 | Mobile sign-in with a one-time code — channel partners (`POST /auth/otp/request`, `POST /auth/otp/verify`) | shared | mocked |
+| AUTH-002 | Current session — user, role, organisation unit, partner and permissions (`GET /auth/me`) | shared | mocked |
+| AUTH-003 | Email and password sign-in — Polysil staff (`POST /auth/login`) | shared | mocked |
+| AUTH-004 | Keep signed in — rotate the access token with the refresh cookie (`POST /auth/refresh`) | shared | mocked |
+| AUTH-005 | Sign out (`POST /auth/logout`) | shared | mocked |
+| AUTH-006 | Signed-in routing — sign-in redirects, return path and session end | frontend | in-progress |
 | LEAD-001 | List leads with filters, sorting and pagination (`GET /leads`) | shared | mocked |
 | LEAD-002 | Create lead (`POST /leads`) | shared | mocked |
 | LEAD-003 | Lead detail (`GET /leads/{leadId}`) | shared | mocked |
@@ -145,5 +151,12 @@ The registry file is the source of truth; this snapshot helps reading.
 | DISP-001 | Dispatch work queue | shared | planned |
 | ADMN-001 | Users, roles and approval thresholds | shared | planned |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |
+| NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | mocked |
+| NOTIF-002 | Mark notifications as read — one or all | shared | mocked |
+| MSG-001 | Conversation list with unread counts | shared | mocked |
+| MSG-002 | Messages in a conversation | shared | mocked |
+| MSG-003 | Send a message, optionally linking a CRM record | shared | mocked |
+| MSG-004 | Start a conversation — staff directory search | shared | mocked |
+| MSG-005 | Mark a conversation as read | shared | mocked |
 | REPO-001 | Changelog system — one entry per change, generated CHANGELOG.md | frontend | in-progress |
 | REPO-002 | Quality gates — lint rules, git hooks, CI pipeline | frontend | in-progress |

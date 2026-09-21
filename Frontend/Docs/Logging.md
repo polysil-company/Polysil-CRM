@@ -46,7 +46,7 @@ You rarely call the logger yourself — the building blocks do it:
 
 | You use | It logs automatically |
 |---|---|
-| `apiRequest()` | Request (debug), response (info), failure (warn/error), `CONTRACT_VIOLATION` (error) |
+| `apiRequest()` | Request (debug), response (info), failure (warn/error), `CONTRACT_VIOLATION` (error). With `sensitive: true` the request and response bodies are replaced by `[REDACTED]` — use it for passwords, one-time codes and tokens |
 | `useAsyncAction()` | Action start, success with duration, failure |
 | TanStack Query caches | Any failure that did not come through `apiRequest()` |
 | `error.tsx` / `global-error.tsx` | Render crashes with the Next.js digest |

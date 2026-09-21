@@ -27,7 +27,6 @@ export function ThemeToggle(): React.JSX.Element {
         <Icon icon={resolvedTheme === "dark" ? Moon02Icon : Sun03Icon} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-40">
-        <DropdownMenuLabel>Theme</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={preference}
           onValueChange={(value: unknown) => {
@@ -36,6 +35,8 @@ export function ThemeToggle(): React.JSX.Element {
             }
           }}
         >
+          {/* A group label must sit inside its group: Base UI throws otherwise, and uses it to name the group. */}
+          <DropdownMenuLabel>Theme</DropdownMenuLabel>
           <DropdownMenuRadioItem value="light">
             <Icon icon={Sun03Icon} />
             Light

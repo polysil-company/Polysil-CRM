@@ -2,7 +2,7 @@
 
 The CRM and dealer management web app for **Polysil Irrigation** (Vadodara, Gujarat), built by **Loopify Solutions**. This repository is the frontend; the API is built separately by the backend developer.
 
-> **Status, 14 September 2026:** the frontend foundation is in place. The design system, app shell, role-based navigation, dashboard and leads run against a mocked API. Authentication and backend integration come next.
+> **Status, 15 September 2026:** the frontend foundation and sign-in are in place. Staff sign in with email and password, channel partners with a one-time code; navigation follows each user's permissions. Everything runs against a mocked API built from the backend's contract; integration on staging comes next.
 
 ## Start here
 
@@ -33,7 +33,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:3000. In development the API is mocked with MSW, so no backend is needed. The user menu (top right) lets you preview the app as another role and switch the data scenario — slow, empty, error or a broken contract — to see every state.
+Open http://localhost:3000. In development the API is mocked with MSW, so no backend is needed. Sign in as staff with any email and the password `polysil-demo`, or as a channel partner with any Indian mobile number and the code `123456`. The user menu (top right) lets you preview the app as another role and switch the data scenario — slow, empty, error or a broken contract — to see every state.
 
 To preview and tweak components in isolation:
 

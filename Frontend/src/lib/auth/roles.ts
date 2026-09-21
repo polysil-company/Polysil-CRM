@@ -1,13 +1,15 @@
 /**
- * Roles, as agreed with the client (Docs/Frontend-Scope.md §2).
+ * Role codes the backend assigns (`role.code` in `GET /auth/me`).
  *
- * Internal roles are Polysil staff. Channel partners are external businesses
- * with a completely different set of screens; they have one role with three
- * types. The umbrella name "channel partner" is a placeholder until the client
- * confirms it.
+ * Screens render the backend's `role.name` and gate on permissions, never on
+ * these codes. The codes exist so the mock backend can preview each kind of user
+ * and tests can read in business terms.
+ *
+ * TODO(AUTH-002): the backend seeds sixteen roles from its RBAC matrix; add the rest once that list is shared.
  */
 
-export const INTERNAL_ROLES = [
+/** Polysil staff, who sign in with a work email and password. */
+export const STAFF_ROLES = [
   "employee",
   "district_manager",
   "state_manager",
@@ -18,16 +20,14 @@ export const INTERNAL_ROLES = [
   "qa_manager",
 ] as const;
 
-// TODO(AUTH-002): confirm the umbrella role name for distributor / dealer / sub-dealer with the client.
-export const CHANNEL_PARTNER_ROLE = "channel_partner";
+/** Channel partner users, who sign in with a one-time code sent to their mobile. */
+export const PARTNER_ROLES = ["distributor", "dealer", "sub_dealer"] as const;
 
-export const ROLES = [...INTERNAL_ROLES, CHANNEL_PARTNER_ROLE] as const;
+export const ROLES = [...STAFF_ROLES, ...PARTNER_ROLES] as const;
 
+export type StaffRole = (typeof STAFF_ROLES)[number];
+export type PartnerRole = (typeof PARTNER_ROLES)[number];
 export type Role = (typeof ROLES)[number];
-
-export const CHANNEL_PARTNER_TYPES = ["distributor", "dealer", "sub_dealer"] as const;
-
-export type ChannelPartnerType = (typeof CHANNEL_PARTNER_TYPES)[number];
 
 export const ROLE_LABELS: Readonly<Record<Role, string>> = {
   employee: "Employee",
@@ -38,11 +38,18 @@ export const ROLE_LABELS: Readonly<Record<Role, string>> = {
   account_manager: "Account Manager",
   dispatch_manager: "Dispatch Manager",
   qa_manager: "QA Manager",
-  channel_partner: "Channel Partner",
-};
-
-export const CHANNEL_PARTNER_TYPE_LABELS: Readonly<Record<ChannelPartnerType, string>> = {
   distributor: "Distributor",
   dealer: "Dealer",
   sub_dealer: "Sub-dealer",
 };
+
+/** Shown when a user holds no role (consumers). */
+export const USER_TYPE_LABELS: Readonly<Record<"staff" | "partner_user" | "consumer", string>> = {
+  staff: "Polysil staff",
+  partner_user: "Channel partner",
+  consumer: "Customer",
+};
+
+export function isPartnerRole(role: Role): role is PartnerRole {
+  return PARTNER_ROLES.some((candidate) => candidate === role);
+}

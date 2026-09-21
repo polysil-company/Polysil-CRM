@@ -1,43 +1,51 @@
 import { z } from "zod";
 
-import { CHANNEL_PARTNER_TYPES, INTERNAL_ROLES } from "@/lib/auth/roles";
+/**
+ * AUTH-002 · GET /auth/me — who the signed-in user is and what to render for them.
+ * Contract: backend/api/schemas/auth.py (MeResponse), backend/docs/api/auth.md.
+ *
+ * Optional fields are read leniently (missing or null) and normalised to null, so
+ * an additive backend change never breaks the shell. Unknown modules and actions
+ * are kept: the UI simply has no screen for them yet.
+ */
 
-// TODO(AUTH-002): replace with the backend's GET /me contract once agreed.
+const refSchema = z.object({ id: z.string().min(1), name: z.string().min(1) });
 
-const sessionUserSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  phone: z.string().min(1),
-  email: z.email().nullable(),
-  avatarUrl: z.url().nullable(),
+const modulePermissionSchema = z.object({
+  module: z.string().min(1),
+  actions: z.array(z.string()),
+  scope: z.string().nullish(),
 });
 
-/** Region-based visibility: what a user can SEE (permissions decide what they can DO). */
-const regionScopeSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("own") }),
-  z.object({ kind: z.literal("district"), districts: z.array(z.string()).min(1) }),
-  z.object({ kind: z.literal("state"), states: z.array(z.string()).min(1) }),
-  z.object({ kind: z.literal("region"), regions: z.array(z.string()).min(1) }),
-  z.object({ kind: z.literal("global") }),
-]);
+export const meResponseSchema = z
+  .object({
+    data: z.object({
+      id: z.string().min(1),
+      full_name: z.string().min(1),
+      user_type: z.enum(["staff", "partner_user", "consumer"]),
+      role: z.object({ code: z.string().min(1), name: z.string().min(1) }).nullish(),
+      /** Staff only. Never set together with `partner`. */
+      org_unit: refSchema.nullish(),
+      /** Portal users only. The name stays null until the channel module lands. */
+      partner: z.object({ id: z.string().min(1), name: z.string().nullish() }).nullish(),
+      permissions: z.array(modulePermissionSchema).optional(),
+    }),
+  })
+  .transform(({ data }) => ({
+    user: { id: data.id, name: data.full_name },
+    userType: data.user_type,
+    role: data.role ?? null,
+    orgUnit: data.org_unit ?? null,
+    partner: data.partner ? { id: data.partner.id, name: data.partner.name ?? null } : null,
+    permissions: (data.permissions ?? []).map((permission) => ({
+      module: permission.module,
+      actions: permission.actions,
+      scope: permission.scope ?? null,
+    })),
+  }));
 
-const internalSessionSchema = z.object({
-  user: sessionUserSchema,
-  role: z.enum(INTERNAL_ROLES),
-  scope: regionScopeSchema,
-});
+/** The backend's JSON, as the mock backend must produce it. */
+export type MeResponse = z.input<typeof meResponseSchema>;
 
-const channelPartnerSessionSchema = z.object({
-  user: sessionUserSchema,
-  role: z.literal("channel_partner"),
-  partner: z.object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    type: z.enum(CHANNEL_PARTNER_TYPES),
-  }),
-  scope: z.object({ kind: z.literal("own") }),
-});
-
-export const sessionSchema = z.union([internalSessionSchema, channelPartnerSessionSchema]);
-
-export type Session = z.infer<typeof sessionSchema>;
+/** The signed-in user, as screens read it. */
+export type Session = z.output<typeof meResponseSchema>;

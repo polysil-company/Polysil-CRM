@@ -1,4 +1,4 @@
-import { ROLES, type Role } from "@/lib/auth/roles";
+import { ROLES, type PartnerRole, type Role, type StaffRole } from "@/lib/auth/roles";
 
 /**
  * Developer controls for the mock backend (MSW). Only meaningful when
@@ -20,7 +20,18 @@ export const MOCK_SCENARIO_LABELS: Readonly<Record<MockScenario, string>> = {
   contract: "Contract violation",
 };
 
-export const DEFAULT_MOCK_ROLE: Role = "state_manager";
+/** Who a staff sign-in becomes in the mock backend, unless a staff role is already chosen. */
+export const DEFAULT_MOCK_ROLE: StaffRole = "state_manager";
+
+/** Who a one-time-code sign-in becomes, unless a partner role is already chosen. */
+export const DEFAULT_MOCK_PARTNER_ROLE: PartnerRole = "dealer";
+
+/**
+ * Demo credentials the mock backend accepts (AUTH-001, AUTH-003). Not secrets: they
+ * only work against MSW, which the build refuses to enable in staging and production.
+ */
+export const MOCK_STAFF_PASSWORD = "polysil-demo";
+export const MOCK_OTP_CODE = "123456";
 
 const SCENARIO_KEY = "polysil:mock-scenario";
 const ROLE_KEY = "polysil:mock-role";

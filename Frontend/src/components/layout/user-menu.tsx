@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
@@ -27,8 +28,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSignOut } from "@/features/auth/hooks/use-sign-out";
+import type { Session } from "@/features/session/api/session.schemas";
 import { useSession } from "@/features/session/hooks/use-session";
-import { CHANNEL_PARTNER_TYPE_LABELS, ROLE_LABELS, ROLES, type Role } from "@/lib/auth/roles";
+import { ROLE_LABELS, ROLES, USER_TYPE_LABELS, type Role } from "@/lib/auth/roles";
 import {
   MOCK_SCENARIO_LABELS,
   MOCK_SCENARIOS,
@@ -47,8 +50,16 @@ import {
   type LogLevel,
 } from "@/lib/logger";
 
+/** "District Manager · Vadodara District", "Dealer · Shah Agro Traders". */
+function describeAccount(session: Session): string {
+  const roleName = session.role?.name ?? USER_TYPE_LABELS[session.userType];
+  const place = session.partner?.name ?? session.orgUnit?.name ?? null;
+  return place === null ? roleName : `${roleName} · ${place}`;
+}
+
 export function UserMenu(): React.JSX.Element {
   const session = useSession();
+  const { signOut, isSigningOut } = useSignOut();
 
   if (session.status === "pending") {
     return <Skeleton className="size-8 rounded-full" />;
@@ -70,10 +81,6 @@ export function UserMenu(): React.JSX.Element {
   }
 
   const { user } = session.data;
-  const roleLabel =
-    session.data.role === "channel_partner"
-      ? `${CHANNEL_PARTNER_TYPE_LABELS[session.data.partner.type]} · ${session.data.partner.name}`
-      : ROLE_LABELS[session.data.role];
 
   return (
     <DropdownMenu>
@@ -94,7 +101,9 @@ export function UserMenu(): React.JSX.Element {
       <DropdownMenuContent align="end" className="w-64">
         <div className="flex flex-col px-2 py-1.5">
           <span className="truncate text-sm font-medium text-foreground">{user.name}</span>
-          <span className="truncate text-xs text-muted-foreground">{roleLabel}</span>
+          <span className="truncate text-xs text-muted-foreground">
+            {describeAccount(session.data)}
+          </span>
         </div>
         <DropdownMenuSeparator />
         {clientEnv.apiMocking === "enabled" ? (
@@ -109,10 +118,14 @@ export function UserMenu(): React.JSX.Element {
             <DropdownMenuSeparator />
           </>
         )}
-        {/* TODO(AUTH-001): wire sign-out once the auth contract is agreed. */}
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem
+          disabled={isSigningOut}
+          onClick={() => {
+            void signOut();
+          }}
+        >
           <Icon icon={Logout03Icon} />
-          Sign out
+          {isSigningOut ? "Signing out…" : "Sign out"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -126,7 +139,7 @@ function MockControls(): React.JSX.Element {
   const [scenario, setScenario] = useState<MockScenario>(readMockScenario);
 
   return (
-    <>
+    <DropdownMenuGroup>
       <DropdownMenuLabel>Mock backend</DropdownMenuLabel>
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>
@@ -181,7 +194,7 @@ function MockControls(): React.JSX.Element {
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenuSub>
-    </>
+    </DropdownMenuGroup>
   );
 }
 

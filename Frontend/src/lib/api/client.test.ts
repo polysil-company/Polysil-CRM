@@ -1,5 +1,5 @@
 import { delay, http, HttpResponse } from "msw";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import {
@@ -10,7 +10,7 @@ import {
 } from "@/lib/logger";
 import { server } from "@/mocks/node";
 
-import { apiRequest } from "./client";
+import { apiRequest, registerAccessTokenProvider, type AccessTokenProvider } from "./client";
 import { ApiError } from "./errors";
 import { buildApiUrl } from "./url";
 
@@ -270,5 +270,187 @@ describe("[OBS-002] apiRequest", () => {
     expect(error).not.toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ name: "AbortError" });
     expect(records.at(-1)).toMatchObject({ level: "debug", message: "✕ GET /test/item cancelled" });
+  });
+});
+
+describe("[AUTH-004] apiRequest authentication", () => {
+  const records: LogRecord[] = [];
+  let unregister = (): void => undefined;
+
+  function registerProvider(token: string | null = "stale"): AccessTokenProvider {
+    const provider: AccessTokenProvider = {
+      getAccessToken: vi.fn(({ forceRefresh }: { readonly forceRefresh: boolean }) =>
+        Promise.resolve(token === null ? null : forceRefresh ? "fresh" : token),
+      ),
+      peekAccessToken: vi.fn(() => token),
+      onSessionRejected: vi.fn(),
+    };
+    registerAccessTokenProvider(provider);
+    return provider;
+  }
+
+  beforeEach(() => {
+    records.length = 0;
+    setBrowserLogLevelOverride("debug");
+    unregister = registerLogTransport({
+      name: "capture",
+      write: (record) => {
+        records.push(record);
+      },
+    });
+  });
+
+  afterEach(() => {
+    registerAccessTokenProvider(null);
+    unregister();
+  });
+
+  const getItem = (auth?: "required" | "optional" | "none"): Promise<unknown> =>
+    apiRequest({
+      dataId: "AUTH-002",
+      logger: log,
+      fn: "getItem",
+      path: "/test/item",
+      schema: itemSchema,
+      ...(auth === undefined ? {} : { auth }),
+    });
+
+  it("sends the access token, and retries once with a refreshed one after a 401", async () => {
+    const provider = registerProvider();
+    const seen: (string | null)[] = [];
+    server.use(
+      http.get(buildApiUrl("/test/item"), ({ request }) => {
+        const authorization = request.headers.get("authorization");
+        seen.push(authorization);
+        return authorization === "Bearer fresh"
+          ? HttpResponse.json({ id: "a", total: 1 })
+          : HttpResponse.json({ error: { code: "unauthenticated" } }, { status: 401 });
+      }),
+    );
+
+    await expect(getItem()).resolves.toEqual({ id: "a", total: 1 });
+
+    expect(seen).toEqual(["Bearer stale", "Bearer fresh"]);
+    expect(provider.getAccessToken).toHaveBeenLastCalledWith({ forceRefresh: true });
+    expect(provider.onSessionRejected).not.toHaveBeenCalled();
+    expect(records.map((record) => record.message)).toContain(
+      "↻ GET /test/item 401, refreshing the session",
+    );
+  });
+
+  it("ends the session when the refreshed token is refused as well", async () => {
+    const provider = registerProvider();
+    server.use(
+      http.get(buildApiUrl("/test/item"), () =>
+        HttpResponse.json({ error: { code: "unauthenticated" } }, { status: 401 }),
+      ),
+    );
+
+    const error = await expectApiError(getItem());
+
+    expect(error).toMatchObject({ status: 401, code: "unauthenticated" });
+    expect(provider.onSessionRejected).toHaveBeenCalledOnce();
+  });
+
+  it("fails without sending anything when there is no session", async () => {
+    registerProvider(null);
+    const handler = vi.fn(() => HttpResponse.json({ id: "a", total: 1 }));
+    server.use(http.get(buildApiUrl("/test/item"), handler));
+
+    const error = await expectApiError(getItem());
+
+    expect(error).toMatchObject({ kind: "http", status: 401, code: "unauthenticated" });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("sends no token and never refreshes for the sign-in endpoints", async () => {
+    const provider = registerProvider();
+    let authorization: string | null = "unset";
+    server.use(
+      http.get(buildApiUrl("/test/item"), ({ request }) => {
+        authorization = request.headers.get("authorization");
+        return HttpResponse.json({ error: { code: "invalid_credentials" } }, { status: 401 });
+      }),
+    );
+
+    const error = await expectApiError(getItem("none"));
+
+    expect(error.code).toBe("invalid_credentials");
+    expect(authorization).toBeNull();
+    expect(provider.getAccessToken).not.toHaveBeenCalled();
+  });
+
+  it("sends the token in memory for optional authentication, without refreshing", async () => {
+    const provider = registerProvider();
+    let authorization: string | null = null;
+    server.use(
+      http.get(buildApiUrl("/test/item"), ({ request }) => {
+        authorization = request.headers.get("authorization");
+        return HttpResponse.json({ id: "a", total: 1 });
+      }),
+    );
+
+    await getItem("optional");
+
+    expect(authorization).toBe("Bearer stale");
+    expect(provider.getAccessToken).not.toHaveBeenCalled();
+  });
+
+  it("sends an Idempotency-Key on mutations, except to /auth", async () => {
+    const keys: Record<string, string | null> = {};
+    server.use(
+      http.post(buildApiUrl("/test/item"), ({ request }) => {
+        keys.item = request.headers.get("idempotency-key");
+        return HttpResponse.json({ id: "a", total: 1 });
+      }),
+      http.post(buildApiUrl("/auth/test"), ({ request }) => {
+        keys.auth = request.headers.get("idempotency-key");
+        return HttpResponse.json({ id: "a", total: 1 });
+      }),
+      http.get(buildApiUrl("/test/item"), ({ request }) => {
+        keys.read = request.headers.get("idempotency-key");
+        return HttpResponse.json({ id: "a", total: 1 });
+      }),
+    );
+
+    const post = (path: "/test/item" | "/auth/test"): Promise<unknown> =>
+      apiRequest({
+        dataId: "AUTH-002",
+        logger: log,
+        fn: "post",
+        method: "POST",
+        path,
+        schema: itemSchema,
+      });
+    await post("/test/item");
+    await post("/auth/test");
+    await getItem("none");
+
+    expect(keys.item).toMatch(UUID);
+    expect(keys.auth).toBeNull();
+    expect(keys.read).toBeNull();
+  });
+
+  it("keeps sensitive request and response bodies out of the logs", async () => {
+    server.use(
+      http.post(buildApiUrl("/test/item"), () => HttpResponse.json({ id: "tok-9f2c", total: 1 })),
+    );
+
+    await apiRequest({
+      dataId: "AUTH-001",
+      logger: log,
+      fn: "verify",
+      method: "POST",
+      path: "/test/item",
+      body: { code: "482913" },
+      schema: itemSchema,
+      auth: "none",
+      sensitive: true,
+    });
+
+    const logged = JSON.stringify(records);
+    expect(logged).not.toContain("482913");
+    expect(logged).not.toContain("tok-9f2c");
+    expect(logged).toContain("[REDACTED]");
   });
 });

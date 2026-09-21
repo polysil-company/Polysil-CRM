@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft01Icon, Call02Icon, WhatsappIcon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Call02Icon, Share08Icon, WhatsappIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -19,6 +19,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { leadDetailQueryOptions } from "@/features/leads/api/leads.queries";
 import type { Lead } from "@/features/leads/api/leads.schemas";
 import { LEAD_SOURCE_LABELS, ORDER_TYPE_LABELS } from "@/features/leads/lib/lead-labels";
+import { toShareParam } from "@/features/messages/lib/share-attachment";
+import { useSession } from "@/features/session/hooks/use-session";
 import { isApiError } from "@/lib/api/errors";
 import {
   EMPTY_VALUE,
@@ -64,6 +66,7 @@ function DetailItem({
 }
 
 function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
+  const { data: session } = useSession();
   const whatsappNumber = lead.phone.replace(/\D/g, "");
   const location = [lead.village, lead.district, lead.state].filter(Boolean).join(", ");
 
@@ -102,6 +105,19 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
             <Icon icon={WhatsappIcon} />
             WhatsApp
           </a>
+          {/* MSG-003 · Messaging is for staff. Opens New message with this lead attached. */}
+          {session?.userType === "staff" ? (
+            <Link
+              href={{
+                pathname: "/messages",
+                query: { share: toShareParam({ type: "lead", id: lead.id }) },
+              }}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <Icon icon={Share08Icon} />
+              Share with a colleague
+            </Link>
+          ) : null}
         </div>
       </div>
 

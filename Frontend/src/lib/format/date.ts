@@ -29,6 +29,13 @@ const dateTime = new Intl.DateTimeFormat("en-IN", {
   hour12: true,
 });
 
+const timeOnly = new Intl.DateTimeFormat("en-IN", {
+  timeZone: APP_TIME_ZONE,
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
 const yearOnly = new Intl.DateTimeFormat("en-IN", { timeZone: APP_TIME_ZONE, year: "numeric" });
 
 const relative = new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" });
@@ -64,6 +71,21 @@ export function formatFullDate(value: DateInput): string {
 export function formatDateTime(value: DateInput): string {
   const date = toDate(value);
   return date ? dateTime.format(date) : EMPTY_VALUE;
+}
+
+/** "4:05 pm" */
+export function formatTime(value: DateInput): string {
+  const date = toDate(value);
+  return date ? timeOnly.format(date) : EMPTY_VALUE;
+}
+
+/** True when both fall on the same calendar day in India. */
+export function isSameDay(a: DateInput, b: DateInput): boolean {
+  const first = toDate(a);
+  const second = toDate(b);
+  return (
+    first !== null && second !== null && dayMonthYear.format(first) === dayMonthYear.format(second)
+  );
 }
 
 const UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [

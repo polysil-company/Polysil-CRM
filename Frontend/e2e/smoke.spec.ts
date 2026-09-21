@@ -1,15 +1,20 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
- * Smoke tests: the main routes load against the mocked API, the core journeys
- * work on desktop and phone, and pages pass automated accessibility checks.
+ * Smoke tests: sign-in works, the main routes load against the mocked API, the
+ * core journeys work on desktop and phone, and pages pass automated
+ * accessibility checks.
  *
  *   npx playwright install chromium   once per machine
  *   npm run test:e2e
  */
 
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+
+/** The mock backend's demo credentials (src/lib/dev/mock-settings.ts). */
+const MOCK_STAFF_PASSWORD = "polysil-demo";
+const MOCK_OTP_CODE = "123456";
 
 async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page })
@@ -22,8 +27,80 @@ async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   expect(results.violations).toEqual([]);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The email field by role: `getByLabel("Work email")` also matches the form, whose
+ * accessible name is "Sign in with your work email".
+ */
+function workEmailField(page: Page): Locator {
+  return page.getByRole("textbox", { name: "Work email" });
+}
+
+/** Signs in as staff and lands on `path`. */
+async function signIn(page: Page, path = "/dashboard"): Promise<void> {
+  await page.goto(`/sign-in?method=staff&next=${encodeURIComponent(path)}`);
+  await workEmailField(page).fill("asha@polysil.in");
+  await page.getByLabel("Password", { exact: true }).fill(MOCK_STAFF_PASSWORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`${escapeRegExp(path)}$`));
+}
+
+test.describe("[AUTH-006] Signed-in routing", () => {
+  test("sends a signed-out visitor to sign-in and back to the page they wanted", async ({
+    page,
+  }) => {
+    await page.goto("/leads");
+    await expect(page).toHaveURL(/\/sign-in\?next=%2Fleads$/);
+
+    await page.getByRole("button", { name: "Staff email" }).click();
+    await workEmailField(page).fill("asha@polysil.in");
+    await page.getByLabel("Password", { exact: true }).fill(MOCK_STAFF_PASSWORD);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+
+    await expect(page).toHaveURL(/\/leads$/);
+    await expect(page.getByRole("table", { name: "Leads" })).toBeVisible();
+  });
+
+  test("keeps the session across a reload, then signs out", async ({ page }) => {
+    await signIn(page);
+    await page.reload();
+    await expect(page.getByRole("region", { name: "Key figures" })).toBeVisible();
+
+    await page.getByRole("button", { name: /Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+
+    await expect(page).toHaveURL(/\/sign-in\?reason=signed-out$/);
+    await expect(page.getByText("You've signed out")).toBeVisible();
+  });
+
+  test("the sign-in page has no automatically detectable accessibility violations", async ({
+    page,
+  }) => {
+    await page.goto("/sign-in");
+    await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+
+    await expectNoAccessibilityViolations(page);
+  });
+});
+
+test.describe("[AUTH-001] Mobile sign-in", () => {
+  test("signs a channel partner in with a one-time code", async ({ page }) => {
+    await page.goto("/sign-in");
+
+    await page.getByLabel("Mobile number").fill("98765 43210");
+    await page.getByRole("button", { name: "Send code" }).click();
+    await page.getByLabel("6-digit code").fill(MOCK_OTP_CODE);
+
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+});
+
 test.describe("[APP-001] App shell", () => {
-  test("sends the root URL to the dashboard", async ({ page }) => {
+  test("sends the root URL to the dashboard once signed in", async ({ page }) => {
+    await signIn(page);
     await page.goto("/");
 
     await expect(page).toHaveURL(/\/dashboard$/);
@@ -31,7 +108,7 @@ test.describe("[APP-001] App shell", () => {
 
   test("opens and closes the command menu from the keyboard", async ({ page, isMobile }) => {
     test.skip(isMobile, "Keyboard shortcuts are a desktop feature.");
-    await page.goto("/dashboard");
+    await signIn(page);
     await expect(page.getByRole("region", { name: "Key figures" })).toBeVisible();
 
     await page.keyboard.press("ControlOrMeta+K");
@@ -44,7 +121,7 @@ test.describe("[APP-001] App shell", () => {
 
 test.describe("[RPT-001] Dashboard", () => {
   test("shows the key figures", async ({ page }) => {
-    await page.goto("/dashboard");
+    await signIn(page);
 
     await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
     const figures = page.getByRole("region", { name: "Key figures" });
@@ -53,7 +130,7 @@ test.describe("[RPT-001] Dashboard", () => {
   });
 
   test("has no automatically detectable accessibility violations", async ({ page }) => {
-    await page.goto("/dashboard");
+    await signIn(page);
     await expect(page.getByRole("region", { name: "Key figures" })).toBeVisible();
 
     await expectNoAccessibilityViolations(page);
@@ -62,7 +139,7 @@ test.describe("[RPT-001] Dashboard", () => {
 
 test.describe("[LEAD-001] Leads", () => {
   test("opens a lead from the list and comes back", async ({ page }) => {
-    await page.goto("/leads");
+    await signIn(page, "/leads");
     const table = page.getByRole("table", { name: "Leads" });
     await expect(table).toBeVisible();
 
@@ -80,13 +157,13 @@ test.describe("[LEAD-001] Leads", () => {
   });
 
   test("restores filters from the URL", async ({ page }) => {
-    await page.goto("/leads?q=no-such-lead-anywhere");
+    await signIn(page, "/leads?q=no-such-lead-anywhere");
 
     await expect(page.getByText("No leads match these filters")).toBeVisible();
   });
 
   test("has no automatically detectable accessibility violations", async ({ page }) => {
-    await page.goto("/leads");
+    await signIn(page, "/leads");
     await expect(page.getByRole("table", { name: "Leads" })).toBeVisible();
 
     await expectNoAccessibilityViolations(page);

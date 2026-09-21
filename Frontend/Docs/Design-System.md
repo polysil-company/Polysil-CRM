@@ -49,7 +49,10 @@ stays out of the way — people will work in it for eight hours a day.
   breathable tables, motion that confirms rather than decorates.
 
 Layout: the sidebar sits directly on the canvas; content lives in an inset panel with a large radius
-(desktop). On phones the panel goes edge-to-edge.
+(desktop). On phones the panel goes edge-to-edge. On desktop the sidebar collapses to a 56px icon
+rail (⌘B / Ctrl+B, or the button at the left of the top bar); names show in tooltips, and the choice
+is remembered per browser. The top bar carries the page title (the one `h1`) and its description,
+taken from the navigation map — pages never repeat them.
 
 ---
 
@@ -70,7 +73,7 @@ They use the semantic tokens below.
 | `bg-overlay` | Dialog and sheet backdrop | 32% sand-950 | 55% black |
 | `text-foreground` | Primary text | sand-950 | ink-50 |
 | `text-muted-foreground` | Secondary text, labels | sand-600 | 68% L |
-| `text-subtle-foreground` | Placeholders, meta, disabled | 56% L | 60% L |
+| `text-subtle-foreground` | Placeholders, meta, disabled | 50% L (as muted) | 60% L |
 
 ### Interaction fills (translucent — they work on any surface)
 
@@ -86,6 +89,10 @@ They use the semantic tokens below.
 |---|---|---|
 | `bg-primary` / `hover:bg-primary-hover` | The main action on a surface | Decoration, large areas |
 | `bg-primary-soft` + `text-primary-soft-foreground` | Selected-but-quiet states, active tab count | Body text backgrounds |
+| `text-primary-text` | Teal as text: links, an unread time | Fills — `text-primary` is for icons, spinners and charts, which need only 3:1 |
+
+In light mode `text-subtle-foreground` is as dark as `text-muted-foreground`: a lighter grey fails
+4.5:1 on tinted rows and hover states. Separate the two tiers with size and weight, not colour.
 | `bg-secondary` / `hover:bg-secondary-hover` | Secondary actions | — |
 | `bg-destructive` | Irreversible actions (delete) | Error *messages* (use `danger`) |
 | `bg-highlight`, `bg-row-selected` | Selection only | Status, emphasis |
@@ -196,7 +203,20 @@ is otherwise invisible.
 - **Control heights:** `h-control-xs` 24 · `h-control-sm` 30 · `h-control-md` 36 (default) ·
   `h-control-lg` 44. On touch devices, text fields and selects grow to 44px
   (`pointer-coarse:h-control-lg`); small icon buttons extend their hit area invisibly.
-- **Layout constants:** `w-sidebar` 248px, `h-header` 56px.
+- **Layout constants:** `w-sidebar` 248px, `w-sidebar-rail` 56px (collapsed), `h-header` 56px.
+- **Page title:** the top bar carries it at `text-lg` with a `text-sm` description — top-bar chrome,
+  not a page heading, so it uses the section-title size rather than `text-xl`.
+- **Wide tables** scroll inside their own area. Shift + wheel scrolls sideways
+  (`useShiftWheelScroll`, built into `DataTable`); at either edge the wheel returns to the page.
+- **Table columns** take a width token from `COLUMN_WIDTH_CLASSES`. Give `fill` to every column
+  that reads better wide — names, tags — and never to only one: on a large monitor a lone `fill`
+  column collects all the leftover width and opens one long gap beside it.
+- **Collapsed sidebar:** style it with the `sidebar-collapsed:` variant on anything marked
+  `data-follows-sidebar`. Nothing may move: rows keep their padding in both states (a 32px row with
+  an icon at `px-2` is already centred in the rail), labels fade with `sidebar-collapsed:opacity-0`,
+  rail icons grow with `sidebar-collapsed:scale-125`, and decoration uses `sidebar-collapsed:hidden`.
+  The sidebar's width is the one layout property we animate (`duration-base`, `ease-in-out`): one
+  element, so the content panel follows the rail instead of jumping.
 - **Stacking layers — never raw z-index:**
 
 | Class | Use for |
@@ -246,6 +266,8 @@ There is no `ease-in`: it makes interfaces feel slow.
 ### Patterns — use the utility, do not hand-roll
 
 - **Press:** `press-scale` → scale 0.97 on `:active` (off under reduced motion). Built into buttons.
+  Skipped while the element's own popup is open: menus open on mouse-down, so a shrunken trigger
+  would make its popup jump on release. The open trigger's background is the feedback instead.
 - **Popovers scale from their trigger:** `origin-(--transform-origin)`, starting at 96% — never
   from 0 and never from the centre (dialogs are the exception: they stay centred).
 - **Tooltips:** 400ms delay for the first one; neighbours open instantly (`data-instant`).
@@ -257,6 +279,10 @@ There is no `ease-in`: it makes interfaces feel slow.
   header are anchored so they never slide.
 - **JavaScript animation (Motion)** only for layout animation (tab underline), presence (selection
   bar) and springs. Import from `motion/react`; values from `@/lib/motion/tokens`.
+- **Custom carets:** `animate-caret-blink` for a caret drawn inside a custom field (`OtpInput`). Pair
+  it with `motion-reduce:animate-none`.
+- **Ambient decoration** is allowed only where people rarely are — the sign-in brand panel's drip
+  lines (`DripField`) animate opacity and transform, and are not drawn at all under reduced motion.
 - **Reduced motion:** Motion follows the OS setting (`MotionConfig reducedMotion="user"`), page
   transitions drop to zero duration, press scale and shimmer switch off.
 
@@ -285,10 +311,10 @@ Three layers, each allowed to use only the layers below it (lint-enforced):
 
 | Layer | Folder | Contains | Knows about the business? |
 |---|---|---|---|
-| Primitives | `src/components/ui` | shadcn/ui (Base UI) restyled: Button, Badge, Checkbox, Input, Select, Dialog, Sheet, Menu, Tooltip, Tabs, Command, Field, Card, Skeleton, Spinner, Icon … | No |
-| Patterns | `src/components/patterns` | DataTable, QueryView, EmptyState, ErrorState, StatCard, Tag/TagList, SegmentedMeter, Sparkline, FilterPill, SearchField, NavTabs, PageHeader, PageContainer … | No |
+| Primitives | `src/components/ui` | shadcn/ui (Base UI) restyled: Button, Badge, Checkbox, Input, PasswordInput, OtpInput, Select, Dialog, Sheet, Menu, Tooltip, Tabs, ToggleGroup, Command, Field, Card, Skeleton, Spinner, Icon … | No |
+| Patterns | `src/components/patterns` | DataTable, QueryView, EmptyState, ErrorState, StatCard, Tag/TagList, SegmentedMeter, Sparkline, FilterPill, SearchField, NavTabs, PageContainer … | No |
 | Layout | `src/components/layout` | App shell, sidebar, header, command menu, user menu, page transition | Navigation only |
-| Features | `src/features/*/components` | Leads table, New lead dialog, dashboard | Yes |
+| Features | `src/features/*/components` | Sign-in, leads table, New lead dialog, dashboard, notification bell, messages | Yes |
 
 Every primitive and pattern has a `*.stories.tsx` next to it covering its states in both themes.
 

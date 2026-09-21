@@ -1,5 +1,6 @@
 import {
   Analytics01Icon,
+  BubbleChatIcon,
   CheckmarkBadge01Icon,
   CustomerSupportIcon,
   DashboardSquare02Icon,
@@ -19,21 +20,24 @@ import {
 import type { Route } from "next";
 
 import type { IconGlyph } from "@/components/ui/icon";
-import { can, type Permission } from "@/lib/auth/permissions";
-import type { Role } from "@/lib/auth/roles";
+import { can, type ModuleCode, type ModulePermission } from "@/lib/auth/permissions";
 import type { DataId } from "@/lib/data-ids";
 
 export interface NavItem {
   readonly id: string;
   readonly label: string;
+  /** One line under the title in the top bar, on this item's own page. */
+  readonly description?: string;
   readonly icon: IconGlyph;
-  /** Shown when the role has ANY of these permissions. */
-  readonly permission: Permission | readonly Permission[];
+  /** Shown when the user may view this backend module. Null: shown to everyone signed in. */
+  readonly module: ModuleCode | null;
   readonly dataId: DataId;
   /** Built modules have a route. Planned modules are listed (as "Soon") but are not links. */
   readonly href?: Route;
+  /** Who the item is for. "staff" hides it from partner users, whatever their permissions. */
+  readonly audience?: "staff";
   /** A live count shown next to the label. */
-  readonly countSource?: "leads";
+  readonly countSource?: "leads" | "messages";
 }
 
 export interface NavSection {
@@ -45,6 +49,9 @@ export interface NavSection {
 /**
  * The whole application map in one place. Order matters: moving down the
  * list animates pages forward, moving up animates them back.
+ *
+ * Who sees what comes from the permission list in GET /auth/me (AUTH-002), so a
+ * change to a role's access is made in the backend, never here.
  */
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
@@ -54,10 +61,22 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "dashboard",
         label: "Dashboard",
+        description: "Your territory at a glance.",
         icon: DashboardSquare02Icon,
-        permission: "dashboard:view",
+        module: null,
         dataId: "RPT-001",
         href: "/dashboard",
+      },
+      {
+        id: "messages",
+        label: "Messages",
+        description: "Talk to colleagues — about a lead, an order or anything else.",
+        icon: BubbleChatIcon,
+        module: null,
+        audience: "staff",
+        dataId: "MSG-001",
+        href: "/messages",
+        countSource: "messages",
       },
     ],
   },
@@ -68,8 +87,9 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "leads",
         label: "Leads",
+        description: "Every enquiry from WhatsApp, the website, QR codes and field staff.",
         icon: UserMultiple02Icon,
-        permission: "leads:view",
+        module: "leads",
         dataId: "LEAD-001",
         href: "/leads",
         countSource: "leads",
@@ -77,16 +97,19 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "quotations",
         label: "Quotations",
+        description: "Quote from a lead with type-based templates, versions and approvals.",
         icon: Invoice03Icon,
-        permission: "quotations:view",
+        module: "quotations",
         dataId: "QUOT-001",
         href: "/quotations",
       },
       {
         id: "sales-orders",
         label: "Sales orders",
+        description:
+          "Orders from won leads or placed directly, with dispatch details and payment terms.",
         icon: PackageIcon,
-        permission: "sales_orders:view",
+        module: "orders",
         dataId: "SO-001",
         href: "/sales-orders",
       },
@@ -94,14 +117,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         id: "approvals",
         label: "Approvals",
         icon: CheckmarkBadge01Icon,
-        permission: "approvals:view",
+        module: "approvals",
         dataId: "APPR-001",
       },
       {
         id: "subsidy",
         label: "Subsidy",
         icon: LegalDocument01Icon,
-        permission: "sales_orders:view",
+        module: "subsidy",
         dataId: "SUBS-001",
       },
     ],
@@ -114,14 +137,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         id: "complaints",
         label: "Complaints",
         icon: CustomerSupportIcon,
-        permission: "complaints:view",
+        module: "complaints",
         dataId: "CMPL-001",
       },
       {
         id: "tasks",
         label: "Tasks",
         icon: Task01Icon,
-        permission: "tasks:view",
+        module: "tasks",
         dataId: "TASK-001",
       },
     ],
@@ -134,21 +157,21 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         id: "channel-partners",
         label: "Channel partners",
         icon: Store01Icon,
-        permission: "channel_partners:view",
+        module: "partners",
         dataId: "CHNL-001",
       },
       {
         id: "marketing",
         label: "Marketing",
         icon: Megaphone02Icon,
-        permission: ["marketing:view", "marketing:manage"],
+        module: "marketing",
         dataId: "MKT-001",
       },
       {
         id: "schemes",
         label: "Schemes",
         icon: DiscountTag01Icon,
-        permission: "schemes:view",
+        module: "schemes",
         dataId: "SCHM-001",
       },
     ],
@@ -161,14 +184,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         id: "accounts",
         label: "Accounts queue",
         icon: RupeeIcon,
-        permission: "accounts:manage",
+        module: "accounts",
         dataId: "ACCT-001",
       },
       {
         id: "dispatch",
         label: "Dispatch queue",
         icon: DeliveryTruck01Icon,
-        permission: "dispatch:manage",
+        module: "dispatch",
         dataId: "DISP-001",
       },
     ],
@@ -181,38 +204,50 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         id: "reports",
         label: "Reports",
         icon: Analytics01Icon,
-        permission: "reports:view",
+        module: "reports",
         dataId: "RPT-002",
       },
       {
         id: "masters",
         label: "Masters",
         icon: Database01Icon,
-        permission: "masters:manage",
+        module: "masters",
         dataId: "MSTR-001",
       },
       {
         id: "users",
         label: "Users & roles",
         icon: Settings02Icon,
-        permission: "users:manage",
+        module: "users",
         dataId: "ADMN-001",
       },
     ],
   },
 ];
 
-export function canSeeNavItem(item: NavItem, role: Role): boolean {
-  const required: readonly Permission[] =
-    typeof item.permission === "string" ? [item.permission] : item.permission;
-  return required.some((permission) => can(role, permission));
+/**
+ * `userType` is the session's `userType` ("staff", "partner_user" …). Unknown (null), it
+ * hides staff-only items rather than risk showing them to a partner.
+ */
+export function canSeeNavItem(
+  item: NavItem,
+  permissions: readonly ModulePermission[],
+  userType: string | null = null,
+): boolean {
+  if (item.audience === "staff" && userType !== "staff") {
+    return false;
+  }
+  return item.module === null || can(permissions, item.module, "view");
 }
 
-/** Sections and items the role may see; empty sections are dropped. */
-export function visibleNavSections(role: Role): NavSection[] {
+/** Sections and items the user may see; empty sections are dropped. */
+export function visibleNavSections(
+  permissions: readonly ModulePermission[],
+  userType: string | null = null,
+): NavSection[] {
   return NAV_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => canSeeNavItem(item, role)),
+    items: section.items.filter((item) => canSeeNavItem(item, permissions, userType)),
   })).filter((section) => section.items.length > 0);
 }
 
@@ -227,4 +262,24 @@ export function findActiveNavItem(pathname: string): NavItem | undefined {
   return NAV_SECTIONS.flatMap((section) => section.items).find((item) =>
     isNavItemActive(item, pathname),
   );
+}
+
+export interface PageHeading {
+  readonly title: string;
+  readonly description?: string;
+}
+
+/**
+ * The top bar's title for a path: the section's label, with its description only on
+ * the section's own page — a detail page beneath it (a lead) names itself in the content.
+ */
+export function findPageHeading(pathname: string): PageHeading {
+  const item = findActiveNavItem(pathname);
+  if (item === undefined) {
+    return { title: "Polysil CRM" };
+  }
+  if (item.href === pathname && item.description !== undefined) {
+    return { title: item.label, description: item.description };
+  }
+  return { title: item.label };
 }

@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useShiftWheelScroll } from "@/hooks/use-shift-wheel-scroll";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -71,7 +72,8 @@ export interface DataTableProps<TData extends RowData> {
 
 /**
  * The app's table. Server-side sorting and pagination; sticky header; scrolls
- * inside its own area so the header and pagination stay in view.
+ * inside its own area so the header and pagination stay in view. Wide tables also
+ * scroll sideways with Shift + wheel.
  * Loading state: <DataTableSkeleton>; empty/error: handled by the parent's <QueryView>.
  */
 export function DataTable<TData extends RowData>({
@@ -92,6 +94,7 @@ export function DataTable<TData extends RowData>({
 }: DataTableProps<TData>): React.JSX.Element {
   const selectable = rowSelection !== undefined && onRowSelectionChange !== undefined;
   const currentSelection = rowSelection ?? EMPTY_SELECTION;
+  const scrollRef = useShiftWheelScroll<HTMLDivElement>();
 
   const table = useTable({
     features: dataTableFeatures,
@@ -125,7 +128,7 @@ export function DataTable<TData extends RowData>({
           label={`Updating ${label.toLowerCase()}`}
           className="absolute inset-x-0 top-10 layer-header"
         />
-        <div className="h-full scrollbar-thin overflow-auto">
+        <div ref={scrollRef} className="h-full scrollbar-thin overflow-auto">
           <table
             aria-label={label}
             aria-rowcount={rowCount + 1}

@@ -4,7 +4,9 @@ import type { Metadata, Viewport } from "next";
 import type * as React from "react";
 
 import { AppProviders } from "@/components/providers/app-providers";
+import { InlineScript } from "@/components/ui/inline-script";
 import { clientEnv } from "@/lib/env/client";
+import { SIDEBAR_INIT_SCRIPT } from "@/lib/sidebar/sidebar";
 import { THEME_INIT_SCRIPT } from "@/lib/theme/theme";
 import { cn } from "@/lib/utils";
 
@@ -36,10 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
       className={cn(fontVariables, "h-full")}
     >
       <head>
-        <script
-          // eslint-disable-next-line react/no-danger -- Must run before first paint to avoid a theme flash; the content is a constant from src/lib/theme/theme.ts.
-          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
-        />
+        {/* Applies the saved theme before first paint, so the page never flashes the wrong one. */}
+        <InlineScript html={THEME_INIT_SCRIPT} />
+        {/* Applies the saved sidebar width the same way, so a collapsed sidebar never flashes open. */}
+        <InlineScript html={SIDEBAR_INIT_SCRIPT} />
       </head>
       <body className="min-h-full">
         <AppProviders>{children}</AppProviders>

@@ -23,7 +23,7 @@ export const buttonVariants = cva(
           "press-scale text-muted-foreground hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground",
         destructive:
           "press-scale bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive-hover",
-        link: "text-primary underline-offset-4 transition-colors hover:underline",
+        link: "text-primary-text underline-offset-4 transition-colors hover:underline",
       },
       size: {
         xs: "h-control-xs px-2 text-xs [&_svg]:size-3.5",

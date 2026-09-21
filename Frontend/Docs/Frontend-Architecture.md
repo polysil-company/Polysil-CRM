@@ -67,7 +67,7 @@ src/
 ├── mocks/                      MSW handlers and seeded data
 ├── styles/tokens.css           The design system
 ├── test/                       Test helpers
-└── proxy.ts                    Runs before page requests (log-level cookie; auth later)
+└── proxy.ts                    Runs before page requests (sign-in redirects, log-level cookie)
 ```
 
 **Import rules — enforced by lint:**
@@ -91,7 +91,7 @@ exports everywhere except route files, configs and stories.
 
 ## 3. Rendering model
 
-- **Server Components by default.** Route files, layouts, `PageHeader`, `EmptyState` render on the
+- **Server Components by default.** Route files, layouts, `PageContainer`, `EmptyState` render on the
   server. Interactive pieces are client islands (`"use client"`): tables, forms, menus, anything
   using a hook.
 - **Values from a `"use client"` module cannot be called on the server.** Keep shared constants and
@@ -151,7 +151,7 @@ Component ──useQuery(leadListQueryOptions(params))──▶ TanStack Query c
 | Data | `staleTime` | Reason |
 |---|---|---|
 | Default | 30 s | Returning to a screen within 30 s is instant and makes no request |
-| Session (`GET /me`) | 5 min | Rarely changes during a visit |
+| Session (`GET /auth/me`) | 5 min | Rarely changes during a visit; cleared on sign-in and sign-out |
 | Counts, dashboard | 60 s | Slow-changing aggregates shown in navigation |
 
 `gcTime` is 5 minutes. Window focus refetches stale queries.
@@ -159,8 +159,9 @@ Component ──useQuery(leadListQueryOptions(params))──▶ TanStack Query c
 **Retries:** network errors, timeouts, 408, 429 and 5xx retry up to twice with exponential backoff.
 4xx and contract violations never retry — retrying cannot fix them. Mutations never retry automatically.
 
-TODO(AUTH-001): once the auth mechanism is known, prefetch critical queries on the server and pass
-them through `HydrationBoundary`, so first paint shows data instead of skeletons.
+TODO(AUTH-006): server-side prefetch through `HydrationBoundary` is not possible yet — the access
+token lives only in browser memory, and the refresh cookie is scoped to `/api/v1/auth`. Revisit if
+first paint needs data before hydration.
 
 ---
 
@@ -185,7 +186,8 @@ Edge cases to handle explicitly (the leads table is the reference):
 - a page number beyond the last page (offer "Go to the first page")
 - a refetch that fails while data is on screen (keep the data, show a retry notice)
 - 404 on a detail page → `notFound()`
-- 401 / 403 → user-facing copy from `toUserFacingError()`; TODO(AUTH-001) redirect to sign-in
+- 401 → `apiRequest` refreshes the token and retries once; if the session is over, the session gate
+  clears cached data and opens sign-in (§8). 403 → user-facing copy from `toUserFacingError()`
 - slow responses → skeleton first, then the refetch bar; never a blank screen
 
 Use the mock scenarios (account menu → Data scenario) to see each state in the running app.
@@ -218,22 +220,72 @@ Use the mock scenarios (account menu → Data scenario) to see each state in the
 - Mock data is generated from a fixed seed and **parsed with the real schemas**, so mocks cannot drift.
 - Handlers live in `src/mocks/handlers/<feature>.ts` and are registered in `handlers/index.ts`.
 - Scenarios (`realistic`, `slow`, `empty`, `error`, `contract`) and a role switcher live in the account
-  menu when mocking is on. `GET /me` ignores the error scenario so the menu stays usable.
+  menu when mocking is on. The `/auth` endpoints ignore the error scenario, so the menu stays usable
+  and nobody is locked out. Demo sign-in: any email with `polysil-demo`, or any Indian mobile with
+  code `123456` (`src/lib/dev/mock-settings.ts`).
 - Tests use the same handlers through `msw/node`, and fail on any unhandled request.
 
 TODO(OBS-002): generate schemas and the Data ID registry from the backend's OpenAPI spec when it exists.
 
 ---
 
-## 8. Roles and permissions
+## 8. Authentication, roles and permissions
 
-- Roles and channel partner types: `src/lib/auth/roles.ts`. Permission matrix: `src/lib/auth/permissions.ts`.
-- `useCan("leads:create")` and `can(role, permission)` hide what a role cannot use. **UI gating only** —
-  the backend must enforce every permission.
+Contract: `backend/docs/api/auth.md`. Staff sign in with email and password (AUTH-003); channel
+partners with a one-time code on their mobile (AUTH-001).
+
+**Where each credential lives**
+
+| Credential | Where | Why |
+|---|---|---|
+| Access token (15 min) | Memory only, in `src/lib/auth/session-store.ts` | An injected script cannot keep it after the tab closes; never in `localStorage` or a readable cookie |
+| Refresh token (30 days) | The backend's httpOnly cookie `polysil_refresh`, path `/api/v1/auth` | No script can read it; only `POST /auth/refresh` and `/auth/logout` receive it |
+| Session marker `polysil_session=1` | Readable cookie, path `/`, set by the frontend | Holds no secret. Lets `proxy.ts` redirect before a protected page renders |
+
+**Same origin.** `next.config.ts` rewrites `/api/v1/*` to `API_PROXY_TARGET`, and the browser calls
+`/api/v1`. It has to: the backend sends no CORS headers, and its refresh cookie is scoped to its own
+host and path.
+
+**The flow**
+
+1. `proxy.ts` (AUTH-006) sends a page request without the marker to `/sign-in?next=…`, and a visitor
+   with the marker away from `/sign-in`. It is an optimistic check for a fast redirect — not security.
+2. Signing in stores the access token, sets the marker, clears the query cache and opens `next`
+   (checked by `safeNextPath`, so it can never leave the site).
+3. On a signed-in page, `AuthGate` exchanges the refresh cookie for a token after each page load
+   (AUTH-004), then renders the page. If the backend cannot be reached it shows an error with a retry
+   rather than a false "signed out".
+4. `apiRequest` sends `Authorization: Bearer …` (`auth: "required"` is the default). The token is
+   refreshed a minute before expiry, when the tab becomes visible and when the connection returns.
+   After a 401 it refreshes and retries once. Concurrent callers share one refresh.
+5. When the session ends — sign-out (AUTH-005), a rejected refresh, or either one in another tab
+   (BroadcastChannel) — the gate clears cached data and opens sign-in: with the page to return to
+   after an expiry, without it after a deliberate sign-out.
+
+**Rules for new code**
+
+- Never read, store or pass tokens yourself. Choose `auth` on `apiRequest`: `required` (default),
+  `optional` (sign-out) or `none` (the pre-auth endpoints).
+- Mark calls that carry credentials, codes or tokens `sensitive: true`, so their bodies never reach
+  the logs.
+- Mutations get an `Idempotency-Key` automatically (except `/auth`). Pass `idempotencyKey` to make a
+  user's retry of the same action replay-safe.
+- Copy for sign-in failures lives in `features/auth/lib/sign-in-errors.ts`. The backend answers
+  a wrong password, an unknown address and a disabled account identically — the copy must not guess.
+
+**Permissions**
+
+- `GET /auth/me` (AUTH-002) returns `permissions: [{ module, actions, scope }]`. `can(permissions,
+  "leads", "create")` and `useCan("leads", "create")` read it. **UI gating only** — the backend
+  checks every request and scopes every list.
+- Module codes: `src/lib/auth/permissions.ts`. Role codes (for previews and tests only — screens
+  never branch on a role): `src/lib/auth/roles.ts`.
 - The navigation is data (`src/components/layout/navigation.ts`): each item declares its route,
-  permission(s) and Data ID. Planned modules appear as "Soon" without links.
-- TODO(AUTH-002): replace the placeholder matrix with the permission list returned by `GET /me`, and
-  add route guards so a hidden page cannot be opened by URL.
+  module and Data ID. An item shows when the user may `view` its module; the dashboard shows to
+  everyone. Planned modules appear as "Soon" without links.
+- The mock matrix in `src/mocks/data/permissions.ts` follows the client's rules (Frontend-Scope §2).
+- TODO(AUTH-002): confirm the module codes of unbuilt modules and the 16 role codes against the
+  backend's RBAC matrix. Add route-level guards so a hidden page cannot be opened by URL.
 
 ---
 
@@ -287,8 +339,10 @@ Top-level `describe` titles start with the Data ID. Query elements the way a use
 
 | Gap | Tracking |
 |---|---|
-| Authentication, sign-out, route guards | AUTH-001, AUTH-002 |
-| Server-side prefetch for first paint | AUTH-001 |
+| Route-level permission guards (a hidden page can still be opened by URL) | AUTH-002 |
+| Module and role codes confirmed against the backend's RBAC matrix | AUTH-002 |
+| Server-side prefetch for first paint | AUTH-006 |
+| Integration of sign-in against the real backend on staging | AUTH-001, AUTH-003 |
 | Remote error and log collection | OBS-001 |
 | Content-Security-Policy with nonce | OBS-002 |
 | OpenAPI-generated schemas | OBS-002 |
