@@ -1,0 +1,35 @@
+# Prepared, NOT applied. GAP-097.
+#
+# This is the site block that puts the staging API on a public subdomain through
+# the reverse proxy that already runs on the box. It is not applied, because the
+# certificate cannot be issued until the DNS record exists: Caddy would retry an
+# ACME challenge that cannot pass, on a proxy that is serving a live site.
+#
+# Order, and only in this order:
+#
+#   1. The user adds an A record for polysil-api.pranayx.tech at Cloudflare,
+#      pointing at this box, DNS-only (grey cloud, not proxied). Let's Encrypt
+#      has to reach the box directly for the HTTP-01 challenge.
+#   2. Rotate DEMO_PASSWORD and reseed. The seeded passwords are published in
+#      scripts/seed_demo.py, and this block puts the login endpoint on the
+#      internet. See docs/workflows/staging-deployment.md.
+#   3. docker network connect distributed-file-system_default polysil-api
+#   4. Append the block below to /home/opc/Distributed-File-System/Caddyfile,
+#      then: docker exec distributed-file-system-web-1 \
+#              caddy reload --config /etc/caddy/Caddyfile
+#
+# Undo, in reverse: remove the block and reload, then
+# `docker network disconnect distributed-file-system_default polysil-api`.
+#
+# The file on the box uses tabs. This one does too, so an append is byte-clean.
+# Checked with `caddy validate` against the combined file.
+
+polysil-api.pranayx.tech {
+	encode zstd gzip
+
+	# polysil-api is the container name, fixed in infra/docker-compose.staging.yml
+	# for exactly this. It resolves once that container is connected to this
+	# network; port 8000 is the container's port, not a host port. Nothing about
+	# the staging stack is published beyond 127.0.0.1.
+	reverse_proxy polysil-api:8000
+}

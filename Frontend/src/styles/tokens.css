@@ -1,0 +1,882 @@
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  POLYSIL DESIGN TOKENS — the single source of visual truth for the web app
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *  Every colour, radius, border, shadow, type size, font weight, easing curve
+ *  and duration is defined in THIS file. Components use only the utilities
+ *  these tokens generate — bg-card, border-border, rounded-lg, shadow-md,
+ *  text-sm, font-medium, ease-out, duration-fast. Tailwind's default palette,
+ *  radii, shadows and type scale are switched off below, so a stray
+ *  `bg-blue-500` or `text-[13px]` fails lint instead of drifting the design.
+ *
+ *  Change a token here → it changes everywhere: app, Storybook, tests.
+ *
+ *  Changing this file requires, in the same PR:
+ *   1. the matching update in Docs/Design-System.md
+ *   2. a changelog entry of type "design"
+ *   3. a check of Storybook → Foundations in light AND dark
+ *
+ *  1. Palette           Raw OKLCH scales. Never referenced by components.
+ *  2. Semantic · light  What a colour is FOR (card, muted, success, highlight).
+ *  3. Semantic · dark
+ *  4. Tailwind theme    Resets defaults; exposes only the tokens above.
+ *  5. Utilities         Durations, press feedback, focus, layers, scroll, skeleton.
+ *  6. Base              Element defaults.
+ *  7. Motion            Keyframes, page transitions, reduced motion.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * APP-005 · The collapsed desktop sidebar. Matches an element marked
+ * `data-follows-sidebar` (and everything inside it) while <html data-sidebar="collapsed">,
+ * which an inline script sets before first paint. The phone menu sheet has no marker,
+ * so it always shows the full sidebar.
+ */
+@custom-variant sidebar-collapsed (&:where([data-sidebar="collapsed"] [data-follows-sidebar], [data-sidebar="collapsed"] [data-follows-sidebar] *));
+
+/* Keep planning docs out of Tailwind's class scanning. */
+@source not "../../Docs";
+@source not "../../changelog";
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 1. PALETTE — primitives only. Use a semantic token in components instead.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Sand — warm neutral: light surfaces and text */
+  --sand-0: oklch(1 0 0);
+  --sand-50: oklch(0.985 0.003 85);
+  --sand-100: oklch(0.968 0.005 85);
+  --sand-150: oklch(0.948 0.006 85);
+  --sand-200: oklch(0.922 0.007 85);
+  --sand-300: oklch(0.868 0.008 85);
+  --sand-400: oklch(0.74 0.009 85);
+  --sand-500: oklch(0.6 0.009 85);
+  --sand-600: oklch(0.5 0.008 85);
+  --sand-700: oklch(0.4 0.007 85);
+  --sand-800: oklch(0.3 0.006 85);
+  --sand-900: oklch(0.215 0.005 85);
+  --sand-950: oklch(0.16 0.004 85);
+
+  /* Ink — cool charcoal: dark surfaces and text */
+  --ink-50: oklch(0.975 0.002 270);
+  --ink-100: oklch(0.93 0.003 270);
+  --ink-200: oklch(0.84 0.004 270);
+  --ink-300: oklch(0.72 0.005 270);
+  --ink-400: oklch(0.62 0.006 270);
+  --ink-500: oklch(0.52 0.006 270);
+  --ink-600: oklch(0.4 0.006 270);
+  --ink-700: oklch(0.31 0.005 270);
+  --ink-800: oklch(0.23 0.004 270);
+  --ink-850: oklch(0.2 0.004 270);
+  --ink-900: oklch(0.172 0.003 270);
+  --ink-950: oklch(0.142 0.003 270);
+
+  /* Teal — "water": brand and primary action */
+  --teal-50: oklch(0.975 0.018 188);
+  --teal-100: oklch(0.945 0.04 188);
+  --teal-200: oklch(0.89 0.075 187);
+  --teal-300: oklch(0.82 0.105 186);
+  --teal-400: oklch(0.74 0.12 185);
+  --teal-500: oklch(0.64 0.115 186);
+  --teal-600: oklch(0.55 0.1 187);
+  --teal-700: oklch(0.47 0.085 188);
+  --teal-800: oklch(0.39 0.068 190);
+
+  /* Sun — "sun": selection and highlight */
+  --sun-100: oklch(0.97 0.05 98);
+  --sun-300: oklch(0.91 0.145 96);
+  --sun-400: oklch(0.87 0.165 93);
+  --sun-500: oklch(0.82 0.165 86);
+  --sun-600: oklch(0.72 0.15 76);
+  --sun-700: oklch(0.52 0.11 70);
+
+  /* Status hues */
+  --green-100: oklch(0.955 0.035 152);
+  --green-400: oklch(0.8 0.13 152);
+  --green-600: oklch(0.52 0.12 152);
+  --amber-100: oklch(0.965 0.045 80);
+  --amber-400: oklch(0.83 0.13 78);
+  --amber-600: oklch(0.52 0.11 62);
+  --red-100: oklch(0.955 0.03 25);
+  --red-400: oklch(0.72 0.16 25);
+  --red-500: oklch(0.56 0.19 27);
+  --red-600: oklch(0.52 0.18 27);
+  --blue-100: oklch(0.955 0.03 250);
+  --blue-400: oklch(0.76 0.11 250);
+  --blue-500: oklch(0.62 0.13 252);
+  --blue-600: oklch(0.52 0.13 255);
+
+  /* Categorical hues — dots, chart marks. Never body text. */
+  --violet-400: oklch(0.72 0.12 295);
+  --violet-500: oklch(0.6 0.14 295);
+  --rose-400: oklch(0.72 0.14 5);
+  --rose-500: oklch(0.63 0.17 5);
+  --orange-400: oklch(0.78 0.13 55);
+  --orange-500: oklch(0.7 0.16 50);
+  --lime-400: oklch(0.82 0.14 130);
+  --lime-500: oklch(0.72 0.15 130);
+  --slate-400: oklch(0.7 0.02 250);
+  --slate-500: oklch(0.58 0.02 250);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 2. SEMANTIC TOKENS · LIGHT (default)
+ *    Contrast notes (WCAG 2.2): text tokens ≥ 4.5:1 on their surfaces;
+ *    --control and --ring ≥ 3:1 against --card.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+:root,
+.light {
+  /* Shape — one knob. Every radius below scales from it. 0 = sharp system. */
+  --radius: 0.625rem;
+
+  /* Surfaces, back to front */
+  --background: var(--sand-100); /* app canvas behind sidebar and panel */
+  --foreground: var(--sand-950);
+  --panel: var(--sand-0); /* inset main content panel */
+  --panel-foreground: var(--sand-950);
+  --card: var(--sand-0);
+  --card-foreground: var(--sand-950);
+  --popover: var(--sand-0);
+  --popover-foreground: var(--sand-950);
+  --overlay: oklch(0.16 0.004 85 / 32%); /* dialog and sheet backdrop */
+
+  /* Text emphasis */
+  --muted-foreground: var(--sand-600); /* secondary text */
+  /* Placeholders, meta, disabled. As dark as muted in light mode: any lighter grey
+     fails WCAG AA (4.5:1) on tinted rows — 56% L measured 3.8:1. Hierarchy comes
+     from size and weight instead. */
+  --subtle-foreground: var(--sand-600);
+
+  /* Translucent fills — adapt to whatever surface they sit on */
+  --muted: oklch(0.3 0.01 85 / 5%);
+  --accent: oklch(0.3 0.01 85 / 6%); /* hover */
+  --accent-strong: oklch(0.3 0.01 85 / 10%); /* pressed, active nav item */
+  --accent-foreground: var(--sand-950);
+
+  /* Actions */
+  --primary: var(--teal-600);
+  --primary-hover: var(--teal-700);
+  --primary-foreground: var(--sand-0);
+  --primary-soft: var(--teal-50);
+  --primary-soft-foreground: var(--teal-700);
+  /* Teal as text (links, an unread time). --primary is a fill: as text, teal-600
+     reaches only 4.2:1 on the canvas. */
+  --primary-text: var(--teal-700);
+  --secondary: oklch(0.3 0.01 85 / 6%);
+  --secondary-hover: oklch(0.3 0.01 85 / 10%);
+  --secondary-foreground: var(--sand-950);
+  --destructive: var(--red-600);
+  --destructive-hover: oklch(0.47 0.17 27);
+  --destructive-foreground: var(--sand-0);
+
+  /* Selection and highlight — "sun" */
+  --highlight: var(--sun-400);
+  --highlight-border: var(--sun-600);
+  --highlight-foreground: var(--sand-950);
+  --highlight-soft: var(--sun-100);
+  --row-selected: var(--sun-100);
+  --selection: oklch(0.87 0.165 93 / 45%);
+
+  /* Status — solid colour for icons/text, soft for tinted backgrounds */
+  --success: var(--green-600);
+  --success-soft: var(--green-100);
+  --warning: var(--amber-600);
+  --warning-soft: var(--amber-100);
+  --danger: var(--red-600);
+  --danger-soft: var(--red-100);
+  --info: var(--blue-600);
+  --info-soft: var(--blue-100);
+
+  /* Lines */
+  --border: var(--sand-200); /* hairlines, dividers, card edges */
+  --border-strong: var(--sand-300); /* hover edges, emphasis */
+  --input: var(--sand-300); /* text field borders */
+  --control: var(--sand-500); /* checkbox, radio, switch borders (≥ 3:1) */
+  --ring: var(--teal-500); /* focus outline (≥ 3:1) */
+
+  /* Loading */
+  --skeleton: oklch(0.3 0.01 85 / 7%);
+  --skeleton-shine: oklch(1 0 0 / 55%);
+
+  /* Categorical: tag dots and chart series */
+  --tag-teal: var(--teal-500);
+  --tag-blue: var(--blue-500);
+  --tag-violet: var(--violet-500);
+  --tag-rose: var(--rose-500);
+  --tag-orange: var(--orange-500);
+  --tag-amber: var(--sun-600);
+  --tag-lime: var(--lime-500);
+  --tag-slate: var(--slate-500);
+  --chart-1: var(--teal-500);
+  --chart-2: var(--blue-500);
+  --chart-3: var(--violet-500);
+  --chart-4: var(--sun-600);
+  --chart-5: var(--rose-500);
+
+  /* Sidebar */
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--sand-700);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  /* Elevation */
+  --elevation-xs: 0 1px 2px 0 oklch(0.2 0.01 85 / 6%);
+  --elevation-sm: 0 1px 2px 0 oklch(0.2 0.01 85 / 5%), 0 2px 6px -1px oklch(0.2 0.01 85 / 6%);
+  --elevation-md: 0 2px 4px -1px oklch(0.2 0.01 85 / 6%), 0 8px 20px -4px oklch(0.2 0.01 85 / 10%);
+  --elevation-lg: 0 4px 8px -2px oklch(0.2 0.01 85 / 6%), 0 20px 48px -8px oklch(0.2 0.01 85 / 18%);
+  --elevation-panel: 0 0 0 1px oklch(0.2 0.01 85 / 6%), 0 1px 3px 0 oklch(0.2 0.01 85 / 4%);
+
+  /* Motion — durations (easings live in section 4). UI stays under 300ms. */
+  --duration-instant: 0ms;
+  --duration-press: 120ms; /* press feedback */
+  --duration-fast: 150ms; /* hover, tooltips, small popovers */
+  --duration-base: 200ms; /* menus, selects, state swaps */
+  --duration-slow: 300ms; /* dialogs, sheets */
+  --duration-page-exit: 120ms;
+  --duration-page-enter: 220ms;
+  --duration-page-move: 320ms;
+  --page-offset: 40px; /* horizontal travel of directional page transitions */
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 3. SEMANTIC TOKENS · DARK
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+.dark {
+  --background: var(--ink-950);
+  --foreground: var(--ink-50);
+  --panel: var(--ink-900);
+  --panel-foreground: var(--ink-50);
+  --card: var(--ink-850);
+  --card-foreground: var(--ink-50);
+  --popover: var(--ink-800);
+  --popover-foreground: var(--ink-50);
+  --overlay: oklch(0 0 0 / 55%);
+
+  --muted-foreground: oklch(0.68 0.005 270);
+  --subtle-foreground: oklch(0.6 0.006 270);
+
+  --muted: oklch(1 0 0 / 5%);
+  --accent: oklch(1 0 0 / 7%);
+  --accent-strong: oklch(1 0 0 / 11%);
+  --accent-foreground: var(--ink-50);
+
+  --primary: var(--teal-400);
+  --primary-hover: var(--teal-300);
+  --primary-foreground: var(--ink-950);
+  --primary-soft: oklch(0.74 0.12 185 / 12%);
+  --primary-soft-foreground: var(--teal-300);
+  --primary-text: var(--teal-400);
+  --secondary: oklch(1 0 0 / 7%);
+  --secondary-hover: oklch(1 0 0 / 11%);
+  --secondary-foreground: var(--ink-50);
+  --destructive: oklch(0.56 0.18 27);
+  --destructive-hover: oklch(0.61 0.19 27);
+  --destructive-foreground: var(--ink-50);
+
+  --highlight: var(--sun-400);
+  --highlight-border: var(--sun-500);
+  --highlight-foreground: var(--ink-950);
+  --highlight-soft: oklch(0.87 0.165 93 / 12%);
+  --row-selected: oklch(0.87 0.165 93 / 7%);
+  --selection: oklch(0.87 0.165 93 / 30%);
+
+  --success: var(--green-400);
+  --success-soft: oklch(0.8 0.13 152 / 12%);
+  --warning: var(--amber-400);
+  --warning-soft: oklch(0.83 0.13 78 / 12%);
+  --danger: var(--red-400);
+  --danger-soft: oklch(0.72 0.16 25 / 12%);
+  --info: var(--blue-400);
+  --info-soft: oklch(0.76 0.11 250 / 12%);
+
+  --border: oklch(1 0 0 / 8%);
+  --border-strong: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 12%);
+  --control: var(--ink-500);
+  --ring: var(--teal-300);
+
+  --skeleton: oklch(1 0 0 / 6%);
+  --skeleton-shine: oklch(1 0 0 / 6%);
+
+  --tag-teal: var(--teal-400);
+  --tag-blue: var(--blue-400);
+  --tag-violet: var(--violet-400);
+  --tag-rose: var(--rose-400);
+  --tag-orange: var(--orange-400);
+  --tag-amber: var(--sun-500);
+  --tag-lime: var(--lime-400);
+  --tag-slate: var(--slate-400);
+  --chart-1: var(--teal-400);
+  --chart-2: var(--blue-400);
+  --chart-3: var(--violet-400);
+  --chart-4: var(--sun-500);
+  --chart-5: var(--rose-400);
+
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--ink-300);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  --elevation-xs: 0 1px 2px 0 oklch(0 0 0 / 40%);
+  --elevation-sm: 0 1px 2px 0 oklch(0 0 0 / 35%), inset 0 1px 0 0 oklch(1 0 0 / 4%);
+  --elevation-md: 0 8px 24px -6px oklch(0 0 0 / 60%), inset 0 1px 0 0 oklch(1 0 0 / 5%);
+  --elevation-lg: 0 24px 56px -12px oklch(0 0 0 / 70%), inset 0 1px 0 0 oklch(1 0 0 / 6%);
+  --elevation-panel: 0 0 0 1px oklch(1 0 0 / 6%);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 4. TAILWIND THEME
+ *    Resets Tailwind's defaults so ONLY this vocabulary exists, then maps it.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  --color-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+  --text-*: initial;
+  --font-*: initial;
+  --font-weight-*: initial;
+  --tracking-*: initial;
+  --leading-*: initial;
+  --ease-*: initial;
+  --animate-*: initial;
+
+  /* Type scale — dense, dashboard-first. Body copy is text-base (14px). */
+  --text-2xs: 0.6875rem; /* 11px — counts, overlines */
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem; /* 12px — captions, table headers, meta */
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem; /* 13px — table cells, nav, buttons, inputs (desktop) */
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem; /* 14px — body */
+  --text-base--line-height: 1.375rem;
+  --text-md: 1rem; /* 16px — inputs on touch devices (prevents iOS zoom) */
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.125rem; /* 18px — card and section titles */
+  --text-lg--line-height: 1.625rem;
+  --text-lg--letter-spacing: -0.01em;
+  --text-xl: 1.375rem; /* 22px — page titles */
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.015em;
+  --text-2xl: 1.75rem; /* 28px — KPI values */
+  --text-2xl--line-height: 2.125rem;
+  --text-2xl--letter-spacing: -0.02em;
+  --text-3xl: 2.25rem; /* 36px — public site headings */
+  --text-3xl--line-height: 2.625rem;
+  --text-3xl--letter-spacing: -0.025em;
+  --text-4xl: 3rem; /* 48px — public site hero */
+  --text-4xl--line-height: 3.25rem;
+  --text-4xl--letter-spacing: -0.03em;
+
+  /* Three weights only. Hierarchy comes from size and colour, not boldness. */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  --tracking-tighter: -0.02em;
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.02em;
+  --tracking-wider: 0.06em; /* uppercase overlines */
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* Easing — custom curves; built-in CSS easings are too weak.
+   * Entering/exiting → ease-out. Moving on screen → ease-in-out.
+   * Sheets and drawers → ease-drawer. Never ease-in for UI. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-spin: spin 700ms linear infinite;
+  --animate-indeterminate: indeterminate 1.1s var(--ease-in-out) infinite;
+  --animate-shake: shake 320ms var(--ease-out);
+  --animate-caret-blink: caret-blink 1.1s var(--ease-out) infinite;
+
+  /* Blur for masking crossfades (Emil: ~2px is enough; never above 20px). */
+  --blur-2xs: 2px;
+
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Named sizes → h-control-md, w-sidebar, h-header … */
+  --spacing-control-xs: 1.5rem; /* 24px — icon buttons inside dense rows */
+  --spacing-control-sm: 1.875rem; /* 30px */
+  --spacing-control-md: 2.25rem; /* 36px — default control height */
+  --spacing-control-lg: 2.75rem; /* 44px — touch-first and primary CTAs */
+  --spacing-sidebar: 15.5rem; /* 248px */
+  --spacing-sidebar-rail: 3.5rem; /* 56px — collapsed sidebar: 32px items plus 12px gutters */
+  --spacing-header: 3.5rem; /* 56px — fits the page title and its description */
+}
+
+@theme inline {
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  --radius-xs: calc(var(--radius) * 0.4); /* 4px  — checkbox, kbd */
+  --radius-sm: calc(var(--radius) * 0.6); /* 6px  — badges, tags, tooltips */
+  --radius-md: calc(var(--radius) * 0.8); /* 8px  — buttons, inputs, menu items */
+  --radius-lg: var(--radius); /* 10px — menus, popovers, small cards */
+  --radius-xl: calc(var(--radius) * 1.4); /* 14px — cards, dialogs */
+  --radius-2xl: calc(var(--radius) * 1.8); /* 18px — main panel, sheets */
+  --radius-3xl: calc(var(--radius) * 2.4); /* 24px — marketing surfaces */
+
+  --shadow-xs: var(--elevation-xs);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
+  --shadow-panel: var(--elevation-panel);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-panel-foreground: var(--panel-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-overlay: var(--overlay);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
+  --color-primary-text: var(--primary-text);
+  --color-secondary: var(--secondary);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-highlight: var(--highlight);
+  --color-highlight-border: var(--highlight-border);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-highlight-soft: var(--highlight-soft);
+  --color-row-selected: var(--row-selected);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-control: var(--control);
+  --color-ring: var(--ring);
+
+  --color-skeleton: var(--skeleton);
+
+  --color-tag-teal: var(--tag-teal);
+  --color-tag-blue: var(--tag-blue);
+  --color-tag-violet: var(--tag-violet);
+  --color-tag-rose: var(--tag-rose);
+  --color-tag-orange: var(--tag-orange);
+  --color-tag-amber: var(--tag-amber);
+  --color-tag-lime: var(--tag-lime);
+  --color-tag-slate: var(--tag-slate);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 5. UTILITIES — named behaviours so components never hand-roll them
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Named durations. Numeric duration-150 etc. are lint errors — use these. */
+@utility duration-instant {
+  --tw-duration: var(--duration-instant);
+  transition-duration: var(--duration-instant);
+}
+@utility duration-press {
+  --tw-duration: var(--duration-press);
+  transition-duration: var(--duration-press);
+}
+@utility duration-fast {
+  --tw-duration: var(--duration-fast);
+  transition-duration: var(--duration-fast);
+}
+@utility duration-base {
+  --tw-duration: var(--duration-base);
+  transition-duration: var(--duration-base);
+}
+@utility duration-slow {
+  --tw-duration: var(--duration-slow);
+  transition-duration: var(--duration-slow);
+}
+
+/*
+ * Press feedback for anything clickable: scale 0.97 on :active.
+ * Skipped while the element's own popup is open ([data-popup-open]): menus open on
+ * mouse-down, so the popup would anchor to the shrunken trigger and then jump when
+ * the trigger grows back on release.
+ */
+@utility press-scale {
+  transition-property: transform, color, background-color, border-color, box-shadow, opacity;
+  transition-duration: var(--duration-press);
+  transition-timing-function: var(--ease-out);
+
+  &:active:not(:disabled, [aria-disabled="true"], [data-disabled], [data-popup-open]) {
+    transform: scale(0.97);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:active:not(:disabled, [aria-disabled="true"], [data-disabled], [data-popup-open]) {
+      transform: none;
+    }
+  }
+}
+
+/* Focus outline drawn inside the element — for rows and items in clipped containers. */
+@utility focus-ring-inset {
+  &:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+}
+
+/* Stacking layers. Arbitrary z-index values are lint errors — use these. */
+@utility layer-sticky {
+  z-index: 10;
+}
+@utility layer-header {
+  z-index: 20;
+}
+@utility layer-overlay {
+  z-index: 40;
+}
+@utility layer-modal {
+  z-index: 50;
+}
+@utility layer-popover {
+  z-index: 60;
+}
+@utility layer-toast {
+  z-index: 70;
+}
+@utility layer-tooltip {
+  z-index: 80;
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility skeleton-shimmer {
+  background-color: var(--skeleton);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--skeleton-shine) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.6s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* SVG path "draw" — pair with pathLength={1}. Used by the success checkmark. */
+@utility draw-path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset var(--duration-slow) var(--ease-out) var(--duration-fast);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+@utility draw-path-drawn {
+  stroke-dashoffset: 0;
+}
+
+/* Bottom padding for the iOS home indicator on full-width mobile sheets. */
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* View-transition anchors: persistent chrome that must not slide with pages. */
+@utility vt-app-sidebar {
+  view-transition-name: app-sidebar;
+}
+@utility vt-app-header {
+  view-transition-name: app-header;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 6. BASE
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+@layer base {
+  *,
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--border);
+  }
+
+  html {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background font-sans text-base text-foreground antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--selection);
+  }
+
+  /* One focus indicator for every focusable element, so none is ever missing. */
+  :where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [role="button"],
+    [tabindex]:not([tabindex="-1"])
+  ):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Applied for one frame while switching theme, so colours swap instantly. */
+  .theme-switching,
+  .theme-switching *,
+  .theme-switching *::before,
+  .theme-switching *::after {
+    transition: none !important;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 7. MOTION
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/* Text caret drawn inside a custom field (OtpInput). Callers add motion-reduce:animate-none. */
+@keyframes caret-blink {
+  0%,
+  70%,
+  100% {
+    opacity: 1;
+  }
+  20%,
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Error feedback: a short horizontal shake (disabled under reduced motion by callers). */
+@keyframes shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  20% {
+    translate: -3px 0;
+  }
+  40% {
+    translate: 3px 0;
+  }
+  60% {
+    translate: -2px 0;
+  }
+  80% {
+    translate: 2px 0;
+  }
+}
+
+/* Directional page transitions — React <ViewTransition> + <Link transitionTypes>.
+ * nav-forward: deeper into the app (list → detail, down the sidebar).
+ * nav-back:    back out (detail → list, up the sidebar). */
+
+::view-transition {
+  pointer-events: none;
+}
+
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}
+
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}
+
+@keyframes vt-slide-in {
+  from {
+    translate: var(--vt-offset) 0;
+  }
+}
+
+@keyframes vt-slide-out {
+  to {
+    translate: var(--vt-offset) 0;
+  }
+}
+
+@keyframes vt-rise-in {
+  from {
+    translate: 0 8px;
+  }
+}
+
+::view-transition-old(.nav-forward) {
+  --vt-offset: calc(var(--page-offset) * -1);
+  animation:
+    var(--duration-page-exit) var(--ease-out) both vt-fade-out,
+    var(--duration-page-move) var(--ease-in-out) both vt-slide-out;
+}
+
+::view-transition-new(.nav-forward) {
+  --vt-offset: var(--page-offset);
+  animation:
+    var(--duration-page-enter) var(--ease-out) var(--duration-page-exit) both vt-fade-in,
+    var(--duration-page-move) var(--ease-in-out) both vt-slide-in;
+}
+
+::view-transition-old(.nav-back) {
+  --vt-offset: var(--page-offset);
+  animation:
+    var(--duration-page-exit) var(--ease-out) both vt-fade-out,
+    var(--duration-page-move) var(--ease-in-out) both vt-slide-out;
+}
+
+::view-transition-new(.nav-back) {
+  --vt-offset: calc(var(--page-offset) * -1);
+  animation:
+    var(--duration-page-enter) var(--ease-out) var(--duration-page-exit) both vt-fade-in,
+    var(--duration-page-move) var(--ease-in-out) both vt-slide-in;
+}
+
+/* Suspense reveal: the skeleton fades out, content rises in. */
+::view-transition-old(.skeleton-exit) {
+  animation: var(--duration-page-exit) var(--ease-out) both vt-fade-out;
+}
+
+::view-transition-new(.content-enter) {
+  animation:
+    var(--duration-page-enter) var(--ease-out) var(--duration-page-exit) both vt-fade-in,
+    var(--duration-page-move) var(--ease-out) both vt-rise-in;
+}
+
+/* Persistent chrome stays still while pages move beneath it. */
+::view-transition-group(app-sidebar),
+::view-transition-group(app-header) {
+  animation: none;
+  z-index: 100;
+}
+
+::view-transition-old(app-sidebar),
+::view-transition-old(app-header) {
+  display: none;
+}
+
+::view-transition-new(app-sidebar),
+::view-transition-new(app-header) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
