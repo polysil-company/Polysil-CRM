@@ -24,7 +24,11 @@ import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/compone
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMarkNotificationsRead } from "@/features/notifications/api/notifications.mutations";
 import { notificationListQueryOptions } from "@/features/notifications/api/notifications.queries";
-import type { AppNotification } from "@/features/notifications/api/notifications.schemas";
+import {
+  NOTIFICATION_KINDS,
+  type AppNotification,
+  type NotificationKind,
+} from "@/features/notifications/api/notifications.schemas";
 import { formatNumber } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 import { describeResourceType, resourceHref } from "@/lib/navigation/resource-href";
@@ -35,11 +39,18 @@ const log = createLogger({
   dataId: "NOTIF-001",
 });
 
-const KIND_ICONS = new Map<string, IconGlyph>([
-  ["approval_requested", CheckmarkBadge01Icon],
-  ["lead_assigned", UserAdd01Icon],
-  ["task_assigned", TaskDone01Icon],
-]);
+/** One icon per known kind — adding a kind to the contract without an icon is a type error. */
+const KIND_ICONS: Readonly<Record<NotificationKind, IconGlyph>> = {
+  approval_requested: CheckmarkBadge01Icon,
+  lead_assigned: UserAdd01Icon,
+  task_assigned: TaskDone01Icon,
+};
+
+/** A kind the backend added before the app knew about it gets the plain bell. */
+function kindIcon(kind: string): IconGlyph {
+  const known = NOTIFICATION_KINDS.find((candidate) => candidate === kind);
+  return known === undefined ? Notification01Icon : KIND_ICONS[known];
+}
 
 /** Above this the badge reads "99+". */
 const MAX_BADGE_COUNT = 99;
@@ -168,7 +179,7 @@ function NotificationItem({
             : "bg-muted text-muted-foreground",
         )}
       >
-        <Icon icon={KIND_ICONS.get(notification.kind) ?? Notification01Icon} size="sm" />
+        <Icon icon={kindIcon(notification.kind)} size="sm" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span

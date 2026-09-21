@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, use } from "react";
+import { useSyncExternalStore } from "react";
 import type * as React from "react";
 
 import { Spinner } from "@/components/ui/spinner";
@@ -9,44 +9,81 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger({ file: "components/providers/mock-gate.tsx", dataId: "APP-004" });
 
-let workerReady: Promise<void> | undefined;
-
-function startMockWorker(): Promise<void> {
-  workerReady ??= import("@/mocks/browser")
-    .then(({ worker }) => worker.start({ onUnhandledRequest: "bypass", quiet: true }))
-    .then(() => {
-      log.info("startMockWorker", "mock backend running");
-    })
-    .catch((error: unknown) => {
-      // Service workers need a secure origin (https or localhost). Keep the app usable without mocks.
-      log.warn("startMockWorker", "mock backend could not start; requests go to the real API", {
-        error,
-      });
-    });
-  return workerReady;
-}
-
-function WaitForMocks({ children }: { children: React.ReactNode }): React.JSX.Element {
-  if (typeof window !== "undefined") {
-    use(startMockWorker());
-  }
-  return <>{children}</>;
+export interface MockReadiness {
+  /** The first subscriber starts the worker; every subscriber hears once it is ready. */
+  subscribe: (listener: () => void) => () => void;
+  isReady: () => boolean;
 }
 
 /**
- * APP-004 · When NEXT_PUBLIC_API_MOCKING=enabled, holds rendering until the
- * mock service worker is ready, so no request escapes to the network first.
- * Does nothing in staging and production (mocking cannot be enabled there).
+ * Whether the mock service worker is running, as a tiny external store. A worker that
+ * cannot start still counts as ready: the app stays usable, and requests go to the real API.
+ */
+export function createMockReadiness(start: () => Promise<void>): MockReadiness {
+  let ready = false;
+  let starting: Promise<void> | undefined;
+  const listeners = new Set<() => void>();
+
+  return {
+    subscribe(listener: () => void): () => void {
+      listeners.add(listener);
+      starting ??= start()
+        .catch((error: unknown) => {
+          // Service workers need a secure origin (https or localhost).
+          log.warn("startMockWorker", "mock backend could not start; requests go to the real API", {
+            error,
+          });
+        })
+        .then(() => {
+          ready = true;
+          for (const notify of listeners) {
+            notify();
+          }
+        });
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    isReady(): boolean {
+      return ready;
+    },
+  };
+}
+
+const mockReadiness = createMockReadiness(async () => {
+  const { worker } = await import("@/mocks/browser");
+  await worker.start({ onUnhandledRequest: "bypass", quiet: true });
+  log.info("startMockWorker", "mock backend running");
+});
+
+function notReadyOnServer(): boolean {
+  return false;
+}
+
+/**
+ * APP-004 · When NEXT_PUBLIC_API_MOCKING=enabled, shows a boot screen until the mock
+ * service worker is ready, so no request escapes to the network first. Does nothing in
+ * staging and production (mocking cannot be enabled there).
+ *
+ * The server renders the boot screen too, never the page. A server-rendered form looks
+ * ready while the worker is still starting and the page is not yet hydrated, and a click
+ * in that gap submits the form natively: the page reloads and the input is lost. The CI
+ * smoke tests hit exactly this.
  */
 export function MockGate({ children }: { children: React.ReactNode }): React.JSX.Element {
   if (clientEnv.apiMocking !== "enabled") {
     return <>{children}</>;
   }
-  return (
-    <Suspense fallback={<BootIndicator />}>
-      <WaitForMocks>{children}</WaitForMocks>
-    </Suspense>
+  return <WaitForMocks>{children}</WaitForMocks>;
+}
+
+function WaitForMocks({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const ready = useSyncExternalStore(
+    mockReadiness.subscribe,
+    mockReadiness.isReady,
+    notReadyOnServer,
   );
+  return ready ? <>{children}</> : <BootIndicator />;
 }
 
 function BootIndicator(): React.JSX.Element {

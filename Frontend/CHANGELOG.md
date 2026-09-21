@@ -169,7 +169,7 @@ The choice is remembered per browser and applied before the first paint, so a co
 
 ### Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation
 
-`feature` · `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md)
+`feature` · `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md)
 
 > **Breaking change.** Read the discussion before you build on this.
 
@@ -195,6 +195,8 @@ Anyone could open every page: there was no sign-in, and "Sign out" in the accoun
 **Mock backend** — all six `/auth` endpoints, built from the backend's contract: demo password `polysil-demo`, demo code `123456`, lockout, code attempts, refresh rotation, and a permission matrix per role that follows the client's visibility rules. The role switcher and slow scenario still work; auth ignores the error scenario so nobody gets locked out.
 
 **Fixed while previewing (APP-002, APP-001)** — opening the theme menu or the account menu crashed the page ("MenuGroupContext is missing"): each menu's section heading sat outside the group it names. Both headings now sit inside their group, which also names the group for screen readers. The theme script in the page head no longer triggers React's "script tag while rendering" warning when the layout re-renders in the browser. Both menus also nudged sideways just after opening: they open on mouse-down, while the button's press animation has shrunk it, and followed the button as it grew back. A button no longer shrinks while its own popup is open, so menus, popovers and selects stay put.
+
+**Fixed after the first CI run (APP-004)** — with the mock backend on (local and preview builds), the server rendered the sign-in form while the browser waited for the mock worker before hydrating it. The form looked ready but wasn't: a click in that gap submitted it natively, reloading the page and losing the input. The mock gate now shows its "Starting the app" screen on the server too, so the page appears only once it works. The e2e tests also find the email field by role: by label, "Work email" also matched the form named "Sign in with your work email".
 
 #### Discussion
 
@@ -277,6 +279,7 @@ The mock backend seeds four conversations and six notifications, and in the brow
 
 - **Decided with Nakul (2026-09-15):** staff ↔ staff only; direct messages that can link a record (not per-record threads yet); the bell starts with approvals and assignments; build on mocks with a proposed contract and polling.
 - **Proposed contracts, not agreed ones.** The backend has no notification or messaging endpoints. The schemas follow `GET /auth/me`'s conventions — a `data` envelope, snake_case, lenient optional fields — and unknown notification kinds and record types still render, so the backend can add them without a frontend release. Every schema carries `TODO(NOTIF-001)` / `TODO(MSG-001)`, and the Data IDs are registered as `mocked` with their endpoints.
+- **Icons follow the contract.** The bell's icon table is typed by the known notification kinds, so adding a kind without an icon fails the type check; a kind the app doesn't know yet gets the plain bell.
 - **Polling, not push.** The architecture reserves live connections for notifications and escalations, but no transport is chosen yet. Polling pauses in hidden tabs, so idle tabs cost nothing; replacing it with server-sent events or WebSockets later changes the queries, not the screens. The open conversation polls faster than the rest because a reply that takes half a minute to appear feels broken.
 - **Staff-only is enforced twice:** navigation hides Messages unless the session's user type is staff (unknown counts as not staff), and the backend must return 403 to partner users — the mock does.
 - **Sharing goes through the URL** (`?share=lead:…`, validated with Zod) instead of shared state, so the leads and messages features don't depend on each other's components, and a share link survives a refresh.

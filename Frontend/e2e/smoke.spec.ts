@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
  * Smoke tests: sign-in works, the main routes load against the mocked API, the
@@ -31,10 +31,18 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * The email field by role: `getByLabel("Work email")` also matches the form, whose
+ * accessible name is "Sign in with your work email".
+ */
+function workEmailField(page: Page): Locator {
+  return page.getByRole("textbox", { name: "Work email" });
+}
+
 /** Signs in as staff and lands on `path`. */
 async function signIn(page: Page, path = "/dashboard"): Promise<void> {
   await page.goto(`/sign-in?method=staff&next=${encodeURIComponent(path)}`);
-  await page.getByLabel("Work email").fill("asha@polysil.in");
+  await workEmailField(page).fill("asha@polysil.in");
   await page.getByLabel("Password", { exact: true }).fill(MOCK_STAFF_PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`${escapeRegExp(path)}$`));
@@ -48,7 +56,7 @@ test.describe("[AUTH-006] Signed-in routing", () => {
     await expect(page).toHaveURL(/\/sign-in\?next=%2Fleads$/);
 
     await page.getByRole("button", { name: "Staff email" }).click();
-    await page.getByLabel("Work email").fill("asha@polysil.in");
+    await workEmailField(page).fill("asha@polysil.in");
     await page.getByLabel("Password", { exact: true }).fill(MOCK_STAFF_PASSWORD);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 

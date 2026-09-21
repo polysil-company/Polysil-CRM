@@ -12,6 +12,7 @@ dataIds:
   - OBS-002
   - APP-001
   - APP-002
+  - APP-004
   - DS-001
 author: Nakul Srivastava
 breaking: true
@@ -39,6 +40,8 @@ Anyone could open every page: there was no sign-in, and "Sign out" in the accoun
 **Mock backend** — all six `/auth` endpoints, built from the backend's contract: demo password `polysil-demo`, demo code `123456`, lockout, code attempts, refresh rotation, and a permission matrix per role that follows the client's visibility rules. The role switcher and slow scenario still work; auth ignores the error scenario so nobody gets locked out.
 
 **Fixed while previewing (APP-002, APP-001)** — opening the theme menu or the account menu crashed the page ("MenuGroupContext is missing"): each menu's section heading sat outside the group it names. Both headings now sit inside their group, which also names the group for screen readers. The theme script in the page head no longer triggers React's "script tag while rendering" warning when the layout re-renders in the browser. Both menus also nudged sideways just after opening: they open on mouse-down, while the button's press animation has shrunk it, and followed the button as it grew back. A button no longer shrinks while its own popup is open, so menus, popovers and selects stay put.
+
+**Fixed after the first CI run (APP-004)** — with the mock backend on (local and preview builds), the server rendered the sign-in form while the browser waited for the mock worker before hydrating it. The form looked ready but wasn't: a click in that gap submitted it natively, reloading the page and losing the input. The mock gate now shows its "Starting the app" screen on the server too, so the page appears only once it works. The e2e tests also find the email field by role: by label, "Work email" also matched the form named "Sign in with your work email".
 
 ## Discussion
 
