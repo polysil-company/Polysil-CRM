@@ -1,4 +1,4 @@
-# Checks every pull request into integration or main before it merges.
+# Checks every pull request into integration, staging or main before it merges.
 #
 # Draft pull requests get the fast checks. Marking one ready for review also runs the
 # slower frontend suites. Our GitHub plan can't block a failing pull request from
@@ -9,7 +9,7 @@ name: Pull request checks
 
 on:
   pull_request:
-    branches: [integration, main]
+    branches: [integration, staging, main]
     types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:

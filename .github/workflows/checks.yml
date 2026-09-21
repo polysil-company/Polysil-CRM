@@ -227,7 +227,7 @@ jobs:
           retention-days: 7
 
   backend-lint:
-    name: "Backend: lint"
+    name: "Backend: lint and types"
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
@@ -252,12 +252,142 @@ jobs:
       - name: Ruff
         run: ruff check .
 
-      - name: Database-backed tests are not wired in yet
-        run: echo "::notice title=Backend tests::The backend test suite needs Postgres behind PgBouncer, so CI doesn't run it yet. See docs/CI-CD.md, section Backend."
+      # CLAUDE.md 4.2 puts mypy --strict on these two packages and only these two.
+      # The rest of the tree is not clean and saying so here is better than a green
+      # tick that means less than it looks like it does.
+      - name: Mypy, strict, on the domain and the services
+        run: mypy --strict api/domain api/services
+
+  backend-tests:
+    name: "Backend: tests"
+    needs: changes
+    # Three containers and the whole suite, so it follows the same draft rule as
+    # the slower frontend suites: push freely on a draft, get the full run when
+    # the pull request is marked ready. After-merge and nightly always run it.
+    if: needs.changes.outputs.backend == 'true' && inputs.slow-suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+
+    # The same three containers the local stack runs, and PgBouncer is not
+    # optional (ADR-021, ADR-023). The suite's whole point is that a claim set with
+    # a plain SET instead of set_config(..., true) leaks to whoever borrows the
+    # connection next, and that only fails against a real transaction-mode pooler.
+    # A direct connection here would pass every test and prove nothing.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: appuser
+          # Local to this runner, thrown away when the job ends. Not a secret and
+          # not worth pretending to be one.
+          POSTGRES_PASSWORD: ci-postgres
+          POSTGRES_DB: appdb
+        options: >-
+          --health-cmd "pg_isready -U appuser -d appdb"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+        ports:
+          - 5432:5432
+
+      pgbouncer:
+        image: edoburu/pgbouncer:v1.25.2-p0
+        env:
+          DB_HOST: postgres
+          DB_PORT: 5432
+          DB_USER: appuser
+          DB_PASSWORD: ci-postgres
+          DB_NAME: appdb
+          LISTEN_PORT: 6432
+          LISTEN_ADDR: 0.0.0.0
+          POOL_MODE: transaction
+          AUTH_TYPE: scram-sha-256
+          MAX_CLIENT_CONN: 200
+          DEFAULT_POOL_SIZE: 25
+          IGNORE_STARTUP_PARAMETERS: extra_float_digits,options
+        options: >-
+          --health-cmd "nc -z 127.0.0.1 6432 || exit 1"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+        ports:
+          - 6432:6432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+        ports:
+          - 6379:6379
+
+    env:
+      # Through PgBouncer, always. Alembic rewrites the driver to psycopg itself.
+      DATABASE_URL: postgresql+asyncpg://appuser:ci-postgres@127.0.0.1:6432/appdb
+      REDIS_URL: redis://127.0.0.1:6379/0
+      JWT_SECRET: ci-only-jwt-secret-not-used-anywhere-else
+      DB_APP_ROLE: app_role
+      DB_ANON_ROLE: app_anon
+      ENVIRONMENT: local
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install the backend with its development tools
+        run: python -m pip install -e ".[dev]"
+
+      # Roles are cluster objects and a migration is per-database, so CREATE ROLE
+      # in a migration would fail on the second database in the same cluster. It is
+      # an out-of-band step everywhere, including here.
+      #
+      # Direct to Postgres, not through the pooler: this is the one thing in the
+      # whole setup that is not application traffic.
+      - name: Create the cluster roles
+        env:
+          PGPASSWORD: ci-postgres
+        run: |
+          psql -h 127.0.0.1 -p 5432 -U appuser -d appdb \
+            -c "CREATE ROLE app_role NOLOGIN;" \
+            -c "CREATE ROLE app_anon NOLOGIN;" \
+            -c "GRANT app_role TO appuser;" \
+            -c "GRANT app_anon TO appuser;"
+
+      # scripts/seed_demo.py reads these three from infra/.env and nowhere else.
+      - name: Write the environment file the seed reads
+        run: |
+          umask 077
+          printf 'DB_USER=appuser\nDB_PASSWORD=ci-postgres\nDB_NAME=appdb\n' > infra/.env
+
+      - name: Migrate
+        run: alembic upgrade head
+
+      # Roles, the permission matrix parsed from RBAC.md, and the administrator.
+      # The parity suite builds its own rows, but the API tests sign in as a seeded
+      # user and the product fixtures need a coded state to hang a district off.
+      - name: Seed
+        run: python scripts/seed_demo.py
+
+      - name: The reference SQL still describes this database
+        run: python scripts/validate_reference_sql.py
+
+      # Everything. What the client's workbooks feed - the three golden subsidy
+      # quotations and the loaded product catalogue - skips on its own, because
+      # those files are not in this repository on purpose. The run prints what it
+      # skipped and why.
+      - name: Pytest
+        run: pytest -q -p no:cacheprovider -rs
 
   ci-passed:
     name: CI passed
-    needs: [changes, frontend-checks, frontend-storybook, frontend-e2e, backend-lint]
+    needs: [changes, frontend-checks, frontend-storybook, frontend-e2e, backend-lint,
+            backend-tests]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -8,8 +8,8 @@ When you change a workflow, update this document in the same pull request.
 
 | Workflow | Runs when | What it does |
 | --- | --- | --- |
-| [Pull request checks](../.github/workflows/pull-request.yml) | A pull request into `integration` or `main` is opened, updated, reopened, or marked ready for review | Runs the checks for the apps the pull request changes |
-| [After merge](../.github/workflows/after-merge.yml) | Commits reach `integration` or `main` | Confirms they came through a merged pull request, runs the checks again, and keeps an alert issue open while the branch is failing |
+| [Pull request checks](../.github/workflows/pull-request.yml) | A pull request into `integration`, `staging` or `main` is opened, updated, reopened, or marked ready for review | Runs the checks for the apps the pull request changes |
+| [After merge](../.github/workflows/after-merge.yml) | Commits reach `integration`, `staging` or `main` | Confirms they came through a merged pull request, runs the checks again, and keeps an alert issue open while the branch is failing |
 | [Nightly](../.github/workflows/nightly.yml) | 02:00 IST when `integration` changed in the last day, or when started by hand | Runs every check on `integration`, plus a dependency audit |
 | [Checks](../.github/workflows/checks.yml) | Only when one of the workflows above calls it | Defines every app's checks, in one place |
 | [Dependabot](../.github/dependabot.yml) | Mondays at 09:00 IST | Opens dependency update pull requests into `integration` |
@@ -19,13 +19,20 @@ After merge and Nightly both use the [alert action](../.github/actions/alert/act
 ## How code moves
 
 ```text
-feature branch ── pull request ──▶ integration (staging) ── pull request ──▶ main (production)
+feature branch ──▶ integration ──▶ staging ──▶ main
+                   checks         reviewed    tested
 ```
 
 - Work happens on feature branches, for example `frontend-foundation` or `backend-foundation`.
-- A pull request merges a feature branch into `integration`.
-- A pull request from `integration` into `main` releases it.
-- Nobody pushes to `integration` or `main` directly.
+- A pull request merges a feature branch into `integration`. **The bar is the automated checks.**
+- A pull request from `integration` into `staging`. **The bar is a review**, with whatever review tooling we are using.
+- A pull request from `staging` into `main` releases it. **The bar is user and load testing** against what `staging` is running.
+- Nobody pushes to `integration`, `staging` or `main` directly.
+
+Three arrows, three different bars, and the checks run on all three. The checks are
+the *floor*, not the whole gate: a green run into `staging` says nothing about
+whether anyone reviewed it, and a green run into `main` says nothing about whether
+it was load tested. Those are the parts a workflow cannot do for us.
 
 ## What our GitHub plan allows
 
@@ -40,7 +47,7 @@ The `polysil-crm` organization is on GitHub's free plan, and this repository is 
 
 GitHub Actions is included on the free plan, with a monthly allowance of minutes. For details, see [Stay within the free minutes](#stay-within-the-free-minutes).
 
-If the organization moves to a paid plan later, add a ruleset for `integration` and `main` with these rules:
+If the organization moves to a paid plan later, add a ruleset for `integration`, `staging` and `main` with these rules:
 - Require a pull request.
 - Require the **CI passed** check.
 - Require one approval.
@@ -89,21 +96,69 @@ The backend developer owns these checks. Every command runs inside `backend/`.
 
 | Job | Runs | Commands |
 | --- | --- | --- |
-| Backend: lint | Whenever the backend is checked | `pip install -e ".[dev]"`, `ruff check .` |
+| Backend: lint and types | Whenever the backend is checked | `ruff check .`, then `mypy --strict api/domain api/services` |
+| Backend: tests | Whenever the backend is checked | roles, `alembic upgrade head`, the demo seed, the reference SQL, then `pytest` |
 
-The backend test suite doesn't run in CI yet. According to `backend/README.md` and `backend/infra/`, it needs:
+`mypy` runs on `api/domain` and `api/services` and nothing else, because that is
+what `backend/CLAUDE.md` puts it on. The rest of the tree is not strict-clean, and
+a tick that covers less than it appears to is worse than an honest narrower one.
 
-- Postgres 16, reached only through PgBouncer in transaction mode on port 6432. The backend refuses direct connections on purpose.
-- The `app_role` role, and `app_anon` where it's used, created by a cluster admin.
-- Migrations applied with Alembic.
-- `DATABASE_URL` (asyncpg driver, port 6432) and `JWT_SECRET`.
-- Redis, for the worker.
+#### The three containers, and why PgBouncer is not optional
 
-To add the suite to CI:
-1. Give the backend job service containers for Postgres, PgBouncer and Redis.
-2. Add steps that create the roles and run the migrations.
-3. Run `pytest`. Consider running `mypy` in the same job, with the arguments you use locally.
-4. Delete the job's "not wired in yet" notice step.
+The tests job runs Postgres 16, PgBouncer and Redis as service containers, which
+is the same shape as the local stack.
+
+**PgBouncer in transaction mode is the point, not plumbing.** Every request sets
+the caller's identity with `set_config(..., true)` so it dies with the
+transaction. Written as a plain `SET` instead, the identity leaks to whoever
+borrows that pooled connection next — and that passes every test in the suite
+except one, which can only fail against a real transaction-mode pooler. Running
+CI against a direct connection would go green and prove nothing about the thing
+most worth proving.
+
+So: Postgres is reached **only** through PgBouncer on 6432. The single exception
+is creating the two cluster roles, which is not application traffic.
+
+#### What the job does, in order
+
+1. **Creates `app_role` and `app_anon`** directly on Postgres. Roles are cluster
+   objects and a migration is per-database, so `CREATE ROLE` in a migration would
+   fail on the second database in the same cluster. It is an out-of-band step
+   everywhere, including here.
+2. **Writes `infra/.env`** with the three values `scripts/seed_demo.py` reads from
+   there and nowhere else.
+3. **`alembic upgrade head`.** The `DATABASE_URL` names the asyncpg driver; Alembic
+   rewrites it to psycopg itself, so one variable serves both.
+4. **Seeds** the roles, the permission matrix parsed from `RBAC.md`, and the
+   administrator. The parity suite builds its own permission rows, but the API
+   tests sign in as a seeded user.
+5. **Checks the reference SQL** still describes the database it just built.
+6. **Runs `pytest`.**
+
+#### What CI cannot run, and why that is on purpose
+
+Some tests skip, and the run prints each one with its reason (`-rs`).
+
+The client's workbooks — the three sample subsidy quotations and the product
+master — are **deliberately not in this repository**. They carry the client's own
+component rates and prices. So anything that feeds on them skips:
+
+| Skipped | Needs |
+| --- | --- |
+| The three golden subsidy quotations | `tests/fixtures/subsidy/{drip,mini_sprinkler,sprinkler}.json` |
+| The subsidy endpoint tests | the same, plus masters loaded by `scripts/load_subsidy_masters.py` |
+| Two price-list tests that need a catalogue | products loaded by `scripts/load_product_master.py` |
+
+Everything else runs: the interpolation and its boundaries against the published
+scheme tables, the whole commercial tax engine, every migration's constraints, the
+RLS policies including the negative cases, the permission parity suite, and every
+endpoint that does not need the client's own figures.
+
+**This is a real gap and worth naming rather than hiding.** The golden tests are
+what prove the subsidy engine reproduces the client's spreadsheets to the paisa,
+and CI does not run them. They run on a developer's machine, where the workbooks
+are, and the mutation checks (`scripts/mutation_check_subsidy.py`,
+`scripts/mutation_check_pricing.py`) run there too.
 
 ### CI passed
 
@@ -134,9 +189,25 @@ When an alert opens, open the run linked in the issue, and fix forward with a pu
 
 ### Deploys
 
-There are no deploys yet, because hosting isn't chosen. When it is, add deploy jobs to `after-merge.yml` with `needs: checks`, so a failing commit never deploys:
-- Staging deploys from `integration`.
-- Production deploys from `main`, started by hand, because this plan has no deployment approvals.
+No deploy runs from CI yet. When one does, add deploy jobs to `after-merge.yml`
+with `needs: checks`, so a failing commit never deploys:
+
+- `staging` deploys to the staging box.
+- `main` deploys to production, started by hand, because this plan has no deployment approvals.
+
+**The backend already has a deploy, and it is not wired to CI.**
+`backend/scripts/deploy_staging.py` puts the API on the shared box that serves
+`https://polysil-api.pranayx.tech`, and it is run from a developer's machine
+because it needs an SSH key. Moving it here means putting that key in Actions
+secrets, which is a decision rather than a task: the box hosts two unrelated
+projects.
+
+One thing that deploy learned, for whoever writes the job: **check the URL a user
+would use, not the one the deploy can reach.** Its health step asked the box over
+loopback, which stayed green while the public address answered 502 for everyone,
+because a container had come back without the reverse proxy's network. A check
+that does not take the same hops as a real request can be green during an outage
+(`backend/docs/issues/OPEN.md`, ISS-091).
 
 ## Nightly
 
@@ -163,10 +234,14 @@ The organization's private repositories share 2,000 GitHub Actions minutes a mon
 Estimated cost of one run, based on local timings:
 - Frontend fast checks: about 6 minutes.
 - Frontend, including Storybook and Playwright: about 15 minutes.
-- Backend lint: about 2 minutes.
+- Backend lint and types: about 3 minutes.
+- Backend tests: **not measured yet.** It takes about 35 minutes on a developer's
+  machine, but almost all of that is network latency to a remote database roughly
+  150 ms per round trip away. In CI the database is a container on the same host,
+  so expect far less. Replace this line with the real figure after the first run.
 
 To stay inside the allowance:
-- Open pull requests as drafts while you're still pushing. Mark them ready when you want the slower suites.
+- Open pull requests as drafts while you're still pushing. Mark them ready when you want the slower suites. **That gate now covers the backend tests too**, so a draft gets lint and types only.
 - Don't worry about pushing again: a new push to a pull request cancels the run for the previous push.
 - Check usage in the organization's billing settings.
 
