@@ -1062,6 +1062,31 @@ async def patch_scoring(db: AsyncSession, body: ScoringPatch) -> list[ScoringIte
 
 _MAX_LIMIT = 100
 
+# The ceiling on `?include_total=true`. A count over a scoped table is a scan, and
+# its cost grows with the rows the caller can see: measured at 3 ms server-side
+# over 111 leads, which says nothing about a global administrator two years in
+# (ISS-014). Counting one row past the ceiling and stopping bounds that forever,
+# and the response says when it stopped so the screen can render "1000+".
+#
+# A thousand is chosen for the screen rather than the database: past forty pages
+# nobody is paging, they are filtering.
+TOTAL_CEILING = 1000
+
+
+async def _capped_total(db: AsyncSession, filters: list[Any]) -> tuple[int, bool]:
+    """How many rows match, up to the ceiling, and whether there are more.
+
+    The LIMIT is inside the subquery on purpose: it stops the scan, which is the
+    whole point. `SELECT count(*) ... LIMIT 1001` would count everything and then
+    return one row.
+    """
+    inner = (sa.select(sa.literal(1))
+             .where(sa.and_(*filters))
+             .limit(TOTAL_CEILING + 1)
+             .subquery())
+    counted = await db.scalar(sa.select(sa.func.count()).select_from(inner)) or 0
+    return (TOTAL_CEILING, True) if counted > TOTAL_CEILING else (int(counted), False)
+
 
 async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = None,
                      priority: str | None = None, owner_user_id: str | None = None,
@@ -1069,7 +1094,8 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
                      source: str | None = None, inquiry_type: str | None = None,
                      created_from: str | None = None, created_to: str | None = None,
                      q: str | None = None, limit: int = 50,
-                     cursor: str | None = None) -> LeadPage:
+                     cursor: str | None = None,
+                     include_total: bool = False) -> LeadPage:
     """The lead list, scoped and filtered, keyset-paged by (created_at desc, id).
 
     Enforcer 1 is scope_predicate; RLS re-checks the same rows underneath. No total
@@ -1110,10 +1136,16 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
         where.append(lead_t.c.created_at <= _parse_ts(created_to, "created_to"))
     if q:
         where.append(_search_clause(q))
+    # Everything above narrows the set the caller asked for. The cursor below
+    # narrows it to one page, so the total is counted from `filters` and not from
+    # `where`: a total that shrank as the user paged would be worse than none.
+    filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)
         where.append(sa.or_(lead_t.c.created_at < c_ts,
                             sa.and_(lead_t.c.created_at == c_ts, lead_t.c.id < c_id)))
+
+    total, total_capped = await _capped_total(db, filters) if include_total else (None, False)
 
     page = (await db.execute(
         sa.select(lead_t.c.id, lead_t.c.created_at)
@@ -1129,13 +1161,15 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
 
     ids = [str(r.id) for r in page]
     if not ids:
-        return LeadPage(data=[], meta=PageMeta(limit=limit, next_cursor=None))
+        return LeadPage(data=[], meta=PageMeta(limit=limit, next_cursor=None,
+                                              total=total, total_capped=total_capped))
 
     rows = (await db.execute(text(_LEAD_SELECT + " WHERE l.id = ANY(:ids)"),
                              {"ids": ids})).all()
     by_id = {str(r.id): r for r in rows}
     data = [_row_to_lead(by_id[i], duplicates=[]) for i in ids if i in by_id]
-    return LeadPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor))
+    return LeadPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
+                                            total=total, total_capped=total_capped))
 
 
 def _search_clause(q: str) -> Any:

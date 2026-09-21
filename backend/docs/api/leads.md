@@ -32,8 +32,21 @@ Conventions for every endpoint in this file:
 The lead list, filtered and in scope.
 
 Keyset pagination by `(created_at desc, id)`: pass the previous page's
-`meta.next_cursor` as `cursor`; it is absent on the last page. There is no
-total. An empty list means nothing in your scope, which is not an error.
+`meta.next_cursor` as `cursor`; it is absent on the last page. An empty list
+means nothing in your scope, which is not an error.
+
+**There are no numbered pages, and that is deliberate.** Leads arrive while
+you are reading, and they arrive at the top, because the list is newest
+first. Offset paging would show you the same lead twice on page 2 and skip
+another one entirely. A cursor names the row you got to, so the next page is
+the next page whatever has been created since.
+
+**`?include_total=true` gives you the count** in `meta.total`, for a caption
+like "1 to 25 of 137". It is off by default because it costs a scan of
+everything in your scope. The count stops at 1,000 and sets
+`meta.total_capped`, so render "1000+" rather than an exact figure when that
+is true: an unbounded count is a query that gets slower every month until one
+day it is the slowest thing on the screen.
 
 **Parameters**
 
@@ -51,6 +64,7 @@ total. An empty list means nothing in your scope, which is not an error.
 | `q` | query | string | null |  | Name, mobile or inquiry number. |
 | `limit` | query | integer |  |  |
 | `cursor` | query | string | null |  | From a previous page's next_cursor. |
+| `include_total` | query | boolean |  | Also count how many leads match, for a "1 to 25 of 137" caption. Off by default: it costs a second query over everything in your scope, and most screens do not need it. |
 
 **Responses**
 
@@ -727,6 +741,8 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `limit` | integer | yes | The page size that was applied. |
 | `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `total` | integer | null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
+| `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
 
 **`ReasonRef`**
 
