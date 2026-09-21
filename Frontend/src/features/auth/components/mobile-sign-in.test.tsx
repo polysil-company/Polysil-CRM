@@ -51,7 +51,10 @@ describe("[AUTH-001] MobileSignIn", () => {
     expect(
       screen.getByText(/is registered with Polysil, a 6-digit code is on its way/),
     ).toBeInTheDocument();
-    expect(codeInput).toHaveFocus();
+    // The step moves focus in an effect just after the field appears; wait for it.
+    await waitFor(() => {
+      expect(codeInput).toHaveFocus();
+    });
 
     await user.type(codeInput, MOCK_OTP_CODE);
 
@@ -79,7 +82,9 @@ describe("[AUTH-001] MobileSignIn", () => {
 
     const mobile = await screen.findByLabelText("Mobile number");
     expect(mobile).toHaveValue("98765 43210");
-    expect(mobile).toHaveFocus();
+    await waitFor(() => {
+      expect(mobile).toHaveFocus();
+    });
   });
 
   it("offers a new code once the wait is over", async () => {
