@@ -12,7 +12,8 @@ from __future__ import annotations
 
 STATE = ("Gujarat", "GJ")
 
-# The 33 districts with the abbreviations the client's sheets use (the client's intake). Baroda appears in the client's list as an alias of Vadodara and is
+# The 33 districts with the abbreviations the client's sheets use (the client's
+# intake). Baroda appears in the client's list as an alias of Vadodara and is
 # folded into it here.
 DISTRICTS: list[tuple[str, str]] = [
     ("Ahmedabad", "AMD"), ("Amreli", "AMR"), ("Anand", "AND"), ("Aravalli", "ARV"),
