@@ -1,0 +1,236 @@
+# Polysil CRM - staging stack, for the frontend track to develop against.
+#
+#   docker compose --project-directory infra -f infra/docker-compose.staging.yml \
+#     --env-file infra/.env.staging up -d
+#
+# Deployed by scripts/deploy_staging.py; see docs/workflows/staging-deployment.md.
+#
+# Two rules this file exists to keep:
+#
+#   1. Every published port is bound to 127.0.0.1. Nothing on this box may be
+#      reachable from the internet except through the reverse proxy that already
+#      owns 80 and 443, and that is a separate, deliberate step.
+#   2. Everything reaches Postgres through PgBouncer in transaction mode
+#      (ADR-021, ADR-023). The claim is SET LOCAL and a direct connection is the
+#      one way its leak stays invisible until production.
+#
+# The box is shared with two unrelated projects. Nothing here touches them: the
+# only contact is that pgbouncer joins the existing rr-dogfood-net so it can
+# reach the Postgres container. That is an endpoint added to our container, not
+# a change to their network, and `docker network disconnect` undoes it.
+
+name: polysil-staging
+
+# Docker's default json-file driver never rotates, and this box has 14 GB free
+# and two other projects on it. Capped here rather than in the daemon config,
+# which belongs to whoever owns the box.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ── PgBouncer, transaction mode ───────────────────────────────────────
+  # It straddles two networks on purpose: ours, where the API and the worker
+  # live, and rr-dogfood-net, which is the only route to the Postgres container.
+  # The host publishes that Postgres on 127.0.0.1:55432, and a container cannot
+  # reach the host's loopback - reaching it would take either a host-network
+  # sidecar listening on a bridge address, which every container on the box
+  # could then use, or this. This is the smaller blast radius.
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    container_name: polysil-staging-pgbouncer
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${PG_HOST:?set PG_HOST}
+      DB_PORT: ${PG_PORT:-5432}
+      DB_USER: ${DB_USER:?set DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+      DB_NAME: ${DB_NAME:?set DB_NAME}
+      LISTEN_PORT: 6432
+      LISTEN_ADDR: 0.0.0.0
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      # The cluster is shared and max_connections is 100. Twelve server
+      # connections is the whole staging stack's share of it.
+      MAX_CLIENT_CONN: 100
+      DEFAULT_POOL_SIZE: 12
+      MIN_POOL_SIZE: 0
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits,options
+    networks:
+      default:
+      rrdogfood:
+    ports:
+      # psql over the SSH tunnel, for inspecting staging data. Loopback only.
+      - "127.0.0.1:${PGBOUNCER_HOST_PORT:-6432}:6432"
+    logging: *logging
+    mem_limit: 96m
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 6432 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: polysil-staging-redis
+    restart: unless-stopped
+    # The ARQ queue and the OTP burst counters. appendonly so a restart does not
+    # drop queued jobs; maxmemory because this box has one CPU and 4 GB free.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb",
+              "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    # No published port. Nothing outside this stack needs it.
+    logging: *logging
+    mem_limit: 192m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ── the API ───────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: runtime
+    image: polysil-api:staging
+    # Fixed, because a reverse proxy on another network will be pointed at this
+    # name: `docker network connect distributed-file-system_default polysil-api`.
+    container_name: polysil-api
+    restart: unless-stopped
+    depends_on:
+      pgbouncer: { condition: service_healthy }
+      redis:     { condition: service_healthy }
+    environment:
+      ENVIRONMENT: staging
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@pgbouncer:6432/${DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      DB_ANON_ROLE: ${DB_ANON_ROLE:-app_anon}
+      DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
+      WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
+      # The three below decide whether a browser on another origin can sign in
+      # and *stay* signed in. Each has a default that is right for a laptop and
+      # wrong behind a reverse proxy, and each fails without an error:
+      #   peers   - the proxy is a container, so it arrives as 172.x rather than
+      #             loopback; left unset, the forwarded header is ignored and
+      #             every caller shares one rate-limit bucket (ISS-084)
+      #   samesite- left at lax, sign-in works and the session dies at the first
+      #             refresh, because the browser will not send a Lax cookie on a
+      #             cross-site background request
+      #   origins - the developer's own machine is allowed by pattern; a deployed
+      #             preview has to be named here
+      TRUSTED_PROXY_PEERS: ${TRUSTED_PROXY_PEERS:-127.0.0.1,::1}
+      REFRESH_COOKIE_SAMESITE: ${REFRESH_COOKIE_SAMESITE:-lax}
+      CORS_ALLOW_LOCALHOST: ${CORS_ALLOW_LOCALHOST:-true}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-}
+    networks:
+      # Ours, where PgBouncer and Redis are, and the proxy's, so the Caddy that
+      # owns 80 and 443 can reach this container by name. Both, every deploy.
+      default:
+      proxy:
+    ports:
+      # Loopback only, and still useful: this is the SSH-tunnel path, and it is
+      # what answers when the proxy in front is the thing that is broken.
+      - "127.0.0.1:${API_HOST_PORT:-8100}:8000"
+    logging: *logging
+    mem_limit: 768m
+    mem_reservation: 256m
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: runtime
+    image: polysil-api:staging
+    container_name: polysil-staging-worker
+    restart: unless-stopped
+    command: ["arq", "worker.main.WorkerSettings"]
+    # Same image as the API, so it inherits the API's HTTP health check - which
+    # the worker serves nothing to answer, and which would mark it unhealthy for
+    # the rest of its life. ARQ has no health endpoint; `logs worker` is the check.
+    healthcheck:
+      disable: true
+    depends_on:
+      pgbouncer: { condition: service_healthy }
+      redis:     { condition: service_healthy }
+    environment:
+      ENVIRONMENT: staging
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@pgbouncer:6432/${DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      DB_ANON_ROLE: ${DB_ANON_ROLE:-app_anon}
+      DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
+      WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+    logging: *logging
+    mem_limit: 512m
+
+  # ── one-shot jobs: migrations, seeds, the master loaders ──────────────
+  # Never started by `up`: the profile keeps it out. It is run, then removed:
+  #
+  #   docker compose ... run --rm tools alembic upgrade head
+  #   docker compose ... run --rm tools python scripts/seed_demo.py
+  #
+  # It shares PgBouncer's network namespace so that 127.0.0.1:6432 inside this
+  # container is PgBouncer, which is what scripts/seed_demo.py connects to.
+  tools:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: tools
+    image: polysil-tools:staging
+    profiles: ["tools"]
+    network_mode: "service:pgbouncer"
+    depends_on:
+      pgbouncer: { condition: service_healthy }
+    environment:
+      ENVIRONMENT: staging
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@pgbouncer:6432/${DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      DB_ANON_ROLE: ${DB_ANON_ROLE:-app_anon}
+      DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-polysil-demo-2026}
+      # scripts/seed_demo.py reads these three out of infra/.env, which the
+      # container writes for itself at the start of the seed step.
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    volumes:
+      # The client's workbooks, read by load_subsidy_masters and
+      # load_product_master. Mounted rather than baked into the image.
+      - ../data:/app/data:ro
+    logging: *logging
+    mem_limit: 512m
+
+volumes:
+  redisdata:
+
+networks:
+  default:
+    name: polysil-staging_default
+  # The reverse proxy that already owns 80 and 443 lives here, on another
+  # project's network. The API joins it so the proxy can reach the container by
+  # name.
+  #
+  # **This belongs in the file rather than in a `docker network connect` run by
+  # hand.** It was done by hand once, and the next `deploy` recreated the
+  # container, dropped the endpoint and answered 502 to everyone - with the
+  # health check still green, because the health check asks the box and the box
+  # was fine. An additive attachment that has to be reapplied after every deploy
+  # is a step that will be forgotten.
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-distributed-file-system_default}
+  # Created and owned by another project. `external` means compose never
+  # creates, configures or removes it - it only attaches pgbouncer to it.
+  rrdogfood:
+    external: true
+    name: ${PG_NETWORK:-rr-dogfood-net}

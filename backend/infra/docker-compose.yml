@@ -1,0 +1,136 @@
+# Polysil CRM — local development stack
+#
+# The database is reached at pgbouncer:6432 by everything else, always.
+# Whether that is a tunnelled remote Postgres or a local container is a
+# profile choice and nothing downstream knows the difference. When the
+# client's VPS arrives, point DB_HOST at it and delete nothing.
+#
+#   docker compose --profile tunnel up -d     # remote Postgres over SSH  (default today)
+#   docker compose --profile local  up -d     # throwaway Postgres in a container
+#
+# See ../docs/workflows/local-environment.md
+
+name: polysil
+
+services:
+  # ── the database, one way or the other ────────────────────────────────
+  db-tunnel:
+    profiles: ["tunnel"]
+    image: alpine:3.20
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache openssh-client >/dev/null
+        cp /key.ro /tmp/key && chmod 600 /tmp/key
+        echo "tunnelling ${SSH_USER}@${SSH_HOST} -> 127.0.0.1:${REMOTE_PG_PORT}"
+        exec ssh -N -T \
+          -o StrictHostKeyChecking=accept-new \
+          -o ExitOnForwardFailure=yes \
+          -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+          -i /tmp/key \
+          -L 0.0.0.0:5432:127.0.0.1:${REMOTE_PG_PORT} \
+          ${SSH_USER}@${SSH_HOST}
+    volumes:
+      - ${SSH_KEY_PATH:?set SSH_KEY_PATH in infra/.env}:/key.ro:ro
+    healthcheck:
+      # the forward is up when something is listening on 5432
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5432 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  postgres:
+    profiles: ["local"]
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── PgBouncer, transaction mode, from day one (ADR-021, ADR-023) ──────
+  # Not optional in development. Developing against a direct connection is
+  # how the SET LOCAL claim leak first appears in production, under load.
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    restart: unless-stopped
+    # No depends_on: the DB service differs by profile, and Compose cannot
+    # interpolate a variable into a depends_on key. PgBouncer connects lazily
+    # per client anyway, so starting before the tunnel is harmless - and
+    # scripts/dev.py waits for a real query to succeed before declaring ready.
+    environment:
+      DB_HOST: ${DB_HOST:-db-tunnel}
+      DB_PORT: 5432
+      LISTEN_PORT: 6432        # the PgBouncer convention; the image defaults to 5432
+      LISTEN_ADDR: 0.0.0.0
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      POOL_MODE: transaction          # ← the whole point
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 25
+      AUTH_TYPE: scram-sha-256
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits,options
+    ports:
+      - "127.0.0.1:6432:6432"         # host access for psql and migrations
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 6432 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── application, added once api/ exists ───────────────────────────────
+  api:
+    profiles: ["app"]
+    build: { context: .., dockerfile: infra/api.Dockerfile }
+    restart: unless-stopped
+    depends_on:
+      pgbouncer: { condition: service_healthy }
+      redis:     { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@pgbouncer:6432/${DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: local
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker:
+    profiles: ["app"]
+    build: { context: .., dockerfile: infra/api.Dockerfile }
+    restart: unless-stopped
+    command: ["arq", "worker.main.WorkerSettings"]
+    depends_on:
+      pgbouncer: { condition: service_healthy }
+      redis:     { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@pgbouncer:6432/${DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: local
+
+volumes:
+  pgdata:
+  redisdata:
