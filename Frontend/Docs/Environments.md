@@ -26,7 +26,8 @@ in the hosting platform — never in the repository.
 | Variable | When it is read | Rules |
 |---|---|---|
 | `NEXT_PUBLIC_APP_ENV` | **Build time** (inlined) | `development` · `feature` · `staging` · `production` |
-| `NEXT_PUBLIC_API_BASE_URL` | Build time | Absolute URL or same-origin path (`/api/v1`). Required in staging and production |
+| `NEXT_PUBLIC_API_BASE_URL` | Build time | The API as the browser sees it. Default and recommended: `/api/v1` (same origin). Required in staging and production |
+| `API_PROXY_TARGET` | Dev-server start and **build time** (server only) | The backend origin `/api/v1` is rewritten to, e.g. `http://127.0.0.1:8000`. Default in development; required in staging and production |
 | `NEXT_PUBLIC_API_MOCKING` | Build time | `enabled` · `disabled`. Forbidden in staging and production |
 | `NEXT_PUBLIC_RELEASE` | Build time | Release identifier (git SHA) — shown in logs and error references |
 | `LOG_LEVEL` | **Runtime** | `debug` · `info` · `warn` · `error` · `silent`. See [Logging.md](Logging.md) |
@@ -55,11 +56,16 @@ fails `next build` with a clear message, so a misconfigured deploy never ships.
 
 ## Backend requirements for staging and production
 
-- CORS (if the API is on another origin): allow request headers `content-type`, `x-request-id`,
-  `x-data-id`, `x-client`; expose `x-request-id`.
-- Or proxy the API through the Next.js app (same origin) and set `NEXT_PUBLIC_API_BASE_URL=/api/v1`.
-  TODO(AUTH-001): decide this together with the auth design — cookie sessions strongly favour
-  same origin.
+- **Same origin, decided with the auth design (AUTH-001).** The browser calls `/api/v1` on the app's
+  own origin, and `next.config.ts` rewrites it to `API_PROXY_TARGET`. The backend sends no CORS
+  headers and scopes its httpOnly refresh cookie to `/api/v1/auth`, so a cross-origin API would lose
+  the session. Keep `NEXT_PUBLIC_API_BASE_URL=/api/v1`.
+- The backend must accept `x-request-id`, `x-data-id`, `x-client` and `idempotency-key`, and trust one
+  proxy hop (`trusted_proxy_hops`) so rate limits see the visitor's address, not the app server's.
+- Rewrites are resolved at build time: a staging build and a production build each need their own
+  `API_PROXY_TARGET`.
+- To run the app against a local backend: start the backend on port 8000, then set
+  `NEXT_PUBLIC_API_MOCKING=disabled` in `.env.local` and restart `npm run dev`.
 
 ---
 

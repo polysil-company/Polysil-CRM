@@ -11,8 +11,11 @@ export type ApiPath = `/${string}`;
 
 /**
  * Builds a request URL from the configured API base and a path.
- * Works with an absolute base (`https://api.example.com/v1`) and with a
- * same-origin base (`/api/v1`, for a Next.js rewrite in front of the backend).
+ *
+ * Works with an absolute base (`https://api.example.com/v1`) and with the
+ * same-origin base the app uses (`/api/v1`, rewritten to the backend by
+ * next.config.ts). In a browser a same-origin URL is made absolute against the
+ * page, so request mocks and every fetch implementation read it the same way.
  */
 export function buildApiUrl(
   path: ApiPath,
@@ -32,5 +35,10 @@ export function buildApiUrl(
   }
 
   const search = params.toString();
-  return `${baseUrl}${path}${search ? `?${search}` : ""}`;
+  const url = `${baseUrl}${path}${search ? `?${search}` : ""}`;
+
+  if (url.startsWith("/") && typeof window !== "undefined") {
+    return new URL(url, window.location.origin).toString();
+  }
+  return url;
 }

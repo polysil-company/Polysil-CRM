@@ -63,6 +63,11 @@ export function DropdownMenuContent({
 
 export const DropdownMenuGroup = MenuPrimitive.Group;
 
+/**
+ * Heading for a section of a menu. It must be a child of `DropdownMenuGroup` or
+ * `DropdownMenuRadioGroup` — Base UI throws at runtime otherwise — and it names
+ * that group for screen readers.
+ */
 export function DropdownMenuLabel({
   className,
   ...props

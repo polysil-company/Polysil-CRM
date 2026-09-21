@@ -29,6 +29,14 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * APP-005 · The collapsed desktop sidebar. Matches an element marked
+ * `data-follows-sidebar` (and everything inside it) while <html data-sidebar="collapsed">,
+ * which an inline script sets before first paint. The phone menu sheet has no marker,
+ * so it always shows the full sidebar.
+ */
+@custom-variant sidebar-collapsed (&:where([data-sidebar="collapsed"] [data-follows-sidebar], [data-sidebar="collapsed"] [data-follows-sidebar] *));
+
 /* Keep planning docs out of Tailwind's class scanning. */
 @source not "../../Docs";
 @source not "../../changelog";
@@ -396,6 +404,7 @@
   --animate-spin: spin 700ms linear infinite;
   --animate-indeterminate: indeterminate 1.1s var(--ease-in-out) infinite;
   --animate-shake: shake 320ms var(--ease-out);
+  --animate-caret-blink: caret-blink 1.1s var(--ease-out) infinite;
 
   /* Blur for masking crossfades (Emil: ~2px is enough; never above 20px). */
   --blur-2xs: 2px;
@@ -409,7 +418,8 @@
   --spacing-control-md: 2.25rem; /* 36px — default control height */
   --spacing-control-lg: 2.75rem; /* 44px — touch-first and primary CTAs */
   --spacing-sidebar: 15.5rem; /* 248px */
-  --spacing-header: 3.5rem; /* 56px */
+  --spacing-sidebar-rail: 3.5rem; /* 56px — collapsed sidebar: 32px items plus 12px gutters */
+  --spacing-header: 3.5rem; /* 56px — fits the page title and its description */
 }
 
 @theme inline {
@@ -533,18 +543,23 @@
   transition-duration: var(--duration-slow);
 }
 
-/* Press feedback for anything clickable: scale 0.97 on :active. */
+/*
+ * Press feedback for anything clickable: scale 0.97 on :active.
+ * Skipped while the element's own popup is open ([data-popup-open]): menus open on
+ * mouse-down, so the popup would anchor to the shrunken trigger and then jump when
+ * the trigger grows back on release.
+ */
 @utility press-scale {
   transition-property: transform, color, background-color, border-color, box-shadow, opacity;
   transition-duration: var(--duration-press);
   transition-timing-function: var(--ease-out);
 
-  &:active:not(:disabled, [aria-disabled="true"], [data-disabled]) {
+  &:active:not(:disabled, [aria-disabled="true"], [data-disabled], [data-popup-open]) {
     transform: scale(0.97);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    &:active:not(:disabled, [aria-disabled="true"], [data-disabled]) {
+    &:active:not(:disabled, [aria-disabled="true"], [data-disabled], [data-popup-open]) {
       transform: none;
     }
   }
@@ -717,6 +732,19 @@
   }
   to {
     transform: translateX(250%);
+  }
+}
+
+/* Text caret drawn inside a custom field (OtpInput). Callers add motion-reduce:animate-none. */
+@keyframes caret-blink {
+  0%,
+  70%,
+  100% {
+    opacity: 1;
+  }
+  20%,
+  50% {
+    opacity: 0;
   }
 }
 

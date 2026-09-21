@@ -120,30 +120,36 @@ const problemDetailsSchema = z.object({
   errors: z.unknown().optional(),
 });
 
-/** Common envelope fallback: `{ error: { code, message, details } }`. */
+/**
+ * The backend's error envelope (backend/docs/api/README.md):
+ * `{ error: { code, message, fields? } }`, where a 422 maps each field path to a reason.
+ * `details` is accepted too, for errors that carry structured context.
+ */
 const errorEnvelopeSchema = z.object({
   error: z.object({
     code: z.string().optional(),
     message: z.string().optional(),
     details: z.unknown().optional(),
+    fields: z.record(z.string(), z.string()).optional(),
   }),
 });
 
 export interface ParsedErrorBody {
   readonly message: string | undefined;
   readonly code: string | undefined;
+  /** Field errors arrive as `{ fields: { mobile: "…" } }`, whichever shape the body used. */
   readonly details: unknown;
 }
 
-// TODO(OBS-002): agree the error format with the backend developer. RFC 9457 is proposed;
-// the envelope branch can be deleted once the contract is fixed.
+/** Reads the backend envelope first, then RFC 9457 problem details (proxies, gateways), then text. */
 export function parseErrorBody(body: unknown): ParsedErrorBody {
   const envelope = errorEnvelopeSchema.safeParse(body);
   if (envelope.success) {
+    const { code, message, details, fields } = envelope.data.error;
     return {
-      message: envelope.data.error.message,
-      code: envelope.data.error.code,
-      details: envelope.data.error.details,
+      message,
+      code,
+      details: details ?? (fields === undefined ? undefined : { fields }),
     };
   }
 

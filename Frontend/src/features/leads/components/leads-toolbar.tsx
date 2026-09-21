@@ -23,7 +23,7 @@ import { NewLeadDialog } from "./new-lead-dialog";
 export function LeadsToolbar(): React.JSX.Element {
   const { params, setFilters, resetFilters, activeFilterCount } = useLeadListParams();
   const { data: summary } = useQuery(leadSummaryQueryOptions());
-  const canCreate = useCan("leads:create");
+  const canCreate = useCan("leads", "create");
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

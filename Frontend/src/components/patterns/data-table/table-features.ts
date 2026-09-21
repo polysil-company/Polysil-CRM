@@ -12,7 +12,14 @@ import {
 
 import { cn } from "@/lib/utils";
 
-/** Column widths — tokens, not free-form classes, so tables stay consistent. */
+/**
+ * Column widths — tokens, not free-form classes, so tables stay consistent.
+ *
+ * `fill` sets a floor and no preferred width, so the column takes a share of whatever
+ * space is left over. Give it to every column that reads better wide (names, tags), never
+ * to just one: a single `fill` column collects all the slack on a large monitor and opens
+ * one long gap beside it.
+ */
 export const COLUMN_WIDTH_CLASSES = {
   checkbox: "w-11 min-w-11",
   xs: "w-20 min-w-20",

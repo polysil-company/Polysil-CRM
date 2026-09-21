@@ -1,7 +1,7 @@
 import { apiRequest } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
-import { sessionSchema, type Session } from "./session.schemas";
+import { meResponseSchema, type Session } from "./session.schemas";
 
 const log = createLogger({ file: "features/session/api/session.api.ts", dataId: "AUTH-002" });
 
@@ -10,8 +10,8 @@ export function fetchSession(signal?: AbortSignal): Promise<Session> {
     dataId: "AUTH-002",
     logger: log,
     fn: "fetchSession",
-    path: "/me",
-    schema: sessionSchema,
+    path: "/auth/me",
+    schema: meResponseSchema,
     signal,
   });
 }

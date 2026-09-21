@@ -36,11 +36,11 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps): React.JSX
   const { setPreference } = useTheme();
 
   const pages = session
-    ? visibleNavSections(session.role)
+    ? visibleNavSections(session.permissions, session.userType)
         .flatMap((section) => section.items)
         .filter((item) => item.href !== undefined)
     : [];
-  const canCreateLead = session !== undefined && can(session.role, "leads:create");
+  const canCreateLead = session !== undefined && can(session.permissions, "leads", "create");
 
   const run = (action: () => void): void => {
     onOpenChange(false);

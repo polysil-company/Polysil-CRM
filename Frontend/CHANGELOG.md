@@ -5,6 +5,273 @@
 Every change to this repository, newest first. Each entry records what existed before, what exists now, the discussion behind the change, the files it touched and how it is tested.
 How to write an entry: [changelog/README.md](changelog/README.md).
 
+## 16 September 2026
+
+### The leads table shares leftover width instead of pooling it in one column
+
+`design` · `LEAD-001` `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-16--design--LEAD-001--leads-table-shares-leftover-width-on-large-monitors.md)
+
+#### Before
+
+On a large monitor the leads table left a long empty band between Customer and Status — on a 2560px screen, roughly 500px of nothing. Customer was the table's only flexible column, so every spare pixel went there. On a laptop, where there is no width to spare, the table looked right.
+
+#### Now
+
+Crops and Owner are flexible too, so the leftover width is split three ways: each column gains a little and the long gap goes. The floors stay where they were (224px), so a laptop, a tablet and a phone are unchanged — the split only happens when there is width to spare.
+
+#### Discussion
+
+- **Why not cap the columns and park the leftover at the right edge?** That removes the in-between gaps completely, and it is what Airtable and Attio do. It also means fixing Customer at a set width, and at about 1280px the columns then add up to more than the panel — so a screen that reads well today would gain a horizontal scrollbar. Not worth trading a working laptop layout for a wide-monitor nicety. If you want the tighter look, this is the change to make, and the leads table is where to start.
+- **Why not cap the whole table?** Centring a capped table leaves dead space at both edges of a full-bleed panel, which reads as a mistake rather than a margin.
+- **Still air on very wide screens.** Three columns share the slack, so each gets about a third of what Customer used to hold. The way to remove it rather than divide it is to show more in that space — more crop tags, a phone number under the name — which is a content decision, not a layout one. Raised, not taken.
+- **Tested by eye.** How a browser divides leftover width between table columns is not something a unit test can see; the test guards the rule that more than one column is flexible.
+
+#### Files changed
+
+- `src/features/leads/lib/lead-table-layout.ts` — Crops and Owner are `fill`
+- `src/components/patterns/data-table/table-features.ts` — what `fill` means, and why it belongs on more than one column
+- `Docs/Design-System.md` — the same rule for every table
+
+#### Tests
+
+- `src/features/leads/lib/lead-table-layout.test.ts` — `[LEAD-001] leads table layout`: more than one column is flexible, and every column has a width
+- By hand: open Leads on the large monitor and check the space between Customer and Status. Then at 1280px and 1440px confirm nothing moved, and at 360px that the table still scrolls sideways.
+
+### Shift and the mouse wheel scroll a wide table sideways
+
+`feature` · `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-16--feature--DS-001--shift-wheel-scrolls-wide-tables-sideways.md)
+
+#### Before
+
+A table with more columns than fit scrolled sideways only by dragging its scrollbar or by swiping on a trackpad. On a mouse, the wheel moved the page and the far-right columns — amounts, follow-up dates, actions — stayed out of reach.
+
+#### Now
+
+Holding Shift and turning the wheel over a table scrolls its columns sideways, the same gesture browsers use on a page. It is built into `DataTable`, so every table gets it: leads today, quotations and orders as they land.
+
+- Only vertical wheel movement is redirected. A trackpad swipe, or a mouse that already sends a sideways wheel, is left to the browser.
+- At the first or last column the wheel returns to the page, so a long table still scrolls down without letting go of Shift.
+- A table whose columns already fit ignores Shift entirely.
+- Nothing changes for keyboard or touch: tabbing through a row still brings cells into view, and phones keep swiping.
+
+#### Discussion
+
+- **In the shared table, not each screen.** `DataTable` owns its scroll area, so the behaviour belongs there rather than in the leads table.
+- **A generic hook** (`useShiftWheelScroll`) holds it, because any scroll area with hidden width can use it later — a wide chart or a filter row.
+- **The listener is non-passive**, which is what lets it replace the page's vertical scroll. It is attached directly to the element rather than through React's `onWheel`, which React registers as passive and where `preventDefault` would do nothing.
+- **Edges fall through on purpose.** Swallowing the wheel at the last column traps the page: the reader holds Shift, the table is finished, and nothing moves.
+- **Not done:** a keyboard equivalent. Tabbing scrolls the container natively, so this is a mouse convenience, not the only way through a table.
+
+#### Files changed
+
+- `src/hooks/use-shift-wheel-scroll.ts` — the hook
+- `src/components/patterns/data-table/data-table.tsx` — the table's scroll area uses it
+- `Docs/Design-System.md` — how wide tables scroll
+
+#### Tests
+
+- `src/hooks/use-shift-wheel-scroll.test.tsx` — `[DS-001] useShiftWheelScroll`: Shift scrolls sideways, a plain wheel is left alone, the edges fall through to the page, and a table that fits ignores it
+- By hand: `npm run dev` → open Leads, narrow the window until columns are cut off, and hold Shift while scrolling over the rows. Check that the page still scrolls at the last column, and that a trackpad swipe behaves as before.
+
+## 15 September 2026
+
+### Collapsible desktop sidebar, and page titles with descriptions in the top bar
+
+`feature` · `APP-005` `APP-001` `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-15--feature--APP-005--collapsible-sidebar-and-page-titles-in-the-top-bar.md)
+
+> **Breaking change.** Read the discussion before you build on this.
+
+#### Before
+
+The desktop sidebar was always 248px wide, so content never had the full width. Every page showed its title twice: small in the top bar, then again as a large heading with a description at the top of the content (`PageHeader`). The Sales pages added a third, "Sales", above their tabs.
+
+#### Now
+
+**Collapsing the sidebar** — on desktop (1024px and up), a button at the left of the top bar collapses the sidebar to a 56px icon rail and expands it again; ⌘B (Mac) or Ctrl+B does the same. In the rail:
+
+- Nav items, search, "Soon" modules and the environment show as icons. Hovering or focusing one shows its name in a tooltip to the right, with the shortcut where there is one.
+- Section headings become hairlines, and stay readable by screen readers. The active page keeps its teal marker.
+- The menu skeleton and the "Couldn't load your menu" state have rail versions; retry becomes an icon button.
+
+The choice is remembered per browser and applied before the first paint, so a collapsed sidebar never flashes open on load, and it follows across open tabs. The button's name ("Collapse sidebar" / "Expand sidebar") and `aria-expanded` state tell screen readers what it will do. Phones and tablets keep the menu sheet, which always shows the full sidebar. Light and dark use the same sidebar tokens.
+
+**Page titles** — the top bar now carries the page title (`text-lg`, the page's one `h1`) and, from 640px up, its description on one line. Pages no longer repeat either. The title uses the section-title size, not the page-title size: in a 56px bar it is chrome, not a page heading. A detail page (a lead) shows its section's title without the description, and names itself in the content. Titles and descriptions live beside each page in the navigation map.
+
+#### Discussion
+
+- **The width animates (200ms, ease-in-out)** — the one layout property the design system animates. An instant collapse was tried first and felt like a jump, because the content panel moves with the sidebar. Everything inside is arranged so nothing else moves: rows keep their padding in both states (a 32px row with an icon at `px-2` is already centred in the 56px rail), labels and section headings fade and fold, and rail icons grow from 16 to 20px with a transform — larger and in a stronger colour, so they read clearly. Reduced motion turns the width transition off.
+- **CSS decides the look, React only the behaviour.** A `sidebar-collapsed:` variant reads `data-sidebar="collapsed"` on `<html>`, set by an inline script from `localStorage` — the same approach as the theme. React state only switches tooltips on and sets the button's label, so nothing depends on hydration to look right. Only elements marked `data-follows-sidebar` respond, which keeps the phone sheet full.
+- **localStorage, not a cookie:** a cookie would let the server render the rail, but reading it in the layout makes every page dynamic. The inline script gives the same result without a flash.
+- **Breaking:** `PageHeader` is removed (no remaining uses). `h-header` stays 56px: a `text-lg` title over a `text-sm` description fits, and a taller bar took height from the page for no gain. Page actions that used to sit beside the title will need a home in the top bar or the content when the first page needs one.
+- **Rejected:** hiding the sidebar completely (people lose their place; the rail keeps navigation one click away); a collapse button at the bottom of the sidebar (far from the title it makes room for, and absent on phones).
+- **Not done:** a "Collapse sidebar" action in the command menu; a Storybook story for the shell (layout components have none yet).
+
+#### Files changed
+
+- `src/lib/sidebar/sidebar.ts`, `sidebar-store.ts`, `use-sidebar.ts` — the saved state, the pre-paint script, and a store that syncs across tabs and logs changes
+- `src/app/layout.tsx` — runs the sidebar script in `<head>`
+- `src/styles/tokens.css` — `sidebar-collapsed:` variant, `w-sidebar-rail` (56px)
+- `src/components/layout/sidebar-toggle.tsx` — the toggle button, tooltip and ⌘B shortcut
+- `src/components/layout/app-sidebar.tsx` — rail layout, tooltips, rail skeleton and error state
+- `src/components/layout/app-shell.tsx` — sidebar width follows the state
+- `src/components/layout/app-header.tsx` — toggle, larger title as `h1`, description
+- `src/components/layout/navigation.ts` — descriptions for built pages; `findPageHeading`
+- `src/app/(app)/dashboard/page.tsx`, `loading.tsx`, `src/app/(app)/(sales)/layout.tsx` — in-page titles removed
+- `src/components/patterns/page-header.tsx`, `page-header.stories.tsx` — removed
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — APP-005 registered
+- `Docs/Design-System.md`, `Docs/Frontend-Architecture.md` — the rail, the variant, the new sizes and where titles live
+
+#### Tests
+
+- `src/lib/sidebar/sidebar.test.ts` — `[APP-005] sidebar state`: pre-paint script, unknown values, blocked storage, persist-apply-notify
+- `src/components/layout/sidebar-toggle.test.tsx` — `[APP-005] SidebarToggle`: collapse and expand with the saved state and `aria-expanded`; Ctrl+B only on desktop widths
+- `src/components/layout/navigation.test.ts` — `[APP-005] page headings in the top bar`: title and description per route; every built page has a description
+- `e2e/smoke.spec.ts` — unchanged; its "Dashboard" level-1 heading now comes from the top bar
+- By hand: `npm run dev` → collapse with the button and with ⌘B/Ctrl+B, reload (no flash), hover and Tab through the rail, open a second tab. Check a lead's detail page, 360px (no toggle, full sheet), a wide screen, light and dark.
+
+### Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation
+
+`feature` · `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md)
+
+> **Breaking change.** Read the discussion before you build on this.
+
+#### Before
+
+Anyone could open every page: there was no sign-in, and "Sign out" in the account menu was disabled. The signed-in user came from a placeholder `GET /me` shape invented by the frontend, and a hard-coded role → permission matrix decided the navigation. The API client sent no credentials, and its default base URL pointed at a separate origin (`http://localhost:4000`), which could never carry the backend's refresh cookie.
+
+#### Now
+
+**Signing in** — `/sign-in`, with a choice that lives in the URL (`?method=staff`):
+
+- **Channel partners (AUTH-001)** enter their mobile number, typed any common way (`98765 43210`, `+91…`, `0…`). The next step never claims a code was sent — only that one is on its way if the number is registered, as the backend requires. The code field accepts typing, pasting (`482 913`) and the phone's SMS autofill, and signs in as soon as the sixth digit arrives. A countdown shows when the code expires and when a new one can be requested; an expired code disables the field. A wrong code clears the field, keeps focus and explains what to do. "Change number" returns with the number kept.
+- **Staff (AUTH-003)** use their work email and password, with a show-password toggle and a Caps Lock warning. A rejected password clears only the password and focuses it. A locked account (5 failures in 15 minutes) says so. Unexpected failures show a copyable reference.
+- Every button shows progress, success or failure and cannot double-submit. Validation errors from the backend (422) land on the field.
+- Wide screens add a teal brand panel with slowly dripping irrigation lines; phones get the form alone. Both themes, 360px upwards, reduced motion respected (no drops drawn).
+
+**Staying signed in (AUTH-004)** — the access token is held in memory only; the backend's httpOnly cookie renews it. The token is refreshed a minute before it expires, when the tab becomes visible and when the connection returns. A request that still meets an expired token refreshes and retries once, and simultaneous requests share one refresh. A reload restores the session with a short "Opening your workspace" screen. If the backend cannot be reached, an error with a retry appears instead of a false sign-out.
+
+**Leaving (AUTH-005, AUTH-006)** — "Sign out" in the account menu works. Signing out, or a session the backend ends, clears all cached data and opens sign-in — in every open tab. After an expiry the visitor returns to the page they were on; after a deliberate sign-out they see "You've signed out". Visiting any page without a session goes straight to sign-in and back afterwards; the return path can never point to another site.
+
+**Who sees what (AUTH-002)** — the account menu, sidebar, command menu, sales tabs and "New lead" follow the `permissions` list from `GET /auth/me` instead of a role matrix. The account menu reads "District Manager · Vadodara District" or "Dealer · Shah Agro Traders".
+
+**Mock backend** — all six `/auth` endpoints, built from the backend's contract: demo password `polysil-demo`, demo code `123456`, lockout, code attempts, refresh rotation, and a permission matrix per role that follows the client's visibility rules. The role switcher and slow scenario still work; auth ignores the error scenario so nobody gets locked out.
+
+**Fixed while previewing (APP-002, APP-001)** — opening the theme menu or the account menu crashed the page ("MenuGroupContext is missing"): each menu's section heading sat outside the group it names. Both headings now sit inside their group, which also names the group for screen readers. The theme script in the page head no longer triggers React's "script tag while rendering" warning when the layout re-renders in the browser. Both menus also nudged sideways just after opening: they open on mouse-down, while the button's press animation has shrunk it, and followed the button as it grew back. A button no longer shrinks while its own popup is open, so menus, popovers and selects stay put.
+
+#### Discussion
+
+- **Contract source:** `backend/docs/api/auth.md` and `backend/api/schemas/auth.py` on `backend-foundation`. Nothing was invented beyond what they state; unknowns are marked `TODO(AUTH-002)`.
+- **Same origin (breaking):** the browser now calls `/api/v1`, and `next.config.ts` rewrites it to `API_PROXY_TARGET` (default `http://127.0.0.1:8000`). The backend has no CORS and scopes its refresh cookie to `/api/v1/auth`, so a separate origin would lose every session. `NEXT_PUBLIC_API_BASE_URL` defaults to `/api/v1`; staging and production builds must set `API_PROXY_TARGET`.
+- **Token in memory, not localStorage:** an injected script could read storage and keep the token. The cost is one refresh call per page load, which the gate covers with a brief loading screen.
+- **Session marker cookie:** `proxy.ts` cannot see the refresh cookie (wrong path), so the frontend sets a secret-free `polysil_session=1` purely to redirect before a protected page renders. The Next.js authentication guide recommends exactly this split: an optimistic check in proxy, real checks next to the data.
+- **Rejected:** a Next.js route handler that holds tokens server-side (a second session system to secure and keep in sync with the backend's); server-side prefetch (impossible while the token lives in the browser — tracked as `TODO(AUTH-006)`).
+- **Permissions (breaking):** `can(role, "leads:create")` became `can(permissions, "leads", "create")`, and `useCan` changed the same way. Role codes now match the backend (`distributor`, `dealer`, `sub_dealer` instead of `channel_partner`). Module codes for unbuilt modules (`quotations`, `approvals`, `marketing`, …) are assumptions to confirm against the backend's RBAC matrix — `TODO(AUTH-002)`.
+- **API client:** every mutation outside `/auth` now sends an `Idempotency-Key`, which the backend requires. `sensitive: true` keeps passwords, codes and tokens out of the logs.
+- **Not done:** route-level guards for pages a user cannot view (AUTH-002); a password reset flow (the backend has no endpoint yet — the form says to ask an administrator); integration on staging.
+
+#### Files changed
+
+- `next.config.ts` — `/api/v1` rewrite to `API_PROXY_TARGET`, validated
+- `.env.example` — same-origin API base URL, new `API_PROXY_TARGET`
+- `src/proxy.ts` — sign-in redirects before pages render, alongside the log-level cookie
+- `src/lib/api/client.ts` — `auth` option, token provider, refresh-and-retry after 401, `Idempotency-Key`, `sensitive` logging, same-origin credentials
+- `src/lib/api/url.ts`, `src/lib/api/errors.ts` — same-origin URLs in the browser; the backend's 422 `fields`
+- `src/lib/env/client.ts` — default API base URL `/api/v1`
+- `src/lib/auth/session-store.ts`, `tokens.ts`, `session-hint.ts`, `redirects.ts` — the session, token contract, marker cookie and safe redirects
+- `src/lib/auth/permissions.ts`, `roles.ts` — module permissions from `GET /auth/me`; backend role codes
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — AUTH-001 and AUTH-002 updated; AUTH-003 to AUTH-006 registered
+- `src/lib/format/duration.ts`, `src/hooks/use-seconds-until.ts` — countdowns on one shared timer
+- `src/lib/dev/mock-settings.ts` — demo credentials, default partner role
+- `src/components/ui/otp-input.tsx`, `password-input.tsx` — new primitives, with stories
+- `src/styles/tokens.css` — `animate-caret-blink`
+- `src/features/auth/` — sign-in screen, mobile and staff forms, error copy, session gate, sign-out hook, brand-panel drip lines, API calls and schemas
+- `src/features/session/` — `GET /auth/me` contract and `useCan(module, action)`
+- `src/app/(auth)/layout.tsx`, `src/app/(auth)/sign-in/page.tsx`, `src/app/(app)/layout.tsx` — sign-in route; signed-in pages behind the gate
+- `src/components/layout/navigation.ts`, `app-sidebar.tsx`, `command-menu.tsx`, `user-menu.tsx` — permission-based navigation; working sign-out
+- `src/features/leads/components/leads-toolbar.tsx`, `sales-tabs.tsx` — permission checks
+- `src/mocks/handlers/auth.ts` (replaces `session.ts`), `src/mocks/data/sessions.ts`, `permissions.ts` — mock `/auth` backend
+- `e2e/smoke.spec.ts` — signs in before each journey; sign-in, reload, sign-out and OTP journeys
+- `Docs/Frontend-Architecture.md`, `Environments.md`, `Frontend-Scope.md`, `Design-System.md`, `Logging.md`, `AGENTS.md`, `README.md` — how auth works and how to use it
+
+#### Tests
+
+- `src/lib/api/client.test.ts` — `[AUTH-004] apiRequest authentication`: token sent, refresh-and-retry, rejected session, no request without a session, pre-auth and optional auth, `Idempotency-Key`, sensitive logs
+- `src/lib/auth/session-store.test.ts` — `[AUTH-004] session store`: never signed in, sign-in, retry after 401, revoked session, shared refresh, restore after reload, unreachable backend and retry, sign-out
+- `src/lib/auth/redirects.test.ts` — `[AUTH-006]`: open-redirect refusals, sign-in links, proxy decisions
+- `src/features/auth/components/auth-gate.test.tsx` — `[AUTH-006] AuthGate`: redirect with return path, page shown when signed in, cache cleared on session end, no return after sign-out
+- `src/features/auth/components/staff-sign-in-form.test.tsx`, `mobile-sign-in.test.tsx` — `[AUTH-003]` and `[AUTH-001]`: validation, success, wrong password or code, lockout, unexpected failure, resend, expiry, change number
+- `src/components/ui/otp-input.test.tsx`, `password-input.test.tsx` — paste, length, autofill attributes, toggle, Caps Lock
+- `src/features/session/api/session.schemas.test.ts`, `src/lib/auth/permissions.test.ts`, `src/mocks/data/permissions.test.ts`, `src/components/layout/navigation.test.ts` — the `/auth/me` contract, `can`, the client's visibility rules, navigation
+- `src/lib/format/duration.test.ts`, `src/lib/env/client.test.ts`, `src/lib/api/url-and-errors.test.ts` — countdown text, new defaults, same-origin URLs and 422 fields
+- By hand: `npm run dev` → you land on sign-in. Try both methods (demo credentials above), a wrong password five times, reload a signed-in page, sign out, and sign out in one tab while another is open. Check at 360px and on a wide screen, in light and dark.
+
+### Notification bell in the top bar, and direct messages between staff
+
+`feature` · `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md)
+
+#### Before
+
+Nothing told a user that work was waiting for them: an approval, a lead or a task assigned to them only showed up if they went looking. Colleagues had no way to talk inside the CRM — conversations about a lead happened on WhatsApp or the phone, away from the record. Neither feature had a backend endpoint or a Data ID.
+
+#### Now
+
+**Notifications (NOTIF-001, NOTIF-002)** — a bell in the top bar, on every signed-in page:
+
+- A teal badge shows the unread count (99+ beyond that), and the button's name says it: "Notifications, 3 unread".
+- It opens the latest 20: approvals waiting on me, leads and tasks assigned to me — each with an icon, who did it, how long ago and the record it concerns. Unread ones are bold with a dot.
+- Clicking one marks it read, and opens its record when that record has a screen (leads today). "Mark all as read" clears everything. Both update the badge at once and roll back if the request fails, with a toast.
+- Loading shows skeleton rows; an empty list says "You're all caught up"; a failure shows the error with a reference and a retry. Partner accounts see an empty bell for now.
+- New notifications arrive by checking every 30 seconds while the tab is visible, and right away when it comes back.
+
+**Messages (MSG-001 … MSG-005)** — one-to-one conversations between staff, under Messages in the sidebar:
+
+- The sidebar item shows the unread total (a dot in the collapsed rail). Partner users don't see it; opening `/messages` tells them messaging is for staff.
+- Desktop and tablet show the conversation list beside the open conversation; phones show one, then the other, with a back button.
+- The list shows each colleague, the last message ("You: …" for mine), when, and an unread badge. "New message" searches the staff directory by name, role or office and opens the existing conversation or starts one.
+- A conversation groups messages by day and by burst, mine on the right in teal. Opening it marks it read. It keeps the newest message in view.
+- The composer: Enter sends and Shift + Enter adds a line on a keyboard; on touch screens Enter adds a line and the button sends. Empty messages can't be sent; over 2,000 characters it says by how much. While sending, the message shows as "Sending…"; if it fails, the text goes back in the box with an explanation.
+- **Sharing a lead:** "Share with a colleague" on a lead's page (staff only) opens New message with the lead attached. The composer shows it as a removable chip, and the sent message carries a card that opens the lead.
+- The list checks for new messages every 30 seconds; the open conversation every 10 seconds.
+
+The mock backend seeds four conversations and six notifications, and in the browser a colleague replies to anything you send about six seconds later — so the polling can be seen working. The data scenarios (slow, empty, error, contract) apply to all new endpoints.
+
+#### Discussion
+
+- **Decided with Nakul (2026-09-15):** staff ↔ staff only; direct messages that can link a record (not per-record threads yet); the bell starts with approvals and assignments; build on mocks with a proposed contract and polling.
+- **Proposed contracts, not agreed ones.** The backend has no notification or messaging endpoints. The schemas follow `GET /auth/me`'s conventions — a `data` envelope, snake_case, lenient optional fields — and unknown notification kinds and record types still render, so the backend can add them without a frontend release. Every schema carries `TODO(NOTIF-001)` / `TODO(MSG-001)`, and the Data IDs are registered as `mocked` with their endpoints.
+- **Polling, not push.** The architecture reserves live connections for notifications and escalations, but no transport is chosen yet. Polling pauses in hidden tabs, so idle tabs cost nothing; replacing it with server-sent events or WebSockets later changes the queries, not the screens. The open conversation polls faster than the rest because a reply that takes half a minute to appear feels broken.
+- **Staff-only is enforced twice:** navigation hides Messages unless the session's user type is staff (unknown counts as not staff), and the backend must return 403 to partner users — the mock does.
+- **Sharing goes through the URL** (`?share=lead:…`, validated with Zod) instead of shared state, so the leads and messages features don't depend on each other's components, and a share link survives a refresh.
+- **Rejected:** optimistic message bubbles in the cached thread (they need a separate "sending" shape in the cache; a "Sending…" bubble read from the pending request gives the same feedback without it); a full notifications page (not needed until there is paging).
+- **Not done:** loading older messages (`nextCursor`, MSG-002); links for quotations, orders, tasks and complaints once their screens exist; read receipts and typing indicators; staging integration.
+
+#### Files changed
+
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — `MSG` domain; NOTIF-001, NOTIF-002 and MSG-001 … MSG-005 registered
+- `src/lib/format/date.ts`, `index.ts` — `formatTime`, `isSameDay`
+- `src/lib/navigation/resource-href.ts` — which records open where, and their names
+- `src/features/notifications/` — contract, API, queries, optimistic mark-as-read, the bell
+- `src/features/messages/` — contract, API, queries, mutations, cache and formatting helpers, share links, conversation list, conversation, composer, message bubble, New message dialog, the Messages shell
+- `src/app/(app)/messages/layout.tsx`, `page.tsx`, `[conversationId]/page.tsx` — the routes
+- `src/components/layout/navigation.ts` — Messages item, staff-only items
+- `src/components/layout/app-sidebar.tsx`, `command-menu.tsx`, `app-header.tsx` — unread count, staff-only navigation, the bell
+- `src/features/leads/components/lead-detail.tsx` — "Share with a colleague"
+- `src/mocks/data/messages.ts`, `notifications.ts`, `src/mocks/db.ts`, `src/mocks/handlers/messages.ts`, `notifications.ts`, `index.ts` — the mock backend
+- `vitest.setup.ts` — no mock replies during tests
+- `Docs/Frontend-Scope.md`, `Docs/Design-System.md` — scope of both features
+
+#### Tests
+
+- `src/features/notifications/api/notifications.api.test.ts` — `[NOTIF-001]`, `[NOTIF-002]`: newest first, unread count, partners, mark one and mark all
+- `src/features/notifications/lib/mark-read.test.ts` — `[NOTIF-002]`: the instant badge update
+- `src/features/notifications/components/notification-bell.test.tsx` — `[NOTIF-001]`: count in the button's name, the list, mark all as read
+- `src/features/messages/api/messages.api.test.ts` — `[MSG-001]` … `[MSG-005]`: order, unread totals, 403 for partners, 404, sending, linking a lead, 422 for an empty message, directory search, reusing a conversation, marking read
+- `src/features/messages/lib/messages-lib.test.ts` — share links, day labels in India time, grouping, list updates
+- `src/features/messages/components/conversation-thread.test.tsx` — `[MSG-002]`: shows the thread, sends with Enter, refuses an empty message
+- `src/features/messages/components/messages-shell.test.tsx` — `[MSG-001]`: staff see conversations, partners see the notice
+- `src/components/layout/navigation.test.ts` — `[MSG-001]`: Messages for staff only
+- By hand: `npm run dev` → open the bell, click a lead notification, mark all read. Open Messages, send a message and wait for the reply, start a conversation with Imran Sheikh, share a lead from its page. Switch the role to Dealer, and try the slow, empty and error scenarios. Check 360px, a tablet and a wide screen, in light and dark.
+
 ## 14 September 2026
 
 ### Frontend foundation — design system, app shell, dashboard, leads and quality gates

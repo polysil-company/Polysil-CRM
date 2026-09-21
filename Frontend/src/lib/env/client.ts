@@ -17,7 +17,12 @@ export type AppEnv = (typeof APP_ENVS)[number];
 
 export const API_MOCKING_MODES = ["enabled", "disabled"] as const;
 
-const DEV_API_BASE_URL = "http://localhost:4000/api/v1";
+/**
+ * Same origin by default: next.config.ts rewrites /api/v1 to the backend. The
+ * backend sends no CORS headers and scopes its refresh cookie to /api/v1/auth,
+ * so the browser must reach it through the app's own origin.
+ */
+const DEFAULT_API_BASE_URL = "/api/v1";
 
 /** Treats an empty string (`FOO=` in a .env file) as "not set". */
 function emptyToUndefined(value: unknown): unknown {
@@ -61,7 +66,7 @@ export const clientEnvSchema = z
   })
   .transform((env) => ({
     appEnv: env.NEXT_PUBLIC_APP_ENV,
-    apiBaseUrl: env.NEXT_PUBLIC_API_BASE_URL ?? DEV_API_BASE_URL,
+    apiBaseUrl: env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL,
     // Mocks default ON only for local development and feature previews.
     apiMocking:
       env.NEXT_PUBLIC_API_MOCKING ??

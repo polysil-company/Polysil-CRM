@@ -1,16 +1,47 @@
 import { describe, expect, it } from "vitest";
 
-import type { Role } from "@/lib/auth/roles";
+import type { ModulePermission } from "@/lib/auth/permissions";
+import { mockPermissionsFor } from "@/mocks/data/permissions";
 
-import { findActiveNavItem, isNavItemActive, NAV_SECTIONS, visibleNavSections } from "./navigation";
+import {
+  findActiveNavItem,
+  findPageHeading,
+  isNavItemActive,
+  NAV_SECTIONS,
+  visibleNavSections,
+} from "./navigation";
 
-function visibleIds(role: Role): string[] {
-  return visibleNavSections(role).flatMap((section) => section.items.map((item) => item.id));
+function visibleIds(
+  permissions: readonly ModulePermission[],
+  userType: string | null = null,
+): string[] {
+  return visibleNavSections(permissions, userType).flatMap((section) =>
+    section.items.map((item) => item.id),
+  );
 }
 
 describe("[APP-001] navigation", () => {
-  it("shows channel partners their own set of modules", () => {
-    const ids = visibleIds("channel_partner");
+  it("shows the modules the user may view, and the dashboard to everyone", () => {
+    expect(
+      visibleIds([{ module: "leads", actions: ["view", "create"], scope: "org_subtree" }]),
+    ).toEqual(["dashboard", "leads"]);
+    expect(visibleIds([])).toEqual(["dashboard"]);
+  });
+
+  it("needs the view action, not just any grant", () => {
+    expect(visibleIds([{ module: "leads", actions: ["create"], scope: null }])).toEqual([
+      "dashboard",
+    ]);
+  });
+
+  it("ignores modules the app does not know yet", () => {
+    expect(visibleIds([{ module: "warehouse", actions: ["view"], scope: "global" }])).toEqual([
+      "dashboard",
+    ]);
+  });
+
+  it("shows a dealer their own set of modules", () => {
+    const ids = visibleIds(mockPermissionsFor("dealer"));
     expect(ids).toEqual(
       expect.arrayContaining([
         "dashboard",
@@ -26,20 +57,8 @@ describe("[APP-001] navigation", () => {
     expect(ids).not.toContain("users");
   });
 
-  it("shows Marketing to channel partners and to Admin (who manages it), not to other staff", () => {
-    expect(visibleIds("admin")).toContain("marketing");
-    expect(visibleIds("employee")).not.toContain("marketing");
-    expect(visibleIds("state_manager")).not.toContain("marketing");
-  });
-
-  it("shows Schemes to every role", () => {
-    for (const role of ["employee", "admin", "qa_manager", "channel_partner"] as const) {
-      expect(visibleIds(role)).toContain("schemes");
-    }
-  });
-
   it("drops sections that end up empty", () => {
-    const sections = visibleNavSections("dispatch_manager");
+    const sections = visibleNavSections(mockPermissionsFor("dispatch_manager"));
     expect(sections.every((section) => section.items.length > 0)).toBe(true);
     expect(sections.map((section) => section.id)).not.toContain("admin");
   });
@@ -54,9 +73,37 @@ describe("[APP-001] navigation", () => {
     expect(findActiveNavItem("/unknown")).toBeUndefined();
   });
 
-  it("gives every built module a Data ID and every planned one no route", () => {
+  it("gives every item a Data ID", () => {
     for (const item of NAV_SECTIONS.flatMap((section) => section.items)) {
       expect(item.dataId).toMatch(/^[A-Z]{2,6}-\d{3}$/);
+    }
+  });
+});
+
+describe("[MSG-001] Messages in navigation", () => {
+  it("shows Messages to staff only", () => {
+    expect(visibleIds([], "staff")).toContain("messages");
+    expect(visibleIds([], "partner_user")).not.toContain("messages");
+    expect(visibleIds([])).not.toContain("messages");
+  });
+});
+
+describe("[APP-005] page headings in the top bar", () => {
+  it("uses the section's title, with its description only on the section's own page", () => {
+    expect(findPageHeading("/dashboard")).toEqual({
+      title: "Dashboard",
+      description: "Your territory at a glance.",
+    });
+    expect(findPageHeading("/leads/lead-10001")).toEqual({ title: "Leads" });
+    expect(findPageHeading("/unknown")).toEqual({ title: "Polysil CRM" });
+  });
+
+  it("gives every built page a description, since pages no longer show one", () => {
+    const built = NAV_SECTIONS.flatMap((section) => section.items).filter(
+      (item) => item.href !== undefined,
+    );
+    for (const item of built) {
+      expect(item.description?.length ?? 0).toBeGreaterThan(0);
     }
   });
 });

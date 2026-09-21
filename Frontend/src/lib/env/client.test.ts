@@ -6,7 +6,7 @@ describe("[OBS-002] public environment", () => {
   it("defaults to local development with mocks on", () => {
     expect(parseClientEnv({})).toEqual({
       appEnv: "development",
-      apiBaseUrl: "http://localhost:4000/api/v1",
+      apiBaseUrl: "/api/v1",
       apiMocking: "enabled",
       release: "local",
     });

@@ -24,8 +24,10 @@ describe("[OBS-002] buildApiUrl", () => {
     );
   });
 
-  it("supports a same-origin base", () => {
-    expect(buildApiUrl("/leads", { page: 2 }, "/api/v1")).toBe("/api/v1/leads?page=2");
+  it("resolves a same-origin base against the page in the browser", () => {
+    expect(buildApiUrl("/leads", { page: 2 }, "/api/v1")).toBe(
+      `${window.location.origin}/api/v1/leads?page=2`,
+    );
   });
 
   it("repeats arrays, skips empty values and encodes the rest", () => {
@@ -33,9 +35,9 @@ describe("[OBS-002] buildApiUrl", () => {
       buildApiUrl(
         "/leads",
         { status: ["new", "won"], q: "Patel & Sons", owner: "", x: null },
-        "/api",
+        "https://api.example.com",
       ),
-    ).toBe("/api/leads?status=new&status=won&q=Patel+%26+Sons");
+    ).toBe("https://api.example.com/leads?status=new&status=won&q=Patel+%26+Sons");
   });
 });
 
@@ -65,6 +67,18 @@ describe("[OBS-002] parseErrorBody", () => {
       code: "X",
       message: "Nope",
       details: { a: 1 },
+    });
+  });
+
+  it("moves the backend's 422 field errors into details", () => {
+    expect(
+      parseErrorBody({
+        error: { code: "validation_error", message: "Invalid", fields: { mobile: "Too short" } },
+      }),
+    ).toEqual({
+      code: "validation_error",
+      message: "Invalid",
+      details: { fields: { mobile: "Too short" } },
     });
   });
 

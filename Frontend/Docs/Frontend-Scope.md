@@ -74,8 +74,9 @@ that field work is part of the same system.
 
 > Roles 6, 7 and 8 are **one person each with global scope** — essentially one work queue apiece.
 
-In code: `src/lib/auth/roles.ts` and `src/lib/auth/permissions.ts` (placeholder matrix until the
-backend returns permissions from `GET /me`).
+In code: the backend returns each user's permissions from `GET /auth/me`, and the UI gates on them
+(`src/lib/auth/permissions.ts`). The mock backend follows the rules above in
+`src/mocks/data/permissions.ts`.
 
 ---
 
@@ -213,6 +214,16 @@ navigation. Streaming response. Not an agent that takes actions. **The key stays
 WhatsApp (their API) and email (Resend or Zoho) — backend sends them. Our work is the template management
 screen and showing message history against a lead or customer.
 
+**In-app (NOTIF-001, NOTIF-002):** a bell in the top bar with the unread count and the latest
+notifications — approvals waiting on me, leads and tasks assigned to me — each opening its record where
+a screen exists. Built against a proposed contract and mocks; polled every 30 s until the backend picks
+a push transport.
+
+### 5.18 Messages
+Direct, one-to-one conversations **between staff** (MSG-001 … MSG-005). Channel partners have none. A
+message can carry a link to a lead — "Share with a colleague" on a lead's page. Built against a proposed
+contract and mocks; the conversation list polls every 30 s and the open conversation every 10 s.
+
 ---
 
 ## 6. How we avoid blocking each other
@@ -296,8 +307,9 @@ Built and ready to extend (details in the changelog):
    is a placeholder.
 2. **Do the three partner types see different screens from each other**, or the same screens with
    different data and limits?
-3. **Auth design** — OTP or password, cookie session or bearer token. Decides whether the API sits on the
-   same origin as the app.
+3. ~~**Auth design**~~ — **Answered by the backend contract (15 September 2026):** staff use email and
+   password, channel partners a one-time code; a short-lived bearer token plus an httpOnly refresh
+   cookie; the API sits on the app's origin. See Frontend-Architecture §8.
 4. **API contract session** — when, and will staging have the shared seed data?
 5. **Money unit** in the API — rupees as decimals or integer paise.
 6. **Error format** — accept RFC 9457 problem details?
