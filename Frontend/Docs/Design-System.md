@@ -311,8 +311,8 @@ Three layers, each allowed to use only the layers below it (lint-enforced):
 
 | Layer | Folder | Contains | Knows about the business? |
 |---|---|---|---|
-| Primitives | `src/components/ui` | shadcn/ui (Base UI) restyled: Button, Badge, Checkbox, Input, PasswordInput, OtpInput, Select, Dialog, Sheet, Menu, Tooltip, Tabs, ToggleGroup, Command, Field, Card, Skeleton, Spinner, Icon … | No |
-| Patterns | `src/components/patterns` | DataTable, QueryView, EmptyState, ErrorState, StatCard, Tag/TagList, SegmentedMeter, Sparkline, FilterPill, SearchField, NavTabs, PageContainer … | No |
+| Primitives | `src/components/ui` | shadcn/ui (Base UI) restyled: Button, Badge, Checkbox, RadioGroup, Input, PasswordInput, OtpInput, Select, Combobox, Dialog, Sheet, Menu, Tooltip, Tabs, ToggleGroup, Command, Field, Card, Skeleton, Spinner, Icon … | No |
+| Patterns | `src/components/patterns` | DataTable, QueryView, EmptyState, ErrorState, StatCard, Tag/TagList, SegmentedMeter, Sparkline, FilterPill, SingleFilterPill, SearchField, NavTabs, PageContainer … | No |
 | Layout | `src/components/layout` | App shell, sidebar, header, command menu, user menu, page transition | Navigation only |
 | Features | `src/features/*/components` | Sign-in, leads table, New lead dialog, dashboard, notification bell, messages | Yes |
 

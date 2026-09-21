@@ -28,9 +28,16 @@ const people: Person[] = [
   { id: "p2", name: "Meena", amount: 20 },
 ];
 
-function renderTable(
-  options: { rowCount?: number; rowSelection?: RowSelectionState; sorting?: SortingState } = {},
-): {
+interface RenderTableOptions {
+  rowCount?: number | null;
+  rowCountCapped?: boolean;
+  hasNextPage?: boolean;
+  pagination?: PaginationState;
+  rowSelection?: RowSelectionState;
+  sorting?: SortingState;
+}
+
+function renderTable(options: RenderTableOptions = {}): {
   onSortingChange: (sorting: SortingState) => void;
   onPaginationChange: (pagination: PaginationState) => void;
   onRowSelectionChange: (selection: RowSelectionState) => void;
@@ -45,10 +52,12 @@ function renderTable(
       columns={columns}
       data={people}
       getRowId={(person) => person.id}
-      rowCount={options.rowCount ?? people.length}
+      rowCount={options.rowCount === undefined ? people.length : options.rowCount}
+      {...(options.rowCountCapped === undefined ? {} : { rowCountCapped: options.rowCountCapped })}
+      {...(options.hasNextPage === undefined ? {} : { hasNextPage: options.hasNextPage })}
       sorting={options.sorting ?? []}
       onSortingChange={onSortingChange}
-      pagination={{ pageIndex: 0, pageSize: 25 }}
+      pagination={options.pagination ?? { pageIndex: 0, pageSize: 25 }}
       onPaginationChange={onPaginationChange}
       rowSelection={options.rowSelection ?? {}}
       onRowSelectionChange={onRowSelectionChange}
@@ -105,13 +114,36 @@ describe("[DS-001] DataTable", () => {
     expect(screen.queryByRole("row", { name: /Meena/, selected: true })).not.toBeInTheDocument();
   });
 
-  it("shows the range and moves to the next page", async () => {
+  it("shows the range of rows on the page and moves to the next page", async () => {
     const user = userEvent.setup();
-    const { onPaginationChange } = renderTable({ rowCount: 60 });
+    const { onPaginationChange } = renderTable({
+      rowCount: 60,
+      pagination: { pageIndex: 0, pageSize: 2 },
+    });
 
-    expect(screen.getByText("1–25 of 60")).toBeInTheDocument();
+    expect(screen.getByText("1–2 of 60")).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 30")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Next page" }));
 
-    expect(onPaginationChange).toHaveBeenCalledWith({ pageIndex: 1, pageSize: 25 });
+    expect(onPaginationChange).toHaveBeenCalledWith({ pageIndex: 1, pageSize: 2 });
+  });
+
+  it("shows a capped total as a lower bound, with no page count and an unknown row count", () => {
+    renderTable({ rowCount: 1000, rowCountCapped: true, hasNextPage: true });
+
+    expect(screen.getByText("1–2 of 1,000+")).toBeInTheDocument();
+    expect(screen.getByText("Page 1")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "People" })).toHaveAttribute("aria-rowcount", "-1");
+    expect(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
+  });
+
+  it("lets a cursor-paged API decide whether there is a next page", () => {
+    renderTable({ rowCount: null, hasNextPage: false, pagination: { pageIndex: 3, pageSize: 2 } });
+
+    expect(screen.getByText("7–8")).toBeInTheDocument();
+    expect(screen.getByText("Page 4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Previous page" })).toBeEnabled();
   });
 });

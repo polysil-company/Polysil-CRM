@@ -3,34 +3,48 @@
 import { useQuery } from "@tanstack/react-query";
 import type * as React from "react";
 
-import { FilterPill } from "@/components/patterns/filter-pill";
+import { FilterPill, SingleFilterPill } from "@/components/patterns/filter-pill";
 import { SearchField } from "@/components/patterns/search-field";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { leadSummaryQueryOptions } from "@/features/leads/api/leads.queries";
-import { LEAD_SOURCES, LEAD_STATUSES, ORDER_TYPES } from "@/features/leads/api/leads.schemas";
+import { LEAD_INQUIRY_TYPES, LEAD_STAGES } from "@/features/leads/api/leads.schemas";
 import { useLeadListParams } from "@/features/leads/hooks/use-lead-list-params";
-import {
-  LEAD_SOURCE_LABELS,
-  LEAD_STATUS_LABELS,
-  ORDER_TYPE_LABELS,
-} from "@/features/leads/lib/lead-labels";
+import { LEAD_INQUIRY_TYPE_LABELS, LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
+import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import { useCan } from "@/features/session/hooks/use-session";
 
 import { NewLeadDialog } from "./new-lead-dialog";
 
-/** Search, filters (with live counts) and the primary action for the leads list. */
+const STAGE_OPTIONS = LEAD_STAGES.map((stage) => ({
+  value: stage,
+  label: LEAD_STAGE_LABELS[stage],
+}));
+const TYPE_OPTIONS = LEAD_INQUIRY_TYPES.map((type) => ({
+  value: type,
+  label: LEAD_INQUIRY_TYPE_LABELS[type],
+}));
+
+/**
+ * Search, filters and the primary action for the leads list. The backend filters by several
+ * stages at once but by one source and one inquiry type, so those two pills are single-choice.
+ */
 export function LeadsToolbar(): React.JSX.Element {
   const { params, setFilters, resetFilters, activeFilterCount } = useLeadListParams();
-  const { data: summary } = useQuery(leadSummaryQueryOptions());
+  const sources = useQuery(lookupListQueryOptions("lead-sources"));
   const canCreate = useCan("leads", "create");
+
+  // Inactive sources stay listed: old leads still carry them, so they are still worth filtering by.
+  const sourceOptions = (sources.data ?? []).map((source) => ({
+    value: source.code,
+    label: source.name,
+  }));
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex min-w-0 flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center">
         <SearchField
           label="Search leads"
-          placeholder="Name, phone or lead code"
+          placeholder="Name, mobile or inquiry number"
           value={params.q}
           onSearch={(q) => {
             setFilters({ q });
@@ -38,36 +52,27 @@ export function LeadsToolbar(): React.JSX.Element {
         />
         <div className="flex flex-wrap items-center gap-2">
           <FilterPill
-            label="Status"
-            options={LEAD_STATUSES.map((status) => ({
-              value: status,
-              label: LEAD_STATUS_LABELS[status],
-              count: summary?.byStatus[status],
-            }))}
-            selected={params.status}
-            onChange={(status) => {
-              setFilters({ status });
+            label="Stage"
+            options={STAGE_OPTIONS}
+            selected={params.stage}
+            onChange={(stage) => {
+              setFilters({ stage });
             }}
           />
-          <FilterPill
+          <SingleFilterPill
             label="Source"
-            options={LEAD_SOURCES.map((source) => ({
-              value: source,
-              label: LEAD_SOURCE_LABELS[source],
-              count: summary?.bySource[source],
-            }))}
+            options={sourceOptions}
             selected={params.source}
+            emptyMessage={
+              sources.isError ? "Sources couldn't be loaded. Try again later." : "Loading sources…"
+            }
             onChange={(source) => {
               setFilters({ source });
             }}
           />
-          <FilterPill
+          <SingleFilterPill
             label="Type"
-            options={ORDER_TYPES.map((type) => ({
-              value: type,
-              label: ORDER_TYPE_LABELS[type],
-              count: summary?.byType[type],
-            }))}
+            options={TYPE_OPTIONS}
             selected={params.type}
             onChange={(type) => {
               setFilters({ type });

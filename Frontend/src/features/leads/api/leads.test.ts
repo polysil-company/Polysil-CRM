@@ -1,38 +1,52 @@
+import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createLeadFieldErrors } from "@/features/leads/lib/create-lead-errors";
+import { ApiError } from "@/lib/api/errors";
+import { buildApiUrl } from "@/lib/api/url";
+import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { mockDb, resetMockDb } from "@/mocks/db";
+import { server } from "@/mocks/node";
 
-import { createLead, getLead, getLeadSummary, listLeads } from "./leads.api";
+import { countLeads, createLead, getLead, listLeads } from "./leads.api";
 import {
   createLeadFormSchema,
   createLeadRequestSchema,
-  LEAD_SOURCES,
-  LEAD_STATUSES,
+  type CreateLeadFormValues,
   type CreateLeadRequest,
   type LeadListParams,
 } from "./leads.schemas";
 
 const FIRST_PAGE: LeadListParams = {
-  page: 1,
+  cursor: null,
   pageSize: 25,
   sort: "createdAt",
   order: "desc",
   q: "",
-  status: [],
-  source: [],
-  type: [],
+  stage: [],
+  source: null,
+  type: null,
 };
 
+function territoryNamed(name: string): (typeof MOCK_TERRITORIES)[number] {
+  const territory = MOCK_TERRITORIES.find((candidate) => candidate.name === name);
+  if (territory === undefined) {
+    throw new Error(`No mock territory named ${name}`);
+  }
+  return territory;
+}
+
 const NEW_LEAD: CreateLeadRequest = {
-  customerName: "Test Farmer",
-  phone: "+919000000001",
-  village: "",
-  district: "Vadodara",
-  state: "Gujarat",
-  source: "employee",
-  type: "subsidised",
-  estimatedValue: 150_000,
-  notes: "",
+  farmer_name: "Test Farmer",
+  mobile: "+919000000001",
+  email: null,
+  territory_id: territoryNamed("Gondal").id,
+  village: null,
+  inquiry_type: "subsidised",
+  mis_system: "drip",
+  source: null,
+  estimated_value: "150000",
+  note: null,
 };
 
 function firstMockLead(): (typeof mockDb.leads)[number] {
@@ -43,41 +57,135 @@ function firstMockLead(): (typeof mockDb.leads)[number] {
   return lead;
 }
 
+/** Leads the default list shows: every stage except merged. */
+function visibleMockLeads(): typeof mockDb.leads {
+  return mockDb.leads.filter((lead) => lead.stage !== "merged");
+}
+
 describe("[LEAD-001] listLeads", () => {
-  it("returns the first page, newest first", async () => {
+  it("returns the first page, newest first, with the matching total", async () => {
     const result = await listLeads(FIRST_PAGE);
 
     expect(result.items).toHaveLength(25);
-    expect(result.total).toBe(mockDb.leads.length);
+    expect(result.total).toBe(visibleMockLeads().length);
+    expect(result.totalCapped).toBe(false);
+    expect(result.nextCursor).not.toBeNull();
     const created = result.items.map((lead) => Date.parse(lead.createdAt));
     expect(created).toEqual([...created].sort((a, b) => b - a));
   });
 
-  it("filters by status and finds a lead by its code", async () => {
-    const won = await listLeads({ ...FIRST_PAGE, status: ["won"], pageSize: 100 });
-    expect(won.items.length).toBeGreaterThan(0);
-    expect(won.items.every((lead) => lead.status === "won")).toBe(true);
+  it("asks for the total, the page size and the order it wants", async () => {
+    let sent: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/leads"), ({ request }) => {
+        sent = new URL(request.url);
+        return HttpResponse.json({ data: [], meta: { limit: 50, next_cursor: null, total: 0 } });
+      }),
+    );
 
-    const target = firstMockLead();
-    const found = await listLeads({ ...FIRST_PAGE, q: target.code });
-    expect(found.items.map((lead) => lead.id)).toContain(target.id);
+    await listLeads({ ...FIRST_PAGE, pageSize: 50, sort: "customerName", order: "asc" });
+
+    expect(sent?.searchParams.get("include_total")).toBe("true");
+    expect(sent?.searchParams.get("limit")).toBe("50");
+    expect(sent?.searchParams.get("sort")).toBe("farmer_name");
+    expect(sent?.searchParams.get("order")).toBe("asc");
+    expect(sent?.searchParams.has("cursor")).toBe(false);
+    expect(sent?.searchParams.has("stage")).toBe(false);
   });
 
-  it("paginates on the server", async () => {
-    const [page1, page2] = await Promise.all([
-      listLeads(FIRST_PAGE),
-      listLeads({ ...FIRST_PAGE, page: 2 }),
-    ]);
+  it("moves through pages with the cursor, and says when there are no more", async () => {
+    const page1 = await listLeads(FIRST_PAGE);
+    const page2 = await listLeads({ ...FIRST_PAGE, cursor: page1.nextCursor });
 
-    expect(page2.page).toBe(2);
     expect(page2.items[0]?.id).not.toBe(page1.items[0]?.id);
+    expect(page2.total).toBe(page1.total);
+
+    const everything = await listLeads({ ...FIRST_PAGE, pageSize: 100 });
+    const last = await listLeads({ ...FIRST_PAGE, pageSize: 100, cursor: everything.nextCursor });
+    expect(last.nextCursor).toBeNull();
+    expect(everything.items.length + last.items.length).toBe(visibleMockLeads().length);
+  });
+
+  it("filters by several stages, and shows merged leads only when asked", async () => {
+    const closed = await listLeads({ ...FIRST_PAGE, stage: ["won", "lost"], pageSize: 100 });
+    expect(closed.items.length).toBeGreaterThan(0);
+    expect(closed.items.every((lead) => lead.stage === "won" || lead.stage === "lost")).toBe(true);
+
+    const everyone = await listLeads({ ...FIRST_PAGE, pageSize: 100 });
+    expect(everyone.items.some((lead) => lead.stage === "merged")).toBe(false);
+
+    const merged = await listLeads({ ...FIRST_PAGE, stage: ["merged"], pageSize: 100 });
+    expect(merged.items.every((lead) => lead.stage === "merged")).toBe(true);
+  });
+
+  it("filters by one source and one inquiry type", async () => {
+    const result = await listLeads({
+      ...FIRST_PAGE,
+      source: "whatsapp",
+      type: "subsidised",
+      pageSize: 100,
+    });
+
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(
+      result.items.every((lead) => lead.source === "whatsapp" && lead.type === "subsidised"),
+    ).toBe(true);
+  });
+
+  it("finds a lead by its inquiry number or part of its mobile number", async () => {
+    const target = firstMockLead();
+
+    const byNumber = await listLeads({ ...FIRST_PAGE, q: target.inquiry_no });
+    expect(byNumber.items.map((lead) => lead.id)).toContain(target.id);
+
+    const byMobile = await listLeads({ ...FIRST_PAGE, q: target.mobile.slice(-6) });
+    expect(byMobile.items.map((lead) => lead.id)).toContain(target.id);
+  });
+
+  it("reads a capped total as a lower bound", async () => {
+    server.use(
+      http.get(buildApiUrl("/leads"), () =>
+        HttpResponse.json({
+          data: [],
+          meta: { limit: 25, next_cursor: "b2Zmc2V0OjI1", total: 1000, total_capped: true },
+        }),
+      ),
+    );
+
+    const result = await listLeads(FIRST_PAGE);
+
+    expect(result).toMatchObject({ total: 1000, totalCapped: true, nextCursor: "b2Zmc2V0OjI1" });
+  });
+
+  it("fails with the backend's field error for a cursor it cannot read", async () => {
+    const error: unknown = await listLeads({ ...FIRST_PAGE, cursor: "not-a-cursor" }).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+      status: 422,
+      details: { fields: { cursor: expect.any(String) } },
+    });
   });
 });
 
 describe("[LEAD-003] getLead", () => {
-  it("returns one lead", async () => {
-    const target = firstMockLead();
-    await expect(getLead(target.id)).resolves.toMatchObject({ id: target.id, code: target.code });
+  it("returns one lead in the screens' shape, with its duplicate links", async () => {
+    const target = mockDb.leads.find((lead) => (lead.duplicates ?? []).length > 0);
+    if (target === undefined) {
+      throw new Error("The mock has no flagged duplicates");
+    }
+
+    const lead = await getLead(target.id);
+
+    expect(lead).toMatchObject({
+      id: target.id,
+      code: target.inquiry_no,
+      customerName: target.farmer_name,
+      phone: target.mobile,
+    });
+    expect(lead.duplicates[0]).toMatchObject({ signal: "mobile", state: "pending" });
   });
 
   it("fails with a 404 ApiError for an unknown lead", async () => {
@@ -89,91 +197,188 @@ describe("[LEAD-003] getLead", () => {
   });
 });
 
+describe("[LEAD-004] countLeads", () => {
+  it("counts the leads the list would show", async () => {
+    await expect(countLeads()).resolves.toEqual({
+      total: visibleMockLeads().length,
+      capped: false,
+    });
+  });
+
+  it("reports a capped count", async () => {
+    server.use(
+      http.get(buildApiUrl("/leads"), () =>
+        HttpResponse.json({
+          data: [{}],
+          meta: { limit: 1, next_cursor: "x", total: 1000, total_capped: true },
+        }),
+      ),
+    );
+
+    await expect(countLeads()).resolves.toEqual({ total: 1000, capped: true });
+  });
+});
+
 describe("[LEAD-002] createLead", () => {
   afterEach(() => {
     resetMockDb();
   });
 
-  it("creates a lead that appears first in the list", async () => {
-    const lead = await createLead(NEW_LEAD);
-    expect(lead).toMatchObject({ customerName: "Test Farmer", status: "new", village: null });
+  it("creates a new lead that appears first in the list", async () => {
+    const lead = await createLead({ body: NEW_LEAD, idempotencyKey: "key-create" });
 
+    expect(lead).toMatchObject({
+      customerName: "Test Farmer",
+      stage: "new",
+      source: "employee",
+      estimatedValue: "150000.00",
+      territory: { name: "Gondal", level: "taluka" },
+    });
     const list = await listLeads(FIRST_PAGE);
     expect(list.items[0]?.id).toBe(lead.id);
   });
 
-  it("rejects a duplicate phone number with a field error", async () => {
+  it("flags a duplicate mobile number instead of refusing it", async () => {
     const existing = firstMockLead();
 
-    await expect(createLead({ ...NEW_LEAD, phone: existing.phone })).rejects.toMatchObject({
-      kind: "http",
-      status: 422,
-      code: "DUPLICATE_PHONE",
-      details: { fields: { phone: expect.any(String) } },
+    const lead = await createLead({
+      body: { ...NEW_LEAD, mobile: existing.mobile },
+      idempotencyKey: "key-duplicate",
     });
+
+    expect(lead.duplicates).toEqual([
+      expect.objectContaining({ leadId: existing.id, signal: "mobile", state: "pending" }),
+    ]);
+  });
+
+  it("replays a retry with the same key instead of creating a second lead", async () => {
+    const before = mockDb.leads.length;
+
+    const first = await createLead({ body: NEW_LEAD, idempotencyKey: "key-retry" });
+    const retry = await createLead({ body: NEW_LEAD, idempotencyKey: "key-retry" });
+
+    expect(retry.id).toBe(first.id);
+    expect(mockDb.leads).toHaveLength(before + 1);
+  });
+
+  it("refuses the same key with different details", async () => {
+    await createLead({ body: NEW_LEAD, idempotencyKey: "key-reused" });
+
+    await expect(
+      createLead({
+        body: { ...NEW_LEAD, farmer_name: "Someone Else" },
+        idempotencyKey: "key-reused",
+      }),
+    ).rejects.toMatchObject({ status: 409, code: "idempotency_key_reused" });
+  });
+
+  it("puts a territory no office covers on the territory field, in plain words", async () => {
+    const error: unknown = await createLead({
+      body: { ...NEW_LEAD, territory_id: territoryNamed("Dang").id },
+      idempotencyKey: "key-dang",
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ status: 422, code: "territory_without_org_unit" });
+    expect(createLeadFieldErrors(error)).toEqual([
+      {
+        field: "territory",
+        message:
+          "No Polysil office covers this place yet. Choose the taluka or district around it.",
+      },
+    ]);
   });
 });
 
 describe("[LEAD-002] New lead form schema", () => {
-  const typed = {
+  const typed: CreateLeadFormValues = {
     customerName: "  Ramesh Patel ",
     phone: "98123 45678",
-    village: "",
-    district: "Vadodara",
-    state: "Gujarat",
-    source: "whatsapp",
+    email: "",
+    territory: { id: territoryNamed("Gondal").id, name: "Gondal", level: "taluka" },
+    village: " Virpur ",
     type: "commercial",
+    misSystem: "drip",
+    source: null,
     estimatedValue: "125000.50",
-    notes: "",
+    note: "",
   };
 
-  it("turns what people type into a valid request body", () => {
-    const result = createLeadFormSchema.parse(typed);
+  it("turns what people type into the backend's request body", () => {
+    const body = createLeadFormSchema.parse(typed);
 
-    expect(result).toMatchObject({
-      customerName: "Ramesh Patel",
-      phone: "+919812345678",
-      estimatedValue: 125_000.5,
+    expect(body).toEqual({
+      farmer_name: "Ramesh Patel",
+      mobile: "+919812345678",
+      email: null,
+      territory_id: territoryNamed("Gondal").id,
+      village: "Virpur",
+      inquiry_type: "commercial",
+      mis_system: "drip",
+      source: null,
+      estimated_value: "125000.50",
+      note: null,
     });
-    expect(createLeadRequestSchema.safeParse(result).success).toBe(true);
+    expect(createLeadRequestSchema.safeParse(body).success).toBe(true);
   });
 
-  it("treats an empty amount as unknown", () => {
-    expect(createLeadFormSchema.parse({ ...typed, estimatedValue: "" }).estimatedValue).toBeNull();
-  });
-
-  it("explains every invalid field", () => {
+  it("explains every invalid or missing field", () => {
     const result = createLeadFormSchema.safeParse({
       ...typed,
-      customerName: "R",
+      customerName: " ",
       phone: "12345",
+      email: "ramesh@",
+      territory: null,
+      misSystem: undefined,
       estimatedValue: "1,25,000",
-      source: undefined,
     });
 
     expect(result.success).toBe(false);
     const messages = result.success ? [] : result.error.issues.map((issue) => issue.message);
     expect(messages).toEqual(
       expect.arrayContaining([
-        "Enter the customer's full name.",
+        "Enter the farmer's name.",
         "Enter a 10-digit Indian mobile number.",
+        "Enter an email like name@example.com, or leave it empty.",
+        "Choose where the farmer is.",
+        "Choose the irrigation system.",
         "Enter an amount in rupees, e.g. 125000.",
-        "Choose where this lead came from.",
       ]),
     );
   });
 });
 
-describe("[LEAD-004] getLeadSummary", () => {
-  it("counts every lead exactly once in each breakdown", async () => {
-    const summary = await getLeadSummary();
-    const sum = (counts: Record<string, number>): number =>
-      Object.values(counts).reduce((a, b) => a + b, 0);
+describe("[LEAD-002] createLeadFieldErrors", () => {
+  function validationError(fields: Record<string, string>, code = "validation_error"): ApiError {
+    return new ApiError({
+      kind: "http",
+      message: "Some fields need correcting.",
+      dataId: "LEAD-002",
+      requestId: "req-1",
+      method: "POST",
+      path: "/leads",
+      status: 422,
+      code,
+      details: { fields },
+    });
+  }
 
-    expect(summary.total).toBe(mockDb.leads.length);
-    expect(sum(summary.byStatus)).toBe(summary.total);
-    expect(sum(summary.bySource)).toBe(summary.total);
-    expect(Object.keys(summary.byStatus)).toEqual([...LEAD_STATUSES]);
-    expect(Object.keys(summary.bySource)).toEqual([...LEAD_SOURCES]);
+  it("maps the backend's field paths onto the form, first error per field", () => {
+    const errors = createLeadFieldErrors(
+      validationError({
+        mobile: "mobile must be E.164 digits",
+        "estimated_value.float": "input should be a valid number",
+        "estimated_value.constrained-str": "string should match pattern",
+        unknown_field: "ignored",
+      }),
+    );
+
+    expect(errors).toEqual([
+      { field: "phone", message: "Mobile must be E.164 digits." },
+      { field: "estimatedValue", message: "Input should be a valid number." },
+    ]);
+  });
+
+  it("returns nothing for errors that are not field validation failures", () => {
+    expect(createLeadFieldErrors(new Error("offline"))).toEqual([]);
   });
 });

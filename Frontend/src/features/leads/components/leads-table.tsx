@@ -2,7 +2,7 @@
 
 import { ArrowLeft01Icon, FilterRemoveIcon, UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import type { RowSelectionState, SortingState } from "@tanstack/react-table";
+import type { PaginationState, RowSelectionState, SortingState } from "@tanstack/react-table";
 import { useState } from "react";
 import type * as React from "react";
 
@@ -19,17 +19,17 @@ import {
   LEADS_TABLE_FRAME_CLASSES,
   LEADS_TABLE_LABEL,
 } from "@/features/leads/lib/lead-table-layout";
-import { formatInrCompact, formatNumber } from "@/lib/format";
+import { readFieldErrors } from "@/lib/api/errors";
+import { formatInrCompact, sumRupees } from "@/lib/format";
 
 import { leadColumns } from "./leads-columns";
 
-/** Columns the table can sort by. "createdAt" (the default order) has no column. */
-const SORTABLE_COLUMNS: readonly LeadSortField[] = [
-  "customerName",
-  "estimatedValue",
-  "followUpAt",
-  "winProbability",
-];
+/**
+ * Columns with a sort arrow. "createdAt" (the default order, newest first) has no column.
+ * TODO(LEAD-001): the backend does not sort yet; the arrows send `sort` and `order`, which it
+ * will honour once it does.
+ */
+const SORTABLE_COLUMNS: readonly LeadSortField[] = ["customerName", "estimatedValue"];
 
 const EMPTY_SELECTION: RowSelectionState = {};
 
@@ -44,13 +44,28 @@ export function LeadsTableSkeleton(): React.JSX.Element {
   );
 }
 
+/** The backend refused the page cursor in the URL: an old or edited link. */
+function isRejectedCursor(error: unknown): boolean {
+  return readFieldErrors(error)?.cursor !== undefined;
+}
+
 /**
- * LEAD-001. All four states: skeleton on first load, error with retry and
- * reference, empty (with and without filters, and an out-of-range page), and
- * the table. Background refetches keep rows visible.
+ * LEAD-001. Every state: skeleton on first load; error with retry and reference; empty with
+ * and without filters; a page link that no longer works; and the table. Background refetches
+ * keep rows visible.
  */
 export function LeadsTable(): React.JSX.Element {
-  const { params, setSort, setPage, resetFilters, activeFilterCount } = useLeadListParams();
+  const {
+    params,
+    pageIndex,
+    setSort,
+    nextPage,
+    previousPage,
+    firstPage,
+    setPageSize,
+    resetFilters,
+    activeFilterCount,
+  } = useLeadListParams();
   const query = useQuery(leadListQueryOptions(params));
 
   // Selection belongs to one exact list (filters + sort + page); any change clears it.
@@ -77,17 +92,35 @@ export function LeadsTable(): React.JSX.Element {
     }
   };
 
+  const firstPageAction = (
+    <Button variant="outline" size="sm" onClick={firstPage}>
+      Go to the first page
+    </Button>
+  );
+
+  if (query.status === "error" && isRejectedCursor(query.error)) {
+    return (
+      <EmptyState
+        icon={ArrowLeft01Icon}
+        title="This page link no longer works"
+        description="The link points to a page of an older list. Start again from the first page."
+        action={firstPageAction}
+        className={LEADS_EMPTY_FRAME_CLASSES}
+      />
+    );
+  }
+
   return (
     <QueryView
       query={query}
       pending={<LeadsTableSkeleton />}
-      isEmpty={(data) => data.total === 0}
+      isEmpty={(data) => data.items.length === 0 && pageIndex === 0}
       empty={
         activeFilterCount > 0 ? (
           <EmptyState
             icon={FilterRemoveIcon}
             title="No leads match these filters"
-            description="Remove a filter, or search for a different name, phone number or lead code."
+            description="Remove a filter, or search for a different name, mobile number or inquiry number."
             action={
               <Button variant="outline" size="sm" onClick={resetFilters}>
                 Clear filters
@@ -99,7 +132,7 @@ export function LeadsTable(): React.JSX.Element {
           <EmptyState
             icon={UserAdd01Icon}
             title="No leads yet"
-            description="Leads from WhatsApp, the website, QR codes and field visits appear here as they are captured."
+            description="Leads you can work on appear here as they are captured — from WhatsApp, the website, QR codes and field visits."
             className={LEADS_EMPTY_FRAME_CLASSES}
           />
         )
@@ -107,32 +140,37 @@ export function LeadsTable(): React.JSX.Element {
     >
       {(data) => {
         if (data.items.length === 0) {
+          // Only reachable past the first page: the list shrank since the link was made.
           return (
             <EmptyState
               icon={ArrowLeft01Icon}
               title="This page is empty"
-              description={`There are ${formatNumber(data.total)} leads, but none on page ${formatNumber(data.page)}.`}
-              action={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setPage(1, data.pageSize);
-                  }}
-                >
-                  Go to the first page
-                </Button>
-              }
+              description="The leads that were here have moved or closed. Start again from the first page."
+              action={firstPageAction}
               className={LEADS_EMPTY_FRAME_CLASSES}
             />
           );
         }
 
         const selectedLeads = data.items.filter((lead) => rowSelection[lead.id] === true);
-        const selectedValue = selectedLeads.reduce(
-          (sum, lead) => sum + (lead.estimatedValue ?? 0),
-          0,
-        );
+        const selectedValue = sumRupees(selectedLeads.map((lead) => lead.estimatedValue));
+
+        // While a new page loads, the rows (and their cursor) still belong to the previous
+        // page: moving again would skip a page, so paging waits for the real data.
+        const pageLoading = query.isPlaceholderData;
+
+        const handlePaginationChange = (next: PaginationState): void => {
+          if (pageLoading) {
+            return;
+          }
+          if (next.pageSize !== params.pageSize) {
+            setPageSize(next.pageSize);
+          } else if (next.pageIndex > pageIndex && data.nextCursor !== null) {
+            nextPage(data.nextCursor);
+          } else if (next.pageIndex < pageIndex) {
+            previousPage();
+          }
+        };
 
         return (
           <>
@@ -142,12 +180,12 @@ export function LeadsTable(): React.JSX.Element {
               data={data.items}
               getRowId={(lead) => lead.id}
               rowCount={data.total}
+              rowCountCapped={data.totalCapped}
+              hasNextPage={data.nextCursor !== null && !pageLoading}
               sorting={sorting}
               onSortingChange={handleSortingChange}
-              pagination={{ pageIndex: data.page - 1, pageSize: data.pageSize }}
-              onPaginationChange={(next) => {
-                setPage(next.pageIndex + 1, next.pageSize);
-              }}
+              pagination={{ pageIndex, pageSize: params.pageSize }}
+              onPaginationChange={handlePaginationChange}
               rowSelection={rowSelection}
               onRowSelectionChange={(rows) => {
                 setSelection({ listKey, rows });

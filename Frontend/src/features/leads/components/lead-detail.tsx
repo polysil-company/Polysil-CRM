@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowLeft01Icon, Call02Icon, Share08Icon, WhatsappIcon } from "@hugeicons/core-free-icons";
+import {
+  AlertCircleIcon,
+  ArrowLeft01Icon,
+  Call02Icon,
+  Share08Icon,
+  WhatsappIcon,
+} from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,16 +15,22 @@ import type * as React from "react";
 import { AvatarLabel } from "@/components/patterns/avatar-label";
 import { QueryView } from "@/components/patterns/query-view";
 import { RelativeDate } from "@/components/patterns/relative-date";
-import { SegmentedMeter } from "@/components/patterns/segmented-meter";
-import { describeTrend, Sparkline } from "@/components/patterns/sparkline";
-import { TagList } from "@/components/patterns/tag";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { leadDetailQueryOptions } from "@/features/leads/api/leads.queries";
 import type { Lead } from "@/features/leads/api/leads.schemas";
-import { LEAD_SOURCE_LABELS, ORDER_TYPE_LABELS } from "@/features/leads/lib/lead-labels";
+import {
+  DUPLICATE_SIGNAL_LABELS,
+  LEAD_INQUIRY_TYPE_LABELS,
+  LEAD_PRIORITY_BADGE,
+  LEAD_PRIORITY_LABELS,
+  partnerTypeLabel,
+} from "@/features/leads/lib/lead-labels";
+import { LookupName } from "@/features/lookups/components/lookup-name";
+import { formatTerritory } from "@/features/lookups/lib/lookup-labels";
 import { toShareParam } from "@/features/messages/lib/share-attachment";
 import { useSession } from "@/features/session/hooks/use-session";
 import { isApiError } from "@/lib/api/errors";
@@ -31,7 +43,10 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { LeadStatusBadge } from "./lead-status-badge";
+import { LeadStageBadge } from "./lead-stage-badge";
+
+/** Detail rows that always render — the skeleton draws the same number. */
+const DETAIL_ROW_COUNT = 15;
 
 /** LEAD-003 · Lead detail. A 404 renders the route's not-found page. */
 export function LeadDetail({ leadId }: { leadId: string }): React.JSX.Element {
@@ -60,15 +75,79 @@ function DetailItem({
   return (
     <div className={cn("flex min-w-0 flex-col gap-1", className)}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-sm text-foreground">{children}</dd>
+      <dd className="min-w-0 text-sm wrap-break-word text-foreground">{children}</dd>
     </div>
+  );
+}
+
+/**
+ * Data the backend does not record yet. TODO(LEAD-003): land, crops, the next follow-up,
+ * win probability and weekly engagement are requested from the backend.
+ */
+function NotRecorded(): React.JSX.Element {
+  return <span className="text-subtle-foreground">{EMPTY_VALUE}</span>;
+}
+
+/** A notice above the details: a merged lead, or possible duplicates. */
+function LeadNotice({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border border-border bg-warning-soft p-3 text-sm text-foreground">
+      <Icon icon={AlertCircleIcon} className="mt-0.5 text-warning" />
+      <div className="flex min-w-0 flex-col gap-1">{children}</div>
+    </div>
+  );
+}
+
+function LeadNotices({ lead }: { lead: Lead }): React.JSX.Element | null {
+  const pending = lead.duplicates.filter((duplicate) => duplicate.state === "pending");
+
+  if (lead.mergedInto) {
+    return (
+      <LeadNotice>
+        <p>
+          This lead was merged into{" "}
+          <Link
+            href={`/leads/${lead.mergedInto.id}`}
+            className="font-mono font-medium text-primary-text underline-offset-4 hover:underline"
+          >
+            {lead.mergedInto.code}
+          </Link>
+          . Work on that lead instead.
+        </p>
+      </LeadNotice>
+    );
+  }
+
+  if (pending.length === 0) {
+    return null;
+  }
+
+  return (
+    <LeadNotice>
+      <p className="font-medium">
+        {pending.length === 1 ? "Possible duplicate" : `${pending.length} possible duplicates`}
+      </p>
+      <ul className="flex flex-col gap-0.5 text-muted-foreground">
+        {pending.map((duplicate) => (
+          <li key={duplicate.linkId}>
+            <Link
+              href={`/leads/${duplicate.leadId}`}
+              className="font-mono text-primary-text underline-offset-4 hover:underline"
+            >
+              {duplicate.code}
+            </Link>{" "}
+            — {DUPLICATE_SIGNAL_LABELS[duplicate.signal]}
+          </li>
+        ))}
+      </ul>
+    </LeadNotice>
   );
 }
 
 function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
   const { data: session } = useSession();
   const whatsappNumber = lead.phone.replace(/\D/g, "");
-  const location = [lead.village, lead.district, lead.state].filter(Boolean).join(", ");
+  const lost = lead.stage === "lost";
 
   return (
     <div className="flex flex-col gap-5">
@@ -84,11 +163,16 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
           </Link>
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="truncate text-xl font-semibold text-foreground">{lead.customerName}</h2>
-            <LeadStatusBadge status={lead.status} />
+            <LeadStageBadge stage={lead.stage} />
+            {lead.priority ? (
+              <Badge variant={LEAD_PRIORITY_BADGE[lead.priority]}>
+                {LEAD_PRIORITY_LABELS[lead.priority]}
+              </Badge>
+            ) : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            <span className="font-mono">{lead.code}</span> · {ORDER_TYPE_LABELS[lead.type]} ·{" "}
-            {LEAD_SOURCE_LABELS[lead.source]}
+            <span className="font-mono">{lead.code}</span> · {LEAD_INQUIRY_TYPE_LABELS[lead.type]} ·{" "}
+            <LookupName list="lead-sources" code={lead.source} />
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -121,6 +205,8 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
         </div>
       </div>
 
+      <LeadNotices lead={lead} />
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -129,30 +215,68 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
           <CardContent>
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
               <DetailItem label="Mobile">{formatIndianPhone(lead.phone)}</DetailItem>
-              <DetailItem label="Location">{location || EMPTY_VALUE}</DetailItem>
+              <DetailItem label="Email">{lead.email ?? EMPTY_VALUE}</DetailItem>
+              <DetailItem label="Territory">{formatTerritory(lead.territory)}</DetailItem>
+              <DetailItem label="Village">{lead.village ?? EMPTY_VALUE}</DetailItem>
+              <DetailItem label="Irrigation system">
+                <LookupName list="mis-systems" code={lead.misSystem} />
+              </DetailItem>
               <DetailItem label="Estimated value">{formatInr(lead.estimatedValue)}</DetailItem>
-              <DetailItem label="Land">
-                {lead.acreage === null ? EMPTY_VALUE : `${formatNumber(lead.acreage)} acres`}
-              </DetailItem>
-              <DetailItem label="Crops">
-                <TagList items={lead.crops.map((crop) => ({ id: crop, label: crop }))} max={6} />
-              </DetailItem>
               <DetailItem label="Owner">
-                <AvatarLabel name={lead.owner.name} imageUrl={lead.owner.avatarUrl} size="xs" />
+                {lead.owner ? (
+                  <AvatarLabel
+                    name={lead.owner.name}
+                    secondary={lead.ownerOrgUnit.name}
+                    size="xs"
+                  />
+                ) : (
+                  <span className="text-muted-foreground">
+                    Unassigned · {lead.ownerOrgUnit.name}
+                  </span>
+                )}
               </DetailItem>
               <DetailItem label="Channel partner">
-                {lead.channelPartner?.name ?? EMPTY_VALUE}
+                {lead.channelPartner
+                  ? `${lead.channelPartner.name} · ${partnerTypeLabel(lead.channelPartner.partnerType)}`
+                  : EMPTY_VALUE}
+              </DetailItem>
+              <DetailItem label="Score">{lead.score ?? EMPTY_VALUE}</DetailItem>
+              <DetailItem label="Land">
+                <NotRecorded />
+              </DetailItem>
+              <DetailItem label="Crops">
+                <NotRecorded />
               </DetailItem>
               <DetailItem label="Follow-up">
-                <RelativeDate value={lead.followUpAt} highlightOverdue />
+                <NotRecorded />
+              </DetailItem>
+              <DetailItem label="First contacted">
+                {lead.firstContactedAt === null ? (
+                  "Not yet"
+                ) : (
+                  <RelativeDate value={lead.firstContactedAt} />
+                )}
               </DetailItem>
               <DetailItem label="Last activity">
                 <RelativeDate value={lead.lastActivityAt} />
               </DetailItem>
-              <DetailItem label="Created">{formatFullDate(lead.createdAt)}</DetailItem>
-              {lead.lostReason ? (
+              <DetailItem label="Created">
+                {formatFullDate(lead.createdAt)}
+                {lead.createdBy ? (
+                  <span className="text-muted-foreground"> · by {lead.createdBy.name}</span>
+                ) : null}
+              </DetailItem>
+              {lead.reopenCount > 0 ? (
+                <DetailItem label="Reopened">
+                  {lead.reopenCount === 1 ? "Once" : `${formatNumber(lead.reopenCount)} times`}
+                </DetailItem>
+              ) : null}
+              {lost ? (
                 <DetailItem label="Lost reason" className="sm:col-span-2">
-                  {lead.lostReason}
+                  {lead.lostReason?.name ?? EMPTY_VALUE}
+                  {lead.lostNote ? (
+                    <span className="mt-1 block text-muted-foreground">{lead.lostNote}</span>
+                  ) : null}
                 </DetailItem>
               ) : null}
             </dl>
@@ -162,25 +286,24 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>
-              <CardTitle level={3}>Win probability</CardTitle>
+              <div className="flex flex-col gap-0.5">
+                <CardTitle level={3}>Win probability</CardTitle>
+                <CardDescription>Not recorded yet</CardDescription>
+              </div>
             </CardHeader>
             <CardContent>
-              <SegmentedMeter value={lead.winProbability} segments={10} label="Win probability" />
+              <NotRecorded />
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <div className="flex flex-col gap-0.5">
                 <CardTitle level={3}>Engagement</CardTitle>
-                <CardDescription>Interactions per week, last 12 weeks</CardDescription>
+                <CardDescription>Interactions per week — not recorded yet</CardDescription>
               </div>
             </CardHeader>
             <CardContent>
-              <Sparkline
-                values={lead.engagement}
-                label={describeTrend(lead.engagement, "Interactions per week")}
-                className="h-12 w-40"
-              />
+              <NotRecorded />
             </CardContent>
           </Card>
         </div>
@@ -214,7 +337,7 @@ export function LeadDetailSkeleton(): React.JSX.Element {
           </CardHeader>
           <CardContent>
             <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              {Array.from({ length: 10 }, (_, index) => (
+              {Array.from({ length: DETAIL_ROW_COUNT }, (_, index) => (
                 <div key={index} className="flex flex-col gap-1">
                   <Skeleton className="h-4 w-20" />
                   <Skeleton className="h-5 w-36" />
@@ -226,10 +349,13 @@ export function LeadDetailSkeleton(): React.JSX.Element {
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-32" />
+              <div className="flex flex-col gap-0.5">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-5 w-28" />
+              </div>
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-3 w-40" />
+              <Skeleton className="h-5 w-6" />
             </CardContent>
           </Card>
           <Card>
@@ -240,7 +366,7 @@ export function LeadDetailSkeleton(): React.JSX.Element {
               </div>
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-12 w-40" />
+              <Skeleton className="h-5 w-6" />
             </CardContent>
           </Card>
         </div>

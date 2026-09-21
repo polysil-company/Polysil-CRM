@@ -131,10 +131,10 @@ The registry file is the source of truth; this snapshot helps reading.
 | AUTH-004 | Keep signed in — rotate the access token with the refresh cookie (`POST /auth/refresh`) | shared | mocked |
 | AUTH-005 | Sign out (`POST /auth/logout`) | shared | mocked |
 | AUTH-006 | Signed-in routing — sign-in redirects, return path and session end | frontend | in-progress |
-| LEAD-001 | List leads with filters, sorting and pagination (`GET /leads`) | shared | mocked |
-| LEAD-002 | Create lead (`POST /leads`) | shared | mocked |
-| LEAD-003 | Lead detail (`GET /leads/{leadId}`) | shared | mocked |
-| LEAD-004 | Lead counts by status (`GET /leads/summary`) | shared | mocked |
+| LEAD-001 | List leads with filters, sorting and pagination (`GET /leads`) | shared | in-progress |
+| LEAD-002 | Create lead (`POST /leads`) | shared | in-progress |
+| LEAD-003 | Lead detail (`GET /leads/{leadId}`) | shared | in-progress |
+| LEAD-004 | Lead count — navigation badge and sales tab (`GET /leads`, one row with the total) | shared | in-progress |
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | mocked |
 | RPT-002 | Reports | shared | planned |
 | QUOT-001 | Quotations list | shared | planned |
@@ -146,6 +146,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | MKT-001 | Marketing offers — set by Admin, visible to channel partners only | shared | planned |
 | SCHM-001 | Schemes — set by Admin, visible to everyone | shared | planned |
 | MSTR-001 | Masters — products, stock, price lists, territories | shared | planned |
+| MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | SUBS-001 | Subsidy forms and case status | shared | planned |
 | ACCT-001 | Accounts work queue | shared | planned |
 | DISP-001 | Dispatch work queue | shared | planned |

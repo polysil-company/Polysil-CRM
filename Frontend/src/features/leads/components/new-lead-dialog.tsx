@@ -3,11 +3,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { parseAsBoolean, useQueryState } from "nuqs";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type * as React from "react";
 import { Controller, useForm, useFormState, type DefaultValues } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { ErrorReference } from "@/components/patterns/error-state";
 import { Button } from "@/components/ui/button";
@@ -37,15 +36,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCreateLead } from "@/features/leads/api/leads.mutations";
 import {
   createLeadFormSchema,
-  LEAD_SOURCES,
-  ORDER_TYPES,
+  LEAD_INQUIRY_TYPES,
   type CreateLeadFormValues,
   type CreateLeadRequest,
+  type Lead,
 } from "@/features/leads/api/leads.schemas";
-import { LEAD_SOURCE_LABELS, ORDER_TYPE_LABELS } from "@/features/leads/lib/lead-labels";
+import { createLeadFieldErrors } from "@/features/leads/lib/create-lead-errors";
+import {
+  DUPLICATE_SIGNAL_LABELS,
+  LEAD_INQUIRY_TYPE_LABELS,
+} from "@/features/leads/lib/lead-labels";
+import { LookupSelect } from "@/features/lookups/components/lookup-select";
+import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { toUserFacingError } from "@/lib/api/error-messages";
-import { isApiError } from "@/lib/api/errors";
+import { createRequestId } from "@/lib/api/request-id";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger({
@@ -56,30 +61,18 @@ const log = createLogger({
 const EMPTY_FORM: DefaultValues<CreateLeadFormValues> = {
   customerName: "",
   phone: "",
+  email: "",
+  territory: null,
   village: "",
-  district: "",
-  state: "",
+  source: null,
   estimatedValue: "",
-  notes: "",
+  note: "",
 };
 
-const FORM_FIELDS = [
-  "customerName",
-  "phone",
-  "village",
-  "district",
-  "state",
-  "source",
-  "type",
-  "estimatedValue",
-  "notes",
-] as const;
-
-/** 422 body agreed for field-level errors: `details: { fields: { phone: "…" } }`. */
-const serverFieldErrorsSchema = z.object({ fields: z.record(z.string(), z.string()) });
-
-const SOURCE_ITEMS = LEAD_SOURCES.map((value) => ({ value, label: LEAD_SOURCE_LABELS[value] }));
-const TYPE_ITEMS = ORDER_TYPES.map((value) => ({ value, label: ORDER_TYPE_LABELS[value] }));
+const TYPE_ITEMS = LEAD_INQUIRY_TYPES.map((value) => ({
+  value,
+  label: LEAD_INQUIRY_TYPE_LABELS[value],
+}));
 
 /** Long enough to see the success check before the dialog closes. */
 const CLOSE_AFTER_SUCCESS_MS = 700;
@@ -126,15 +119,29 @@ function FormField({
   );
 }
 
+/** "Ramesh Patel · POL/GJ/2026-27/00123", plus a warning when the backend flagged a duplicate. */
+function describeCreatedLead(lead: Lead): string {
+  const created = `${lead.customerName} · ${lead.code}`;
+  const duplicate = lead.duplicates.find((candidate) => candidate.state === "pending");
+  if (duplicate === undefined) {
+    return created;
+  }
+  return `${created}. Possible duplicate of ${duplicate.code} (${DUPLICATE_SIGNAL_LABELS[duplicate.signal]}) — flagged for review.`;
+}
+
 /**
- * LEAD-002 · New lead. Open state lives in the URL (?newLead=true), so the
- * command menu and links can open it. Validation runs on blur, then on change;
- * server field errors (422) land on the matching field; anything else shows an
- * inline error with a copyable reference.
+ * LEAD-002 · New lead. Open state lives in the URL (?newLead=true), so the command menu and
+ * links can open it. Validation runs on blur, then on change; server field errors (422) land
+ * on the matching field; anything else shows an inline error with a copyable reference.
+ *
+ * Retrying the same details reuses the Idempotency-Key, so a save whose reply was lost is
+ * replayed by the backend instead of creating the lead twice. Changing any detail makes a
+ * new key. Duplicates are never refused: the backend flags them, and the toast says so.
  */
 export function NewLeadDialog(): React.JSX.Element {
   const [open, setOpen] = useQueryState("newLead", parseAsBoolean.withDefault(false));
   const [formError, setFormError] = useState<unknown>(null);
+  const lastAttempt = useRef<{ body: string; key: string } | null>(null);
   const createLead = useCreateLead();
   const form = useForm<CreateLeadFormValues, unknown, CreateLeadRequest>({
     resolver: zodResolver(createLeadFormSchema),
@@ -143,35 +150,38 @@ export function NewLeadDialog(): React.JSX.Element {
   });
   const { errors } = useFormState({ control: form.control });
 
+  const idempotencyKeyFor = (body: CreateLeadRequest): string => {
+    const serialized = JSON.stringify(body);
+    if (lastAttempt.current?.body !== serialized) {
+      lastAttempt.current = { body: serialized, key: createRequestId() };
+    }
+    return lastAttempt.current.key;
+  };
+
   const applyServerFieldErrors = (error: unknown): boolean => {
-    if (!isApiError(error) || error.status !== 422) {
-      return false;
-    }
-    const parsed = serverFieldErrorsSchema.safeParse(error.details);
-    if (!parsed.success) {
-      return false;
-    }
-    let applied = false;
-    for (const [name, message] of Object.entries(parsed.data.fields)) {
-      const field = FORM_FIELDS.find((candidate) => candidate === name);
-      if (field !== undefined) {
-        form.setError(field, { type: "server", message }, { shouldFocus: !applied });
-        applied = true;
-      }
-    }
-    return applied;
+    const fieldErrors = createLeadFieldErrors(error);
+    fieldErrors.forEach(({ field, message }, index) => {
+      form.setError(field, { type: "server", message }, { shouldFocus: index === 0 });
+    });
+    return fieldErrors.length > 0;
+  };
+
+  const resetForm = (): void => {
+    form.reset(EMPTY_FORM);
+    lastAttempt.current = null;
   };
 
   const submit = useAsyncAction({
-    action: (input: CreateLeadRequest) => createLead.mutateAsync(input),
+    action: (body: CreateLeadRequest) =>
+      createLead.mutateAsync({ body, idempotencyKey: idempotencyKeyFor(body) }),
     logger: log,
     fn: "handleCreateLead",
     dataId: "LEAD-002",
     onSuccess: (lead) => {
-      toast.success("Lead created", { description: `${lead.customerName} · ${lead.code}` });
+      toast.success("Lead created", { description: describeCreatedLead(lead) });
       window.setTimeout(() => {
         void setOpen(false);
-        form.reset(EMPTY_FORM);
+        resetForm();
       }, CLOSE_AFTER_SUCCESS_MS);
     },
     onError: (error) => {
@@ -186,16 +196,16 @@ export function NewLeadDialog(): React.JSX.Element {
       return; // Never close in the middle of a save.
     }
     if (!next) {
-      form.reset(EMPTY_FORM);
+      resetForm();
       setFormError(null);
       submit.reset();
     }
     void setOpen(next);
   };
 
-  const onValid = (values: CreateLeadRequest): void => {
+  const onValid = (body: CreateLeadRequest): void => {
     setFormError(null);
-    void submit.run(values);
+    void submit.run(body);
   };
 
   const formErrorView = formError === null ? null : toUserFacingError(formError);
@@ -225,7 +235,7 @@ export function NewLeadDialog(): React.JSX.Element {
             <FieldGroup className="grid gap-4 sm:grid-cols-2">
               <FormField
                 id="lead-customer-name"
-                label="Customer name"
+                label="Farmer name"
                 error={errors.customerName?.message}
                 className="sm:col-span-2"
               >
@@ -244,6 +254,49 @@ export function NewLeadDialog(): React.JSX.Element {
                     {...aria}
                     {...form.register("phone")}
                   />
+                )}
+              </FormField>
+
+              <FormField id="lead-email" label="Email" optional error={errors.email?.message}>
+                {(aria) => (
+                  <Input
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    {...aria}
+                    {...form.register("email")}
+                  />
+                )}
+              </FormField>
+
+              <Controller
+                control={form.control}
+                name="territory"
+                render={({ field, fieldState }) => (
+                  <FormField
+                    id="lead-territory"
+                    label="Territory"
+                    description="The district, taluka or village the farmer is in. It decides which office gets the lead."
+                    error={fieldState.error?.message}
+                    className="sm:col-span-2"
+                  >
+                    {(aria) => (
+                      <TerritoryPicker
+                        {...aria}
+                        value={field.value ?? null}
+                        onValueChange={(territory) => {
+                          field.onChange(territory);
+                        }}
+                        onBlur={field.onBlur}
+                      />
+                    )}
+                  </FormField>
+                )}
+              />
+
+              <FormField id="lead-village" label="Village" optional error={errors.village?.message}>
+                {(aria) => (
+                  <Input autoComplete="address-level3" {...aria} {...form.register("village")} />
                 )}
               </FormField>
 
@@ -267,60 +320,11 @@ export function NewLeadDialog(): React.JSX.Element {
                 )}
               </FormField>
 
-              <FormField id="lead-village" label="Village" optional error={errors.village?.message}>
-                {(aria) => (
-                  <Input autoComplete="address-level3" {...aria} {...form.register("village")} />
-                )}
-              </FormField>
-
-              <FormField id="lead-district" label="District" error={errors.district?.message}>
-                {(aria) => (
-                  <Input autoComplete="address-level2" {...aria} {...form.register("district")} />
-                )}
-              </FormField>
-
-              <FormField id="lead-state" label="State" error={errors.state?.message}>
-                {(aria) => (
-                  <Input autoComplete="address-level1" {...aria} {...form.register("state")} />
-                )}
-              </FormField>
-
-              <Controller
-                control={form.control}
-                name="source"
-                render={({ field, fieldState }) => (
-                  <FormField id="lead-source" label="Source" error={fieldState.error?.message}>
-                    {(aria) => (
-                      <Select
-                        items={SOURCE_ITEMS}
-                        value={field.value ?? null}
-                        onValueChange={(value) => {
-                          if (value !== null) {
-                            field.onChange(value);
-                          }
-                        }}
-                      >
-                        <SelectTrigger {...aria} onBlur={field.onBlur}>
-                          <SelectValue placeholder="Choose a source" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SOURCE_ITEMS.map((item) => (
-                            <SelectItem key={item.value} value={item.value}>
-                              {item.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </FormField>
-                )}
-              />
-
               <Controller
                 control={form.control}
                 name="type"
                 render={({ field, fieldState }) => (
-                  <FormField id="lead-type" label="Order type" error={fieldState.error?.message}>
+                  <FormField id="lead-type" label="Inquiry type" error={fieldState.error?.message}>
                     {(aria) => (
                       <Select
                         items={TYPE_ITEMS}
@@ -347,14 +351,64 @@ export function NewLeadDialog(): React.JSX.Element {
                 )}
               />
 
+              <Controller
+                control={form.control}
+                name="misSystem"
+                render={({ field, fieldState }) => (
+                  <FormField
+                    id="lead-mis-system"
+                    label="Irrigation system"
+                    error={fieldState.error?.message}
+                  >
+                    {(aria) => (
+                      <LookupSelect
+                        {...aria}
+                        list="mis-systems"
+                        placeholder="Choose a system"
+                        value={field.value ?? null}
+                        onValueChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    )}
+                  </FormField>
+                )}
+              />
+
+              <Controller
+                control={form.control}
+                name="source"
+                render={({ field, fieldState }) => (
+                  <FormField
+                    id="lead-source"
+                    label="Source"
+                    optional
+                    description="Left empty, it's recorded from who you are — Employee for staff."
+                    error={fieldState.error?.message}
+                    className="sm:col-span-2"
+                  >
+                    {(aria) => (
+                      <LookupSelect
+                        {...aria}
+                        list="lead-sources"
+                        placeholder="Where the enquiry came from"
+                        value={field.value ?? null}
+                        onValueChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    )}
+                  </FormField>
+                )}
+              />
+
               <FormField
-                id="lead-notes"
-                label="Notes"
+                id="lead-note"
+                label="Note"
                 optional
-                error={errors.notes?.message}
+                description="Becomes the first entry on the lead's timeline."
+                error={errors.note?.message}
                 className="sm:col-span-2"
               >
-                {(aria) => <Textarea rows={3} {...aria} {...form.register("notes")} />}
+                {(aria) => <Textarea rows={3} {...aria} {...form.register("note")} />}
               </FormField>
             </FieldGroup>
 
