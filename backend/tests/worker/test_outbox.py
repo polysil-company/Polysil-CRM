@@ -242,14 +242,20 @@ async def test_the_budget_stops_the_loop(sessions: Callable[[], AsyncSession],
     rows = [await _queue(sessions(), recipient=_mobile()) for _ in range(3)]
     monkeypatch.setattr(get_settings(), "outbox_drain_budget", 0.05)
     try:
-        handled = await outbox_drain({"provider": FakeProvider(ACCEPTED)})
+        # The delay is the provider's, not the database's. Asserting on how long a
+        # round trip happens to take made this test say different things on
+        # different machines: `== 1` against a tunnel 150 ms away, three of three
+        # against a container on the same host. One send that outlasts the budget
+        # makes the loop stop after exactly one claim wherever it runs, because
+        # the budget is checked before each claim.
+        handled = await outbox_drain({"provider": FakeProvider(ACCEPTED, delay=0.08)})
         # Not `== 1`. That encoded the development database being 150 ms away,
         # where one claim fills a fifty-millisecond budget; against a local
         # container two fit and the test failed for being fast. What the budget
         # promises is that it stops the loop before the work runs out.
-        assert 1 <= handled < len(rows), (
-            f"the budget admitted {handled} of {len(rows)} and should have stopped "
-            f"after at least one and before the last")
+        assert handled == 1, (
+            f"the budget admitted {handled} of {len(rows)}; one send outlasts it, so the "
+            f"loop should claim once and stop")
     finally:
         await _drop(sessions(), *rows)
 
