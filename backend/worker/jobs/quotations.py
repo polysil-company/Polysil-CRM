@@ -25,6 +25,7 @@ import datetime as dt
 import functools
 import json
 import pathlib
+import warnings
 from decimal import Decimal
 from typing import Any
 
@@ -88,14 +89,22 @@ def renderer_available() -> str | None:
     """None when WeasyPrint imports, else why not. Cached: the answer does not
     change while the process lives, and the import is expensive."""
     try:
-        import weasyprint  # noqa: F401
+        # A DeprecationWarning is not a missing library. The test settings make
+        # warnings errors, and WeasyPrint warns when HarfBuzz-Subset is absent, so
+        # without this the probe called a working renderer unavailable and CI
+        # skipped every PDF test.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            import weasyprint  # noqa: F401
     except Exception as exc:  # OSError on a missing native library, ImportError otherwise
         return f"{type(exc).__name__}: {str(exc).splitlines()[0][:200]}"
     return None
 
 
 def render_pdf(html: str) -> bytes:
-    import weasyprint
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        import weasyprint
 
     return bytes(weasyprint.HTML(string=html).write_pdf())
 
