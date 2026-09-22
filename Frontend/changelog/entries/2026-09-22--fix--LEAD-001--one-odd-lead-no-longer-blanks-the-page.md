@@ -48,7 +48,7 @@ The widened code pattern is deliberately a shape check, not an allow-list: the f
 - `src/features/lookups/components/lookup-select.tsx` — `clearable`, placeholder helper.
 - `src/features/leads/components/new-lead-dialog.tsx` — cancelled timer, clearable Source.
 - `src/features/leads/components/leads-toolbar.tsx` — three messages for the Source pill.
-- `src/components/patterns/data-table/data-table.tsx`, `leads-table.tsx` — `isPaging`.
+- `src/components/patterns/data-table/data-table.tsx`, `leads-table.tsx` — `isPaging`, with a `Paging` story.
 
 ## Tests
 
