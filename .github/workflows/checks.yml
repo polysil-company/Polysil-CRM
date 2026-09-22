@@ -367,6 +367,12 @@ jobs:
       - name: Install the backend with its development tools
         run: python -m pip install -e ".[dev]"
 
+      # The PDF tests skip where the renderer does not import, which is right on a
+      # laptop and wrong here: once a probe misread a warning as a missing library
+      # and CI stayed green with every PDF test skipped. Fail instead.
+      - name: The PDF renderer must import
+        run: python -c "from worker.jobs.quotations import renderer_available as r; p = r(); assert p is None, p"
+
       # Roles are cluster objects and a migration is per-database, so CREATE ROLE
       # in a migration would fail on the second database in the same cluster. It is
       # an out-of-band step everywhere, including here.
