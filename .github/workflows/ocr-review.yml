@@ -1,0 +1,110 @@
+# AI code review on pull requests, with OpenCodeReview (github.com/alibaba/open-code-review).
+#
+# Reviews each pull request into integration, staging or main and posts inline comments
+# plus one summary comment that updates in place. Later pushes review only what changed
+# since the last review. A member can ask for a fresh review by commenting
+# `/open-code-review` on the pull request.
+#
+# The review rules are in .opencodereview/rule.json. Test files are reviewed on purpose:
+# the tool skips them by default, and a test that cannot fail is a defect.
+#
+# SETUP (Settings -> Secrets and variables -> Actions). Until OCR_LLM_MODEL is set this
+# workflow does nothing, so pull requests stay green.
+#   secret    OCR_LLM_URL            the model API endpoint, e.g. https://api.anthropic.com
+#   secret    OCR_LLM_AUTH_TOKEN     the API key for that endpoint
+#   variable  OCR_LLM_MODEL          the model name, e.g. claude-sonnet-5
+#   variable  OCR_LLM_USE_ANTHROPIC  'true' for Anthropic, 'false' for an OpenAI-compatible API
+#
+# SECURITY. pull_request_target gives the job the secrets, so it must never run code from
+# the pull request. The action checks out the base branch and reads the pull request only
+# as git objects. GitHub runs this file, and the action reads the rules, from the base
+# branch, so a pull request cannot change its own review. Both the action and the CLI it
+# installs are pinned to one release; bump them together, on purpose.
+#
+# COST. Each run is capped at OCR_MAX_TOKENS tokens (partial results are still posted).
+# Draft pull requests are not reviewed.
+
+name: AI code review
+
+on:
+  pull_request_target:
+    branches: [integration, staging, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+# A new review of the same pull request cancels a stale one. Comments that are not a
+# review request get a unique group, so they never cancel a running review.
+concurrency:
+  group: >-
+    ${{
+      (
+        github.event_name == 'pull_request_target'
+        || (
+          github.event_name == 'issue_comment'
+          && github.event.issue.pull_request
+          && startsWith(github.event.comment.body, '/open-code-review')
+        )
+      )
+      && format('ocr-{0}', github.event.pull_request.number || github.event.issue.number)
+      || format('noop-{0}', github.run_id)
+    }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  OCR_VERSION: '1.12.9'
+  OCR_MAX_TOKENS: '2000000'
+
+jobs:
+  review:
+    name: OpenCodeReview
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: |
+      vars.OCR_LLM_MODEL != ''
+      && (
+        (github.event_name == 'pull_request_target' && !github.event.pull_request.draft)
+        || (
+          github.event_name == 'issue_comment'
+          && github.event.issue.pull_request
+          && github.event.comment.user.type != 'Bot'
+          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+          && startsWith(github.event.comment.body, '/open-code-review')
+        )
+      )
+    steps:
+      - name: Find the pull request's refs (comment trigger)
+        id: pr
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput('base_ref', pr.base.ref);
+            core.setOutput('head_sha', pr.head.sha);
+
+      - name: Review
+        uses: alibaba/open-code-review@bccbc15f785269400735d5255540c231e6c02b6d # v1.12.9
+        with:
+          ocr_version: ${{ env.OCR_VERSION }}
+          llm_url: ${{ secrets.OCR_LLM_URL }}
+          llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
+          llm_model: ${{ vars.OCR_LLM_MODEL }}
+          llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC }}
+          effort: medium
+          max_tokens_budget: ${{ env.OCR_MAX_TOKENS }}
+          sticky_summary: 'true'
+          incremental: 'true'
+          # low-severity findings go to the summary instead of inline, so the diff
+          # carries only what needs a decision
+          route_severity_below: low
+          base_ref: ${{ steps.pr.outputs.base_ref }}
+          head_sha: ${{ steps.pr.outputs.head_sha }}

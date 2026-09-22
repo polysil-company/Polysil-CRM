@@ -1,0 +1,47 @@
+{
+  "include": [
+    "backend/tests/**/*.py"
+  ],
+  "exclude": [
+    "backend/docs/api/**",
+    "backend/tests/fixtures/**",
+    "backend/tests/domain/golden/**"
+  ],
+  "rules": [
+    {
+      "path": "backend/api/db/migrations/versions/**/*.py",
+      "rule": "This is a hand-written Alembic migration for PostgreSQL 16 reached through PgBouncer in transaction pooling mode. Enforce:\n- Every table with a policy has ENABLE ROW LEVEL SECURITY and its policies in the same migration; enabled with no policies silently denies everything.\n- RLS policies wrap every auth helper call in a scalar subselect: (SELECT app_current_user_id()), never a bare call (per-row versus per-statement cost).\n- Every column a policy references is indexed.\n- Every SECURITY DEFINER function pins `SET search_path = public, pg_temp`, guards its caller (a permission check or app_is_system()), and ends up REVOKEd from PUBLIC; a migration's own REVOKE sweep does not reach a later migration's functions.\n- No session-level SET, advisory session lock or temporary table: session state does not survive PgBouncer transaction pooling. set_config(..., true) only.\n- Money is numeric(14,2); masters are effective-dated and never updated in place.\n- A migration that has run on another machine is corrected forward, never edited in place.\n- downgrade() restores exactly what upgrade() replaced.\n- Flag any claim in a comment about PostgreSQL behaviour (locking, trigger order, privileges, RLS on UPDATE) that the change relies on and that no test executes.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/api/domain/**/*.py",
+      "rule": "Pure business logic: GST, discounts, subsidy, pricing, state tables. Enforce:\n- No SQLAlchemy, database or network import anywhere in this package.\n- Money is Decimal end to end: never float, never a float literal in arithmetic, never '%.2f' on a float. Rounding is ROUND_HALF_UP to the paisa, and the point at which each figure is rounded must match the printed document (each discount tier rounded before the next; CGST and SGST each computed at half the slab and rounded on their own).\n- A figure the frontend prints must come from here, not be re-derived by a caller.\n- State transitions are explicit tables; a transition not in the table is refused, not allowed by default.\n- Flag any constant that encodes a client business rule without a comment naming its source (a client document, an ADR, or a GAP id for an assumption).",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/api/services/**/*.py",
+      "rule": "Services own transactions' contents, not their boundaries. Enforce:\n- A service never calls commit(); the request dependency owns the transaction.\n- Every state change writes an activity_event row in the same transaction.\n- Outbound messages are rows in notification_outbox; nothing sends over the network inside a request.\n- Row locks are taken in the documented order (lead, then quotation rows lower version first, then counters). Flag any mutation that locks a child before its parent, or skips the lead lock.\n- An existence check or count run under the caller's RLS can lie to a narrow-scope caller (a colleague's row, a soft-deleted row). Where the answer must be global (next version number, 'is there an accepted quotation', 'is there an open draft'), it must come from a SECURITY DEFINER function that counts as the owner.\n- A database error is mapped to an API error by constraint name, never by SQLSTATE alone; an unmapped constraint surfaces as a 500.\n- Values read for a sent or frozen document come from its snapshot, never from a live master.\n- No float in any money path; dates that mean 'today' use today_ist(), never date.today() or SQL current_date (the server runs UTC).",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/api/routers/**/*.py",
+      "rule": "Thin HTTP layer; its docstrings and Pydantic field descriptions become the frontend's API contract. Enforce:\n- Every mutating endpoint (POST, PUT, PATCH, DELETE) takes an Idempotency-Key and runs through run_idempotent.\n- Every path or query parameter that reaches a uuid column carries a pattern, so a malformed value is a 422, not a 500.\n- The endpoint docstring says what the endpoint is for, from the frontend's side, and names the error codes it can return.\n- A breaking change to a request or response shape (a removed or renamed field, a changed type or meaning) must be called out: it breaks the frontend's build.\n- No business logic here beyond parsing and calling a service.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/worker/**/*.py",
+      "rule": "ARQ background jobs. Enforce:\n- Each database transaction re-enters the system principal; nothing relies on session state carried between transactions (PgBouncer transaction pooling).\n- No network call or file upload inside an open database transaction holding row locks.\n- Synchronous blocking work (PDF rendering, boto3, heavy CPU) runs off the event loop (asyncio.to_thread or a process), because the same loop sends sign-in codes.\n- A leased job's completion and failure are conditional on its lease token, and a stale worker cannot overwrite what a newer lease published.\n- Retries back off and give up with the reason recorded; a failure never loops forever.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/tests/**/*.py",
+      "rule": "Tests are part of the change and the code in this repository is largely model-generated, so the tests and the code can share a blind spot. Review the test as a proof, not as code:\n- For each test, name the mechanism it claims to prove, and ask whether deleting that mechanism would turn it red. Flag assertions that cannot fail: `or True`, `status in (200, 404)`, comparing a value with itself, asserting an identity that holds by definition.\n- RLS and permission changes need negative cases: prove the caller who must not see or change a row cannot.\n- A test must not depend on data that happens to be loaded in a developer's database (for example `SELECT ... LIMIT 1` from a master table); CI starts from an empty database.\n- Concurrency claims (lock order, one winner per race) need two real connections ordered with an Event, not two calls in one transaction.\n- A test that commits must clean up after itself; one that writes against a committed fixture row must roll back first.\n- Money tests check figures to the paisa against an independent oracle or a client document, not against the function under test.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/**/*.py",
+      "rule": "Backend Python (FastAPI, SQLAlchemy async, asyncpg, PostgreSQL behind PgBouncer). Enforce: type hints everywhere; comments explain why, never what; no attribution comments; no secrets, client data or personal data in code or fixtures; no session-level database state; no float for money.",
+      "merge_system_rule": true
+    }
+  ]
+}
