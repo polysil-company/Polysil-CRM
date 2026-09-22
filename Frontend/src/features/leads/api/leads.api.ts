@@ -19,8 +19,8 @@ const log = createLogger({ file: "features/leads/api/leads.api.ts", dataId: "LEA
  * LEAD-001 · GET /leads — one page, newest first, with the matching total.
  * `include_total` costs the backend a second query; the list shows "1–25 of 74", so it asks.
  */
-export function listLeads(params: LeadListParams, signal?: AbortSignal): Promise<LeadPage> {
-  return apiRequest({
+export async function listLeads(params: LeadListParams, signal?: AbortSignal): Promise<LeadPage> {
+  const page = await apiRequest({
     dataId: "LEAD-001",
     logger: log,
     fn: "listLeads",
@@ -29,7 +29,7 @@ export function listLeads(params: LeadListParams, signal?: AbortSignal): Promise
       limit: params.pageSize,
       cursor: params.cursor,
       include_total: true,
-      q: params.q.trim(),
+      q: params.q,
       stage: params.stage.join(","),
       source: params.source,
       inquiry_type: params.type,
@@ -39,6 +39,16 @@ export function listLeads(params: LeadListParams, signal?: AbortSignal): Promise
     schema: leadPageSchema,
     signal,
   });
+
+  if (page.skipped > 0) {
+    // A backend-side issue: the page is still shown, so it would otherwise go unnoticed.
+    log.warn("listLeads", `left out ${String(page.skipped)} lead(s) that did not match the contract`, {
+      dataId: "LEAD-001",
+      context: { skipped: page.skipped, kept: page.items.length },
+    });
+  }
+
+  return page;
 }
 
 /** LEAD-003 · GET /leads/{leadId} */

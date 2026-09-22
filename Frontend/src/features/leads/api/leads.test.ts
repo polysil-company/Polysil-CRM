@@ -74,6 +74,39 @@ describe("[LEAD-001] listLeads", () => {
     expect(created).toEqual([...created].sort((a, b) => b - a));
   });
 
+  it("leaves out a lead that breaks the contract and keeps the rest of the page", async () => {
+    const good = firstMockLead();
+    server.use(
+      http.get(buildApiUrl("/leads"), () =>
+        HttpResponse.json({
+          data: [good, { ...good, id: "broken-lead", mobile: null }],
+          meta: { limit: 25, next_cursor: null, total: 2 },
+        }),
+      ),
+    );
+
+    const result = await listLeads(FIRST_PAGE);
+
+    expect(result.items.map((lead) => lead.id)).toEqual([good.id]);
+    expect(result.skipped).toBe(1);
+  });
+
+  it("fails as a contract violation when no lead in the page matches", async () => {
+    server.use(
+      http.get(buildApiUrl("/leads"), () =>
+        HttpResponse.json({
+          data: [{ id: 42 }],
+          meta: { limit: 25, next_cursor: null, total: 1 },
+        }),
+      ),
+    );
+
+    await expect(listLeads(FIRST_PAGE)).rejects.toMatchObject({
+      code: "CONTRACT_VIOLATION",
+      dataId: "LEAD-001",
+    });
+  });
+
   it("asks for the total, the page size and the order it wants", async () => {
     let sent: URL | undefined;
     server.use(

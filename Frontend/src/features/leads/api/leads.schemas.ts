@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { pageMetaSchema, type CursorPage } from "@/lib/api/pagination";
+import {
+  cursorPageSchema,
+  pageMetaSchema,
+  type CursorPage,
+  type PageMetaWire,
+} from "@/lib/api/pagination";
 import { normalizeIndianMobile } from "@/lib/format";
 
 /**
@@ -151,17 +156,15 @@ export type LeadResponseWire = z.input<typeof leadResponseSchema>;
 
 export type LeadPage = CursorPage<Lead>;
 
-/** GET /leads: `{ data: Lead[], meta: PageMeta }`. */
-export const leadPageSchema = z
-  .object({ data: z.array(leadSchema), meta: pageMetaSchema })
-  .transform(({ data, meta }): LeadPage => ({
-    items: data,
-    nextCursor: meta.nextCursor,
-    total: meta.total,
-    totalCapped: meta.totalCapped,
-  }));
+/**
+ * GET /leads: `{ data: Lead[], meta: PageMeta }`, read one lead at a time. A lead the
+ * backend sends wrong is left out and counted rather than failing the whole page — see
+ * `cursorPageSchema`. A page where no lead matches is still a contract violation.
+ */
+export const leadPageSchema = cursorPageSchema(leadSchema);
 
-export type LeadPageWire = z.input<typeof leadPageSchema>;
+/** The backend's JSON for one page, as the mock backend must produce it. */
+export type LeadPageWire = { data: LeadWire[]; meta: PageMetaWire };
 
 /**
  * LEAD-004 · How many leads the caller can see: GET /leads?limit=1&include_total=true.
@@ -199,7 +202,7 @@ export interface LeadListParams {
   readonly pageSize: number;
   readonly sort: LeadSortField;
   readonly order: SortOrder;
-  /** Name, mobile or inquiry number. */
+  /** Name, mobile or inquiry number. Already trimmed; empty means no search. */
   readonly q: string;
   /** Empty means the backend's default: every stage except merged. */
   readonly stage: readonly LeadStage[];

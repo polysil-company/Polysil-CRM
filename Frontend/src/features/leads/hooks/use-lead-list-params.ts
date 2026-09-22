@@ -24,8 +24,12 @@ import {
 
 const DEFAULT_PAGE_SIZE = LEAD_PAGE_SIZES[0];
 
-/** Lookup codes are lowercase words joined by underscores ("agri_fair"). Anything else is dropped. */
-const LOOKUP_CODE_PATTERN = /^[a-z0-9_]{1,64}$/;
+/**
+ * Administrators write these codes, so only their shape is checked, never their spelling:
+ * letters, digits, `_`, `-` and `.` ("agri_fair", "agri-fair", "qr.code"). Anything else is
+ * URL junk and is dropped. A code the backend does not know is refused by the backend.
+ */
+const LOOKUP_CODE_PATTERN = /^[\w.-]{1,64}$/;
 
 const parseAsLookupCode = createParser({
   parse: (value: string) => (LOOKUP_CODE_PATTERN.test(value) ? value : null),
@@ -91,7 +95,8 @@ export function useLeadListParams(): LeadListParamsControls {
     pageSize: normalizePageSize(values.pageSize),
     sort: values.sort,
     order: values.order,
-    q: values.q,
+    // The search field already trims; a hand-edited URL may not.
+    q: values.q.trim(),
     stage: values.stage,
     source: values.source,
     type: values.type,

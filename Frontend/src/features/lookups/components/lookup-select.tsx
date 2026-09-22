@@ -19,11 +19,27 @@ export interface LookupSelectProps {
   list: LookupList;
   /** A code from the list, or null for none. */
   value: string | null;
-  onValueChange: (code: string) => void;
+  onValueChange: (code: string | null) => void;
   onBlur?: () => void;
   placeholder: string;
+  /**
+   * Offers "Not set", so a field that may be left empty can be emptied again. Without it a
+   * chosen code can only be swapped for another one. Default false.
+   */
+  clearable?: boolean;
   "aria-invalid"?: true | undefined;
   "aria-describedby"?: string | undefined;
+}
+
+/** What the closed field says while the list is on its way, or once it failed. */
+function fieldPlaceholder(isPending: boolean, isError: boolean, placeholder: string): string {
+  if (isPending) {
+    return "Loading…";
+  }
+  if (isError) {
+    return "Couldn't load the list";
+  }
+  return placeholder;
 }
 
 /**
@@ -38,6 +54,7 @@ export function LookupSelect({
   onValueChange,
   onBlur,
   placeholder,
+  clearable = false,
   ...aria
 }: LookupSelectProps): React.JSX.Element {
   const query = useQuery(lookupListQueryOptions(list));
@@ -56,17 +73,25 @@ export function LookupSelect({
         onValueChange={(next) => {
           if (typeof next === "string") {
             onValueChange(next);
+            return;
+          }
+          // Base UI sends null for the "Not set" row; ignored on a field that needs a value.
+          if (clearable && next === null) {
+            onValueChange(null);
           }
         }}
       >
         <SelectTrigger id={id} onBlur={onBlur} {...aria}>
           <SelectValue
-            placeholder={
-              query.isPending ? "Loading…" : query.isError ? "Couldn't load the list" : placeholder
-            }
+            placeholder={fieldPlaceholder(query.isPending, query.isError, placeholder)}
           />
         </SelectTrigger>
         <SelectContent>
+          {clearable ? (
+            <SelectItem value={null} className="text-muted-foreground">
+              Not set
+            </SelectItem>
+          ) : null}
           {items.map((item) => (
             <SelectItem key={item.value} value={item.value}>
               {item.label}
