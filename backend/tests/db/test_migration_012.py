@@ -116,7 +116,41 @@ async def _quotation(db: AsyncSession, ids: Fixtures, lead_id: str, *,
          "until": valid_until})).scalar_one())
 
 
+_TEST_LIST = "mig012 lines"
+
+
+async def _catalogue_row(db: AsyncSession) -> tuple[str, str]:
+    """A price-list item and a tax rate of the test's own, created in its
+    transaction and gone with the rollback. The dev database has the client's
+    catalogue loaded and CI's fresh one has nothing, so borrowing an existing row
+    passed here and failed there. Reused within one test."""
+    found = (await db.execute(text(
+        "SELECT i.id AS item, g.id AS gst FROM price_list_item i "
+        "JOIN price_list l ON l.id = i.price_list_id AND l.name = :n "
+        "JOIN gst_rate g ON g.hsn_code = '3917' AND g.effective_from = DATE '1990-01-01' "
+        "LIMIT 1"), {"n": _TEST_LIST})).one_or_none()
+    if found is not None:
+        return str(found.item), str(found.gst)
+    product = (await db.execute(text(
+        "INSERT INTO product (description, product_category_id, quotation_category, uom_id) "
+        "SELECT CAST(:d AS citext), (SELECT id FROM product_category ORDER BY sort_order LIMIT 1), "
+        "'field', (SELECT id FROM uom LIMIT 1) RETURNING id"),
+        {"d": "MIG012 PIPE " + uuid.uuid4().hex[:8]})).scalar_one()
+    price_list = (await db.execute(text(
+        "INSERT INTO price_list (name, channel_tier, status, published_at, effective_from, "
+        "effective_to) VALUES (:n, 'farmer', 'published', now(), DATE '1990-01-01', "
+        "DATE '1991-01-01') RETURNING id"), {"n": _TEST_LIST})).scalar_one()
+    item = (await db.execute(text(
+        "INSERT INTO price_list_item (price_list_id, product_id, rate) "
+        "VALUES (:l, :p, 100) RETURNING id"), {"l": price_list, "p": product})).scalar_one()
+    gst = (await db.execute(text(
+        "INSERT INTO gst_rate (hsn_code, rate, effective_from, effective_to) "
+        "VALUES ('3917', 5, DATE '1990-01-01', DATE '1991-01-01') RETURNING id"))).scalar_one()
+    return str(item), str(gst)
+
+
 async def _line(db: AsyncSession, quotation_id: str) -> str:
+    item, gst = await _catalogue_row(db)
     return str((await db.execute(text(
         "INSERT INTO quotation_line (quotation_id, line_no, product_id, description, hsn_code, "
         "uom, qty, rate, price_list_id, price_list_item_id, gst_rate_id, gross, discount_pct, "
@@ -124,9 +158,10 @@ async def _line(db: AsyncSession, quotation_id: str) -> str:
         "discount3_pct, discount3_amt, discount, taxable, gst_slab, cgst_rate, sgst_rate, "
         "igst_rate, cgst, sgst, igst, total) "
         "SELECT CAST(:q AS uuid), 1, i.product_id, 'x', '3917', 'NOS', 1, 100, i.price_list_id, "
-        "i.id, (SELECT id FROM gst_rate LIMIT 1), 100, 10, 10, 90, 0, 0, 90, 0, 0, 10, 90, 5, "
-        "2.5, 2.5, 0, 2.25, 2.25, 0, 94.50 FROM price_list_item i LIMIT 1 RETURNING id"),
-        {"q": quotation_id})).scalar_one())
+        "i.id, CAST(:g AS uuid), 100, 10, 10, 90, 0, 0, 90, 0, 0, 10, 90, 5, "
+        "2.5, 2.5, 0, 2.25, 2.25, 0, 94.50 FROM price_list_item i WHERE i.id = CAST(:i AS uuid) "
+        "RETURNING id"),
+        {"q": quotation_id, "i": item, "g": gst})).scalar_one())
 
 
 async def _refused(db: AsyncSession, sql: str, params: dict[str, Any], sqlstate: str) -> str:
