@@ -57,4 +57,21 @@ SPECS: dict[str, ScopeSpec] = {
         parents={"territory_id": "territory", "owner_org_unit_id": "org_unit",
                  "assigned_partner_id": "channel_partner"},
     ),
+    # A quotation is scoped like its lead: its owner, org unit and territory are
+    # the lead's, copied under the lead's lock and propagated by a trigger when
+    # the lead moves (FS-005 rule 11). partner_subtree is the channel partner the
+    # sale goes through, which decides the tier as well as who sees it. The lead
+    # is a parent, so the INSERT policy carries an EXISTS on it: a quotation can
+    # only be written on a lead the writer can see, by RLS as well as by the
+    # service. No self_column: a quotation is not a person.
+    "quotations": ScopeSpec(
+        module="quotations",
+        table="quotation",
+        own="owner_user_id",
+        org_subtree="owner_org_unit_id",
+        territory="territory_id",
+        partner_subtree="partner_id",
+        parents={"lead_id": "lead", "territory_id": "territory",
+                 "owner_org_unit_id": "org_unit", "partner_id": "channel_partner"},
+    ),
 }

@@ -147,8 +147,8 @@ def test_cross_site_over_plain_http_is_refused_at_startup() -> None:
 
 
 def test_cross_site_is_allowed_where_there_is_tls() -> None:
-    assert settings(refresh_cookie_samesite="none",
-                    environment="staging").refresh_cookie_samesite == "none"
+    assert settings(refresh_cookie_samesite="none", environment="staging",
+                    public_web_url="https://crm.polysil.in").refresh_cookie_samesite == "none"
 
 
 def test_the_default_is_the_same_origin_answer() -> None:

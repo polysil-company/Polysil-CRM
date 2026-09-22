@@ -498,8 +498,10 @@ it. Keyset-paged: pass the previous page's `meta.next_cursor` as `cursor`.
 Move a lead along its lifecycle: contact it, qualify it, or mark it lost.
 
 Only the moves the lifecycle allows are accepted. Marking a lead **lost** needs
-a `lost_reason_id`. Stages from **quoted** onward are refused with
-`quotation_required` until quotations ship. Pass `expected_stage` to act only if
+a `lost_reason_id`. **quoted** and **negotiation** are reached by sending a
+quotation and by recording a negotiation on it, never from here; **won** needs
+an accepted quotation on the lead, and accepting one moves the lead itself.
+All three answer `quotation_required` otherwise. Pass `expected_stage` to act only if
 the lead has not moved since you loaded it; if it has, you get `409 stage_changed`
 with the current stage in `fields.stage`.
 

@@ -552,6 +552,64 @@ async def pass_3_leads(client: httpx.AsyncClient, admin: Api, ids: dict[str, str
     print(f"pass 3: {created} leads created for the duplicate and merge pairs")
 
 
+# ── pass 3b: quotations at every status the API can reach ────────────────────
+#
+# A dozen quotations across the qualified leads, raised by the officer who owns
+# each lead, so the frontend has a list worth paging and a detail screen in every
+# state: draft, sent, negotiation, accepted, rejected, and one number with two
+# versions. `viewed` needs the farmer to open the link and `expired` needs the
+# nightly job, so neither is seeded. The PDFs render when the worker runs; on a
+# box without R2 they fail with the reason, which is the truthful state (FS-005).
+
+QUOTATION_MIX = ["draft", "sent", "sent", "sent", "negotiation", "negotiation",
+                 "accepted", "accepted", "rejected", "revised", "sent", "draft"]
+
+
+async def pass_3b_quotations(client: httpx.AsyncClient, admin: Api) -> None:
+    rng = random.Random(2027)
+    leads = await admin.page("/leads", stage="qualified")
+    if not leads:
+        print("pass 3b: no qualified leads to quote")
+        return
+    products = (await admin.get("/products", limit=50))["data"]
+    sessions: dict[str, Api] = {}
+    created = 0
+    for lead, outcome in zip(leads, QUOTATION_MIX, strict=False):
+        if await admin.page("/quotations", lead_id=lead["id"], current_only="false"):
+            continue
+        # the lead's owner raises it, so the row sits in that officer's own scope
+        api = admin
+        owner = lead.get("owner")
+        if owner:
+            email = (await admin.get(f"/users/{owner['id']}"))["data"].get("email") or ""
+            local = email.split("@", 1)[0]
+            if local not in sessions:
+                signed = await _login(client, email, SHOWCASE_PASSWORD)
+                if signed is not None:
+                    sessions[local] = signed
+            api = sessions.get(local, admin)
+        lines = [{"product_id": p["id"], "qty": str(rng.choice((2, 5, 10, 18, 100))),
+                  "discount_pct": str(rng.choice((0, 5, 10))),
+                  "discount2_pct": str(rng.choice((0, 0, 3)))}
+                 for p in rng.sample(products, k=min(3, len(products)))]
+        q = (await api.post("/quotations", {
+            "lead_id": lead["id"], "sales_type": "commercial", "partner_id": None,
+            "terms": "Prices ex-works Rajkot. Delivery within 7 days.", "lines": lines}))["data"]
+        created += 1
+        if outcome == "draft":
+            continue
+        await api.post(f"/quotations/{q['id']}/send", {"channel": "none"}, expect=200)
+        if outcome in ("negotiation", "accepted", "rejected"):
+            await api.post(f"/quotations/{q['id']}/transition",
+                           {"to": outcome, "remark": "Recorded from the field visit"},
+                           expect=200)
+        elif outcome == "revised":
+            v2 = (await api.post(f"/quotations/{q['id']}/revise", {}))["data"]
+            await api.post(f"/quotations/{v2['id']}/send", {"channel": "none"}, expect=200)
+            created += 1
+    print(f"pass 3b: {created} quotations created")
+
+
 # ── pass 4: the timeline ─────────────────────────────────────────────────────
 
 def _staff_emails() -> list[str]:
@@ -689,6 +747,7 @@ async def _run() -> dict[str, object]:
         ids = await pass_1_masters(admin)
         staff, partners = await pass_2_people(client, admin, ids)
         await pass_3_leads(client, admin, ids, staff, partners)
+        await pass_3b_quotations(client, admin)
     pass_4_timeline()
     return report()
 

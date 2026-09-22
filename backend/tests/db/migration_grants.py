@@ -28,7 +28,7 @@ _VERSIONS = Path(__file__).resolve().parents[2] / "api/db/migrations/versions"
 # list[tuple[str, str]]. Add a migration here when it grants or hand-writes a policy.
 _MODULE_NAMES = ("005_authorization", "006_leads", "007_administration",
                  "008_message_delivery", "009_subsidy_masters",
-                 "010_products_and_pricing")
+                 "010_products_and_pricing", "012_quotations")
 
 _NAME = re.compile(r"CREATE POLICY (\w+)")
 

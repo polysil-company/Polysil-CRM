@@ -1,6 +1,6 @@
 # Quotations API Contract - `/api/v1/quotations` and `/public/q`
 
-> **Status: spec rev 3, approved by plan review. Not shipped; being built.** The shapes
+> **Status: shipped.** The generated contract is `backend/docs/api/quotations.md` and `backend/docs/api/public.md`, which is the record; this document is the context around it and matches it. The shapes
 > below are the contract to build against, the same way `13-Leads-API-Contract.md`
 > was before leads shipped. Once the endpoints exist, the generated API doc
 > (`backend/docs/api/quotations.md`) supersedes this file's endpoint section:
@@ -148,7 +148,7 @@ or a revision: a product on the document is no longer sold; informational).
 ```jsonc
 { "lead_id": "uuid",
   "sales_type": "commercial",                     // defaults to the lead's inquiry_type; commercial | industrial
-  "partner_id": null,                             // defaults to the lead's assigned partner; decides the price tier
+  "partner_id": null,                             // OMIT the field for the lead's assigned partner; send null for a direct sale at the farmer tier
   "place_of_supply_territory_id": null,           // defaults to the lead's territory
   "seller_gstin_id": null,                        // defaults to the registration in force
   "price_effective_date": null,                   // defaults to today; a future date is allowed and warns
@@ -258,7 +258,8 @@ before the nightly job has run), `quotation_superseded`, `lead_not_open`,
 `201` with a new draft: version n+1, the same number, `supersedes: { id, version }`,
 lines copied and re-priced, `warnings` naming any line whose rate or slab changed
 (`repriced`). `409 revision_exists` if an open draft of this number already
-exists (open that one instead). Not from `draft` (edit it) or `accepted`.
+exists (open that one instead). Not from `draft` (edit it) or `accepted`, and
+`409 quotation_superseded` on an older version: revise the current one.
 
 ### `GET /quotations/{id}/versions`
 

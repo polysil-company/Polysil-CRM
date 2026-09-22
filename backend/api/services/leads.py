@@ -508,10 +508,21 @@ async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
     if not domain.can_transition(current, body.to_stage):
         raise ValidationFailed(f"A {current} lead cannot move to {body.to_stage}.",
                                code="invalid_transition", fields={"to_stage": body.to_stage})
-    if body.to_stage in domain.REQUIRES_QUOTATION:
+    if body.to_stage in domain.VIA_QUOTATION:
         raise ValidationFailed(
-            "This stage needs an accepted quotation, which this release does not have yet.",
+            "This stage is reached by sending a quotation, not from here.",
             code="quotation_required", fields={"to_stage": body.to_stage})
+    if body.to_stage in domain.REQUIRES_QUOTATION:
+        # Counted as the owner: an EXISTS under the caller's quotation policies would
+        # say no to an officer whose colleague raised the accepted quotation
+        # (FS-005 edge case 9).
+        accepted = (await db.execute(
+            text("SELECT quotation_accepted_for_lead(CAST(:id AS uuid))"),
+            {"id": lead_id})).scalar_one()
+        if not accepted:
+            raise ValidationFailed(
+                "This stage needs an accepted quotation on the lead.",
+                code="quotation_required", fields={"to_stage": body.to_stage})
 
     payload: dict[str, Any] = {"from": current, "to": body.to_stage}
     if body.to_stage == "lost":
@@ -1073,14 +1084,17 @@ _MAX_LIMIT = 100
 TOTAL_CEILING = 1000
 
 
-async def _capped_total(db: AsyncSession, filters: list[Any]) -> tuple[int, bool]:
+async def _capped_total(db: AsyncSession, table: Any, filters: list[Any]) -> tuple[int, bool]:
     """How many rows match, up to the ceiling, and whether there are more.
 
     The LIMIT is inside the subquery on purpose: it stops the scan, which is the
     whole point. `SELECT count(*) ... LIMIT 1001` would count everything and then
-    return one row.
+    return one row. The FROM is explicit because a global caller who also holds
+    the delete permission has a predicate of `true`, which names no column, and
+    `SELECT 1 WHERE true` is one row however many exist (code review F-6).
     """
     inner = (sa.select(sa.literal(1))
+             .select_from(table)
              .where(sa.and_(*filters))
              .limit(TOTAL_CEILING + 1)
              .subquery())
@@ -1145,7 +1159,8 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
         where.append(sa.or_(lead_t.c.created_at < c_ts,
                             sa.and_(lead_t.c.created_at == c_ts, lead_t.c.id < c_id)))
 
-    total, total_capped = await _capped_total(db, filters) if include_total else (None, False)
+    total, total_capped = (await _capped_total(db, lead_t, filters)
+                           if include_total else (None, False))
 
     page = (await db.execute(
         sa.select(lead_t.c.id, lead_t.c.created_at)

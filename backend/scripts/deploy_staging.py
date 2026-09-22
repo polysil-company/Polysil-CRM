@@ -123,7 +123,9 @@ def load_config() -> dict[str, str]:
 
     required = ["SSH_HOST", "SSH_USER", "SSH_KEY_PATH", "REMOTE_DIR",
                 "DB_NAME", "DB_USER", "DB_PASSWORD", "JWT_SECRET",
-                "PG_HOST", "PG_CONTAINER", "PG_SUPERUSER"]
+                "PG_HOST", "PG_CONTAINER", "PG_SUPERUSER",
+                # FS-005: the share link's origin; the API refuses to start without it
+                "PUBLIC_WEB_URL"]
     missing = [k for k in required if not env.get(k)]
     if missing:
         die("infra/.env.staging is missing: " + ", ".join(missing))

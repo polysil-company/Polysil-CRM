@@ -1,0 +1,177 @@
+{
+ "source": "data/masters/Commercial-Industrial Quotation and Sales Order formats.xls, sheet 'Users list', rows 14 to 20 and the totals in row 24. The sheet's own figures are unrounded floats shown here at two decimals; it applies each tier to the running balance and does not round between tiers.",
+ "intra_state": true,
+ "lines": [
+  {
+   "rate": "35.00",
+   "qty": "2.000",
+   "discounts": [
+    "10.000",
+    "5.000",
+    "3.000"
+   ],
+   "gst_slab": "5.000",
+   "sheet": {
+    "gross": "70.00",
+    "d1": "7.00",
+    "after1": "63.00",
+    "d2": "3.15",
+    "after2": "59.85",
+    "d3": "1.80",
+    "final": "58.05",
+    "total_discount": "11.95",
+    "gst": "2.90",
+    "final_with_gst": "60.96"
+   }
+  },
+  {
+   "rate": "36.00",
+   "qty": "2.000",
+   "discounts": [
+    "10.000",
+    "5.000",
+    "3.000"
+   ],
+   "gst_slab": "5.000",
+   "sheet": {
+    "gross": "72.00",
+    "d1": "7.20",
+    "after1": "64.80",
+    "d2": "3.24",
+    "after2": "61.56",
+    "d3": "1.85",
+    "final": "59.71",
+    "total_discount": "12.29",
+    "gst": "2.99",
+    "final_with_gst": "62.70"
+   }
+  },
+  {
+   "rate": "37.00",
+   "qty": "2.000",
+   "discounts": [
+    "10.000",
+    "5.000",
+    "3.000"
+   ],
+   "gst_slab": "5.000",
+   "sheet": {
+    "gross": "74.00",
+    "d1": "7.40",
+    "after1": "66.60",
+    "d2": "3.33",
+    "after2": "63.27",
+    "d3": "1.90",
+    "final": "61.37",
+    "total_discount": "12.63",
+    "gst": "3.07",
+    "final_with_gst": "64.44"
+   }
+  },
+  {
+   "rate": "38.00",
+   "qty": "1.000",
+   "discounts": [
+    "10.000",
+    "5.000",
+    "3.000"
+   ],
+   "gst_slab": "5.000",
+   "sheet": {
+    "gross": "38.00",
+    "d1": "3.80",
+    "after1": "34.20",
+    "d2": "1.71",
+    "after2": "32.49",
+    "d3": "0.97",
+    "final": "31.52",
+    "total_discount": "6.48",
+    "gst": "1.58",
+    "final_with_gst": "33.09"
+   }
+  },
+  {
+   "rate": "39.00",
+   "qty": "2.000",
+   "discounts": [
+    "10.000",
+    "5.000",
+    "3.000"
+   ],
+   "gst_slab": "5.000",
+   "sheet": {
+    "gross": "78.00",
+    "d1": "7.80",
+    "after1": "70.20",
+    "d2": "3.51",
+    "after2": "66.69",
+    "d3": "2.00",
+    "final": "64.69",
+    "total_discount": "13.31",
+    "gst": "3.23",
+    "final_with_gst": "67.92"
+   }
+  },
+  {
+   "rate": "10.00",
+   "qty": "6400.000",
+   "discounts": [
+    "10.000",
+    "5.000",
+    "3.000"
+   ],
+   "gst_slab": "5.000",
+   "sheet": {
+    "gross": "64000.00",
+    "d1": "6400.00",
+    "after1": "57600.00",
+    "d2": "2880.00",
+    "after2": "54720.00",
+    "d3": "1641.60",
+    "final": "53078.40",
+    "total_discount": "10921.60",
+    "gst": "2653.92",
+    "final_with_gst": "55732.32"
+   }
+  },
+  {
+   "rate": "41.00",
+   "qty": "1.000",
+   "discounts": [
+    "10.000",
+    "5.000",
+    "3.000"
+   ],
+   "gst_slab": "5.000",
+   "sheet": {
+    "gross": "41.00",
+    "d1": "4.10",
+    "after1": "36.90",
+    "d2": "1.84",
+    "after2": "35.05",
+    "d3": "1.05",
+    "final": "34.00",
+    "total_discount": "7.00",
+    "gst": "1.70",
+    "final_with_gst": "35.70"
+   }
+  }
+ ],
+ "sheet_totals": {
+  "gross": "64373.00",
+  "d1": "6437.30",
+  "after1": "57935.70",
+  "d2": "2896.79",
+  "after2": "55038.92",
+  "d3": "1651.17",
+  "final": "53387.75",
+  "total_discount": "10985.25",
+  "gst": "2669.39",
+  "final_with_gst": "56057.13"
+ },
+ "engine_totals_expected": {
+  "taxable": "53387.74",
+  "gst": "2669.38",
+  "note": "per-tier rounding, one paisa below the sheet on taxable and on GST (GAP-118); asserted exactly by the test, and the delta against sheet_totals is asserted too so a change in either direction is noticed"
+ }
+}

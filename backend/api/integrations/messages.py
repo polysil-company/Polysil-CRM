@@ -26,6 +26,7 @@ from api.config import Settings
 
 TEMPLATE_AUTH_OTP: Final = "auth.otp"
 TEMPLATE_LEAD_ACK: Final = "lead_ack"
+TEMPLATE_QUOTATION_SHARE: Final = "quotation_share"
 
 # FS-007 rule 16: the channel the sign-in code goes out on, a deployment constant
 # the 202 body and the definer's row both carry. Never derived from the number.
@@ -52,6 +53,13 @@ TEMPLATES: Final[dict[str, TemplateSpec]] = {
     # normalise_value and by rule 10b (once a day per number) until the client decides.
     TEMPLATE_LEAD_ACK: TemplateSpec("whatsapp_template_lead_ack",
                                     ("farmer_name", "inquiry_no"), None, timedelta(hours=24)),
+    # FS-005 rule 16: the link is a body parameter carrying the whole URL, built by
+    # the worker from public_web_url and the row's token; the origin is bounded at
+    # startup so the value never reaches VALUE_MAX (edge case 17). No button: the
+    # adapter's only button is the authentication one (GAP-110).
+    TEMPLATE_QUOTATION_SHARE: TemplateSpec("whatsapp_template_quotation_share",
+                                           ("party_name", "quote_no", "link"), None,
+                                           timedelta(days=7)),
 }
 
 _BODIES: Final[dict[str, str]] = {
@@ -65,6 +73,9 @@ _BODIES: Final[dict[str, str]] = {
     TEMPLATE_LEAD_ACK: (
         "Thank you {farmer_name}. Polysil has received your enquiry {inquiry_no}. "
         "Our team will contact you shortly."
+    ),
+    TEMPLATE_QUOTATION_SHARE: (
+        "{party_name}, your Polysil quotation {quote_no} is ready: {link}"
     ),
 }
 

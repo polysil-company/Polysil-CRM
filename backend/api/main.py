@@ -25,7 +25,7 @@ from api.errors import (
     internal_error_handler,
     validation_error_handler,
 )
-from api.routers import auth, leads, masters, pricing, products, subsidy, users
+from api.routers import auth, leads, masters, pricing, products, public, quotations, subsidy, users
 
 log = structlog.get_logger()
 
@@ -149,6 +149,10 @@ def create_app() -> FastAPI:
     app.include_router(products.tax_rates, prefix=API_PREFIX)
     app.include_router(pricing.price_lists, prefix=API_PREFIX)
     app.include_router(pricing.router, prefix=API_PREFIX)
+    app.include_router(quotations.router, prefix=API_PREFIX)
+    # The farmer's link: /public, not /api/v1. No session, two definer functions
+    # on app_anon, and a file route the local storage adapter alone uses (FS-005 4).
+    app.include_router(public.router)
 
     return app
 

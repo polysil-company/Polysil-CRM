@@ -34,12 +34,26 @@ MUTATIONS = [
     ("the discount is taken off the unrounded gross", TAX,
      "    gross = round2(rate * qty)\n    if gross > MAX_LINE_TOTAL:",
      "    gross = rate * qty\n    if gross > MAX_LINE_TOTAL:"),
-    ("the taxable value is rounded again", TAX,
-     "    taxable = gross - discount",
-     "    taxable = round2(round2(rate * qty * (HUNDRED - discount_pct) / HUNDRED))"),
-    ("the discount is not rounded", TAX,
-     "    discount = round2(gross * discount_pct / HUNDRED)",
-     "    discount = gross * discount_pct / HUNDRED"),
+    ("the taxable value is recomputed in one shot", TAX,
+     "    taxable = balance",
+     "    taxable = round2(gross * (HUNDRED - sum(tiers, ZERO)) / HUNDRED)"),
+    ("a tier's amount is not rounded", TAX,
+     "        amount = round2(balance * pct / HUNDRED)",
+     "        amount = balance * pct / HUNDRED"),
+
+    # ── FS-005 rule 6: the cascade ───────────────────────────────────────────
+    ("the second tier is taken off the gross, not the running balance", TAX,
+     "        amount = round2(balance * pct / HUNDRED)",
+     "        amount = round2(gross * pct / HUNDRED)"),
+    ("the document discount is a summed percentage of the gross", TAX,
+     "    discount = gross - balance",
+     "    discount = round2(gross * sum(tiers, ZERO) / HUNDRED)"),
+    ("a zero tier is skipped and the columns shift", TAX,
+     "    for pct in tiers:\n        amount = round2(balance * pct / HUNDRED)",
+     "    for pct in tiers:\n        if pct == ZERO:\n            continue\n"
+     "        amount = round2(balance * pct / HUNDRED)"),
+    ("the tier bound is not enforced", TAX,
+     "    if len(tiers) > MAX_TIERS:", "    if False:"),
 
     # ── rule 9: each component at its own rate, rounded on its own ───────────
     ("the whole slab is halved instead of halving the rate", TAX,

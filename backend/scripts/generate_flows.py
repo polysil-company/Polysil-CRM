@@ -925,9 +925,10 @@ def f_quotation() -> None:
     e += title("A quotation: saved, frozen, numbered, sent, answered",
                sub="The save re-resolves every line. The send is a database transaction and "
                    "nothing else. The worker renders. A sent document never changes.",
-               status="DESIGN (FS-005 rev 2, plan review round 2 in progress). Nothing built. "
-                      "Pricing underneath it is FS-010, built.",
-               status_colour=RED)
+               status="BUILT (FS-005 rev 4): migration 012, /quotations, /public/q, the worker "
+                      "render lease and the nightly expiry. The PDF renders in CI and the "
+                      "container; not on the Windows box.",
+               status_colour=GREEN)
 
     steps = [
         ("q1", "POST /quotations  on a QUALIFIED lead\nlines: product, qty, three discounts,\n"

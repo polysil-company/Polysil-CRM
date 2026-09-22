@@ -491,9 +491,16 @@ base, and nobody has told us which.
 | `price_list_id` | string | yes |  |
 | `price_list_item_id` | string | yes |  |
 | `gross` | string | yes |  |
-| `discount_pct` | string | yes |  |
-| `discount` | string | yes |  |
-| `taxable` | string | yes |  |
+| `discount_pct` | string | yes | The first tier's percentage. |
+| `discount1_amt` | string | yes | What the first tier took off the gross. |
+| `after_discount1` | string | yes |  |
+| `discount2_pct` | string | yes |  |
+| `discount2_amt` | string | yes | What the second tier took off after_discount1. |
+| `after_discount2` | string | yes |  |
+| `discount3_pct` | string | yes |  |
+| `discount3_amt` | string | yes | What the third tier took off after_discount2. |
+| `discount` | string | yes | The three amounts summed. Not gross x discount_pct: that is only the first tier. |
+| `taxable` | string | yes | The balance after the third tier. |
 | `hsn_code` | string | yes |  |
 | `gst_slab` | string | yes |  |
 | `gst_rate_id` | string | yes |  |
@@ -512,7 +519,9 @@ base, and nobody has told us which.
 |---|---|---|---|
 | `product_id` | string | yes |  |
 | `qty` | number | string | yes | At most as many decimals as the unit admits, and a multiple of `pack_multiple` when the product sets one. |
-| `discount_pct` | number | string |  | Per cent off this line, at most three decimals. Default `0`. |
+| `discount_pct` | number | string |  | The first discount tier: per cent off the gross, at most three decimals. Default `0`. |
+| `discount2_pct` | number | string |  | The second tier, per cent off the balance after the first. Each tier's amount is rounded to the paisa before the next applies. Default `0`. |
+| `discount3_pct` | number | string |  | The third tier, per cent off the balance after the second. Default `0`. |
 
 **`QuoteLinesRequest`**
 

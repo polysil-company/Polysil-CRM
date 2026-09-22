@@ -12,6 +12,7 @@ from api.domain.leads import (
     REQUIRES_QUOTATION,
     TERMINAL,
     TRANSITIONS,
+    VIA_QUOTATION,
     MobileError,
     can_transition,
     financial_year,
@@ -44,7 +45,11 @@ def test_terminal_stages_have_no_transition_out() -> None:
 
 
 def test_the_quotation_gated_stages_are_marked() -> None:
-    assert set(REQUIRES_QUOTATION) == {"quoted", "negotiation", "won"}
+    """FS-005: quoted and negotiation are reached through the quotation, never from
+    the lead endpoint; won needs an accepted quotation on the lead."""
+    assert set(VIA_QUOTATION) == {"quoted", "negotiation"}
+    assert set(REQUIRES_QUOTATION) == {"won"}
+    assert "won" in TRANSITIONS["quoted"], "a quotation accepted as sent skips negotiation"
 
 
 # ── mobile normalisation ─────────────────────────────────────────────────────
