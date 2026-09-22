@@ -24,6 +24,17 @@ const TYPE_OPTIONS = LEAD_INQUIRY_TYPES.map((type) => ({
   label: LEAD_INQUIRY_TYPE_LABELS[type],
 }));
 
+/** What the Source pill says when it has no options: three different reasons, three messages. */
+function sourcesMessage(isPending: boolean, isError: boolean): string {
+  if (isError) {
+    return "Sources couldn't be loaded. Try again later.";
+  }
+  if (isPending) {
+    return "Loading sources…";
+  }
+  return "No sources are set up yet.";
+}
+
 /**
  * Search, filters and the primary action for the leads list. The backend filters by several
  * stages at once but by one source and one inquiry type, so those two pills are single-choice.
@@ -63,9 +74,7 @@ export function LeadsToolbar(): React.JSX.Element {
             label="Source"
             options={sourceOptions}
             selected={params.source}
-            emptyMessage={
-              sources.isError ? "Sources couldn't be loaded. Try again later." : "Loading sources…"
-            }
+            emptyMessage={sourcesMessage(sources.isPending, sources.isError)}
             onChange={(source) => {
               setFilters({ source });
             }}

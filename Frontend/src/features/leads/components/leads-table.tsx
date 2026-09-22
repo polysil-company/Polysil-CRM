@@ -181,7 +181,8 @@ export function LeadsTable(): React.JSX.Element {
               getRowId={(lead) => lead.id}
               rowCount={data.total}
               rowCountCapped={data.totalCapped}
-              hasNextPage={data.nextCursor !== null && !pageLoading}
+              hasNextPage={data.nextCursor !== null}
+              isPaging={pageLoading}
               sorting={sorting}
               onSortingChange={handleSortingChange}
               pagination={{ pageIndex, pageSize: params.pageSize }}

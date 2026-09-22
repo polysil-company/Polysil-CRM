@@ -32,6 +32,21 @@ describe("[LEAD-001] LeadsTable", () => {
     expect(await within(table).findAllByText("Agri Fair")).not.toHaveLength(0);
   });
 
+  it("keeps a source code the administrators wrote with a hyphen", async () => {
+    let sent: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/leads"), ({ request }) => {
+        sent = new URL(request.url);
+        return emptyPage(0);
+      }),
+    );
+    renderWithProviders(<LeadsTable />, { searchParams: "?source=agri-fair" });
+
+    // "No leads yet" instead would mean the filter was dropped on the way in.
+    expect(await screen.findByText("No leads match these filters")).toBeInTheDocument();
+    expect(sent?.searchParams.get("source")).toBe("agri-fair");
+  });
+
   it("moves to the next page with the page token, and back", async () => {
     const user = userEvent.setup();
     const onUrlChange = vi.fn<(queryString: string) => void>();

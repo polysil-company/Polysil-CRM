@@ -32,6 +32,7 @@ interface RenderTableOptions {
   rowCount?: number | null;
   rowCountCapped?: boolean;
   hasNextPage?: boolean;
+  isPaging?: boolean;
   pagination?: PaginationState;
   rowSelection?: RowSelectionState;
   sorting?: SortingState;
@@ -55,6 +56,7 @@ function renderTable(options: RenderTableOptions = {}): {
       rowCount={options.rowCount === undefined ? people.length : options.rowCount}
       {...(options.rowCountCapped === undefined ? {} : { rowCountCapped: options.rowCountCapped })}
       {...(options.hasNextPage === undefined ? {} : { hasNextPage: options.hasNextPage })}
+      {...(options.isPaging === undefined ? {} : { isPaging: options.isPaging })}
       sorting={options.sorting ?? []}
       onSortingChange={onSortingChange}
       pagination={options.pagination ?? { pageIndex: 0, pageSize: 25 }}
@@ -136,6 +138,18 @@ describe("[DS-001] DataTable", () => {
     expect(screen.getByText("Page 1")).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "People" })).toHaveAttribute("aria-rowcount", "-1");
     expect(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
+  });
+
+  it("disables both paging buttons while a page change is still loading", () => {
+    renderTable({
+      rowCount: 60,
+      hasNextPage: true,
+      isPaging: true,
+      pagination: { pageIndex: 1, pageSize: 2 },
+    });
+
+    expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
   });
 
   it("lets a cursor-paged API decide whether there is a next page", () => {

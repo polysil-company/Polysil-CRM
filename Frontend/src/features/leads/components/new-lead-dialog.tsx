@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { parseAsBoolean, useQueryState } from "nuqs";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type * as React from "react";
 import { Controller, useForm, useFormState, type DefaultValues } from "react-hook-form";
 import { toast } from "sonner";
@@ -142,6 +142,7 @@ export function NewLeadDialog(): React.JSX.Element {
   const [open, setOpen] = useQueryState("newLead", parseAsBoolean.withDefault(false));
   const [formError, setFormError] = useState<unknown>(null);
   const lastAttempt = useRef<{ body: string; key: string } | null>(null);
+  const closeTimer = useRef<number | undefined>(undefined);
   const createLead = useCreateLead();
   const form = useForm<CreateLeadFormValues, unknown, CreateLeadRequest>({
     resolver: zodResolver(createLeadFormSchema),
@@ -149,6 +150,14 @@ export function NewLeadDialog(): React.JSX.Element {
     mode: "onTouched",
   });
   const { errors } = useFormState({ control: form.control });
+
+  // The dialog can be left before the success check has had its moment; the timer must not
+  // outlive it, or it resets a form that is gone and writes to another page's URL.
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(closeTimer.current);
+    };
+  }, []);
 
   const idempotencyKeyFor = (body: CreateLeadRequest): string => {
     const serialized = JSON.stringify(body);
@@ -167,6 +176,7 @@ export function NewLeadDialog(): React.JSX.Element {
   };
 
   const resetForm = (): void => {
+    window.clearTimeout(closeTimer.current);
     form.reset(EMPTY_FORM);
     lastAttempt.current = null;
   };
@@ -179,7 +189,7 @@ export function NewLeadDialog(): React.JSX.Element {
     dataId: "LEAD-002",
     onSuccess: (lead) => {
       toast.success("Lead created", { description: describeCreatedLead(lead) });
-      window.setTimeout(() => {
+      closeTimer.current = window.setTimeout(() => {
         void setOpen(false);
         resetForm();
       }, CLOSE_AFTER_SUCCESS_MS);
@@ -390,6 +400,7 @@ export function NewLeadDialog(): React.JSX.Element {
                       <LookupSelect
                         {...aria}
                         list="lead-sources"
+                        clearable
                         placeholder="Where the enquiry came from"
                         value={field.value ?? null}
                         onValueChange={field.onChange}

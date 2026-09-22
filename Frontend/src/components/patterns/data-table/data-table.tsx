@@ -64,6 +64,12 @@ export interface DataTableProps<TData extends RowData> {
    * page" is enabled, instead of the count.
    */
   hasNextPage?: boolean;
+  /**
+   * A page change has not landed yet, so the rows on screen still belong to the previous
+   * page. Both paging buttons are disabled until it does: their next click would be read
+   * against the wrong page.
+   */
+  isPaging?: boolean;
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
   pagination: PaginationState;
@@ -91,6 +97,7 @@ export function DataTable<TData extends RowData>({
   rowCount,
   rowCountCapped = false,
   hasNextPage,
+  isPaging = false,
   sorting,
   onSortingChange,
   pagination,
@@ -130,7 +137,9 @@ export function DataTable<TData extends RowData>({
   const firstRowIndex = pagination.pageIndex * pagination.pageSize;
   const pageCount =
     rowCount === null ? null : Math.max(1, Math.ceil(rowCount / pagination.pageSize));
-  const canNext = hasNextPage ?? (pageCount !== null && pagination.pageIndex + 1 < pageCount);
+  const canNext =
+    !isPaging && (hasNextPage ?? (pageCount !== null && pagination.pageIndex + 1 < pageCount));
+  const canPrevious = !isPaging && pagination.pageIndex > 0;
   // -1 tells assistive tech the total is unknown, rather than announcing a wrong one.
   const ariaRowCount = rowCount === null || rowCountCapped ? -1 : rowCount + 1;
 
@@ -199,7 +208,7 @@ export function DataTable<TData extends RowData>({
         lastRow={firstRowIndex + rows.length}
         rowCount={rowCount}
         rowCountCapped={rowCountCapped}
-        canPrevious={pagination.pageIndex > 0}
+        canPrevious={canPrevious}
         canNext={canNext}
         onPrevious={() => {
           onPaginationChange({ ...pagination, pageIndex: pagination.pageIndex - 1 });
