@@ -920,6 +920,137 @@ def f_pricing() -> None:
     write("11-pricing", e)
 
 
+def f_quotation() -> None:
+    e, n = [], {}
+    e += title("A quotation: saved, frozen, numbered, sent, answered",
+               sub="The save re-resolves every line. The send is a database transaction and "
+                   "nothing else. The worker renders. A sent document never changes.",
+               status="DESIGN (FS-005 rev 2, plan review round 2 in progress). Nothing built. "
+                      "Pricing underneath it is FS-010, built.",
+               status_colour=RED)
+
+    steps = [
+        ("q1", "POST /quotations  on a QUALIFIED lead\nlines: product, qty, three discounts,\n"
+               "and the ids the preview showed", BLUE),
+        ("q2", "re-resolve every line at price_effective_date\n"
+               "(FS-010: state > tier, dated tax masters)\n"
+               "ids differ from the preview -> 409 rate_changed", GREEN),
+        ("q3", "INSERT quotation + lines. NO NUMBER YET.\nscope columns copied from the lead\n"
+               "activity_event quotation.created (carries lead_id)", BLUE),
+        ("q4", "draft: PATCH header, PUT lines, re-priced on every save\n"
+               "expected_status on every mutation", BLUE),
+        ("q5", "POST /send: lock draft (and predecessor, lower version first)\n"
+               "re-resolve and compare again -> 409 rate_changed\n"
+               "predecessor accepted -> 409", YELLOW),
+        ("q6", "allocate QT/GJ/2026-27/00001  (definer, row lock,\n"
+               "LAST read before the write)\nvalid_until = send date IST + 45 d\n"
+               "share token derived by HMAC, only its hash stored", GREEN),
+        ("q7", "lead_stage_from_quotation(lead, 'quoted')\n"
+               "ONE definer function moves the lead, or refuses:\n"
+               "lost / merged / dormant / deleted -> 422 lead_not_open", RED),
+        ("q8", "COMMIT. status sent, pdf_state pending.\n"
+               "No network call happened.", GREEN),
+        ("q9", "WORKER, every 5 s, as the system principal:\n"
+               "claim one pending (definer, SKIP LOCKED)\n"
+               "render HTML -> PDF, put to R2, mark ready,\n"
+               "THEN queue the WhatsApp link", VIOLET),
+        ("q10", "GET /public/q/{token}: number, total, validity.\n"
+                "NO name, NO mobile, NO lines.\n"
+                "GET /public/q/{token}/pdf: the view is recorded HERE,\n"
+                "then 302 to a ten-minute presigned URL", BLUE),
+        ("q11", "POST /transition: accepted / rejected / negotiation\n"
+                "accepted -> lead WON (through the same definer)\n"
+                "past valid_until (IST) -> 422 quotation_expired", GREEN),
+        ("q12", "POST /revise -> version n+1, same number, new draft\n"
+                "sending it sets superseded_by_id on version n\n"
+                "version n keeps its status, PDF and link", BLUE),
+    ]
+    y = 60
+    for eid, label, colour in steps:
+        els = node(eid, 300, y, label, w=560, h=92, colour=colour)
+        n[eid] = els[0]
+        e += els
+        y += 150
+    order = [s[0] for s in steps]
+    for a, b in zip(order, order[1:], strict=False):
+        e += edge(f"e_{a}_{b}", n[a], n[b])
+
+    e += note("nRed1", 920, 60,
+              "THE LEAD IS NEVER UPDATED DIRECTLY\n\n"
+              "An UPDATE on a lead the caller no longer owns\n"
+              "is filtered by RLS to zero rows and raises\n"
+              "nothing. The event written beside it would\n"
+              "record a move that did not happen.\n\n"
+              "lead_stage_from_quotation() requires\n"
+              "lead_visible() and leads.edit, locks the lead,\n"
+              "applies the coupling table, and returns the\n"
+              "previous stage or raises. Every role that can\n"
+              "create or edit a quotation holds leads.edit at\n"
+              "the same scope, so it never locks out a\n"
+              "legitimate caller (edge case 2, plan review B-8).",
+              w=460, colour=RED)
+
+    e += note("nRed2", 920, 420,
+              "NO NETWORK CALL INSIDE THE TRANSACTION\n\n"
+              "Rev 1 rendered the PDF and PUT it to R2 inside\n"
+              "the send, holding two row locks and a pooled\n"
+              "connection for the provider's timeout. Rev 2\n"
+              "moves the render, the upload and the outbox row\n"
+              "to the worker. Two things fall out for free: the\n"
+              "outbox INSERT policy (narrowed to lead_ack and\n"
+              "the system principal in 006) needs no new arm,\n"
+              "and WeasyPrint never runs in the API process.\n\n"
+              "The system principal holds no module\n"
+              "permissions, so the worker touches quotations\n"
+              "only through definer functions guarded on\n"
+              "app_is_system().",
+              w=460, colour=RED)
+
+    e += note("nRed3", 920, 780,
+              "TODAY IS today_ist(), NEVER current_date\n\n"
+              "The box runs UTC. At 00:05 IST current_date is\n"
+              "still yesterday, so a job written with it expires\n"
+              "every quotation a day late and disagrees with\n"
+              "the service for five and a half hours a night.\n"
+              "The job takes the date as a parameter; the\n"
+              "service and the public JSON use the same clock.",
+              w=460, colour=RED)
+
+    e += note("nGreen1", 920, 1000,
+              "SCOPE MIRRORS THE LEAD\n\n"
+              "owner_user_id, owner_org_unit_id and territory_id\n"
+              "are the lead's, propagated by a definer trigger\n"
+              "when the lead is reassigned, corrected or merged.\n"
+              "The creator is created_by. The immutability\n"
+              "trigger admits those three columns only at\n"
+              "trigger depth 2, never from a statement.\n\n"
+              "Quotation events are visible to whoever can see\n"
+              "the quotation; lead_timeline() filters them.",
+              w=460, colour=GREEN)
+
+    e += note("nYellow1", 920, 1260,
+              "ASSUMPTIONS WITH GAPS (103 to 119)\n\n"
+              "Number at send, own series, the lead's state.\n"
+              "Versioning not editing (question 2.4).\n"
+              "Each discount tier rounded before the next:\n"
+              "one paisa apart from the client's sheet on its\n"
+              "own seven lines (GAP-118).\n"
+              "Acceptance wins the lead; several accepted\n"
+              "quotations per lead allowed.\n"
+              "Stand-in prices sendable with a banner.\n"
+              "No approval gate until the engine (W4).\n"
+              "External quotation and attachments: FS-005a.",
+              w=460, colour=YELLOW)
+
+    e += note("nGrey1", 300, y + 20,
+              "Not here: the sales order (W4), the approval chain, the price-list\n"
+              "selector on a revision (GAP-116), export / marketing / sample /\n"
+              "subsidised types, streaming the PDF through the API.",
+              w=560, colour=GREY)
+
+    write("12-quotation", e)
+
+
 def f_auth() -> None:
     e, n = [], {}
     e += title("Signing in, and staying signed in",
@@ -1152,5 +1283,5 @@ if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
     f_approval(); f_subsidy(); f_outbox(); f_money(); f_pricing()
-    f_auth(); f_admin()
+    f_quotation(); f_auth(); f_admin()
     print(f"\nwrote to {OUT}")
