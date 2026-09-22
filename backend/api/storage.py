@@ -19,9 +19,10 @@ import hashlib
 import hmac
 import logging
 import pathlib
+import re
 from dataclasses import dataclass
 from typing import Any, Protocol
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 
 from api.config import Settings
 
@@ -186,5 +187,13 @@ def get_storage(settings: Settings) -> Storage:
                         public_base="")
 
 
+_UNSAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
+
+
 def filename_from_query(name: str | None) -> str:
-    return unquote(name) if name else "quotation.pdf"
+    """A header-safe file name from the query. FastAPI has already decoded it
+    once; decoding again let `%2522` close the quoted value and `%E0%A4%95` raise
+    on the latin-1 header (PR #10 review). Anything outside [A-Za-z0-9._-] is a
+    dash, which is also what domain.pdf_filename() produces."""
+    cleaned = _UNSAFE_NAME.sub("-", name or "").strip("-.")[:120]
+    return cleaned or "quotation.pdf"

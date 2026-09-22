@@ -216,6 +216,9 @@ class Settings(BaseSettings):
     # The render lease (FS-005 5.2): longer than any render, shorter than a
     # user's patience.
     pdf_lease_minutes: int = 5
+    # seconds one render tick may keep claiming; under the 5 s cadence, so ticks do
+    # not pile up and hold the worker's job slots the outbox drain needs
+    pdf_render_budget: float = 4.0
 
     sentry_dsn: SecretStr | None = None
 

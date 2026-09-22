@@ -163,14 +163,23 @@ def test_every_glyph_of_the_widest_table_lies_on_the_page() -> None:
     reader = pypdf.PdfReader(io.BytesIO(render_pdf(render_html(doc))))
     for page in reader.pages:
         width = float(page.mediabox.width)
-        xs: list[float] = []
+        ends: list[tuple[float, str]] = []
 
-        def visit(text: str, cm: list, tm: list, *_: object, xs: list[float] = xs) -> None:
-            if text.strip():
-                xs.append(cm[4] + tm[4] * cm[0])
+        def visit(text: str, cm: list, tm: list, _font: object, size: float,
+                  ends: list[tuple[float, str]] = ends) -> None:
+            if not text.strip():
+                return
+            scale = cm[0] * tm[0] or 1.0
+            start = cm[4] + tm[4] * cm[0]
+            # PR #10 review: the start alone passes a figure that overruns the edge
+            # by less than its own width. Half an em per character is a floor for
+            # Noto Sans digits, so the estimate never flatters the layout.
+            ends.append((start + 0.5 * size * scale * len(text.strip()), text.strip()))
 
         page.extract_text(visitor_text=visit)
-        assert xs and max(xs) < width, (max(xs), width)
+        assert ends, "no text on the page"
+        widest = max(ends)
+        assert widest[0] <= width, (widest, width)
 
 
 def test_a_stale_worker_writes_beside_the_published_document(
@@ -206,3 +215,33 @@ def test_a_stale_worker_writes_beside_the_published_document(
     assert store[published] == b"the document the farmer has"
     assert storage_key(qid, version, "lease-b") in store
     assert put_threads and put_threads[0] != loop_thread[0], "the upload ran on the loop"
+
+
+
+def test_a_render_tick_stops_at_its_budget_and_never_overlaps(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """PR #10 review: without a budget a backlog of slow renders held a tick for
+    minutes, and overlapping ticks filled the job slots the outbox drain needs."""
+    import asyncio
+
+    calls: list[int] = []
+
+    async def slow_render(*_: object) -> str:
+        calls.append(1)
+        await asyncio.sleep(0.05)
+        return "ready"
+
+    settings = get_settings().model_copy(update={"pdf_render_budget": 0.12})
+    monkeypatch.setattr(job, "render_one", slow_render)
+    monkeypatch.setattr(job, "get_settings", lambda: settings)
+
+    async def two_ticks() -> tuple[int, int]:
+        first = asyncio.create_task(job.quotation_render_due({"storage": object()}))
+        await asyncio.sleep(0.01)
+        second = await job.quotation_render_due({"storage": object()})
+        return await first, second
+
+    handled, overlapped = asyncio.run(two_ticks())
+    assert overlapped == 0, "a tick that finds one running does nothing"
+    assert 1 <= handled <= 4, handled
+    assert asyncio.run(job.quotation_render_due({"storage": object()})) >= 1, "the guard resets"

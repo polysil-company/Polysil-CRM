@@ -739,3 +739,17 @@ async def test_a_seller_state_change_is_refused_at_send_though_no_id_moved(
                              "WHERE id = CAST(:g AS uuid)"),
                         {"home": home, "g": catalogue.gstin_id})
         await s.commit()
+
+
+async def test_a_price_date_too_far_ahead_names_the_quotations_own_field(
+        client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue) -> None:
+    """PR #10 review: the refusal named `as_of`, which the quotation forms do not
+    have, so the screen could not attach it to the input."""
+    h = await _auth(client, quoter)
+    lead = await _qualified_lead(client, h, qenv)
+    far = (today_ist() + dt.timedelta(days=800)).isoformat()
+    r = await client.post(f"{V1}/quotations", headers={**h, **_key()},
+                          json=_create_body(lead["id"], catalogue, price_effective_date=far))
+    assert r.status_code == 422, r.text
+    fields = r.json()["error"]["fields"]
+    assert "price_effective_date" in fields and "as_of" not in fields, fields

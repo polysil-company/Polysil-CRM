@@ -25,6 +25,7 @@ import datetime as dt
 import functools
 import json
 import pathlib
+import time
 import warnings
 from decimal import Decimal
 from typing import Any
@@ -189,18 +190,32 @@ async def render_one(settings: Settings, storage: Storage) -> str | None:
     return "ready"
 
 
+# one render tick at a time in this process (PR #10 review)
+_ticking = False
+
+
 async def quotation_render_due(ctx: dict[str, Any], *, batch: int = 20) -> int:
     """Every five seconds: render what is pending, one document per lease, up to
     `batch` in one tick. Twelve a minute is a field team's pace, not a bulk send's."""
-    settings = get_settings()
-    storage: Storage = ctx.get("storage") or get_storage(settings)
-    handled = 0
-    while handled < batch:
-        outcome = await render_one(settings, storage)
-        if outcome is None:
-            break
-        handled += 1
-    return handled
+    global _ticking
+    if _ticking:
+        # the previous tick is still rendering; a second one would take another of
+        # the worker's ten job slots, and enough of them stall the sign-in codes
+        return 0
+    _ticking = True
+    try:
+        settings = get_settings()
+        storage: Storage = ctx.get("storage") or get_storage(settings)
+        started = time.monotonic()
+        handled = 0
+        while handled < batch and time.monotonic() - started < settings.pdf_render_budget:
+            outcome = await render_one(settings, storage)
+            if outcome is None:
+                break
+            handled += 1
+        return handled
+    finally:
+        _ticking = False
 
 
 # ── the nightly expiry ───────────────────────────────────────────────────────

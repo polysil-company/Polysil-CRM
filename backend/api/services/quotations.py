@@ -55,7 +55,7 @@ from api.schemas.leads import (
     UserRef,
 )
 from api.services import pricing
-from api.services.clock import today_ist
+from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
 from api.storage import Storage
@@ -278,9 +278,17 @@ async def _lead_defaults(db: AsyncSession, lead_id: str) -> Any:
 async def _price(db: AsyncSession, *, partner_id: str | None, pos_territory_id: str,
                  seller_gstin_id: str | None, as_of: dt.date | None,
                  specs: list[LineSpec], existing: bool) -> PricedContext:
-    return await pricing.price_document(
-        db, partner_id=partner_id, place_of_supply_territory_id=pos_territory_id,
-        seller_gstin_id=seller_gstin_id, as_of=as_of, lines=specs, existing=existing)
+    try:
+        return await pricing.price_document(
+            db, partner_id=partner_id, place_of_supply_territory_id=pos_territory_id,
+            seller_gstin_id=seller_gstin_id, as_of=as_of, lines=specs, existing=existing)
+    except ValidationFailed as exc:
+        # the pipeline speaks the preview's field name; a quotation's is
+        # price_effective_date, and a screen attaches errors by field (PR #10 review)
+        if exc.fields and "as_of" in exc.fields:
+            exc.fields = {("price_effective_date" if k == "as_of" else k): v
+                          for k, v in exc.fields.items()}
+        raise
 
 
 def _compare(lines: list[sch.QuotationLineIn], ctx: PricedContext) -> None:
@@ -606,8 +614,10 @@ async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | No
 
 
 def _parse_date(value: str, field: str) -> datetime:
+    """The start of that day on the IST calendar. A UTC midnight put the list's
+    date filter five and a half hours off the day the user means (PR #10 review)."""
     try:
-        return datetime.combine(dt.date.fromisoformat(value), dt.time.min, tzinfo=UTC)
+        return datetime.combine(dt.date.fromisoformat(value), dt.time.min, tzinfo=IST)
     except ValueError as exc:
         raise ValidationFailed(fields={field: "not an ISO date"}) from exc
 
@@ -724,6 +734,11 @@ async def create_quotation(db: AsyncSession, caller: Caller, body: sch.Quotation
     return _with_pricing_warnings(await get_quotation(db, str(quotation_id), settings), ctx)
 
 
+# the messages refuse_sent_quotation_edit() and its line twin raise (migration 012)
+_FROZEN_REFUSALS = ("a sent quotation cannot change", "the lines of a sent quotation",
+                    "cannot become", "an accepted quotation cannot be superseded")
+
+
 def _map_write_error(exc: DBAPIError) -> Exception:
     code = _sqlstate(exc)
     msg = _pg_text(exc)
@@ -731,10 +746,13 @@ def _map_write_error(exc: DBAPIError) -> Exception:
         return ConflictError("A revision of this quotation is already open. Send or delete it.",
                              code="revision_exists")
     if code == "23514":
+        # by what raised it, never by SQLSTATE alone: the table's own CHECKs failing
+        # is a server bug and must surface as a 500 (PR #10 review)
         if "party_gstin" in msg:
             return ValidationFailed(fields={"party.gstin": "not a valid GSTIN"})
-        return ConflictError("The quotation cannot change in that way.",
-                             code="quotation_not_draft")
+        if any(m in msg for m in _FROZEN_REFUSALS):
+            return ConflictError("The quotation cannot change in that way.",
+                                 code="quotation_not_draft")
     if code == "42501":
         return ForbiddenError("Not permitted on this quotation.")
     return exc

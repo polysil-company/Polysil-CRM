@@ -389,16 +389,33 @@ async def test_the_system_functions_refuse_a_person(db: AsyncSession, ids: Fixtu
 async def test_the_lead_cannot_be_moved_by_someone_holding_only_leads_edit(
         db: AsyncSession, ids: Fixtures) -> None:
     """Cross-vendor B-2: marketing and every portal role hold leads.edit without
-    quotations.edit. Called directly, past the routes."""
+    quotations.edit. Called directly, past the routes.
+
+    PR #10 review: the dealer must be able to SEE the quotation, or the next
+    guard (quotation_visible) refuses with the same SQLSTATE and deleting the
+    permission guard leaves the test green. So the quotation is routed through
+    the dealer, the dealer may view quotations, and the refusal's message is the
+    permission guard's own."""
     lead = await _lead(db, ids, stage="quoted")
-    q = await _quotation(db, ids, lead, status="sent")
+    q = await _quotation(db, ids, lead)
+    await db.execute(text("UPDATE quotation SET partner_id = CAST(:d AS uuid) "
+                          "WHERE id = CAST(:q AS uuid)"), {"d": ids.dealer_id, "q": q})
+    await db.execute(text(
+        "UPDATE quotation SET status = 'sent', sent_at = now(), valid_until = CURRENT_DATE + 45, "
+        "share_token = :token, quote_no = :no, seller_legal_name = 'Polysil', "
+        "seller_gstin_no = '24AAAAA0000A1Z5', seller_state_code = 'GJ', pdf_state = 'pending' "
+        "WHERE id = CAST(:q AS uuid)"),
+        {"token": domain.share_token(), "no": "QT/T/" + uuid.uuid4().hex[:8], "q": q})
     await _grant(db, ids.portal_role_id, "leads", ["view", "edit"], "global")
+    await _grant(db, ids.portal_role_id, "quotations", ["view"], "partner_subtree")
     dealer = await make_partner_user(db, ids, mobile="9198" + f"{uuid.uuid4().int % 10**8:08d}")
     await _as(db, dealer)
-    await _refused(db, "SELECT lead_stage_from_quotation(CAST(:q AS uuid), 'quoted')", {"q": q},
-                   "42501")
-    await _refused(db, "SELECT lead_stage_from_quotation(CAST(:q AS uuid), 'won')", {"q": q},
-                   "42501")
+    assert (await db.execute(text("SELECT quotation_visible(CAST(:q AS uuid))"),
+                             {"q": q})).scalar_one(), "the dealer sees the routed quotation"
+    for to in ("quoted", "won"):
+        message = await _refused(db, "SELECT lead_stage_from_quotation(CAST(:q AS uuid), :to)",
+                                 {"q": q, "to": to}, "42501")
+        assert "not permitted to edit quotations" in message, message
 
 
 async def test_the_lead_moves_only_for_a_quotation_in_the_justifying_state(
@@ -552,6 +569,16 @@ async def test_expiry_takes_the_date_it_is_given_and_skips_superseded_rows(
     await db.execute(text("UPDATE quotation SET superseded_by_id = CAST(:n AS uuid) "
                           "WHERE id = CAST(:s AS uuid)"), {"n": newer, "s": superseded})
     await _as_system(db)
+    # PR #10 review: the date is the parameter, not the database's own. On the
+    # day it is still valid nothing of this test's moves; a function reading
+    # CURRENT_DATE would expire it here and turn this red.
+    await db.execute(text("SELECT quotation_expire_due(:today)"), {"today": yesterday})
+    await _as_owner(db)
+    on_the_day = (await db.execute(
+        text("SELECT status::text FROM quotation WHERE id = CAST(:q AS uuid)"),
+        {"q": due})).scalar_one()
+    assert on_the_day == "sent", "valid through its last day, in the date it was given"
+    await _as_system(db)
     count = (await db.execute(text("SELECT quotation_expire_due(:today)"),
                               {"today": dt.date.today()})).scalar_one()
     assert count >= 1
@@ -568,7 +595,10 @@ async def test_expiry_takes_the_date_it_is_given_and_skips_superseded_rows(
     still = (await db.execute(
         text("SELECT status::text FROM quotation WHERE id = CAST(:f AS uuid)"),
         {"f": fresh})).scalar_one()
-    assert still == "sent" and again >= 0
+    events = (await db.execute(text(
+        "SELECT count(*) FROM activity_event WHERE entity_id = CAST(:q AS uuid) "
+        "AND kind = 'quotation.expired'"), {"q": due})).scalar_one()
+    assert still == "sent" and events == 1, (again, events)
 
 
 # ── the timeline's own filter ────────────────────────────────────────────────
