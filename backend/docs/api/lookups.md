@@ -52,7 +52,7 @@ Add a lead source. `quality` (0 to 1) is its factor in the priority score.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -62,9 +62,9 @@ Add a lead source. `quality` (0 to 1) is its factor in the priority score.
 |---|---|---|---|
 | `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
 | `name` | string | yes | Display name. |
-| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
-| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
-| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
 
 **Responses**
 
@@ -90,7 +90,7 @@ Switch a source on or off, reorder it, or retune its quality factor.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -98,9 +98,9 @@ Switch a source on or off, reorder it, or retune its quality factor.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `is_active` | boolean | null |  |  |
-| `sort_order` | integer | null |  |  |
-| `quality` | number | string | null |  | Sources only. |
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
 
 **Responses**
 
@@ -144,7 +144,7 @@ Add a reason a lead can be marked lost with. `kind` defaults to lost.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -154,9 +154,9 @@ Add a reason a lead can be marked lost with. `kind` defaults to lost.
 |---|---|---|---|
 | `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
 | `name` | string | yes | Display name. |
-| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
-| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
-| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
 
 **Responses**
 
@@ -182,7 +182,7 @@ Switch a reason on or off, or reorder it. Names never change in place.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -190,9 +190,9 @@ Switch a reason on or off, or reorder it. Names never change in place.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `is_active` | boolean | null |  |  |
-| `sort_order` | integer | null |  |  |
-| `quality` | number | string | null |  | Sources only. |
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
 
 **Responses**
 
@@ -234,7 +234,7 @@ Add a micro-irrigation system to the list.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -244,9 +244,9 @@ Add a micro-irrigation system to the list.
 |---|---|---|---|
 | `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
 | `name` | string | yes | Display name. |
-| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
-| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
-| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
 
 **Responses**
 
@@ -272,7 +272,7 @@ Switch a system on or off.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -280,9 +280,9 @@ Switch a system on or off.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `is_active` | boolean | null |  |  |
-| `sort_order` | integer | null |  |  |
-| `quality` | number | string | null |  | Sources only. |
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
 
 **Responses**
 
@@ -309,7 +309,7 @@ partners in its territories, an admin all of them.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `q` | query | string | null |  | Name or code substring. |
+| `q` | query | string \| null |  | Name or code substring. |
 | `limit` | query | integer |  |  |
 
 **Responses**
@@ -372,7 +372,7 @@ computation (the next create, transition, note, assign or reopen).
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -406,9 +406,9 @@ talukas by passing `parent_id`, or search by name with `q`.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `level` | query | string | null |  | state, district, taluka or village. |
-| `parent_id` | query | string | null |  | Only children of this territory. |
-| `q` | query | string | null |  | Name substring. |
+| `level` | query | string \| null |  | state, district, taluka or village. |
+| `parent_id` | query | string \| null |  | Only children of this territory. |
+| `q` | query | string \| null |  | Name substring. |
 | `limit` | query | integer |  |  |
 
 **Responses**
@@ -466,7 +466,7 @@ talukas by passing `parent_id`, or search by name with `q`.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -480,9 +480,9 @@ talukas by passing `parent_id`, or search by name with `q`.
 |---|---|---|---|
 | `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
 | `name` | string | yes | Display name. |
-| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
-| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
-| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
 
 **`LookupItem`**
 
@@ -497,9 +497,9 @@ talukas by passing `parent_id`, or search by name with `q`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `is_active` | boolean | null |  |  |
-| `sort_order` | integer | null |  |  |
-| `quality` | number | string | null |  | Sources only. |
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
 
 **`PartnerPick`**
 
@@ -509,7 +509,7 @@ talukas by passing `parent_id`, or search by name with `q`.
 | `code` | string | yes |  |
 | `name` | string | yes |  |
 | `partner_type` | string | yes | distributor, dealer or sub_dealer. |
-| `territory` | TerritoryParent | null |  |  |
+| `territory` | TerritoryParent \| null |  |  |
 
 **`RoleItem`**
 
@@ -549,5 +549,5 @@ talukas by passing `parent_id`, or search by name with `q`.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 | `level` | string | yes | state, district, taluka or village. |
-| `code` | string | null |  |  |
-| `parent` | TerritoryParent | null |  |  |
+| `code` | string \| null |  |  |
+| `parent` | TerritoryParent \| null |  |  |

@@ -294,7 +294,8 @@ class PricedContext:
 async def price_document(db: AsyncSession, *, partner_id: str | None,
                          place_of_supply_territory_id: str, seller_gstin_id: str | None,
                          as_of: dt.date | None, lines: Sequence[LineSpec],
-                         existing: bool = False) -> PricedContext:
+                         existing: bool = False,
+                         tax_as_of: dt.date | None = None) -> PricedContext:
     """Resolve and price a set of lines against the masters in force on a date.
     Stores nothing and locks nothing (rule 14).
 
@@ -308,8 +309,14 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
     refused, and the quantity is not re-validated against a unit or pack multiple
     that may have changed since it was typed (FS-005 rule 5, edge cases 8 and 13).
     A new line is refused on both, as before.
+
+    `tax_as_of` separates the tax from the price (FS-011 rule 3): rates resolve at
+    `as_of`, the HSN, the GST slab and the seller registration at `tax_as_of`,
+    because tax is charged on the date of supply. It defaults to `as_of`, which is
+    what a quotation and the preview do.
     """
     day = as_of or today_ist()
+    tax_day = tax_as_of or day
     if day > today_ist() + MAX_FUTURE:
         raise ValidationFailed(fields={"as_of": "A price date may not be more than a year ahead."})
     if len(lines) > MAX_LINES:
@@ -317,14 +324,15 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
 
     target, tier, pos_state = await resolve_scope(
         db, partner_id=partner_id, place_of_supply_territory_id=place_of_supply_territory_id)
-    gstin_id, seller, seller_code = await seller_state(db, gstin_id=seller_gstin_id, as_of=day)
+    gstin_id, seller, seller_code = await seller_state(db, gstin_id=seller_gstin_id,
+                                                       as_of=tax_day)
     intra_state = seller == pos_state
     pos_code = (await db.execute(
         text("SELECT code::text FROM territory WHERE id = CAST(:t AS uuid)"),
         {"t": pos_state})).scalar_one_or_none() or ""
 
     ids = [ln.product_id for ln in lines]
-    products = await load_products(db, ids, day)
+    products = await load_products(db, ids, tax_day)
     rates = await load_rates(db, ids, as_of=day, state_territory_id=pos_state, tier=tier)
 
     missing = {f"lines[{i}].product_id": "No such product."
@@ -349,7 +357,7 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
                 inactive[f"lines[{i}].product_id"] = f"{product.description} is no longer sold."
         if tax.slab < 0:
             untaxed[f"lines[{i}].product_id"] = (
-                f"{product.description} has no tax rate in force on {day}.")
+                f"{product.description} has no tax rate in force on {tax_day}.")
         winner = pick(rates.get(ln.product_id, []))
         if winner is None:
             remedy = (" Revise the document at a date a list covers, or remove the line."

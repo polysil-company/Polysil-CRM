@@ -36,17 +36,17 @@ the header without lines. An empty list means nothing in your scope.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `lead_id` | query | string | null |  | Quotations on this lead, and on any lead merged into it. |
-| `status` | query | string | null |  | One status. |
-| `sales_type` | query | string | null |  |  |
-| `owner` | query | string | null |  | `me`, or a user id. |
-| `partner_id` | query | string | null |  |  |
-| `q` | query | string | null |  | Number, party name or mobile. |
-| `from` | query | string | null |  | ISO date. |
-| `to` | query | string | null |  | ISO date, inclusive. |
+| `lead_id` | query | string \| null |  | Quotations on this lead, and on any lead merged into it. |
+| `status` | query | string \| null |  | One status. |
+| `sales_type` | query | string \| null |  |  |
+| `owner` | query | string \| null |  | `me`, or a user id. |
+| `partner_id` | query | string \| null |  |  |
+| `q` | query | string \| null |  | Number, party name or mobile. |
+| `from` | query | string \| null |  | ISO date. |
+| `to` | query | string \| null |  | ISO date, inclusive. |
 | `current_only` | query | boolean |  | Hide superseded versions. On by default; switch it off to see every version of every number. |
 | `limit` | query | integer |  |  |
-| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+| `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 | `include_total` | query | boolean |  | Also count how many match, for a "1 to 25 of 137" caption. Off by default; the count stops at 1,000 and sets `meta.total_capped`. |
 
 **Responses**
@@ -87,7 +87,7 @@ that blocks them.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -96,13 +96,13 @@ that blocks them.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `lead_id` | string | yes |  |
-| `sales_type` | `commercial` | `industrial` | `export` | `subsidised` | `marketing` | `sample` | null |  | Defaults to the lead's inquiry type. commercial and industrial are priced today; the others are refused with sales_type_unsupported naming the question that blocks them. |
-| `partner_id` | string | null |  | OMIT the field for the lead's assigned partner. Send null for a direct sale at the farmer tier. Decides the price tier and who sees the row. |
-| `place_of_supply_territory_id` | string | null |  | Where the goods are delivered. Defaults to the lead's territory. |
-| `seller_gstin_id` | string | null |  | Which of our registrations supplies. Defaults to the one in force. |
-| `price_effective_date` | date | null |  | Price against the masters in force on this date. Today in India by default; a future date is allowed and warns. |
-| `party` | Party | null |  | Defaults from the lead. |
-| `terms` | string | null |  | Free text printed at the foot. |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` \| null |  | Defaults to the lead's inquiry type. commercial and industrial are priced today; the others are refused with sales_type_unsupported naming the question that blocks them. |
+| `partner_id` | string \| null |  | OMIT the field for the lead's assigned partner. Send null for a direct sale at the farmer tier. Decides the price tier and who sees the row. |
+| `place_of_supply_territory_id` | string \| null |  | Where the goods are delivered. Defaults to the lead's territory. |
+| `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
+| `price_effective_date` | date \| null |  | Price against the masters in force on this date. Today in India by default; a future date is allowed and warns. |
+| `party` | Party \| null |  | Defaults from the lead. |
+| `terms` | string \| null |  | Free text printed at the foot. |
 | `lines` | QuotationLineIn[] |  | Zero to 200. A draft may be saved empty; sending needs at least one. |
 
 **Responses**
@@ -131,7 +131,7 @@ it expires (`409 quotation_not_draft`).
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `quotation_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -139,7 +139,7 @@ it expires (`409 quotation_not_draft`).
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **Responses**
 
@@ -197,7 +197,7 @@ anything but a draft with `409 quotation_not_draft`.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `quotation_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -205,14 +205,14 @@ anything but a draft with `409 quotation_not_draft`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `sales_type` | `commercial` | `industrial` | `export` | `subsidised` | `marketing` | `sample` | null |  |  |
-| `partner_id` | string | null |  | Send null for a direct sale. |
-| `place_of_supply_territory_id` | string | null |  |  |
-| `seller_gstin_id` | string | null |  |  |
-| `price_effective_date` | date | null |  |  |
-| `party` | Party | null |  |  |
-| `terms` | string | null |  |  |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` \| null |  |  |
+| `partner_id` | string \| null |  | Send null for a direct sale. |
+| `place_of_supply_territory_id` | string \| null |  |  |
+| `seller_gstin_id` | string \| null |  |  |
+| `price_effective_date` | date \| null |  |  |
+| `party` | Party \| null |  |  |
+| `terms` | string \| null |  |  |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
 
 **Responses**
 
@@ -241,7 +241,7 @@ allowed on a draft; sending needs at least one.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `quotation_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -250,7 +250,7 @@ allowed on a draft; sending needs at least one.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `lines` | QuotationLineIn[] | yes | The whole basket, in order. |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **Responses**
 
@@ -313,7 +313,7 @@ A quotation on a merged lead is revised on the survivor.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `quotation_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -321,8 +321,8 @@ A quotation on a merged lead is revised on the survivor.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `price_effective_date` | date | null |  | Defaults to today: a revision is a new offer at today's rates. |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `price_effective_date` | date \| null |  | Defaults to today: a revision is a new offer at today's rates. |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **Responses**
 
@@ -362,7 +362,7 @@ its PDF carries an "INDICATIVE PRICING" banner and `is_provisional` is true.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `quotation_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -370,8 +370,8 @@ its PDF carries an "INDICATIVE PRICING" banner and `is_provisional` is true.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `channel` | `whatsapp` | `none` |  | whatsapp: the link goes to the party's mobile once the PDF is ready. none: no message; share the link yourself. Default `whatsapp`. |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `channel` | `whatsapp` \| `none` |  | whatsapp: the link goes to the party's mobile once the PDF is ready. none: no message; share the link yourself. Default `whatsapp`. |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **Responses**
 
@@ -401,7 +401,7 @@ rows appear on the lead's timeline. No payload carries a money figure.
 |---|---|---|---|---|
 | `quotation_id` | path | string | yes |  |
 | `limit` | query | integer |  |  |
-| `cursor` | query | string | null |  |  |
+| `cursor` | query | string \| null |  |  |
 
 **Responses**
 
@@ -432,7 +432,7 @@ is accepted and moves nothing.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `quotation_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -440,9 +440,9 @@ is accepted and moves nothing.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `to` | `accepted` | `rejected` | `negotiation` | yes | What the customer said. |
-| `remark` | string | null |  |  |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `to` | `accepted` \| `rejected` \| `negotiation` | yes | What the customer said. |
+| `remark` | string \| null |  |  |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **Responses**
 
@@ -488,7 +488,7 @@ Every version of the number, oldest first. Any version's id works.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **`Envelope_PdfLink_`**
 
@@ -514,7 +514,7 @@ Every version of the number, oldest first. Any version's id works.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -528,14 +528,14 @@ Every version of the number, oldest first. Any version's id works.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `inquiry_no` | string | yes |  |
-| `stage` | `new` | `contacted` | `qualified` | `quoted` | `negotiation` | `won` | `lost` | `merged` | `dormant` | yes |  |
+| `stage` | `new` \| `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` \| `merged` \| `dormant` | yes |  |
 
 **`LinesReplace`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `lines` | QuotationLineIn[] | yes | The whole basket, in order. |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **`OrgUnitRef`**
 
@@ -549,8 +549,8 @@ Every version of the number, oldest first. Any version's id works.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `limit` | integer | yes | The page size that was applied. |
-| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
-| `total` | integer | null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
+| `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
 
 **`Party`**
@@ -559,8 +559,8 @@ Every version of the number, oldest first. Any version's id works.
 |---|---|---|---|
 | `name` | string | yes |  |
 | `mobile` | string | yes | Any Indian form; stored as +91XXXXXXXXXX. The WhatsApp link goes here. |
-| `address` | string | null |  |  |
-| `gstin` | string | null |  | A company buyer's GSTIN, upper-cased on save and printed if given. |
+| `address` | string \| null |  |  |
+| `gstin` | string \| null |  | A company buyer's GSTIN, upper-cased on save and printed if given. |
 
 **`PdfLink`**
 
@@ -589,43 +589,43 @@ Every version of the number, oldest first. Any version's id works.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `quote_no` | string | null | yes | Null while draft; allocated at send. |
+| `quote_no` | string \| null | yes | Null while draft; allocated at send. |
 | `version` | integer | yes |  |
-| `status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | yes |  |
-| `sales_type` | `commercial` | `industrial` | `export` | `subsidised` | `marketing` | `sample` | yes |  |
-| `source` | `internal` | `external` | yes |  |
-| `lead` | LeadRef | null | yes | Null when the lead is deleted or outside your lead scope. |
+| `status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` | yes |  |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` | yes |  |
+| `source` | `internal` \| `external` | yes |  |
+| `lead` | LeadRef \| null | yes | Null when the lead is deleted or outside your lead scope. |
 | `party` | Party | yes |  |
-| `partner` | api__schemas__leads__PartnerRef | null | yes |  |
-| `owner` | UserRef | null | yes | The lead's owner; null while unassigned. |
+| `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
+| `owner` | UserRef \| null | yes | The lead's owner; null while unassigned. |
 | `owner_org_unit` | OrgUnitRef | yes |  |
 | `territory` | TerritoryRef | yes |  |
 | `seller_gstin` | SellerRef | yes |  |
 | `place_of_supply` | PlaceOfSupply | yes |  |
 | `intra_state` | boolean | yes |  |
 | `price_effective_date` | string | yes |  |
-| `price_list` | PriceListRef | null | yes | Null when the lines drew from more than one list. |
+| `price_list` | PriceListRef \| null | yes | Null when the lines drew from more than one list. |
 | `price_list_ids` | string[] | yes |  |
 | `lines` | QuotationLine[] | yes |  |
 | `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
 | `warnings` | string[] | yes | Each is `code: sentence`. |
-| `terms` | string | null | yes |  |
-| `valid_until` | string | null | yes |  |
-| `sent_at` | string | null | yes |  |
-| `viewed_at` | string | null | yes |  |
+| `terms` | string \| null | yes |  |
+| `valid_until` | string \| null | yes |  |
+| `sent_at` | string \| null | yes |  |
+| `viewed_at` | string \| null | yes |  |
 | `open_count` | integer | yes |  |
-| `accepted_at` | string | null | yes |  |
-| `rejected_at` | string | null | yes |  |
-| `decided_by` | UserRef | null | yes |  |
-| `decision_remark` | string | null | yes |  |
-| `supersedes` | VersionRef | null | yes |  |
-| `superseded_by` | VersionRef | null | yes |  |
-| `share_url` | string | null | yes | Present on every read once sent. |
-| `pdf_state` | `pending` | `ready` | `failed` | null | yes | pending | ready | failed once sent. |
-| `pdf_error` | string | null | yes |  |
+| `accepted_at` | string \| null | yes |  |
+| `rejected_at` | string \| null | yes |  |
+| `decided_by` | UserRef \| null | yes |  |
+| `decision_remark` | string \| null | yes |  |
+| `supersedes` | VersionRef \| null | yes |  |
+| `superseded_by` | VersionRef \| null | yes |  |
+| `share_url` | string \| null | yes | Present on every read once sent. |
+| `pdf_state` | `pending` \| `ready` \| `failed` \| null | yes | pending | ready | failed once sent. |
+| `pdf_error` | string \| null | yes |  |
 | `created_at` | string | yes |  |
-| `created_by` | UserRef | null | yes |  |
+| `created_by` | UserRef \| null | yes |  |
 | `updated_at` | string | yes |  |
 
 **`QuotationCreate`**
@@ -633,13 +633,13 @@ Every version of the number, oldest first. Any version's id works.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `lead_id` | string | yes |  |
-| `sales_type` | `commercial` | `industrial` | `export` | `subsidised` | `marketing` | `sample` | null |  | Defaults to the lead's inquiry type. commercial and industrial are priced today; the others are refused with sales_type_unsupported naming the question that blocks them. |
-| `partner_id` | string | null |  | OMIT the field for the lead's assigned partner. Send null for a direct sale at the farmer tier. Decides the price tier and who sees the row. |
-| `place_of_supply_territory_id` | string | null |  | Where the goods are delivered. Defaults to the lead's territory. |
-| `seller_gstin_id` | string | null |  | Which of our registrations supplies. Defaults to the one in force. |
-| `price_effective_date` | date | null |  | Price against the masters in force on this date. Today in India by default; a future date is allowed and warns. |
-| `party` | Party | null |  | Defaults from the lead. |
-| `terms` | string | null |  | Free text printed at the foot. |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` \| null |  | Defaults to the lead's inquiry type. commercial and industrial are priced today; the others are refused with sales_type_unsupported naming the question that blocks them. |
+| `partner_id` | string \| null |  | OMIT the field for the lead's assigned partner. Send null for a direct sale at the farmer tier. Decides the price tier and who sees the row. |
+| `place_of_supply_territory_id` | string \| null |  | Where the goods are delivered. Defaults to the lead's territory. |
+| `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
+| `price_effective_date` | date \| null |  | Price against the masters in force on this date. Today in India by default; a future date is allowed and warns. |
+| `party` | Party \| null |  | Defaults from the lead. |
+| `terms` | string \| null |  | Free text printed at the foot. |
 | `lines` | QuotationLineIn[] |  | Zero to 200. A draft may be saved empty; sending needs at least one. |
 
 **`QuotationLine`**
@@ -682,12 +682,12 @@ Every version of the number, oldest first. Any version's id works.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `product_id` | string | yes |  |
-| `qty` | number | string | yes | At most as many decimals as the unit admits, and a multiple of `pack_multiple` when the product sets one. |
-| `discount_pct` | number | string |  | The first discount tier, per cent off the gross. Default `0`. |
-| `discount2_pct` | number | string |  | The second tier, per cent off the balance after the first. Default `0`. |
-| `discount3_pct` | number | string |  | The third tier, per cent off the balance after the second. Default `0`. |
-| `price_list_item_id` | string | null |  | From the preview. Refused with rate_changed if it no longer resolves. |
-| `gst_rate_id` | string | null |  | From the preview. Refused with rate_changed if it no longer resolves. |
+| `qty` | number \| string | yes | At most as many decimals as the unit admits, and a multiple of `pack_multiple` when the product sets one. |
+| `discount_pct` | number \| string |  | The first discount tier, per cent off the gross. Default `0`. |
+| `discount2_pct` | number \| string |  | The second tier, per cent off the balance after the first. Default `0`. |
+| `discount3_pct` | number \| string |  | The third tier, per cent off the balance after the second. Default `0`. |
+| `price_list_item_id` | string \| null |  | From the preview. Refused with rate_changed if it no longer resolves. |
+| `gst_rate_id` | string \| null |  | From the preview. Refused with rate_changed if it no longer resolves. |
 
 **`QuotationPage`**
 
@@ -700,44 +700,44 @@ Every version of the number, oldest first. Any version's id works.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `sales_type` | `commercial` | `industrial` | `export` | `subsidised` | `marketing` | `sample` | null |  |  |
-| `partner_id` | string | null |  | Send null for a direct sale. |
-| `place_of_supply_territory_id` | string | null |  |  |
-| `seller_gstin_id` | string | null |  |  |
-| `price_effective_date` | date | null |  |  |
-| `party` | Party | null |  |  |
-| `terms` | string | null |  |  |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` \| null |  |  |
+| `partner_id` | string \| null |  | Send null for a direct sale. |
+| `place_of_supply_territory_id` | string \| null |  |  |
+| `seller_gstin_id` | string \| null |  |  |
+| `price_effective_date` | date \| null |  |  |
+| `party` | Party \| null |  |  |
+| `terms` | string \| null |  |  |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
 
 **`QuotationSummary`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `quote_no` | string | null | yes |  |
+| `quote_no` | string \| null | yes |  |
 | `version` | integer | yes |  |
-| `status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | yes |  |
-| `sales_type` | `commercial` | `industrial` | `export` | `subsidised` | `marketing` | `sample` | yes |  |
-| `lead` | LeadRef | null | yes |  |
+| `status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` | yes |  |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` | yes |  |
+| `lead` | LeadRef \| null | yes |  |
 | `party_name` | string | yes |  |
 | `party_mobile` | string | yes |  |
-| `partner` | api__schemas__leads__PartnerRef | null | yes |  |
-| `owner` | UserRef | null | yes |  |
+| `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
+| `owner` | UserRef \| null | yes |  |
 | `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes |  |
-| `valid_until` | string | null | yes |  |
-| `sent_at` | string | null | yes |  |
-| `viewed_at` | string | null | yes |  |
-| `pdf_state` | `pending` | `ready` | `failed` | null | yes |  |
-| `superseded_by` | VersionRef | null | yes |  |
+| `valid_until` | string \| null | yes |  |
+| `sent_at` | string \| null | yes |  |
+| `viewed_at` | string \| null | yes |  |
+| `pdf_state` | `pending` \| `ready` \| `failed` \| null | yes |  |
+| `superseded_by` | VersionRef \| null | yes |  |
 | `created_at` | string | yes |  |
 
 **`ReviseRequest`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `price_effective_date` | date | null |  | Defaults to today: a revision is a new offer at today's rates. |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `price_effective_date` | date \| null |  | Defaults to today: a revision is a new offer at today's rates. |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **`SellerRef`**
 
@@ -746,15 +746,15 @@ Every version of the number, oldest first. Any version's id works.
 | `id` | string | yes |  |
 | `gstin` | string | yes |  |
 | `legal_name` | string | yes |  |
-| `address` | string | null |  |  |
+| `address` | string \| null |  |  |
 | `state` | string | yes | The state code, e.g. GJ. |
 
 **`SendRequest`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `channel` | `whatsapp` | `none` |  | whatsapp: the link goes to the party's mobile once the PDF is ready. none: no message; share the link yourself. Default `whatsapp`. |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `channel` | `whatsapp` \| `none` |  | whatsapp: the link goes to the party's mobile once the PDF is ready. none: no message; share the link yourself. Default `whatsapp`. |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **`TerritoryRef`**
 
@@ -771,7 +771,7 @@ Every version of the number, oldest first. Any version's id works.
 | `id` | string | yes |  |
 | `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
 | `occurred_at` | string | yes |  |
-| `actor` | UserRef | null |  | Who caused the event, if known. |
+| `actor` | UserRef \| null |  | Who caused the event, if known. |
 | `payload` | object |  |  |
 
 **`TimelinePage`**
@@ -797,9 +797,9 @@ Every version of the number, oldest first. Any version's id works.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `to` | `accepted` | `rejected` | `negotiation` | yes | What the customer said. |
-| `remark` | string | null |  |  |
-| `expected_status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | null |  |  |
+| `to` | `accepted` \| `rejected` \| `negotiation` | yes | What the customer said. |
+| `remark` | string \| null |  |  |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **`UserRef`**
 

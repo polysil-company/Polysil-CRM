@@ -1,11 +1,9 @@
 # Orders API Contract - `/api/v1/orders`, `/api/v1/approvals`, `/api/v1/dispatches`
 
-> **Status: specified, not shipped.** The spec is reviewed (an edge-case pass, a
-> plan review and its re-check, and findings from a cross-vendor pass) and ready
-> to build. The shapes below are the contract to build against, the way
-> `18-Quotations-API-Contract.md` was before quotations shipped. Once the
-> endpoints exist, the generated API docs supersede the endpoint sections; anything
-> that changes before then is additive or announced here.
+> **Status: shipped.** The generated contract is `backend/docs/api/orders.md`, which
+> is the record; this document is the context around it and matches it. Every error
+> code below exists in the build. A partner user's order detail and timeline carry
+> no internal remark and no approver name, as described under the portal view.
 > Companions: `18-Quotations-API-Contract.md` (the accepted quotation an order is
 > made from) · `17-Products-and-Pricing-Handover.md` (the product picker and the
 > live preview) · `04-Permissions-RBAC.md` (who sees and approves what).

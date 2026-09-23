@@ -28,6 +28,7 @@ from api.authz.modules import SPECS
 from api.authz.predicate import Caller, scope_predicate
 from api.config import get_settings
 from api.domain import leads as domain
+from api.domain.orders import actor_hidden_from_partner
 from api.errors import ForbiddenError, NotFoundError, StageChangedError, ValidationFailed
 from api.integrations.messages import TEMPLATE_LEAD_ACK
 from api.schemas.leads import (
@@ -623,7 +624,9 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
         if isinstance(payload, str):
             payload = json.loads(payload)
         actor = None
-        if r.actor_id is not None:
+        # question 15.14: a partner never learns which approver decided an order
+        hidden = caller.partner_id is not None and actor_hidden_from_partner(r.kind)
+        if r.actor_id is not None and not hidden:
             actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name") or "")
         events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso_req(r.occurred_at),
                                     actor=actor, payload=payload or {}))

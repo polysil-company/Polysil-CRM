@@ -74,4 +74,18 @@ SPECS: dict[str, ScopeSpec] = {
         parents={"lead_id": "lead", "territory_id": "territory",
                  "owner_org_unit_id": "org_unit", "partner_id": "channel_partner"},
     ),
+    # FS-011: the quotation's shape. An order's scope is set at create (from its
+    # quotations, else the raiser or the portal routing) and follows nothing after
+    # (GAP-127); the parents guard a lead, office, territory or partner the caller
+    # cannot see (edge case 22).
+    "sales_orders": ScopeSpec(
+        module="sales_orders",
+        table="sales_order",
+        own="owner_user_id",
+        org_subtree="owner_org_unit_id",
+        territory="territory_id",
+        partner_subtree="partner_id",
+        parents={"lead_id": "lead", "territory_id": "territory",
+                 "owner_org_unit_id": "org_unit", "partner_id": "channel_partner"},
+    ),
 }

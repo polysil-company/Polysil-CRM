@@ -49,6 +49,9 @@ TABLES = {
     "quotation": sa.table("quotation", sa.column("id", _ID), sa.column("owner_user_id", _ID),
                           sa.column("owner_org_unit_id", _ID), sa.column("territory_id", _ID),
                           sa.column("partner_id", _ID), sa.column("deleted_at")),
+    "sales_order": sa.table("sales_order", sa.column("id", _ID), sa.column("owner_user_id", _ID),
+                            sa.column("owner_org_unit_id", _ID), sa.column("territory_id", _ID),
+                            sa.column("partner_id", _ID), sa.column("deleted_at")),
 }
 
 
@@ -159,6 +162,29 @@ async def _quotation(db: AsyncSession, ids: Fixtures, *, owner_user_id: str | No
         {"lead": lead, "p": partner_id, "ou": owner_user_id,
          "oou": owner_org_unit_id or ids.org_unit_id, "terr": territory_id or ids.territory_id,
          "del": deleted})).scalar_one())
+
+
+async def _order(db: AsyncSession, ids: Fixtures, *, owner_user_id: str | None = None,
+                 owner_org_unit_id: str | None = None, territory_id: str | None = None,
+                 partner_id: str | None = None, deleted: bool = False) -> str:
+    """A draft sales order with no lead: the scope columns are the order's own
+    (FS-011 rule 11), so a consolidated order with a null lead is covered too."""
+    order = str((await db.execute(text(
+        "INSERT INTO sales_order (order_type, partner_id, owner_user_id, owner_org_unit_id, "
+        "territory_id, party_name, party_mobile, seller_gstin_id, "
+        "place_of_supply_territory_id, place_of_supply_state_id, intra_state, "
+        "price_effective_date) VALUES ('commercial', :p, :ou, :oou, :terr, "
+        "'Farmer', '+919800000000', "
+        "(SELECT id FROM seller_gstin ORDER BY is_default DESC LIMIT 1), "
+        ":terr, :terr, true, CURRENT_DATE) RETURNING id"),
+        {"p": partner_id, "ou": owner_user_id,
+         "oou": owner_org_unit_id or ids.org_unit_id,
+         "terr": territory_id or ids.territory_id})).scalar_one())
+    if deleted:
+        # the insert trigger refuses anything but a fresh draft, so delete after
+        await db.execute(text("UPDATE sales_order SET deleted_at = now() WHERE id = :o"),
+                         {"o": order})
+    return order
 
 
 async def _visible(db: AsyncSession, table: str, ids_: list[str],
@@ -381,7 +407,72 @@ async def quotations_global(db: AsyncSession, ids: Fixtures) -> Witness:
                    {a: True, b: True})
 
 
+# ── witnesses: sales orders (FS-011), the quotation's shape ───────────────────
+
+async def sales_orders_own(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "fo")
+    await _grant(db, role, "sales_orders", ["view"], "own")
+    me = await _staff(db, ids, role, ids.org_unit_id)
+    other = await _staff(db, ids, role, ids.org_unit_id)
+    mine = await _order(db, ids, owner_user_id=me)
+    theirs = await _order(db, ids, owner_user_id=other)
+    return Witness(Caller(me, ids.org_unit_id, None, {"sales_orders": "own"}),
+                   {mine: True, theirs: False})
+
+
+async def sales_orders_org_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "dm")
+    await _grant(db, role, "sales_orders", ["view"], "org_subtree")
+    manager = await _staff(db, ids, role, ids.org_unit_id)
+    below = await _order(db, ids, owner_org_unit_id=await _org(db, ids, "child",
+                                                               parent=ids.org_unit_id))
+    outside = await _order(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    return Witness(Caller(manager, ids.org_unit_id, None, {"sales_orders": "org_subtree"}),
+                   {below: True, outside: False})
+
+
+async def sales_orders_territory(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "sc")
+    await _grant(db, role, "sales_orders", ["view"], "territory")
+    coord = await _staff(db, ids, role, ids.org_unit_id)
+    await db.execute(text("INSERT INTO user_territory (user_id, territory_id) VALUES (:u, :t)"),
+                     {"u": coord, "t": ids.territory_id})
+    here = await _order(db, ids, territory_id=ids.territory_id)
+    there = await _order(db, ids, territory_id=await _territory(db, ids, "far"))
+    return Witness(Caller(coord, ids.org_unit_id, None, {"sales_orders": "territory"}),
+                   {here: True, there: False})
+
+
+async def sales_orders_partner_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    """A distributor sees orders placed by its subtree, not another tree's and
+    not a direct sale."""
+    role = await _role(db, ids, "dist", portal=True, level=3)
+    await _grant(db, role, "sales_orders", ["view"], "partner_subtree")
+    me = await _partner_user(db, ids, role, ids.distributor_id)
+    mine = await _order(db, ids, partner_id=ids.dealer_id)
+    other_tree = await _partner(db, ids, "OTHER", ids.territory_id)
+    theirs = await _order(db, ids, partner_id=other_tree)
+    direct = await _order(db, ids, partner_id=None)
+    return Witness(Caller(me, None, ids.distributor_id, {"sales_orders": "partner_subtree"}),
+                   {mine: True, theirs: False, direct: False})
+
+
+async def sales_orders_global(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "sales_orders", ["view"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    a = await _order(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    b = await _order(db, ids, partner_id=ids.dealer_id)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"sales_orders": "global"}),
+                   {a: True, b: True})
+
+
 WITNESSES: dict[tuple[str, str], Builder] = {
+    ("sales_orders", "own"): sales_orders_own,
+    ("sales_orders", "org_subtree"): sales_orders_org_subtree,
+    ("sales_orders", "territory"): sales_orders_territory,
+    ("sales_orders", "partner_subtree"): sales_orders_partner_subtree,
+    ("sales_orders", "global"): sales_orders_global,
     ("quotations", "own"): quotations_own,
     ("quotations", "org_subtree"): quotations_org_subtree,
     ("quotations", "territory"): quotations_territory,
@@ -447,8 +538,19 @@ async def quotations_deleted(db: AsyncSession, ids: Fixtures) -> Witness:
                    {live: True, gone: False})
 
 
+async def sales_orders_deleted(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "sales_orders", ["view", "edit"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    live = await _order(db, ids)
+    gone = await _order(db, ids, deleted=True)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"sales_orders": "global"}),
+                   {live: True, gone: False})
+
+
 DELETED: dict[str, Builder] = {"users": users_deleted, "partners": partners_deleted,
-                               "leads": leads_deleted, "quotations": quotations_deleted}
+                               "leads": leads_deleted, "quotations": quotations_deleted,
+                               "sales_orders": sales_orders_deleted}
 
 
 def test_every_spec_with_a_soft_delete_column_has_a_deleted_witness() -> None:

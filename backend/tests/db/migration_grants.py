@@ -28,7 +28,8 @@ _VERSIONS = Path(__file__).resolve().parents[2] / "api/db/migrations/versions"
 # list[tuple[str, str]]. Add a migration here when it grants or hand-writes a policy.
 _MODULE_NAMES = ("005_authorization", "006_leads", "007_administration",
                  "008_message_delivery", "009_subsidy_masters",
-                 "010_products_and_pricing", "012_quotations")
+                 "010_products_and_pricing", "012_quotations",
+                 "013_orders_approvals_dispatch")
 
 _NAME = re.compile(r"CREATE POLICY (\w+)")
 
@@ -48,12 +49,33 @@ def _modules() -> list[ModuleType]:
     return [m for name in _MODULE_NAMES if (m := _load(name)) is not None]
 
 
+def _table_verbs(verbs: str) -> set[str]:
+    """The table-wide verbs in a GRANT list. A verb with a column list (013's
+    `UPDATE (party_name, ...)` on sales_order) is not a table privilege:
+    has_table_privilege() answers false for it, and the column grants are
+    asserted by the migration's own tests."""
+    out: set[str] = set()
+    depth, item = 0, ""
+    for ch in verbs + ",":
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        if ch == "," and depth == 0:
+            if "(" not in item:
+                out.add(item.strip())
+            item = ""
+        else:
+            item += ch
+    return out
+
+
 def grants() -> dict[str, set[str]]:
     """table -> the set of verbs app_role holds, unioned across migrations."""
     out: dict[str, set[str]] = {}
     for mod in _modules():
         for table, verbs in getattr(mod, "GRANTS", {}).items():
-            out.setdefault(table, set()).update(v.strip() for v in verbs.split(","))
+            out.setdefault(table, set()).update(_table_verbs(verbs))
     return out
 
 

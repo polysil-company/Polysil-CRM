@@ -93,7 +93,7 @@ worker has not finished.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -113,11 +113,11 @@ worker has not finished.
 |---|---|---|---|
 | `quote_no` | string | yes |  |
 | `version` | integer | yes |  |
-| `status` | `draft` | `sent` | `viewed` | `accepted` | `rejected` | `negotiation` | `expired` | yes |  |
-| `sales_type` | `commercial` | `industrial` | `export` | `subsidised` | `marketing` | `sample` | yes |  |
+| `status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` | yes |  |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` | yes |  |
 | `seller` | PublicSeller | yes |  |
-| `sent_at` | string | null | yes |  |
-| `valid_until` | string | null | yes |  |
+| `sent_at` | string \| null | yes |  |
+| `valid_until` | string \| null | yes |  |
 | `expired` | boolean | yes |  |
 | `superseded` | boolean | yes |  |
 | `totals` | Totals | yes |  |
@@ -148,7 +148,7 @@ worker has not finished.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `loc` | string | integer[] | yes |  |
+| `loc` | string \| integer[] | yes |  |
 | `msg` | string | yes |  |
 | `type` | string | yes |  |
 | `input` | any |  |  |

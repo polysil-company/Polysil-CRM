@@ -434,9 +434,11 @@ def f_lead() -> None:
 
 def f_approval() -> None:
     e, n = [], {}
-    e += title("Approval routing", sub="One engine, three chains, thresholds as data.",
-               status="DESIGN ONLY (RBAC.md 5.2a-5.2f). No code. W3-W4.",
-               status_colour=RED)
+    e += title("Approval routing", sub="One engine, thresholds as data. Orders are its first "
+                                       "document type.",
+               status="BUILT FOR ORDERS (FS-011, migration 013). The quotation gate (GAP-105) "
+                      "and complaints (W5) are not wired yet.",
+               status_colour=GREEN)
 
     els = node("r", 0, 120, "Raiser\nemployee or dealer", w=220, h=70, colour=GREY, size=14)
     n["r"] = els[0]; e += els
@@ -473,13 +475,14 @@ def f_approval() -> None:
     e += edge("e_t_ac", n["t"], n["ac"], "order", BLUE)
     e += edge("e_ac_dp", n["ac"], n["dp"], colour=BLUE)
 
-    els = node("qc", 1280, 200, "QC Manager", w=190, h=60, colour=RED, size=14)
+    els = node("qc", 1280, 200, "QC Manager\n(W5, not built)", w=190, h=60, colour=GREY, size=14)
     n["qc"] = els[0]; e += els
-    e += edge("e_t_qc", n["t"], n["qc"], "complaint", RED)
+    e += edge("e_t_qc", n["t"], n["qc"], "complaint", GREY, dashed=True)
 
-    els = node("done", 1280, 340, "Approved", w=190, h=60, colour=GREEN, size=14)
+    els = node("done", 1280, 340, "Approved\n(GAP-105, not built)", w=190, h=60, colour=GREY,
+               size=14)
     n["done"] = els[0]; e += els
-    e += edge("e_t_done", n["t"], n["done"], "quotation", GREEN)
+    e += edge("e_t_done", n["t"], n["done"], "quotation", GREY, dashed=True)
 
     els = node("rej", 300, 420, "Back to raiser\n+ reason", w=220, h=70, colour=RED, size=14)
     n["rej"] = els[0]; e += els
@@ -490,9 +493,23 @@ def f_approval() -> None:
               "THRESHOLDS ARE DATA\n\n"
               "approval_threshold(doc_type, role,\n"
               "                   territory_id, max_amount)\n\n"
-              "Global fallback row where territory is NULL.\n"
-              "Seed one number now, split per state later\n"
-              "with no migration.", w=350, colour=YELLOW)
+              "Global fallback row where territory is NULL;\n"
+              "the nearest territory row wins.\n"
+              "Stand-ins: DM 1,00,000, SM 5,00,000, RM uncapped\n"
+              "(question 15.1). Compared with the total\n"
+              "INCLUDING GST. Fixed at submit.", w=350, colour=YELLOW)
+    e += note("n3", 0, 480,
+              "WHO DECIDES A STEP\n\n"
+              "Levels at or below the OWNER's line level are\n"
+              "dropped: an FO's order starts at DM, a DM's\n"
+              "own order goes straight to Accounts.\n"
+              "A higher line manager may decide a lower line\n"
+              "step (absence, question 15.9). Accounts and\n"
+              "Dispatch never decide a line step.\n"
+              "Nobody decides an order they own, created or\n"
+              "submitted. Steps decide in sequence.\n"
+              "A reject returns the order to DRAFT; resubmit\n"
+              "runs the whole chain again.", w=350, colour=GREEN)
     e += note("n2", 1040, 440,
               "APPROVERS NEVER UPDATE THE BUSINESS ROW.\n\n"
               "They write their own approval_step (needs the\n"
@@ -502,8 +519,9 @@ def f_approval() -> None:
               "That is why `approve` is a distinct permission\n"
               "from `edit`: collapsing them would hand every\n"
               "approver a price-editing capability.\n\n"
-              "Test: Account Mgr CAN approve an order and\n"
-              "CANNOT change grand_total.", w=430, colour=RED)
+              "Tested: Accounts CAN decide an order and\n"
+              "CANNOT create or edit one (RLS-8). app_role\n"
+              "has no column grant on status at all.", w=430, colour=RED)
     write("05-approval-routing", e)
 
 
@@ -1052,6 +1070,109 @@ def f_quotation() -> None:
     write("12-quotation", e)
 
 
+def f_order() -> None:
+    e, n = [], {}
+    e += title("A sales order: priced, numbered, approved, dispatched",
+               sub="Every mutation locks the order row first. The database moves the status; "
+                   "the API never writes it.",
+               status="BUILT (FS-011 rev 3.2): migration 013, /orders, /approvals, /dispatches. "
+                      "Commercial and industrial only. No message is sent.",
+               status_colour=GREEN)
+
+    steps = [
+        ("o1", "POST /orders  from ACCEPTED quotations, or lines typed in\n"
+               "one lead: the lead and its farmer\n"
+               "several leads of ONE dealer: no lead, the dealer is the party", BLUE),
+        ("o2", "price_document(): rates at the price date,\n"
+               "HSN, slab and seller registration at TODAY (IST)\n"
+               "stale preview id -> 409 rate_changed", GREEN),
+        ("o3", "INSERT draft + lines. NO NUMBER YET.\n"
+               "order_quotations_claim(): quotations locked in id order,\n"
+               "one live order each -> 409 quotation_on_order", BLUE),
+        ("o4", "draft: PATCH header, PUT lines, re-priced on every save\n"
+               "expected_status on every mutation", BLUE),
+        ("o5", "POST /submit -> order_submit():\n"
+               "zero total -> 422; nobody for a functional step -> 422 no_approver\n"
+               "number SO/<state>/<FY>/<nnnnn>, chain built from the owner", YELLOW),
+        ("o6", "POST /approvals/steps/{id}/decision -> record_decision()\n"
+               "order, request, step locked in that order\n"
+               "reject -> DRAFT with the reason, number kept", GREEN),
+        ("o7", "last step approves -> status approved\n"
+               "apply_approval_outcome(): status and timestamp ONLY", GREEN),
+        ("o8", "POST /orders/{id}/dispatches -> dispatch_record()\n"
+               "order, then its lines; never above the open quantity,\n"
+               "in the line's unit precision; status derived from the lines", BLUE),
+        ("o9", "void a dispatch, or close the balance short\n"
+               "qty_short written only by a depth-2 trigger", BLUE),
+    ]
+    y = 60
+    for eid, label, colour in steps:
+        els = node(eid, 300, y, label, w=560, h=92, colour=colour)
+        n[eid] = els[0]
+        e += els
+        y += 150
+    order = [s[0] for s in steps]
+    for a, b in zip(order, order[1:], strict=False):
+        e += edge(f"e_{a}_{b}", n[a], n[b])
+
+    e += note("nRed1", 920, 60,
+              "app_role CANNOT WRITE THE STATUS\n\n"
+              "sales_order grants INSERT and UPDATE on the\n"
+              "draft-editable columns only. A direct UPDATE of\n"
+              "status, or an INSERT naming it, is 42501 before\n"
+              "any trigger runs. The trigger is the second belt:\n"
+              "a new order is a fresh draft whoever inserts it.\n\n"
+              "has_table_privilege() does not see column\n"
+              "grants; the grant test parses them itself.",
+              w=460, colour=RED)
+
+    e += note("nRed2", 920, 380,
+              "THE LOCK ORDER\n\n"
+              "order -> request -> steps -> lines ->\n"
+              "quotations (id order) -> counters.\n"
+              "No order path locks a lead. A quotation's scope\n"
+              "trigger takes the lead then quotation rows, so\n"
+              "the two meet only on quotation rows.\n\n"
+              "Proved for PATCH, PUT, submit, decision, cancel\n"
+              "and dispatch: hold the order, wait for pg_locks\n"
+              "to show the call blocked, then lock the rest.",
+              w=460, colour=RED)
+
+    e += note("nRed3", 920, 720,
+              "REMARKS NEVER REACH A DEALER\n\n"
+              "The remark lives on approval_step only, never in\n"
+              "an event payload. A portal caller gets seq, role,\n"
+              "decision and time; last_rejection.remark is the\n"
+              "stock text (question 15.14).",
+              w=460, colour=RED)
+
+    e += note("nGreen1", 920, 940,
+              "ONE OUTCOME PER RACE\n\n"
+              "Two claims of one quotation: one order.\n"
+              "Two dispatches of one line: never over-shipped.\n"
+              "A decision losing to a cancel: 409 request_closed,\n"
+              "never an approved cancelled order.",
+              w=460, colour=GREEN)
+
+    e += note("nYellow1", 920, 1160,
+              "ASSUMPTIONS WITH GAPS (121 to 133)\n\n"
+              "Thresholds are stand-ins. Tax at the submit date.\n"
+              "No change after approval; cancel before dispatch.\n"
+              "Short supply stays open until closed short.\n"
+              "Invoice numbers recorded, not issued.\n"
+              "A direct order does not move its lead.\n"
+              "No credit or stock check. Our number format.",
+              w=460, colour=YELLOW)
+
+    e += note("nGrey1", 300, y + 20,
+              "Not here: payments, stock, schemes, the order PDF and WhatsApp\n"
+              "(GAP-129), export / sample / marketing / subsidised / replacement\n"
+              "orders (GAP-121).",
+              w=560, colour=GREY)
+
+    write("13-order", e)
+
+
 def f_auth() -> None:
     e, n = [], {}
     e += title("Signing in, and staying signed in",
@@ -1284,5 +1405,5 @@ if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
     f_approval(); f_subsidy(); f_outbox(); f_money(); f_pricing()
-    f_quotation(); f_auth(); f_admin()
+    f_quotation(); f_order(); f_auth(); f_admin()
     print(f"\nwrote to {OUT}")
