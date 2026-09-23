@@ -40,14 +40,14 @@ scope, which is not an error; a 403 means you may not view people at all.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `q` | query | string | null |  | Name, email or mobile substring. |
-| `user_type` | query | string | null |  | staff or partner_user. |
-| `role` | query | string | null |  | A role code. |
-| `org_unit_id` | query | string | null |  | Staff anchored on this office. |
-| `partner_id` | query | string | null |  | Users anchored on this partner. |
-| `is_active` | query | boolean | null |  |  |
+| `q` | query | string \| null |  | Name, email or mobile substring. |
+| `user_type` | query | string \| null |  | staff or partner_user. |
+| `role` | query | string \| null |  | A role code. |
+| `org_unit_id` | query | string \| null |  | Staff anchored on this office. |
+| `partner_id` | query | string \| null |  | Users anchored on this partner. |
+| `is_active` | query | boolean \| null |  |  |
 | `limit` | query | integer |  |  |
-| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+| `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 
 **Responses**
 
@@ -81,7 +81,7 @@ counts) is `409`.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -89,15 +89,15 @@ counts) is `409`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `user_type` | `staff` | `partner_user` | yes | staff or partner_user. Consumers are not created here. |
+| `user_type` | `staff` \| `partner_user` | yes | staff or partner_user. Consumers are not created here. |
 | `full_name` | string | yes |  |
-| `email` | string | null |  | Staff only. Trimmed and lower-cased; unique among live people. |
-| `mobile` | string | null |  | Partner users only (optional on staff). Any Indian form: 10 digits, or with 0, 91 or +91. Stored as 91XXXXXXXXXX. Unique among live people. |
-| `role` | string | null |  | Staff only: a code from GET /lookups/roles that is not a portal role. A partner user's role is its partner's type and is never sent. |
-| `org_unit_id` | string | null |  | Staff only: an open office. |
-| `partner_id` | string | null |  | Partner users only: an active partner. |
+| `email` | string \| null |  | Staff only. Trimmed and lower-cased; unique among live people. |
+| `mobile` | string \| null |  | Partner users only (optional on staff). Any Indian form: 10 digits, or with 0, 91 or +91. Stored as 91XXXXXXXXXX. Unique among live people. |
+| `role` | string \| null |  | Staff only: a code from GET /lookups/roles that is not a portal role. A partner user's role is its partner's type and is never sent. |
+| `org_unit_id` | string \| null |  | Staff only: an open office. |
+| `partner_id` | string \| null |  | Partner users only: an active partner. |
 | `territory_ids` | string[] |  | Staff only. A role that reads any module at territory scope needs at least one, or the person sees nothing there. |
-| `password` | string | null |  | Staff only. A temporary password of at least 12 characters, told to the person out of band; they must change it at first sign-in. |
+| `password` | string \| null |  | Staff only. A temporary password of at least 12 characters, told to the person out of band; they must change it at first sign-in. |
 
 **Responses**
 
@@ -127,7 +127,7 @@ your own row, and for the last administrator. A repeat is `204`.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `user_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Responses**
 
@@ -185,7 +185,7 @@ administrator cannot be deactivated or demoted (`422 fields.id`).
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `user_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -193,14 +193,14 @@ administrator cannot be deactivated or demoted (`422 fields.id`).
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `full_name` | string | null |  |  |
-| `email` | string | null |  | Staff only. |
-| `mobile` | string | null |  | Any Indian form. |
-| `role` | string | null |  | Staff only, and never your own. A partner user's role follows its partner. |
-| `org_unit_id` | string | null |  | Staff only: an open office. Never your own. |
-| `partner_id` | string | null |  | Partner users only: an active partner. Never your own. |
-| `territory_ids` | string[] | null |  | Staff only. Replaces the whole set. Never your own. |
-| `is_active` | boolean | null |  | false deactivates (every session is signed out first), true reactivates into an open office or active partner. Never your own. |
+| `full_name` | string \| null |  |  |
+| `email` | string \| null |  | Staff only. |
+| `mobile` | string \| null |  | Any Indian form. |
+| `role` | string \| null |  | Staff only, and never your own. A partner user's role follows its partner. |
+| `org_unit_id` | string \| null |  | Staff only: an open office. Never your own. |
+| `partner_id` | string \| null |  | Partner users only: an active partner. Never your own. |
+| `territory_ids` | string[] \| null |  | Staff only. Replaces the whole set. Never your own. |
+| `is_active` | boolean \| null |  | false deactivates (every session is signed out first), true reactivates into an open office or active partner. Never your own. |
 
 **Responses**
 
@@ -232,7 +232,7 @@ refused while anything remains. Zero leads to move is still a 200.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `user_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -270,7 +270,7 @@ partner user signs in by OTP and has no password (`422 fields.user_type`).
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `user_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -306,7 +306,7 @@ Sign a person out everywhere, now. Their next request on any device is a
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `user_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Responses**
 
@@ -335,7 +335,7 @@ failed attempts stay on record. A partner user has nothing to unlock
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `user_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Responses**
 
@@ -389,7 +389,7 @@ failed attempts stay on record. A partner user has nothing to unlock
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -424,7 +424,9 @@ failed attempts stay on record. A partner user has nothing to unlock
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `limit` | integer | yes | The page size that was applied. |
-| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
+| `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
 
 **`PasswordSet`**
 
@@ -473,39 +475,39 @@ failed attempts stay on record. A partner user has nothing to unlock
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `user_type` | `staff` | `partner_user` | yes | staff or partner_user. Consumers are not created here. |
+| `user_type` | `staff` \| `partner_user` | yes | staff or partner_user. Consumers are not created here. |
 | `full_name` | string | yes |  |
-| `email` | string | null |  | Staff only. Trimmed and lower-cased; unique among live people. |
-| `mobile` | string | null |  | Partner users only (optional on staff). Any Indian form: 10 digits, or with 0, 91 or +91. Stored as 91XXXXXXXXXX. Unique among live people. |
-| `role` | string | null |  | Staff only: a code from GET /lookups/roles that is not a portal role. A partner user's role is its partner's type and is never sent. |
-| `org_unit_id` | string | null |  | Staff only: an open office. |
-| `partner_id` | string | null |  | Partner users only: an active partner. |
+| `email` | string \| null |  | Staff only. Trimmed and lower-cased; unique among live people. |
+| `mobile` | string \| null |  | Partner users only (optional on staff). Any Indian form: 10 digits, or with 0, 91 or +91. Stored as 91XXXXXXXXXX. Unique among live people. |
+| `role` | string \| null |  | Staff only: a code from GET /lookups/roles that is not a portal role. A partner user's role is its partner's type and is never sent. |
+| `org_unit_id` | string \| null |  | Staff only: an open office. |
+| `partner_id` | string \| null |  | Partner users only: an active partner. |
 | `territory_ids` | string[] |  | Staff only. A role that reads any module at territory scope needs at least one, or the person sees nothing there. |
-| `password` | string | null |  | Staff only. A temporary password of at least 12 characters, told to the person out of band; they must change it at first sign-in. |
+| `password` | string \| null |  | Staff only. A temporary password of at least 12 characters, told to the person out of band; they must change it at first sign-in. |
 
 **`UserDetail`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `user_type` | `staff` | `partner_user` | yes |  |
+| `user_type` | `staff` \| `partner_user` | yes |  |
 | `full_name` | string | yes |  |
-| `email` | string | null | yes | Staff sign in with it. Stored lower-case. |
-| `mobile` | string | null | yes | Partner users sign in with it by OTP. 91XXXXXXXXXX, no plus. |
-| `role` | RoleRef | null | yes |  |
-| `org_unit` | OrgUnitRef | null | yes | The office a staff member is anchored on; null for a partner user. |
-| `partner` | api__schemas__users__PartnerRef | null | yes | The partner a partner user is anchored on; null for staff. |
+| `email` | string \| null | yes | Staff sign in with it. Stored lower-case. |
+| `mobile` | string \| null | yes | Partner users sign in with it by OTP. 91XXXXXXXXXX, no plus. |
+| `role` | RoleRef \| null | yes |  |
+| `org_unit` | OrgUnitRef \| null | yes | The office a staff member is anchored on; null for a partner user. |
+| `partner` | api__schemas__users__PartnerRef \| null | yes | The partner a partner user is anchored on; null for staff. |
 | `is_active` | boolean | yes |  |
 | `must_change_password` | boolean | yes | A temporary password set by an administrator is still in force. |
-| `last_login_at` | string | null | yes |  |
-| `open_leads` | integer | null | yes | Leads this staff member owns that are not won, lost or merged. Null for a partner user, who owns no leads. |
+| `last_login_at` | string \| null | yes |  |
+| `open_leads` | integer \| null | yes | Leads this staff member owns that are not won, lost or merged. Null for a partner user, who owns no leads. |
 | `territories` | TerritoryRef[] | yes | The territories a staff member reads at territory scope. |
-| `locked_until` | string | null |  | Staff only, and only when you hold users.edit: the end of a live sign-in lockout (five failed passwords in fifteen minutes), else null. |
-| `active_sessions` | integer | null |  | Live sessions, when you hold users.edit; null otherwise. |
-| `password_changed_at` | string | null | yes |  |
+| `locked_until` | string \| null |  | Staff only, and only when you hold users.edit: the end of a live sign-in lockout (five failed passwords in fifteen minutes), else null. |
+| `active_sessions` | integer \| null |  | Live sessions, when you hold users.edit; null otherwise. |
+| `password_changed_at` | string \| null | yes |  |
 | `created_at` | string | yes |  |
-| `deleted_at` | string | null | yes | Set once the person is soft-deleted. Deleted people are returned only to users.delete holders, and never in the list. |
-| `created_by` | UserRef | null | yes |  |
+| `deleted_at` | string \| null | yes | Set once the person is soft-deleted. Deleted people are returned only to users.delete holders, and never in the list. |
+| `created_by` | UserRef \| null | yes |  |
 
 **`UserPage`**
 
@@ -518,14 +520,14 @@ failed attempts stay on record. A partner user has nothing to unlock
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `full_name` | string | null |  |  |
-| `email` | string | null |  | Staff only. |
-| `mobile` | string | null |  | Any Indian form. |
-| `role` | string | null |  | Staff only, and never your own. A partner user's role follows its partner. |
-| `org_unit_id` | string | null |  | Staff only: an open office. Never your own. |
-| `partner_id` | string | null |  | Partner users only: an active partner. Never your own. |
-| `territory_ids` | string[] | null |  | Staff only. Replaces the whole set. Never your own. |
-| `is_active` | boolean | null |  | false deactivates (every session is signed out first), true reactivates into an open office or active partner. Never your own. |
+| `full_name` | string \| null |  |  |
+| `email` | string \| null |  | Staff only. |
+| `mobile` | string \| null |  | Any Indian form. |
+| `role` | string \| null |  | Staff only, and never your own. A partner user's role follows its partner. |
+| `org_unit_id` | string \| null |  | Staff only: an open office. Never your own. |
+| `partner_id` | string \| null |  | Partner users only: an active partner. Never your own. |
+| `territory_ids` | string[] \| null |  | Staff only. Replaces the whole set. Never your own. |
+| `is_active` | boolean \| null |  | false deactivates (every session is signed out first), true reactivates into an open office or active partner. Never your own. |
 
 **`UserRef`**
 
@@ -539,21 +541,21 @@ failed attempts stay on record. A partner user has nothing to unlock
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `user_type` | `staff` | `partner_user` | yes |  |
+| `user_type` | `staff` \| `partner_user` | yes |  |
 | `full_name` | string | yes |  |
-| `email` | string | null | yes | Staff sign in with it. Stored lower-case. |
-| `mobile` | string | null | yes | Partner users sign in with it by OTP. 91XXXXXXXXXX, no plus. |
-| `role` | RoleRef | null | yes |  |
-| `org_unit` | OrgUnitRef | null | yes | The office a staff member is anchored on; null for a partner user. |
-| `partner` | api__schemas__users__PartnerRef | null | yes | The partner a partner user is anchored on; null for staff. |
+| `email` | string \| null | yes | Staff sign in with it. Stored lower-case. |
+| `mobile` | string \| null | yes | Partner users sign in with it by OTP. 91XXXXXXXXXX, no plus. |
+| `role` | RoleRef \| null | yes |  |
+| `org_unit` | OrgUnitRef \| null | yes | The office a staff member is anchored on; null for a partner user. |
+| `partner` | api__schemas__users__PartnerRef \| null | yes | The partner a partner user is anchored on; null for staff. |
 | `is_active` | boolean | yes |  |
 | `must_change_password` | boolean | yes | A temporary password set by an administrator is still in force. |
-| `last_login_at` | string | null | yes |  |
-| `open_leads` | integer | null | yes | Leads this staff member owns that are not won, lost or merged. Null for a partner user, who owns no leads. |
+| `last_login_at` | string \| null | yes |  |
+| `open_leads` | integer \| null | yes | Leads this staff member owns that are not won, lost or merged. Null for a partner user, who owns no leads. |
 
 **`api__schemas__users__PartnerRef`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `name` | string | null |  | Null when the partner row is outside your partners scope. |
+| `name` | string \| null |  | Null when the partner row is outside your partners scope. |

@@ -156,7 +156,8 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
 
 
 async def get_db_anon() -> AsyncIterator[AsyncSession]:
-    """A transaction with no claim at all, for the four pre-auth endpoints.
+    """A transaction with no claim at all, for the pre-auth endpoints: the four
+    auth doors and the two public quotation reads (FS-005).
 
     A connection with no claim must not be able to read `app_user` freely: it holds
     every password hash, and once `app_user` acquires RLS in FS-002 a NULL claim

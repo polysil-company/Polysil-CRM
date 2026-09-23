@@ -43,6 +43,13 @@ def _placeholders(row: dict[str, object]) -> int | None:
     return None
 
 
+def unconfigured_templates(settings: Settings) -> list[str]:
+    """The template keys whose account name is unset: sends with that key will
+    dead-letter until it is configured. Logged at worker startup, one line."""
+    return [key for key, spec in TEMPLATES.items()
+            if getattr(settings, spec.name_setting) is None]
+
+
 async def check_templates(provider: MessageProvider, settings: Settings) -> list[str]:
     """The problems found, each one line, scrubbed. Empty means the account is
     ready for what this system sends."""
@@ -55,7 +62,13 @@ async def check_templates(provider: MessageProvider, settings: Settings) -> list
     by_name = {str(_first(r, "name", "templateName", "Name") or "").lower(): r for r in rows}
     problems: list[str] = []
     for key, spec in TEMPLATES.items():
-        name = str(getattr(settings, spec.name_setting))
+        configured = getattr(settings, spec.name_setting)
+        if configured is None:
+            # An expected state, not a problem: the client's BSP has not approved
+            # the template yet (GAP-110). unconfigured_templates() names it on its
+            # own line at worker startup; the gate stays green for the rest.
+            continue
+        name = str(configured)
         row = by_name.get(name.lower())
         if row is None:
             problems.append(f"{key}: template {name!r} is not on the account")

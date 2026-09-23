@@ -37,12 +37,12 @@ means nothing in your scope; 403 means you may not view partners at all.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `q` | query | string | null |  | Name or code substring. |
-| `partner_type` | query | string | null |  | distributor, dealer or sub_dealer. |
-| `parent_id` | query | string | null |  | Children of this partner. |
-| `is_active` | query | boolean | null |  |  |
+| `q` | query | string \| null |  | Name or code substring. |
+| `partner_type` | query | string \| null |  | distributor, dealer or sub_dealer. |
+| `parent_id` | query | string \| null |  | Children of this partner. |
+| `is_active` | query | boolean \| null |  |  |
 | `limit` | query | integer |  |  |
-| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+| `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 
 **Responses**
 
@@ -68,7 +68,7 @@ down under itself. `price_tier` is set to the type. The code must be unique.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -76,20 +76,20 @@ down under itself. `price_tier` is set to the type. The code must be unique.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `parent_id` | string | null |  | The partner one type up (a dealer under a distributor). Null for a distributor. A dealer or distributor creating from the portal must name itself. |
-| `partner_type` | `distributor` | `dealer` | `sub_dealer` | yes |  |
+| `parent_id` | string \| null |  | The partner one type up (a dealer under a distributor). Null for a distributor. A dealer or distributor creating from the portal must name itself. |
+| `partner_type` | `distributor` \| `dealer` \| `sub_dealer` | yes |  |
 | `code` | string | yes | Unique. |
 | `name` | string | yes |  |
 | `territory_id` | string | yes |  |
-| `contact_name` | string | null |  |  |
-| `mobile` | string | null |  | Any Indian form. |
-| `email` | string | null |  |  |
-| `address` | string | null |  |  |
-| `gstin` | string | null |  | 15 characters; checked for shape. |
-| `pan` | string | null |  |  |
+| `contact_name` | string \| null |  |  |
+| `mobile` | string \| null |  | Any Indian form. |
+| `email` | string \| null |  |  |
+| `address` | string \| null |  |  |
+| `gstin` | string \| null |  | 15 characters; checked for shape. |
+| `pan` | string \| null |  |  |
 | `is_gst_registered` | boolean |  | Default `False`. |
-| `credit_limit` | number | string | null |  | Staff only. Rupees. |
-| `payment_terms_days` | integer | null |  | Staff only. |
+| `credit_limit` | number \| string \| null |  | Staff only. Rupees. |
+| `payment_terms_days` | integer \| null |  | Staff only. |
 
 **Responses**
 
@@ -143,7 +143,7 @@ terms, the territory and the type are staff-only or never change.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -151,17 +151,17 @@ terms, the territory and the type are staff-only or never change.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `name` | string | null |  |  |
-| `contact_name` | string | null |  |  |
-| `mobile` | string | null |  |  |
-| `email` | string | null |  |  |
-| `address` | string | null |  |  |
-| `gstin` | string | null |  |  |
-| `pan` | string | null |  |  |
-| `is_gst_registered` | boolean | null |  |  |
-| `territory_id` | string | null |  | Staff only. |
-| `credit_limit` | number | string | null |  | Staff only. |
-| `payment_terms_days` | integer | null |  | Staff only. |
+| `name` | string \| null |  |  |
+| `contact_name` | string \| null |  |  |
+| `mobile` | string \| null |  |  |
+| `email` | string \| null |  |  |
+| `address` | string \| null |  |  |
+| `gstin` | string \| null |  |  |
+| `pan` | string \| null |  |  |
+| `is_gst_registered` | boolean \| null |  |  |
+| `territory_id` | string \| null |  | Staff only. |
+| `credit_limit` | number \| string \| null |  | Staff only. |
+| `payment_terms_days` | integer \| null |  | Staff only. |
 
 **Responses**
 
@@ -189,7 +189,7 @@ signed out and deactivated. Staff only; a partner cannot close itself.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Responses**
 
@@ -217,7 +217,7 @@ many, and each is reactivated through `PATCH /users/{id}`.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Responses**
 
@@ -253,7 +253,7 @@ many, and each is reactivated through `PATCH /users/{id}`.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -266,7 +266,9 @@ many, and each is reactivated through `PATCH /users/{id}`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `limit` | integer | yes | The page size that was applied. |
-| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
+| `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
 
 **`Partner`**
 
@@ -275,19 +277,19 @@ many, and each is reactivated through `PATCH /users/{id}`.
 | `id` | string | yes |  |
 | `code` | string | yes |  |
 | `name` | string | yes |  |
-| `partner_type` | `distributor` | `dealer` | `sub_dealer` | yes |  |
+| `partner_type` | `distributor` \| `dealer` \| `sub_dealer` | yes |  |
 | `price_tier` | string | yes | Always the partner type (ADR-030). |
-| `parent` | PartnerParent | null | yes |  |
-| `territory` | TerritoryRef | null | yes |  |
-| `contact_name` | string | null | yes |  |
-| `mobile` | string | null | yes | 91XXXXXXXXXX, no plus. |
-| `email` | string | null | yes |  |
-| `address` | string | null | yes |  |
-| `gstin` | string | null | yes |  |
-| `pan` | string | null | yes |  |
+| `parent` | PartnerParent \| null | yes |  |
+| `territory` | TerritoryRef \| null | yes |  |
+| `contact_name` | string \| null | yes |  |
+| `mobile` | string \| null | yes | 91XXXXXXXXXX, no plus. |
+| `email` | string \| null | yes |  |
+| `address` | string \| null | yes |  |
+| `gstin` | string \| null | yes |  |
+| `pan` | string \| null | yes |  |
 | `is_gst_registered` | boolean | yes |  |
-| `credit_limit` | string | null | yes | Rupees, a decimal string. Stored, not enforced (H12). Staff readers only. |
-| `payment_terms_days` | integer | null | yes | Staff readers only. |
+| `credit_limit` | string \| null | yes | Rupees, a decimal string. Stored, not enforced (H12). Staff readers only. |
+| `payment_terms_days` | integer \| null | yes | Staff readers only. |
 | `is_active` | boolean | yes |  |
 | `users` | integer | yes | Active partner users anchored here. |
 | `created_at` | string | yes |  |
@@ -296,20 +298,20 @@ many, and each is reactivated through `PATCH /users/{id}`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `parent_id` | string | null |  | The partner one type up (a dealer under a distributor). Null for a distributor. A dealer or distributor creating from the portal must name itself. |
-| `partner_type` | `distributor` | `dealer` | `sub_dealer` | yes |  |
+| `parent_id` | string \| null |  | The partner one type up (a dealer under a distributor). Null for a distributor. A dealer or distributor creating from the portal must name itself. |
+| `partner_type` | `distributor` \| `dealer` \| `sub_dealer` | yes |  |
 | `code` | string | yes | Unique. |
 | `name` | string | yes |  |
 | `territory_id` | string | yes |  |
-| `contact_name` | string | null |  |  |
-| `mobile` | string | null |  | Any Indian form. |
-| `email` | string | null |  |  |
-| `address` | string | null |  |  |
-| `gstin` | string | null |  | 15 characters; checked for shape. |
-| `pan` | string | null |  |  |
+| `contact_name` | string \| null |  |  |
+| `mobile` | string \| null |  | Any Indian form. |
+| `email` | string \| null |  |  |
+| `address` | string \| null |  |  |
+| `gstin` | string \| null |  | 15 characters; checked for shape. |
+| `pan` | string \| null |  |  |
 | `is_gst_registered` | boolean |  | Default `False`. |
-| `credit_limit` | number | string | null |  | Staff only. Rupees. |
-| `payment_terms_days` | integer | null |  | Staff only. |
+| `credit_limit` | number \| string \| null |  | Staff only. Rupees. |
+| `payment_terms_days` | integer \| null |  | Staff only. |
 
 **`PartnerPage`**
 
@@ -330,17 +332,17 @@ many, and each is reactivated through `PATCH /users/{id}`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `name` | string | null |  |  |
-| `contact_name` | string | null |  |  |
-| `mobile` | string | null |  |  |
-| `email` | string | null |  |  |
-| `address` | string | null |  |  |
-| `gstin` | string | null |  |  |
-| `pan` | string | null |  |  |
-| `is_gst_registered` | boolean | null |  |  |
-| `territory_id` | string | null |  | Staff only. |
-| `credit_limit` | number | string | null |  | Staff only. |
-| `payment_terms_days` | integer | null |  | Staff only. |
+| `name` | string \| null |  |  |
+| `contact_name` | string \| null |  |  |
+| `mobile` | string \| null |  |  |
+| `email` | string \| null |  |  |
+| `address` | string \| null |  |  |
+| `gstin` | string \| null |  |  |
+| `pan` | string \| null |  |  |
+| `is_gst_registered` | boolean \| null |  |  |
+| `territory_id` | string \| null |  | Staff only. |
+| `credit_limit` | number \| string \| null |  | Staff only. |
+| `payment_terms_days` | integer \| null |  | Staff only. |
 
 **`PartnerStateChange`**
 
@@ -349,19 +351,19 @@ many, and each is reactivated through `PATCH /users/{id}`.
 | `id` | string | yes |  |
 | `code` | string | yes |  |
 | `name` | string | yes |  |
-| `partner_type` | `distributor` | `dealer` | `sub_dealer` | yes |  |
+| `partner_type` | `distributor` \| `dealer` \| `sub_dealer` | yes |  |
 | `price_tier` | string | yes | Always the partner type (ADR-030). |
-| `parent` | PartnerParent | null | yes |  |
-| `territory` | TerritoryRef | null | yes |  |
-| `contact_name` | string | null | yes |  |
-| `mobile` | string | null | yes | 91XXXXXXXXXX, no plus. |
-| `email` | string | null | yes |  |
-| `address` | string | null | yes |  |
-| `gstin` | string | null | yes |  |
-| `pan` | string | null | yes |  |
+| `parent` | PartnerParent \| null | yes |  |
+| `territory` | TerritoryRef \| null | yes |  |
+| `contact_name` | string \| null | yes |  |
+| `mobile` | string \| null | yes | 91XXXXXXXXXX, no plus. |
+| `email` | string \| null | yes |  |
+| `address` | string \| null | yes |  |
+| `gstin` | string \| null | yes |  |
+| `pan` | string \| null | yes |  |
 | `is_gst_registered` | boolean | yes |  |
-| `credit_limit` | string | null | yes | Rupees, a decimal string. Stored, not enforced (H12). Staff readers only. |
-| `payment_terms_days` | integer | null | yes | Staff readers only. |
+| `credit_limit` | string \| null | yes | Rupees, a decimal string. Stored, not enforced (H12). Staff readers only. |
+| `payment_terms_days` | integer \| null | yes | Staff readers only. |
 | `is_active` | boolean | yes |  |
 | `users` | integer | yes | Active partner users anchored here. |
 | `created_at` | string | yes |  |

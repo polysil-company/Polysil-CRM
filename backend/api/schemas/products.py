@@ -23,7 +23,7 @@ import datetime as dt
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 from api.schemas.leads import UUID_RE
 
@@ -289,17 +289,29 @@ class QuoteLineIn(BaseModel):
                           "`pack_multiple` when the product sets one.")]
     discount_pct: Annotated[Decimal, Field(
         default=Decimal("0"), ge=0, le=100,
-        description="Per cent off this line, at most three decimals.")]
+        description="The first discount tier: per cent off the gross, at most three "
+                    "decimals.")]
+    discount2_pct: Annotated[Decimal, Field(
+        default=Decimal("0"), ge=0, le=100,
+        description="The second tier, per cent off the balance after the first. "
+                    "Each tier's amount is rounded to the paisa before the next applies.")]
+    discount3_pct: Annotated[Decimal, Field(
+        default=Decimal("0"), ge=0, le=100,
+        description="The third tier, per cent off the balance after the second.")]
 
     @field_validator("qty")
     @classmethod
     def _qty_places(cls, v: Decimal) -> Decimal:
         return _places(v, 3, "qty")
 
-    @field_validator("discount_pct")
+    @field_validator("discount_pct", "discount2_pct", "discount3_pct")
     @classmethod
-    def _discount_places(cls, v: Decimal) -> Decimal:
-        return _places(v, 3, "discount_pct")
+    def _discount_places(cls, v: Decimal, info: ValidationInfo) -> Decimal:
+        return _places(v, 3, str(info.field_name))
+
+    @property
+    def discounts(self) -> tuple[Decimal, Decimal, Decimal]:
+        return (self.discount_pct, self.discount2_pct, self.discount3_pct)
 
 
 class QuoteLinesRequest(BaseModel):
@@ -338,9 +350,17 @@ class QuoteLine(BaseModel):
     price_list_id: str
     price_list_item_id: str
     gross: str
-    discount_pct: str
-    discount: str
-    taxable: str
+    discount_pct: str = Field(description="The first tier's percentage.")
+    discount1_amt: str = Field(description="What the first tier took off the gross.")
+    after_discount1: str
+    discount2_pct: str
+    discount2_amt: str = Field(description="What the second tier took off after_discount1.")
+    after_discount2: str
+    discount3_pct: str
+    discount3_amt: str = Field(description="What the third tier took off after_discount2.")
+    discount: str = Field(description="The three amounts summed. Not gross x discount_pct: "
+                                      "that is only the first tier.")
+    taxable: str = Field(description="The balance after the third tier.")
     hsn_code: str
     gst_slab: str
     gst_rate_id: str

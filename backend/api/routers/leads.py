@@ -123,17 +123,35 @@ async def list_leads(
     q: Annotated[str | None, Query(description="Name, mobile or inquiry number.")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: Annotated[str | None, Query(description="From a previous page's next_cursor.")] = None,
+    include_total: Annotated[bool, Query(
+        description="Also count how many leads match, for a \"1 to 25 of 137\" caption. "
+                    "Off by default: it costs a second query over everything in your "
+                    "scope, and most screens do not need it.")] = False,
 ) -> LeadPage:
     """The lead list, filtered and in scope.
 
     Keyset pagination by `(created_at desc, id)`: pass the previous page's
-    `meta.next_cursor` as `cursor`; it is absent on the last page. There is no
-    total. An empty list means nothing in your scope, which is not an error.
+    `meta.next_cursor` as `cursor`; it is absent on the last page. An empty list
+    means nothing in your scope, which is not an error.
+
+    **There are no numbered pages, and that is deliberate.** Leads arrive while
+    you are reading, and they arrive at the top, because the list is newest
+    first. Offset paging would show you the same lead twice on page 2 and skip
+    another one entirely. A cursor names the row you got to, so the next page is
+    the next page whatever has been created since.
+
+    **`?include_total=true` gives you the count** in `meta.total`, for a caption
+    like "1 to 25 of 137". It is off by default because it costs a scan of
+    everything in your scope. The count stops at 1,000 and sets
+    `meta.total_capped`, so render "1000+" rather than an exact figure when that
+    is true: an unbounded count is a query that gets slower every month until one
+    day it is the slowest thing on the screen.
     """
     return await service.list_leads(
         db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id,
         owner=owner, territory_id=territory_id, source=source, inquiry_type=inquiry_type,
-        created_from=created_from, created_to=created_to, q=q, limit=limit, cursor=cursor)
+        created_from=created_from, created_to=created_to, q=q, limit=limit, cursor=cursor,
+        include_total=include_total)
 
 
 # Declared before the /{lead_id} routes so the literal path wins the match.
@@ -191,8 +209,10 @@ async def transition(
     """Move a lead along its lifecycle: contact it, qualify it, or mark it lost.
 
     Only the moves the lifecycle allows are accepted. Marking a lead **lost** needs
-    a `lost_reason_id`. Stages from **quoted** onward are refused with
-    `quotation_required` until quotations ship. Pass `expected_stage` to act only if
+    a `lost_reason_id`. **quoted** and **negotiation** are reached by sending a
+    quotation and by recording a negotiation on it, never from here; **won** needs
+    an accepted quotation on the lead, and accepting one moves the lead itself.
+    All three answer `quotation_required` otherwise. Pass `expected_stage` to act only if
     the lead has not moved since you loaded it; if it has, you get `409 stage_changed`
     with the current stage in `fields.stage`.
     """

@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import Dealer, Staff
 
-__all__ = ["Admin", "Dealer", "Staff", "admin", "scoped_admin"]
+__all__ = ["Admin", "Catalogue", "Dealer", "Staff", "admin", "catalogue", "scoped_admin"]
 
 V1 = "/api/v1"
 PASSWORD = "correct horse battery staple"
@@ -260,4 +260,99 @@ async def scoped_admin(sessions: Callable[[], AsyncSession], admin: Admin) -> As
             ("DELETE FROM org_unit WHERE id = CAST(:o AS uuid)", {"o": str(org)}),
         ):
             await c.execute(text(stmt), params)
+        await c.commit()
+
+
+# ── the catalogue FS-010 and FS-005 both quote from ──────────────────────────
+
+@dataclass
+class Catalogue:
+    """One product, classified and taxed, priced in a list of this test's own."""
+
+    product_id: str
+    description: str
+    category: str
+    uom: str
+    gstin_id: str
+    gujarat_district_id: str
+    price_list_id: str
+    rate: str
+
+
+def _gstin() -> str:
+    """A registration number of this test's own.
+
+    `ck_seller_gstin_format` is two digits, five letters, four digits, a letter,
+    then three alphanumerics, and `gstin` is uniquely indexed. Varying one
+    character of a hex tag gives sixteen possible numbers, so a file with thirty
+    tests collides with itself - and one of the sixteen is the seeded
+    registration, which collides on the first run.
+    """
+    alnum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    n = uuid.uuid4().int
+    tail = "".join(alnum[(n >> (6 * i)) % 36] for i in range(3))
+    return f"24AAAAA{n % 9000 + 1000:04d}A{tail}"
+
+
+@pytest_asyncio.fixture
+async def catalogue(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Catalogue]:
+    tag = uuid.uuid4().hex[:8]
+    description = f"TEST PIPE {tag}"
+    s = sessions()
+    category = (await s.execute(text(
+        "SELECT code::text FROM product_category ORDER BY sort_order LIMIT 1"))).scalar_one()
+    uom = (await s.execute(text(
+        "SELECT code::text FROM uom WHERE decimals = 0 LIMIT 1"))).scalar_one()
+    product = str((await s.execute(text(
+        "INSERT INTO product (description, product_category_id, quotation_category, uom_id, "
+        "  provisional_fields) "
+        "SELECT CAST(:d AS citext), c.id, 'field', u.id, ARRAY['gst_slab','mrp']::text[] "
+        "FROM product_category c, uom u "
+        "WHERE c.code = CAST(:c AS citext) AND u.code = CAST(:u AS citext) RETURNING id"),
+        {"d": description, "c": category, "u": uom})).scalar_one())
+    await s.execute(text(
+        "INSERT INTO product_hsn (product_id, hsn_code, effective_from) "
+        "VALUES (CAST(:p AS uuid), '3917', DATE '2019-01-01')"), {"p": product})
+    # 3917 already carries a rate from 2026-04-01; this one covers the test window
+    # and closes before it, so the two never overlap.
+    await s.execute(text(
+        "INSERT INTO gst_rate (hsn_code, rate, effective_from, effective_to) "
+        "VALUES ('3917', 5, DATE '2019-01-01', DATE '2021-01-01')"))
+    # A second registration, not the default: the unique index allows only one
+    # default, and the seeded one does not start until 2026.
+    gstin = str((await s.execute(text(
+        "INSERT INTO seller_gstin (gstin, legal_name, state_territory_id, effective_from, "
+        "  effective_to) "
+        "SELECT CAST(:g AS citext), 'Polysil Test', t.id, DATE '2019-01-01', DATE '2021-01-01' "
+        "FROM territory t WHERE t.level = 'state' AND t.code = 'GJ' RETURNING id"),
+        {"g": _gstin()})).scalar_one())
+    district = str((await s.execute(text(
+        "SELECT d.id FROM territory d JOIN territory s ON s.id = d.parent_id "
+        "WHERE s.level = 'state' AND s.code = 'GJ' AND d.level = 'district' LIMIT 1"
+    ))).scalar_one())
+    price_list = str((await s.execute(text(
+        "INSERT INTO price_list (name, channel_tier, status, published_at, effective_from, "
+        "  effective_to, is_provisional) "
+        "VALUES (:n, 'farmer', 'published', now(), DATE '2020-01-01', DATE '2021-01-01', true) "
+        "RETURNING id"), {"n": f"test list {tag}"})).scalar_one())
+    await s.execute(text(
+        "INSERT INTO price_list_item (price_list_id, product_id, rate) "
+        "VALUES (CAST(:l AS uuid), CAST(:p AS uuid), 103.19)"),
+        {"l": price_list, "p": product})
+    await s.commit()
+
+    try:
+        yield Catalogue(product, description, category, uom, gstin, district, price_list,
+                        "103.19")
+    finally:
+        c = sessions()
+        for stmt in (
+            "DELETE FROM price_list_item WHERE product_id = CAST(:p AS uuid)",
+            "DELETE FROM price_list WHERE id = CAST(:l AS uuid)",
+            "DELETE FROM product_hsn WHERE product_id = CAST(:p AS uuid)",
+            "DELETE FROM gst_rate WHERE hsn_code = '3917' AND effective_to = DATE '2021-01-01'",
+            "DELETE FROM seller_gstin WHERE id = CAST(:g AS uuid)",
+            "DELETE FROM product WHERE id = CAST(:p AS uuid)",
+        ):
+            await c.execute(text(stmt), {"p": product, "l": price_list, "g": gstin})
         await c.commit()

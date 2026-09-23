@@ -25,16 +25,22 @@ TRANSITIONS: dict[str, frozenset[str]] = {
     "new": frozenset({"contacted", "lost"}),
     "contacted": frozenset({"qualified", "lost"}),
     "qualified": frozenset({"quoted", "lost"}),
-    "quoted": frozenset({"negotiation", "lost"}),
+    # quoted -> won: a quotation accepted as sent never passes through negotiation,
+    # and the flowchart's straight line would otherwise force a fake stage (FS-005 3)
+    "quoted": frozenset({"negotiation", "won", "lost"}),
     "negotiation": frozenset({"won", "lost"}),
 }
 
 # won, lost and merged accept no transition and no edit; a lost lead is reopened.
 TERMINAL: frozenset[str] = frozenset({"won", "lost", "merged"})
 
-# Moving into these needs an accepted quotation, and no quotation table exists yet,
-# so the service refuses them with quotation_required until FS-005 (GAP-051).
-REQUIRES_QUOTATION: frozenset[str] = frozenset({"quoted", "negotiation", "won"})
+# Reached through the quotation, never from the lead endpoint: sending one moves
+# the lead to quoted, a negotiation moves it on (FS-005 3). Refused here with
+# quotation_required.
+VIA_QUOTATION: frozenset[str] = frozenset({"quoted", "negotiation"})
+# Reachable from the lead endpoint once an accepted quotation is linked
+# (AC-LEAD-6, GAP-051 closed by FS-005); refused with quotation_required until then.
+REQUIRES_QUOTATION: frozenset[str] = frozenset({"won"})
 
 # A lead must carry all of these before it can be qualified (FS-003 3).
 QUALIFICATION_FIELDS: tuple[str, ...] = (

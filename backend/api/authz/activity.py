@@ -20,6 +20,9 @@ ENTITY_REFS: dict[str, str] = {
     "lead": "lead_id",
     "channel_partner": "partner_id",
     "customer": "customer_id",
+    # FS-005 5: a quotation event always carries its lead, so the lead timeline
+    # reads it; its visibility resolves through the quotation (ENTITY_BY_ID).
+    "quotation": "lead_id",
 }
 
 # entity_type -> the table whose policies decide visibility. Only tables that
@@ -37,7 +40,18 @@ LIVE_TABLES: dict[str, str] = {
 # stays visible. Kept out of ENTITY_REFS on purpose: activity_event carries no
 # org_unit_id or territory_id column, and a CHECK requiring one would not compile
 # (FS-006 5, plan review round 2 B-5).
-ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory")
+# FS-011: an order event may carry no lead (a direct order, a consolidated one),
+# so sales_order resolves through entity_id and is not in ENTITY_REFS; approval
+# and dispatch events are written as sales_order events with their own kind.
+ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory", "quotation", "sales_order")
+
+# A type in both LIVE_TABLES and ENTITY_BY_ID would emit two `WHEN` arms, the
+# first through its reference column's table and the second dead, and PostgreSQL
+# accepts that silently (FS-005 edge case 23). ENTITY_REFS and ENTITY_BY_ID may
+# overlap: the CHECK and the arm are different facts.
+if set(LIVE_TABLES) & set(ENTITY_BY_ID):
+    raise RuntimeError(f"an entity type is in both LIVE_TABLES and ENTITY_BY_ID: "
+                       f"{set(LIVE_TABLES) & set(ENTITY_BY_ID)}")
 
 
 def check_sql() -> str:

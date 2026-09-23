@@ -37,6 +37,15 @@ RUN mkdir -p api worker \
 # ── the image that serves traffic ─────────────────────────────────────────
 FROM python:3.12-slim-bookworm AS runtime
 
+# WeasyPrint's native libraries (FS-005, ADR-024) and the fonts a quotation
+# needs: a farmer's name is typed in Gujarati or Hindi, and DejaVu alone renders
+# it as a row of boxes. Noto core covers both scripts.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 libfontconfig1 libcairo2 \
+        libgdk-pixbuf-2.0-0 fonts-noto-core shared-mime-info \
+ && rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"

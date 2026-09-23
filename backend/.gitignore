@@ -25,3 +25,6 @@ build/
 # Staging secrets. Uploaded to the box by scripts/deploy_staging.py.
 infra/.env.staging
 infra/.staging-password
+
+# the shared-repo push script and its clone; never committed, never snapshotted
+scripts/local/

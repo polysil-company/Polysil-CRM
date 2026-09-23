@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
@@ -48,6 +49,7 @@ from api.domain.pricing.tax import (
 )
 from api.domain.pricing.types import (
     ZERO,
+    DiscountStep,
     PricedDocument,
     PricedLine,
     PriceList,
@@ -261,27 +263,76 @@ def _check_quantity(product: Product, qty: Decimal, index: int) -> None:
             f"{product.uom_code}.")})
 
 
-async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.QuoteLinesResponse:
-    """Price and tax a set of lines. Stores nothing and locks nothing (rule 14)."""
-    day = body.as_of or today_ist()
+@dataclass(frozen=True)
+class LineSpec:
+    """One line to price: what the preview posts and what a saved line re-resolves.
+    `discounts` is the cascade, tier one first."""
+
+    product_id: str
+    qty: Decimal
+    discounts: tuple[Decimal, ...] = ()
+
+
+@dataclass(frozen=True)
+class PricedContext:
+    """A priced document and the resolution around it: the date, the registration
+    and the state it supplies from, the ship-to state and its code, the tier. What
+    the preview returns and what the quotation stores (FS-005 5.3)."""
+
+    document: PricedDocument
+    as_of: dt.date
+    seller_gstin_id: str
+    seller_state_id: str
+    seller_code: str
+    place_of_supply_state_id: str
+    place_of_supply_code: str
+    intra_state: bool
+    tier: str
+    partner_id: str | None
+
+
+async def price_document(db: AsyncSession, *, partner_id: str | None,
+                         place_of_supply_territory_id: str, seller_gstin_id: str | None,
+                         as_of: dt.date | None, lines: Sequence[LineSpec],
+                         existing: bool = False,
+                         tax_as_of: dt.date | None = None) -> PricedContext:
+    """Resolve and price a set of lines against the masters in force on a date.
+    Stores nothing and locks nothing (rule 14).
+
+    **One implementation for the preview and the save.** `POST /pricing/quote-lines`
+    and every quotation write call this, so the figures a screen previews and the
+    figures a document stores cannot disagree, which is what the `rate_changed`
+    comparison rests on (FS-005 rule 4).
+
+    `existing=True` is a document re-resolving lines it already holds: a product
+    discontinued since the line was saved is priced with a warning rather than
+    refused, and the quantity is not re-validated against a unit or pack multiple
+    that may have changed since it was typed (FS-005 rule 5, edge cases 8 and 13).
+    A new line is refused on both, as before.
+
+    `tax_as_of` separates the tax from the price (FS-011 rule 3): rates resolve at
+    `as_of`, the HSN, the GST slab and the seller registration at `tax_as_of`,
+    because tax is charged on the date of supply. It defaults to `as_of`, which is
+    what a quotation and the preview do.
+    """
+    day = as_of or today_ist()
+    tax_day = tax_as_of or day
     if day > today_ist() + MAX_FUTURE:
         raise ValidationFailed(fields={"as_of": "A price date may not be more than a year ahead."})
-    lines = body.lines
     if len(lines) > MAX_LINES:
         raise ValidationFailed(fields={"lines": f"At most {MAX_LINES} lines."})
 
-    _, tier, pos_state = await resolve_scope(
-        db, partner_id=body.partner_id,
-        place_of_supply_territory_id=body.place_of_supply_territory_id)
-    gstin_id, seller, seller_code = await seller_state(
-        db, gstin_id=body.seller_gstin_id, as_of=day)
+    target, tier, pos_state = await resolve_scope(
+        db, partner_id=partner_id, place_of_supply_territory_id=place_of_supply_territory_id)
+    gstin_id, seller, seller_code = await seller_state(db, gstin_id=seller_gstin_id,
+                                                       as_of=tax_day)
     intra_state = seller == pos_state
     pos_code = (await db.execute(
         text("SELECT code::text FROM territory WHERE id = CAST(:t AS uuid)"),
         {"t": pos_state})).scalar_one_or_none() or ""
 
     ids = [ln.product_id for ln in lines]
-    products = await load_products(db, ids, day)
+    products = await load_products(db, ids, tax_day)
     rates = await load_rates(db, ids, as_of=day, state_territory_id=pos_state, tier=tier)
 
     missing = {f"lines[{i}].product_id": "No such product."
@@ -296,17 +347,23 @@ async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.Quot
     untaxed: dict[str, str] = {}
     unpriced: dict[str, str] = {}
     chosen: dict[str, Rate] = {}
+    discontinued = 0
     for i, ln in enumerate(lines):
         product, tax = products[ln.product_id]
         if not product.is_active:
-            inactive[f"lines[{i}].product_id"] = f"{product.description} is no longer sold."
+            if existing:
+                discontinued += 1
+            else:
+                inactive[f"lines[{i}].product_id"] = f"{product.description} is no longer sold."
         if tax.slab < 0:
             untaxed[f"lines[{i}].product_id"] = (
-                f"{product.description} has no tax rate in force on {day}.")
+                f"{product.description} has no tax rate in force on {tax_day}.")
         winner = pick(rates.get(ln.product_id, []))
         if winner is None:
+            remedy = (" Revise the document at a date a list covers, or remove the line."
+                      if existing else "")
             unpriced[f"lines[{i}].product_id"] = (
-                f"{product.description} has no price in force on {day}.")
+                f"{product.description} has no price in force on {day}.{remedy}")
         else:
             chosen[str(i)] = winner
     if inactive:
@@ -319,17 +376,19 @@ async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.Quot
     priced: list[PricedLine] = []
     for i, ln in enumerate(lines):
         product, tax = products[ln.product_id]
-        _check_quantity(product, ln.qty, i)
+        if not existing:
+            _check_quantity(product, ln.qty, i)
         rate = chosen[str(i)]
+        tiers = tuple(ln.discounts) or (ZERO,)
         try:
-            money = compute_line(rate=rate.rate, qty=ln.qty, discount_pct=ln.discount_pct,
+            money = compute_line(rate=rate.rate, qty=ln.qty, discounts=tiers,
                                  slab=tax.slab, intra_state=intra_state)
         except PricingError as exc:
             raise ValidationFailed(
                 exc.message, code=exc.code,
                 fields={f"lines[{i}].{exc.field_path or 'qty'}": exc.message}) from exc
-        priced.append(PricedLine(product=product, qty=ln.qty, discount_pct=ln.discount_pct,
-                                 rate=rate, tax=tax, money=money))
+        priced.append(PricedLine(product=product, qty=ln.qty, discount_pct=tiers[0],
+                                 rate=rate, tax=tax, money=money, discounts=tiers))
 
     try:
         totals = document_totals(tuple(p.money for p in priced))
@@ -348,11 +407,44 @@ async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.Quot
         warnings.append(f"provisional_pricing: {provisional} of {len(priced)} lines use a "
                         f"stand-in rate or tax slab that the client has not confirmed. Fine "
                         f"for testing, not for a quotation anyone sends.")
+    if discontinued:
+        warnings.append(f"discontinued_products: {discontinued} of {len(priced)} lines are "
+                        f"products no longer sold. They stay priced on this document; they "
+                        f"cannot be added to a new one.")
 
     document = PricedDocument(lines=tuple(priced), totals=totals, intra_state=intra_state,
                               warnings=tuple(warnings))
-    return _quote_response(document, as_of=day, gstin_id=gstin_id, seller_code=seller_code,
-                           pos_code=pos_code)
+    return PricedContext(document=document, as_of=day, seller_gstin_id=gstin_id,
+                         seller_state_id=seller, seller_code=seller_code,
+                         place_of_supply_state_id=pos_state, place_of_supply_code=pos_code,
+                         intra_state=intra_state, tier=tier, partner_id=target)
+
+
+async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.QuoteLinesResponse:
+    """Price and tax a set of lines. Stores nothing and locks nothing (rule 14)."""
+    ctx = await price_document(
+        db, partner_id=body.partner_id,
+        place_of_supply_territory_id=body.place_of_supply_territory_id,
+        seller_gstin_id=body.seller_gstin_id, as_of=body.as_of,
+        lines=[LineSpec(product_id=ln.product_id, qty=ln.qty, discounts=ln.discounts)
+               for ln in body.lines])
+    return _quote_response(ctx.document, as_of=ctx.as_of, gstin_id=ctx.seller_gstin_id,
+                           seller_code=ctx.seller_code, pos_code=ctx.place_of_supply_code)
+
+
+def _cascade(steps: tuple[DiscountStep, ...]) -> dict[str, str]:
+    """The three tiers as the sheet prints them, always three, zero-filled: the
+    columns exist whatever the percentages were (FS-005 rule 6)."""
+    padded = list(steps) + [DiscountStep(pct=ZERO, amount=ZERO, after=steps[-1].after)] * (
+        3 - len(steps))
+    s1, s2, s3 = padded[:3]
+    return {
+        "discount_pct": f"{s1.pct:.3f}", "discount1_amt": _s(s1.amount),
+        "after_discount1": _s(s1.after),
+        "discount2_pct": f"{s2.pct:.3f}", "discount2_amt": _s(s2.amount),
+        "after_discount2": _s(s2.after),
+        "discount3_pct": f"{s3.pct:.3f}", "discount3_amt": _s(s3.amount),
+    }
 
 
 def _quote_response(doc: PricedDocument, *, as_of: dt.date, gstin_id: str, seller_code: str,
@@ -362,7 +454,7 @@ def _quote_response(doc: PricedDocument, *, as_of: dt.date, gstin_id: str, selle
             product_id=p.product.id, description=p.product.description, uom=p.product.uom_code,
             qty=f"{p.qty:.{p.product.uom_decimals}f}", rate=_s(p.rate.rate),
             price_list_id=p.rate.price_list.id, price_list_item_id=p.rate.price_list_item_id,
-            gross=_s(p.money.gross), discount_pct=f"{p.discount_pct:.3f}",
+            gross=_s(p.money.gross), **_cascade(p.money.steps),
             discount=_s(p.money.discount), taxable=_s(p.money.taxable),
             hsn_code=p.tax.hsn_code, gst_slab=_rate(p.tax.slab), gst_rate_id=p.tax.gst_rate_id,
             cgst_rate=_rate(p.money.cgst_rate), sgst_rate=_rate(p.money.sgst_rate),

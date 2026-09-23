@@ -28,6 +28,7 @@ from api.authz.modules import SPECS
 from api.authz.predicate import Caller, scope_predicate
 from api.config import get_settings
 from api.domain import leads as domain
+from api.domain.orders import actor_hidden_from_partner
 from api.errors import ForbiddenError, NotFoundError, StageChangedError, ValidationFailed
 from api.integrations.messages import TEMPLATE_LEAD_ACK
 from api.schemas.leads import (
@@ -508,10 +509,21 @@ async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
     if not domain.can_transition(current, body.to_stage):
         raise ValidationFailed(f"A {current} lead cannot move to {body.to_stage}.",
                                code="invalid_transition", fields={"to_stage": body.to_stage})
-    if body.to_stage in domain.REQUIRES_QUOTATION:
+    if body.to_stage in domain.VIA_QUOTATION:
         raise ValidationFailed(
-            "This stage needs an accepted quotation, which this release does not have yet.",
+            "This stage is reached by sending a quotation, not from here.",
             code="quotation_required", fields={"to_stage": body.to_stage})
+    if body.to_stage in domain.REQUIRES_QUOTATION:
+        # Counted as the owner: an EXISTS under the caller's quotation policies would
+        # say no to an officer whose colleague raised the accepted quotation
+        # (FS-005 edge case 9).
+        accepted = (await db.execute(
+            text("SELECT quotation_accepted_for_lead(CAST(:id AS uuid))"),
+            {"id": lead_id})).scalar_one()
+        if not accepted:
+            raise ValidationFailed(
+                "This stage needs an accepted quotation on the lead.",
+                code="quotation_required", fields={"to_stage": body.to_stage})
 
     payload: dict[str, Any] = {"from": current, "to": body.to_stage}
     if body.to_stage == "lost":
@@ -612,7 +624,9 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
         if isinstance(payload, str):
             payload = json.loads(payload)
         actor = None
-        if r.actor_id is not None:
+        # question 15.14: a partner never learns which approver decided an order
+        hidden = caller.partner_id is not None and actor_hidden_from_partner(r.kind)
+        if r.actor_id is not None and not hidden:
             actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name") or "")
         events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso_req(r.occurred_at),
                                     actor=actor, payload=payload or {}))
@@ -1062,6 +1076,34 @@ async def patch_scoring(db: AsyncSession, body: ScoringPatch) -> list[ScoringIte
 
 _MAX_LIMIT = 100
 
+# The ceiling on `?include_total=true`. A count over a scoped table is a scan, and
+# its cost grows with the rows the caller can see: measured at 3 ms server-side
+# over 111 leads, which says nothing about a global administrator two years in
+# (ISS-014). Counting one row past the ceiling and stopping bounds that forever,
+# and the response says when it stopped so the screen can render "1000+".
+#
+# A thousand is chosen for the screen rather than the database: past forty pages
+# nobody is paging, they are filtering.
+TOTAL_CEILING = 1000
+
+
+async def _capped_total(db: AsyncSession, table: Any, filters: list[Any]) -> tuple[int, bool]:
+    """How many rows match, up to the ceiling, and whether there are more.
+
+    The LIMIT is inside the subquery on purpose: it stops the scan, which is the
+    whole point. `SELECT count(*) ... LIMIT 1001` would count everything and then
+    return one row. The FROM is explicit because a global caller who also holds
+    the delete permission has a predicate of `true`, which names no column, and
+    `SELECT 1 WHERE true` is one row however many exist (code review F-6).
+    """
+    inner = (sa.select(sa.literal(1))
+             .select_from(table)
+             .where(sa.and_(*filters))
+             .limit(TOTAL_CEILING + 1)
+             .subquery())
+    counted = await db.scalar(sa.select(sa.func.count()).select_from(inner)) or 0
+    return (TOTAL_CEILING, True) if counted > TOTAL_CEILING else (int(counted), False)
+
 
 async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = None,
                      priority: str | None = None, owner_user_id: str | None = None,
@@ -1069,7 +1111,8 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
                      source: str | None = None, inquiry_type: str | None = None,
                      created_from: str | None = None, created_to: str | None = None,
                      q: str | None = None, limit: int = 50,
-                     cursor: str | None = None) -> LeadPage:
+                     cursor: str | None = None,
+                     include_total: bool = False) -> LeadPage:
     """The lead list, scoped and filtered, keyset-paged by (created_at desc, id).
 
     Enforcer 1 is scope_predicate; RLS re-checks the same rows underneath. No total
@@ -1110,10 +1153,17 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
         where.append(lead_t.c.created_at <= _parse_ts(created_to, "created_to"))
     if q:
         where.append(_search_clause(q))
+    # Everything above narrows the set the caller asked for. The cursor below
+    # narrows it to one page, so the total is counted from `filters` and not from
+    # `where`: a total that shrank as the user paged would be worse than none.
+    filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)
         where.append(sa.or_(lead_t.c.created_at < c_ts,
                             sa.and_(lead_t.c.created_at == c_ts, lead_t.c.id < c_id)))
+
+    total, total_capped = (await _capped_total(db, lead_t, filters)
+                           if include_total else (None, False))
 
     page = (await db.execute(
         sa.select(lead_t.c.id, lead_t.c.created_at)
@@ -1129,13 +1179,15 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
 
     ids = [str(r.id) for r in page]
     if not ids:
-        return LeadPage(data=[], meta=PageMeta(limit=limit, next_cursor=None))
+        return LeadPage(data=[], meta=PageMeta(limit=limit, next_cursor=None,
+                                              total=total, total_capped=total_capped))
 
     rows = (await db.execute(text(_LEAD_SELECT + " WHERE l.id = ANY(:ids)"),
                              {"ids": ids})).all()
     by_id = {str(r.id): r for r in rows}
     data = [_row_to_lead(by_id[i], duplicates=[]) for i in ids if i in by_id]
-    return LeadPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor))
+    return LeadPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
+                                            total=total, total_capped=total_capped))
 
 
 def _search_clause(q: str) -> Any:

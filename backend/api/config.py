@@ -11,6 +11,7 @@ import re
 from datetime import timedelta
 from functools import lru_cache
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from pydantic import PostgresDsn, RedisDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -181,6 +182,10 @@ class Settings(BaseSettings):
     # language until question 3.2 is answered (GAP-022).
     whatsapp_template_otp: str = "polysil_auth_otp"
     whatsapp_template_lead_ack: str = "polysil_lead_ack"
+    # FS-005: the quotation link. Optional, because a bare str would refuse to
+    # start every process until the client's BSP approves the template (GAP-110);
+    # the checker reports an unset name on its own line.
+    whatsapp_template_quotation_share: str | None = None
     whatsapp_template_language: str = "en"
     # A total deadline per send: httpx's timeout bounds each socket operation, not
     # the request. Re-sized from the smoke's slowest sends.
@@ -196,6 +201,24 @@ class Settings(BaseSettings):
 
     r2_endpoint: str | None = None
     r2_bucket: str | None = None
+    r2_access_key_id: str | None = None
+    r2_secret_access_key: SecretStr | None = None
+    # FS-005 5.3. The local adapter is for the dev box only (ADR-026 rejects local
+    # disk outright); outside local R2 is required, validated below.
+    storage_dir: str = "infra/storage"
+    # The frontend origin the share link points at, no trailing slash. A link is
+    # the origin plus 46 characters and the adapter's value bound is 100, so the
+    # origin is bounded at 54 (edge case 17).
+    public_web_url: str = "http://localhost:3000"
+    # weasyprint renders a PDF; html stores the rendered HTML as the document and
+    # is allowed on the dev box only, where WeasyPrint's native libraries are not.
+    pdf_renderer: Literal["weasyprint", "html"] = "weasyprint"
+    # The render lease (FS-005 5.2): longer than any render, shorter than a
+    # user's patience.
+    pdf_lease_minutes: int = 5
+    # seconds one render tick may keep claiming; under the 5 s cadence, so ticks do
+    # not pile up and hold the worker's job slots the outbox drain needs
+    pdf_render_budget: float = 4.0
 
     sentry_dsn: SecretStr | None = None
 
@@ -295,6 +318,50 @@ class Settings(BaseSettings):
         if self.environment == "production" and self.whatsapp_provider == "mock":
             raise ValueError("whatsapp_provider is mock in production; no message would leave")
         return self
+
+    @field_validator("whatsapp_template_quotation_share", "r2_endpoint", "r2_bucket",
+                     "r2_access_key_id", "r2_secret_access_key", mode="before")
+    @classmethod
+    def _empty_is_unset(cls, v: object) -> object:
+        """The compose files pass `${VAR:-}`, and an empty string is not a value:
+        an empty template name would read as configured and fail every send."""
+        return None if isinstance(v, str) and not v.strip() else v
+
+    @model_validator(mode="after")
+    def _quotations_are_configured(self) -> Settings:
+        """FS-005 5.3. Three things that are fine on the dev box and wrong anywhere
+        else, refused at startup: HTML in place of a PDF, a share link the
+        WhatsApp adapter would truncate, and a share link that points at
+        localhost, which is what an unset origin would send to a farmer's phone.
+        A missing R2 bucket is not refused here: it takes the quotation PDF down,
+        not the CRM (edge case 20), and `storage_configured` says so at startup
+        and on every render."""
+        origin = self.public_web_url.strip().rstrip("/")
+        if not origin and self.environment == "local":
+            origin = "http://localhost:3000"
+        self.public_web_url = origin
+        if self.environment != "local":
+            host = urlsplit(origin).hostname if origin else None
+            if not origin or host in _LOCAL_HOSTS:
+                raise ValueError("public_web_url must be the frontend's real origin outside "
+                                 "local: the share link and the WhatsApp message carry it")
+        if len(self.public_web_url) > 54:
+            raise ValueError("public_web_url is longer than 54 characters; the share link "
+                             "would exceed the WhatsApp value bound of 100")
+        if self.environment != "local" and self.pdf_renderer != "weasyprint":
+            raise ValueError("pdf_renderer must be weasyprint outside local")
+        return self
+
+    @property
+    def storage_configured(self) -> bool:
+        """R2 in full, or the local directory on the dev box. ADR-026 rejects local
+        disk anywhere else, so outside local an unset R2 means no storage at all."""
+        r2 = bool(self.r2_endpoint and self.r2_bucket and self.r2_access_key_id
+                  and self.r2_secret_access_key)
+        return r2 or self.environment == "local"
+
+
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1"})
 
 
 @lru_cache

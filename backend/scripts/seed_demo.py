@@ -164,6 +164,21 @@ def main() -> None:
         # rather than discovered when an UPDATE quietly affects nothing.
         cur.execute("SELECT assert_role_permission_invariants()")
 
+        # The approval thresholds name roles, and roles are created here, not by a
+        # migration. On a fresh database migration 013's seed finds no roles and
+        # inserts nothing (ISS-098). Seed the same stand-ins (question 15.1,
+        # GAP-122); an existing row, an admin's edit included, is left alone.
+        cur.execute(
+            """
+            INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount)
+            SELECT 'sales_order', r.id, NULL, v.amount
+              FROM (VALUES ('district_manager', 100000.00::numeric),
+                           ('state_manager', 500000.00), ('regional_manager', NULL)) v(code, amount)
+              JOIN role r ON r.code = v.code
+            ON CONFLICT (doc_type, role_id, territory_id) DO NOTHING
+            """
+        )
+
         territories = _tree(
             cur, "territory",
             [("Gujarat", "state", None), ("Rajkot", "district", "Gujarat"),
