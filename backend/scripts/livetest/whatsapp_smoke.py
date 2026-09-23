@@ -2,6 +2,7 @@
 
     python scripts/livetest/whatsapp_smoke.py --to 91XXXXXXXXXX --template auth.otp
     python scripts/livetest/whatsapp_smoke.py --to 91XXXXXXXXXX --template lead_ack
+    python scripts/livetest/whatsapp_smoke.py --to 91XXXXXXXXXX --template quotation_share
 
 The only place this project sends a real message outside a deployment (FS-007
 rule 19). It refuses to run without a number, it never reads a farmer's number
@@ -25,13 +26,21 @@ import uuid
 import httpx
 
 from api.config import Settings, get_settings
-from api.integrations.messages import TEMPLATE_AUTH_OTP, TEMPLATE_LEAD_ACK, template_values
+from api.integrations.messages import (
+    TEMPLATE_AUTH_OTP,
+    TEMPLATE_LEAD_ACK,
+    TEMPLATE_QUOTATION_SHARE,
+    template_values,
+)
 from api.integrations.whatsapp.elevenza import ElevenZaProvider
 from api.integrations.whatsapp.provider import OutboundMessage, scrub
 
 SAMPLES: dict[str, dict[str, object]] = {
     TEMPLATE_AUTH_OTP: {"code": "123456"},
     TEMPLATE_LEAD_ACK: {"farmer_name": "Smoke Test", "inquiry_no": "POL/GJ/2026-27/00000"},
+    # the link is the company's own home page: a real address, and no quotation token
+    TEMPLATE_QUOTATION_SHARE: {"party_name": "Smoke Test", "quote_no": "QT/GJ/2026-27/00000",
+                               "link": "https://polysilirrigation.com/"},
 }
 
 

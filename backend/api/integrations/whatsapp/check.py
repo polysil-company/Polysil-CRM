@@ -59,7 +59,14 @@ async def check_templates(provider: MessageProvider, settings: Settings) -> list
     # survive a case-sensitive scrub at the end (cross-vendor review of the code, P2).
     rows = [{str(k): (scrub(v, secrets) if isinstance(v, str) else v) for k, v in r.items()}
             for r in await provider.list_templates()]
-    by_name = {str(_first(r, "name", "templateName", "Name") or "").lower(): r for r in rows}
+    # one row per name, preferring the localization in the language this system sends
+    wanted = settings.whatsapp_template_language.lower()
+    by_name: dict[str, dict[str, object]] = {}
+    for r in rows:
+        name_ = str(_first(r, "name", "templateName", "Name") or "").lower()
+        language_ = str(_first(r, "language", "languageCode", "Language") or "").lower()
+        if name_ not in by_name or language_ == wanted:
+            by_name[name_] = r
     problems: list[str] = []
     for key, spec in TEMPLATES.items():
         configured = getattr(settings, spec.name_setting)

@@ -445,3 +445,72 @@ def test_a_refused_configuration_does_not_print_the_token() -> None:
     with pytest.raises(ValueError) as exc:
         _settings(environment="production", whatsapp_provider="mock")
     assert TOKEN not in str(exc.value) and "mock" in str(exc.value)
+
+
+# ── the live listing's shape (W10, settled 23 Sep by the first live run) ─────
+
+def _doc(name: str, category: str, *locs: tuple[str, str, str]) -> dict[str, object]:
+    """One template as 11za lists it: localizations carry the language, the status
+    and the components."""
+    return {"_id": "x", "name": name, "category": category, "subCategory": "CUSTOM",
+            "localizations": [{"language": lang, "status": status,
+                               "components": [{"type": "HEADER", "format": "TEXT", "text": "Hi"},
+                                              {"type": "BODY", "text": body}]}
+                              for lang, status, body in locs]}
+
+
+def _live_listing(docs: list[dict[str, object]], pages: list[int] | None = None) -> Any:
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = json.loads(request.content)["page"]
+        if pages is not None:
+            pages.append(page)
+        return _json(200, {"Message": "template list",
+                           "Data": {"docs": docs if page == 1 else [], "totalDocs": len(docs),
+                                    "hasNextPage": False}})
+    return handler
+
+
+async def test_the_live_listing_becomes_one_row_per_localization() -> None:
+    docs = [_doc("polysil_lead_ack", "UTILITY",
+                 ("hi", "PENDING", "नमस्ते {{1}}, {{2}}"),
+                 ("en", "APPROVED", "Hello {{1}}, your inquiry {{2}} is received.")),
+            _doc("dealer_gift", "MARKETING", ("en", "APPROVED", "A small gesture"))]
+    pages: list[int] = []
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_live_listing(docs, pages))) as c:
+        rows = await ElevenZaProvider(_settings(), c).list_templates()
+    assert pages == [1], "three rows from two templates is one short page, not a full one"
+    assert [(r["name"], r["language"], r["status"]) for r in rows] == [
+        ("polysil_lead_ack", "hi", "PENDING"), ("polysil_lead_ack", "en", "APPROVED"),
+        ("dealer_gift", "en", "APPROVED")]
+    assert rows[1]["body"] == "Hello {{1}}, your inquiry {{2}} is received."
+    assert rows[1]["category"] == "UTILITY"
+
+
+async def test_the_paging_counts_templates_not_localizations() -> None:
+    """A full page of 100 templates, half of them with no localization yet, is 50
+    rows: counting rows would stop there and lose page 2."""
+    asked: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = json.loads(request.content)["page"]
+        asked.append(page)
+        count = 100 if page == 1 else 1
+        docs = [_doc(f"t{page}_{i}", "UTILITY", *([("en", "APPROVED", "x")] if i % 2 == 0 else []))
+                for i in range(count)]
+        return _json(200, {"Data": {"docs": docs}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+        rows = await ElevenZaProvider(_settings(), c).list_templates()
+    assert asked == [1, 2] and len(rows) == 51
+
+
+async def test_the_check_reads_the_live_shape_in_our_language() -> None:
+    """The approved English localization passes even when a pending Hindi one is
+    listed first; the missing templates are named."""
+    docs = [_doc("polysil_lead_ack", "UTILITY",
+                 ("hi", "PENDING", "नमस्ते {{1}}, {{2}}"),
+                 ("en", "APPROVED", "Hello {{1}}, your inquiry {{2}} is received."))]
+    settings = _settings(whatsapp_template_lead_ack="polysil_lead_ack")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_live_listing(docs))) as c:
+        problems = await check_templates(ElevenZaProvider(settings, c), settings)
+    assert problems == ["auth.otp: template 'polysil_auth_otp' is not on the account"], problems

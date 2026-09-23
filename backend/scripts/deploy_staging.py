@@ -293,6 +293,13 @@ SEED_SHOWCASE = SEED_DEMO.replace("python scripts/seed_demo.py",
 
 def seed(env: dict[str, str], *, masters: bool = True, showcase: bool = True) -> None:
     guard(env)
+    # The seeds sign partners in by reading their code from the outbox and create
+    # leads on generated mobiles. On a real provider the first texts made-up numbers
+    # and then fails (a sent code's payload is cleared), and the second texts one
+    # stranger per lead.
+    if env.get("WHATSAPP_PROVIDER", "mock").strip() != "mock":
+        die("refusing to seed while WHATSAPP_PROVIDER is not mock",
+            "set WHATSAPP_PROVIDER=mock in infra/.env.staging, deploy, seed, then switch back")
     run_remote(env, compose(env, "run", "--rm", "--entrypoint", "sh", "tools",
                             "-c", SEED_DEMO, profile="tools"))
     if masters:
