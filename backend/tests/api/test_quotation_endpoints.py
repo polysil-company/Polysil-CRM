@@ -24,6 +24,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.config import get_settings
+from api.errors import ApiError
+from api.services import quotations as service
 from api.services.clock import today_ist
 from api.storage import LocalStorage
 from tests.api.conftest import PASSWORD, V1, Catalogue, Staff, _auth, _key
@@ -602,6 +604,51 @@ async def test_the_public_link_shows_no_party_data_and_records_the_view_on_the_p
     assert got["open_count"] == 2 and got["status"] == "viewed", "later opens only count"
 
     assert (await client.get("/public/q/" + "x" * 43)).status_code == 404
+
+
+class _StorageDown:
+    """R2 unconfigured, as on staging before the bucket exists."""
+
+    def presign_get(self, key: str, *, filename: str) -> tuple[str, dt.datetime]:
+        raise RuntimeError("R2 is not configured (r2_endpoint, r2_bucket, r2_access_key_id, "
+                           "r2_secret_access_key); local disk is not allowed")
+
+
+async def test_a_storage_failure_never_names_configuration_to_the_public_link(
+        client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue,
+        tmp_path: pathlib.Path, sessions: Callable[[], AsyncSession]) -> None:
+    """API review L4: the farmer's link got the storage error verbatim."""
+    h = await _auth(client, quoter)
+    q = await _draft(client, h, qenv, catalogue)
+    sent = await _send(client, h, q["id"])
+    assert await _render(tmp_path) == "ready"
+    token = sent["share_url"].rsplit("/", 1)[1]
+    s = sessions()
+    try:
+        with pytest.raises(ApiError) as caught:
+            await service.public_open(s, token, None, _StorageDown())  # type: ignore[arg-type]
+    finally:
+        await s.rollback()
+        await s.close()
+    assert caught.value.code == "storage_unavailable"
+    assert "r2" not in caught.value.message.lower() and "config" not in caught.value.message.lower()
+
+
+async def test_the_quotation_list_takes_several_statuses(
+        client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue) -> None:
+    """API review: "open quotations" in one call."""
+    h = await _auth(client, quoter)
+    draft = await _draft(client, h, qenv, catalogue)
+    sent = await _send(client, h, (await _draft(client, h, qenv, catalogue))["id"])
+
+    async def ids(status: str) -> set[str]:
+        r = await client.get(f"{V1}/quotations", headers=h, params={"status": status, "limit": 100})
+        assert r.status_code == 200, r.text
+        return {x["id"] for x in r.json()["data"]} & {draft["id"], sent["id"]}
+
+    assert await ids("draft,sent") == {draft["id"], sent["id"]}
+    assert await ids("sent,viewed,negotiation") == {sent["id"]}
+    assert await ids("accepted") == set()
 
 
 # ── delete ───────────────────────────────────────────────────────────────────

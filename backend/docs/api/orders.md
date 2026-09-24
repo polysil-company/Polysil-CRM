@@ -36,7 +36,7 @@ has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `status` | query | string \| null |  | One status. |
+| `status` | query | string \| null |  | One status, or several separated by commas: submitted,approved,partially_dispatched. |
 | `order_type` | query | string \| null |  | One order type. |
 | `partner_id` | query | string \| null |  | Orders placed through this partner. |
 | `lead_id` | query | string \| null |  | Orders on this lead. |
@@ -116,6 +116,37 @@ draft has no number until it is submitted.
 | `403` | `ErrorResponse` | Not in your permissions, or not your step. |
 | `404` | `ErrorResponse` | Not in your scope. |
 | `409` | `ErrorResponse` | Key reused, the status moved on, prices changed (`rate_changed`), or the order is not in a state that allows it. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
+## `GET /api/v1/orders/stats`
+
+**Order Stats**
+
+Counts for the order board and the dashboard tiles: every status, and the
+submitted orders by whose approval is next. Same scope and filters as the list.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `status` | query | string \| null |  | Comma-separated statuses. |
+| `order_type` | query | string \| null |  | One order type. |
+| `partner_id` | query | string \| null |  |  |
+| `lead_id` | query | string \| null |  |  |
+| `owner` | query | string \| null |  | `me`, or a user id. |
+| `from` | query | string \| null |  | ISO date, IST. |
+| `to` | query | string \| null |  | ISO date, inclusive. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `OrderStats` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions, or not your step. |
+| `404` | `ErrorResponse` | Not in your scope. |
 | `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
 
 ---
@@ -500,6 +531,7 @@ and only the outcome to a dealer.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
+| `order` | DispatchOrderRef | yes | The order this dispatch shipped against. |
 | `dispatch_no` | string | yes | The order number with a sequence, per order. |
 | `dc_no` | string \| null | yes |  |
 | `dc_date` | string \| null | yes |  |
@@ -541,6 +573,14 @@ and only the outcome to a dealer.
 | `order_line_id` | string | yes |  |
 | `line_no` | integer | yes |  |
 | `qty` | string | yes |  |
+
+**`DispatchOrderRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `order_no` | string \| null | yes |  |
+| `party_name` | string | yes |  |
 
 **`Envelope_Dispatch_`**
 
@@ -727,6 +767,14 @@ and only the outcome to a dealer.
 | `legal_name` | string | yes |  |
 | `address` | string \| null | yes |  |
 | `state_code` | string | yes |  |
+
+**`OrderStats`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `total` | integer | yes | Orders matching the filters. |
+| `by_status` | object | yes | Every status, 0 when empty. |
+| `waiting_on` | object | yes | Submitted orders by the role whose approval step is next, e.g. {"district_manager": 3, "account_manager": 1}. |
 
 **`OrderSummary`**
 

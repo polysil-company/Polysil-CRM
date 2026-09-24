@@ -98,7 +98,9 @@ async def list_quotations(
     lead_id: Annotated[str | None, Query(
         pattern=UUID_RE,
         description="Quotations on this lead, and on any lead merged into it.")] = None,
-    status_: Annotated[str | None, Query(alias="status", description="One status.")] = None,
+    status_: Annotated[str | None, Query(
+        alias="status",
+        description="One status, or several separated by commas: sent,viewed,negotiation.")] = None,
     sales_type: Annotated[str | None, Query()] = None,
     owner: Annotated[str | None, Query(pattern=_OWNER_RE,
                                        description="`me`, or a user id.")] = None,
@@ -126,14 +128,16 @@ async def list_quotations(
 
 @router.get("/{quotation_id}", response_model=Envelope[Quotation], responses=_ERRORS,
             dependencies=[Depends(require("quotations", "view"))])
-async def get_quotation(quotation_id: QuotationId, db: DbSession) -> Envelope[Quotation]:
+async def get_quotation(quotation_id: QuotationId, db: DbSession,
+                        caller: CallerDep) -> Envelope[Quotation]:
     """The document in full. Every key is always present; null means not set.
     `lead` is null when the lead is deleted or outside your lead scope. Once sent,
     `share_url` is present on every read and `pdf_state` says whether the PDF is
     ready (`pending` for a few seconds after send, then `ready`, or `failed` with
     `pdf_error`).
     """
-    return Envelope(data=await service.get_quotation(db, quotation_id, get_settings()))
+    return Envelope(data=await service.get_quotation(db, quotation_id, get_settings(),
+                                                     portal=caller.partner_id is not None))
 
 
 @router.patch("/{quotation_id}", response_model=Envelope[Quotation], responses=_MUTATION_ERRORS,

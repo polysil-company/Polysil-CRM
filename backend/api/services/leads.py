@@ -45,6 +45,7 @@ from api.schemas.leads import (
     LeadPage,
     LeadPatch,
     LeadReopen,
+    LeadStats,
     LeadTransition,
     LookupCreate,
     LookupItem,
@@ -1111,21 +1112,16 @@ async def _capped_total(db: AsyncSession, table: Any, filters: list[Any]) -> tup
     return (TOTAL_CEILING, True) if counted > TOTAL_CEILING else (int(counted), False)
 
 
-async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = None,
-                     priority: str | None = None, owner_user_id: str | None = None,
-                     owner: str | None = None, territory_id: str | None = None,
-                     source: str | None = None, inquiry_type: str | None = None,
-                     created_from: str | None = None, created_to: str | None = None,
-                     q: str | None = None, limit: int = 50,
-                     cursor: str | None = None,
-                     include_total: bool = False) -> LeadPage:
-    """The lead list, scoped and filtered, keyset-paged by (created_at desc, id).
-
-    Enforcer 1 is scope_predicate; RLS re-checks the same rows underneath. No total
-    (ISS-014): counting a scoped table on every page is the cost this avoids.
-    """
-    limit = max(1, min(limit, _MAX_LIMIT))
-
+async def _lead_filters(db: AsyncSession, caller: Caller, *, stage: str | None = None,
+                        priority: str | None = None, owner_user_id: str | None = None,
+                        owner: str | None = None, territory_id: str | None = None,
+                        owner_org_unit_id: str | None = None,
+                        assigned_partner_id: str | None = None,
+                        source: str | None = None, inquiry_type: str | None = None,
+                        created_from: str | None = None, created_to: str | None = None,
+                        q: str | None = None) -> list[Any]:
+    """The scope and every filter of the lead list, shared with the counts so the
+    two can never disagree about which leads a filter means."""
     where = [scope_predicate(_LEADS, caller, lead_t)]
 
     if stage:
@@ -1144,8 +1140,16 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
         where.append(lead_t.c.owner_user_id.is_(None))
     elif owner_user_id:
         where.append(lead_t.c.owner_user_id == owner_user_id)
+    # Each filter takes its whole subtree: a state selects its districts and
+    # talukas, an office the offices under it, a distributor its dealers. The
+    # closures hold every node as its own descendant.
     if territory_id:
-        where.append(lead_t.c.territory_id == territory_id)
+        where.append(lead_t.c.territory_id.in_(_under("territory_closure", territory_id)))
+    if owner_org_unit_id:
+        where.append(lead_t.c.owner_org_unit_id.in_(_under("org_closure", owner_org_unit_id)))
+    if assigned_partner_id:
+        where.append(lead_t.c.assigned_partner_id.in_(
+            _under("partner_closure", assigned_partner_id)))
     if source:
         src_id = (await db.execute(
             text("SELECT id FROM lead_source WHERE code = :c"),
@@ -1162,6 +1166,31 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
     # Everything above narrows the set the caller asked for. The cursor below
     # narrows it to one page, so the total is counted from `filters` and not from
     # `where`: a total that shrank as the user paged would be worse than none.
+    return where
+
+
+async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = None,
+                     priority: str | None = None, owner_user_id: str | None = None,
+                     owner: str | None = None, territory_id: str | None = None,
+                     owner_org_unit_id: str | None = None,
+                     assigned_partner_id: str | None = None,
+                     source: str | None = None, inquiry_type: str | None = None,
+                     created_from: str | None = None, created_to: str | None = None,
+                     q: str | None = None, limit: int = 50,
+                     cursor: str | None = None,
+                     include_total: bool = False) -> LeadPage:
+    """The lead list, scoped and filtered, keyset-paged by (created_at desc, id).
+
+    Enforcer 1 is scope_predicate; RLS re-checks the same rows underneath. No total
+    (ISS-014): counting a scoped table on every page is the cost this avoids.
+    """
+    limit = max(1, min(limit, _MAX_LIMIT))
+
+    where = await _lead_filters(
+        db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id, owner=owner,
+        territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
+        assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
+        created_from=created_from, created_to=created_to, q=q)
     filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)
@@ -1195,6 +1224,42 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
     data = [_row_to_lead(by_id[i], duplicates=[], names=names) for i in ids if i in by_id]
     return LeadPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
                                             total=total, total_capped=total_capped))
+
+
+_PRIORITIES = ("hot", "warm", "cold")
+
+
+async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) -> LeadStats:
+    """Counts under the list's own scope and filters (API review B2). One pass
+    over the matching rows; no ceiling, because a count per stage is the point."""
+    where = await _lead_filters(db, caller, **filters)
+    stage = sa.cast(lead_t.c.stage, sa.Text)
+    priority = sa.cast(lead_t.c.priority, sa.Text)
+    rows = (await db.execute(
+        sa.select(stage.label("stage"), priority.label("priority"),
+                  (lead_t.c.owner_user_id.is_(None)).label("unassigned"),
+                  sa.func.count().label("n"))
+        .select_from(lead_t).where(sa.and_(*where))
+        .group_by(stage, priority, lead_t.c.owner_user_id.is_(None)))).all()
+    by_stage = dict.fromkeys(domain.STAGES, 0)
+    by_priority = dict.fromkeys(_PRIORITIES, 0)
+    unassigned = total = 0
+    for r in rows:
+        total += r.n
+        by_stage[r.stage] = by_stage.get(r.stage, 0) + r.n
+        if r.priority:
+            by_priority[r.priority] = by_priority.get(r.priority, 0) + r.n
+        if r.unassigned:
+            unassigned += r.n
+    return LeadStats(total=total, by_stage=by_stage, by_priority=by_priority,
+                     unassigned=unassigned)
+
+
+def _under(closure: str, ancestor: str) -> Any:
+    """The ids at and below `ancestor` in one of the three trees. The closures are
+    readable by any authenticated caller; scope is applied by the list itself."""
+    t = sa.table(closure, sa.column("ancestor_id", _UUID), sa.column("descendant_id", _UUID))
+    return sa.select(t.c.descendant_id).where(t.c.ancestor_id == ancestor).scalar_subquery()
 
 
 def _search_clause(q: str) -> Any:

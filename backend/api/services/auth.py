@@ -554,10 +554,13 @@ _ME_QUERY = text(
     SELECT u.id, u.full_name, u.user_type::text AS user_type,
            r.code AS role_code, r.name AS role_name,
            o.id AS org_id, o.name AS org_name,
-           u.partner_id, u.must_change_password
+           u.partner_id, cp.name AS partner_name, cp.partner_type::text AS partner_type,
+           u.must_change_password
       FROM app_user u
       LEFT JOIN role r     ON r.id = u.role_id
       LEFT JOIN org_unit o ON o.id = u.org_unit_id
+      -- the caller's own partner row, which channel_partner's policy admits
+      LEFT JOIN channel_partner cp ON cp.id = u.partner_id
      WHERE u.id = :uid
     """
 )
@@ -592,7 +595,8 @@ async def me(db: AsyncSession, *, user_id: str) -> MeResponse:
         user_type=row.user_type,
         role=RoleRef(code=row.role_code, name=row.role_name) if row.role_code else None,
         org_unit=OrgUnitRef(id=str(row.org_id), name=row.org_name) if row.org_id else None,
-        partner=PartnerRef(id=str(row.partner_id)) if row.partner_id else None,
+        partner=(PartnerRef(id=str(row.partner_id), name=row.partner_name,
+                            partner_type=row.partner_type) if row.partner_id else None),
         must_change_password=bool(row.must_change_password),
         permissions=[
             ModulePermission(module=p.module, actions=list(p.actions), scope=p.scope)

@@ -31,8 +31,12 @@ def _iso(v: Any) -> str | None:
     return None if v is None else v.isoformat()
 
 
+_TOTAL_CEILING = 1000
+
+
 async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False,
-                limit: int = 50, cursor: str | None = None) -> sch.QueuePage:
+                limit: int = 50, cursor: str | None = None,
+                include_total: bool = False) -> sch.QueuePage:
     limit = max(1, min(limit, _MAX_LIMIT))
     before_at, before_id = (None, None)
     if cursor:
@@ -46,8 +50,16 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
         last = rows[limit - 1]
         next_cursor = _encode_cursor(last.waiting_since, str(last.step_id))
         rows = rows[:limit]
+    total, capped = None, False
+    if include_total:
+        # the badge: the same queue, counted to a ceiling (ISS-097 is its cost)
+        counted = len((await db.execute(text(
+            "SELECT 1 FROM approval_queue(NULL, NULL, :lim, :below)"),
+            {"lim": _TOTAL_CEILING + 1, "below": include_below})).all())
+        total, capped = min(counted, _TOTAL_CEILING), counted > _TOTAL_CEILING
     if not rows:
-        return sch.QueuePage(data=[], meta=PageMeta(limit=limit, next_cursor=None))
+        return sch.QueuePage(data=[], meta=PageMeta(limit=limit, next_cursor=None,
+                                                    total=total, total_capped=capped))
     # the approver can see every order in their queue (approval_refusal() checks
     # order_visible()), so the documents read under their own RLS
     docs = {str(d.id): d for d in (await db.execute(text(
@@ -70,7 +82,8 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
                 raised_by=names.user(d.created_by, d.full_name),
                 raised_at=(d.submitted_at or d.created_at).isoformat()),
             waiting_since=r.waiting_since.isoformat()))
-    return sch.QueuePage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor))
+    return sch.QueuePage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
+                                                  total=total, total_capped=capped))
 
 
 async def get_request(db: AsyncSession, caller: Caller, request_id: str) -> sch.Approval:

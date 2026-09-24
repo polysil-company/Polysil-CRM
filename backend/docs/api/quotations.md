@@ -37,7 +37,7 @@ the header without lines. An empty list means nothing in your scope.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `lead_id` | query | string \| null |  | Quotations on this lead, and on any lead merged into it. |
-| `status` | query | string \| null |  | One status. |
+| `status` | query | string \| null |  | One status, or several separated by commas: sent,viewed,negotiation. |
 | `sales_type` | query | string \| null |  |  |
 | `owner` | query | string \| null |  | `me`, or a user id. |
 | `partner_id` | query | string \| null |  |  |

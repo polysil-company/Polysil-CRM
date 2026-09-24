@@ -154,6 +154,18 @@ class PageMeta(BaseModel):
                     "`total` as \"1000+\" rather than an exact figure when this is set.")
 
 
+class LeadStats(BaseModel):
+    """Counts over the same scope and filters as the list, for the pipeline board
+    and the dashboard tiles. Every stage and priority is present, 0 when empty."""
+
+    total: int = Field(description="Leads matching the filters.")
+    by_stage: dict[str, int] = Field(
+        description="Every stage. merged is 0 unless the stage filter asks for it, "
+                    "as on the list.")
+    by_priority: dict[str, int] = Field(description="hot, warm and cold.")
+    unassigned: int = Field(description="Leads with no owner: the assignment queue.")
+
+
 class LeadPage(BaseModel):
     """The lead list. Keyset paging by (created_at desc, id); there is no total,
     because counting a scoped table on every page is the cost this avoids."""

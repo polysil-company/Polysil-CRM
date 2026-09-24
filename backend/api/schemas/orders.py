@@ -274,8 +274,15 @@ class DispatchLineOut(BaseModel):
     qty: str
 
 
+class DispatchOrderRef(BaseModel):
+    id: str
+    order_no: str | None
+    party_name: str
+
+
 class Dispatch(BaseModel):
     id: str
+    order: DispatchOrderRef = Field(description="The order this dispatch shipped against.")
     dispatch_no: str = Field(description="The order number with a sequence, per order.")
     dc_no: str | None
     dc_date: str | None
@@ -351,6 +358,16 @@ class OrderSummary(BaseModel):
     approval_waiting_on: str | None = Field(description="The role of the next undecided step.")
     submitted_at: str | None
     created_at: str
+
+
+class OrderStats(BaseModel):
+    """Counts over the same scope and filters as the order list."""
+
+    total: int = Field(description="Orders matching the filters.")
+    by_status: dict[str, int] = Field(description="Every status, 0 when empty.")
+    waiting_on: dict[str, int] = Field(
+        description="Submitted orders by the role whose approval step is next, e.g. "
+                    "{\"district_manager\": 3, \"account_manager\": 1}.")
 
 
 class OrderPage(BaseModel):

@@ -33,6 +33,7 @@ from decimal import Decimal
 from typing import Any, cast
 
 import sqlalchemy as sa
+import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -487,8 +488,15 @@ def _with_pricing_warnings(out: sch.Quotation, ctx: PricedContext) -> sch.Quotat
     return out
 
 
+log = structlog.get_logger()
+
+_STORAGE_DOWN = "The document cannot be opened right now. Try again later."
+
+
 def _to_quotation(row: Any, line_rows: list[Any], settings: Settings,
-                  names: people.Names | None = None) -> sch.Quotation:
+                  names: people.Names | None = None, portal: bool = False) -> sch.Quotation:
+    """`portal`: a partner caller gets no staff decision remark and no render error
+    (question 15.14, API review L1 and L4)."""
     names = names or people.Names()
     partner, owner = _people(row, names)
     lines = [_line_out(r) for r in line_rows]
@@ -518,7 +526,7 @@ def _to_quotation(row: Any, line_rows: list[Any], settings: Settings,
         viewed_at=_iso(row.viewed_at), open_count=row.open_count,
         accepted_at=_iso(row.accepted_at), rejected_at=_iso(row.rejected_at),
         decided_by=names.user(row.decided_by, row.decided_by_name),
-        decision_remark=row.decision_remark,
+        decision_remark=None if portal else row.decision_remark,
         supersedes=(sch.VersionRef(id=str(row.supersedes_id), version=row.supersedes_version)
                     if row.supersedes_id and row.supersedes_version else None),
         superseded_by=(sch.VersionRef(id=str(row.superseded_by_id),
@@ -526,7 +534,7 @@ def _to_quotation(row: Any, line_rows: list[Any], settings: Settings,
                        if row.superseded_by_id and row.superseded_by_version else None),
         share_url=(domain.share_url(settings.public_web_url, row.share_token)
                    if row.share_token else None),
-        pdf_state=_pdf_state(row), pdf_error=row.pdf_error,
+        pdf_state=_pdf_state(row), pdf_error=None if portal else row.pdf_error,
         created_at=row.created_at.isoformat(),
         created_by=names.user(row.created_by, row.created_by_name),
         updated_at=row.updated_at.isoformat())
@@ -546,13 +554,14 @@ def _to_summary(row: Any, names: people.Names) -> sch.QuotationSummary:
         created_at=row.created_at.isoformat())
 
 
-async def get_quotation(db: AsyncSession, quotation_id: str, settings: Settings) -> sch.Quotation:
+async def get_quotation(db: AsyncSession, quotation_id: str, settings: Settings,
+                        portal: bool = False) -> sch.Quotation:
     row = (await db.execute(text(_Q_SELECT + " WHERE q.id = CAST(:id AS uuid)"),
                             {"id": quotation_id})).one_or_none()
     if row is None:
         raise NotFoundError("No such quotation.")
     return _to_quotation(row, await _stored_lines(db, row.id), settings,
-                         await _names(db, [row]))
+                         await _names(db, [row]), portal)
 
 
 async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | None = None,
@@ -573,7 +582,9 @@ async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | No
                 sa.table("lead", sa.column("id", _UUID), sa.column("merged_into_id", _UUID))
             ).where(sa.column("merged_into_id", _UUID) == lead_id))))
     if status:
-        where.append(sa.cast(quotation_t.c.status, sa.Text) == status)
+        # a comma list, like the lead list's stage: "open" is several statuses
+        wanted = [x.strip() for x in status.split(",") if x.strip()]
+        where.append(sa.cast(quotation_t.c.status, sa.Text).in_(wanted) if wanted else sa.true())
     if sales_type:
         where.append(sa.cast(quotation_t.c.sales_type, sa.Text) == sales_type)
     if owner == "me":
@@ -1085,7 +1096,10 @@ async def pdf_link(db: AsyncSession, quotation_id: str, storage: Storage) -> sch
     try:
         url, expires = storage.presign_get(row.pdf_key, filename=filename)
     except RuntimeError as exc:
-        raise ConflictError(str(exc), code="storage_unavailable") from exc
+        # the reason names configuration; it goes to the log, never to a caller
+        # (API review L4: the public link reached it)
+        log.warning("quotation.storage_unavailable", reason=str(exc))
+        raise ConflictError(_STORAGE_DOWN, code="storage_unavailable") from exc
     return sch.PdfLink(url=url, expires_at=expires.isoformat(), filename=filename)
 
 
@@ -1137,5 +1151,8 @@ async def public_open(db: AsyncSession, token: str, user_agent: str | None,
     try:
         url, _ = storage.presign_get(str(doc["pdf_key"]), filename=filename)
     except RuntimeError as exc:
-        raise ConflictError(str(exc), code="storage_unavailable") from exc
+        # the reason names configuration; it goes to the log, never to a caller
+        # (API review L4: the public link reached it)
+        log.warning("quotation.storage_unavailable", reason=str(exc))
+        raise ConflictError(_STORAGE_DOWN, code="storage_unavailable") from exc
     return url

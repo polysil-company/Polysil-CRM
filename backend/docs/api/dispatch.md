@@ -120,6 +120,7 @@ order.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
+| `order` | DispatchOrderRef | yes | The order this dispatch shipped against. |
 | `dispatch_no` | string | yes | The order number with a sequence, per order. |
 | `dc_no` | string \| null | yes |  |
 | `dc_date` | string \| null | yes |  |
@@ -141,6 +142,14 @@ order.
 | `order_line_id` | string | yes |  |
 | `line_no` | integer | yes |  |
 | `qty` | string | yes |  |
+
+**`DispatchOrderRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `order_no` | string \| null | yes |  |
+| `party_name` | string | yes |  |
 
 **`DispatchPage`**
 

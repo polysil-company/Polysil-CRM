@@ -40,6 +40,7 @@ covers comes back `stalled`, and you may decide it.
 | `include_below` | query | boolean |  | Also every lower step in your area, so you can cover a manager on leave. |
 | `limit` | query | integer |  |  |
 | `cursor` | query | string \| null |  | From the previous page's next_cursor. |
+| `include_total` | query | boolean |  | Also count everything waiting, for the inbox badge. Stops at 1,000 and sets meta.total_capped. |
 
 **Responses**
 
@@ -209,6 +210,7 @@ One approval chain.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
+| `order` | DispatchOrderRef | yes | The order this dispatch shipped against. |
 | `dispatch_no` | string | yes | The order number with a sequence, per order. |
 | `dc_no` | string \| null | yes |  |
 | `dc_date` | string \| null | yes |  |
@@ -230,6 +232,14 @@ One approval chain.
 | `order_line_id` | string | yes |  |
 | `line_no` | integer | yes |  |
 | `qty` | string | yes |  |
+
+**`DispatchOrderRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `order_no` | string \| null | yes |  |
+| `party_name` | string | yes |  |
 
 **`Envelope_Approval_`**
 

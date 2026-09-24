@@ -455,3 +455,39 @@ async def test_thresholds_must_rise_with_the_level(client: httpx.AsyncClient, sh
     r = await client.put(f"{V1}/approvals/thresholds", headers={**ha, **_key()}, json={
         "role": "state_manager", "territory_id": shop.state, "max_amount": "50000"})
     assert r.status_code == 422 and r.json()["error"]["code"] == "thresholds_not_increasing"
+
+
+async def test_the_order_list_takes_several_statuses(client: httpx.AsyncClient, shop: Shop) -> None:
+    """API review: "open orders" in one call."""
+    ho = await _as(client, shop, "field_officer")
+    draft = await _create(client, ho, _direct(shop))
+    submitted = await _submit(client, ho, (await _create(client, ho, _direct(shop)))["id"])
+
+    async def ids(status: str) -> set[str]:
+        r = await client.get(f"{V1}/orders", headers=ho, params={"status": status, "limit": 100})
+        assert r.status_code == 200, r.text
+        return {x["id"] for x in r.json()["data"]} & {draft["id"], submitted["id"]}
+
+    assert await ids("draft,submitted") == {draft["id"], submitted["id"]}
+    assert await ids("draft") == {draft["id"]}
+    assert await ids("approved,cancelled") == set()
+
+
+async def test_the_order_counts_and_the_inbox_badge(client: httpx.AsyncClient, shop: Shop) -> None:
+    """API review B2: the board's counts under the list's scope, the submitted
+    orders by whose step is next, and the approver's badge."""
+    ho = await _as(client, shop, "field_officer")
+    await _create(client, ho, _direct(shop))
+    await _submit(client, ho, (await _create(client, ho, _direct(shop)))["id"])
+    r = await client.get(f"{V1}/orders/stats", headers=ho)
+    assert r.status_code == 200, r.text
+    got = r.json()
+    assert got["total"] == 2 and got["by_status"]["draft"] == 1 and got["by_status"]["submitted"] == 1
+    assert got["by_status"]["cancelled"] == 0
+    assert got["waiting_on"] == {"district_manager": 1}
+    hm = await _as(client, shop, "district_manager")
+    q = (await client.get(f"{V1}/approvals/pending", headers=hm,
+                          params={"include_total": "true", "limit": 1})).json()
+    # the manager's area is this shop's one office, so the badge is exact
+    assert q["meta"]["total"] == 1 and q["meta"]["total_capped"] is False
+    assert len(q["data"]) == 1

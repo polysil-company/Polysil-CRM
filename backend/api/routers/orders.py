@@ -30,6 +30,7 @@ from api.schemas.orders import (
     OrderLinesReplace,
     OrderPage,
     OrderPatch,
+    OrderStats,
     QueuePage,
     RemarkRequest,
     SubmitRequest,
@@ -109,7 +110,10 @@ async def create_order(body: OrderCreate, db: DbSession, caller: CallerDep, clai
             dependencies=[Depends(require("sales_orders", "view"))])
 async def list_orders(
     db: DbSession, caller: CallerDep,
-    status_: Annotated[str | None, Query(alias="status", description="One status.")] = None,
+    status_: Annotated[str | None, Query(
+        alias="status",
+        description="One status, or several separated by commas: submitted,approved,"
+                    "partially_dispatched.")] = None,
     order_type: Annotated[str | None, Query(description="One order type.")] = None,
     partner_id: Annotated[str | None, Query(
         pattern=UUID_RE, description="Orders placed through this partner.")] = None,
@@ -130,6 +134,27 @@ async def list_orders(
         db, caller, status=status_, order_type=order_type, partner_id=partner_id,
         lead_id=lead_id, owner=owner, q=q, created_from=created_from, created_to=created_to,
         limit=limit, cursor=cursor, include_total=include_total)
+
+
+@router.get("/stats", response_model=OrderStats, responses=_ERRORS,
+            dependencies=[Depends(require("sales_orders", "view"))])
+async def order_stats(
+    db: DbSession, caller: CallerDep,
+    status_: Annotated[str | None, Query(alias="status",
+                                         description="Comma-separated statuses.")] = None,
+    order_type: Annotated[str | None, Query(description="One order type.")] = None,
+    partner_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
+    lead_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
+    owner: Annotated[str | None, Query(pattern=_OWNER_RE,
+                                       description="`me`, or a user id.")] = None,
+    created_from: Annotated[str | None, Query(alias="from", description="ISO date, IST.")] = None,
+    created_to: ToDate = None,
+) -> OrderStats:
+    """Counts for the order board and the dashboard tiles: every status, and the
+    submitted orders by whose approval is next. Same scope and filters as the list."""
+    return await service.order_stats(
+        db, caller, status=status_, order_type=order_type, partner_id=partner_id,
+        lead_id=lead_id, owner=owner, created_from=created_from, created_to=created_to)
 
 
 @router.get("/{order_id}", response_model=Envelope[Order], responses=_ERRORS,
@@ -300,12 +325,16 @@ async def pending(db: DbSession, caller: CallerDep,
                       description="Also every lower step in your area, so you can cover a "
                                   "manager on leave.")] = False,
                   limit: Annotated[int, Query(ge=1, le=100)] = 50,
-                  cursor: Cursor = None) -> QueuePage:
+                  cursor: Cursor = None,
+                  include_total: Annotated[bool, Query(
+                      description="Also count everything waiting, for the inbox badge. "
+                                  "Stops at 1,000 and sets meta.total_capped.")] = False,
+                  ) -> QueuePage:
     """What is waiting on you, oldest first: steps of your role whose earlier steps are
     done, on orders you can see, never your own. A lower step nobody of its own role
     covers comes back `stalled`, and you may decide it."""
     return await approval_service.queue(db, caller, include_below=include_below, limit=limit,
-                                        cursor=cursor)
+                                        cursor=cursor, include_total=include_total)
 
 
 @approvals.get("/thresholds", response_model=Envelope[list[Threshold]], responses=_ERRORS)
