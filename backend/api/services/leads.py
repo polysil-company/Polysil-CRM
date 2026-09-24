@@ -64,6 +64,7 @@ from api.schemas.leads import (
     TimelinePage,
     UserRef,
 )
+from api.services import people
 
 _LEADS = SPECS["leads"]
 
@@ -450,9 +451,16 @@ async def _duplicates(db: AsyncSession, lead_id: str) -> list[DuplicateRef]:
                          state=r.state) for r in rows]
 
 
-def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef]) -> Lead:
-    """The non-person fields, plus the people from the RLS-filtered joins. get_lead
-    overrides the people from lead_people(); the list keeps these (GAP-058)."""
+_LEAD_PEOPLE = [("owner_user_id", "owner_name"), ("created_by", "created_by_name")]
+_LEAD_PARTNERS = [("assigned_partner_id", "partner_name")]
+
+
+def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
+                 names: people.Names | None = None) -> Lead:
+    """The non-person fields, plus the people: from the RLS-filtered joins, and
+    from people_names() where the caller's scope did not reach (GAP-060). get_lead
+    overrides the people from lead_people()."""
+    names = names or people.Names()
     return Lead(
         id=str(row.id), inquiry_no=row.inquiry_no, stage=row.stage,
         inquiry_type=row.inquiry_type, mis_system=row.mis_code, source=row.source_code,
@@ -460,13 +468,11 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef]) -> Lead:
         territory=TerritoryRef(id=str(row.territory_id), name=row.territory_name,
                                level=row.territory_level),
         village=row.village,
-        owner=UserRef(id=str(row.owner_user_id), full_name=row.owner_name)
-        if row.owner_user_id and row.owner_name else None,
+        owner=names.user(row.owner_user_id, row.owner_name),
         owner_org_unit=OrgUnitRef(id=str(row.owner_org_unit_id),
                                   name=row.owner_org_unit_name),
-        assigned_partner=PartnerRef(id=str(row.assigned_partner_id), name=row.partner_name,
-                                    partner_type=row.partner_type)
-        if row.assigned_partner_id and row.partner_name else None,
+        assigned_partner=names.partner(row.assigned_partner_id, row.partner_name,
+                                       row.partner_type),
         score=_dec(row.score), priority=row.priority, estimated_value=_dec(row.estimated_value),
         lost_reason=ReasonRef(id=str(row.lost_reason_id), code=row.lost_reason_code,
                               name=row.lost_reason_name) if row.lost_reason_id else None,
@@ -475,8 +481,7 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef]) -> Lead:
         if row.merged_into_id and row.merged_into_no else None,
         first_contacted_at=_iso(row.first_contacted_at),
         last_activity_at=_iso_req(row.last_activity_at), created_at=_iso_req(row.created_at),
-        created_by=UserRef(id=str(row.created_by), full_name=row.created_by_name)
-        if row.created_by and row.created_by_name else None,
+        created_by=names.user(row.created_by, row.created_by_name),
         duplicates=duplicates)
 
 
@@ -923,7 +928,8 @@ async def duplicates(db: AsyncSession, caller: Caller, *, limit: int = 50,
         return DuplicatePage(data=[], meta=PageMeta(limit=limit, next_cursor=None))
     ids = list({str(x) for r in links for x in (r.lead_a_id, r.lead_b_id)})
     rows = (await db.execute(text(_LEAD_SELECT + " WHERE l.id = ANY(:ids)"), {"ids": ids})).all()
-    by_id = {str(r.id): _row_to_lead(r, duplicates=[]) for r in rows}
+    names = await people.resolve(db, rows, _LEAD_PEOPLE, _LEAD_PARTNERS)
+    by_id = {str(r.id): _row_to_lead(r, duplicates=[], names=names) for r in rows}
     pairs = [DuplicatePair(link_id=str(r.id), signal=r.signal, score=_dec(r.score), state=r.state,
                            created_at=_iso(r.created_at) or "",
                            lead_a=by_id[str(r.lead_a_id)], lead_b=by_id[str(r.lead_b_id)])
@@ -1185,7 +1191,8 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
     rows = (await db.execute(text(_LEAD_SELECT + " WHERE l.id = ANY(:ids)"),
                              {"ids": ids})).all()
     by_id = {str(r.id): r for r in rows}
-    data = [_row_to_lead(by_id[i], duplicates=[]) for i in ids if i in by_id]
+    names = await people.resolve(db, rows, _LEAD_PEOPLE, _LEAD_PARTNERS)
+    data = [_row_to_lead(by_id[i], duplicates=[], names=names) for i in ids if i in by_id]
     return LeadPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
                                             total=total, total_capped=total_capped))
 

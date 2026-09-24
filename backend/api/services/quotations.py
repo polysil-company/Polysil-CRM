@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, cast
@@ -54,7 +55,7 @@ from api.schemas.leads import (
     TimelinePage,
     UserRef,
 )
-from api.services import pricing
+from api.services import people, pricing
 from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
@@ -421,13 +422,18 @@ def _lead_ref(row: Any) -> sch.LeadRef | None:
     return sch.LeadRef(id=str(row.lead_id), inquiry_no=row.lead_inquiry_no, stage=row.lead_stage)
 
 
-def _people(row: Any) -> tuple[PartnerRef | None, UserRef | None]:
-    partner = (PartnerRef(id=str(row.partner_id), name=row.partner_name,
-                          partner_type=row.partner_type)
-               if row.partner_id and row.partner_name else None)
-    owner = (UserRef(id=str(row.owner_user_id), full_name=row.owner_name)
-             if row.owner_user_id and row.owner_name else None)
-    return partner, owner
+_Q_PEOPLE = [("owner_user_id", "owner_name"), ("created_by", "created_by_name"),
+             ("decided_by", "decided_by_name")]
+_Q_PARTNERS = [("partner_id", "partner_name")]
+
+
+async def _names(db: AsyncSession, rows: Sequence[Any]) -> people.Names:
+    return await people.resolve(db, rows, _Q_PEOPLE, _Q_PARTNERS)
+
+
+def _people(row: Any, names: people.Names) -> tuple[PartnerRef | None, UserRef | None]:
+    return (names.partner(row.partner_id, row.partner_name, row.partner_type),
+            names.user(row.owner_user_id, row.owner_name))
 
 
 def _totals(row: Any) -> sch.Totals:
@@ -481,8 +487,10 @@ def _with_pricing_warnings(out: sch.Quotation, ctx: PricedContext) -> sch.Quotat
     return out
 
 
-def _to_quotation(row: Any, line_rows: list[Any], settings: Settings) -> sch.Quotation:
-    partner, owner = _people(row)
+def _to_quotation(row: Any, line_rows: list[Any], settings: Settings,
+                  names: people.Names | None = None) -> sch.Quotation:
+    names = names or people.Names()
+    partner, owner = _people(row, names)
     lines = [_line_out(r) for r in line_rows]
     return sch.Quotation(
         id=str(row.id), quote_no=row.quote_no, version=row.version, status=row.status,
@@ -509,8 +517,7 @@ def _to_quotation(row: Any, line_rows: list[Any], settings: Settings) -> sch.Quo
         valid_until=_iso(row.valid_until), sent_at=_iso(row.sent_at),
         viewed_at=_iso(row.viewed_at), open_count=row.open_count,
         accepted_at=_iso(row.accepted_at), rejected_at=_iso(row.rejected_at),
-        decided_by=(UserRef(id=str(row.decided_by), full_name=row.decided_by_name)
-                    if row.decided_by and row.decided_by_name else None),
+        decided_by=names.user(row.decided_by, row.decided_by_name),
         decision_remark=row.decision_remark,
         supersedes=(sch.VersionRef(id=str(row.supersedes_id), version=row.supersedes_version)
                     if row.supersedes_id and row.supersedes_version else None),
@@ -521,13 +528,12 @@ def _to_quotation(row: Any, line_rows: list[Any], settings: Settings) -> sch.Quo
                    if row.share_token else None),
         pdf_state=_pdf_state(row), pdf_error=row.pdf_error,
         created_at=row.created_at.isoformat(),
-        created_by=(UserRef(id=str(row.created_by), full_name=row.created_by_name)
-                    if row.created_by and row.created_by_name else None),
+        created_by=names.user(row.created_by, row.created_by_name),
         updated_at=row.updated_at.isoformat())
 
 
-def _to_summary(row: Any) -> sch.QuotationSummary:
-    partner, owner = _people(row)
+def _to_summary(row: Any, names: people.Names) -> sch.QuotationSummary:
+    partner, owner = _people(row, names)
     return sch.QuotationSummary(
         id=str(row.id), quote_no=row.quote_no, version=row.version, status=row.status,
         sales_type=row.sales_type, lead=_lead_ref(row), party_name=row.party_name,
@@ -545,7 +551,8 @@ async def get_quotation(db: AsyncSession, quotation_id: str, settings: Settings)
                             {"id": quotation_id})).one_or_none()
     if row is None:
         raise NotFoundError("No such quotation.")
-    return _to_quotation(row, await _stored_lines(db, row.id), settings)
+    return _to_quotation(row, await _stored_lines(db, row.id), settings,
+                         await _names(db, [row]))
 
 
 async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | None = None,
@@ -607,8 +614,9 @@ async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | No
     rows = (await db.execute(text(_Q_SELECT + " WHERE q.id = ANY(CAST(:ids AS uuid[]))"),
                              {"ids": ids})).all()
     by_id = {str(r.id): r for r in rows}
+    names = await _names(db, rows)
     return sch.QuotationPage(
-        data=[_to_summary(by_id[i]) for i in ids if i in by_id],
+        data=[_to_summary(by_id[i], names) for i in ids if i in by_id],
         meta=PageMeta(limit=limit, next_cursor=next_cursor, total=total,
                       total_capped=total_capped))
 
@@ -644,7 +652,8 @@ async def versions(db: AsyncSession, quotation_id: str) -> list[sch.QuotationSum
     else:
         rows = (await db.execute(text(_Q_SELECT + " WHERE q.quote_no = :no ORDER BY q.version"),
                                  {"no": anchor.quote_no})).all()
-    return [_to_summary(r) for r in rows]
+    names = await _names(db, rows)
+    return [_to_summary(r, names) for r in rows]
 
 
 async def timeline(db: AsyncSession, quotation_id: str, *, limit: int = 100,

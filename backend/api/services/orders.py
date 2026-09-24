@@ -46,14 +46,13 @@ from api.schemas import orders as sch
 from api.schemas.leads import (
     OrgUnitRef,
     PageMeta,
-    PartnerRef,
     TerritoryRef,
     TimelineEvent,
     TimelinePage,
     UserRef,
 )
 from api.schemas.quotations import QuotationLineIn, Totals
-from api.services import pricing
+from api.services import people, pricing
 from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor, _route
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
@@ -387,10 +386,11 @@ async def _approval(db: AsyncSession, order_id: str, portal: bool,
         "LEFT JOIN role dr ON dr.id = s.decided_role_id "
         "LEFT JOIN app_user u ON u.id = s.approver_user_id "
         "WHERE s.request_id = CAST(:r AS uuid) ORDER BY s.seq"), {"r": str(req.id)})).all()
+    names = (people.Names() if portal
+             else await people.resolve(db, steps, [("approver_user_id", "full_name")]))
     out = []
     for s in steps:
-        by = (UserRef(id=str(s.approver_user_id), full_name=s.full_name or "")
-              if s.approver_user_id and not portal else None)
+        by = None if portal else names.user(s.approver_user_id, s.full_name)
         out.append(sch.ApprovalStep(
             id=str(s.id), seq=s.seq, role=s.role,
             decided_role=s.decided_role if s.decided_role and s.decided_role != s.role else None,
@@ -420,11 +420,13 @@ async def _with_lines(db: AsyncSession, rows: Sequence[Any], portal: bool) -> li
     for ln in lines:
         by_dispatch.setdefault(str(ln.dispatch_id), []).append(sch.DispatchLineOut(
             order_line_id=str(ln.order_line_id), line_no=ln.line_no, qty=_qty(ln.qty)))
-    return [_dispatch_out(r, by_dispatch.get(str(r.id), []), portal) for r in rows]
+    names = (people.Names() if portal
+             else await people.resolve(db, rows, [("dispatched_by", "full_name")]))
+    return [_dispatch_out(r, by_dispatch.get(str(r.id), []), portal, names) for r in rows]
 
 
-def _dispatch_out(r: Any, lines: list[sch.DispatchLineOut], portal: bool = False
-                  ) -> sch.Dispatch:
+def _dispatch_out(r: Any, lines: list[sch.DispatchLineOut], portal: bool = False,
+                  names: people.Names | None = None) -> sch.Dispatch:
     """A partner sees what shipped and when, not who recorded it or why a dispatch
     was voided (question 15.14)."""
     return sch.Dispatch(
@@ -432,8 +434,8 @@ def _dispatch_out(r: Any, lines: list[sch.DispatchLineOut], portal: bool = False
         invoice_no=r.invoice_no, invoice_date=_iso(r.invoice_date),
         dispatched_at=r.dispatched_at.isoformat(), transporter=r.transporter,
         vehicle_no=r.vehicle_no,
-        dispatched_by=(UserRef(id=str(r.dispatched_by), full_name=r.full_name or "")
-                       if r.dispatched_by and not portal else None),
+        dispatched_by=(None if portal
+                       else (names or people.Names()).user(r.dispatched_by, r.full_name)),
         voided_at=_iso(r.voided_at), void_remark=None if portal else r.void_remark,
         lines=lines)
 
@@ -495,9 +497,9 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
                 role=rej.role, at=rej.decided_at.isoformat())
     seller = (sch.OrderSeller(gstin=r.s_gstin, legal_name=r.s_name, address=r.s_address,
                               state_code=r.s_state) if r.s_gstin else None)
-    partner = (PartnerRef(id=str(r.partner_id), name=r.partner_name,
-                          partner_type=r.partner_type)
-               if r.partner_id and r.partner_name else None)
+    names = await people.resolve(db, [r], [("owner_user_id", "owner_name")],
+                                 [("partner_id", "partner_name")])
+    partner = names.partner(r.partner_id, r.partner_name, r.partner_type)
     return sch.Order(
         id=str(r.id), order_no=r.order_no, status=r.status_text, order_type=r.type_text,
         party=sch.OrderParty(name=r.party_name, mobile=r.party_mobile, address=r.party_address,
@@ -506,8 +508,7 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         lead=(sch.OrderLeadRef(id=str(r.lead_id), inquiry_no=r.lead_inquiry_no)
               if r.lead_id and r.lead_inquiry_no else None),
         quotations=quotations,
-        owner=(UserRef(id=str(r.owner_user_id), full_name=r.owner_name)
-               if r.owner_user_id and r.owner_name else None),
+        owner=names.user(r.owner_user_id, r.owner_name),
         owner_org_unit=OrgUnitRef(id=str(r.owner_org_unit_id), name=r.owner_org_unit_name),
         territory=TerritoryRef(id=str(r.territory_id), name=r.territory_name,
                                level=r.territory_level),
@@ -599,6 +600,8 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
                  ORDER BY s.seq LIMIT 1) AS waiting
           FROM sales_order o WHERE o.id = ANY(CAST(:ids AS uuid[]))"""), {"ids": ids})).all()}
     by_id = {str(r.id): r for r in rows}
+    names = await people.resolve(db, rows, [("owner_user_id", "owner_name")],
+                                 [("partner_id", "partner_name")])
     data = []
     for i in ids:
         r = by_id.get(i)
@@ -608,11 +611,8 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
         data.append(sch.OrderSummary(
             id=i, order_no=r.order_no, status=r.status_text, order_type=r.type_text,
             party_name=r.party_name,
-            partner=(PartnerRef(id=str(r.partner_id), name=r.partner_name,
-                                partner_type=r.partner_type)
-                     if r.partner_id and r.partner_name else None),
-            owner=(UserRef(id=str(r.owner_user_id), full_name=r.owner_name)
-                   if r.owner_user_id and r.owner_name else None),
+            partner=names.partner(r.partner_id, r.partner_name, r.partner_type),
+            owner=names.user(r.owner_user_id, r.owner_name),
             totals=_totals(r), is_provisional=r.is_provisional,
             dispatched_pct=domain.dispatched_pct(Decimal(x.ordered), Decimal(x.sent)),
             approval_waiting_on=x.waiting, submitted_at=_iso(r.submitted_at),
@@ -654,13 +654,15 @@ async def timeline(db: AsyncSession, caller: Caller, order_id: str, *, limit: in
         last = rows[limit - 1]
         next_cursor = _encode_cursor(last.occurred_at, str(last.id))
         rows = rows[:limit]
+    names = await people.resolve(db, rows, [("actor_id", "full_name")])
     events = []
     for r in rows:
         payload = json.loads(r.payload) if isinstance(r.payload, str) else dict(r.payload or {})
         approval = r.kind.startswith("approval.")
         if approval and not portal and r.remark:
             payload["remark"] = r.remark
-        name = payload.pop("actor_name", None) or r.full_name or ""
+        name = (payload.pop("actor_name", None) or r.full_name
+                or names.users.get(str(r.actor_id)) or "")
         hidden = portal and domain.actor_hidden_from_partner(r.kind)
         actor = (UserRef(id=str(r.actor_id), full_name=name)
                  if r.actor_id is not None and not hidden else None)

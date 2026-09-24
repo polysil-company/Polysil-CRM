@@ -19,8 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.authz.predicate import Caller
 from api.errors import NotFoundError, ValidationFailed
 from api.schemas import orders as sch
-from api.schemas.leads import PageMeta, TerritoryRef, UserRef
+from api.schemas.leads import PageMeta, TerritoryRef
 from api.services import orders as order_service
+from api.services import people
 from api.services.leads import _decode_cursor, _encode_cursor
 
 _MAX_LIMIT = 100
@@ -54,6 +55,7 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
         "o.created_by, u.full_name, o.submitted_at, o.created_at FROM sales_order o "
         "LEFT JOIN app_user u ON u.id = o.created_by WHERE o.id = ANY(CAST(:ids AS uuid[]))"),
         {"ids": [str(r.entity_id) for r in rows]})).all()}
+    names = await people.resolve(db, list(docs.values()), [("created_by", "full_name")])
     data = []
     for r in rows:
         d = docs.get(str(r.entity_id))
@@ -65,8 +67,7 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
             document=sch.QueueDocument(
                 id=str(d.id), number=d.order_no, party_name=d.party_name,
                 total=f"{d.total:.2f}", is_provisional=d.is_provisional,
-                raised_by=(UserRef(id=str(d.created_by), full_name=d.full_name or "")
-                           if d.created_by else None),
+                raised_by=names.user(d.created_by, d.full_name),
                 raised_at=(d.submitted_at or d.created_at).isoformat()),
             waiting_since=r.waiting_since.isoformat()))
     return sch.QueuePage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor))
