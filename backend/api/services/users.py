@@ -370,7 +370,7 @@ async def _territories_exist(db: AsyncSession, ids: list[str]) -> None:
         return
     if len(set(ids)) != len(ids):
         raise ValidationFailed(fields={"territory_ids": "repeated"})
-    n = (await db.execute(text(
+    n: int = (await db.execute(text(
         "SELECT count(*) FROM territory WHERE id = ANY(CAST(:ids AS uuid[])) "
         "AND deleted_at IS NULL"), {"ids": ids})).scalar_one()
     if int(n) != len(ids):
@@ -654,7 +654,7 @@ async def patch_user(db: AsyncSession, caller: Caller, user_id: str,
 
     if (role_changed and "territory_ids" not in fields and staff and role_id
             and await _role_needs_territory(db, role_id)):
-        held = (await db.execute(text(
+        held: int = (await db.execute(text(
             "SELECT count(*) FROM user_territory WHERE user_id = CAST(:u AS uuid)"),
             {"u": user_id})).scalar_one()
         if not held:
@@ -744,7 +744,7 @@ async def unlock(db: AsyncSession, caller: Caller, user_id: str) -> UnlockResult
     if row.user_type != "staff":
         raise ValidationFailed(fields={"user_type": "OTP sign-in has no lockout to clear"})
     settings = get_settings()
-    was_locked = (await db.execute(text(
+    was_locked: Any = (await db.execute(text(
         "SELECT auth_unlock_user(CAST(:id AS uuid), :n, :l)"),
         {"id": user_id, "n": settings.login_max_failures,
          "l": settings.login_lockout})).scalar_one()
@@ -784,7 +784,7 @@ async def handover(db: AsyncSession, caller: Caller, user_id: str,
     leaver = by_id.get(user_id)
     if leaver is None or leaver.deleted_at is not None or body.to_user_id not in by_id:
         raise NotFoundError("No such person.")
-    ok = (await db.execute(text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
+    ok: bool = (await db.execute(text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
                            {"u": body.to_user_id})).scalar_one()
     if not ok:
         raise ValidationFailed(fields={"to_user_id": "not assignable by you"})

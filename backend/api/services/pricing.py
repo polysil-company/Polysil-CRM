@@ -137,7 +137,7 @@ async def resolve_scope(db: AsyncSession, *, partner_id: str | None,
         target = ""
 
     if target:
-        tier = (await db.execute(text(
+        tier: str = (await db.execute(text(
             "SELECT price_tier::text FROM channel_partner WHERE id = CAST(:p AS uuid)"),
             {"p": target})).scalar_one()
     else:
@@ -579,7 +579,7 @@ async def create_product(db: AsyncSession, body: sch.ProductCreate) -> sch.Produ
     category_id = await _lookup(db, "product_category", body.product_category, "product_category")
     uom_id = await _lookup(db, "uom", body.uom, "uom")
     try:
-        new_id = (await db.execute(text(
+        new_id: Any = (await db.execute(text(
             "INSERT INTO product (description, item_code, product_category_id, "
             "  quotation_category, uom_id, mrp, pack_multiple, is_subsidy_eligible, created_by) "
             "VALUES (CAST(:desc AS citext), CAST(:code AS citext), CAST(:cat AS uuid), "
@@ -916,7 +916,7 @@ async def create_price_list(db: AsyncSession, body: sch.PriceListCreate) -> sch.
     if body.effective_to is not None and body.effective_to <= body.effective_from:
         raise ValidationFailed(fields={"effective_to": "Must be later than effective_from."})
 
-    new_id = (await db.execute(text(
+    new_id: Any = (await db.execute(text(
         "INSERT INTO price_list (name, state_territory_id, channel_tier, effective_from, "
         "  effective_to, source_note, created_by) "
         "VALUES (:name, CAST(:state AS uuid), CAST(:tier AS channel_tier), CAST(:start AS date), "

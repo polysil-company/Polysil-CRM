@@ -670,7 +670,7 @@ async def versions(db: AsyncSession, quotation_id: str) -> list[sch.QuotationSum
 async def timeline(db: AsyncSession, quotation_id: str, *, limit: int = 100,
                    cursor: str | None = None) -> TimelinePage:
     limit = max(1, min(limit, _MAX_LIMIT))
-    visible = (await db.execute(text("SELECT quotation_visible(CAST(:id AS uuid))"),
+    visible: bool = (await db.execute(text("SELECT quotation_visible(CAST(:id AS uuid))"),
                                 {"id": quotation_id})).scalar_one()
     if not visible:
         raise NotFoundError("No such quotation.")
@@ -726,7 +726,7 @@ async def create_quotation(db: AsyncSession, caller: Caller, body: sch.Quotation
     _compare(body.lines, ctx)
 
     try:
-        quotation_id = (await db.execute(text("""
+        quotation_id: Any = (await db.execute(text("""
             INSERT INTO quotation (lead_id, sales_type, partner_id, owner_user_id,
                 owner_org_unit_id, territory_id, party_name, party_mobile, party_address,
                 party_gstin, seller_gstin_id, place_of_supply_territory_id,
@@ -1042,7 +1042,7 @@ async def revise_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                        seller_gstin_id=str(src.seller_gstin_id), as_of=body.price_effective_date,
                        specs=_specs_from_rows(stored), existing=True)
     try:
-        new_id = (await db.execute(text("""
+        new_id: Any = (await db.execute(text("""
             INSERT INTO quotation (quote_no, version, supersedes_id, lead_id, sales_type,
                 partner_id, owner_user_id, owner_org_unit_id, territory_id, party_name,
                 party_mobile, party_address, party_gstin, seller_gstin_id,
@@ -1129,7 +1129,8 @@ def _public(doc: dict[str, Any], token: str) -> sch.PublicQuotation:
 
 
 async def public_view(db: AsyncSession, token: str) -> sch.PublicQuotation:
-    doc = (await db.execute(text("SELECT quotation_public_view(:t)"), {"t": token})).scalar_one()
+    doc: Any = (await db.execute(text("SELECT quotation_public_view(:t)"),
+                                 {"t": token})).scalar_one()
     if doc is None:
         raise NotFoundError("No such quotation.")
     if isinstance(doc, str):
@@ -1140,7 +1141,7 @@ async def public_view(db: AsyncSession, token: str) -> sch.PublicQuotation:
 async def public_open(db: AsyncSession, token: str, user_agent: str | None,
                       storage: Storage) -> str:
     """Records the view (once), then the ten-minute URL to redirect to."""
-    doc = (await db.execute(text("SELECT quotation_public_open(:t, :ua)"),
+    doc: Any = (await db.execute(text("SELECT quotation_public_open(:t, :ua)"),
                             {"t": token, "ua": (user_agent or "")[:200]})).scalar_one()
     if doc is None:
         raise NotFoundError("No such quotation.")

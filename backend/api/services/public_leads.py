@@ -83,7 +83,7 @@ async def request_code(db: AsyncSession, raw_mobile: str, ip: str | None) -> sch
     settings = get_settings()
     mobile = _mobile(raw_mobile)
     code = generate_otp(6)
-    outcome = (await db.execute(text(
+    outcome: str = (await db.execute(text(
         "SELECT lead_intake_issue(:m, CAST(:ip AS inet), :c, :h, :ttl, :per_ip, :per_hour)"),
         {"m": mobile, "ip": ip, "c": code, "h": hash_otp(code),
          "ttl": settings.public_lead_code_ttl_seconds,
@@ -221,7 +221,7 @@ async def create_qr(db: AsyncSession, caller: Caller, body: sch.QrCodeCreate) ->
         code = "".join(secrets.choice(QR_ALPHABET) for _ in range(QR_LENGTH))
         try:
             async with db.begin_nested():
-                new_id = (await db.execute(text(
+                new_id: Any = (await db.execute(text(
                     "INSERT INTO lead_qr_code (code, label, campaign, partner_id, territory_id, "
                     "owner_org_unit_id, created_by, updated_by) VALUES (:c, :l, :cmp, "
                     "CAST(:p AS uuid), CAST(:t AS uuid), CAST(:u AS uuid), CAST(:me AS uuid), "

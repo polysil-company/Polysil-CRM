@@ -288,7 +288,7 @@ async def request_otp(db: AsyncSession, *, mobile: str, ip: str | None) -> None:
         return
 
     code = generate_otp(settings.otp_length)
-    issued = (
+    issued: Any = (
         await db.execute(
             text("SELECT auth_issue_otp_challenge(:m, CAST(:ip AS inet), :c, :cap)"),
             {"m": mobile, "ip": ip, "c": code, "cap": settings.otp_per_phone_per_day},
@@ -629,7 +629,7 @@ async def change_own_password(db: AsyncSession, *, current_password: str,
     if problem:
         raise ValidationFailed(fields={"new_password": problem})
     new_hash = await asyncio.to_thread(hash_password, new_password)
-    changed = (await db.execute(
+    changed: bool = (await db.execute(
         text("SELECT auth_set_own_password(:expected, :new)"),
         {"expected": row.password_hash, "new": new_hash})).scalar_one()
     if not changed:

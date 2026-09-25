@@ -1074,7 +1074,7 @@ async def record_dispatch(db: AsyncSession, caller: Caller, order_id: str,
     if body.invoice_date and body.dc_date and body.invoice_date < body.dc_date:
         warnings.append("invoice_before_dc: the invoice date is before the DC date.")
     if body.invoice_no:
-        repeats = (await db.execute(text(
+        repeats: int = (await db.execute(text(
             "SELECT count(*) FROM dispatch WHERE invoice_no = :i AND id <> CAST(:d AS uuid) "
             "AND voided_at IS NULL"), {"i": body.invoice_no, "d": str(dispatch_id)})).scalar_one()
         if repeats:

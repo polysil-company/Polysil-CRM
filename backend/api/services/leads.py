@@ -541,7 +541,7 @@ async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
         # Counted as the owner: an EXISTS under the caller's quotation policies would
         # say no to an officer whose colleague raised the accepted quotation
         # (FS-005 edge case 9).
-        accepted = (await db.execute(
+        accepted: bool = (await db.execute(
             text("SELECT quotation_accepted_for_lead(CAST(:id AS uuid))"),
             {"id": lead_id})).scalar_one()
         if not accepted:
@@ -682,8 +682,9 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
     if "owner_user_id" in fields and body.owner_user_id is not None:
         if caller.scopes.get("leads") not in ("global", "org_subtree"):
             raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
-        ok = (await db.execute(text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
-                               {"u": body.owner_user_id})).scalar_one()
+        ok: bool = (await db.execute(
+            text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
+            {"u": body.owner_user_id})).scalar_one()
         if not ok:
             raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
 
@@ -703,7 +704,7 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
         payload["owner_user_id"] = body.owner_user_id
     if "assigned_partner_id" in fields:
         if body.assigned_partner_id is not None:
-            vis = (await db.execute(
+            vis: bool = (await db.execute(
                 text("SELECT authz_visible('channel_partner', CAST(:p AS uuid))"),
                 {"p": body.assigned_partner_id})).scalar_one()
             if not vis:
