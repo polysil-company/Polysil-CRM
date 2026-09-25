@@ -57,6 +57,17 @@ Sixteen. Six in the line hierarchy, six functional, three portal, one board.
 |---|---|---|
 | 16 | `board` | Board of Directors — view-only, global |
 
+### Principals — not people, not in the matrix, never assignable
+
+| Code | Who | Holds |
+|---|---|---|
+| `system` | the worker (migration 005) | no matrix rows; its reach is explicit `app_is_system()` branches |
+| `intake` | the public lead form, "Website and QR" (migration 015, FS-003a) | leads view, create, edit and partners view, all global. Its claim is set only by `deps.intake_session`, after a WhatsApp code matched, and the route returns only an inquiry number. It has no password and no mobile, and a trigger refuses both, so it cannot sign in |
+
+Neither is in the parsed matrix below, in `ASSIGNABLE_ROLES`, or reconciled by the seed.
+
+Neither is administered either. `GET /users` never lists them, and every `/users/{id}` action refuses them (`422`, field `id`); a handover cannot name one as `to_user_id`. The intake account is also never a lead assignee: `authz_user_assignable()` and `staff_directory()` leave it out, although its role holds leads edit. Its trigger refuses a password, a mobile, a role or type change, deletion, deactivation and a move of office.
+
 > **Agent is not a role.** Dropped by ADR-030; `Requirements.md` REQ-1109 is void. A salesperson is a `field_officer`.
 
 ---

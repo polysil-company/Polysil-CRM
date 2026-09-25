@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.authz.predicate import Caller
 from api.db.session import enter_role
 from api.domain.orders import PORTAL_REMARK
+from api.errors import ConflictError
 from api.services import leads as lead_service
 from api.services import orders as service
 from tests.api import test_order_endpoints as endpoints
@@ -203,3 +204,33 @@ async def test_a_dealer_reads_a_rejected_quotation_without_the_staff_remark(
         await s.close()
     assert seen.status == "rejected" and seen.decision_remark is None
     assert seen.pdf_error is None
+
+
+async def test_a_dealer_learns_the_order_pdf_failed_but_not_why(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """FS-012: `pdf_error` names storage and configuration; staff see it, a dealer
+    does not."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    order = await endpoints._approve_all(client, shop, await endpoints._submit(
+        client, ho, (await endpoints._create(
+            client, ho, endpoints._direct(shop, partner_id=shop.partner)))["id"]))
+    reason = "ClientError: NoSuchBucket polysil-internal"
+    owner = sessions()
+    try:
+        await owner.execute(text("UPDATE sales_order SET pdf_state = 'failed', pdf_error = :e "
+                                 "WHERE id = CAST(:o AS uuid)"), {"e": reason, "o": order["id"]})
+        await owner.commit()
+    finally:
+        await owner.close()
+
+    r = await client.get(f"{V1}/orders/{order['id']}/pdf", headers=ho)
+    assert r.status_code == 409 and r.json()["error"]["fields"]["pdf_error"] == reason, r.text
+
+    s, dealer = await _as_dealer(sessions, shop)
+    try:
+        with pytest.raises(ConflictError) as refused:
+            await service.pdf_link(s, dealer, order["id"], storage=None)  # type: ignore[arg-type]
+    finally:
+        await s.rollback()
+        await s.close()
+    assert refused.value.code == "pdf_failed" and reason not in repr(vars(refused.value))

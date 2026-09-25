@@ -80,6 +80,14 @@ class Settings(BaseSettings):
     # role, seeded by migration 005 under this stable id. The worker sets it as
     # its claim and re-validates the row on every job. Nothing looks it up by name.
     system_user_id: str = "26809c63-290b-5bd9-9d6a-a717dc0b32e3"  # uuid5(DNS, "polysil.system")
+    # FS-003a: the public form's principal, migration 015; uuid5(DNS, "polysil.intake")
+    intake_user_id: str = "3f962ae5-f0d3-5583-91b5-5cea037139fc"
+    public_lead_code_ttl_seconds: int = 600
+    # rule 5: the sign-in value, so one carrier address at a fair is not a lockout
+    public_lead_codes_per_ip_per_hour: int = 200
+    # rule 9: a ceiling on paid messages from the public form, whatever the source
+    public_lead_codes_per_hour: int = 300
+    public_lead_code_retention: timedelta = timedelta(days=30)
 
     # FS-003 rule 4 (GAP-046, ISS-067). owner_org_unit_id is never user-supplied: it
     # is the sales-line unit whose territory covers the lead's territory. When no

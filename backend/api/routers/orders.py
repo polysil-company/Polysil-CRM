@@ -37,8 +37,10 @@ from api.schemas.orders import (
     Threshold,
     ThresholdPut,
 )
+from api.schemas.quotations import PdfLink
 from api.services import approvals as approval_service
 from api.services import orders as service
+from api.storage import get_storage
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 approvals = APIRouter(prefix="/approvals", tags=["approvals"])
@@ -165,6 +167,22 @@ async def get_order(order_id: Id, db: DbSession, caller: CallerDep) -> dict[str,
     partner or owner you cannot see is null. A dealer sees no approver names and no
     remarks."""
     return _order(await service.get_order(db, caller, order_id))
+
+
+@router.get("/{order_id}/pdf", response_model=Envelope[PdfLink],
+            responses={**_ERRORS, 409: {"model": ErrorResponse, "description":
+                                        "`pdf_pending`, `pdf_failed`, `order_cancelled` or "
+                                        "`storage_unavailable`."}},
+            dependencies=[Depends(require("sales_orders", "view"))])
+async def order_pdf(order_id: Id, db: DbSession, caller: CallerDep) -> Envelope[PdfLink]:
+    """A URL for the approved order's PDF, valid ten minutes. **Open it in a new tab;
+    do not fetch it with the bearer token.** The order's `pdf_state` says when to
+    offer it: `ready` shows "Download PDF", `pending` shows "Preparing PDF". `404`
+    before approval, `409 pdf_pending` while the worker has not finished,
+    `409 pdf_failed` when it gave up (staff see `pdf_error`), `409 order_cancelled`
+    once the order is cancelled."""
+    return Envelope(data=await service.pdf_link(db, caller, order_id,
+                                                get_storage(get_settings())))
 
 
 @router.patch("/{order_id}", response_model=Envelope[Order], responses=_MUTATION_ERRORS,

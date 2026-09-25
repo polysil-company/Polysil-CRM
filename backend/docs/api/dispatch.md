@@ -216,6 +216,9 @@ order.
 | `dispatches` | Dispatch[] | yes |  |
 | `warnings` | string[] | yes | repriced, discontinued_products, provisional_pricing. Shown, never blocking. |
 | `remarks` | string \| null | yes |  |
+| `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
+| `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
+| `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |

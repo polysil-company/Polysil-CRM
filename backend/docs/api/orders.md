@@ -435,6 +435,36 @@ Replace a draft's lines wholesale, priced as new lines.
 
 ---
 
+## `GET /api/v1/orders/{order_id}/pdf`
+
+**Order Pdf**
+
+A URL for the approved order's PDF, valid ten minutes. **Open it in a new tab;
+do not fetch it with the bearer token.** The order's `pdf_state` says when to
+offer it: `ready` shows "Download PDF", `pending` shows "Preparing PDF". `404`
+before approval, `409 pdf_pending` while the worker has not finished,
+`409 pdf_failed` when it gave up (staff see `pdf_error`), `409 order_cancelled`
+once the order is cancelled.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `order_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_PdfLink_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions, or not your step. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | `pdf_pending`, `pdf_failed`, `order_cancelled` or `storage_unavailable`. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `POST /api/v1/orders/{order_id}/submit`
 
 **Submit Order**
@@ -594,6 +624,12 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `data` | Order | yes |  |
 
+**`Envelope_PdfLink_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PdfLink | yes |  |
+
 **`Envelope_list_Dispatch__`**
 
 | Field | Type | Required | Notes |
@@ -652,6 +688,9 @@ and only the outcome to a dealer.
 | `dispatches` | Dispatch[] | yes |  |
 | `warnings` | string[] | yes | repriced, discontinued_products, provisional_pricing. Shown, never blocking. |
 | `remarks` | string \| null | yes |  |
+| `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
+| `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
+| `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |
@@ -809,6 +848,14 @@ and only the outcome to a dealer.
 | `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
+
+**`PdfLink`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `url` | string | yes | Open it in a new tab. Valid for ten minutes. |
+| `expires_at` | string | yes |  |
+| `filename` | string | yes |  |
 
 **`QuotationLineIn`**
 

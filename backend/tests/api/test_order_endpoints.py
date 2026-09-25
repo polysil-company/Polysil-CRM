@@ -13,6 +13,7 @@ at today, and both dates must resolve (FS-011 rule 3).
 from __future__ import annotations
 
 import datetime as dt
+import pathlib
 import random
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -25,8 +26,11 @@ from argon2 import PasswordHasher
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.config import get_settings
 from api.services.clock import today_ist
+from api.storage import LocalStorage
 from tests.api.conftest import PASSWORD, V1, _key, _login
+from worker.jobs.orders import render_one as render_order
 
 pytestmark = pytest.mark.db
 
@@ -491,3 +495,45 @@ async def test_the_order_counts_and_the_inbox_badge(client: httpx.AsyncClient, s
     # the manager's area is this shop's one office, so the badge is exact
     assert q["meta"]["total"] == 1 and q["meta"]["total_capped"] is False
     assert len(q["data"]) == 1
+
+
+# ── the order PDF (FS-012) ───────────────────────────────────────────────────
+
+async def test_the_order_pdf_follows_approval_and_is_withdrawn_on_cancel(
+        client: httpx.AsyncClient, shop: Shop, tmp_path: pathlib.Path) -> None:
+    ho = await _as(client, shop, "field_officer")
+    draft = await _create(client, ho, _direct(shop, remarks="Internal: rate agreed below list"))
+    assert draft["pdf_state"] == "none"
+    r = await client.get(f"{V1}/orders/{draft['id']}/pdf", headers=ho)
+    assert r.status_code == 404, "no PDF before approval"
+
+    order = await _approve_all(client, shop, await _submit(client, ho, draft["id"]))
+    assert order["pdf_state"] == "pending"
+    r = await client.get(f"{V1}/orders/{order['id']}/pdf", headers=ho)
+    assert r.status_code == 409 and r.json()["error"]["code"] == "pdf_pending"
+
+    settings = get_settings().model_copy(update={"pdf_renderer": "html"})
+    storage = LocalStorage(root=tmp_path, secret=b"test", public_base="")
+    for _ in range(5):          # another pending order may be claimed first
+        if await render_order(settings, storage) is None:
+            break
+    got = (await client.get(f"{V1}/orders/{order['id']}", headers=ho)).json()["data"]
+    assert got["pdf_state"] == "ready", got["pdf_state"]
+    link = (await client.get(f"{V1}/orders/{order['id']}/pdf", headers=ho)).json()["data"]
+    assert link["filename"] == order["order_no"].replace("/", "-") + ".pdf"
+    assert "/public/files/" in link["url"]
+    files = list(tmp_path.rglob(f"orders/{order['id']}/*.pdf"))
+    assert len(files) == 1
+    body = files[0].read_bytes()
+    assert order["order_no"].encode() in body and b"Rameshbhai Patel" in body
+    # rule 9: the order's own remark is internal (code review F-6: the approvers'
+    # remarks never reach the claim, so only this one can leak)
+    assert b"rate agreed below list" not in body
+
+    hs = await _as(client, shop, "state_manager")
+    r = await client.post(f"{V1}/orders/{order['id']}/cancel",
+                          json={"remark": "Plant shut", "expected_status": "approved"},
+                          headers={**hs, **_key()})
+    assert r.status_code == 200, r.text
+    r = await client.get(f"{V1}/orders/{order['id']}/pdf", headers=ho)
+    assert r.status_code == 409 and r.json()["error"]["code"] == "order_cancelled"

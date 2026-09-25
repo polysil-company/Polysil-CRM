@@ -335,6 +335,14 @@ class Order(BaseModel):
     warnings: list[str] = Field(description="repriced, discontinued_products, "
                                             "provisional_pricing. Shown, never blocking.")
     remarks: str | None
+    pdf_state: Literal["none", "pending", "ready", "failed"] = Field(
+        description="The approved order's PDF: none before approval, pending while the "
+                    "worker renders it, ready to download, or failed.")
+    pdf_error: str | None = Field(default=None, description="Why the PDF failed. Staff only.")
+    confirmation: Literal["queued", "no_mobile", "disabled"] | None = Field(
+        default=None, description="Whether the buyer was sent the WhatsApp confirmation on "
+                                  "approval: queued, no_mobile (tell the officer to call), "
+                                  "or disabled. Null before approval.")
     submitted_at: str | None
     approved_at: str | None
     cancelled_at: str | None

@@ -43,7 +43,9 @@ LIVE_TABLES: dict[str, str] = {
 # FS-011: an order event may carry no lead (a direct order, a consolidated one),
 # so sales_order resolves through entity_id and is not in ENTITY_REFS; approval
 # and dispatch events are written as sales_order events with their own kind.
-ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory", "quotation", "sales_order")
+# FS-003a: a QR code's events resolve through the code's own policies.
+ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory", "quotation", "sales_order",
+                                 "lead_qr_code")
 
 # A type in both LIVE_TABLES and ENTITY_BY_ID would emit two `WHEN` arms, the
 # first through its reference column's table and the second dead, and PostgreSQL

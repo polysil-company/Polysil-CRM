@@ -203,7 +203,9 @@ async def _rescore(db: AsyncSession, lead_id: Any) -> None:
 
 # ── create ───────────────────────────────────────────────────────────────────
 
-async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lead:
+async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate, *,
+                      intake: bool = False, intake_partner_id: str | None = None,
+                      qr_code_id: str | None = None) -> Lead:
     """Enter one lead, in one transaction (rule 14). require('leads','create') has
     already run in the route, and the idempotency record is reserved around this
     call, so this is the work that commits or rolls back as a unit."""
@@ -244,9 +246,15 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lea
             code="territory_without_state_code",
             fields={"territory_id": "no coded state ancestor"})
 
-    # 4. route the owner and the org unit (rules 4 and 5).
-    owner_user_id, owner_org_unit_id, assigned_partner_id = await _route(
-        db, caller, str(body.territory_id))
+    # 4. route the owner and the org unit (rules 4 and 5). A public lead routes by
+    # its territory and QR code, never by the intake principal's own office
+    # (FS-003a EC-2).
+    if intake:
+        owner_user_id, owner_org_unit_id, assigned_partner_id = await _route_intake(
+            db, str(body.territory_id), intake_partner_id)
+    else:
+        owner_user_id, owner_org_unit_id, assigned_partner_id = await _route(
+            db, caller, str(body.territory_id))
 
     # 4b. the routed row must sit in the caller's own scope. The INSERT policy would
     # refuse it with 42501 (a 500); this turns the common misroute into a clean 422
@@ -277,16 +285,16 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lea
         INSERT INTO lead (inquiry_no, stage, inquiry_type, mis_system_id, lead_source_id,
             farmer_name, mobile, email, territory_id, village, owner_user_id,
             owner_org_unit_id, assigned_partner_id, score, priority, estimated_value,
-            created_by)
+            created_by, qr_code_id)
         VALUES (:no, 'new', CAST(:it AS inquiry_type), :mis, :src, :name, :mob, :email,
             :tid, :village, :owner, :oou, :ap, :score, CAST(:prio AS lead_priority),
-            :est, :me)
+            :est, :me, :qr)
         RETURNING id"""), {
         "no": inquiry_no, "it": body.inquiry_type, "mis": mis.id, "src": src.id,
         "name": body.farmer_name, "mob": mobile, "email": body.email,
         "tid": str(body.territory_id), "village": body.village, "owner": owner_user_id,
         "oou": owner_org_unit_id, "ap": assigned_partner_id, "score": score,
-        "prio": priority, "est": body.estimated_value, "me": caller.user_id,
+        "prio": priority, "est": body.estimated_value, "me": caller.user_id, "qr": qr_code_id,
     })).scalar_one()
 
     # 8. the event (CLAUDE.md rule 7, FS-003 rule 14). actor_id must be the caller:
@@ -348,6 +356,16 @@ async def _route(db: AsyncSession, caller: Caller, territory_id: str
     if caller.org_unit_id is not None and own_unit_territory is not None:
         return (owner, caller.org_unit_id, None)
     return (owner, await _covering_org_unit(db, territory_id), None)
+
+
+async def _route_intake(db: AsyncSession, territory_id: str, partner_id: str | None
+                        ) -> tuple[str | None, str, str | None]:
+    """A public lead (FS-003a §5): the covering unit, the auto-assigned officer or
+    nobody (the unassigned list), and the QR code's partner."""
+    owner = (await db.execute(text("SELECT lead_auto_owner(:t)"),
+                              {"t": territory_id})).scalar_one_or_none()
+    return (str(owner) if owner else None, await _covering_org_unit(db, territory_id),
+            partner_id)
 
 
 async def _covering_org_unit(db: AsyncSession, territory_id: str) -> str:

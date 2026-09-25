@@ -27,6 +27,17 @@ from api.config import Settings
 TEMPLATE_AUTH_OTP: Final = "auth.otp"
 TEMPLATE_LEAD_ACK: Final = "lead_ack"
 TEMPLATE_QUOTATION_SHARE: Final = "quotation_share"
+# FS-003a: the public form's code. Its own key, so a lead code never retires a
+# sign-in code, but the same approved authentication template: Meta fixes the
+# body of an authentication template, so a second one would say the same words.
+TEMPLATE_LEAD_VERIFY: Final = "lead.verify"
+# FS-012: the order's messages. Their provider names live in the message_template
+# table, and the definer that writes the row copies the name into the payload as
+# `_template`, so the table is the one switch (EC-5, plan review B-2).
+TEMPLATE_ORDER_CONFIRMED: Final = "order.confirmed"
+TEMPLATE_APPROVAL_WAITING: Final = "approval.waiting"
+TEMPLATE_ORDER_DECIDED: Final = "order.decided"
+PAYLOAD_TEMPLATE_KEY: Final = "_template"
 
 # FS-007 rule 16: the channel the sign-in code goes out on, a deployment constant
 # the 202 body and the definer's row both carry. Never derived from the number.
@@ -41,7 +52,8 @@ VALUE_MAX: Final = 100
 
 @dataclass(frozen=True)
 class TemplateSpec:
-    name_setting: str            # the Settings attribute holding the provider's template name
+    name_setting: str | None     # the Settings attribute holding the provider's template
+                                 # name; None: the payload's `_template` carries it
     params: tuple[str, ...]      # payload keys, in the template's positional order
     button: str | None           # the payload key sent as the copy-code button's value
     max_age: timedelta | None    # None: derived from settings (the OTP's TTL less a minute)
@@ -49,6 +61,9 @@ class TemplateSpec:
 
 TEMPLATES: Final[dict[str, TemplateSpec]] = {
     TEMPLATE_AUTH_OTP: TemplateSpec("whatsapp_template_otp", ("code",), "code", None),
+    # the challenge lives ten minutes; a code older than nine is not worth sending
+    TEMPLATE_LEAD_VERIFY: TemplateSpec("whatsapp_template_otp", ("code",), "code",
+                                       timedelta(minutes=9)),
     # GAP-072: farmer_name is an officer-typed value on Polysil's number, bounded by
     # normalise_value and by rule 10b (once a day per number) until the client decides.
     TEMPLATE_LEAD_ACK: TemplateSpec("whatsapp_template_lead_ack",
@@ -57,6 +72,12 @@ TEMPLATES: Final[dict[str, TemplateSpec]] = {
     # the worker from public_web_url and the row's token; the origin is bounded at
     # startup so the value never reaches VALUE_MAX (edge case 17). No button: the
     # adapter's only button is the authentication one (GAP-110).
+    TEMPLATE_ORDER_CONFIRMED: TemplateSpec(None, ("party_name", "order_no", "total"), None,
+                                           timedelta(hours=24)),
+    TEMPLATE_APPROVAL_WAITING: TemplateSpec(None, ("approver_name", "order_no", "party_name",
+                                                   "total"), None, timedelta(hours=24)),
+    TEMPLATE_ORDER_DECIDED: TemplateSpec(None, ("owner_name", "order_no", "party_name",
+                                                "outcome"), None, timedelta(hours=24)),
     TEMPLATE_QUOTATION_SHARE: TemplateSpec("whatsapp_template_quotation_share",
                                            ("party_name", "quote_no", "link"), None,
                                            timedelta(days=7)),
@@ -67,6 +88,10 @@ _BODIES: Final[dict[str, str]] = {
         "{code} is your Polysil verification code. "
         "It is valid for 5 minutes. Do not share it with anyone."
     ),
+    TEMPLATE_LEAD_VERIFY: (
+        "{code} is your Polysil verification code. "
+        "It is valid for 10 minutes. Do not share it with anyone."
+    ),
     # FS-003 rule 17. English only, like every body here (ISS-010). The worker
     # dead-letters an unknown key, so a lead created before this body existed would
     # have failed its acknowledgement silently (plan review B-5).
@@ -76,6 +101,18 @@ _BODIES: Final[dict[str, str]] = {
     ),
     TEMPLATE_QUOTATION_SHARE: (
         "{party_name}, your Polysil quotation {quote_no} is ready: {link}"
+    ),
+    TEMPLATE_ORDER_CONFIRMED: (
+        "Hello {party_name}, your order {order_no} with Polysil Irrigation is confirmed. "
+        "Order value: Rs {total}. Our team will contact you about delivery."
+    ),
+    TEMPLATE_APPROVAL_WAITING: (
+        "Hello {approver_name}, order {order_no} for {party_name}, value Rs {total}, "
+        "is waiting for your approval in the Polysil CRM."
+    ),
+    TEMPLATE_ORDER_DECIDED: (
+        "Hello {owner_name}, order {order_no} for {party_name} has been {outcome}. "
+        "Please check the Polysil CRM for details."
     ),
 }
 
@@ -134,3 +171,14 @@ def render(template_key: str, payload: dict[str, object]) -> str:
         return body.format(**payload)
     except KeyError as exc:
         raise UnknownTemplateError(f"{template_key} is missing {exc}") from exc
+
+
+def provider_template(key: str, settings: Settings, payload: dict[str, object]) -> str | None:
+    """The account's template name for a key: from its setting, or, for the keys
+    the database gates, from the payload the definer wrote (FS-012)."""
+    spec = TEMPLATES[key]
+    if spec.name_setting is None:
+        name = payload.get(PAYLOAD_TEMPLATE_KEY)
+        return str(name) if name else None
+    value = getattr(settings, spec.name_setting)
+    return str(value) if value else None

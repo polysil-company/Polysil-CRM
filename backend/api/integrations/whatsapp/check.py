@@ -47,7 +47,32 @@ def unconfigured_templates(settings: Settings) -> list[str]:
     """The template keys whose account name is unset: sends with that key will
     dead-letter until it is configured. Logged at worker startup, one line."""
     return [key for key, spec in TEMPLATES.items()
-            if getattr(settings, spec.name_setting) is None]
+            if spec.name_setting is not None and getattr(settings, spec.name_setting) is None]
+
+
+def _by_name(rows: list[dict[str, object]], language: str) -> dict[str, dict[str, object]]:
+    """One row per lower-cased name, preferring the localization in the language
+    this system sends."""
+    wanted = language.lower()
+    by_name: dict[str, dict[str, object]] = {}
+    for r in rows:
+        name_ = str(_first(r, "name", "templateName", "Name") or "").lower()
+        language_ = str(_first(r, "language", "languageCode", "Language") or "").lower()
+        if name_ not in by_name or language_ == wanted:
+            by_name[name_] = r
+    return by_name
+
+
+def approved_names(rows: list[dict[str, object]], language: str) -> set[str]:
+    """The lower-cased names approved in this system's language: the ones a
+    `message_template` row may be switched on for (FS-012 rule 3)."""
+    approved: set[str] = set()
+    for name, row in _by_name(rows, language).items():
+        status = str(_first(row, "status", "Status", "templateStatus") or "").lower()
+        row_language = str(_first(row, "language", "languageCode", "Language") or "").lower()
+        if status == "approved" and row_language in ("", language.lower()):
+            approved.add(name)
+    return approved
 
 
 async def check_templates(provider: MessageProvider, settings: Settings) -> list[str]:
@@ -59,17 +84,20 @@ async def check_templates(provider: MessageProvider, settings: Settings) -> list
     # survive a case-sensitive scrub at the end (cross-vendor review of the code, P2).
     rows = [{str(k): (scrub(v, secrets) if isinstance(v, str) else v) for k, v in r.items()}
             for r in await provider.list_templates()]
-    # one row per name, preferring the localization in the language this system sends
-    wanted = settings.whatsapp_template_language.lower()
-    by_name: dict[str, dict[str, object]] = {}
-    for r in rows:
-        name_ = str(_first(r, "name", "templateName", "Name") or "").lower()
-        language_ = str(_first(r, "language", "languageCode", "Language") or "").lower()
-        if name_ not in by_name or language_ == wanted:
-            by_name[name_] = r
+    by_name = _by_name(rows, settings.whatsapp_template_language)
     problems: list[str] = []
+    checked: set[str] = set()
     for key, spec in TEMPLATES.items():
+        if spec.name_setting is None:
+            # the database gates these; message_template names them (FS-012)
+            continue
         configured = getattr(settings, spec.name_setting)
+        # two keys may send with one account template (lead.verify rides on the
+        # sign-in code's): check each template once, under its first key
+        if configured is not None and str(configured).lower() in checked:
+            continue
+        if configured is not None:
+            checked.add(str(configured).lower())
         if configured is None:
             # An expected state, not a problem: the client's BSP has not approved
             # the template yet (GAP-110). unconfigured_templates() names it on its

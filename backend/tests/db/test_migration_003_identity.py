@@ -46,6 +46,13 @@ PRE_AUTH = {
     # FS-005: the public quotation link, two more definer functions on app_anon
     "quotation_public_view": "p_token text",
     "quotation_public_open": "p_token text, p_user_agent text",
+    # FS-003a: the public enquiry form and QR codes, five more
+    "lead_intake_issue": ("p_mobile text, p_ip inet, p_code text, p_code_hash text, "
+                          "p_ttl_seconds integer, p_ip_per_hour integer, p_codes_per_hour integer"),
+    "lead_intake_consume": "p_mobile text, p_code_hash text",
+    "lead_qr_public": "p_code text",
+    "lead_public_form": "",
+    "lead_public_territories": "p_parent uuid",
 }
 
 
@@ -66,7 +73,7 @@ async def _lookup(db: AsyncSession, email: str):
 
 # ── the pre-auth surface ─────────────────────────────────────────────────────
 
-async def test_exactly_the_ten_pre_auth_functions_exist(db: AsyncSession) -> None:
+async def test_exactly_the_pre_auth_functions_exist(db: AsyncSession) -> None:
     """Keyed on the pre-auth role's privilege, not on the name prefix: 007 adds six
     `auth_*` functions that are not pre-auth. Extension functions are excluded,
     because app_anon inherits EXECUTE on 114 pgcrypto, pg_trgm and citext

@@ -25,7 +25,11 @@ import httpx
 import structlog
 
 from api.config import Settings
-from api.integrations.messages import TEMPLATES, UnknownTemplateError, template_values
+from api.integrations.messages import (
+    UnknownTemplateError,
+    provider_template,
+    template_values,
+)
 from api.integrations.whatsapp.provider import (
     OutboundMessage,
     Outcome,
@@ -76,12 +80,11 @@ class ElevenZaProvider:
             values, button = template_values(msg.template_key, msg.payload)
         except UnknownTemplateError as exc:
             return ProviderResult(Outcome.PERMANENT, None, f"unknown template: {exc}")
-        spec = TEMPLATES[msg.template_key]
         token = self._token()
         body: dict[str, Any] = {
             "authToken": token,
             "sendto": sendto,
-            "templateName": getattr(self._settings, spec.name_setting),
+            "templateName": provider_template(msg.template_key, self._settings, msg.payload),
             "language": self._settings.whatsapp_template_language,
             "data": values,
             "tags": msg.reference,

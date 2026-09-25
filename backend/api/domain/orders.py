@@ -7,6 +7,7 @@ checks first and what it maps the database's refusals to.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Final
@@ -96,3 +97,18 @@ def open_quantity(qty: Decimal, sent: Decimal, short: Decimal) -> Decimal:
     """What can still ship on a line. Never below zero: the database refuses the
     dispatch that would take it there, and this is only a display."""
     return max(Decimal("0"), qty - short - sent)
+
+
+# ── the order PDF (FS-012) ───────────────────────────────────────────────────
+
+_UNSAFE = re.compile(r"[^A-Za-z0-9]+")
+
+
+def pdf_storage_key(order_id: str, lease: str) -> str:
+    """One object per lease, like the quotation's: a stale worker writes beside the
+    published document, never over it."""
+    return f"orders/{order_id}/{lease}.pdf"
+
+
+def pdf_filename(order_no: str) -> str:
+    return f"{_UNSAFE.sub('-', order_no).strip('-')}.pdf"

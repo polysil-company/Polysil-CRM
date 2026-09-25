@@ -25,6 +25,7 @@ from decimal import Decimal
 from typing import Any
 
 import sqlalchemy as sa
+import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,11 +52,15 @@ from api.schemas.leads import (
     TimelinePage,
     UserRef,
 )
-from api.schemas.quotations import QuotationLineIn, Totals
+from api.schemas.quotations import PdfLink, QuotationLineIn, Totals
 from api.services import people, pricing
 from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor, _route
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
+from api.services.quotations import _STORAGE_DOWN
+from api.storage import Storage
+
+log = structlog.get_logger(__name__)
 
 _ORDERS = SPECS["sales_orders"]
 _MAX_LIMIT = 100
@@ -524,6 +529,12 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         tax_date=_iso(r.tax_date), is_provisional=r.is_provisional, lines=lines,
         totals=_totals(r), approval=approval, last_rejection=last_rejection,
         dispatches=await _dispatches(db, order_id, portal), warnings=_warnings(r, lines),
+        pdf_state=("pending" if r.pdf_state == "rendering" else r.pdf_state or "none"),
+        pdf_error=None if portal else r.pdf_error,
+        confirmation=(await db.execute(text(
+            "SELECT payload->>'confirmation' FROM activity_event WHERE entity_type = 'sales_order' "
+            "AND entity_id = CAST(:o AS uuid) AND kind = 'order.approved' "
+            "ORDER BY occurred_at DESC LIMIT 1"), {"o": order_id})).scalar_one_or_none(),
         remarks=r.remarks, submitted_at=_iso(r.submitted_at), approved_at=_iso(r.approved_at),
         cancelled_at=_iso(r.cancelled_at),
         # a partner reads its own cancel reason, never a staff one (question 15.14)
@@ -1136,3 +1147,35 @@ __all__ = ["ApiError", "cancel_order", "close_short", "create_order", "delete_or
            "get_order", "list_dispatches", "list_orders", "map_db_error", "order_dispatches",
            "patch_order", "record_dispatch", "replace_lines", "submit_order", "timeline",
            "void_dispatch"]
+
+
+# ── the order PDF (FS-012) ───────────────────────────────────────────────────
+
+async def pdf_link(db: AsyncSession, caller: Caller, order_id: str, storage: Storage) -> PdfLink:
+    """A ten-minute link to the approved order's PDF. The row is read under RLS, so
+    an order out of scope is a 404 like any other."""
+    row = (await db.execute(text(
+        "SELECT order_no::text AS order_no, status::text AS status, pdf_state, pdf_key, pdf_error "
+        "FROM sales_order WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL"),
+        {"id": order_id})).one_or_none()
+    if row is None:
+        raise NotFoundError("No such order.")
+    if row.status == "cancelled":
+        # rule 8: the PDF is the approved order, and this one no longer stands
+        raise ConflictError("The order was cancelled; its PDF is withdrawn.",
+                            code="order_cancelled")
+    if row.pdf_state is None:
+        raise NotFoundError("No PDF: the order is not approved yet.")
+    if row.pdf_state == "failed":
+        raise ConflictError("The PDF could not be produced.", code="pdf_failed",
+                            fields={} if _is_portal(caller) else {"pdf_error": row.pdf_error or ""})
+    if row.pdf_state != "ready":
+        raise ConflictError("The PDF is being prepared; try again in a few seconds.",
+                            code="pdf_pending")
+    filename = domain.pdf_filename(row.order_no)
+    try:
+        url, expires = storage.presign_get(row.pdf_key, filename=filename)
+    except RuntimeError as exc:
+        log.warning("order.storage_unavailable", reason=str(exc))
+        raise ConflictError(_STORAGE_DOWN, code="storage_unavailable") from exc
+    return PdfLink(url=url, expires_at=expires.isoformat(), filename=filename)

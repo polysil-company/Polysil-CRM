@@ -222,6 +222,11 @@ services:
       DB_ANON_ROLE: ${DB_ANON_ROLE:-app_anon}
       DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-polysil-demo-2026}
+      # scripts/sync_message_templates.py reads the account's template listing,
+      # after every migration. Without these it saw the mock and changed nothing.
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
+      WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+      WHATSAPP_ORIGIN_WEBSITE: ${WHATSAPP_ORIGIN_WEBSITE:-}
       # Settings refuses to load outside local without it, so alembic and the
       # seeds need it too, not only the API and the worker.
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}

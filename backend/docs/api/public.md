@@ -25,6 +25,97 @@ Conventions for every endpoint in this file:
 
 ---
 
+## `GET /public/lead-form`
+
+**Lead Form**
+
+What the enquiry page needs before the farmer types: the QR code's label and
+campaign (show "Enquiry through Shah Irrigation" at the top), the states, the
+irrigation systems and the inquiry types. Districts and talukas come from
+`GET /public/territories?parent_id=`.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `qr` | query | string \| null |  | The code from the page URL, if the farmer scanned one. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_PublicLeadForm_` | Successful Response |
+| `404` | `ErrorResponse` | An unknown or inactive QR code. |
+| `422` | `ErrorResponse` | A field, or `invalid_code`. |
+| `429` | `ErrorResponse` | Too many codes for this number or address. |
+
+---
+
+## `POST /public/leads`
+
+**Public Lead**
+
+Create the lead once the code matches. Show the farmer the `inquiry_no`
+either way; the acknowledgement also goes by WhatsApp, but it can be held back
+(one a day per number), so the page is the place they read it. A retry after a
+lost response returns the same number. `invalid_code` covers a wrong, expired
+or used-up code: offer to send a new one.
+
+**Request body**
+
+**`PublicLeadCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `mobile` | string | yes |  |
+| `code` | string | yes | The six digits from WhatsApp. |
+| `farmer_name` | string | yes |  |
+| `territory_id` | string | yes | A district or taluka, never a state. |
+| `village` | string \| null |  |  |
+| `mis_system` | string | yes |  |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` |  | Default `commercial`. |
+| `note` | string \| null |  |  |
+| `qr` | string \| null |  | The code from the page URL, if any. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_PublicLeadResult_` | Already enquired today, or a retry: the earlier inquiry number. |
+| `201` | `Envelope_PublicLeadResult_` | Successful Response |
+| `404` | `ErrorResponse` | An unknown or inactive QR code. |
+| `422` | `ErrorResponse` | A field, or `invalid_code`. |
+| `429` | `ErrorResponse` | Too many codes for this number or address. |
+
+---
+
+## `POST /public/leads/verify`
+
+**Lead Verify**
+
+Send the farmer a six-digit WhatsApp code for this mobile. The body is the
+same whether or not the number is known to Polysil. Offer "send again" after
+`resend_after` seconds; a new code replaces the old one.
+
+**Request body**
+
+**`VerifyRequest`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `mobile` | string | yes | Any Indian form: 9876543210, +91 98765 43210. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `202` | `Envelope_VerifySent_` | Successful Response |
+| `404` | `ErrorResponse` | An unknown or inactive QR code. |
+| `422` | `ErrorResponse` | A field, or `invalid_code`. |
+| `429` | `ErrorResponse` | Too many codes for this number or address. |
+
+---
+
 ## `GET /public/q/{token}`
 
 **Public Quotation**
@@ -79,13 +170,60 @@ worker has not finished.
 
 ---
 
+## `GET /public/territories`
+
+**Public Territories**
+
+The children of one territory, name and id only, at most 200.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `parent_id` | query | string | yes | A state for its districts, a district for its talukas. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_PublicTerritory__` | Successful Response |
+| `404` | `ErrorResponse` | An unknown or inactive QR code. |
+| `422` | `ErrorResponse` | A field, or `invalid_code`. |
+| `429` | `ErrorResponse` | Too many codes for this number or address. |
+
+---
+
 ## Models
+
+**`Envelope_PublicLeadForm_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PublicLeadForm | yes |  |
+
+**`Envelope_PublicLeadResult_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PublicLeadResult | yes |  |
 
 **`Envelope_PublicQuotation_`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | PublicQuotation | yes |  |
+
+**`Envelope_VerifySent_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | VerifySent | yes |  |
+
+**`Envelope_list_PublicTerritory__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PublicTerritory[] | yes |  |
 
 **`ErrorBody`**
 
@@ -106,6 +244,45 @@ worker has not finished.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `detail` | ValidationError[] |  |  |
+
+**`PublicLeadCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `mobile` | string | yes |  |
+| `code` | string | yes | The six digits from WhatsApp. |
+| `farmer_name` | string | yes |  |
+| `territory_id` | string | yes | A district or taluka, never a state. |
+| `village` | string \| null |  |  |
+| `mis_system` | string | yes |  |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` |  | Default `commercial`. |
+| `note` | string \| null |  |  |
+| `qr` | string \| null |  | The code from the page URL, if any. |
+
+**`PublicLeadForm`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `qr` | PublicQr \| null | yes | Null when the page was opened without a code. |
+| `states` | PublicState[] | yes |  |
+| `mis_systems` | PublicSystem[] | yes |  |
+| `inquiry_types` | string[] | yes |  |
+
+**`PublicLeadResult`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `inquiry_no` | string | yes | Show it to the farmer; it also goes by WhatsApp. |
+| `created` | boolean | yes | False when this mobile already enquired today through the form: the earlier number is returned. |
+
+**`PublicQr`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes |  |
+| `label` | string | yes | The dealer or place the code was printed for. |
+| `campaign` | string \| null | yes |  |
+| `territory_id` | string \| null | yes | Preselect this territory in the picker. |
 
 **`PublicQuotation`**
 
@@ -132,6 +309,28 @@ worker has not finished.
 | `legal_name` | string | yes |  |
 | `gstin` | string | yes |  |
 
+**`PublicState`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+
+**`PublicSystem`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+
+**`PublicTerritory`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes | district, taluka or village. |
+
 **`Totals`**
 
 | Field | Type | Required | Notes |
@@ -153,3 +352,18 @@ worker has not finished.
 | `type` | string | yes |  |
 | `input` | any |  |  |
 | `ctx` | object |  |  |
+
+**`VerifyRequest`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `mobile` | string | yes | Any Indian form: 9876543210, +91 98765 43210. |
+
+**`VerifySent`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `sent` | boolean |  | Default `True`. |
+| `channel` | string |  | Default `whatsapp`. |
+| `expires_in` | integer | yes | Seconds the code is valid. |
+| `resend_after` | integer | yes | Seconds before offering to send another. |

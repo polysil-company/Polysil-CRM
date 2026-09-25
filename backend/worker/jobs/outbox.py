@@ -46,6 +46,7 @@ from api.integrations import cache
 from api.integrations.messages import (
     TEMPLATE_AUTH_OTP,
     TEMPLATE_LEAD_ACK,
+    TEMPLATE_LEAD_VERIFY,
     TEMPLATES,
     UnknownTemplateError,
     max_age,
@@ -208,11 +209,12 @@ async def _handle(session: AsyncSession, row: Any, provider: MessageProvider,
         await _dead(session, row.id, "too old to send")
         return "dead"
 
-    if key == TEMPLATE_AUTH_OTP:
+    if key in (TEMPLATE_AUTH_OTP, TEMPLATE_LEAD_VERIFY):
+        # only the newest code of its kind can arrive (FS-007 rule 1a, FS-003a EC-5)
         newer = (await session.execute(text(
-            "SELECT EXISTS (SELECT 1 FROM notification_outbox o WHERE o.template_key = 'auth.otp' "
+            "SELECT EXISTS (SELECT 1 FROM notification_outbox o WHERE o.template_key = :k "
             "AND o.recipient = :r AND o.created_at > :c AND o.id <> :i)"),
-            {"r": row.recipient, "c": row.created_at, "i": row.id})).scalar_one()
+            {"k": key, "r": row.recipient, "c": row.created_at, "i": row.id})).scalar_one()
         if newer:
             await _dead(session, row.id, "superseded")
             return "dead"
@@ -344,7 +346,13 @@ async def purge_expired_sessions(ctx: dict[str, Any]) -> int:
                  "AND created_at < :cut"),
             {"cut": now - settings.outbox_retention},
         )).rowcount
+        # FS-003a: the public form's codes hold a mobile and an address; a definer
+        # deletes them, because no policy admits either role to the table
+        codes = (await session.execute(
+            text("SELECT lead_intake_purge(:cut)"),
+            {"cut": now - settings.public_lead_code_retention},
+        )).scalar_one()
 
     log.info("retention.purged", sessions=sessions, attempts=attempts, idempotency=idem,
-             outbox=outbox)
-    return int(sessions) + int(attempts) + int(idem) + int(outbox)
+             outbox=outbox, lead_codes=codes)
+    return int(sessions) + int(attempts) + int(idem) + int(outbox) + int(codes)

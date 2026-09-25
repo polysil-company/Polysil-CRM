@@ -25,6 +25,54 @@ Conventions for every endpoint in this file:
 
 ---
 
+## `GET /api/v1/lead-qr-codes`
+
+**List Qr**
+
+The codes in your scope, newest first, with how many leads each brought.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `QrCodeList` | Successful Response |
+| `422` | `ErrorResponse` | A field. |
+
+---
+
+## `POST /api/v1/lead-qr-codes`
+
+**Create Qr**
+
+Make a code to print. `url` is what the QR image encodes; draw it on the page
+and offer a download. Leads from it are credited to `partner_id` when set.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`QrCodeCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string | yes | What staff will recognise: the dealer, the stall, the leaflet. |
+| `campaign` | string \| null |  |  |
+| `partner_id` | string \| null |  | Leads from this code are assigned to this partner. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_QrCode_` | Successful Response |
+| `422` | `ErrorResponse` | A field. |
+
+---
+
 ## `GET /api/v1/leads`
 
 **List Leads**
@@ -634,6 +682,12 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `data` | Lead | yes |  |
 
+**`Envelope_QrCode_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | QrCode | yes |  |
+
 **`Envelope_TimelineEvent_`**
 
 | Field | Type | Required | Notes |
@@ -792,6 +846,36 @@ with the current stage in `fields.stage`.
 | `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
+
+**`QrCode`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes | Six characters, no look-alikes. |
+| `url` | string | yes | What the printed QR encodes; the frontend draws it. |
+| `label` | string | yes |  |
+| `campaign` | string \| null | yes |  |
+| `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
+| `territory` | TerritoryRef \| null | yes |  |
+| `is_active` | boolean | yes |  |
+| `lead_count` | integer | yes | Leads this code has brought, in your scope. |
+| `created_at` | string | yes |  |
+
+**`QrCodeCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string | yes | What staff will recognise: the dealer, the stall, the leaflet. |
+| `campaign` | string \| null |  |  |
+| `partner_id` | string \| null |  | Leads from this code are assigned to this partner. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+
+**`QrCodeList`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | QrCode[] | yes |  |
 
 **`ReasonRef`**
 

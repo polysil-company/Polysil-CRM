@@ -124,6 +124,14 @@ class ValidationFailed(ApiError):
     message = "Some fields need correcting."
 
 
+class RateLimitedError(ApiError):
+    """Too many requests from one number or address (FS-003a rule 5)."""
+
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "rate_limited"
+    message = "Too many attempts. Wait a few minutes and try again."
+
+
 class NotFoundError(ApiError):
     """The id is not in the caller's scope, which includes 'exists but hidden' -
     the two are one answer on purpose, so a 404 leaks no existence (FS-003 section 4)."""
