@@ -961,7 +961,7 @@ async def send_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                        seller_gstin_id=str(row.seller_gstin_id), as_of=row.price_effective_date,
                        specs=_specs_from_rows(stored), existing=True)
     _compare_stored(stored, ctx)
-    gate = (await db.execute(text("SELECT quotation_send_gate(CAST(:q AS uuid))"),
+    gate: str = (await db.execute(text("SELECT quotation_send_gate(CAST(:q AS uuid))"),
                              {"q": quotation_id})).scalar_one()
     if gate == "pending":
         raise ConflictError("The discount is waiting for approval.", code="approval_pending")
