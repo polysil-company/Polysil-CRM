@@ -598,6 +598,7 @@ async def pass_3b_quotations(client: httpx.AsyncClient, admin: Api) -> None:
         created += 1
         if outcome == "draft":
             continue
+        await _approve_discount(api, admin, q)
         await api.post(f"/quotations/{q['id']}/send", {"channel": "none"}, expect=200)
         if outcome in ("negotiation", "accepted", "rejected"):
             await api.post(f"/quotations/{q['id']}/transition",
@@ -605,9 +606,23 @@ async def pass_3b_quotations(client: httpx.AsyncClient, admin: Api) -> None:
                            expect=200)
         elif outcome == "revised":
             v2 = (await api.post(f"/quotations/{q['id']}/revise", {}))["data"]
+            await _approve_discount(api, admin, v2)
             await api.post(f"/quotations/{v2['id']}/send", {"channel": "none"}, expect=200)
             created += 1
     print(f"pass 3b: {created} quotations created")
+
+
+async def _approve_discount(api: Api, admin: Api, q: dict[str, Any]) -> None:
+    """FS-013: a discount above the owner's limit is sent only once approved. The
+    owner asks, and Admin-Sales, above every ladder step, approves."""
+    if (q.get("discount") or {}).get("send_gate") not in ("required", "void", "returned"):
+        return
+    asked = (await api.post(f"/quotations/{q['id']}/request-approval",
+                            {"remark": "Season order, the farmer asked for a better rate"},
+                            expect=200))["data"]
+    step = asked["approval"]["steps"][0]["id"]
+    await admin.post(f"/approvals/steps/{step}/decision",
+                     {"decision": "approve", "remark": "Approved for the season"}, expect=200)
 
 
 # ── pass 4: the timeline ─────────────────────────────────────────────────────

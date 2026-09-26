@@ -293,6 +293,52 @@ worker has not finished, `409 pdf_failed` with `pdf_error` when it gave up.
 
 ---
 
+## `POST /api/v1/quotations/{quotation_id}/request-approval`
+
+**Request Approval**
+
+Ask a manager to approve a discount above the owner's limit (FS-013). Use it
+when the draft's `discount.send_gate` is `required`, `void` or `returned`.
+
+One step goes to the lowest manager above the owner whose limit covers the
+discount; it appears in their `GET /approvals/pending` as a `quotation` row.
+The draft stays a draft. **Any edit or delete cancels a pending request**, so
+the approval is always for the figures the approver saw. Once approved, send
+as usual. Returns the quotation with `approval` pending.
+
+Refused with `approval_not_required` (within the limit: just send),
+`approval_pending`, `quotation_not_draft`, `no_approver` (nobody's limit covers
+it: lower the discount or ask an administrator).
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `quotation_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`ApprovalRequestIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string \| null |  | Why the discount is needed. Shown to the approver on the timeline. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Quotation_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, the status moved on, prices changed since the preview (`rate_changed`), or the quotation is not a draft. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `POST /api/v1/quotations/{quotation_id}/revise`
 
 **Revise Quotation**
@@ -351,7 +397,9 @@ until `pdf_state` is `ready`. With `channel: whatsapp` the link goes to the
 party's mobile once the PDF exists, so the farmer never opens a link whose
 document is not there. To send to another number, change the party first.
 
-Refused with `no_lines`, `quotation_not_draft`, `rate_changed` (a price or tax
+Refused with `discount_approval_required` (the discount is above the owner's
+limit: request approval, `fields.send_gate` says why), `approval_pending`,
+`no_lines`, `quotation_not_draft`, `rate_changed` (a price or tax
 moved under the draft since it was saved: re-preview, save, send again with a
 new key), `predecessor_accepted` (the version this one revises was accepted
 meanwhile), `lead_not_open`. A quotation on stand-in prices **is** sendable;
@@ -392,8 +440,10 @@ its PDF carries an "INDICATIVE PRICING" banner and `is_provisional` is true.
 **Quotation Timeline**
 
 The quotation's events, newest first: created, updated, lines_replaced, sent,
-viewed, accepted, rejected, negotiation, expired, revised, deleted. The same
-rows appear on the lead's timeline. No payload carries a money figure.
+viewed, accepted, rejected, negotiation, expired, revised, deleted, and the
+discount approval's requested, approved, returned and cancelled. The same rows
+appear on the lead's timeline. No payload carries a money figure. A dealer sees
+no staff remark and not who decided a discount.
 
 **Parameters**
 
@@ -484,11 +534,48 @@ Every version of the number, oldest first. Any version's id works.
 
 ## Models
 
+**`Approval`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `request_id` | string | yes |  |
+| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the document was cancelled, or a quotation edited, while pending. |
+| `steps` | ApprovalStep[] | yes |  |
+| `request_remark` | string \| null |  | Why the approval was asked for (a quotation discount). Null for a dealer, always. |
+
+**`ApprovalRequestIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string \| null |  | Why the discount is needed. Shown to the approver on the timeline. |
+
+**`ApprovalStep`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `seq` | integer | yes | 1 is decided first. |
+| `role` | string | yes | The role code the step waits on. |
+| `decided_role` | string \| null | yes | Set when a higher manager decided this step in place of its own role. |
+| `decision` | `approve` \| `reject` \| null | yes | Null while undecided. |
+| `by` | UserRef \| null | yes | Null for a dealer, always. |
+| `remark` | string \| null | yes | Null for a dealer, always. |
+| `decided_at` | string \| null | yes |  |
+
 **`DeleteRequest`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
+
+**`DiscountInfo`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `effective_pct` | string | yes | What the customer saves off the list price across the three tiers, in percent, two places. |
+| `owner_limit_pct` | string \| null | yes | The most the owner may give without approval. Null: no limit. |
+| `approval_required` | boolean | yes | The discount is above the owner's limit. Exact, not the rounded figures. |
+| `send_gate` | `none_needed` \| `required` \| `pending` \| `approved` \| `void` \| `returned` | yes | What send will do. none_needed or approved: it sends. required, void (approved, then the figures changed) or returned: request approval. pending: wait for the approver. |
 
 **`Envelope_PdfLink_`**
 
@@ -588,6 +675,7 @@ Every version of the number, oldest first. Any version's id works.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
+| `doc_type` | string |  | Always quotation. Tells a quotation from an order where either can come back. Default `quotation`. |
 | `id` | string | yes |  |
 | `quote_no` | string \| null | yes | Null while draft; allocated at send. |
 | `version` | integer | yes |  |
@@ -624,6 +712,8 @@ Every version of the number, oldest first. Any version's id works.
 | `share_url` | string \| null | yes | Present on every read once sent. |
 | `pdf_state` | `pending` \| `ready` \| `failed` \| null | yes | pending | ready | failed once sent. |
 | `pdf_error` | string \| null | yes |  |
+| `discount` | DiscountInfo \| null |  | FS-013. Present on a draft; null once sent. |
+| `approval` | Approval \| null |  | The latest discount approval, or null if none was asked. A dealer sees no approver names and no remarks. |
 | `created_at` | string | yes |  |
 | `created_by` | UserRef \| null | yes |  |
 | `updated_at` | string | yes |  |

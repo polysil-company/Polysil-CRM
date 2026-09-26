@@ -126,9 +126,13 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
         people = list(ids.values())
         orders = "(SELECT id FROM sales_order WHERE territory_id = CAST(:d AS uuid))"
         leads = "(SELECT id FROM lead WHERE territory_id = CAST(:d AS uuid))"
+        quotations = "(SELECT id FROM quotation WHERE territory_id = CAST(:d AS uuid))"
         for stmt in (
             f"DELETE FROM approval_step WHERE request_id IN (SELECT id FROM approval_request WHERE entity_id IN {orders})",
             f"DELETE FROM approval_request WHERE entity_id IN {orders}",
+            # FS-013: a quotation's discount approval
+            f"DELETE FROM approval_step WHERE request_id IN (SELECT id FROM approval_request WHERE entity_id IN {quotations})",
+            f"DELETE FROM approval_request WHERE entity_id IN {quotations}",
             f"DELETE FROM dispatch WHERE sales_order_id IN {orders}",
             f"DELETE FROM activity_event WHERE entity_id IN {orders}",
             "DELETE FROM sales_order WHERE territory_id = CAST(:d AS uuid)",

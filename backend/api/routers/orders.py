@@ -15,13 +15,14 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from api.config import get_settings
-from api.deps import CallerDep, Claims, DbSession, IdemKey, require
+from api.deps import CallerDep, Claims, DbSession, IdemKey, require, require_any
 from api.idempotency import payload_digest, run_idempotent
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE, TimelinePage
 from api.schemas.orders import (
     Approval,
     DecisionRequest,
+    DecisionResult,
     Dispatch,
     DispatchCreate,
     DispatchPage,
@@ -43,6 +44,7 @@ from api.services import orders as service
 from api.storage import get_storage
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+
 approvals = APIRouter(prefix="/approvals", tags=["approvals"])
 dispatches = APIRouter(prefix="/dispatches", tags=["dispatch"])
 
@@ -337,7 +339,8 @@ async def void_dispatch(dispatch_id: Id, body: RemarkRequest, db: DbSession, cal
 # ── approvals ────────────────────────────────────────────────────────────────
 
 @approvals.get("/pending", response_model=QueuePage, responses=_ERRORS,
-               dependencies=[Depends(require("sales_orders", "approve"))])
+               dependencies=[Depends(require_any(("sales_orders", "approve"),
+                                                 ("quotations", "approve")))])
 async def pending(db: DbSession, caller: CallerDep,
                   include_below: Annotated[bool, Query(
                       description="Also every lower step in your area, so you can cover a "
@@ -376,23 +379,30 @@ async def put_threshold(body: ThresholdPut, db: DbSession, caller: CallerDep, cl
 
 
 @approvals.get("/{request_id}", response_model=Envelope[Approval], responses=_ERRORS,
-               dependencies=[Depends(require("sales_orders", "view"))])
+               dependencies=[Depends(require_any(("sales_orders", "view"),
+                                                 ("quotations", "view")))])
 async def get_request(request_id: Id, db: DbSession, caller: CallerDep) -> dict[str, Any]:
     """One approval chain."""
     a = await approval_service.get_request(db, caller, request_id)
     return {"data": a.model_dump(mode="json")}
 
 
-@approvals.post("/steps/{step_id}/decision", response_model=Envelope[Order],
+@approvals.post("/steps/{step_id}/decision", response_model=DecisionResult,
                 responses=_MUTATION_ERRORS,
-                dependencies=[Depends(require("sales_orders", "approve"))])
+                dependencies=[Depends(require_any(("sales_orders", "approve"),
+                                                  ("quotations", "approve")))])
 async def decide(step_id: Id, body: DecisionRequest, db: DbSession, caller: CallerDep,
                  claims: Claims, idem: IdemKey) -> Response:
     """Approve or reject a step. A remark is required to reject, and on every Accounts
     decision. `403 not_your_step`, `403 self_approval`, `409 step_already_decided`,
     `409 earlier_step_undecided`, `409 request_closed`. Returns the order with its new
-    status: the last approval approves it, any rejection returns it to draft."""
+    status: the last approval approves it, any rejection returns it to draft.
+
+    For a quotation step (`doc_type: quotation` in the queue) it returns the
+    quotation: its `discount.send_gate` is `approved` or `returned`, and its status
+    stays draft. `409 figures_changed` when the draft was edited under the request."""
     async def work() -> tuple[int, dict[str, Any]]:
-        return 200, _order(await approval_service.decide(db, caller, step_id, body))
+        return 200, {"data": (await approval_service.decide(db, caller, step_id, body)
+                              ).model_dump(mode="json")}
     return await _idem(db, claims, idem, f"POST /api/v1/approvals/steps/{step_id}/decision",
                        body, work)

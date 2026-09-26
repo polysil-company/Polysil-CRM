@@ -540,8 +540,9 @@ and only the outcome to a dealer.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `request_id` | string | yes |  |
-| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the order was cancelled while pending. |
+| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the document was cancelled, or a quotation edited, while pending. |
 | `steps` | ApprovalStep[] | yes |  |
+| `request_remark` | string \| null |  | Why the approval was asked for (a quotation discount). Null for a dealer, always. |
 
 **`ApprovalStep`**
 
@@ -662,6 +663,7 @@ and only the outcome to a dealer.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
+| `doc_type` | string |  | Always sales_order. Tells an order from a quotation where either can come back. Default `sales_order`. |
 | `id` | string | yes |  |
 | `order_no` | string \| null | yes | Null until the first submit. |
 | `status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` | yes |  |

@@ -53,7 +53,7 @@ from api.schemas.leads import (
     UserRef,
 )
 from api.schemas.quotations import PdfLink, QuotationLineIn, Totals
-from api.services import people, pricing
+from api.services import approval_view, people, pricing
 from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor, _route
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
@@ -140,10 +140,10 @@ def map_db_error(exc: DBAPIError) -> Exception:
     msg = _pg_text(exc)
     if code == "42501":
         if "self_approval" in msg:
-            return ForbiddenError("You cannot decide on your own order.", code="self_approval")
+            return ForbiddenError("You cannot decide on your own request.", code="self_approval")
         if "not_your_step" in msg:
             return ForbiddenError("This step is not yours to decide.", code="not_your_step")
-        return ForbiddenError("Not permitted on this order.")
+        return ForbiddenError("Not permitted on this document.")
     if code == "23514" and ("submitted order cannot change" in msg or "cannot move from" in msg
                             or "lines of a submitted order" in msg):
         return ConflictError("Only a draft can be changed.", code="order_not_draft")
@@ -151,7 +151,7 @@ def map_db_error(exc: DBAPIError) -> Exception:
         status, api_code = domain.SQLSTATE_TO_ERROR[code]
         sentence = msg.split("\n", 1)[0]
         if status == 404:
-            return NotFoundError("No such order.")
+            return NotFoundError("No such document.")
         if status == 409:
             return ConflictError(sentence, code=api_code)
         return ValidationFailed(sentence, code=api_code)
@@ -376,32 +376,7 @@ def _is_portal(caller: Caller) -> bool:
 async def _approval(db: AsyncSession, order_id: str, portal: bool,
                     request_id: str | None = None) -> tuple[sch.Approval | None, Any]:
     """The named request of the order, or its latest."""
-    req = (await db.execute(text(
-        "SELECT id, status::text AS status FROM approval_request "
-        "WHERE doc_type = 'sales_order' AND entity_id = CAST(:o AS uuid) "
-        "AND (CAST(:r AS uuid) IS NULL OR id = CAST(:r AS uuid)) "
-        "ORDER BY created_at DESC, id DESC LIMIT 1"),
-        {"o": order_id, "r": request_id})).one_or_none()
-    if req is None:
-        return None, None
-    steps = (await db.execute(text(
-        "SELECT s.id, s.seq, r.code::text AS role, dr.code::text AS decided_role, "
-        "s.decision::text AS decision, s.approver_user_id, u.full_name, s.remark, s.decided_at "
-        "FROM approval_step s JOIN role r ON r.id = s.approver_role_id "
-        "LEFT JOIN role dr ON dr.id = s.decided_role_id "
-        "LEFT JOIN app_user u ON u.id = s.approver_user_id "
-        "WHERE s.request_id = CAST(:r AS uuid) ORDER BY s.seq"), {"r": str(req.id)})).all()
-    names = (people.Names() if portal
-             else await people.resolve(db, steps, [("approver_user_id", "full_name")]))
-    out = []
-    for s in steps:
-        by = None if portal else names.user(s.approver_user_id, s.full_name)
-        out.append(sch.ApprovalStep(
-            id=str(s.id), seq=s.seq, role=s.role,
-            decided_role=s.decided_role if s.decided_role and s.decided_role != s.role else None,
-            decision=s.decision, by=by, remark=None if portal else s.remark,
-            decided_at=_iso(s.decided_at)))
-    return sch.Approval(request_id=str(req.id), status=req.status, steps=out), (req, steps)
+    return await approval_view.load(db, "sales_order", order_id, portal, request_id)
 
 
 async def _dispatches(db: AsyncSession, order_id: str, portal: bool = False

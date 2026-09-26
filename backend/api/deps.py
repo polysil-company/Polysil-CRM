@@ -302,6 +302,21 @@ def require(module: str, action: str) -> Callable[..., Coroutine[Any, Any, None]
     return dep
 
 
+def require_any(*pairs: tuple[str, str]) -> Callable[..., Coroutine[Any, Any, None]]:
+    """`require()` for an endpoint shared by several documents: any one of the
+    permissions passes. The per-document check stays with the database."""
+
+    async def dep(db: DbSession) -> None:
+        for module, action in pairs:
+            allowed = await db.execute(
+                text("SELECT app_has_permission(:m, :a)"), {"m": module, "a": action})
+            if allowed.scalar_one():
+                return
+        raise ForbiddenError()
+
+    return dep
+
+
 # ── who is calling, and what they may reach ──────────────────────────────────
 #
 # Stage 3 of FS-002 section 3, resolved once per request into the Caller that the

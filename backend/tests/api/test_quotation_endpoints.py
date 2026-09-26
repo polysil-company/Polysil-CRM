@@ -54,8 +54,21 @@ async def quoter(sessions: Callable[[], AsyncSession], staff: Staff) -> AsyncIte
         "(:r, 'quotations', 'edit', 'global'), (:r, 'quotations', 'delete', 'global'), "
         "(:r, 'pricing', 'view', 'global') ON CONFLICT DO NOTHING"),
         {"r": staff.role_id})
+    # FS-013: these tests are about sending; with no quotation row the role's
+    # discount limit would be 0 and every discounted send would need approval
+    await s.execute(text(
+        "INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount) "
+        "VALUES ('quotation', CAST(:r AS uuid), NULL, NULL) ON CONFLICT DO NOTHING"),
+        {"r": staff.role_id})
     await s.commit()
-    yield staff
+    try:
+        yield staff
+    finally:
+        c = sessions()
+        await c.execute(text("DELETE FROM approval_threshold WHERE role_id = CAST(:r AS uuid)"),
+                        {"r": staff.role_id})
+        await c.commit()
+        await c.close()
 
 
 @pytest_asyncio.fixture
@@ -76,6 +89,9 @@ async def officer(sessions: Callable[[], AsyncSession], quoter: Staff) -> AsyncI
         "(:r, 'leads', 'edit', 'global'), "
         "(:r, 'quotations', 'view', 'global'), (:r, 'quotations', 'create', 'global'), "
         "(:r, 'quotations', 'edit', 'global'), (:r, 'pricing', 'view', 'global')"), {"r": role})
+    await s.execute(text(
+        "INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount) "
+        "VALUES ('quotation', CAST(:r AS uuid), NULL, NULL) ON CONFLICT DO NOTHING"), {"r": role})
     user = str((await s.execute(text(
         "INSERT INTO app_user (user_type, email, password_hash, full_name, role_id, org_unit_id) "
         "VALUES ('staff', :e, :p, 'Kiran Desai', :r, :o) RETURNING id"),
@@ -96,6 +112,7 @@ async def officer(sessions: Callable[[], AsyncSession], quoter: Staff) -> AsyncI
             "DELETE FROM login_attempt WHERE identifier = CAST(:e AS citext)",
             "DELETE FROM app_user WHERE id = CAST(:u AS uuid)",
             "DELETE FROM role_permission WHERE role_id = CAST(:r AS uuid)",
+            "DELETE FROM approval_threshold WHERE role_id = CAST(:r AS uuid)",
             "DELETE FROM role WHERE id = CAST(:r AS uuid)",
         ):
             await c.execute(text(stmt), {"u": user, "e": email, "r": role})

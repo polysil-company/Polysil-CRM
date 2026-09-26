@@ -228,9 +228,66 @@ rendered by a background worker within seconds; poll `GET /quotations/{id}` (or
 refresh) until `pdf_state` is `ready`. The WhatsApp message goes out only once
 the PDF exists, so the farmer never opens a link whose document is not there.
 
-Errors: `quotation_not_draft`, `no_lines`, `rate_changed` (a price or tax moved
-under the draft since it was saved), `predecessor_accepted` (the version this
-one revises was accepted meanwhile), `lead_not_open`, `status_changed`.
+Errors: `discount_approval_required` (the discount is above the owner's limit;
+request approval first, see below), `approval_pending`, `quotation_not_draft`,
+`no_lines`, `rate_changed` (a price or tax moved under the draft since it was
+saved), `predecessor_accepted` (the version this one revises was accepted
+meanwhile), `lead_not_open`, `status_changed`.
+
+### Discount approval: `POST /quotations/{id}/request-approval`
+
+A draft whose discount is above its owner's limit is sent only once a manager
+approves it. The draft carries what the builder needs:
+
+```jsonc
+"discount": {
+  "effective_pct": "12.00",      // what the customer saves off the list price, all three tiers
+  "owner_limit_pct": "5.00",     // null: no limit
+  "approval_required": true,
+  "send_gate": "required"        // what Send will do, below
+},
+"approval": {                    // the latest request, or null
+  "request_id": "…", "status": "pending",
+  "steps": [{"id": "…", "seq": 1, "role": "state_manager", "decision": null, "by": null,
+             "remark": null, "decided_at": null, "decided_role": null}]
+}
+```
+
+`discount` is on a draft only; null once sent.
+
+| `send_gate` | The builder shows |
+|---|---|
+| `none_needed` | **Send** |
+| `approved` | **Send**, and "Discount approved" |
+| `required` | **Request approval** in place of Send |
+| `pending` | "Waiting for approval" and the approver's role; Send disabled |
+| `void` | "Approval no longer applies: the figures changed", and **Request approval** |
+| `returned` | "Approval refused" with the remark (staff), and **Request approval** after an edit |
+
+`POST /quotations/{id}/request-approval` with `{"remark": "…"}` (optional) returns
+the quotation with `approval` pending. Errors: `approval_not_required` (just send),
+`approval_pending`, `quotation_not_draft`, `no_approver` (nobody's limit covers the
+discount: lower it).
+
+- **Any save or delete of the draft cancels a pending request.** The approval is
+  always for the figures the approver saw. Warn before saving while pending.
+- The draft stays `draft` throughout. Approval changes what Send may do, not the
+  status.
+- The approver sees it in `GET /approvals/pending` as a row with
+  `doc_type: "quotation"`, `document.number: null` (drafts have none),
+  `document.party_name`, `document.total` and **`document.discount_pct`**. The
+  decision (`POST /approvals/steps/{id}/decision`) returns the **quotation** for
+  such a row, and can answer `409 figures_changed`. Its body is `DecisionResult`:
+  read `data.doc_type` (`sales_order` or `quotation`), which every order and
+  quotation now carries, to tell which came back.
+- A dealer never sees `discount` (null) or who approved and why, on the detail or
+  on either timeline.
+- Staff read why it was asked in `approval.request_remark`, and on the timeline's
+  `quotation.approval_requested` event.
+- One step: the lowest manager above the owner whose limit covers the discount.
+  The limits are stand-ins until the client confirms them: officer 5 %, District
+  10 %, State 15 %, Regional 20 %, Admin-Sales no limit. Admins change them with
+  `PUT /approvals/thresholds` and `doc_type: "quotation"`; rows carry `unit: "pct"`.
 
 A quotation on stand-in prices **can** be sent; its PDF carries an "INDICATIVE
 PRICING" banner and `is_provisional` is true. Show the same banner.
@@ -343,11 +400,13 @@ Rate-limited to 60 a minute per link.
 | Screen | Shows | Actions | Notes |
 |---|---|---|---|
 | **Lead detail, Quotations tab** | `GET /quotations?lead_id=` as cards: number or "Draft", version, status chip, total, sent and viewed dates, `pdf_state` | **New quotation**, enabled only when the lead is `qualified`, `quoted`, `negotiation` or `won`; on `new`/`contacted` show why; on `lost` say to reopen first | rows from a merged-in lead appear too, read-only; a `superseded_by` row renders muted |
-| **Quotation builder** | header (party, partner, place of supply, price date, seller registration), the line grid with the product picker, three discount columns per line, live totals from `POST /pricing/quote-lines` on every change | **Save draft** (`POST` / `PUT lines`), **Send** | on `rate_changed`, show the changed lines, re-preview, let the user save again. Money comes back as strings; never compute a total on the screen |
+| **Quotation builder** | header (party, partner, place of supply, price date, seller registration), the line grid with the product picker, three discount columns per line, live totals from `POST /pricing/quote-lines` on every change, and **the effective discount against the owner's limit** (`discount`) | **Save draft** (`POST` / `PUT lines`), **Send**, or **Request approval** by `discount.send_gate` | on `rate_changed`, show the changed lines, re-preview, let the user save again. Money comes back as strings; never compute a total on the screen |
 | **Quotation detail** | the document as returned: status chip, the cascade columns, tax, totals, validity, `warnings`, the timeline, the versions strip, the share link with a copy button, **Open PDF** | **Send** (draft), **Accepted** / **Rejected** / **Negotiation** with a remark, **Revise**, **Delete** (draft, with the permission) | states: `draft`, `sent`, `viewed`, `negotiation`, `accepted`, `rejected`, `expired`, the `superseded_by` overlay on any of them, and `pdf_state` (`pending`: "preparing", poll; `failed`: show `pdf_error`). `is_provisional` shows the banner. `lead` may be null: show "lead not visible" |
 | **Quotation list** | `GET /quotations`, keyset-paged, `include_total` for the count | filters: status, sales type, owner, partner, date range, search | `current_only` on by default; a toggle shows every version |
 | **Public page `/q/{token}`** | number, seller, validity, total, `pdf_ready`, expired / superseded | **View quotation** opens `pdf_url` in a new tab | the button is the view. Never fetch the PDF on page load |
-| **Partner portal** | list and detail, read-only | none | partner roles hold `quotations.view` only |
+| **Approvals inbox** | quotation rows beside order rows, labelled "Quotation discount", with `discount_pct` | Approve / Reject with a remark | the decision returns the quotation |
+| **Approval limits (admin)** | the quotation rows of `GET /approvals/thresholds` (`unit: pct`) beside the order rows | edit per role | a higher role's limit stays above a lower one's |
+| **Partner portal** | list and detail, read-only | none | partner roles hold `quotations.view` only; the approval shows roles and outcomes, never names or remarks |
 
 The lead list's `stage` chips gain `quoted`, `negotiation` and `won` as reachable
 values.

@@ -13,17 +13,19 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from api.schemas.approvals import Approval as Approval  # re-exported
+from api.schemas.approvals import ApprovalStatus as ApprovalStatus  # re-exported
+from api.schemas.approvals import ApprovalStep as ApprovalStep  # re-exported
+from api.schemas.approvals import Decision
 from api.schemas.leads import UUID_RE, OrgUnitRef, PageMeta, PartnerRef, TerritoryRef, UserRef
 from api.schemas.products import MAX_LINES, _places
-from api.schemas.quotations import QuotationLineIn, Totals
+from api.schemas.quotations import Quotation, QuotationLineIn, Totals
 
 OrderType = Literal["commercial", "industrial", "export", "sample", "marketing_material",
                     "subsidised", "replacement"]
 OrderStatus = Literal["draft", "submitted", "approved", "partially_dispatched", "dispatched",
                       "closed_short", "cancelled"]
 PaymentTerms = Literal["full_payment", "credit"]
-ApprovalStatus = Literal["pending", "approved", "rejected", "cancelled"]
-Decision = Literal["approve", "reject"]
 
 _GSTIN_RE = r"^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][0-9A-Za-z]{3}$"
 _EXPECTED = "The status the screen showed; a different one is 409 status_changed."
@@ -177,12 +179,18 @@ class DispatchCreate(BaseModel):
 class ThresholdPut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    doc_type: Literal["sales_order"] = "sales_order"
-    role: Literal["district_manager", "state_manager", "regional_manager"]
+    doc_type: Literal["sales_order", "quotation"] = "sales_order"
+    role: Literal["field_officer", "district_manager", "state_manager", "regional_manager",
+                  "admin_sales"] = Field(
+        description="An order's rows are for the three managers. A quotation's are for any "
+                    "of the five: the field officer's is the officer's own limit.")
     territory_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE, description="Null for the company-wide row.")]
     max_amount: Annotated[Decimal | None, Field(
-        default=None, gt=0, description="Null for no ceiling. Including GST.")]
+        default=None, ge=0, description="Null for no ceiling. An order's is rupees "
+                                        "including GST, above 0; a quotation's is a discount "
+                                        "in percent, 0 to 100 (0: no discount without "
+                                        "approval).")]
 
 
 # ── responses ────────────────────────────────────────────────────────────────
@@ -243,25 +251,6 @@ class OrderLine(BaseModel):
     qty_open: str = Field(description="Still to ship: qty less dispatched less short.")
 
 
-class ApprovalStep(BaseModel):
-    id: str
-    seq: int = Field(description="1 is decided first.")
-    role: str = Field(description="The role code the step waits on.")
-    decided_role: str | None = Field(description="Set when a higher manager decided this "
-                                                 "step in place of its own role.")
-    decision: Decision | None = Field(description="Null while undecided.")
-    by: UserRef | None = Field(description="Null for a dealer, always.")
-    remark: str | None = Field(description="Null for a dealer, always.")
-    decided_at: str | None
-
-
-class Approval(BaseModel):
-    request_id: str
-    status: ApprovalStatus = Field(
-        description="cancelled when the order was cancelled while pending.")
-    steps: list[ApprovalStep]
-
-
 class LastRejection(BaseModel):
     remark: str = Field(description="For a dealer, a fixed text in place of the reason.")
     role: str
@@ -301,6 +290,9 @@ class Dispatch(BaseModel):
 
 
 class Order(BaseModel):
+    doc_type: Literal["sales_order"] = Field(
+        default="sales_order", description="Always sales_order. Tells an order from a "
+                                           "quotation where either can come back.")
     """The order. Every key is always present; null means not set or not visible."""
 
     id: str
@@ -390,7 +382,11 @@ class QueueDocument(BaseModel):
     total: str
     is_provisional: bool
     raised_by: UserRef | None
-    raised_at: str = Field(description="The submit time.")
+    raised_at: str = Field(description="The submit time, or when a quotation's approval "
+                                       "was asked.")
+    discount_pct: str | None = Field(
+        default=None, description="A quotation row: the effective discount asked for, in "
+                                  "percent. Null on an order.")
 
 
 class QueueRow(BaseModel):
@@ -398,7 +394,8 @@ class QueueRow(BaseModel):
     seq: int
     role: str
     stalled: bool = Field(description="Nobody of the step's own role covers the order.")
-    doc_type: str = Field(description="sales_order today.")
+    doc_type: str = Field(description="sales_order, or quotation for a discount approval "
+                                      "(FS-013); the decision returns that document.")
     document: QueueDocument
     waiting_since: str = Field(description="When the step before it was decided, or the "
                                            "submit time for the first.")
@@ -413,9 +410,18 @@ class Threshold(BaseModel):
     doc_type: str
     role: str
     territory: TerritoryRef | None = Field(description="Null for the company-wide row.")
-    max_amount: str | None = Field(description="Including GST. Null for no ceiling.")
+    max_amount: str | None = Field(description="Null for no ceiling. See unit.")
+    unit: Literal["inr", "pct"] = Field(
+        description="inr: an order's limit including GST. pct: a quotation's discount limit.")
 
 
 class DispatchPage(BaseModel):
     data: list[Dispatch]
     meta: PageMeta
+
+
+class DecisionResult(BaseModel):
+    """The decided document: an order, or for a discount approval (FS-013) the
+    quotation. `data.doc_type` says which."""
+
+    data: Annotated[Order | Quotation, Field(discriminator="doc_type")]

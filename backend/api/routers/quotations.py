@@ -18,6 +18,7 @@ from api.idempotency import payload_digest, run_idempotent
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE, TimelinePage
 from api.schemas.quotations import (
+    ApprovalRequestIn,
     DeleteRequest,
     LinesReplace,
     PdfLink,
@@ -200,7 +201,9 @@ async def send_quotation(
     party's mobile once the PDF exists, so the farmer never opens a link whose
     document is not there. To send to another number, change the party first.
 
-    Refused with `no_lines`, `quotation_not_draft`, `rate_changed` (a price or tax
+    Refused with `discount_approval_required` (the discount is above the owner's
+    limit: request approval, `fields.send_gate` says why), `approval_pending`,
+    `no_lines`, `quotation_not_draft`, `rate_changed` (a price or tax
     moved under the draft since it was saved: re-preview, save, send again with a
     new key), `predecessor_accepted` (the version this one revises was accepted
     meanwhile), `lead_not_open`. A quotation on stand-in prices **is** sendable;
@@ -215,6 +218,37 @@ async def send_quotation(
     outcome = await run_idempotent(db, key=idem, user_id=claims.sub,
                                    route=f"POST /api/v1/quotations/{quotation_id}/send",
                                    payload_hash=payload_hash, work=work)
+    return JSONResponse(outcome.body, status_code=outcome.status_code)
+
+
+@router.post("/{quotation_id}/request-approval", response_model=Envelope[Quotation],
+             responses=_MUTATION_ERRORS, dependencies=[Depends(require("quotations", "edit"))])
+async def request_approval(
+    quotation_id: QuotationId, body: ApprovalRequestIn, db: DbSession, caller: CallerDep,
+    claims: Claims, idem: IdemKey,
+) -> JSONResponse:
+    """Ask a manager to approve a discount above the owner's limit (FS-013). Use it
+    when the draft's `discount.send_gate` is `required`, `void` or `returned`.
+
+    One step goes to the lowest manager above the owner whose limit covers the
+    discount; it appears in their `GET /approvals/pending` as a `quotation` row.
+    The draft stays a draft. **Any edit or delete cancels a pending request**, so
+    the approval is always for the figures the approver saw. Once approved, send
+    as usual. Returns the quotation with `approval` pending.
+
+    Refused with `approval_not_required` (within the limit: just send),
+    `approval_pending`, `quotation_not_draft`, `no_approver` (nobody's limit covers
+    it: lower the discount or ask an administrator)."""
+    payload_hash = payload_digest(body.model_dump(mode="json", exclude_unset=True))
+
+    async def work() -> tuple[int, dict]:
+        q = await service.request_approval(db, caller, quotation_id, body, get_settings())
+        return status.HTTP_200_OK, {"data": q.model_dump(mode="json")}
+
+    outcome = await run_idempotent(
+        db, key=idem, user_id=claims.sub,
+        route=f"POST /api/v1/quotations/{quotation_id}/request-approval",
+        payload_hash=payload_hash, work=work)
     return JSONResponse(outcome.body, status_code=outcome.status_code)
 
 
@@ -285,15 +319,18 @@ async def list_versions(quotation_id: QuotationId,
 @router.get("/{quotation_id}/timeline", response_model=TimelinePage, responses=_ERRORS,
             dependencies=[Depends(require("quotations", "view"))])
 async def quotation_timeline(
-    quotation_id: QuotationId, db: DbSession,
+    quotation_id: QuotationId, db: DbSession, caller: CallerDep,
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
     cursor: Annotated[str | None, Query()] = None,
 ) -> TimelinePage:
     """The quotation's events, newest first: created, updated, lines_replaced, sent,
-    viewed, accepted, rejected, negotiation, expired, revised, deleted. The same
-    rows appear on the lead's timeline. No payload carries a money figure.
+    viewed, accepted, rejected, negotiation, expired, revised, deleted, and the
+    discount approval's requested, approved, returned and cancelled. The same rows
+    appear on the lead's timeline. No payload carries a money figure. A dealer sees
+    no staff remark and not who decided a discount.
     """
-    return await service.timeline(db, quotation_id, limit=limit, cursor=cursor)
+    return await service.timeline(db, quotation_id, limit=limit, cursor=cursor,
+                                  portal=caller.partner_id is not None)
 
 
 @router.get("/{quotation_id}/pdf", response_model=Envelope[PdfLink],

@@ -12,14 +12,16 @@ import pytest
 
 from api.domain import orders as domain
 
-MIGRATION = (Path(__file__).resolve().parents[2]
-             / "api/db/migrations/versions/013_orders_approvals_dispatch.py").read_text("utf-8")
+_VERSIONS = Path(__file__).resolve().parents[2] / "api/db/migrations/versions"
+MIGRATION = (_VERSIONS / "013_orders_approvals_dispatch.py").read_text("utf-8")
+# the engine's later arms raise through the same map (FS-013)
+ENGINE = MIGRATION + (_VERSIONS / "017_quotation_discount_approval.py").read_text("utf-8")
 
 
 def test_every_custom_sqlstate_the_migration_raises_has_an_api_error_and_no_other() -> None:
     """A code missing from the map reaches the frontend as a 500; a stale entry
     documents an error that cannot happen."""
-    raised = {c for c in re.findall(r"ERRCODE = '([A-Z0-9]{5})'", MIGRATION)
+    raised = {c for c in re.findall(r"ERRCODE = '([A-Z0-9]{5})'", ENGINE)
               if not c[0].isdigit()}
     assert raised == set(domain.SQLSTATE_TO_ERROR), raised ^ set(domain.SQLSTATE_TO_ERROR)
 

@@ -63,6 +63,10 @@ decision. `403 not_your_step`, `403 self_approval`, `409 step_already_decided`,
 `409 earlier_step_undecided`, `409 request_closed`. Returns the order with its new
 status: the last approval approves it, any rejection returns it to draft.
 
+For a quotation step (`doc_type: quotation` in the queue) it returns the
+quotation: its `discount.send_gate` is `approved` or `returned`, and its status
+stays draft. `409 figures_changed` when the draft was edited under the request.
+
 **Parameters**
 
 | Name | In | Type | Required | Notes |
@@ -83,7 +87,7 @@ status: the last approval approves it, any rejection returns it to draft.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `Envelope_Order_` | Successful Response |
+| `200` | `DecisionResult` | Successful Response |
 | `400` | `ErrorResponse` | Idempotency-Key missing. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not in your permissions, or not your step. |
@@ -132,10 +136,10 @@ submitted from now on.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `doc_type` | string |  | Default `sales_order`. |
-| `role` | `district_manager` \| `state_manager` \| `regional_manager` | yes |  |
+| `doc_type` | `sales_order` \| `quotation` |  | Default `sales_order`. |
+| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` | yes | An order's rows are for the three managers. A quotation's are for any of the five: the field officer's is the officer's own limit. |
 | `territory_id` | string \| null |  | Null for the company-wide row. |
-| `max_amount` | number \| string \| null |  | Null for no ceiling. Including GST. |
+| `max_amount` | number \| string \| null |  | Null for no ceiling. An order's is rupees including GST, above 0; a quotation's is a discount in percent, 0 to 100 (0: no discount without approval). |
 
 **Responses**
 
@@ -182,8 +186,9 @@ One approval chain.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `request_id` | string | yes |  |
-| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the order was cancelled while pending. |
+| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the document was cancelled, or a quotation edited, while pending. |
 | `steps` | ApprovalStep[] | yes |  |
+| `request_remark` | string \| null |  | Why the approval was asked for (a quotation discount). Null for a dealer, always. |
 
 **`ApprovalStep`**
 
@@ -204,6 +209,21 @@ One approval chain.
 |---|---|---|---|
 | `decision` | `approve` \| `reject` | yes | reject returns the order to draft with the remark as the reason. |
 | `remark` | string \| null |  | Required to reject, and on every Accounts decision. |
+
+**`DecisionResult`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | any | yes |  |
+
+**`DiscountInfo`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `effective_pct` | string | yes | What the customer saves off the list price across the three tiers, in percent, two places. |
+| `owner_limit_pct` | string \| null | yes | The most the owner may give without approval. Null: no limit. |
+| `approval_required` | boolean | yes | The discount is above the owner's limit. Exact, not the rounded figures. |
+| `send_gate` | `none_needed` \| `required` \| `pending` \| `approved` \| `void` \| `returned` | yes | What send will do. none_needed or approved: it sends. required, void (approved, then the figures changed) or returned: request approval. pending: wait for the approver. |
 
 **`Dispatch`**
 
@@ -247,12 +267,6 @@ One approval chain.
 |---|---|---|---|
 | `data` | Approval | yes |  |
 
-**`Envelope_Order_`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `data` | Order | yes |  |
-
 **`Envelope_list_Threshold__`**
 
 | Field | Type | Required | Notes |
@@ -281,10 +295,19 @@ One approval chain.
 | `role` | string | yes |  |
 | `at` | string | yes |  |
 
+**`LeadRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `inquiry_no` | string | yes |  |
+| `stage` | `new` \| `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` \| `merged` \| `dormant` | yes |  |
+
 **`Order`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
+| `doc_type` | string |  | Always sales_order. Tells an order from a quotation where either can come back. Default `sales_order`. |
 | `id` | string | yes |  |
 | `order_no` | string \| null | yes | Null until the first submit. |
 | `status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` | yes |  |
@@ -400,6 +423,29 @@ One approval chain.
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
 
+**`Party`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes |  |
+| `mobile` | string | yes | Any Indian form; stored as +91XXXXXXXXXX. The WhatsApp link goes here. |
+| `address` | string \| null |  |  |
+| `gstin` | string \| null |  | A company buyer's GSTIN, upper-cased on save and printed if given. |
+
+**`PlaceOfSupply`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `territory` | TerritoryRef | yes |  |
+| `state` | string | yes | The state code the tax is worked out against. |
+
+**`PriceListRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+
 **`QueueDocument`**
 
 | Field | Type | Required | Notes |
@@ -410,7 +456,8 @@ One approval chain.
 | `total` | string | yes |  |
 | `is_provisional` | boolean | yes |  |
 | `raised_by` | UserRef \| null | yes |  |
-| `raised_at` | string | yes | The submit time. |
+| `raised_at` | string | yes | The submit time, or when a quotation's approval was asked. |
+| `discount_pct` | string \| null |  | A quotation row: the effective discount asked for, in percent. Null on an order. |
 
 **`QueuePage`**
 
@@ -427,9 +474,91 @@ One approval chain.
 | `seq` | integer | yes |  |
 | `role` | string | yes |  |
 | `stalled` | boolean | yes | Nobody of the step's own role covers the order. |
-| `doc_type` | string | yes | sales_order today. |
+| `doc_type` | string | yes | sales_order, or quotation for a discount approval (FS-013); the decision returns that document. |
 | `document` | QueueDocument | yes |  |
 | `waiting_since` | string | yes | When the step before it was decided, or the submit time for the first. |
+
+**`Quotation`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `doc_type` | string |  | Always quotation. Tells a quotation from an order where either can come back. Default `quotation`. |
+| `id` | string | yes |  |
+| `quote_no` | string \| null | yes | Null while draft; allocated at send. |
+| `version` | integer | yes |  |
+| `status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` | yes |  |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` | yes |  |
+| `source` | `internal` \| `external` | yes |  |
+| `lead` | LeadRef \| null | yes | Null when the lead is deleted or outside your lead scope. |
+| `party` | Party | yes |  |
+| `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
+| `owner` | UserRef \| null | yes | The lead's owner; null while unassigned. |
+| `owner_org_unit` | OrgUnitRef | yes |  |
+| `territory` | TerritoryRef | yes |  |
+| `seller_gstin` | SellerRef | yes |  |
+| `place_of_supply` | PlaceOfSupply | yes |  |
+| `intra_state` | boolean | yes |  |
+| `price_effective_date` | string | yes |  |
+| `price_list` | PriceListRef \| null | yes | Null when the lines drew from more than one list. |
+| `price_list_ids` | string[] | yes |  |
+| `lines` | QuotationLine[] | yes |  |
+| `totals` | Totals | yes |  |
+| `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
+| `warnings` | string[] | yes | Each is `code: sentence`. |
+| `terms` | string \| null | yes |  |
+| `valid_until` | string \| null | yes |  |
+| `sent_at` | string \| null | yes |  |
+| `viewed_at` | string \| null | yes |  |
+| `open_count` | integer | yes |  |
+| `accepted_at` | string \| null | yes |  |
+| `rejected_at` | string \| null | yes |  |
+| `decided_by` | UserRef \| null | yes |  |
+| `decision_remark` | string \| null | yes |  |
+| `supersedes` | VersionRef \| null | yes |  |
+| `superseded_by` | VersionRef \| null | yes |  |
+| `share_url` | string \| null | yes | Present on every read once sent. |
+| `pdf_state` | `pending` \| `ready` \| `failed` \| null | yes | pending | ready | failed once sent. |
+| `pdf_error` | string \| null | yes |  |
+| `discount` | DiscountInfo \| null |  | FS-013. Present on a draft; null once sent. |
+| `approval` | Approval \| null |  | The latest discount approval, or null if none was asked. A dealer sees no approver names and no remarks. |
+| `created_at` | string | yes |  |
+| `created_by` | UserRef \| null | yes |  |
+| `updated_at` | string | yes |  |
+
+**`QuotationLine`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `line_no` | integer | yes |  |
+| `product_id` | string | yes |  |
+| `description` | string | yes |  |
+| `hsn_code` | string | yes |  |
+| `uom` | string | yes |  |
+| `qty` | string | yes |  |
+| `rate` | string | yes |  |
+| `gross` | string | yes |  |
+| `discount_pct` | string | yes | The first tier's percentage. |
+| `discount1_amt` | string | yes |  |
+| `after_discount1` | string | yes |  |
+| `discount2_pct` | string | yes |  |
+| `discount2_amt` | string | yes |  |
+| `after_discount2` | string | yes |  |
+| `discount3_pct` | string | yes |  |
+| `discount3_amt` | string | yes |  |
+| `discount` | string | yes | The three amounts summed. Not gross x discount_pct. |
+| `taxable` | string | yes |  |
+| `gst_slab` | string | yes |  |
+| `cgst_rate` | string | yes |  |
+| `sgst_rate` | string | yes |  |
+| `igst_rate` | string | yes |  |
+| `cgst` | string | yes |  |
+| `sgst` | string | yes |  |
+| `igst` | string | yes |  |
+| `total` | string | yes |  |
+| `price_list_id` | string | yes |  |
+| `price_list_item_id` | string | yes |  |
+| `gst_rate_id` | string | yes |  |
+| `provisional_fields` | string[] | yes |  |
 
 **`QuotationRef`**
 
@@ -438,6 +567,16 @@ One approval chain.
 | `id` | string | yes |  |
 | `quote_no` | string \| null | yes |  |
 | `version` | integer | yes |  |
+
+**`SellerRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `gstin` | string | yes |  |
+| `legal_name` | string | yes |  |
+| `address` | string \| null |  |  |
+| `state` | string | yes | The state code, e.g. GJ. |
 
 **`TerritoryRef`**
 
@@ -454,16 +593,17 @@ One approval chain.
 | `doc_type` | string | yes |  |
 | `role` | string | yes |  |
 | `territory` | TerritoryRef \| null | yes | Null for the company-wide row. |
-| `max_amount` | string \| null | yes | Including GST. Null for no ceiling. |
+| `max_amount` | string \| null | yes | Null for no ceiling. See unit. |
+| `unit` | `inr` \| `pct` | yes | inr: an order's limit including GST. pct: a quotation's discount limit. |
 
 **`ThresholdPut`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `doc_type` | string |  | Default `sales_order`. |
-| `role` | `district_manager` \| `state_manager` \| `regional_manager` | yes |  |
+| `doc_type` | `sales_order` \| `quotation` |  | Default `sales_order`. |
+| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` | yes | An order's rows are for the three managers. A quotation's are for any of the five: the field officer's is the officer's own limit. |
 | `territory_id` | string \| null |  | Null for the company-wide row. |
-| `max_amount` | number \| string \| null |  | Null for no ceiling. Including GST. |
+| `max_amount` | number \| string \| null |  | Null for no ceiling. An order's is rupees including GST, above 0; a quotation's is a discount in percent, 0 to 100 (0: no discount without approval). |
 
 **`Totals`**
 
@@ -483,6 +623,13 @@ One approval chain.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
+
+**`VersionRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `version` | integer | yes |  |
 
 **`api__schemas__leads__PartnerRef`**
 

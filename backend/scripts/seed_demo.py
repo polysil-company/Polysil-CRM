@@ -178,6 +178,20 @@ def main() -> None:
             ON CONFLICT (doc_type, role_id, territory_id) DO NOTHING
             """
         )
+        # FS-013: the discount each role may give on a quotation, in percent
+        # (question 6.8, GAP-105). The officer's row is its own limit; Admin-Sales
+        # tops the ladder, uncapped. Migration 017 inserts the same where roles exist.
+        cur.execute(
+            """
+            INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount)
+            SELECT 'quotation', r.id, NULL, v.pct
+              FROM (VALUES ('field_officer', 5.00::numeric), ('district_manager', 10.00),
+                           ('state_manager', 15.00), ('regional_manager', 20.00),
+                           ('admin_sales', NULL)) v(code, pct)
+              JOIN role r ON r.code = v.code
+            ON CONFLICT (doc_type, role_id, territory_id) DO NOTHING
+            """
+        )
 
         territories = _tree(
             cur, "territory",

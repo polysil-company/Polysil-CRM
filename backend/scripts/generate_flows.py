@@ -436,8 +436,8 @@ def f_approval() -> None:
     e, n = [], {}
     e += title("Approval routing", sub="One engine, thresholds as data. Orders are its first "
                                        "document type.",
-               status="BUILT FOR ORDERS (FS-011, migration 013). The quotation gate (GAP-105) "
-                      "and complaints (W5) are not wired yet.",
+               status="BUILT for orders (FS-011) and quotation discounts (FS-013, migration "
+                      "017). Complaints (W5) are the next document type.",
                status_colour=GREEN)
 
     els = node("r", 0, 120, "Raiser\nemployee or dealer", w=220, h=70, colour=GREY, size=14)
@@ -977,7 +977,9 @@ def f_quotation() -> None:
                "expected_status on every mutation", BLUE),
         ("q5", "POST /send: lock draft (and predecessor, lower version first)\n"
                "re-resolve and compare again -> 409 rate_changed\n"
-               "predecessor accepted -> 409", YELLOW),
+               "predecessor accepted -> 409\n"
+               "discount above the owner's limit, not approved\n"
+               "-> 409 discount_approval_required (quotation_send_gate)", YELLOW),
         ("q6", "allocate QT/GJ/2026-27/00001  (definer, row lock,\n"
                "LAST read before the write)\nvalid_until = send date IST + 45 d\n"
                "share token derived by HMAC, only its hash stored", GREEN),
@@ -1084,6 +1086,17 @@ def f_quotation() -> None:
               "subsidised types, streaming the PDF through the API.",
               w=560, colour=GREY)
 
+    e += note("nDisc", -420, 700,
+              "DISCOUNT APPROVAL (FS-013)\n\n"
+              "Above the owner's limit: POST /request-approval.\n"
+              "One step: the lowest of DM, SM, RM, Admin-Sales\n"
+              "above the owner whose limit covers it.\n"
+              "The request holds a HASH of the priced figures.\n"
+              "An edit cancels a pending request; an edit after\n"
+              "approval voids it; the decision refuses\n"
+              "figures_changed. The status never moves.\n"
+              "Stand-in limits 5 / 10 / 15 / 20 % (GAP-105).",
+              w=380, colour=YELLOW)
     write("12-quotation", e)
 
 

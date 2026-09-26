@@ -14,6 +14,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
+from api.schemas.approvals import Approval
 from api.schemas.leads import (
     UUID_RE,
     OrgUnitRef,
@@ -274,8 +275,41 @@ class VersionRef(BaseModel):
     version: int
 
 
+SendGate = Literal["none_needed", "required", "pending", "approved", "void", "returned"]
+
+
+class DiscountInfo(BaseModel):
+    """FS-013: the discount against the owner's limit. The builder follows
+    `send_gate` alone: "Send" for none_needed and approved, "Request approval" for
+    required, void and returned, and a wait for pending. `approval.status` can read
+    approved while the gate is void: the figures changed after it."""
+
+    effective_pct: str = Field(description="What the customer saves off the list price "
+                                           "across the three tiers, in percent, two places.")
+    owner_limit_pct: str | None = Field(description="The most the owner may give without "
+                                                    "approval. Null: no limit.")
+    approval_required: bool = Field(description="The discount is above the owner's limit. "
+                                                "Exact, not the rounded figures.")
+    send_gate: SendGate = Field(
+        description="What send will do. none_needed or approved: it sends. required, void "
+                    "(approved, then the figures changed) or returned: request approval. "
+                    "pending: wait for the approver.")
+
+
+class ApprovalRequestIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    remark: Annotated[str | None, Field(
+        default=None, max_length=1000,
+        description="Why the discount is needed. Shown to the approver on the timeline.")]
+
+
 class Quotation(BaseModel):
     """The document. Every key is always present; null means not set."""
+
+    doc_type: Literal["quotation"] = Field(
+        default="quotation", description="Always quotation. Tells a quotation from an "
+                                         "order where either can come back.")
 
     id: str
     quote_no: str | None = Field(description="Null while draft; allocated at send.")
@@ -316,6 +350,11 @@ class Quotation(BaseModel):
     share_url: str | None = Field(description="Present on every read once sent.")
     pdf_state: PdfState | None = Field(description="pending | ready | failed once sent.")
     pdf_error: str | None
+    discount: DiscountInfo | None = Field(
+        default=None, description="FS-013. Present on a draft; null once sent.")
+    approval: Approval | None = Field(
+        default=None, description="The latest discount approval, or null if none was asked. "
+                                  "A dealer sees no approver names and no remarks.")
     created_at: str
     created_by: UserRef | None
     updated_at: str

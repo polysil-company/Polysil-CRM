@@ -33,7 +33,10 @@ PARTY_FIELDS_FROM_QUOTATIONS: Final = ("partner_id", "place_of_supply_territory_
 PORTAL_REMARK: Final = "Returned for changes; your contact at Polysil will explain."
 
 # question 15.14: a partner sees that an order was decided, never by whom
-_DECIDER_KINDS: Final = frozenset({"order.returned", "order.approved"})
+_DECIDER_KINDS: Final = frozenset({"order.returned", "order.approved",
+                                    # FS-013: the discount's decision is internal too
+                                    "quotation.approval_approved",
+                                    "quotation.approval_returned"})
 
 
 def actor_hidden_from_partner(kind: str) -> bool:
@@ -63,6 +66,12 @@ SQLSTATE_TO_ERROR: Final[dict[str, tuple[int, str]]] = {
     "APREU": (409, "earlier_step_undecided"),
     "APRRM": (422, "remark_required"),
     "APRNF": (404, "not_found"),
+    # FS-013, quotation discount approval
+    "APRFC": (409, "figures_changed"),
+    "APRNR": (409, "approval_not_required"),
+    "APRNA": (422, "no_approver"),
+    "QTNDR": (409, "quotation_not_draft"),
+    "QTNF0": (404, "not_found"),
     "DSPLN": (422, "line_not_on_order"),
     "DSPOV": (422, "over_open_quantity"),
     "DSPPR": (422, "unit_precision"),
