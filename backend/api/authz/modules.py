@@ -88,4 +88,18 @@ SPECS: dict[str, ScopeSpec] = {
         parents={"lead_id": "lead", "territory_id": "territory",
                  "owner_org_unit_id": "org_unit", "partner_id": "channel_partner"},
     ),
+    # FS-014: a task is its assignee's (own) and sits under the assignee's office
+    # (org_subtree), which is where a manager and the assigner read it (ADR-034
+    # assigns only downwards). No partner branch: portal roles hold no tasks (RBAC
+    # 6.3, GAP-141). No soft delete: a task is cancelled, never deleted. The three
+    # links are parents, so a caller cannot hang a task off something they cannot see.
+    "tasks": ScopeSpec(
+        module="tasks",
+        table="task",
+        own="assigned_to",
+        org_subtree="owner_org_unit_id",
+        soft_delete=None,
+        parents={"lead_id": "lead", "partner_id": "channel_partner",
+                 "sales_order_id": "sales_order", "owner_org_unit_id": "org_unit"},
+    ),
 }

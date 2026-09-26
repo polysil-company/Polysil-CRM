@@ -52,6 +52,8 @@ TABLES = {
     "sales_order": sa.table("sales_order", sa.column("id", _ID), sa.column("owner_user_id", _ID),
                             sa.column("owner_org_unit_id", _ID), sa.column("territory_id", _ID),
                             sa.column("partner_id", _ID), sa.column("deleted_at")),
+    "task": sa.table("task", sa.column("id", _ID), sa.column("assigned_to", _ID),
+                     sa.column("owner_org_unit_id", _ID)),
 }
 
 
@@ -467,7 +469,57 @@ async def sales_orders_global(db: AsyncSession, ids: Fixtures) -> Witness:
                    {a: True, b: True})
 
 
+# ── witnesses: tasks (FS-014), own on the assignee, org_subtree on the office ──
+
+async def _task(db: AsyncSession, ids: Fixtures, *, assigned_to: str,
+                owner_org_unit_id: str | None = None) -> str:
+    """A personal task as the owner: no link, given by its assignee."""
+    return str((await db.execute(text(
+        "INSERT INTO task (title, task_type, due_at, assigned_to, assigned_by, owner_org_unit_id) "
+        "VALUES ('Call', 'call', now(), CAST(:u AS uuid), CAST(:u AS uuid), CAST(:o AS uuid)) "
+        "RETURNING id"),
+        {"u": assigned_to, "o": owner_org_unit_id or ids.org_unit_id})).scalar_one())
+
+
+async def tasks_own(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "fo")
+    await _grant(db, role, "tasks", ["view"], "own")
+    me = await _staff(db, ids, role, ids.org_unit_id)
+    other = await _staff(db, ids, role, ids.org_unit_id)
+    mine = await _task(db, ids, assigned_to=me)
+    theirs = await _task(db, ids, assigned_to=other)
+    return Witness(Caller(me, ids.org_unit_id, None, {"tasks": "own"}),
+                   {mine: True, theirs: False})
+
+
+async def tasks_org_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "dm")
+    await _grant(db, role, "tasks", ["view"], "org_subtree")
+    manager = await _staff(db, ids, role, ids.org_unit_id)
+    child = await _org(db, ids, "child", parent=ids.org_unit_id)
+    elsewhere = await _org(db, ids, "elsewhere")
+    below = await _task(db, ids, assigned_to=await _staff(db, ids, role, child),
+                        owner_org_unit_id=child)
+    outside = await _task(db, ids, assigned_to=await _staff(db, ids, role, elsewhere),
+                          owner_org_unit_id=elsewhere)
+    return Witness(Caller(manager, ids.org_unit_id, None, {"tasks": "org_subtree"}),
+                   {below: True, outside: False})
+
+
+async def tasks_global(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "tasks", ["view"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    elsewhere = await _org(db, ids, "elsewhere")
+    a = await _task(db, ids, assigned_to=await _staff(db, ids, role, elsewhere),
+                    owner_org_unit_id=elsewhere)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"tasks": "global"}), {a: True})
+
+
 WITNESSES: dict[tuple[str, str], Builder] = {
+    ("tasks", "own"): tasks_own,
+    ("tasks", "org_subtree"): tasks_org_subtree,
+    ("tasks", "global"): tasks_global,
     ("sales_orders", "own"): sales_orders_own,
     ("sales_orders", "org_subtree"): sales_orders_org_subtree,
     ("sales_orders", "territory"): sales_orders_territory,

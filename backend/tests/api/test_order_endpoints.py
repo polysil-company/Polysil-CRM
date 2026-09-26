@@ -128,6 +128,10 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
         leads = "(SELECT id FROM lead WHERE territory_id = CAST(:d AS uuid))"
         quotations = "(SELECT id FROM quotation WHERE territory_id = CAST(:d AS uuid))"
         for stmt in (
+            # FS-014: tasks and minutes point at people, leads and each other
+            "UPDATE meeting_minutes SET task_id = NULL WHERE created_by = ANY(CAST(:people AS uuid[]))",
+            "DELETE FROM task WHERE assigned_to = ANY(CAST(:people AS uuid[])) OR assigned_by = ANY(CAST(:people AS uuid[]))",
+            "DELETE FROM meeting_minutes WHERE created_by = ANY(CAST(:people AS uuid[]))",
             f"DELETE FROM approval_step WHERE request_id IN (SELECT id FROM approval_request WHERE entity_id IN {orders})",
             f"DELETE FROM approval_request WHERE entity_id IN {orders}",
             # FS-013: a quotation's discount approval

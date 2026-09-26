@@ -1010,6 +1010,7 @@ _LOOKUP_COLS: dict[str, frozenset[str]] = {
     "lead_source": frozenset({"sort_order", "quality"}),
     "mis_system": frozenset(),
     "won_lost_reason": frozenset({"sort_order", "kind"}),
+    "meeting_type": frozenset({"sort_order"}),  # FS-014
 }
 
 
@@ -1327,6 +1328,15 @@ async def list_mis_systems(db: AsyncSession) -> list[LookupItem]:
     rows = (await db.execute(text(
         "SELECT id, code, name, is_active FROM mis_system "
         "WHERE deleted_at IS NULL ORDER BY name"))).all()
+    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
+            for r in rows]
+
+
+async def list_meeting_types(db: AsyncSession) -> list[LookupItem]:
+    """FS-014: switched-off types included with `is_active` false, as for lost reasons."""
+    rows = (await db.execute(text(
+        "SELECT id, code, name, is_active FROM meeting_type "
+        "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
     return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
             for r in rows]
 

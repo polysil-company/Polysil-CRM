@@ -1448,9 +1448,86 @@ def f_admin() -> None:
     write("10-administration", e)
 
 
+def f_tasks() -> None:
+    e, n = [], {}
+    e += title("Tasks, the planner, meetings and minutes",
+               sub="Staff only. A task is for one person, given by one person, about at most one "
+                   "lead, dealer or order. Minutes' action items are tasks.",
+               status="BUILT. FS-014: /tasks, /planner, /planner/team, /minutes, "
+                      "/lookups/meeting-types, migration 018.",
+               status_colour=GREEN)
+
+    steps = [
+        ("k1", "POST /tasks\ncall, visit, meeting, follow-up, other\n"
+               "a date alone = 18:00 IST; naive times refused", BLUE),
+        ("k2", "assignee: yourself, or authz_user_assignable('tasks')\n"
+               "an officer: only themselves -> 422 not_assignable", VIOLET),
+        ("k3", "task_link_visible_as(assignee, link)\nthe claim swapped for one check, "
+               "then restored\n-> 422 link_not_visible_to_assignee", RED),
+        ("k4", "open: in the planner by IST day\noverdue = open and due before the day, "
+               "90 days back", BLUE),
+        ("k5", "complete (outcome) / cancel (reason)\nrow FOR UPDATE; the loser gets "
+               "409 task_not_open", GREEN),
+        ("k6", "reopen: assignee or assigner, 7 days,\nassignee still active", YELLOW),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(steps):
+        els = node(eid, 0, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid])
+        prev = eid
+
+    side = [
+        ("m1", "POST /minutes on a lead or a dealer\nheld_at, attendees, notes, action items", BLUE),
+        ("m2", "each action item: the same checks as a create\n"
+               "one bad item -> 422 with fields.action_items[i],\nnothing saved", RED),
+        ("m3", "task_id given: must be on the same lead or dealer;\n"
+               "open -> completed as 'Minutes recorded'", GREEN),
+        ("m4", "people leave: handover moves all open tasks\n(user_tasks_handover, task.reassigned "
+               "each);\ndeactivate and delete refuse with open tasks", VIOLET),
+        ("m5", "office move: trigger on app_user.org_unit_id\nopen tasks follow the person", GREEN),
+        ("m6", "lead merge: tasks and minutes move to the survivor", GREEN),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(side):
+        els = node(eid, 620, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid], dashed=True)
+        prev = eid
+
+    e += note("nRed1", 1240, 0,
+              "DEALERS SEE NONE OF THIS\n\n"
+              "Portal roles hold no tasks permission. Minutes read\n"
+              "through minutes_visible(), staff only. The lead\n"
+              "timeline filters task and minutes events by the\n"
+              "row's own visibility, so a dealer reading its own\n"
+              "lead sees no task.* or minutes.* event.", w=420, colour=RED)
+    e += note("nRed2", 1240, 260,
+              "A BARE DATE IS NOT A DATETIME\n\n"
+              "Pydantic reads \"2026-10-02\" as a naive midnight\n"
+              "datetime. DueAt parses a 10-character string as a\n"
+              "date first, so the 18:00 IST default applies.", w=420, colour=RED)
+    e += note("nGreen1", 1240, 480,
+              "owner_org_unit_id follows the assignee on every\n"
+              "reassign, handover and office move. The manager\n"
+              "above sees it; the old office stops seeing it.", w=420, colour=GREEN)
+    e += note("nYellow1", 0, 760,
+              "STAND-INS AND GAPS\n\n"
+              "18:00, 7 days, 90 days are stand-ins (GAP-143).\n"
+              "No dealer tasks (GAP-141). A drifted link shows\n"
+              "hidden (GAP-142). No message on assignment\n"
+              "(GAP-144). Open tasks stay open when the lead\n"
+              "closes (GAP-145).", w=520, colour=YELLOW)
+    write("14-tasks-and-planner", e)
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
     f_approval(); f_subsidy(); f_outbox(); f_money(); f_pricing()
-    f_quotation(); f_order(); f_auth(); f_admin()
+    f_quotation(); f_order(); f_auth(); f_admin(); f_tasks()
     print(f"\nwrote to {OUT}")

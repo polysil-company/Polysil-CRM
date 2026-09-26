@@ -58,11 +58,21 @@ A task:
 
 | Call | Notes |
 |---|---|
-| `POST /minutes {lead_id or partner_id, task_id?, held_at, attendees: [...], notes, action_items: [{title, assigned_to?, due_at, task_type?}]}` | one save: the minutes and a task per action item. One bad action item refuses the whole save, with `fields.action_items[i]`. An action item is not a meeting. `task_id`: the meeting this records; it is completed if still open |
+| `POST /minutes {lead_id or partner_id, task_id?, held_at, attendees: [...], notes, action_items: [{title, assigned_to?, due_at, task_type?}]}` | `held_at` with a timezone, like `due_at`. One save: the minutes and a task per action item. One bad action item refuses the whole save, with `fields.action_items[i]`. An action item is not a meeting. `task_id`: the meeting this records; it is completed if still open |
 | `GET /minutes?lead_id=` or `?partner_id=` | newest first |
 | `GET /minutes/{id}` | with each action item's current task, so show "2 of 3 done" |
 
 Minutes are for staff; a dealer never sees them.
+
+## People leaving (the users screens)
+
+| Call | What changes |
+|---|---|
+| `POST /users/{id}/handover` | also moves every open task to the receiver. The result gains `tasks_moved` |
+| `PATCH /users/{id} {"is_active": false}` | `422` with `fields.is_active` while the person has open tasks. Offer the handover |
+| `DELETE /users/{id}` | `422` with `fields.open_tasks` while the person has open tasks |
+
+A person moved to another office takes their open tasks with them. Nothing to build for that.
 
 ## Not yet
 
