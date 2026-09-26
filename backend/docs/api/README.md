@@ -10,15 +10,15 @@ any endpoint change, so it is always current rather than a snapshot.
 | Approvals | 5 | [`approvals.md`](approvals.md) |
 | Auth | 7 | [`auth.md`](auth.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
-| Leads | 14 | [`leads.md`](leads.md) |
+| Leads | 17 | [`leads.md`](leads.md) |
 | Lookups | 14 | [`lookups.md`](lookups.md) |
-| Orders | 12 | [`orders.md`](orders.md) |
+| Orders | 14 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 6 | [`partners.md`](partners.md) |
 | Pricing | 8 | [`pricing.md`](pricing.md) |
 | Products | 8 | [`products.md`](products.md) |
-| Public | 2 | [`public.md`](public.md) |
-| Quotations | 12 | [`quotations.md`](quotations.md) |
+| Public | 6 | [`public.md`](public.md) |
+| Quotations | 13 | [`quotations.md`](quotations.md) |
 | Subsidy | 4 | [`subsidy.md`](subsidy.md) |
 | Territories | 4 | [`territories.md`](territories.md) |
 | Users | 9 | [`users.md`](users.md) |

@@ -15,7 +15,7 @@ from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Path, Query, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from api.config import get_settings
 from api.deps import AnonSession
@@ -24,7 +24,17 @@ from api.errors import NotFoundError
 from api.integrations import cache
 from api.routers.auth import _client_ip
 from api.schemas.auth import Envelope, ErrorResponse
+from api.schemas.leads import UUID_RE
+from api.schemas.public_leads import (
+    PublicLeadCreate,
+    PublicLeadForm,
+    PublicLeadResult,
+    PublicTerritory,
+    VerifyRequest,
+    VerifySent,
+)
 from api.schemas.quotations import PublicQuotation
+from api.services import public_leads as lead_capture
 from api.services import quotations as service
 from api.storage import LocalStorage, filename_from_query, get_storage
 
@@ -103,3 +113,57 @@ async def local_file(sig: Annotated[str, Path(max_length=1024)],
     filename = filename_from_query(name)
     return Response(content=data, media_type=content_type,
                     headers={"Content-Disposition": f'inline; filename="{filename}"'})
+
+
+# ── the public lead form (FS-003a) ───────────────────────────────────────────
+
+_LEAD_ERRORS: dict[int | str, dict[str, object]] = {
+    404: {"model": ErrorResponse, "description": "An unknown or inactive QR code."},
+    422: {"model": ErrorResponse, "description": "A field, or `invalid_code`."},
+    429: {"model": ErrorResponse, "description": "Too many codes for this number or address."},
+}
+
+
+@router.get("/lead-form", response_model=Envelope[PublicLeadForm], responses=_LEAD_ERRORS)
+async def lead_form(db: AnonSession, qr: Annotated[str | None, Query(
+        max_length=12, description="The code from the page URL, if the farmer scanned one."
+)] = None) -> Envelope[PublicLeadForm]:
+    """What the enquiry page needs before the farmer types: the QR code's label and
+    campaign (show "Enquiry through Shah Irrigation" at the top), the states, the
+    irrigation systems and the inquiry types. Districts and talukas come from
+    `GET /public/territories?parent_id=`."""
+    return Envelope(data=await lead_capture.form(db, qr))
+
+
+@router.get("/territories", response_model=Envelope[list[PublicTerritory]],
+            responses=_LEAD_ERRORS)
+async def public_territories(db: AnonSession, parent_id: Annotated[str, Query(
+        pattern=UUID_RE, description="A state for its districts, a district for its talukas."
+)]) -> Envelope[list[PublicTerritory]]:
+    """The children of one territory, name and id only, at most 200."""
+    return Envelope(data=await lead_capture.territories(db, parent_id))
+
+
+@router.post("/leads/verify", status_code=202, response_model=Envelope[VerifySent],
+             responses=_LEAD_ERRORS)
+async def lead_verify(body: VerifyRequest, request: Request,
+                      db: AnonSession) -> Envelope[VerifySent]:
+    """Send the farmer a six-digit WhatsApp code for this mobile. The body is the
+    same whether or not the number is known to Polysil. Offer "send again" after
+    `resend_after` seconds; a new code replaces the old one."""
+    return Envelope(data=await lead_capture.request_code(db, body.mobile, _client_ip(request)))
+
+
+@router.post("/leads", status_code=201, response_model=Envelope[PublicLeadResult],
+             responses={**_LEAD_ERRORS,
+                        200: {"model": Envelope[PublicLeadResult],
+                              "description": "Already enquired today, or a retry: the "
+                                             "earlier inquiry number."}})
+async def public_lead(body: PublicLeadCreate) -> Response:
+    """Create the lead once the code matches. Show the farmer the `inquiry_no`
+    either way; the acknowledgement also goes by WhatsApp, but it can be held back
+    (one a day per number), so the page is the place they read it. A retry after a
+    lost response returns the same number. `invalid_code` covers a wrong, expired
+    or used-up code: offer to send a new one."""
+    status, result = await lead_capture.submit(body)
+    return JSONResponse(status_code=status, content={"data": result.model_dump(mode="json")})

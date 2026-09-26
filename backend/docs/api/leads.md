@@ -25,6 +25,54 @@ Conventions for every endpoint in this file:
 
 ---
 
+## `GET /api/v1/lead-qr-codes`
+
+**List Qr**
+
+The codes in your scope, newest first, with how many leads each brought.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `QrCodeList` | Successful Response |
+| `422` | `ErrorResponse` | A field. |
+
+---
+
+## `POST /api/v1/lead-qr-codes`
+
+**Create Qr**
+
+Make a code to print. `url` is what the QR image encodes; draw it on the page
+and offer a download. Leads from it are credited to `partner_id` when set.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`QrCodeCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string | yes | What staff will recognise: the dealer, the stall, the leaflet. |
+| `campaign` | string \| null |  |  |
+| `partner_id` | string \| null |  | Leads from this code are assigned to this partner. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_QrCode_` | Successful Response |
+| `422` | `ErrorResponse` | A field. |
+
+---
+
 ## `GET /api/v1/leads`
 
 **List Leads**
@@ -56,7 +104,9 @@ day it is the slowest thing on the screen.
 | `priority` | query | string \| null |  | hot, warm or cold. |
 | `owner_user_id` | query | string \| null |  | Leads owned by this user. |
 | `owner` | query | string \| null |  | `none` for the unassigned list a manager works from. |
-| `territory_id` | query | string \| null |  |  |
+| `territory_id` | query | string \| null |  | Leads in this territory or anywhere under it: a state selects its districts and talukas. |
+| `owner_org_unit_id` | query | string \| null |  | Leads owned by this office or any office under it (the hierarchy filter). |
+| `assigned_partner_id` | query | string \| null |  | Leads assigned to this partner or any partner under it: a distributor selects its dealers' leads too. |
 | `source` | query | string \| null |  | A source code. |
 | `inquiry_type` | query | string \| null |  |  |
 | `created_from` | query | string \| null |  | ISO date, inclusive. |
@@ -199,6 +249,42 @@ pair leaves the queue and both timelines record the dismissal.
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not in your scope. |
 | `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/leads/stats`
+
+**Lead Stats**
+
+Counts for the pipeline board and the dashboard tiles: leads by stage, by
+priority, and unassigned. Same scope and same filters as the list, so a board
+column and its list always agree. Every stage is present, 0 when empty.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `stage` | query | string \| null |  | Comma-separated stages. |
+| `priority` | query | string \| null |  | hot, warm or cold. |
+| `owner_user_id` | query | string \| null |  |  |
+| `owner` | query | string \| null |  | `none` for unassigned leads. |
+| `territory_id` | query | string \| null |  | This territory and everything under it. |
+| `owner_org_unit_id` | query | string \| null |  | This office and every office under it. |
+| `assigned_partner_id` | query | string \| null |  | This partner and every partner under it. |
+| `source` | query | string \| null |  | A source code. |
+| `inquiry_type` | query | string \| null |  |  |
+| `created_from` | query | string \| null |  | ISO date, inclusive. |
+| `created_to` | query | string \| null |  | ISO date, inclusive. |
+| `q` | query | string \| null |  | Name, mobile or inquiry number. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `LeadStats` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
 
 ---
@@ -596,6 +682,12 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `data` | Lead | yes |  |
 
+**`Envelope_QrCode_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | QrCode | yes |  |
+
 **`Envelope_TimelineEvent_`**
 
 | Field | Type | Required | Notes |
@@ -714,6 +806,15 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `note` | string \| null |  | Optional. Why the lead is being reopened; kept on the timeline. |
 
+**`LeadStats`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `total` | integer | yes | Leads matching the filters. |
+| `by_stage` | object | yes | Every stage. merged is 0 unless the stage filter asks for it, as on the list. |
+| `by_priority` | object | yes | hot, warm and cold. |
+| `unassigned` | integer | yes | Leads with no owner: the assignment queue. |
+
 **`LeadTransition`**
 
 | Field | Type | Required | Notes |
@@ -745,6 +846,36 @@ with the current stage in `fields.stage`.
 | `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
+
+**`QrCode`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes | Six characters, no look-alikes. |
+| `url` | string | yes | What the printed QR encodes; the frontend draws it. |
+| `label` | string | yes |  |
+| `campaign` | string \| null | yes |  |
+| `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
+| `territory` | TerritoryRef \| null | yes |  |
+| `is_active` | boolean | yes |  |
+| `lead_count` | integer | yes | Leads this code has brought, in your scope. |
+| `created_at` | string | yes |  |
+
+**`QrCodeCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string | yes | What staff will recognise: the dealer, the stall, the leaflet. |
+| `campaign` | string \| null |  |  |
+| `partner_id` | string \| null |  | Leads from this code are assigned to this partner. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+
+**`QrCodeList`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | QrCode[] | yes |  |
 
 **`ReasonRef`**
 

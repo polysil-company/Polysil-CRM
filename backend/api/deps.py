@@ -8,7 +8,7 @@ Sessions are created here and in `worker/` and nowhere else (CLAUDE.md 4.1 rule 
 `tests/test_scaffold.py` greps for violations and fails the build on one, because
 the claim propagation below only works if exactly one place owns the boundary.
 
-There are two dependencies and there will not be a third:
+There are two dependencies, and one context manager for the public form:
 
   * `get_db` - a request that carries an access token. Verifies it, opens one
     transaction, sets the claim inside that transaction, then switches into
@@ -17,6 +17,10 @@ There are two dependencies and there will not be a third:
     refresh and cookie-only logout (rule 25). Sets no claim at all, switches into
     `app_anon`, and reaches the database only through the eight `SECURITY DEFINER`
     functions.
+  * `intake_session` - the public lead form (FS-003a). Enters `app_anon`, consumes
+    the WhatsApp code, and only when it matched sets the intake principal's claim
+    and switches into `app_role`. The order of those two steps is the whole of its
+    security: anyone can call it, and only a verified code reaches the claim.
 
 The order inside `get_db` is load-bearing (FS-002 5.1): the claims lookup runs
 first, as the owner, because under `app_role` a self-only policy on `app_user` would
@@ -27,6 +31,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import AsyncIterator, Callable, Coroutine
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Annotated, Any
 
 import structlog
@@ -178,6 +184,38 @@ async def get_db_anon() -> AsyncIterator[AsyncSession]:
         yield session
 
 
+@dataclass
+class Intake:
+    """What the code check found. `session` is set only when it matched."""
+
+    outcome: str                       # ok, replay or invalid
+    session: AsyncSession | None = None
+    challenge_id: str | None = None
+    inquiry_no: str | None = None      # the earlier lead's, on a replay
+
+
+@asynccontextmanager
+async def intake_session(mobile: str, code_hash: str) -> AsyncIterator[Intake]:
+    """FS-003a §5, plan review B-1. One transaction: consume the code as `app_anon`;
+    on a match, the intake claim and `app_role`, and the caller creates the lead in
+    the same transaction. A wrong code is returned, not raised, so its attempt
+    count commits; an error inside the block rolls the consumption back, so the
+    farmer's code is still good after a 422 elsewhere (EC-3)."""
+    settings = get_settings()
+    async with async_session_factory() as session, session.begin():
+        await enter_role(session, settings.db_anon_role)
+        row = (await session.execute(
+            text("SELECT outcome, challenge_id, inquiry_no FROM lead_intake_consume(:m, :h)"),
+            {"m": mobile, "h": code_hash})).one()
+        if row.outcome != "ok":
+            yield Intake(row.outcome, inquiry_no=row.inquiry_no)
+            return
+        await session.execute(text("SELECT set_config('app.current_user_id', :u, true)"),
+                              {"u": settings.intake_user_id})
+        await enter_role(session, settings.db_app_role)
+        yield Intake("ok", session=session, challenge_id=str(row.challenge_id))
+
+
 async def assert_runtime_role(settings: Settings | None = None) -> None:
     """Rule 5, at startup. Outside `local`, refuse to serve if the runtime role is
     unset, missing, or not granted to the login: a policy migration on a cluster
@@ -260,6 +298,21 @@ def require(module: str, action: str) -> Callable[..., Coroutine[Any, Any, None]
         )
         if not allowed.scalar_one():
             raise ForbiddenError()
+
+    return dep
+
+
+def require_any(*pairs: tuple[str, str]) -> Callable[..., Coroutine[Any, Any, None]]:
+    """`require()` for an endpoint shared by several documents: any one of the
+    permissions passes. The per-document check stays with the database."""
+
+    async def dep(db: DbSession) -> None:
+        for module, action in pairs:
+            allowed = await db.execute(
+                text("SELECT app_has_permission(:m, :a)"), {"m": module, "a": action})
+            if allowed.scalar_one():
+                return
+        raise ForbiddenError()
 
     return dep
 

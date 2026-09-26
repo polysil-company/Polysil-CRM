@@ -30,6 +30,7 @@ from api.schemas.leads import (
     LeadPage,
     LeadPatch,
     LeadReopen,
+    LeadStats,
     LeadTransition,
     LookupCreate,
     LookupItem,
@@ -115,7 +116,18 @@ async def list_leads(
                                                 description="Leads owned by this user.")] = None,
     owner: Annotated[str | None, Query(
         description="`none` for the unassigned list a manager works from.")] = None,
-    territory_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
+    territory_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Leads in this territory or anywhere under it: a state selects its "
+                    "districts and talukas.")] = None,
+    owner_org_unit_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Leads owned by this office or any office under it (the hierarchy "
+                    "filter).")] = None,
+    assigned_partner_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Leads assigned to this partner or any partner under it: a "
+                    "distributor selects its dealers' leads too.")] = None,
     source: Annotated[str | None, Query(description="A source code.")] = None,
     inquiry_type: Annotated[str | None, Query()] = None,
     created_from: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
@@ -149,9 +161,45 @@ async def list_leads(
     """
     return await service.list_leads(
         db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id,
-        owner=owner, territory_id=territory_id, source=source, inquiry_type=inquiry_type,
+        owner=owner, territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
+        assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
         created_from=created_from, created_to=created_to, q=q, limit=limit, cursor=cursor,
         include_total=include_total)
+
+
+@router.get(
+    "/stats",
+    response_model=LeadStats,
+    responses=_ERRORS,
+    dependencies=[Depends(require("leads", "view"))],
+)
+async def lead_stats(
+    db: DbSession,
+    caller: CallerDep,
+    stage: Annotated[str | None, Query(description="Comma-separated stages.")] = None,
+    priority: Annotated[str | None, Query(description="hot, warm or cold.")] = None,
+    owner_user_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
+    owner: Annotated[str | None, Query(description="`none` for unassigned leads.")] = None,
+    territory_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="This territory and everything under it.")] = None,
+    owner_org_unit_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="This office and every office under it.")] = None,
+    assigned_partner_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="This partner and every partner under it.")] = None,
+    source: Annotated[str | None, Query(description="A source code.")] = None,
+    inquiry_type: Annotated[str | None, Query()] = None,
+    created_from: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
+    created_to: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
+    q: Annotated[str | None, Query(description="Name, mobile or inquiry number.")] = None,
+) -> LeadStats:
+    """Counts for the pipeline board and the dashboard tiles: leads by stage, by
+    priority, and unassigned. Same scope and same filters as the list, so a board
+    column and its list always agree. Every stage is present, 0 when empty."""
+    return await service.lead_stats(
+        db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id, owner=owner,
+        territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
+        assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
+        created_from=created_from, created_to=created_to, q=q)
 
 
 # Declared before the /{lead_id} routes so the literal path wins the match.

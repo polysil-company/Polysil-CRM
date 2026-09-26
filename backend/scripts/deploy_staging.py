@@ -4,6 +4,7 @@
     python scripts/deploy_staging.py provision   # the role, the database, the grants
     python scripts/deploy_staging.py deploy      # sync, build, up, alembic upgrade head
     python scripts/deploy_staging.py seed        # demo users, masters, showcase dataset
+    python scripts/deploy_staging.py templates   # order messages on only where 11za approved them
     python scripts/deploy_staging.py status      # containers, health, resource use
     python scripts/deploy_staging.py logs [svc]
     python scripts/deploy_staging.py down
@@ -260,6 +261,18 @@ def migrate(env: dict[str, str]) -> None:
     guard(env)
     run_remote(env, compose(env, "run", "--rm", "tools",
                             "alembic", "upgrade", "head", profile="tools"))
+    # The api came up before the migration. A migration that changes a table's
+    # columns leaves plans on the pooled connections that fail once each with
+    # "cached statement plan is invalid" (ISS-100). Fresh connections plan anew.
+    run_remote(env, compose(env, "restart", "pgbouncer", "api", "worker"))
+    sync_templates(env)
+
+
+def sync_templates(env: dict[str, str]) -> None:
+    """Switch each order message on only if 11za has approved its template (FS-012
+    rule 3). A failed listing leaves the switches alone and the deploy goes on."""
+    run_remote(env, compose(env, "run", "--rm", "tools", "python",
+                            "scripts/sync_message_templates.py", profile="tools"), check=False)
 
 
 # scripts/seed_demo.py reads DB_USER, DB_PASSWORD and DB_NAME out of infra/.env
@@ -293,6 +306,13 @@ SEED_SHOWCASE = SEED_DEMO.replace("python scripts/seed_demo.py",
 
 def seed(env: dict[str, str], *, masters: bool = True, showcase: bool = True) -> None:
     guard(env)
+    # The seeds sign partners in by reading their code from the outbox and create
+    # leads on generated mobiles. On a real provider the first texts made-up numbers
+    # and then fails (a sent code's payload is cleared), and the second texts one
+    # stranger per lead.
+    if env.get("WHATSAPP_PROVIDER", "mock").strip() != "mock":
+        die("refusing to seed while WHATSAPP_PROVIDER is not mock",
+            "set WHATSAPP_PROVIDER=mock in infra/.env.staging, deploy, seed, then switch back")
     run_remote(env, compose(env, "run", "--rm", "--entrypoint", "sh", "tools",
                             "-c", SEED_DEMO, profile="tools"))
     if masters:
@@ -347,7 +367,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("step", nargs="?", default="deploy",
                         choices=["provision", "deploy", "sync", "build", "up", "migrate",
-                                 "seed", "status", "logs", "down"])
+                                 "seed", "templates", "status", "logs", "down"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
     parser.add_argument("--seed", action="store_true", help="deploy: run the seeds too")
     parser.add_argument("--no-showcase", action="store_true",
@@ -373,6 +393,8 @@ def main(argv: list[str] | None = None) -> int:
         migrate(env)
     elif args.step == "seed":
         seed(env, masters=not args.no_masters, showcase=not args.no_showcase)
+    elif args.step == "templates":
+        sync_templates(env)
     elif args.step == "status":
         status(env)
     elif args.step == "logs":

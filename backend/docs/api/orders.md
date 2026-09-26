@@ -36,7 +36,7 @@ has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `status` | query | string \| null |  | One status. |
+| `status` | query | string \| null |  | One status, or several separated by commas: submitted,approved,partially_dispatched. |
 | `order_type` | query | string \| null |  | One order type. |
 | `partner_id` | query | string \| null |  | Orders placed through this partner. |
 | `lead_id` | query | string \| null |  | Orders on this lead. |
@@ -116,6 +116,37 @@ draft has no number until it is submitted.
 | `403` | `ErrorResponse` | Not in your permissions, or not your step. |
 | `404` | `ErrorResponse` | Not in your scope. |
 | `409` | `ErrorResponse` | Key reused, the status moved on, prices changed (`rate_changed`), or the order is not in a state that allows it. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
+## `GET /api/v1/orders/stats`
+
+**Order Stats**
+
+Counts for the order board and the dashboard tiles: every status, and the
+submitted orders by whose approval is next. Same scope and filters as the list.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `status` | query | string \| null |  | Comma-separated statuses. |
+| `order_type` | query | string \| null |  | One order type. |
+| `partner_id` | query | string \| null |  |  |
+| `lead_id` | query | string \| null |  |  |
+| `owner` | query | string \| null |  | `me`, or a user id. |
+| `from` | query | string \| null |  | ISO date, IST. |
+| `to` | query | string \| null |  | ISO date, inclusive. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `OrderStats` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions, or not your step. |
+| `404` | `ErrorResponse` | Not in your scope. |
 | `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
 
 ---
@@ -404,6 +435,36 @@ Replace a draft's lines wholesale, priced as new lines.
 
 ---
 
+## `GET /api/v1/orders/{order_id}/pdf`
+
+**Order Pdf**
+
+A URL for the approved order's PDF, valid ten minutes. **Open it in a new tab;
+do not fetch it with the bearer token.** The order's `pdf_state` says when to
+offer it: `ready` shows "Download PDF", `pending` shows "Preparing PDF". `404`
+before approval, `409 pdf_pending` while the worker has not finished,
+`409 pdf_failed` when it gave up (staff see `pdf_error`), `409 order_cancelled`
+once the order is cancelled.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `order_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_PdfLink_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions, or not your step. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | `pdf_pending`, `pdf_failed`, `order_cancelled` or `storage_unavailable`. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `POST /api/v1/orders/{order_id}/submit`
 
 **Submit Order**
@@ -479,8 +540,9 @@ and only the outcome to a dealer.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `request_id` | string | yes |  |
-| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the order was cancelled while pending. |
+| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the document was cancelled, or a quotation edited, while pending. |
 | `steps` | ApprovalStep[] | yes |  |
+| `request_remark` | string \| null |  | Why the approval was asked for (a quotation discount). Null for a dealer, always. |
 
 **`ApprovalStep`**
 
@@ -500,6 +562,7 @@ and only the outcome to a dealer.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
+| `order` | DispatchOrderRef | yes | The order this dispatch shipped against. |
 | `dispatch_no` | string | yes | The order number with a sequence, per order. |
 | `dc_no` | string \| null | yes |  |
 | `dc_date` | string \| null | yes |  |
@@ -542,6 +605,14 @@ and only the outcome to a dealer.
 | `line_no` | integer | yes |  |
 | `qty` | string | yes |  |
 
+**`DispatchOrderRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `order_no` | string \| null | yes |  |
+| `party_name` | string | yes |  |
+
 **`Envelope_Dispatch_`**
 
 | Field | Type | Required | Notes |
@@ -553,6 +624,12 @@ and only the outcome to a dealer.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | Order | yes |  |
+
+**`Envelope_PdfLink_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PdfLink | yes |  |
 
 **`Envelope_list_Dispatch__`**
 
@@ -586,6 +663,7 @@ and only the outcome to a dealer.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
+| `doc_type` | string |  | Always sales_order. Tells an order from a quotation where either can come back. Default `sales_order`. |
 | `id` | string | yes |  |
 | `order_no` | string \| null | yes | Null until the first submit. |
 | `status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` | yes |  |
@@ -612,6 +690,9 @@ and only the outcome to a dealer.
 | `dispatches` | Dispatch[] | yes |  |
 | `warnings` | string[] | yes | repriced, discontinued_products, provisional_pricing. Shown, never blocking. |
 | `remarks` | string \| null | yes |  |
+| `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
+| `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
+| `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |
@@ -728,6 +809,14 @@ and only the outcome to a dealer.
 | `address` | string \| null | yes |  |
 | `state_code` | string | yes |  |
 
+**`OrderStats`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `total` | integer | yes | Orders matching the filters. |
+| `by_status` | object | yes | Every status, 0 when empty. |
+| `waiting_on` | object | yes | Submitted orders by the role whose approval step is next, e.g. {"district_manager": 3, "account_manager": 1}. |
+
 **`OrderSummary`**
 
 | Field | Type | Required | Notes |
@@ -761,6 +850,14 @@ and only the outcome to a dealer.
 | `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
+
+**`PdfLink`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `url` | string | yes | Open it in a new tab. Valid for ten minutes. |
+| `expires_at` | string | yes |  |
+| `filename` | string | yes |  |
 
 **`QuotationLineIn`**
 

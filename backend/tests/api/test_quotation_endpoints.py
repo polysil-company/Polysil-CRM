@@ -24,6 +24,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.config import get_settings
+from api.errors import ApiError
+from api.services import quotations as service
 from api.services.clock import today_ist
 from api.storage import LocalStorage
 from tests.api.conftest import PASSWORD, V1, Catalogue, Staff, _auth, _key
@@ -52,8 +54,21 @@ async def quoter(sessions: Callable[[], AsyncSession], staff: Staff) -> AsyncIte
         "(:r, 'quotations', 'edit', 'global'), (:r, 'quotations', 'delete', 'global'), "
         "(:r, 'pricing', 'view', 'global') ON CONFLICT DO NOTHING"),
         {"r": staff.role_id})
+    # FS-013: these tests are about sending; with no quotation row the role's
+    # discount limit would be 0 and every discounted send would need approval
+    await s.execute(text(
+        "INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount) "
+        "VALUES ('quotation', CAST(:r AS uuid), NULL, NULL) ON CONFLICT DO NOTHING"),
+        {"r": staff.role_id})
     await s.commit()
-    yield staff
+    try:
+        yield staff
+    finally:
+        c = sessions()
+        await c.execute(text("DELETE FROM approval_threshold WHERE role_id = CAST(:r AS uuid)"),
+                        {"r": staff.role_id})
+        await c.commit()
+        await c.close()
 
 
 @pytest_asyncio.fixture
@@ -74,6 +89,9 @@ async def officer(sessions: Callable[[], AsyncSession], quoter: Staff) -> AsyncI
         "(:r, 'leads', 'edit', 'global'), "
         "(:r, 'quotations', 'view', 'global'), (:r, 'quotations', 'create', 'global'), "
         "(:r, 'quotations', 'edit', 'global'), (:r, 'pricing', 'view', 'global')"), {"r": role})
+    await s.execute(text(
+        "INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount) "
+        "VALUES ('quotation', CAST(:r AS uuid), NULL, NULL) ON CONFLICT DO NOTHING"), {"r": role})
     user = str((await s.execute(text(
         "INSERT INTO app_user (user_type, email, password_hash, full_name, role_id, org_unit_id) "
         "VALUES ('staff', :e, :p, 'Kiran Desai', :r, :o) RETURNING id"),
@@ -94,6 +112,7 @@ async def officer(sessions: Callable[[], AsyncSession], quoter: Staff) -> AsyncI
             "DELETE FROM login_attempt WHERE identifier = CAST(:e AS citext)",
             "DELETE FROM app_user WHERE id = CAST(:u AS uuid)",
             "DELETE FROM role_permission WHERE role_id = CAST(:r AS uuid)",
+            "DELETE FROM approval_threshold WHERE role_id = CAST(:r AS uuid)",
             "DELETE FROM role WHERE id = CAST(:r AS uuid)",
         ):
             await c.execute(text(stmt), {"u": user, "e": email, "r": role})
@@ -602,6 +621,51 @@ async def test_the_public_link_shows_no_party_data_and_records_the_view_on_the_p
     assert got["open_count"] == 2 and got["status"] == "viewed", "later opens only count"
 
     assert (await client.get("/public/q/" + "x" * 43)).status_code == 404
+
+
+class _StorageDown:
+    """R2 unconfigured, as on staging before the bucket exists."""
+
+    def presign_get(self, key: str, *, filename: str) -> tuple[str, dt.datetime]:
+        raise RuntimeError("R2 is not configured (r2_endpoint, r2_bucket, r2_access_key_id, "
+                           "r2_secret_access_key); local disk is not allowed")
+
+
+async def test_a_storage_failure_never_names_configuration_to_the_public_link(
+        client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue,
+        tmp_path: pathlib.Path, sessions: Callable[[], AsyncSession]) -> None:
+    """API review L4: the farmer's link got the storage error verbatim."""
+    h = await _auth(client, quoter)
+    q = await _draft(client, h, qenv, catalogue)
+    sent = await _send(client, h, q["id"])
+    assert await _render(tmp_path) == "ready"
+    token = sent["share_url"].rsplit("/", 1)[1]
+    s = sessions()
+    try:
+        with pytest.raises(ApiError) as caught:
+            await service.public_open(s, token, None, _StorageDown())  # type: ignore[arg-type]
+    finally:
+        await s.rollback()
+        await s.close()
+    assert caught.value.code == "storage_unavailable"
+    assert "r2" not in caught.value.message.lower() and "config" not in caught.value.message.lower()
+
+
+async def test_the_quotation_list_takes_several_statuses(
+        client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue) -> None:
+    """API review: "open quotations" in one call."""
+    h = await _auth(client, quoter)
+    draft = await _draft(client, h, qenv, catalogue)
+    sent = await _send(client, h, (await _draft(client, h, qenv, catalogue))["id"])
+
+    async def ids(status: str) -> set[str]:
+        r = await client.get(f"{V1}/quotations", headers=h, params={"status": status, "limit": 100})
+        assert r.status_code == 200, r.text
+        return {x["id"] for x in r.json()["data"]} & {draft["id"], sent["id"]}
+
+    assert await ids("draft,sent") == {draft["id"], sent["id"]}
+    assert await ids("sent,viewed,negotiation") == {sent["id"]}
+    assert await ids("accepted") == set()
 
 
 # ── delete ───────────────────────────────────────────────────────────────────

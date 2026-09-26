@@ -27,11 +27,13 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, cast
 
 import sqlalchemy as sa
+import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,6 +42,7 @@ from api.authz.modules import SPECS
 from api.authz.predicate import Caller, scope_predicate
 from api.config import Settings
 from api.domain import leads as leads_domain
+from api.domain import orders as order_domain
 from api.domain import quotations as domain
 from api.domain.identity import normalise_mobile
 from api.domain.pricing.types import PricedLine
@@ -54,7 +57,7 @@ from api.schemas.leads import (
     TimelinePage,
     UserRef,
 )
-from api.services import pricing
+from api.services import approval_view, people, pricing
 from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
@@ -421,13 +424,18 @@ def _lead_ref(row: Any) -> sch.LeadRef | None:
     return sch.LeadRef(id=str(row.lead_id), inquiry_no=row.lead_inquiry_no, stage=row.lead_stage)
 
 
-def _people(row: Any) -> tuple[PartnerRef | None, UserRef | None]:
-    partner = (PartnerRef(id=str(row.partner_id), name=row.partner_name,
-                          partner_type=row.partner_type)
-               if row.partner_id and row.partner_name else None)
-    owner = (UserRef(id=str(row.owner_user_id), full_name=row.owner_name)
-             if row.owner_user_id and row.owner_name else None)
-    return partner, owner
+_Q_PEOPLE = [("owner_user_id", "owner_name"), ("created_by", "created_by_name"),
+             ("decided_by", "decided_by_name")]
+_Q_PARTNERS = [("partner_id", "partner_name")]
+
+
+async def _names(db: AsyncSession, rows: Sequence[Any]) -> people.Names:
+    return await people.resolve(db, rows, _Q_PEOPLE, _Q_PARTNERS)
+
+
+def _people(row: Any, names: people.Names) -> tuple[PartnerRef | None, UserRef | None]:
+    return (names.partner(row.partner_id, row.partner_name, row.partner_type),
+            names.user(row.owner_user_id, row.owner_name))
 
 
 def _totals(row: Any) -> sch.Totals:
@@ -481,8 +489,17 @@ def _with_pricing_warnings(out: sch.Quotation, ctx: PricedContext) -> sch.Quotat
     return out
 
 
-def _to_quotation(row: Any, line_rows: list[Any], settings: Settings) -> sch.Quotation:
-    partner, owner = _people(row)
+log = structlog.get_logger()
+
+_STORAGE_DOWN = "The document cannot be opened right now. Try again later."
+
+
+def _to_quotation(row: Any, line_rows: list[Any], settings: Settings,
+                  names: people.Names | None = None, portal: bool = False) -> sch.Quotation:
+    """`portal`: a partner caller gets no staff decision remark and no render error
+    (question 15.14, API review L1 and L4)."""
+    names = names or people.Names()
+    partner, owner = _people(row, names)
     lines = [_line_out(r) for r in line_rows]
     return sch.Quotation(
         id=str(row.id), quote_no=row.quote_no, version=row.version, status=row.status,
@@ -509,9 +526,8 @@ def _to_quotation(row: Any, line_rows: list[Any], settings: Settings) -> sch.Quo
         valid_until=_iso(row.valid_until), sent_at=_iso(row.sent_at),
         viewed_at=_iso(row.viewed_at), open_count=row.open_count,
         accepted_at=_iso(row.accepted_at), rejected_at=_iso(row.rejected_at),
-        decided_by=(UserRef(id=str(row.decided_by), full_name=row.decided_by_name)
-                    if row.decided_by and row.decided_by_name else None),
-        decision_remark=row.decision_remark,
+        decided_by=names.user(row.decided_by, row.decided_by_name),
+        decision_remark=None if portal else row.decision_remark,
         supersedes=(sch.VersionRef(id=str(row.supersedes_id), version=row.supersedes_version)
                     if row.supersedes_id and row.supersedes_version else None),
         superseded_by=(sch.VersionRef(id=str(row.superseded_by_id),
@@ -519,15 +535,14 @@ def _to_quotation(row: Any, line_rows: list[Any], settings: Settings) -> sch.Quo
                        if row.superseded_by_id and row.superseded_by_version else None),
         share_url=(domain.share_url(settings.public_web_url, row.share_token)
                    if row.share_token else None),
-        pdf_state=_pdf_state(row), pdf_error=row.pdf_error,
+        pdf_state=_pdf_state(row), pdf_error=None if portal else row.pdf_error,
         created_at=row.created_at.isoformat(),
-        created_by=(UserRef(id=str(row.created_by), full_name=row.created_by_name)
-                    if row.created_by and row.created_by_name else None),
+        created_by=names.user(row.created_by, row.created_by_name),
         updated_at=row.updated_at.isoformat())
 
 
-def _to_summary(row: Any) -> sch.QuotationSummary:
-    partner, owner = _people(row)
+def _to_summary(row: Any, names: people.Names) -> sch.QuotationSummary:
+    partner, owner = _people(row, names)
     return sch.QuotationSummary(
         id=str(row.id), quote_no=row.quote_no, version=row.version, status=row.status,
         sales_type=row.sales_type, lead=_lead_ref(row), party_name=row.party_name,
@@ -540,12 +555,41 @@ def _to_summary(row: Any) -> sch.QuotationSummary:
         created_at=row.created_at.isoformat())
 
 
-async def get_quotation(db: AsyncSession, quotation_id: str, settings: Settings) -> sch.Quotation:
+async def get_quotation(db: AsyncSession, quotation_id: str, settings: Settings,
+                        portal: bool = False) -> sch.Quotation:
     row = (await db.execute(text(_Q_SELECT + " WHERE q.id = CAST(:id AS uuid)"),
                             {"id": quotation_id})).one_or_none()
     if row is None:
         raise NotFoundError("No such quotation.")
-    return _to_quotation(row, await _stored_lines(db, row.id), settings)
+    out = _to_quotation(row, await _stored_lines(db, row.id), settings,
+                        await _names(db, [row]), portal)
+    out.approval, _ = await approval_view.load(db, "quotation", quotation_id, portal)
+    if row.status == "draft" and not portal:
+        # a dealer does not learn the officer's discount limit (OCR review)
+        out.discount = await _discount(db, quotation_id)
+    return out
+
+
+async def _discount(db: AsyncSession, quotation_id: str) -> sch.DiscountInfo:
+    """FS-013: the owner's limit and the gate, from the definers (officers cannot read
+    the threshold rows, EC-7)."""
+    # one round trip: every read of a draft pays for this (code review)
+    lim = (await db.execute(text(
+        "SELECT l.owner_limit_pct, l.effective_pct, l.approval_required, "
+        "quotation_send_gate(CAST(:q AS uuid)) AS gate "
+        "FROM quotation_discount_limit(CAST(:q AS uuid)) l"), {"q": quotation_id})).one()
+    gate = lim.gate
+    return sch.DiscountInfo(
+        effective_pct=f"{lim.effective_pct:.2f}",
+        owner_limit_pct=None if lim.owner_limit_pct is None else f"{lim.owner_limit_pct:.2f}",
+        approval_required=bool(lim.approval_required), send_gate=gate)
+
+
+async def _cancel_approval(db: AsyncSession, quotation_id: str) -> None:
+    """Plan review B-2: an edit or a delete cancels a pending request, so an approval
+    is never for other figures (EC-1). After the lead and quotation locks."""
+    await db.execute(text("SELECT quotation_approval_cancel(CAST(:q AS uuid))"),
+                     {"q": quotation_id})
 
 
 async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | None = None,
@@ -566,7 +610,9 @@ async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | No
                 sa.table("lead", sa.column("id", _UUID), sa.column("merged_into_id", _UUID))
             ).where(sa.column("merged_into_id", _UUID) == lead_id))))
     if status:
-        where.append(sa.cast(quotation_t.c.status, sa.Text) == status)
+        # a comma list, like the lead list's stage: "open" is several statuses
+        wanted = [x.strip() for x in status.split(",") if x.strip()]
+        where.append(sa.cast(quotation_t.c.status, sa.Text).in_(wanted) if wanted else sa.true())
     if sales_type:
         where.append(sa.cast(quotation_t.c.sales_type, sa.Text) == sales_type)
     if owner == "me":
@@ -607,8 +653,9 @@ async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | No
     rows = (await db.execute(text(_Q_SELECT + " WHERE q.id = ANY(CAST(:ids AS uuid[]))"),
                              {"ids": ids})).all()
     by_id = {str(r.id): r for r in rows}
+    names = await _names(db, rows)
     return sch.QuotationPage(
-        data=[_to_summary(by_id[i]) for i in ids if i in by_id],
+        data=[_to_summary(by_id[i], names) for i in ids if i in by_id],
         meta=PageMeta(limit=limit, next_cursor=next_cursor, total=total,
                       total_capped=total_capped))
 
@@ -644,13 +691,18 @@ async def versions(db: AsyncSession, quotation_id: str) -> list[sch.QuotationSum
     else:
         rows = (await db.execute(text(_Q_SELECT + " WHERE q.quote_no = :no ORDER BY q.version"),
                                  {"no": anchor.quote_no})).all()
-    return [_to_summary(r) for r in rows]
+    names = await _names(db, rows)
+    return [_to_summary(r, names) for r in rows]
+
+
+# what a dealer's quotation timeline never carries: staff remarks (question 15.14)
+_PORTAL_HIDDEN_KEYS = frozenset({"remark", "decision_remark", "owner_limit_pct"})
 
 
 async def timeline(db: AsyncSession, quotation_id: str, *, limit: int = 100,
-                   cursor: str | None = None) -> TimelinePage:
+                   cursor: str | None = None, portal: bool = False) -> TimelinePage:
     limit = max(1, min(limit, _MAX_LIMIT))
-    visible = (await db.execute(text("SELECT quotation_visible(CAST(:id AS uuid))"),
+    visible: bool = (await db.execute(text("SELECT quotation_visible(CAST(:id AS uuid))"),
                                 {"id": quotation_id})).scalar_one()
     if not visible:
         raise NotFoundError("No such quotation.")
@@ -669,15 +721,35 @@ async def timeline(db: AsyncSession, quotation_id: str, *, limit: int = 100,
         last = rows[limit - 1]
         next_cursor = _encode_cursor(last.occurred_at, str(last.id))
         rows = rows[:limit]
+    remarks = {} if portal else await _request_remarks(db, quotation_id)
     events = []
     for r in rows:
-        payload = json.loads(r.payload) if isinstance(r.payload, str) else (r.payload or {})
+        payload = json.loads(r.payload) if isinstance(r.payload, str) else dict(r.payload or {})
+        if portal:
+            # a dealer sees that the discount was decided, never by whom or why
+            # (cross-vendor review of FS-013)
+            payload = {k: v for k, v in payload.items() if k not in _PORTAL_HIDDEN_KEYS}
+        elif r.kind == "quotation.approval_requested":
+            remark = remarks.get(str(payload.get("request_id")))
+            if remark:
+                payload["remark"] = remark
+        hidden = portal and order_domain.actor_hidden_from_partner(r.kind)
         actor = (UserRef(id=str(r.actor_id), full_name=payload.get("actor_name") or "")
-                 if r.actor_id is not None else None)
+                 if r.actor_id is not None and not hidden else None)
         events.append(TimelineEvent(id=str(r.id), kind=r.kind,
                                     occurred_at=r.occurred_at.isoformat(),
                                     actor=actor, payload=payload))
     return TimelinePage(data=events, meta=PageMeta(limit=limit, next_cursor=next_cursor))
+
+
+async def _request_remarks(db: AsyncSession, quotation_id: str) -> dict[str, str]:
+    """Why each discount approval was asked for, for staff: kept on the request, never
+    in an event payload."""
+    rows = (await db.execute(text(
+        "SELECT id::text AS id, remark FROM approval_request "
+        "WHERE doc_type = 'quotation' AND entity_id = CAST(:q AS uuid) AND remark IS NOT NULL"),
+        {"q": quotation_id})).all()
+    return {r.id: r.remark for r in rows}
 
 
 # ── create ───────────────────────────────────────────────────────────────────
@@ -706,7 +778,7 @@ async def create_quotation(db: AsyncSession, caller: Caller, body: sch.Quotation
     _compare(body.lines, ctx)
 
     try:
-        quotation_id = (await db.execute(text("""
+        quotation_id: Any = (await db.execute(text("""
             INSERT INTO quotation (lead_id, sales_type, partner_id, owner_user_id,
                 owner_org_unit_id, territory_id, party_name, party_mobile, party_address,
                 party_gstin, seller_gstin_id, place_of_supply_territory_id,
@@ -806,6 +878,7 @@ async def patch_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
         raise _map_write_error(exc) from exc
     await _write_lines(db, row.id, ctx, snapshots=stored)
     await _write_header_figures(db, row.id, ctx)
+    await _cancel_approval(db, quotation_id)
     await _emit(db, quotation_id=row.id, lead_id=row.lead_id, kind="quotation.updated",
                 actor_id=caller.user_id, actor_name=await _actor_name(db),
                 fields=sorted(body.model_fields_set - {"expected_status"}))
@@ -830,6 +903,7 @@ async def replace_lines(db: AsyncSession, caller: Caller, quotation_id: str,
     _compare(body.lines, ctx)
     await _write_lines(db, row.id, ctx)
     await _write_header_figures(db, row.id, ctx)
+    await _cancel_approval(db, quotation_id)
     await _emit(db, quotation_id=row.id, lead_id=row.lead_id, kind="quotation.lines_replaced",
                 actor_id=caller.user_id, actor_name=await _actor_name(db), lines=len(body.lines))
     return _with_pricing_warnings(await get_quotation(db, quotation_id, settings), ctx)
@@ -846,6 +920,7 @@ async def delete_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     row = await _lock_quotation(db, quotation_id)
     _expect(row, body.expected_status)
     _must_be_draft(row)
+    await _cancel_approval(db, quotation_id)
     await _emit(db, quotation_id=row.id, lead_id=row.lead_id, kind="quotation.deleted",
                 actor_id=caller.user_id, actor_name=await _actor_name(db))
     await db.execute(text("UPDATE quotation SET deleted_at = now(), updated_by = CAST(:me AS uuid) "
@@ -886,6 +961,17 @@ async def send_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                        seller_gstin_id=str(row.seller_gstin_id), as_of=row.price_effective_date,
                        specs=_specs_from_rows(stored), existing=True)
     _compare_stored(stored, ctx)
+    gate: str = (await db.execute(text("SELECT quotation_send_gate(CAST(:q AS uuid))"),
+                             {"q": quotation_id})).scalar_one()
+    if gate == "pending":
+        raise ConflictError("The discount is waiting for approval.", code="approval_pending")
+    if gate not in ("none_needed", "approved"):
+        raise ConflictError("The discount is above your limit. Request approval first.",
+                            code="discount_approval_required", fields={"send_gate": gate})
+    if gate == "none_needed":
+        # a limit raised while a request waited: the request is moot, and must not
+        # sit in the approver's inbox for a sent document (code review)
+        await _cancel_approval(db, quotation_id)
 
     lead = await _lead_defaults(db, str(row.lead_id))
     if predecessor is not None and predecessor.quote_no:
@@ -935,6 +1021,44 @@ async def send_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                 quote_no=quote_no, version=row.version, channel=body.channel,
                 lead_stage_before=previous, provisional=any(r.provisional_fields for r in stored))
     return _with_pricing_warnings(await get_quotation(db, quotation_id, settings), ctx)
+
+
+# ── discount approval (FS-013) ──────────────────────────────────────────────
+
+_APPROVAL_ERRORS = {
+    "APRNR": (409, "approval_not_required", "The discount is within the owner's limit; send it."),
+    "APRPD": (409, "approval_pending", "An approval is already waiting."),
+    "APRNA": (422, "no_approver", "Nobody's limit covers this discount. Lower it or ask an "
+                                  "administrator to raise a limit."),
+    "QTNDR": (409, "quotation_not_draft", "Only a draft needs a discount approval."),
+    "QTNF0": (404, "not_found", "No such quotation."),
+}
+
+
+async def request_approval(db: AsyncSession, caller: Caller, quotation_id: str,
+                           body: sch.ApprovalRequestIn, settings: Settings) -> sch.Quotation:
+    head = (await db.execute(text(
+        "SELECT lead_id FROM quotation WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL"),
+        {"id": quotation_id})).one_or_none()
+    if head is None:
+        raise NotFoundError("No such quotation.")
+    await _lock_lead(db, str(head.lead_id), require_open=False)
+    try:
+        await db.execute(text("SELECT quotation_request_approval(CAST(:q AS uuid), :r)"),
+                         {"q": quotation_id, "r": body.remark})
+    except DBAPIError as exc:
+        code = _sqlstate(exc) or ""
+        if code == "42501":
+            raise ForbiddenError("Not permitted on this quotation.") from exc
+        if code in _APPROVAL_ERRORS:
+            status, api_code, sentence = _APPROVAL_ERRORS[code]
+            if status == 404:
+                raise NotFoundError(sentence) from exc
+            if status == 409:
+                raise ConflictError(sentence, code=api_code) from exc
+            raise ValidationFailed(sentence, code=api_code) from exc
+        raise
+    return await get_quotation(db, quotation_id, settings)
 
 
 # ── the answer ───────────────────────────────────────────────────────────────
@@ -1022,7 +1146,7 @@ async def revise_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                        seller_gstin_id=str(src.seller_gstin_id), as_of=body.price_effective_date,
                        specs=_specs_from_rows(stored), existing=True)
     try:
-        new_id = (await db.execute(text("""
+        new_id: Any = (await db.execute(text("""
             INSERT INTO quotation (quote_no, version, supersedes_id, lead_id, sales_type,
                 partner_id, owner_user_id, owner_org_unit_id, territory_id, party_name,
                 party_mobile, party_address, party_gstin, seller_gstin_id,
@@ -1076,7 +1200,10 @@ async def pdf_link(db: AsyncSession, quotation_id: str, storage: Storage) -> sch
     try:
         url, expires = storage.presign_get(row.pdf_key, filename=filename)
     except RuntimeError as exc:
-        raise ConflictError(str(exc), code="storage_unavailable") from exc
+        # the reason names configuration; it goes to the log, never to a caller
+        # (API review L4: the public link reached it)
+        log.warning("quotation.storage_unavailable", reason=str(exc))
+        raise ConflictError(_STORAGE_DOWN, code="storage_unavailable") from exc
     return sch.PdfLink(url=url, expires_at=expires.isoformat(), filename=filename)
 
 
@@ -1106,7 +1233,8 @@ def _public(doc: dict[str, Any], token: str) -> sch.PublicQuotation:
 
 
 async def public_view(db: AsyncSession, token: str) -> sch.PublicQuotation:
-    doc = (await db.execute(text("SELECT quotation_public_view(:t)"), {"t": token})).scalar_one()
+    doc: Any = (await db.execute(text("SELECT quotation_public_view(:t)"),
+                                 {"t": token})).scalar_one()
     if doc is None:
         raise NotFoundError("No such quotation.")
     if isinstance(doc, str):
@@ -1117,7 +1245,7 @@ async def public_view(db: AsyncSession, token: str) -> sch.PublicQuotation:
 async def public_open(db: AsyncSession, token: str, user_agent: str | None,
                       storage: Storage) -> str:
     """Records the view (once), then the ten-minute URL to redirect to."""
-    doc = (await db.execute(text("SELECT quotation_public_open(:t, :ua)"),
+    doc: Any = (await db.execute(text("SELECT quotation_public_open(:t, :ua)"),
                             {"t": token, "ua": (user_agent or "")[:200]})).scalar_one()
     if doc is None:
         raise NotFoundError("No such quotation.")
@@ -1128,5 +1256,8 @@ async def public_open(db: AsyncSession, token: str, user_agent: str | None,
     try:
         url, _ = storage.presign_get(str(doc["pdf_key"]), filename=filename)
     except RuntimeError as exc:
-        raise ConflictError(str(exc), code="storage_unavailable") from exc
+        # the reason names configuration; it goes to the log, never to a caller
+        # (API review L4: the public link reached it)
+        log.warning("quotation.storage_unavailable", reason=str(exc))
+        raise ConflictError(_STORAGE_DOWN, code="storage_unavailable") from exc
     return url

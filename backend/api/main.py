@@ -27,6 +27,7 @@ from api.errors import (
 )
 from api.routers import (
     auth,
+    lead_qr,
     leads,
     masters,
     orders,
@@ -150,6 +151,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(leads.router, prefix=API_PREFIX)
     app.include_router(leads.lookups, prefix=API_PREFIX)
+    app.include_router(lead_qr.router, prefix=API_PREFIX)
     app.include_router(users.router, prefix=API_PREFIX)
     app.include_router(users.roles, prefix=API_PREFIX)
     app.include_router(masters.org_units, prefix=API_PREFIX)

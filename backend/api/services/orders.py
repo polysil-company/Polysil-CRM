@@ -25,6 +25,7 @@ from decimal import Decimal
 from typing import Any
 
 import sqlalchemy as sa
+import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,17 +47,20 @@ from api.schemas import orders as sch
 from api.schemas.leads import (
     OrgUnitRef,
     PageMeta,
-    PartnerRef,
     TerritoryRef,
     TimelineEvent,
     TimelinePage,
     UserRef,
 )
-from api.schemas.quotations import QuotationLineIn, Totals
-from api.services import pricing
+from api.schemas.quotations import PdfLink, QuotationLineIn, Totals
+from api.services import approval_view, people, pricing
 from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor, _route
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
+from api.services.quotations import _STORAGE_DOWN
+from api.storage import Storage
+
+log = structlog.get_logger(__name__)
 
 _ORDERS = SPECS["sales_orders"]
 _MAX_LIMIT = 100
@@ -136,10 +140,10 @@ def map_db_error(exc: DBAPIError) -> Exception:
     msg = _pg_text(exc)
     if code == "42501":
         if "self_approval" in msg:
-            return ForbiddenError("You cannot decide on your own order.", code="self_approval")
+            return ForbiddenError("You cannot decide on your own request.", code="self_approval")
         if "not_your_step" in msg:
             return ForbiddenError("This step is not yours to decide.", code="not_your_step")
-        return ForbiddenError("Not permitted on this order.")
+        return ForbiddenError("Not permitted on this document.")
     if code == "23514" and ("submitted order cannot change" in msg or "cannot move from" in msg
                             or "lines of a submitted order" in msg):
         return ConflictError("Only a draft can be changed.", code="order_not_draft")
@@ -147,7 +151,7 @@ def map_db_error(exc: DBAPIError) -> Exception:
         status, api_code = domain.SQLSTATE_TO_ERROR[code]
         sentence = msg.split("\n", 1)[0]
         if status == 404:
-            return NotFoundError("No such order.")
+            return NotFoundError("No such document.")
         if status == 409:
             return ConflictError(sentence, code=api_code)
         return ValidationFailed(sentence, code=api_code)
@@ -372,37 +376,15 @@ def _is_portal(caller: Caller) -> bool:
 async def _approval(db: AsyncSession, order_id: str, portal: bool,
                     request_id: str | None = None) -> tuple[sch.Approval | None, Any]:
     """The named request of the order, or its latest."""
-    req = (await db.execute(text(
-        "SELECT id, status::text AS status FROM approval_request "
-        "WHERE doc_type = 'sales_order' AND entity_id = CAST(:o AS uuid) "
-        "AND (CAST(:r AS uuid) IS NULL OR id = CAST(:r AS uuid)) "
-        "ORDER BY created_at DESC, id DESC LIMIT 1"),
-        {"o": order_id, "r": request_id})).one_or_none()
-    if req is None:
-        return None, None
-    steps = (await db.execute(text(
-        "SELECT s.id, s.seq, r.code::text AS role, dr.code::text AS decided_role, "
-        "s.decision::text AS decision, s.approver_user_id, u.full_name, s.remark, s.decided_at "
-        "FROM approval_step s JOIN role r ON r.id = s.approver_role_id "
-        "LEFT JOIN role dr ON dr.id = s.decided_role_id "
-        "LEFT JOIN app_user u ON u.id = s.approver_user_id "
-        "WHERE s.request_id = CAST(:r AS uuid) ORDER BY s.seq"), {"r": str(req.id)})).all()
-    out = []
-    for s in steps:
-        by = (UserRef(id=str(s.approver_user_id), full_name=s.full_name or "")
-              if s.approver_user_id and not portal else None)
-        out.append(sch.ApprovalStep(
-            id=str(s.id), seq=s.seq, role=s.role,
-            decided_role=s.decided_role if s.decided_role and s.decided_role != s.role else None,
-            decision=s.decision, by=by, remark=None if portal else s.remark,
-            decided_at=_iso(s.decided_at)))
-    return sch.Approval(request_id=str(req.id), status=req.status, steps=out), (req, steps)
+    return await approval_view.load(db, "sales_order", order_id, portal, request_id)
 
 
 async def _dispatches(db: AsyncSession, order_id: str, portal: bool = False
                       ) -> list[sch.Dispatch]:
     rows = (await db.execute(text(
-        "SELECT d.*, u.full_name FROM dispatch d LEFT JOIN app_user u ON u.id = d.dispatched_by "
+        "SELECT d.*, u.full_name, o.order_no::text AS order_no, o.party_name FROM dispatch d "
+        "JOIN sales_order o ON o.id = d.sales_order_id "
+        "LEFT JOIN app_user u ON u.id = d.dispatched_by "
         "WHERE d.sales_order_id = CAST(:o AS uuid) ORDER BY d.created_at, d.dispatch_no"),
         {"o": order_id})).all()
     return await _with_lines(db, rows, portal)
@@ -420,20 +402,25 @@ async def _with_lines(db: AsyncSession, rows: Sequence[Any], portal: bool) -> li
     for ln in lines:
         by_dispatch.setdefault(str(ln.dispatch_id), []).append(sch.DispatchLineOut(
             order_line_id=str(ln.order_line_id), line_no=ln.line_no, qty=_qty(ln.qty)))
-    return [_dispatch_out(r, by_dispatch.get(str(r.id), []), portal) for r in rows]
+    names = (people.Names() if portal
+             else await people.resolve(db, rows, [("dispatched_by", "full_name")]))
+    return [_dispatch_out(r, by_dispatch.get(str(r.id), []), portal, names) for r in rows]
 
 
-def _dispatch_out(r: Any, lines: list[sch.DispatchLineOut], portal: bool = False
-                  ) -> sch.Dispatch:
+def _dispatch_out(r: Any, lines: list[sch.DispatchLineOut], portal: bool = False,
+                  names: people.Names | None = None) -> sch.Dispatch:
     """A partner sees what shipped and when, not who recorded it or why a dispatch
     was voided (question 15.14)."""
     return sch.Dispatch(
-        id=str(r.id), dispatch_no=r.dispatch_no, dc_no=r.dc_no, dc_date=_iso(r.dc_date),
+        id=str(r.id),
+        order=sch.DispatchOrderRef(id=str(r.sales_order_id), order_no=r.order_no,
+                                   party_name=r.party_name),
+        dispatch_no=r.dispatch_no, dc_no=r.dc_no, dc_date=_iso(r.dc_date),
         invoice_no=r.invoice_no, invoice_date=_iso(r.invoice_date),
         dispatched_at=r.dispatched_at.isoformat(), transporter=r.transporter,
         vehicle_no=r.vehicle_no,
-        dispatched_by=(UserRef(id=str(r.dispatched_by), full_name=r.full_name or "")
-                       if r.dispatched_by and not portal else None),
+        dispatched_by=(None if portal
+                       else (names or people.Names()).user(r.dispatched_by, r.full_name)),
         voided_at=_iso(r.voided_at), void_remark=None if portal else r.void_remark,
         lines=lines)
 
@@ -495,9 +482,9 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
                 role=rej.role, at=rej.decided_at.isoformat())
     seller = (sch.OrderSeller(gstin=r.s_gstin, legal_name=r.s_name, address=r.s_address,
                               state_code=r.s_state) if r.s_gstin else None)
-    partner = (PartnerRef(id=str(r.partner_id), name=r.partner_name,
-                          partner_type=r.partner_type)
-               if r.partner_id and r.partner_name else None)
+    names = await people.resolve(db, [r], [("owner_user_id", "owner_name")],
+                                 [("partner_id", "partner_name")])
+    partner = names.partner(r.partner_id, r.partner_name, r.partner_type)
     return sch.Order(
         id=str(r.id), order_no=r.order_no, status=r.status_text, order_type=r.type_text,
         party=sch.OrderParty(name=r.party_name, mobile=r.party_mobile, address=r.party_address,
@@ -506,8 +493,7 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         lead=(sch.OrderLeadRef(id=str(r.lead_id), inquiry_no=r.lead_inquiry_no)
               if r.lead_id and r.lead_inquiry_no else None),
         quotations=quotations,
-        owner=(UserRef(id=str(r.owner_user_id), full_name=r.owner_name)
-               if r.owner_user_id and r.owner_name else None),
+        owner=names.user(r.owner_user_id, r.owner_name),
         owner_org_unit=OrgUnitRef(id=str(r.owner_org_unit_id), name=r.owner_org_unit_name),
         territory=TerritoryRef(id=str(r.territory_id), name=r.territory_name,
                                level=r.territory_level),
@@ -518,6 +504,12 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         tax_date=_iso(r.tax_date), is_provisional=r.is_provisional, lines=lines,
         totals=_totals(r), approval=approval, last_rejection=last_rejection,
         dispatches=await _dispatches(db, order_id, portal), warnings=_warnings(r, lines),
+        pdf_state=("pending" if r.pdf_state == "rendering" else r.pdf_state or "none"),
+        pdf_error=None if portal else r.pdf_error,
+        confirmation=(await db.execute(text(
+            "SELECT payload->>'confirmation' FROM activity_event WHERE entity_type = 'sales_order' "
+            "AND entity_id = CAST(:o AS uuid) AND kind = 'order.approved' "
+            "ORDER BY occurred_at DESC LIMIT 1"), {"o": order_id})).scalar_one_or_none(),
         remarks=r.remarks, submitted_at=_iso(r.submitted_at), approved_at=_iso(r.approved_at),
         cancelled_at=_iso(r.cancelled_at),
         # a partner reads its own cancel reason, never a staff one (question 15.14)
@@ -534,16 +526,16 @@ def _parse_date(value: str, field: str) -> dt.datetime:
         raise ValidationFailed(fields={field: "not an ISO date"}) from exc
 
 
-async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = None,
-                      order_type: str | None = None, partner_id: str | None = None,
-                      lead_id: str | None = None, owner: str | None = None, q: str | None = None,
-                      created_from: str | None = None, created_to: str | None = None,
-                      limit: int = 25, cursor: str | None = None,
-                      include_total: bool = False) -> sch.OrderPage:
-    limit = max(1, min(limit, _MAX_LIMIT))
+def _order_filters(caller: Caller, *, status: str | None = None,
+                   order_type: str | None = None, partner_id: str | None = None,
+                   lead_id: str | None = None, owner: str | None = None, q: str | None = None,
+                   created_from: str | None = None, created_to: str | None = None) -> list[Any]:
+    """The scope and every filter of the order list, shared with the counts."""
     where: list[Any] = [scope_predicate(_ORDERS, caller, order_t)]
     if status:
-        where.append(sa.cast(order_t.c.status, sa.Text) == status)
+        # a comma list, like the lead list's stage: "open" is several statuses
+        wanted = [x.strip() for x in status.split(",") if x.strip()]
+        where.append(sa.cast(order_t.c.status, sa.Text).in_(wanted) if wanted else sa.true())
     if order_type:
         where.append(sa.cast(order_t.c.order_type, sa.Text) == order_type)
     if partner_id:
@@ -563,6 +555,58 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
         like = f"%{esc}%"
         where.append(sa.or_(sa.cast(order_t.c.order_no, sa.Text).ilike(like),
                             order_t.c.party_name.ilike(like), order_t.c.party_mobile.ilike(like)))
+    return where
+
+
+_STATUSES = ("draft", "submitted", "approved", "partially_dispatched", "dispatched",
+             "closed_short", "cancelled")
+_step_t = sa.table("approval_step", sa.column("request_id", sa.Uuid),
+                   sa.column("approver_role_id", sa.Uuid), sa.column("decision"),
+                   sa.column("seq", sa.Integer))
+_request_t = sa.table("approval_request", sa.column("id", sa.Uuid), sa.column("doc_type"),
+                      sa.column("entity_id", sa.Uuid), sa.column("status"))
+_role_t = sa.table("role", sa.column("id", sa.Uuid), sa.column("code"))
+
+
+async def order_stats(db: AsyncSession, caller: Caller, **filters: str | None) -> sch.OrderStats:
+    """Counts for the order board (API review B2): every status, and the submitted
+    orders by the role whose step is next."""
+    where = _order_filters(caller, **filters)
+    status = sa.cast(order_t.c.status, sa.Text)
+    by_status = dict.fromkeys(_STATUSES, 0)
+    for r in (await db.execute(sa.select(status.label("s"), sa.func.count().label("n"))
+                               .select_from(order_t).where(sa.and_(*where))
+                               .group_by(status))).all():
+        by_status[r.s] = r.n
+    # the next undecided step of each pending request on a submitted order in scope
+    first = (sa.select(_step_t.c.request_id, sa.func.min(_step_t.c.seq).label("seq"))
+             .where(_step_t.c.decision.is_(None)).group_by(_step_t.c.request_id).subquery())
+    submitted = sa.select(order_t.c.id).where(sa.and_(*where, status == "submitted"))
+    waiting = (await db.execute(
+        sa.select(sa.cast(_role_t.c.code, sa.Text).label("role"), sa.func.count().label("n"))
+        .select_from(_request_t
+                     .join(first, first.c.request_id == _request_t.c.id)
+                     .join(_step_t, sa.and_(_step_t.c.request_id == first.c.request_id,
+                                            _step_t.c.seq == first.c.seq))
+                     .join(_role_t, _role_t.c.id == _step_t.c.approver_role_id))
+        .where(_request_t.c.doc_type == "sales_order",
+               sa.cast(_request_t.c.status, sa.Text) == "pending",
+               _request_t.c.entity_id.in_(submitted))
+        .group_by(_role_t.c.code))).all()
+    return sch.OrderStats(total=sum(by_status.values()), by_status=by_status,
+                          waiting_on={r.role: r.n for r in waiting})
+
+
+async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = None,
+                      order_type: str | None = None, partner_id: str | None = None,
+                      lead_id: str | None = None, owner: str | None = None, q: str | None = None,
+                      created_from: str | None = None, created_to: str | None = None,
+                      limit: int = 25, cursor: str | None = None,
+                      include_total: bool = False) -> sch.OrderPage:
+    limit = max(1, min(limit, _MAX_LIMIT))
+    where = _order_filters(caller, status=status, order_type=order_type,
+                           partner_id=partner_id, lead_id=lead_id, owner=owner, q=q,
+                           created_from=created_from, created_to=created_to)
     filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)
@@ -599,6 +643,8 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
                  ORDER BY s.seq LIMIT 1) AS waiting
           FROM sales_order o WHERE o.id = ANY(CAST(:ids AS uuid[]))"""), {"ids": ids})).all()}
     by_id = {str(r.id): r for r in rows}
+    names = await people.resolve(db, rows, [("owner_user_id", "owner_name")],
+                                 [("partner_id", "partner_name")])
     data = []
     for i in ids:
         r = by_id.get(i)
@@ -608,11 +654,8 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
         data.append(sch.OrderSummary(
             id=i, order_no=r.order_no, status=r.status_text, order_type=r.type_text,
             party_name=r.party_name,
-            partner=(PartnerRef(id=str(r.partner_id), name=r.partner_name,
-                                partner_type=r.partner_type)
-                     if r.partner_id and r.partner_name else None),
-            owner=(UserRef(id=str(r.owner_user_id), full_name=r.owner_name)
-                   if r.owner_user_id and r.owner_name else None),
+            partner=names.partner(r.partner_id, r.partner_name, r.partner_type),
+            owner=names.user(r.owner_user_id, r.owner_name),
             totals=_totals(r), is_provisional=r.is_provisional,
             dispatched_pct=domain.dispatched_pct(Decimal(x.ordered), Decimal(x.sent)),
             approval_waiting_on=x.waiting, submitted_at=_iso(r.submitted_at),
@@ -654,13 +697,15 @@ async def timeline(db: AsyncSession, caller: Caller, order_id: str, *, limit: in
         last = rows[limit - 1]
         next_cursor = _encode_cursor(last.occurred_at, str(last.id))
         rows = rows[:limit]
+    names = await people.resolve(db, rows, [("actor_id", "full_name")])
     events = []
     for r in rows:
         payload = json.loads(r.payload) if isinstance(r.payload, str) else dict(r.payload or {})
         approval = r.kind.startswith("approval.")
         if approval and not portal and r.remark:
             payload["remark"] = r.remark
-        name = payload.pop("actor_name", None) or r.full_name or ""
+        name = (payload.pop("actor_name", None) or r.full_name
+                or names.users.get(str(r.actor_id)) or "")
         hidden = portal and domain.actor_hidden_from_partner(r.kind)
         actor = (UserRef(id=str(r.actor_id), full_name=name)
                  if r.actor_id is not None and not hidden else None)
@@ -1004,7 +1049,7 @@ async def record_dispatch(db: AsyncSession, caller: Caller, order_id: str,
     if body.invoice_date and body.dc_date and body.invoice_date < body.dc_date:
         warnings.append("invoice_before_dc: the invoice date is before the DC date.")
     if body.invoice_no:
-        repeats = (await db.execute(text(
+        repeats: int = (await db.execute(text(
             "SELECT count(*) FROM dispatch WHERE invoice_no = :i AND id <> CAST(:d AS uuid) "
             "AND voided_at IS NULL"), {"i": body.invoice_no, "d": str(dispatch_id)})).scalar_one()
         if repeats:
@@ -1050,7 +1095,8 @@ async def list_dispatches(db: AsyncSession, caller: Caller, *, order_id: str | N
     if cursor:
         before_at, before_id = _decode_cursor(cursor)
     rows = (await db.execute(text(
-        "SELECT d.*, u.full_name FROM dispatch d JOIN sales_order o ON o.id = d.sales_order_id "
+        "SELECT d.*, u.full_name, o.order_no::text AS order_no, o.party_name "
+        "FROM dispatch d JOIN sales_order o ON o.id = d.sales_order_id "
         "LEFT JOIN app_user u ON u.id = d.dispatched_by "
         "WHERE (CAST(:o AS uuid) IS NULL OR d.sales_order_id = CAST(:o AS uuid)) "
         "AND (CAST(:p AS uuid) IS NULL OR o.partner_id = CAST(:p AS uuid)) "
@@ -1076,3 +1122,35 @@ __all__ = ["ApiError", "cancel_order", "close_short", "create_order", "delete_or
            "get_order", "list_dispatches", "list_orders", "map_db_error", "order_dispatches",
            "patch_order", "record_dispatch", "replace_lines", "submit_order", "timeline",
            "void_dispatch"]
+
+
+# ── the order PDF (FS-012) ───────────────────────────────────────────────────
+
+async def pdf_link(db: AsyncSession, caller: Caller, order_id: str, storage: Storage) -> PdfLink:
+    """A ten-minute link to the approved order's PDF. The row is read under RLS, so
+    an order out of scope is a 404 like any other."""
+    row = (await db.execute(text(
+        "SELECT order_no::text AS order_no, status::text AS status, pdf_state, pdf_key, pdf_error "
+        "FROM sales_order WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL"),
+        {"id": order_id})).one_or_none()
+    if row is None:
+        raise NotFoundError("No such order.")
+    if row.status == "cancelled":
+        # rule 8: the PDF is the approved order, and this one no longer stands
+        raise ConflictError("The order was cancelled; its PDF is withdrawn.",
+                            code="order_cancelled")
+    if row.pdf_state is None:
+        raise NotFoundError("No PDF: the order is not approved yet.")
+    if row.pdf_state == "failed":
+        raise ConflictError("The PDF could not be produced.", code="pdf_failed",
+                            fields={} if _is_portal(caller) else {"pdf_error": row.pdf_error or ""})
+    if row.pdf_state != "ready":
+        raise ConflictError("The PDF is being prepared; try again in a few seconds.",
+                            code="pdf_pending")
+    filename = domain.pdf_filename(row.order_no)
+    try:
+        url, expires = storage.presign_get(row.pdf_key, filename=filename)
+    except RuntimeError as exc:
+        log.warning("order.storage_unavailable", reason=str(exc))
+        raise ConflictError(_STORAGE_DOWN, code="storage_unavailable") from exc
+    return PdfLink(url=url, expires_at=expires.isoformat(), filename=filename)

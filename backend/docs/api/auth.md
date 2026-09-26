@@ -426,4 +426,5 @@ response on a slow connection does not sign the user out of everything.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `name` | string \| null |  | Null until the channel module lands; the id is stable now. |
+| `name` | string \| null |  | The partner firm, for the portal header. |
+| `partner_type` | string \| null |  | distributor, dealer or sub_dealer. |

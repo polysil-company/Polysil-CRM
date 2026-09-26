@@ -45,6 +45,7 @@ from api.schemas.leads import (
     LeadPage,
     LeadPatch,
     LeadReopen,
+    LeadStats,
     LeadTransition,
     LookupCreate,
     LookupItem,
@@ -64,6 +65,7 @@ from api.schemas.leads import (
     TimelinePage,
     UserRef,
 )
+from api.services import people
 
 _LEADS = SPECS["leads"]
 
@@ -201,7 +203,9 @@ async def _rescore(db: AsyncSession, lead_id: Any) -> None:
 
 # ── create ───────────────────────────────────────────────────────────────────
 
-async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lead:
+async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate, *,
+                      intake: bool = False, intake_partner_id: str | None = None,
+                      qr_code_id: str | None = None) -> Lead:
     """Enter one lead, in one transaction (rule 14). require('leads','create') has
     already run in the route, and the idempotency record is reserved around this
     call, so this is the work that commits or rolls back as a unit."""
@@ -242,9 +246,15 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lea
             code="territory_without_state_code",
             fields={"territory_id": "no coded state ancestor"})
 
-    # 4. route the owner and the org unit (rules 4 and 5).
-    owner_user_id, owner_org_unit_id, assigned_partner_id = await _route(
-        db, caller, str(body.territory_id))
+    # 4. route the owner and the org unit (rules 4 and 5). A public lead routes by
+    # its territory and QR code, never by the intake principal's own office
+    # (FS-003a EC-2).
+    if intake:
+        owner_user_id, owner_org_unit_id, assigned_partner_id = await _route_intake(
+            db, str(body.territory_id), intake_partner_id)
+    else:
+        owner_user_id, owner_org_unit_id, assigned_partner_id = await _route(
+            db, caller, str(body.territory_id))
 
     # 4b. the routed row must sit in the caller's own scope. The INSERT policy would
     # refuse it with 42501 (a 500); this turns the common misroute into a clean 422
@@ -275,16 +285,16 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate) -> Lea
         INSERT INTO lead (inquiry_no, stage, inquiry_type, mis_system_id, lead_source_id,
             farmer_name, mobile, email, territory_id, village, owner_user_id,
             owner_org_unit_id, assigned_partner_id, score, priority, estimated_value,
-            created_by)
+            created_by, qr_code_id)
         VALUES (:no, 'new', CAST(:it AS inquiry_type), :mis, :src, :name, :mob, :email,
             :tid, :village, :owner, :oou, :ap, :score, CAST(:prio AS lead_priority),
-            :est, :me)
+            :est, :me, :qr)
         RETURNING id"""), {
         "no": inquiry_no, "it": body.inquiry_type, "mis": mis.id, "src": src.id,
         "name": body.farmer_name, "mob": mobile, "email": body.email,
         "tid": str(body.territory_id), "village": body.village, "owner": owner_user_id,
         "oou": owner_org_unit_id, "ap": assigned_partner_id, "score": score,
-        "prio": priority, "est": body.estimated_value, "me": caller.user_id,
+        "prio": priority, "est": body.estimated_value, "me": caller.user_id, "qr": qr_code_id,
     })).scalar_one()
 
     # 8. the event (CLAUDE.md rule 7, FS-003 rule 14). actor_id must be the caller:
@@ -346,6 +356,16 @@ async def _route(db: AsyncSession, caller: Caller, territory_id: str
     if caller.org_unit_id is not None and own_unit_territory is not None:
         return (owner, caller.org_unit_id, None)
     return (owner, await _covering_org_unit(db, territory_id), None)
+
+
+async def _route_intake(db: AsyncSession, territory_id: str, partner_id: str | None
+                        ) -> tuple[str | None, str, str | None]:
+    """A public lead (FS-003a §5): the covering unit, the auto-assigned officer or
+    nobody (the unassigned list), and the QR code's partner."""
+    owner = (await db.execute(text("SELECT lead_auto_owner(:t)"),
+                              {"t": territory_id})).scalar_one_or_none()
+    return (str(owner) if owner else None, await _covering_org_unit(db, territory_id),
+            partner_id)
 
 
 async def _covering_org_unit(db: AsyncSession, territory_id: str) -> str:
@@ -450,9 +470,16 @@ async def _duplicates(db: AsyncSession, lead_id: str) -> list[DuplicateRef]:
                          state=r.state) for r in rows]
 
 
-def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef]) -> Lead:
-    """The non-person fields, plus the people from the RLS-filtered joins. get_lead
-    overrides the people from lead_people(); the list keeps these (GAP-058)."""
+_LEAD_PEOPLE = [("owner_user_id", "owner_name"), ("created_by", "created_by_name")]
+_LEAD_PARTNERS = [("assigned_partner_id", "partner_name")]
+
+
+def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
+                 names: people.Names | None = None) -> Lead:
+    """The non-person fields, plus the people: from the RLS-filtered joins, and
+    from people_names() where the caller's scope did not reach (GAP-060). get_lead
+    overrides the people from lead_people()."""
+    names = names or people.Names()
     return Lead(
         id=str(row.id), inquiry_no=row.inquiry_no, stage=row.stage,
         inquiry_type=row.inquiry_type, mis_system=row.mis_code, source=row.source_code,
@@ -460,13 +487,11 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef]) -> Lead:
         territory=TerritoryRef(id=str(row.territory_id), name=row.territory_name,
                                level=row.territory_level),
         village=row.village,
-        owner=UserRef(id=str(row.owner_user_id), full_name=row.owner_name)
-        if row.owner_user_id and row.owner_name else None,
+        owner=names.user(row.owner_user_id, row.owner_name),
         owner_org_unit=OrgUnitRef(id=str(row.owner_org_unit_id),
                                   name=row.owner_org_unit_name),
-        assigned_partner=PartnerRef(id=str(row.assigned_partner_id), name=row.partner_name,
-                                    partner_type=row.partner_type)
-        if row.assigned_partner_id and row.partner_name else None,
+        assigned_partner=names.partner(row.assigned_partner_id, row.partner_name,
+                                       row.partner_type),
         score=_dec(row.score), priority=row.priority, estimated_value=_dec(row.estimated_value),
         lost_reason=ReasonRef(id=str(row.lost_reason_id), code=row.lost_reason_code,
                               name=row.lost_reason_name) if row.lost_reason_id else None,
@@ -475,8 +500,7 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef]) -> Lead:
         if row.merged_into_id and row.merged_into_no else None,
         first_contacted_at=_iso(row.first_contacted_at),
         last_activity_at=_iso_req(row.last_activity_at), created_at=_iso_req(row.created_at),
-        created_by=UserRef(id=str(row.created_by), full_name=row.created_by_name)
-        if row.created_by and row.created_by_name else None,
+        created_by=names.user(row.created_by, row.created_by_name),
         duplicates=duplicates)
 
 
@@ -517,7 +541,7 @@ async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
         # Counted as the owner: an EXISTS under the caller's quotation policies would
         # say no to an officer whose colleague raised the accepted quotation
         # (FS-005 edge case 9).
-        accepted = (await db.execute(
+        accepted: bool = (await db.execute(
             text("SELECT quotation_accepted_for_lead(CAST(:id AS uuid))"),
             {"id": lead_id})).scalar_one()
         if not accepted:
@@ -658,8 +682,9 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
     if "owner_user_id" in fields and body.owner_user_id is not None:
         if caller.scopes.get("leads") not in ("global", "org_subtree"):
             raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
-        ok = (await db.execute(text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
-                               {"u": body.owner_user_id})).scalar_one()
+        ok: bool = (await db.execute(
+            text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
+            {"u": body.owner_user_id})).scalar_one()
         if not ok:
             raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
 
@@ -679,7 +704,7 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
         payload["owner_user_id"] = body.owner_user_id
     if "assigned_partner_id" in fields:
         if body.assigned_partner_id is not None:
-            vis = (await db.execute(
+            vis: bool = (await db.execute(
                 text("SELECT authz_visible('channel_partner', CAST(:p AS uuid))"),
                 {"p": body.assigned_partner_id})).scalar_one()
             if not vis:
@@ -923,7 +948,8 @@ async def duplicates(db: AsyncSession, caller: Caller, *, limit: int = 50,
         return DuplicatePage(data=[], meta=PageMeta(limit=limit, next_cursor=None))
     ids = list({str(x) for r in links for x in (r.lead_a_id, r.lead_b_id)})
     rows = (await db.execute(text(_LEAD_SELECT + " WHERE l.id = ANY(:ids)"), {"ids": ids})).all()
-    by_id = {str(r.id): _row_to_lead(r, duplicates=[]) for r in rows}
+    names = await people.resolve(db, rows, _LEAD_PEOPLE, _LEAD_PARTNERS)
+    by_id = {str(r.id): _row_to_lead(r, duplicates=[], names=names) for r in rows}
     pairs = [DuplicatePair(link_id=str(r.id), signal=r.signal, score=_dec(r.score), state=r.state,
                            created_at=_iso(r.created_at) or "",
                            lead_a=by_id[str(r.lead_a_id)], lead_b=by_id[str(r.lead_b_id)])
@@ -1105,21 +1131,16 @@ async def _capped_total(db: AsyncSession, table: Any, filters: list[Any]) -> tup
     return (TOTAL_CEILING, True) if counted > TOTAL_CEILING else (int(counted), False)
 
 
-async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = None,
-                     priority: str | None = None, owner_user_id: str | None = None,
-                     owner: str | None = None, territory_id: str | None = None,
-                     source: str | None = None, inquiry_type: str | None = None,
-                     created_from: str | None = None, created_to: str | None = None,
-                     q: str | None = None, limit: int = 50,
-                     cursor: str | None = None,
-                     include_total: bool = False) -> LeadPage:
-    """The lead list, scoped and filtered, keyset-paged by (created_at desc, id).
-
-    Enforcer 1 is scope_predicate; RLS re-checks the same rows underneath. No total
-    (ISS-014): counting a scoped table on every page is the cost this avoids.
-    """
-    limit = max(1, min(limit, _MAX_LIMIT))
-
+async def _lead_filters(db: AsyncSession, caller: Caller, *, stage: str | None = None,
+                        priority: str | None = None, owner_user_id: str | None = None,
+                        owner: str | None = None, territory_id: str | None = None,
+                        owner_org_unit_id: str | None = None,
+                        assigned_partner_id: str | None = None,
+                        source: str | None = None, inquiry_type: str | None = None,
+                        created_from: str | None = None, created_to: str | None = None,
+                        q: str | None = None) -> list[Any]:
+    """The scope and every filter of the lead list, shared with the counts so the
+    two can never disagree about which leads a filter means."""
     where = [scope_predicate(_LEADS, caller, lead_t)]
 
     if stage:
@@ -1138,8 +1159,16 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
         where.append(lead_t.c.owner_user_id.is_(None))
     elif owner_user_id:
         where.append(lead_t.c.owner_user_id == owner_user_id)
+    # Each filter takes its whole subtree: a state selects its districts and
+    # talukas, an office the offices under it, a distributor its dealers. The
+    # closures hold every node as its own descendant.
     if territory_id:
-        where.append(lead_t.c.territory_id == territory_id)
+        where.append(lead_t.c.territory_id.in_(_under("territory_closure", territory_id)))
+    if owner_org_unit_id:
+        where.append(lead_t.c.owner_org_unit_id.in_(_under("org_closure", owner_org_unit_id)))
+    if assigned_partner_id:
+        where.append(lead_t.c.assigned_partner_id.in_(
+            _under("partner_closure", assigned_partner_id)))
     if source:
         src_id = (await db.execute(
             text("SELECT id FROM lead_source WHERE code = :c"),
@@ -1156,6 +1185,31 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
     # Everything above narrows the set the caller asked for. The cursor below
     # narrows it to one page, so the total is counted from `filters` and not from
     # `where`: a total that shrank as the user paged would be worse than none.
+    return where
+
+
+async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = None,
+                     priority: str | None = None, owner_user_id: str | None = None,
+                     owner: str | None = None, territory_id: str | None = None,
+                     owner_org_unit_id: str | None = None,
+                     assigned_partner_id: str | None = None,
+                     source: str | None = None, inquiry_type: str | None = None,
+                     created_from: str | None = None, created_to: str | None = None,
+                     q: str | None = None, limit: int = 50,
+                     cursor: str | None = None,
+                     include_total: bool = False) -> LeadPage:
+    """The lead list, scoped and filtered, keyset-paged by (created_at desc, id).
+
+    Enforcer 1 is scope_predicate; RLS re-checks the same rows underneath. No total
+    (ISS-014): counting a scoped table on every page is the cost this avoids.
+    """
+    limit = max(1, min(limit, _MAX_LIMIT))
+
+    where = await _lead_filters(
+        db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id, owner=owner,
+        territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
+        assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
+        created_from=created_from, created_to=created_to, q=q)
     filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)
@@ -1185,9 +1239,46 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
     rows = (await db.execute(text(_LEAD_SELECT + " WHERE l.id = ANY(:ids)"),
                              {"ids": ids})).all()
     by_id = {str(r.id): r for r in rows}
-    data = [_row_to_lead(by_id[i], duplicates=[]) for i in ids if i in by_id]
+    names = await people.resolve(db, rows, _LEAD_PEOPLE, _LEAD_PARTNERS)
+    data = [_row_to_lead(by_id[i], duplicates=[], names=names) for i in ids if i in by_id]
     return LeadPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
                                             total=total, total_capped=total_capped))
+
+
+_PRIORITIES = ("hot", "warm", "cold")
+
+
+async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) -> LeadStats:
+    """Counts under the list's own scope and filters (API review B2). One pass
+    over the matching rows; no ceiling, because a count per stage is the point."""
+    where = await _lead_filters(db, caller, **filters)
+    stage = sa.cast(lead_t.c.stage, sa.Text)
+    priority = sa.cast(lead_t.c.priority, sa.Text)
+    rows = (await db.execute(
+        sa.select(stage.label("stage"), priority.label("priority"),
+                  (lead_t.c.owner_user_id.is_(None)).label("unassigned"),
+                  sa.func.count().label("n"))
+        .select_from(lead_t).where(sa.and_(*where))
+        .group_by(stage, priority, lead_t.c.owner_user_id.is_(None)))).all()
+    by_stage = dict.fromkeys(domain.STAGES, 0)
+    by_priority = dict.fromkeys(_PRIORITIES, 0)
+    unassigned = total = 0
+    for r in rows:
+        total += r.n
+        by_stage[r.stage] = by_stage.get(r.stage, 0) + r.n
+        if r.priority:
+            by_priority[r.priority] = by_priority.get(r.priority, 0) + r.n
+        if r.unassigned:
+            unassigned += r.n
+    return LeadStats(total=total, by_stage=by_stage, by_priority=by_priority,
+                     unassigned=unassigned)
+
+
+def _under(closure: str, ancestor: str) -> Any:
+    """The ids at and below `ancestor` in one of the three trees. The closures are
+    readable by any authenticated caller; scope is applied by the list itself."""
+    t = sa.table(closure, sa.column("ancestor_id", _UUID), sa.column("descendant_id", _UUID))
+    return sa.select(t.c.descendant_id).where(t.c.ancestor_id == ancestor).scalar_subquery()
 
 
 def _search_clause(q: str) -> Any:

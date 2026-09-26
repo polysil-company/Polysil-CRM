@@ -12,6 +12,7 @@ import datetime as dt
 import hashlib
 import re
 import secrets
+from decimal import ROUND_HALF_UP, Decimal
 
 # ── the lifecycle (FS-005 3) ─────────────────────────────────────────────────
 
@@ -120,3 +121,25 @@ PARTY_COLUMNS: frozenset[str] = frozenset({
     "party_name", "party_mobile", "party_address", "party_gstin", "lead_id", "lines",
     "owner_user_id", "terms",
 })
+
+
+# ── discount approval (FS-013 rule 2a) ───────────────────────────────────────
+
+_PCT = Decimal("0.01")
+
+
+def effective_discount_pct(gross: Decimal, discount: Decimal) -> Decimal:
+    """What the customer saves off the list price across the three tiers, in percent,
+    to two places, half up. 0 on a zero gross. For display: the gate below is exact."""
+    if gross == 0:
+        return Decimal("0.00")
+    return (discount * 100 / gross).quantize(_PCT, rounding=ROUND_HALF_UP)
+
+
+def discount_approval_required(gross: Decimal, discount: Decimal,
+                               owner_limit_pct: Decimal | None) -> bool:
+    """Exact, no rounding: a discount a hair above the limit needs approval even when
+    it displays as the limit. None is no limit."""
+    if owner_limit_pct is None:
+        return False
+    return discount * 100 > owner_limit_pct * gross

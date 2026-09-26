@@ -57,6 +57,17 @@ Sixteen. Six in the line hierarchy, six functional, three portal, one board.
 |---|---|---|
 | 16 | `board` | Board of Directors — view-only, global |
 
+### Principals — not people, not in the matrix, never assignable
+
+| Code | Who | Holds |
+|---|---|---|
+| `system` | the worker (migration 005) | no matrix rows; its reach is explicit `app_is_system()` branches |
+| `intake` | the public lead form, "Website and QR" (migration 015, FS-003a) | leads view, create, edit and partners view, all global. Its claim is set only by `deps.intake_session`, after a WhatsApp code matched, and the route returns only an inquiry number. It has no password and no mobile, and a trigger refuses both, so it cannot sign in |
+
+Neither is in the parsed matrix below, in `ASSIGNABLE_ROLES`, or reconciled by the seed.
+
+Neither is administered either. `GET /users` never lists them, and every `/users/{id}` action refuses them (`422`, field `id`); a handover cannot name one as `to_user_id`. The intake account is also never a lead assignee: `authz_user_assignable()` and `staff_directory()` leave it out, although its role holds leads edit. Its trigger refuses a password, a mobile, a role or type change, deletion, deactivation and a move of office.
+
 > **Agent is not a role.** Dropped by ADR-030; `Requirements.md` REQ-1109 is void. A salesperson is a `field_officer`.
 
 ---
@@ -566,7 +577,7 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | tasks | V:own CE | V:org CE | V:org CE | V:org CE | V:global CEAD | V:global CEAD |
 | reports | V:own | V:org | V:org | V:org | V:global | V:global |
 | chat | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
-| users | | | | | V:global CEAD | V:global CEAD |
+| users | | V:org | V:org | V:org | V:global CEAD | V:global CEAD |
 | masters | | | | | V:global CEAD | V:global CEAD |
 
 *V = view · C = create · E = edit · A = approve · D = delete*
@@ -585,10 +596,13 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | marketing_material | | | | | V:global CEAD | |
 | campaigns | | | | | V:global CEAD | |
 | reports | V:global | V:global | V:global | **V:territory** | V:global | V:global |
+| users | V:global | V:global | | V:global | V:global | V:global |
 | tasks | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
 | chat | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
 
 State Co-ordinators own subsidy stage entry (ADR-030), scoped by `user_territory`.
+
+> **Whoever can see a lead, quotation or order sees the people on it.** Every role that views a document module views `users` at a scope that covers the people named on those documents: the line managers over their org subtree, the functional roles company-wide. Before this, the row was blank for them, and every list showed the owner as unassigned. The `users` spec has no territory branch, so State Co-ordinators read people company-wide (GAP-134). Write access (`C`, `E`, `D`) on `users` stays with the administrators.
 
 > **Their scope is `territory`, never `org`.** They sit at `hq_subsidy`, which has no sales descendants, so an org-subtree seed would give them access to nothing at all. This was wrong in the previous revision — a global find-and-replace collapsing `V:state` into `V:org` caught these four rows along with the line-manager ones.
 >

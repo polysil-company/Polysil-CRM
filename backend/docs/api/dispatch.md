@@ -99,8 +99,9 @@ order.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `request_id` | string | yes |  |
-| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the order was cancelled while pending. |
+| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the document was cancelled, or a quotation edited, while pending. |
 | `steps` | ApprovalStep[] | yes |  |
+| `request_remark` | string \| null |  | Why the approval was asked for (a quotation discount). Null for a dealer, always. |
 
 **`ApprovalStep`**
 
@@ -120,6 +121,7 @@ order.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
+| `order` | DispatchOrderRef | yes | The order this dispatch shipped against. |
 | `dispatch_no` | string | yes | The order number with a sequence, per order. |
 | `dc_no` | string \| null | yes |  |
 | `dc_date` | string \| null | yes |  |
@@ -141,6 +143,14 @@ order.
 | `order_line_id` | string | yes |  |
 | `line_no` | integer | yes |  |
 | `qty` | string | yes |  |
+
+**`DispatchOrderRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `order_no` | string \| null | yes |  |
+| `party_name` | string | yes |  |
 
 **`DispatchPage`**
 
@@ -181,6 +191,7 @@ order.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
+| `doc_type` | string |  | Always sales_order. Tells an order from a quotation where either can come back. Default `sales_order`. |
 | `id` | string | yes |  |
 | `order_no` | string \| null | yes | Null until the first submit. |
 | `status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` | yes |  |
@@ -207,6 +218,9 @@ order.
 | `dispatches` | Dispatch[] | yes |  |
 | `warnings` | string[] | yes | repriced, discontinued_products, provisional_pricing. Shown, never blocking. |
 | `remarks` | string \| null | yes |  |
+| `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
+| `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
+| `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |

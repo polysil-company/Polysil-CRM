@@ -15,13 +15,14 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from api.config import get_settings
-from api.deps import CallerDep, Claims, DbSession, IdemKey, require
+from api.deps import CallerDep, Claims, DbSession, IdemKey, require, require_any
 from api.idempotency import payload_digest, run_idempotent
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE, TimelinePage
 from api.schemas.orders import (
     Approval,
     DecisionRequest,
+    DecisionResult,
     Dispatch,
     DispatchCreate,
     DispatchPage,
@@ -30,16 +31,20 @@ from api.schemas.orders import (
     OrderLinesReplace,
     OrderPage,
     OrderPatch,
+    OrderStats,
     QueuePage,
     RemarkRequest,
     SubmitRequest,
     Threshold,
     ThresholdPut,
 )
+from api.schemas.quotations import PdfLink
 from api.services import approvals as approval_service
 from api.services import orders as service
+from api.storage import get_storage
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+
 approvals = APIRouter(prefix="/approvals", tags=["approvals"])
 dispatches = APIRouter(prefix="/dispatches", tags=["dispatch"])
 
@@ -109,7 +114,10 @@ async def create_order(body: OrderCreate, db: DbSession, caller: CallerDep, clai
             dependencies=[Depends(require("sales_orders", "view"))])
 async def list_orders(
     db: DbSession, caller: CallerDep,
-    status_: Annotated[str | None, Query(alias="status", description="One status.")] = None,
+    status_: Annotated[str | None, Query(
+        alias="status",
+        description="One status, or several separated by commas: submitted,approved,"
+                    "partially_dispatched.")] = None,
     order_type: Annotated[str | None, Query(description="One order type.")] = None,
     partner_id: Annotated[str | None, Query(
         pattern=UUID_RE, description="Orders placed through this partner.")] = None,
@@ -132,6 +140,27 @@ async def list_orders(
         limit=limit, cursor=cursor, include_total=include_total)
 
 
+@router.get("/stats", response_model=OrderStats, responses=_ERRORS,
+            dependencies=[Depends(require("sales_orders", "view"))])
+async def order_stats(
+    db: DbSession, caller: CallerDep,
+    status_: Annotated[str | None, Query(alias="status",
+                                         description="Comma-separated statuses.")] = None,
+    order_type: Annotated[str | None, Query(description="One order type.")] = None,
+    partner_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
+    lead_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
+    owner: Annotated[str | None, Query(pattern=_OWNER_RE,
+                                       description="`me`, or a user id.")] = None,
+    created_from: Annotated[str | None, Query(alias="from", description="ISO date, IST.")] = None,
+    created_to: ToDate = None,
+) -> OrderStats:
+    """Counts for the order board and the dashboard tiles: every status, and the
+    submitted orders by whose approval is next. Same scope and filters as the list."""
+    return await service.order_stats(
+        db, caller, status=status_, order_type=order_type, partner_id=partner_id,
+        lead_id=lead_id, owner=owner, created_from=created_from, created_to=created_to)
+
+
 @router.get("/{order_id}", response_model=Envelope[Order], responses=_ERRORS,
             dependencies=[Depends(require("sales_orders", "view"))])
 async def get_order(order_id: Id, db: DbSession, caller: CallerDep) -> dict[str, Any]:
@@ -140,6 +169,22 @@ async def get_order(order_id: Id, db: DbSession, caller: CallerDep) -> dict[str,
     partner or owner you cannot see is null. A dealer sees no approver names and no
     remarks."""
     return _order(await service.get_order(db, caller, order_id))
+
+
+@router.get("/{order_id}/pdf", response_model=Envelope[PdfLink],
+            responses={**_ERRORS, 409: {"model": ErrorResponse, "description":
+                                        "`pdf_pending`, `pdf_failed`, `order_cancelled` or "
+                                        "`storage_unavailable`."}},
+            dependencies=[Depends(require("sales_orders", "view"))])
+async def order_pdf(order_id: Id, db: DbSession, caller: CallerDep) -> Envelope[PdfLink]:
+    """A URL for the approved order's PDF, valid ten minutes. **Open it in a new tab;
+    do not fetch it with the bearer token.** The order's `pdf_state` says when to
+    offer it: `ready` shows "Download PDF", `pending` shows "Preparing PDF". `404`
+    before approval, `409 pdf_pending` while the worker has not finished,
+    `409 pdf_failed` when it gave up (staff see `pdf_error`), `409 order_cancelled`
+    once the order is cancelled."""
+    return Envelope(data=await service.pdf_link(db, caller, order_id,
+                                                get_storage(get_settings())))
 
 
 @router.patch("/{order_id}", response_model=Envelope[Order], responses=_MUTATION_ERRORS,
@@ -294,18 +339,23 @@ async def void_dispatch(dispatch_id: Id, body: RemarkRequest, db: DbSession, cal
 # ── approvals ────────────────────────────────────────────────────────────────
 
 @approvals.get("/pending", response_model=QueuePage, responses=_ERRORS,
-               dependencies=[Depends(require("sales_orders", "approve"))])
+               dependencies=[Depends(require_any(("sales_orders", "approve"),
+                                                 ("quotations", "approve")))])
 async def pending(db: DbSession, caller: CallerDep,
                   include_below: Annotated[bool, Query(
                       description="Also every lower step in your area, so you can cover a "
                                   "manager on leave.")] = False,
                   limit: Annotated[int, Query(ge=1, le=100)] = 50,
-                  cursor: Cursor = None) -> QueuePage:
+                  cursor: Cursor = None,
+                  include_total: Annotated[bool, Query(
+                      description="Also count everything waiting, for the inbox badge. "
+                                  "Stops at 1,000 and sets meta.total_capped.")] = False,
+                  ) -> QueuePage:
     """What is waiting on you, oldest first: steps of your role whose earlier steps are
     done, on orders you can see, never your own. A lower step nobody of its own role
     covers comes back `stalled`, and you may decide it."""
     return await approval_service.queue(db, caller, include_below=include_below, limit=limit,
-                                        cursor=cursor)
+                                        cursor=cursor, include_total=include_total)
 
 
 @approvals.get("/thresholds", response_model=Envelope[list[Threshold]], responses=_ERRORS)
@@ -329,23 +379,30 @@ async def put_threshold(body: ThresholdPut, db: DbSession, caller: CallerDep, cl
 
 
 @approvals.get("/{request_id}", response_model=Envelope[Approval], responses=_ERRORS,
-               dependencies=[Depends(require("sales_orders", "view"))])
+               dependencies=[Depends(require_any(("sales_orders", "view"),
+                                                 ("quotations", "view")))])
 async def get_request(request_id: Id, db: DbSession, caller: CallerDep) -> dict[str, Any]:
     """One approval chain."""
     a = await approval_service.get_request(db, caller, request_id)
     return {"data": a.model_dump(mode="json")}
 
 
-@approvals.post("/steps/{step_id}/decision", response_model=Envelope[Order],
+@approvals.post("/steps/{step_id}/decision", response_model=DecisionResult,
                 responses=_MUTATION_ERRORS,
-                dependencies=[Depends(require("sales_orders", "approve"))])
+                dependencies=[Depends(require_any(("sales_orders", "approve"),
+                                                  ("quotations", "approve")))])
 async def decide(step_id: Id, body: DecisionRequest, db: DbSession, caller: CallerDep,
                  claims: Claims, idem: IdemKey) -> Response:
     """Approve or reject a step. A remark is required to reject, and on every Accounts
     decision. `403 not_your_step`, `403 self_approval`, `409 step_already_decided`,
     `409 earlier_step_undecided`, `409 request_closed`. Returns the order with its new
-    status: the last approval approves it, any rejection returns it to draft."""
+    status: the last approval approves it, any rejection returns it to draft.
+
+    For a quotation step (`doc_type: quotation` in the queue) it returns the
+    quotation: its `discount.send_gate` is `approved` or `returned`, and its status
+    stays draft. `409 figures_changed` when the draft was edited under the request."""
     async def work() -> tuple[int, dict[str, Any]]:
-        return 200, _order(await approval_service.decide(db, caller, step_id, body))
+        return 200, {"data": (await approval_service.decide(db, caller, step_id, body)
+                              ).model_dump(mode="json")}
     return await _idem(db, claims, idem, f"POST /api/v1/approvals/steps/{step_id}/decision",
                        body, work)

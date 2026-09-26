@@ -358,77 +358,77 @@ def f_permissions() -> None:
 
 def f_lead() -> None:
     e, n = [], {}
-    e += title("Lead capture", sub="Public capture never touches `lead` directly.",
-               status="BUILT. FS-003: manual entry, lifecycle, assignment, duplicates, "
-                      "lookup admin. Other capture sources adapt onto it later.",
-               status_colour=RED)
+    e += title("Lead capture", sub="Every source ends in create_lead(). The public one proves the "
+                                   "mobile first.",
+               status="BUILT. FS-003: manual entry. FS-003a: the public enquiry form and QR codes. "
+                      "Inbound WhatsApp later.",
+               status_colour=GREEN)
 
-    for i, (eid, lbl) in enumerate([("web", "Website form"), ("qr", "QR code"),
-                                    ("wa", "WhatsApp inbound"), ("meta", "Meta / Google\n(later)")]):
-        els = node(eid, 0, i * 80, lbl, w=200, h=60, colour=GREY, size=14)
-        n[eid] = els[0]; e += els
+    steps = [
+        ("p1", "Farmer opens /enquiry, or scans a QR code (/enquiry?qr=CODE)\n"
+               "GET /public/lead-form: states, systems, types, the QR label", GREY),
+        ("p2", "POST /public/leads/verify {mobile}\n"
+               "lead_intake_issue() as app_anon: rate limits, the hourly ceiling,\n"
+               "code hashed, outbox lead.verify -> WhatsApp code. Always 202", YELLOW),
+        ("p3", "POST /public/leads {mobile, code, name, territory, ...}\n"
+               "body validated BEFORE the code is touched", BLUE),
+        ("p4", "intake_session(): as app_anon, lead_intake_consume()\n"
+               "wrong code -> count the attempt, burn at five, 422 invalid_code", RED),
+        ("p5", "code matched -> claim = the intake account, enter app_role\n"
+               "same mobile already enquired today -> 200 created:false, same number", BLUE),
+        ("p6", "create_lead(intake=True): the territory's unit and auto-owner,\n"
+               "or unassigned; a QR code's dealer becomes the assigned partner", GREEN),
+        ("p7", "LEAD + lead.created event + acknowledgement on the outbox\n"
+               "returns {inquiry_no, created} and nothing else", GREEN),
+    ]
+    y = 60
+    for eid, label, colour in steps:
+        els = node(eid, 300, y, label, w=560, h=92, colour=colour)
+        n[eid] = els[0]
+        e += els
+        y += 150
+    order = [s[0] for s in steps]
+    for a, b in zip(order, order[1:], strict=False):
+        e += edge(f"e_{a}_{b}", n[a], n[b])
 
-    els = node("fn", 300, 100, "intake_submit()\nSECURITY DEFINER", w=250, h=80, colour=RED)
-    n["fn"] = els[0]; e += els
-    for eid in ("web", "qr", "wa", "meta"):
-        e += edge(f"e_{eid}_fn", n[eid], n["fn"], colour=GREY)
+    els = node("man", 0, 810, "Manual entry\n(CRM / dealer portal)", w=220, h=70, colour=GREY,
+               size=14)
+    n["man"] = els[0]
+    e += els
+    e += edge("e_man", n["man"], n["p6"], colour=GREY, dashed=True)
 
-    els = node("tbl", 640, 100, "lead_intake\nappend-only", w=220, h=80, colour=YELLOW)
-    n["tbl"] = els[0]; e += els
-    e += edge("e_fn_tbl", n["fn"], n["tbl"])
-
-    els = node("wk", 950, 100, "worker\nclaim + process", w=220, h=80, colour=VIOLET)
-    n["wk"] = els[0]; e += els
-    e += edge("e_tbl_wk", n["tbl"], n["wk"])
-
-    chain = [("dup", "Duplicate check\nflag, never block"),
-             ("num", "Inquiry number\nPOL/GJ/2026-27/00123"),
-             ("asg", "Assign +\nderive senior manager"),
-             ("scr", "Score\nhot / warm / cold")]
-    for i, (eid, lbl) in enumerate(chain):
-        els = node(eid, 950, 240 + i * 100, lbl, w=260, h=76, colour=BLUE, size=14)
-        n[eid] = els[0]; e += els
-        e += edge(f"e_ch{i}", n["wk"] if i == 0 else n[chain[i-1][0]], n[eid], colour=BLUE)
-
-    els = node("lead", 950, 660, "LEAD  +  activity_event\n+ thank-you outbox row",
-               w=300, h=80, colour=GREEN)
-    n["lead"] = els[0]; e += els
-    e += edge("e_scr_lead", n["scr"], n["lead"], colour=GREEN)
-
-    els = node("man", 640, 660, "Manual entry\n(CRM / portal)", w=210, h=70, colour=GREY, size=14)
-    n["man"] = els[0]; e += els
-    e += edge("e_man", n["man"], n["lead"], colour=GREY, dashed=True)
-
-    e += note("n1", 300, 220,
-              "The public role holds EXECUTE on this\n"
-              "function and NO table grants at all.\n\n"
-              "It returns only id / status / replayed -\n"
-              "never the payload, so it cannot be used\n"
-              "to probe whether a number is known.", w=310, colour=RED)
-    e += note("n2", 620, 220,
-              "THREE unique indexes, by what the\n"
-              "transport actually provides:\n\n"
-              "  source_event_id   (11za, Meta)\n"
-              "  idempotency_key   (our own form)\n"
-              "  payload_hash + UTC hour  (bare post)\n\n"
-              "Same key + different payload -> 409.\n"
-              "The hour bucket is a GENERATED column:\n"
-              "date_trunc on timestamptz is not\n"
-              "IMMUTABLE and Postgres rejects it.", w=330, colour=YELLOW)
-    e += note("n3", 1260, 240,
-              "BUSINESS duplication (same farmer enquiring\n"
-              "twice) is real and allowed - flagged for a\n"
-              "human, never blocked. A blocked enquiry is\n"
-              "a lost enquiry.\n\n"
-              "TRANSPORT duplication (a retried submission)\n"
-              "is suppressed silently. Two different things.", w=380, colour=VIOLET)
-    e += note("n4", 1260, 460,
-              "Claim uses FOR UPDATE SKIP LOCKED and\n"
-              "reclaims STALE 'processing' rows, not just\n"
-              "'pending' - otherwise a worker dying after\n"
-              "its claim commits strands the enquiry.\n\n"
-              "claim_token stops a resurrected worker\n"
-              "overwriting a row someone else reclaimed.", w=390, colour=VIOLET)
+    e += note("nRed1", 920, 60,
+              "A WRONG CODE MUST COMMIT ITS COUNT\n\n"
+              "lead_intake_consume() returns a result, never\n"
+              "raises. submit() raises the refusal AFTER the\n"
+              "intake session has closed. Raise inside it and\n"
+              "the attempt count rolls back: unlimited guesses.",
+              w=460, colour=RED)
+    e += note("nRed2", 920, 300,
+              "THE INTAKE ACCOUNT SEES EVERY LEAD\n\n"
+              "\"Website and QR\": leads view/create/edit and\n"
+              "partners view, global. Its claim exists only\n"
+              "inside POST /public/leads, after the code matched,\n"
+              "and the route returns only the inquiry number.\n"
+              "No password, no mobile: a trigger refuses both.",
+              w=460, colour=RED)
+    e += note("nGreen1", 920, 560,
+              "DUPLICATES ARE FLAGGED, NEVER BLOCKED\n\n"
+              "The same farmer twice on different days is two\n"
+              "leads, flagged for a human. A retry the same day\n"
+              "is the first lead's number back.",
+              w=460, colour=GREEN)
+    e += note("nYellow1", 920, 760,
+              "OUR RULES, WITH GAPS\n\n"
+              "300 codes an hour across the site (GAP-136).\n"
+              "One public lead per mobile per day (GAP-137).\n"
+              "The code rides the approved polysil_auth_otp.\n"
+              "An unknown or closed QR code: a plain website lead.",
+              w=460, colour=YELLOW)
+    e += note("nGrey1", 300, y + 20,
+              "Not here: inbound WhatsApp as a source (11za webhook settings),\n"
+              "editing or switching off a QR code, dealership enquiries (GAP-135).",
+              w=560, colour=GREY)
     write("04-lead-capture", e)
 
 
@@ -436,8 +436,8 @@ def f_approval() -> None:
     e, n = [], {}
     e += title("Approval routing", sub="One engine, thresholds as data. Orders are its first "
                                        "document type.",
-               status="BUILT FOR ORDERS (FS-011, migration 013). The quotation gate (GAP-105) "
-                      "and complaints (W5) are not wired yet.",
+               status="BUILT for orders (FS-011) and quotation discounts (FS-013, migration "
+                      "017). Complaints (W5) are the next document type.",
                status_colour=GREEN)
 
     els = node("r", 0, 120, "Raiser\nemployee or dealer", w=220, h=70, colour=GREY, size=14)
@@ -629,8 +629,8 @@ def f_subsidy() -> None:
 def f_outbox() -> None:
     e, n = [], {}
     e += title("Message delivery", sub="Never send inside a request handler.",
-               status="BUILT (FS-007): the 11za adapter, WhatsApp only. The OTP goes out on "
-                      "WhatsApp (ADR-040). Delivery status and inbound are FS-007a.",
+               status="BUILT and LIVE on the client's 11za account since 23 Sep (FS-007, FS-012). "
+                      "Delivery status and inbound are FS-007a.",
                status_colour=GREEN)
 
     els = node("svc", 0, 60, "Service", w=220, h=64, colour=BLUE); n["svc"] = els[0]; e += els
@@ -714,8 +714,25 @@ def f_outbox() -> None:
               "name. sendTemplate returns NO message id\n"
               "(only IsSuccess); classify on the body.\n"
               "tags carries our row id for FS-007a.\n\n"
-              "dev.py whatsapp-check: the two templates\n"
-              "exist, are approved, take our values.", w=420, colour=YELLOW)
+              "dev.py whatsapp-check: the configured\n"
+              "templates exist, are approved, take our values.", w=420, colour=YELLOW)
+    e += note("n5", 1280, 820,
+              "WHICH TEMPLATE SENDS WHAT\n\n"
+              "polysil_auth_otp     sign-in code, and the public\n"
+              "                     form's code (lead.verify)\n"
+              "polysil_lead_ack     the enquiry acknowledgement\n"
+              "polysil_quotation    the quotation link (off on\n"
+              "                     staging until R2)\n"
+              "polysil_order_confirmed / _approval_waiting /\n"
+              "_order_decided       the order messages (FS-012):\n"
+              "                     NOT YET CREATED in 11za\n\n"
+              "The order keys take their name from\n"
+              "message_template, copied into the payload as\n"
+              "_template. An off row writes nothing, so a\n"
+              "template waiting on Meta never dead-letters.\n"
+              "sync_message_templates.py turns a row on only\n"
+              "when 11za lists it approved; the deploy runs it.",
+              w=420, colour=YELLOW)
     write("07-message-delivery", e)
 
 
@@ -960,7 +977,9 @@ def f_quotation() -> None:
                "expected_status on every mutation", BLUE),
         ("q5", "POST /send: lock draft (and predecessor, lower version first)\n"
                "re-resolve and compare again -> 409 rate_changed\n"
-               "predecessor accepted -> 409", YELLOW),
+               "predecessor accepted -> 409\n"
+               "discount above the owner's limit, not approved\n"
+               "-> 409 discount_approval_required (quotation_send_gate)", YELLOW),
         ("q6", "allocate QT/GJ/2026-27/00001  (definer, row lock,\n"
                "LAST read before the write)\nvalid_until = send date IST + 45 d\n"
                "share token derived by HMAC, only its hash stored", GREEN),
@@ -1067,6 +1086,17 @@ def f_quotation() -> None:
               "subsidised types, streaming the PDF through the API.",
               w=560, colour=GREY)
 
+    e += note("nDisc", -420, 700,
+              "DISCOUNT APPROVAL (FS-013)\n\n"
+              "Above the owner's limit: POST /request-approval.\n"
+              "One step: the lowest of DM, SM, RM, Admin-Sales\n"
+              "above the owner whose limit covers it.\n"
+              "The request holds a HASH of the priced figures.\n"
+              "An edit cancels a pending request; an edit after\n"
+              "approval voids it; the decision refuses\n"
+              "figures_changed. The status never moves.\n"
+              "Stand-in limits 5 / 10 / 15 / 20 % (GAP-105).",
+              w=380, colour=YELLOW)
     write("12-quotation", e)
 
 
@@ -1075,8 +1105,8 @@ def f_order() -> None:
     e += title("A sales order: priced, numbered, approved, dispatched",
                sub="Every mutation locks the order row first. The database moves the status; "
                    "the API never writes it.",
-               status="BUILT (FS-011 rev 3.2): migration 013, /orders, /approvals, /dispatches. "
-                      "Commercial and industrial only. No message is sent.",
+               status="BUILT (FS-011 rev 3.2, FS-012): migrations 013 and 016. Commercial and "
+                      "industrial only. Messages wait on their 11za templates.",
                status_colour=GREEN)
 
     steps = [
@@ -1095,10 +1125,11 @@ def f_order() -> None:
                "zero total -> 422; nobody for a functional step -> 422 no_approver\n"
                "number SO/<state>/<FY>/<nnnnn>, chain built from the owner", YELLOW),
         ("o6", "POST /approvals/steps/{id}/decision -> record_decision()\n"
-               "order, request, step locked in that order\n"
-               "reject -> DRAFT with the reason, number kept", GREEN),
+               "each open step: approval.waiting to who may decide it\n"
+               "reject -> DRAFT with the reason; order.decided to the owner", GREEN),
         ("o7", "last step approves -> status approved\n"
-               "apply_approval_outcome(): status and timestamp ONLY", GREEN),
+               "order.confirmed to the buyer, order.decided to the owner,\n"
+               "pdf_state = pending; the worker renders the PDF once", GREEN),
         ("o8", "POST /orders/{id}/dispatches -> dispatch_record()\n"
                "order, then its lines; never above the open quantity,\n"
                "in the line's unit precision; status derived from the lines", BLUE),
@@ -1164,10 +1195,26 @@ def f_order() -> None:
               "No credit or stock check. Our number format.",
               w=460, colour=YELLOW)
 
+    e += note("nYellow2", -420, 900,
+              "ORDER MESSAGES (FS-012)\n\n"
+              "Written by the approval definers, in the\n"
+              "decision's transaction. message_template is the\n"
+              "one switch: an off key writes nothing, so nothing\n"
+              "dead-letters while 11za approves a template.\n"
+              "One alert per person per step per hour (GAP-138).\n"
+              "A stalled step messages nobody (GAP-139).",
+              w=380, colour=YELLOW)
+    e += note("nRed4", -420, 1180,
+              "THE PDF IS THE APPROVED ORDER\n\n"
+              "Claim, render, upload, close: each outside the\n"
+              "others' transactions, the quotation's lease.\n"
+              "A cancelled order is not rendered; its link\n"
+              "answers 409 order_cancelled. No approver names\n"
+              "and no remarks on the page.",
+              w=380, colour=RED)
     e += note("nGrey1", 300, y + 20,
-              "Not here: payments, stock, schemes, the order PDF and WhatsApp\n"
-              "(GAP-129), export / sample / marketing / subsidised / replacement\n"
-              "orders (GAP-121).",
+              "Not here: payments, stock, schemes, export / sample / marketing /\n"
+              "subsidised / replacement orders (GAP-121).",
               w=560, colour=GREY)
 
     write("13-order", e)

@@ -152,9 +152,17 @@ role the order is waiting for).
   "last_rejection": null,
   "dispatches": [],
   "warnings": [],
+  "pdf_state": "none", "pdf_error": null, "confirmation": null,
   "submitted_at": null, "approved_at": null, "cancelled_at": null, "created_at": "…"
 }
 ```
+
+- `pdf_state`: `none` before approval, `pending` while the worker makes the PDF (a
+  few seconds), `ready`, or `failed`. `pdf_error` says why it failed; it is null for a
+  dealer.
+- `confirmation`: whether the buyer got the WhatsApp confirmation on approval.
+  `queued`, `no_mobile` (show "No mobile on the order: call the buyer"), or `disabled`
+  (the message is switched off). Null before approval.
 
 - `approval` is null until the first submit, then the latest chain. Draw it as a
   stepper. `decided_role` is set when a higher manager decided a step on behalf of an
@@ -193,6 +201,24 @@ by a State Manager or above. `409 order_dispatched` once something has shipped;
 
 A draft that was never submitted. A numbered draft is cancelled instead
 (`409 order_was_submitted`).
+
+### `GET /api/v1/orders/{id}/pdf`
+
+`200 {url, expires_at, filename}`: a link valid for ten minutes. **Open it in a new
+tab; do not fetch it with the bearer token.** Ask for it when the user clicks, not on
+page load.
+
+| Answer | Meaning |
+|---|---|
+| `404` | not approved yet, or not in your scope |
+| `409 pdf_pending` | being made; poll the order until `pdf_state` is `ready` |
+| `409 pdf_failed` | the worker gave up; staff see `fields.pdf_error` |
+| `409 order_cancelled` | the order was cancelled; its PDF is withdrawn |
+| `409 storage_unavailable` | file storage is down; try later |
+
+The PDF prints the order number, the approval date, the seller, the buyer, delivery and
+place of supply, every line with its discounts and tax, the totals and the payment
+terms. It never prints approver names or remarks.
 
 ### `GET /api/v1/orders/{id}/timeline`
 
@@ -238,6 +264,20 @@ submitted afterwards; a waiting chain keeps its steps.
 
 ---
 
+## 4a. WhatsApp messages about orders
+
+Sent by the backend in the same step as the decision. The frontend sends nothing.
+
+| When | To | Says |
+|---|---|---|
+| an approval step opens | each person who may decide it, except whoever submitted | "order SO/… for <party>, value Rs …, is waiting for your approval" |
+| the last step approves | the buyer's mobile on the order | "your order SO/… is confirmed, value Rs …" |
+| the order is approved or returned | the order's owner | "order SO/… for <party> has been approved / returned for changes" |
+
+A person gets one waiting message per step per hour, so a resubmit loop does not
+flood them. Each message can be switched off on the backend; the order's
+`confirmation` field says what happened to the buyer's.
+
 ## 5. Dispatch
 
 ### `POST /api/v1/orders/{id}/dispatches`
@@ -280,7 +320,7 @@ For an approved or partly dispatched order.
 |---|---|---|
 | Order list | everyone with orders | status chips, dispatched bar, "waiting on", provisional badge |
 | New order | officer, manager, dealer | pick accepted quotations that agree, or type lines; price date only for a direct order; live figures from `POST /pricing/quote-lines`; show `repriced` warnings |
-| Order detail | everyone | lines with sent / short / open, the chain as a stepper, the last rejection while in draft, dispatches, timeline; actions by status and permission |
+| Order detail | everyone | lines with sent / short / open, the chain as a stepper, the last rejection while in draft, dispatches, timeline; actions by status and permission; "Download PDF" when `pdf_state` is `ready`, "Preparing PDF" while `pending`; a "No mobile: call the buyer" note when `confirmation` is `no_mobile` |
 | My approvals | every approver | the queue, a stalled badge, an "include lower steps" toggle for managers, approve or reject with remark |
 | Dispatch entry | Dispatch Manager | open quantities pre-filled per line; DC and invoice fields; warnings shown, not blocking |
 | Approval thresholds | admin | the bands per role and territory |
@@ -291,6 +331,5 @@ For an approved or partly dispatched order.
 
 - Payments and the dealer ledger; stock and warehouses; credit limits.
 - Export, sample, marketing material, subsidised and replacement orders.
-- An order PDF and an order-confirmation WhatsApp.
 - Schemes (the fourth discount).
 - Changing an approved order.

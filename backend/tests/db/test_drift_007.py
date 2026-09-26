@@ -47,6 +47,13 @@ def _statements() -> dict[str, str]:
         match = _HEAD.search(stmt)
         assert match, stmt[:80]
         out[match.group(1)] = stmt
+    # a later migration that replaces a 007 body: the live body is the last one
+    m15 = _load("015_public_lead_capture")
+    if m15 is not None:
+        for stmt in m15._assignee_functions(patched=True):
+            match = _HEAD.search(stmt)
+            assert match and match.group(1) in out, stmt[:80]
+            out[match.group(1)] = stmt
     return out
 
 

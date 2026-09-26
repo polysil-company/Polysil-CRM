@@ -53,8 +53,10 @@ def test_the_state_coordinator_is_territory_scoped(grants: list[Grant]) -> None:
     """RBAC.md 6.2, and the regression it records: a find-and-replace once turned
     these into org, which at hq_subsidy is an empty subtree."""
     mine = {g for g in grants if g.role == "state_coordinator"}
-    # tasks and chat are own for every role; everything else this role holds is territory
-    assert {g.scope for g in mine if g.module not in ("tasks", "chat")} == {"territory"}
+    # tasks and chat are own for every role; users is global and read-only, because
+    # the users spec has no territory branch (GAP-134); everything else is territory
+    assert {g.scope for g in mine if g.module not in ("tasks", "chat", "users")} == {"territory"}
+    assert {(g.action, g.scope) for g in mine if g.module == "users"} == {("view", "global")}
     assert "org_subtree" not in {g.scope for g in mine}
     assert Grant("state_coordinator", "subsidy", "create", "territory") in mine
 

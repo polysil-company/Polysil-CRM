@@ -114,6 +114,8 @@ services:
       DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
       WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
       WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+      # 11za's originWebsite, sent on every request; the account's own setting
+      WHATSAPP_ORIGIN_WEBSITE: ${WHATSAPP_ORIGIN_WEBSITE:-}
       # FS-005: the share link's origin (the frontend; the API refuses to start
       # without it), the share template once the BSP approves it, and R2 for the
       # PDFs. Empty means unset.
@@ -179,6 +181,8 @@ services:
       DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
       WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
       WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+      # 11za's originWebsite, sent on every request; the account's own setting
+      WHATSAPP_ORIGIN_WEBSITE: ${WHATSAPP_ORIGIN_WEBSITE:-}
       # FS-005: the share link's origin (the frontend; the API refuses to start
       # without it), the share template once the BSP approves it, and R2 for the
       # PDFs. Empty means unset.
@@ -218,6 +222,14 @@ services:
       DB_ANON_ROLE: ${DB_ANON_ROLE:-app_anon}
       DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-polysil-demo-2026}
+      # scripts/sync_message_templates.py reads the account's template listing,
+      # after every migration. Without these it saw the mock and changed nothing.
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
+      WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+      WHATSAPP_ORIGIN_WEBSITE: ${WHATSAPP_ORIGIN_WEBSITE:-}
+      # Settings refuses to load outside local without it, so alembic and the
+      # seeds need it too, not only the API and the worker.
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}
       # scripts/seed_demo.py reads these three out of infra/.env, which the
       # container writes for itself at the start of the seed step.
       DB_USER: ${DB_USER}

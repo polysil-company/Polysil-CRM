@@ -9,6 +9,7 @@ under the dealer's own claim, which is what the router would pass it.
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from collections.abc import Callable
 
 import httpx
@@ -19,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.authz.predicate import Caller
 from api.db.session import enter_role
 from api.domain.orders import PORTAL_REMARK
+from api.errors import ConflictError
 from api.services import leads as lead_service
 from api.services import orders as service
 from tests.api import test_order_endpoints as endpoints
@@ -159,5 +161,76 @@ async def test_a_dealer_sees_what_shipped_but_not_staff_reasons_or_who_recorded_
         for d in ds:
             assert d.dispatched_by is None and d.void_remark is None, (where, d)
             assert d.lines and d.lines[0].order_line_id == line, (where, d)
+            # API review B5: a register row opens its order without parsing the number
+            assert (d.order.id, d.order.order_no) == (order["id"], seen.order_no), (where, d)
         assert sum(d.voided_at is not None for d in ds) == 1, where
     assert void_reason not in repr(seen) and close_reason not in repr(seen)
+
+
+async def test_a_dealer_reads_a_rejected_quotation_without_the_staff_remark(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """API review L1: the decision remark is internal, as on orders (question 15.14)."""
+    from api.config import get_settings
+    from api.services import quotations as quotation_service
+
+    ho = await endpoints._as(client, shop, "field_officer")
+    lead = (await client.post(f"{V1}/leads", headers={**ho, **_key()}, json={
+        "farmer_name": "Remark Farmer", "mobile": "97" + f"{uuid.uuid4().int % 10**8:08d}",
+        "territory_id": shop.district, "inquiry_type": "commercial", "mis_system": "drip",
+        "village": "Vadod", "assigned_partner_id": shop.partner})).json()["data"]
+    for stage in ("contacted", "qualified"):
+        await client.post(f"{V1}/leads/{lead['id']}/transition", json={"to_stage": stage},
+                          headers={**ho, **_key()})
+    r = await client.post(f"{V1}/quotations", headers={**ho, **_key()}, json={
+        "lead_id": lead["id"], "sales_type": "commercial", "partner_id": shop.partner,
+        "place_of_supply_territory_id": shop.district, "seller_gstin_id": shop.seller,
+        "price_effective_date": endpoints.AS_OF,
+        "lines": [{"product_id": shop.product, "qty": "5", "discount_pct": "0"}]})
+    assert r.status_code == 201, r.text
+    q = r.json()["data"]
+    await client.post(f"{V1}/quotations/{q['id']}/send", json={"channel": "none"},
+                      headers={**ho, **_key()})
+    remark = "Dealer margin too thin, do not match competitor"
+    r = await client.post(f"{V1}/quotations/{q['id']}/transition", headers={**ho, **_key()},
+                          json={"to": "rejected", "remark": remark})
+    assert r.status_code == 200 and r.json()["data"]["decision_remark"] == remark, r.text
+
+    s, dealer = await _as_dealer(sessions, shop)
+    try:
+        seen = await quotation_service.get_quotation(s, q["id"], get_settings(),
+                                                     portal=dealer.partner_id is not None)
+    finally:
+        await s.rollback()
+        await s.close()
+    assert seen.status == "rejected" and seen.decision_remark is None
+    assert seen.pdf_error is None
+
+
+async def test_a_dealer_learns_the_order_pdf_failed_but_not_why(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """FS-012: `pdf_error` names storage and configuration; staff see it, a dealer
+    does not."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    order = await endpoints._approve_all(client, shop, await endpoints._submit(
+        client, ho, (await endpoints._create(
+            client, ho, endpoints._direct(shop, partner_id=shop.partner)))["id"]))
+    reason = "ClientError: NoSuchBucket polysil-internal"
+    owner = sessions()
+    try:
+        await owner.execute(text("UPDATE sales_order SET pdf_state = 'failed', pdf_error = :e "
+                                 "WHERE id = CAST(:o AS uuid)"), {"e": reason, "o": order["id"]})
+        await owner.commit()
+    finally:
+        await owner.close()
+
+    r = await client.get(f"{V1}/orders/{order['id']}/pdf", headers=ho)
+    assert r.status_code == 409 and r.json()["error"]["fields"]["pdf_error"] == reason, r.text
+
+    s, dealer = await _as_dealer(sessions, shop)
+    try:
+        with pytest.raises(ConflictError) as refused:
+            await service.pdf_link(s, dealer, order["id"], storage=None)  # type: ignore[arg-type]
+    finally:
+        await s.rollback()
+        await s.close()
+    assert refused.value.code == "pdf_failed" and reason not in repr(vars(refused.value))
