@@ -161,6 +161,180 @@ export const leadPageSchema = cursorPageSchema(leadSchema);
 /** The backend's JSON for one page, as the mock backend must produce it. */
 export type LeadPageWire = { data: LeadWire[]; meta: PageMetaWire };
 
+// ── timeline and notes (LEAD-005, LEAD-006) ───────────────────────────────────
+
+/** The backend's limit on a note (`LeadNote.note`, 1–2,000 characters after trimming). */
+export const LEAD_NOTE_MAX_LENGTH = 2000;
+
+/** The backend allows up to 100 events a page; 20 keeps the first paint short. */
+export const TIMELINE_PAGE_SIZE = 20;
+
+/**
+ * One timeline entry. `kind` stays an open string (`lead.created`, `quotation.sent`, …) so
+ * an event the backend adds later still shows; `payload` is read per kind by
+ * `lib/timeline-entries.ts`. `actor` is null when unknown or hidden from a partner, and
+ * its name can be empty, so it is read leniently rather than dropping the event.
+ */
+const timelineEventWireSchema = z.object({
+  id: z.string().min(1),
+  kind: z.string().min(1),
+  occurred_at: isoDateTime,
+  actor: z.object({ id: z.string().min(1), full_name: z.string() }).nullish(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type TimelineEventWire = z.input<typeof timelineEventWireSchema>;
+
+export const timelineEventSchema = timelineEventWireSchema.transform((wire) => ({
+  id: wire.id,
+  kind: wire.kind,
+  occurredAt: wire.occurred_at,
+  actor: wire.actor ? { id: wire.actor.id, name: wire.actor.full_name.trim() || null } : null,
+  payload: wire.payload ?? {},
+}));
+
+export type TimelineEvent = z.output<typeof timelineEventSchema>;
+
+/** GET /leads/{id}/timeline — newest first, read one event at a time (`cursorPageSchema`). */
+export const timelinePageSchema = cursorPageSchema(timelineEventSchema);
+
+export type TimelinePage = CursorPage<TimelineEvent>;
+
+/** The backend's JSON for one timeline page, as the mock backend must produce it. */
+export type TimelinePageWire = { data: TimelineEventWire[]; meta: PageMetaWire };
+
+/** POST /leads/{id}/notes answers `{ data: TimelineEvent }`. */
+export const timelineEventResponseSchema = z
+  .object({ data: timelineEventSchema })
+  .transform(({ data }) => data);
+
+/** POST /leads/{id}/notes request body. */
+export const addLeadNoteRequestSchema = z.object({
+  note: z.string().trim().min(1).max(LEAD_NOTE_MAX_LENGTH),
+});
+
+export type AddLeadNoteRequest = z.infer<typeof addLeadNoteRequestSchema>;
+
+// ── stage change and reopen (LEAD-007) ─────────────────────────────────────────
+
+/** Where POST /leads/{id}/transition may send a lead. quoted and negotiation come from a quotation. */
+export const LEAD_TRANSITION_TARGETS = [
+  "contacted",
+  "qualified",
+  "quoted",
+  "negotiation",
+  "won",
+  "lost",
+] as const;
+
+/** The backend's limit on a lost note and on a reopening note. */
+export const LEAD_STAGE_NOTE_MAX_LENGTH = 2000;
+
+/**
+ * POST /leads/{id}/transition. `expected_stage` is the stage on screen: if the lead has
+ * moved since, the backend answers 409 `stage_changed` instead of acting on a stale view.
+ */
+export const transitionLeadRequestSchema = z.object({
+  to_stage: z.enum(LEAD_TRANSITION_TARGETS),
+  lost_reason_id: z.string().min(1).nullable(),
+  lost_note: z.string().trim().max(LEAD_STAGE_NOTE_MAX_LENGTH).nullable(),
+  expected_stage: z.enum(LEAD_STAGES),
+});
+
+export type TransitionLeadRequest = z.infer<typeof transitionLeadRequestSchema>;
+
+/** POST /leads/{id}/reopen — a lost lead goes back to the stage it was lost from. */
+export const reopenLeadRequestSchema = z.object({
+  note: z.string().trim().max(LEAD_STAGE_NOTE_MAX_LENGTH).nullable(),
+});
+
+export type ReopenLeadRequest = z.infer<typeof reopenLeadRequestSchema>;
+
+/** The Mark lost form: a reason from the admin list (by code) and an optional note. */
+export const markLostFormSchema = z.object({
+  reasonCode: z
+    .string()
+    .nullable()
+    .refine((value) => value !== null && value !== "", { message: "Choose why the lead was lost" }),
+  note: z
+    .string()
+    .trim()
+    .max(LEAD_STAGE_NOTE_MAX_LENGTH, {
+      message: `Keep the note under ${String(LEAD_STAGE_NOTE_MAX_LENGTH)} characters`,
+    }),
+});
+
+export type MarkLostFormValues = z.input<typeof markLostFormSchema>;
+
+// ── assignment (LEAD-008) ──────────────────────────────────────────────────────
+
+/**
+ * GET /leads/assignees — the staff the caller may make a lead's owner: everyone for a
+ * global assigner, their own office tree for a district manager, nobody for other scopes.
+ */
+export const assigneeListResponseSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        id: z.string().min(1),
+        full_name: z.string().min(1),
+        org_unit: refSchema.nullish(),
+      }),
+    ),
+  })
+  .transform(({ data }) =>
+    data.map((wire) => ({
+      id: wire.id,
+      name: wire.full_name,
+      officeName: wire.org_unit?.name ?? null,
+    })),
+  );
+
+export type Assignee = z.output<typeof assigneeListResponseSchema>[number];
+export type AssigneeListWire = z.input<typeof assigneeListResponseSchema>;
+
+/** GET /lookups/partners — the channel partners in the caller's scope, searchable. */
+export const partnerPickListResponseSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        id: z.string().min(1),
+        code: z.string().min(1),
+        name: z.string().min(1),
+        partner_type: z.string().min(1),
+        territory: refSchema.extend({ level: z.string().min(1) }).nullish(),
+      }),
+    ),
+  })
+  .transform(({ data }) =>
+    data.map((wire) => ({
+      id: wire.id,
+      code: wire.code,
+      name: wire.name,
+      partnerType: wire.partner_type,
+      territoryName: wire.territory?.name ?? null,
+    })),
+  );
+
+export type PartnerPick = z.output<typeof partnerPickListResponseSchema>[number];
+export type PartnerPickListWire = z.input<typeof partnerPickListResponseSchema>;
+
+/**
+ * POST /leads/{id}/assign. A field left out is unchanged; a field sent as null is cleared.
+ * At least one must be sent.
+ */
+export const assignLeadRequestSchema = z
+  .object({
+    owner_user_id: z.string().min(1).nullable().optional(),
+    assigned_partner_id: z.string().min(1).nullable().optional(),
+  })
+  .refine((body) => "owner_user_id" in body || "assigned_partner_id" in body, {
+    path: ["owner_user_id"],
+    message: "provide an owner or a partner",
+  });
+
+export type AssignLeadRequest = z.infer<typeof assignLeadRequestSchema>;
+
 const countSchema = z.number().int().nonnegative();
 
 /**

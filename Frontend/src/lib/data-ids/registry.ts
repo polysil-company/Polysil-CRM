@@ -200,6 +200,40 @@ export const DATA_IDS = {
     notes:
       "Connected to the dev API. An exact count, by stage and priority, with the unassigned total; the badge and the tab show the total.",
   },
+  "LEAD-005": {
+    domain: "LEAD",
+    title: "Lead timeline — the lead's history, newest first",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads/{leadId}/timeline"],
+    notes: "Cursor-paged; includes the events of leads merged into this one.",
+  },
+  "LEAD-006": {
+    domain: "LEAD",
+    title: "Add a note to a lead",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{leadId}/notes"],
+    notes: "The note becomes a timeline entry and bumps the lead's last activity.",
+  },
+  "LEAD-007": {
+    domain: "LEAD",
+    title: "Move a lead's stage — contact, qualify, mark lost, reopen",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{leadId}/transition", "POST /leads/{leadId}/reopen"],
+    notes:
+      "Quoted and negotiation are reached through a quotation; won needs an accepted quotation. Lost needs a lost reason.",
+  },
+  "LEAD-008": {
+    domain: "LEAD",
+    title: "Assign a lead — owner and channel partner",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{leadId}/assign", "GET /leads/assignees", "GET /lookups/partners"],
+    notes:
+      "Only what changed is sent. Owners come from GET /leads/assignees, which is empty for roles that may not set one; a closed lead cannot be reassigned.",
+  },
   "RPT-001": {
     domain: "RPT",
     title: "Dashboard overview — KPIs, pipeline, follow-ups",

@@ -6,6 +6,8 @@
 
 **Changed in v0.3 (2026-08-14):** ERP confirmed as *planned, not live* -> [ADR-019](Docs/Decisions.md) seams, schedule risk drops from +1-1.5 weeks to ~1 day - WhatsApp moves to the client's BSP behind a provider port ([ADR-020](Docs/Decisions.md)), removing Meta verification from the critical path - scale confirmed at 700-800 users / 100+ concurrent -> [ADR-021](Docs/Decisions.md) and a new load-test gate.
 
+**Where the build stands now:** see [§9 Integration status](#9-integration-status--frontend--backend) — updated with every integration pull request.
+
 **Changed in v0.2:** window extended 5 → 6.5 weeks · code review replaced by test gating ([ADR-016](Docs/Decisions.md)) · Field Sales confirmed as a **native app**, moving from Phase 2 into scope · application count fixed at 3 · Meta Lead Ads and rewards pulled back into scope.
 
 ---
@@ -266,6 +268,70 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | 17 | Per-PR preview deploys | ⬜ Week 1 D5 |
 | 18 | Mutation testing on business logic | ⬜ Week 2 |
 | 19 | Generated RBAC test matrix | ⬜ Week 1 D5 |
+
+---
+
+## 9. Integration status — frontend ↔ backend
+
+> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **27 September 2026**: PR #8 and PR #18 merged; lead actions (LEAD-005…008) built on `claude/integration-branch-review-gw0r1g`.
+
+**How the two sides meet.** The browser calls `/api/v1` on the app's own origin; `next.config.ts` forwards it to `API_PROXY_TARGET`. Every call goes through `apiRequest` (`src/lib/api/client.ts`): Zod-validated responses, `x-request-id` / `x-data-id`, `Idempotency-Key` on mutations, one refresh-and-retry on a 401. The backend's contract is `backend/docs/api/*.md` (generated) and the dev API's `/openapi.json`. `NEXT_PUBLIC_API_MOCKING=partial` sends everything to the dev API except the modules listed in `unbuiltHandlers` (`src/mocks/handlers/index.ts`).
+
+### 9.1 Connected to the real backend
+
+| Area | Data IDs | Endpoints |
+|---|---|---|
+| Sign-in, session, refresh, sign-out | AUTH-001…006 | `/auth/login`, `/auth/otp/*`, `/auth/refresh`, `/auth/logout`, `/auth/me` |
+| Lead list — cursor paging in the URL, stage / source / type filters, search | LEAD-001 | `GET /leads` |
+| New lead — territory picker, admin lookups, safe retries, field errors | LEAD-002 | `POST /leads` |
+| Lead page — the real record and possible duplicates | LEAD-003 | `GET /leads/{id}` |
+| Lead count — sidebar badge and Sales tab, exact | LEAD-004 | `GET /leads/stats` |
+| Lookups — sources, irrigation systems, lost reasons, territories | MSTR-002 | `/lookups/*`, `/territories` |
+| Lead history and notes — the Activity card on the lead page | LEAD-005, LEAD-006 | `GET /leads/{id}/timeline`, `POST /leads/{id}/notes` |
+| Stage change and reopen — Update stage menu, lost reason, won and reopen dialogs | LEAD-007 | `POST /leads/{id}/transition`, `POST /leads/{id}/reopen` |
+| Assign owner and channel partner | LEAD-008 | `POST /leads/{id}/assign`, `GET /leads/assignees`, `GET /lookups/partners` |
+
+LEAD-005…008 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+
+**`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
+
+| Old `/leads/summary` (guessed) | `GET /leads/stats` (real) |
+|---|---|
+| `total` | `total` — exact, never capped |
+| `byStatus` | `by_stage` — the backend's nine stages |
+| `bySource`, `byType` | not served |
+| `followUpsDueToday` | not served — the backend records no follow-up date yet |
+| — | `by_priority`, `unassigned` (new) |
+
+### 9.2 Still mocked — no backend endpoint yet
+
+| Area | Data IDs | Mock endpoints | Needs from the backend |
+|---|---|---|---|
+| Dashboard figures | RPT-001 | `GET /dashboard/overview` | A figures endpoint, or agreement to compose it from `/leads/stats` and `/orders/stats`; source breakdown; follow-ups |
+| Notifications | NOTIF-001, NOTIF-002 | `GET /notifications`, `POST /notifications/read` | The endpoints |
+| Staff messages | MSG-001…005 | `/conversations*`, `/staff-directory` | The endpoints |
+
+### 9.3 Served by the backend, not yet built on the frontend
+
+| Area | Endpoints | Contract | Order |
+|---|---|---|---|
+| **Quotations** — draft, lines with GST pricing, send, PDF, discount approval, revisions. Also what moves a lead to quoted, negotiation and won | `/quotations/*`, `POST /pricing/quote-lines` | `backend/docs/handover/quotations-api-contract.md` | **1 — next** |
+| Sales orders, approvals, dispatch | `/orders/*`, `/approvals/*`, `/dispatches/*` | `backend/docs/handover/orders-api-contract.md` | 2 |
+| Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 3 |
+| Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 4 |
+| Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 5 |
+
+**On `backend-foundation`, not yet in `integration`:** the tasks and planner contract (FS-014) and the complaints contract (FS-015).
+
+### 9.4 Asked of the backend
+
+Every open ask — sorting, a follow-up date, crops and land, win probability, territory levels, names in assignment events, stats by source, the dashboard, notifications and messages endpoints, the dev API — is a task with a checkbox in **[`docs/Backend-Tasks.md`](../../docs/Backend-Tasks.md)** (BE-001…). The backend developer ticks it and writes the commit and any notes there; the frontend reads it after each merge.
+
+### 9.5 Housekeeping
+
+- Dependabot PRs #13–#17 target `integration`. Three are major upgrades — ESLint 10, `@vitest/browser` 5, jsdom 30 — and need a look before they merge.
+- PR #11, `integration` → `staging`, is open for the staging check ([Environments.md](Environments.md)).
+- Consider generating the Zod contracts from `/openapi.json`, as the backend handover suggests, so a contract change fails the type check rather than a screen.
 
 ---
 

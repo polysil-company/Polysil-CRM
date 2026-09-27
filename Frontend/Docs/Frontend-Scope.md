@@ -328,6 +328,8 @@ Built and ready to extend (details in the changelog):
 12. **GST invoices, or only quotations and sales orders?**
 13. **Brand assets** — logo, colours, typeface approval (the design tokens make this a small change).
 
+**Tracked for the backend in [`docs/Backend-Tasks.md`](../../docs/Backend-Tasks.md)** — questions 7 and 14–18 below are tasks BE-014 and BE-001…BE-005 there, with a checkbox, the commit that closes them and the backend's notes. Ask new backend questions there.
+
 **Asked of the backend for leads (22 September 2026)** — the lead screens run on the dev API; these
 gaps show as "—" or have no effect until they land:
 
