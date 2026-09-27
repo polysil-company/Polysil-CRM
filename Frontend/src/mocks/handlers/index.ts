@@ -4,6 +4,7 @@ import { leadHandlers } from "./leads";
 import { lookupHandlers } from "./lookups";
 import { messageHandlers } from "./messages";
 import { notificationHandlers } from "./notifications";
+import { quotationHandlers } from "./quotations";
 
 /**
  * What the backend does not serve yet, so it stays mocked even against a real API
@@ -21,7 +22,13 @@ export const unbuiltHandlers = [
 
 /**
  * Every mock endpoint: the full mock backend (NEXT_PUBLIC_API_MOCKING=enabled) and the
- * unit tests. A new API integration adds its handlers here first. Leads and lookups are
- * served by the backend, so in partial mode they go to the real API.
+ * unit tests. A new API integration adds its handlers here first. Leads, lookups and
+ * quotations are served by the backend, so in partial mode they go to the real API.
  */
-export const handlers = [...authHandlers, ...leadHandlers, ...lookupHandlers, ...unbuiltHandlers];
+export const handlers = [
+  ...authHandlers,
+  ...leadHandlers,
+  ...lookupHandlers,
+  ...quotationHandlers,
+  ...unbuiltHandlers,
+];

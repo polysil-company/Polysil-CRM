@@ -290,8 +290,11 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Lead history and notes — the Activity card on the lead page | LEAD-005, LEAD-006 | `GET /leads/{id}/timeline`, `POST /leads/{id}/notes` |
 | Stage change and reopen — Update stage menu, lost reason, won and reopen dialogs | LEAD-007 | `POST /leads/{id}/transition`, `POST /leads/{id}/reopen` |
 | Assign owner and channel partner | LEAD-008 | `POST /leads/{id}/assign`, `GET /leads/assignees`, `GET /lookups/partners` |
+| Quotations list — the Quotations page and a lead's quotations | QUOT-001 | `GET /quotations` |
+| Quotation detail — the document as printed, with its notices | QUOT-002 | `GET /quotations/{id}` |
+| Open a quotation's PDF | QUOT-003 | `GET /quotations/{id}/pdf` |
 
-LEAD-005…008 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+LEAD-005…008 and QUOT-001…003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 
@@ -315,7 +318,7 @@ LEAD-005…008 are built on the backend's contract and tested against the mock b
 
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
-| **Quotations** — draft, lines with GST pricing, send, PDF, discount approval, revisions. Also what moves a lead to quoted, negotiation and won | `/quotations/*`, `POST /pricing/quote-lines` | `backend/docs/handover/quotations-api-contract.md` | **1 — next** |
+| **Quotations, the rest** — the builder (draft, lines, live pricing from `POST /pricing/quote-lines`, `rate_changed`); send and discount approval; accept, reject, negotiation (what moves a lead to quoted, negotiation and won); revise, versions, timeline, delete; the public `/q/{token}` page | `POST`/`PATCH`/`PUT`/`DELETE /quotations/*`, `POST /pricing/quote-lines`, `/public/q/*` | `backend/docs/handover/quotations-api-contract.md` | **1 — in progress** (reads done: QUOT-001…003) |
 | Sales orders, approvals, dispatch | `/orders/*`, `/approvals/*`, `/dispatches/*` | `backend/docs/handover/orders-api-contract.md` | 2 |
 | Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 3 |
 | Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 4 |

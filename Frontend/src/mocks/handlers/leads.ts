@@ -28,6 +28,7 @@ import { mockTimelineFor, newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
+import { decodeCursor, encodeCursor, errorResponse } from "./shared";
 
 /**
  * LEAD-001 … LEAD-004 · The backend's lead endpoints (backend/docs/api/leads.md), as far as
@@ -49,37 +50,8 @@ const MAX_LIMIT = 100;
 /** The signed-in staff user in the mock (usr-001 in the session mock owns what they create). */
 const MOCK_CREATOR = MOCK_STAFF[0];
 
-function errorResponse(
-  status: number,
-  code: string,
-  message: string,
-  fields?: Record<string, string>,
-): Response {
-  return HttpResponse.json(
-    { error: { code, message, ...(fields === undefined ? {} : { fields }) } },
-    { status },
-  );
-}
-
 function isStage(value: string): value is LeadStage {
   return LEAD_STAGES.some((stage) => stage === value);
-}
-
-/** The mock's cursor is an offset, base64url-encoded like the backend's opaque cursors. */
-function encodeCursor(offset: number): string {
-  return btoa(`offset:${String(offset)}`)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-function decodeCursor(cursor: string): number | null {
-  try {
-    const match = /^offset:(\d+)$/.exec(atob(cursor.replace(/-/g, "+").replace(/_/g, "/")));
-    return match?.[1] === undefined ? null : Number(match[1]);
-  } catch {
-    return null;
-  }
 }
 
 /** q matches the name (contains), the mobile's digits (contains) and the inquiry number (exact). */
