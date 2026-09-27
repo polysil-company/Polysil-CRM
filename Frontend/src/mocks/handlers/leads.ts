@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw";
 
 import {
+  addLeadNoteRequestSchema,
   createLeadRequestSchema,
   LEAD_STAGES,
   type CreateLeadRequest,
@@ -8,12 +9,15 @@ import {
   type LeadResponseWire,
   type LeadStage,
   type LeadStatsWire,
+  type TimelineEventWire,
+  type TimelinePageWire,
   type LeadWire,
 } from "@/features/leads/api/leads.schemas";
 import { summarizeSchemaIssues } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
 import { MOCK_ID_SPACE, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
 import { findMockTerritory, mockOfficeFor, toTerritoryRef } from "@/mocks/data/territories";
+import { mockTimelineFor, newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
@@ -22,11 +26,15 @@ import { applyScenario } from "./scenario";
  * LEAD-001 … LEAD-004 · The backend's lead endpoints (backend/docs/api/leads.md), as far as
  * the frontend uses them: search rules, the default stage filter, cursor paging, the capped
  * total, the stats, idempotent create, and duplicates that are flagged rather than refused.
+ * LEAD-005, LEAD-006 · The timeline (derived from each lead, plus the notes added here) and
+ * notes, with the backend's Idempotency-Key replay and 409.
  */
 
 /** The backend stops counting here and says so with `total_capped`. */
 const TOTAL_CEILING = 1000;
 const DEFAULT_LIMIT = 50;
+/** GET /leads/{id}/timeline returns 100 events unless asked for fewer. */
+const TIMELINE_DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 100;
 
 /** The signed-in staff user in the mock (usr-001 in the session mock owns what they create). */
@@ -296,6 +304,102 @@ export const leadHandlers = [
     }
     const body: LeadResponseWire = { data: lead };
     return HttpResponse.json(body);
+  }),
+
+  http.get(buildApiUrl("/leads/:leadId/timeline"), async ({ params, request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const lead = mockDb.leads.find((item) => item.id === params.leadId);
+    if (!lead) {
+      return errorResponse(404, "not_found", "No such lead.");
+    }
+    if (scenario === "contract") {
+      // Deliberately wrong shape: exercises CONTRACT_VIOLATION handling end to end.
+      return HttpResponse.json({ data: [{ id: 7, kind: null }], meta: { limit: "20" } });
+    }
+
+    const url = new URL(request.url);
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(
+        1,
+        Number(url.searchParams.get("limit") ?? TIMELINE_DEFAULT_LIMIT) || TIMELINE_DEFAULT_LIMIT,
+      ),
+    );
+    const cursorParam = url.searchParams.get("cursor");
+    const offset = cursorParam === null ? 0 : decodeCursor(cursorParam);
+    if (offset === null) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        cursor: "malformed cursor",
+      });
+    }
+
+    const events =
+      scenario === "empty"
+        ? []
+        : [...(mockDb.leadNotes.get(lead.id) ?? []), ...mockTimelineFor(lead)].sort(newestFirst);
+    const hasMore = offset + limit < events.length;
+    const body: TimelinePageWire = {
+      data: events.slice(offset, offset + limit),
+      meta: { limit, next_cursor: hasMore ? encodeCursor(offset + limit) : null },
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.post(buildApiUrl("/leads/:leadId/notes"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const key = request.headers.get("idempotency-key")?.trim() ?? "";
+    if (key === "") {
+      return errorResponse(
+        400,
+        "idempotency_key_required",
+        "An Idempotency-Key header is required on this request.",
+      );
+    }
+
+    const lead = mockDb.leads.find((item) => item.id === params.leadId);
+    if (!lead) {
+      return errorResponse(404, "not_found", "No such lead.");
+    }
+
+    const raw: unknown = await request.json();
+    const serialized = JSON.stringify({ leadId: lead.id, body: raw });
+    const replay = mockDb.noteCreations.get(key);
+    if (replay !== undefined) {
+      if (replay.body !== serialized) {
+        return errorResponse(
+          409,
+          "idempotency_key_reused",
+          "This Idempotency-Key was already used for a different request.",
+        );
+      }
+      return HttpResponse.json({ data: replay.event }, { status: 201 });
+    }
+
+    const parsed = addLeadNoteRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      const fields = Object.fromEntries(
+        summarizeSchemaIssues(parsed.error).map((issue) => [issue.path, issue.message]),
+      );
+      return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+    }
+
+    const now = new Date().toISOString();
+    const notes = mockDb.leadNotes.get(lead.id) ?? [];
+    const event: TimelineEventWire = {
+      id: mockUuid(MOCK_ID_SPACE.timeline, 900_000_000 + mockDb.noteCreations.size + 1),
+      kind: "lead.note_added",
+      occurred_at: now,
+      actor: MOCK_CREATOR ?? null,
+      payload: { actor_name: MOCK_CREATOR?.full_name ?? "", note: parsed.data.note },
+    };
+    mockDb.leadNotes.set(lead.id, [event, ...notes]);
+    mockDb.noteCreations.set(key, { body: serialized, event });
+    lead.last_activity_at = now;
+    return HttpResponse.json({ data: event }, { status: 201 });
   }),
 
   http.post(buildApiUrl("/leads"), async ({ request }) => {

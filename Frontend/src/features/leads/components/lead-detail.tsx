@@ -32,7 +32,7 @@ import {
 import { LookupName } from "@/features/lookups/components/lookup-name";
 import { formatTerritory } from "@/features/lookups/lib/lookup-labels";
 import { toShareParam } from "@/features/messages/lib/share-attachment";
-import { useSession } from "@/features/session/hooks/use-session";
+import { useCan, useSession } from "@/features/session/hooks/use-session";
 import { isApiError } from "@/lib/api/errors";
 import {
   EMPTY_VALUE,
@@ -43,7 +43,9 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { LeadNoteComposer } from "./lead-note-composer";
 import { LeadStageBadge } from "./lead-stage-badge";
+import { LeadTimeline, LeadTimelineSkeleton } from "./lead-timeline";
 
 /** Detail rows that always render — the skeleton draws the same number. */
 const DETAIL_ROW_COUNT = 15;
@@ -146,6 +148,7 @@ function LeadNotices({ lead }: { lead: Lead }): React.JSX.Element | null {
 
 function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
   const { data: session } = useSession();
+  const canEdit = useCan("leads", "edit");
   const whatsappNumber = lead.phone.replace(/\D/g, "");
   const lost = lead.stage === "lost";
 
@@ -207,81 +210,97 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
 
       <LeadNotices lead={lead} />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle level={3}>Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              <DetailItem label="Mobile">{formatIndianPhone(lead.phone)}</DetailItem>
-              <DetailItem label="Email">{lead.email ?? EMPTY_VALUE}</DetailItem>
-              <DetailItem label="Territory">{formatTerritory(lead.territory)}</DetailItem>
-              <DetailItem label="Village">{lead.village ?? EMPTY_VALUE}</DetailItem>
-              <DetailItem label="Irrigation system">
-                <LookupName list="mis-systems" code={lead.misSystem} />
-              </DetailItem>
-              <DetailItem label="Estimated value">{formatInr(lead.estimatedValue)}</DetailItem>
-              <DetailItem label="Owner">
-                {lead.owner ? (
-                  <AvatarLabel
-                    name={lead.owner.name}
-                    secondary={lead.ownerOrgUnit.name}
-                    size="xs"
-                  />
-                ) : (
-                  <span className="text-muted-foreground">
-                    Unassigned · {lead.ownerOrgUnit.name}
-                  </span>
-                )}
-              </DetailItem>
-              <DetailItem label="Channel partner">
-                {lead.channelPartner
-                  ? `${lead.channelPartner.name} · ${partnerTypeLabel(lead.channelPartner.partnerType)}`
-                  : EMPTY_VALUE}
-              </DetailItem>
-              <DetailItem label="Score">{lead.score ?? EMPTY_VALUE}</DetailItem>
-              <DetailItem label="Land">
-                <NotRecorded />
-              </DetailItem>
-              <DetailItem label="Crops">
-                <NotRecorded />
-              </DetailItem>
-              <DetailItem label="Follow-up">
-                <NotRecorded />
-              </DetailItem>
-              <DetailItem label="First contacted">
-                {lead.firstContactedAt === null ? (
-                  "Not yet"
-                ) : (
-                  <RelativeDate value={lead.firstContactedAt} />
-                )}
-              </DetailItem>
-              <DetailItem label="Last activity">
-                <RelativeDate value={lead.lastActivityAt} />
-              </DetailItem>
-              <DetailItem label="Created">
-                {formatFullDate(lead.createdAt)}
-                {lead.createdBy ? (
-                  <span className="text-muted-foreground"> · by {lead.createdBy.name}</span>
-                ) : null}
-              </DetailItem>
-              {lead.reopenCount > 0 ? (
-                <DetailItem label="Reopened">
-                  {lead.reopenCount === 1 ? "Once" : `${formatNumber(lead.reopenCount)} times`}
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle level={3}>Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                <DetailItem label="Mobile">{formatIndianPhone(lead.phone)}</DetailItem>
+                <DetailItem label="Email">{lead.email ?? EMPTY_VALUE}</DetailItem>
+                <DetailItem label="Territory">{formatTerritory(lead.territory)}</DetailItem>
+                <DetailItem label="Village">{lead.village ?? EMPTY_VALUE}</DetailItem>
+                <DetailItem label="Irrigation system">
+                  <LookupName list="mis-systems" code={lead.misSystem} />
                 </DetailItem>
-              ) : null}
-              {lost ? (
-                <DetailItem label="Lost reason" className="sm:col-span-2">
-                  {lead.lostReason?.name ?? EMPTY_VALUE}
-                  {lead.lostNote ? (
-                    <span className="mt-1 block text-muted-foreground">{lead.lostNote}</span>
+                <DetailItem label="Estimated value">{formatInr(lead.estimatedValue)}</DetailItem>
+                <DetailItem label="Owner">
+                  {lead.owner ? (
+                    <AvatarLabel
+                      name={lead.owner.name}
+                      secondary={lead.ownerOrgUnit.name}
+                      size="xs"
+                    />
+                  ) : (
+                    <span className="text-muted-foreground">
+                      Unassigned · {lead.ownerOrgUnit.name}
+                    </span>
+                  )}
+                </DetailItem>
+                <DetailItem label="Channel partner">
+                  {lead.channelPartner
+                    ? `${lead.channelPartner.name} · ${partnerTypeLabel(lead.channelPartner.partnerType)}`
+                    : EMPTY_VALUE}
+                </DetailItem>
+                <DetailItem label="Score">{lead.score ?? EMPTY_VALUE}</DetailItem>
+                <DetailItem label="Land">
+                  <NotRecorded />
+                </DetailItem>
+                <DetailItem label="Crops">
+                  <NotRecorded />
+                </DetailItem>
+                <DetailItem label="Follow-up">
+                  <NotRecorded />
+                </DetailItem>
+                <DetailItem label="First contacted">
+                  {lead.firstContactedAt === null ? (
+                    "Not yet"
+                  ) : (
+                    <RelativeDate value={lead.firstContactedAt} />
+                  )}
+                </DetailItem>
+                <DetailItem label="Last activity">
+                  <RelativeDate value={lead.lastActivityAt} />
+                </DetailItem>
+                <DetailItem label="Created">
+                  {formatFullDate(lead.createdAt)}
+                  {lead.createdBy ? (
+                    <span className="text-muted-foreground"> · by {lead.createdBy.name}</span>
                   ) : null}
                 </DetailItem>
-              ) : null}
-            </dl>
-          </CardContent>
-        </Card>
+                {lead.reopenCount > 0 ? (
+                  <DetailItem label="Reopened">
+                    {lead.reopenCount === 1 ? "Once" : `${formatNumber(lead.reopenCount)} times`}
+                  </DetailItem>
+                ) : null}
+                {lost ? (
+                  <DetailItem label="Lost reason" className="sm:col-span-2">
+                    {lead.lostReason?.name ?? EMPTY_VALUE}
+                    {lead.lostNote ? (
+                      <span className="mt-1 block text-muted-foreground">{lead.lostNote}</span>
+                    ) : null}
+                  </DetailItem>
+                ) : null}
+              </dl>
+            </CardContent>
+          </Card>
+
+          {/* LEAD-005, LEAD-006 · Notes and the lead's history. A merged lead is read-only. */}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-0.5">
+                <CardTitle level={3}>Activity</CardTitle>
+                <CardDescription>Notes and every change, newest first</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5">
+              {canEdit && lead.stage !== "merged" ? <LeadNoteComposer leadId={lead.id} /> : null}
+              <LeadTimeline leadId={lead.id} />
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="flex flex-col gap-4">
           <Card>
@@ -330,22 +349,35 @@ export function LeadDetailSkeleton(): React.JSX.Element {
           <Skeleton className="h-control-md w-28 rounded-md" />
         </div>
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <Skeleton className="h-6 w-20" />
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              {Array.from({ length: DETAIL_ROW_COUNT }, (_, index) => (
-                <div key={index} className="flex flex-col gap-1">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-5 w-36" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-20" />
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                {Array.from({ length: DETAIL_ROW_COUNT }, (_, index) => (
+                  <div key={index} className="flex flex-col gap-1">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-5 w-36" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-0.5">
+                <Skeleton className="h-6 w-20" />
+                <Skeleton className="h-5 w-56" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <LeadTimelineSkeleton />
+            </CardContent>
+          </Card>
+        </div>
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>

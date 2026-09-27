@@ -161,6 +161,60 @@ export const leadPageSchema = cursorPageSchema(leadSchema);
 /** The backend's JSON for one page, as the mock backend must produce it. */
 export type LeadPageWire = { data: LeadWire[]; meta: PageMetaWire };
 
+// ── timeline and notes (LEAD-005, LEAD-006) ───────────────────────────────────
+
+/** The backend's limit on a note (`LeadNote.note`, 1–2,000 characters after trimming). */
+export const LEAD_NOTE_MAX_LENGTH = 2000;
+
+/** The backend allows up to 100 events a page; 20 keeps the first paint short. */
+export const TIMELINE_PAGE_SIZE = 20;
+
+/**
+ * One timeline entry. `kind` stays an open string (`lead.created`, `quotation.sent`, …) so
+ * an event the backend adds later still shows; `payload` is read per kind by
+ * `lib/timeline-entries.ts`. `actor` is null when unknown or hidden from a partner, and
+ * its name can be empty, so it is read leniently rather than dropping the event.
+ */
+const timelineEventWireSchema = z.object({
+  id: z.string().min(1),
+  kind: z.string().min(1),
+  occurred_at: isoDateTime,
+  actor: z.object({ id: z.string().min(1), full_name: z.string() }).nullish(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type TimelineEventWire = z.input<typeof timelineEventWireSchema>;
+
+export const timelineEventSchema = timelineEventWireSchema.transform((wire) => ({
+  id: wire.id,
+  kind: wire.kind,
+  occurredAt: wire.occurred_at,
+  actor: wire.actor ? { id: wire.actor.id, name: wire.actor.full_name.trim() || null } : null,
+  payload: wire.payload ?? {},
+}));
+
+export type TimelineEvent = z.output<typeof timelineEventSchema>;
+
+/** GET /leads/{id}/timeline — newest first, read one event at a time (`cursorPageSchema`). */
+export const timelinePageSchema = cursorPageSchema(timelineEventSchema);
+
+export type TimelinePage = CursorPage<TimelineEvent>;
+
+/** The backend's JSON for one timeline page, as the mock backend must produce it. */
+export type TimelinePageWire = { data: TimelineEventWire[]; meta: PageMetaWire };
+
+/** POST /leads/{id}/notes answers `{ data: TimelineEvent }`. */
+export const timelineEventResponseSchema = z
+  .object({ data: timelineEventSchema })
+  .transform(({ data }) => data);
+
+/** POST /leads/{id}/notes request body. */
+export const addLeadNoteRequestSchema = z.object({
+  note: z.string().trim().min(1).max(LEAD_NOTE_MAX_LENGTH),
+});
+
+export type AddLeadNoteRequest = z.infer<typeof addLeadNoteRequestSchema>;
+
 const countSchema = z.number().int().nonnegative();
 
 /**

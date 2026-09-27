@@ -1,4 +1,4 @@
-import type { LeadWire } from "@/features/leads/api/leads.schemas";
+import type { LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 
@@ -14,6 +14,10 @@ export interface MockDb {
   messages: MessageWire[];
   /** POST /leads replays: Idempotency-Key → the request body and the lead it created. */
   leadCreations: Map<string, { body: string; leadId: string }>;
+  /** Notes added through POST /leads/{id}/notes, by lead; merged into the derived timeline. */
+  leadNotes: Map<string, TimelineEventWire[]>;
+  /** POST /leads/{id}/notes replays: Idempotency-Key → the request body and the event. */
+  noteCreations: Map<string, { body: string; event: TimelineEventWire }>;
 }
 
 function createMockDb(): MockDb {
@@ -25,6 +29,8 @@ function createMockDb(): MockDb {
     conversations,
     messages,
     leadCreations: new Map(),
+    leadNotes: new Map(),
+    noteCreations: new Map(),
   };
 }
 

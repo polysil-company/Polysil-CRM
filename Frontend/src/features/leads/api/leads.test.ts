@@ -8,8 +8,16 @@ import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 
-import { createLead, getLead, getLeadStats, listLeads } from "./leads.api";
 import {
+  addLeadNote,
+  createLead,
+  getLead,
+  getLeadStats,
+  getLeadTimeline,
+  listLeads,
+} from "./leads.api";
+import {
+  TIMELINE_PAGE_SIZE,
   createLeadFormSchema,
   createLeadRequestSchema,
   type CreateLeadFormValues,
@@ -437,5 +445,167 @@ describe("[LEAD-002] createLeadFieldErrors", () => {
 
   it("returns nothing for errors that are not field validation failures", () => {
     expect(createLeadFieldErrors(new Error("offline"))).toEqual([]);
+  });
+});
+
+/** A seeded lead whose history runs past one timeline page: lost after many steps. */
+function leadWithLongHistory(): (typeof mockDb.leads)[number] {
+  const lead = mockDb.leads.find((item) => item.stage === "lost" || item.stage === "won");
+  if (lead === undefined) {
+    throw new Error("No won or lost lead in the mock database");
+  }
+  return lead;
+}
+
+describe("[LEAD-005] getLeadTimeline", () => {
+  afterEach(() => {
+    server.events.removeAllListeners();
+    resetMockDb();
+  });
+
+  it("returns the newest events first, starting with the lead's creation at the end", async () => {
+    const lead = firstMockLead();
+
+    const page = await getLeadTimeline({ leadId: lead.id, cursor: null });
+
+    expect(page.items.length).toBeGreaterThan(0);
+    const times = page.items.map((event) => Date.parse(event.occurredAt));
+    expect([...times].sort((a, b) => b - a)).toEqual(times);
+    expect(page.items.at(-1)?.kind).toBe("lead.created");
+  });
+
+  it("asks for one page and follows the cursor to older events", async () => {
+    const lead = leadWithLongHistory();
+    for (let index = 0; index < TIMELINE_PAGE_SIZE; index += 1) {
+      await addLeadNote({
+        leadId: lead.id,
+        body: { note: `Visit ${String(index)}` },
+        idempotencyKey: `key-${String(index)}`,
+      });
+    }
+    let sent: URL | undefined;
+    server.events.on("request:start", ({ request }) => {
+      sent = new URL(request.url);
+    });
+
+    const first = await getLeadTimeline({ leadId: lead.id, cursor: null });
+    expect(sent?.searchParams.get("limit")).toBe(String(TIMELINE_PAGE_SIZE));
+    expect(first.items).toHaveLength(TIMELINE_PAGE_SIZE);
+    expect(first.nextCursor).not.toBeNull();
+
+    const older = await getLeadTimeline({ leadId: lead.id, cursor: first.nextCursor });
+    expect(older.items.at(-1)?.kind).toBe("lead.created");
+    expect(older.items.map((event) => event.id)).not.toContain(first.items[0]?.id);
+  });
+
+  it("keeps an event with an empty actor name, and hides no event for its payload", async () => {
+    server.use(
+      http.get(buildApiUrl("/leads/:leadId/timeline"), () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: "e1",
+              kind: "quotation.sent",
+              occurred_at: "2026-09-20T10:00:00+00:00",
+              actor: { id: "u1", full_name: "" },
+              payload: { quotation_no: 7 },
+            },
+            { id: "e2", kind: "lead.created", occurred_at: "2026-09-19T10:00:00+00:00" },
+          ],
+          meta: { limit: 20 },
+        }),
+      ),
+    );
+
+    const page = await getLeadTimeline({ leadId: "lead-x", cursor: null });
+
+    expect(page.items.map((event) => event.id)).toEqual(["e1", "e2"]);
+    expect(page.items[0]?.actor).toEqual({ id: "u1", name: null });
+    expect(page.items[1]?.actor).toBeNull();
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("leaves out one broken event and keeps the rest", async () => {
+    server.use(
+      http.get(buildApiUrl("/leads/:leadId/timeline"), () =>
+        HttpResponse.json({
+          data: [
+            { id: "e1", kind: "lead.created", occurred_at: "2026-09-19T10:00:00+00:00" },
+            { id: "e2", kind: "lead.note_added", occurred_at: "yesterday" },
+          ],
+          meta: { limit: 20, next_cursor: null },
+        }),
+      ),
+    );
+
+    const page = await getLeadTimeline({ leadId: "lead-x", cursor: null });
+
+    expect(page.items.map((event) => event.id)).toEqual(["e1"]);
+    expect(page.skipped).toBe(1);
+  });
+
+  it("reports a lead outside the caller's scope as 404", async () => {
+    await expect(getLeadTimeline({ leadId: "lead-missing", cursor: null })).rejects.toMatchObject({
+      kind: "http",
+      status: 404,
+      dataId: "LEAD-005",
+    });
+  });
+});
+
+describe("[LEAD-006] addLeadNote", () => {
+  afterEach(() => {
+    resetMockDb();
+  });
+
+  it("adds the note as the newest timeline event", async () => {
+    const lead = firstMockLead();
+
+    const event = await addLeadNote({
+      leadId: lead.id,
+      body: { note: "Farmer wants a site visit on Monday" },
+      idempotencyKey: "note-1",
+    });
+
+    expect(event).toMatchObject({
+      kind: "lead.note_added",
+      payload: { note: "Farmer wants a site visit on Monday" },
+    });
+    const page = await getLeadTimeline({ leadId: lead.id, cursor: null });
+    expect(page.items[0]?.id).toBe(event.id);
+  });
+
+  it("replays a retry with the same key instead of adding the note twice", async () => {
+    const lead = firstMockLead();
+    const input = { leadId: lead.id, body: { note: "Called twice?" }, idempotencyKey: "note-2" };
+
+    const first = await addLeadNote(input);
+    const retry = await addLeadNote(input);
+
+    expect(retry.id).toBe(first.id);
+    const page = await getLeadTimeline({ leadId: lead.id, cursor: null });
+    expect(page.items.filter((item) => item.kind === "lead.note_added")).toHaveLength(1);
+  });
+
+  it("refuses a key reused for a different note with 409", async () => {
+    const lead = firstMockLead();
+    await addLeadNote({ leadId: lead.id, body: { note: "First" }, idempotencyKey: "note-3" });
+
+    await expect(
+      addLeadNote({ leadId: lead.id, body: { note: "Second" }, idempotencyKey: "note-3" }),
+    ).rejects.toMatchObject({ kind: "http", status: 409, dataId: "LEAD-006" });
+  });
+
+  it("reports a blank note as a field error on note", async () => {
+    const lead = firstMockLead();
+
+    const error: unknown = await addLeadNote({
+      leadId: lead.id,
+      body: { note: "   " },
+      idempotencyKey: "note-4",
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 422, details: { fields: { note: expect.any(String) } } });
   });
 });

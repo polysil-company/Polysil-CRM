@@ -17,6 +17,14 @@ export function findLookupName(items: readonly LookupItem[] | undefined, code: s
   return items?.find((item) => item.code === code)?.name ?? humanizeCode(code);
 }
 
+/** The name of the row with this id — events and records that store the id, not the code. */
+export function findLookupNameById(
+  items: readonly LookupItem[] | undefined,
+  id: string,
+): string | null {
+  return items?.find((item) => item.id === id)?.name ?? null;
+}
+
 const TERRITORY_LEVEL_LABELS: Readonly<Record<string, string>> = {
   state: "State",
   district: "District",

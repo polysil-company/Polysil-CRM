@@ -1,6 +1,6 @@
-import { keepPreviousData, queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 
-import { getLead, getLeadStats, listLeads } from "./leads.api";
+import { getLead, getLeadStats, getLeadTimeline, listLeads } from "./leads.api";
 import type { LeadListParams } from "./leads.schemas";
 
 /**
@@ -14,6 +14,7 @@ export const leadKeys = {
   list: (params: LeadListParams) => [...leadKeys.lists(), params] as const,
   details: () => [...leadKeys.all, "detail"] as const,
   detail: (leadId: string) => [...leadKeys.details(), leadId] as const,
+  timeline: (leadId: string) => [...leadKeys.details(), leadId, "timeline"] as const,
   stats: () => [...leadKeys.all, "stats"] as const,
 };
 
@@ -42,5 +43,22 @@ export function leadStatsQueryOptions() {
     queryFn: ({ signal }) => getLeadStats(signal),
     staleTime: 60_000,
     meta: { dataId: "LEAD-004" },
+  });
+}
+
+/** The first timeline page has no cursor. Typed here so the page param is `string | null`. */
+const NEWEST_TIMELINE_PAGE: string | null = null;
+
+/**
+ * LEAD-005 · The timeline, newest first, one page at a time: "Show older" loads the next
+ * page with the previous page's cursor. Invalidating the lead's detail key refreshes it too.
+ */
+export function leadTimelineQueryOptions(leadId: string) {
+  return infiniteQueryOptions({
+    queryKey: leadKeys.timeline(leadId),
+    queryFn: ({ pageParam, signal }) => getLeadTimeline({ leadId, cursor: pageParam }, signal),
+    initialPageParam: NEWEST_TIMELINE_PAGE,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    meta: { dataId: "LEAD-005" },
   });
 }
