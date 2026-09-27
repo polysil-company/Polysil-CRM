@@ -193,12 +193,12 @@ export const DATA_IDS = {
   },
   "LEAD-004": {
     domain: "LEAD",
-    title: "Lead count — navigation badge and sales tab",
+    title: "Lead stats — navigation badge and sales tab",
     owner: "shared",
     status: "in-progress",
-    endpoints: ["GET /leads"],
+    endpoints: ["GET /leads/stats"],
     notes:
-      "One row with include_total=true; the count is capped by the backend and shown as 1,000+ when it is.",
+      "Connected to the dev API. An exact count, by stage and priority, with the unassigned total; the badge and the tab show the total.",
   },
   "RPT-001": {
     domain: "RPT",

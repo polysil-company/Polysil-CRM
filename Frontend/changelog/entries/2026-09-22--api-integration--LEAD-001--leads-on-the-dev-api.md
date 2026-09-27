@@ -40,7 +40,7 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 - New states: a page link the backend no longer accepts ("This page link no longer works", with a way back to the first page); a later page that has emptied since the link was made. Clicking "Next" twice while a page loads no longer skips a page.
 - The selection bar adds the selected leads' values exactly, in whole paise.
 
-**The lead count (LEAD-004)** — the sidebar badge and the Sales tab ask `GET /leads` for one row and the count, and show "1,000+" when it is capped. The tab no longer asks when the user cannot see leads.
+**The lead count (LEAD-004)** — the sidebar badge and the Sales tab read `GET /leads/stats`: the exact number of leads the user can see, never capped, and no lead rows fetched just to count them. The stats also carry counts by stage and priority and the unassigned total, parsed and ready for the dashboard tiles. The tab no longer asks when the user cannot see leads.
 
 **The lead page (LEAD-003)** — the real record: stage and priority badges; mobile, email, territory with its level, village, irrigation system, estimated value, owner and office (or "Unassigned · office"), channel partner and type, score, first contact, last activity, created on and by, times reopened, and for a lost lead its reason and note. A merged lead points to the lead it was merged into; possible duplicates are listed with how they matched ("same mobile number"). Land, crops, follow-up, win probability and engagement show "—".
 
@@ -63,6 +63,7 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 - **Lookups (MSTR-002)** are fetched once and shared by every cell, filter and form (ten minutes fresh). A code shows in readable form ("farmer_meeting" → "Farmer meeting") until its name arrives. The form offers active rows only; filters keep inactive ones, because old leads still carry them.
 - **Partial mode's one seam:** messages are still mocked but leads are real. The mock now accepts a real lead linked in a message and names it "Lead", instead of refusing every real lead.
 - **Mocks follow the backend:** seeded sources, irrigation systems and lost reasons from its migrations; the territory tree and partners shaped like its showcase seed; its search rules, default stage filter, 1,000 ceiling, cursor refusal, idempotency replay and 409, duplicate flagging, and `territory_without_org_unit` (Dang has no office in the mock, to preview it). The dashboard mock assumes a follow-up three days after the last activity, since the backend records none.
+- **The count comes from `GET /leads/stats`**, which the backend added after this branch was cut (backend PR #12), instead of asking `GET /leads` for one row with `include_total`. It is one count query with no rows, the same scope and filters as the list, and exact, so the badge no longer needs "1,000+". It is a bare object, not `{ data }`. Stage keys are read as open strings, so a stage the backend adds later cannot hide the badge.
 - **Asked of the backend** (Frontend-Scope §10, questions 14–18): sorting; a follow-up date; crops and acreage; win probability and weekly activity (or confirmation that the score and timeline replace them); which territory levels a lead may sit in.
 - **Not done:** honouring `must_change_password` (AUTH-002); the lead timeline, stage changes, assignment and merging (their endpoints exist); integration on staging.
 
@@ -71,8 +72,8 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 - `src/lib/env/client.ts` — `partial` mode, refused in staging and production
 - `src/mocks/handlers/index.ts`, `src/mocks/browser.ts` — the still-mocked list; leads and lookups leave it
 - `src/components/providers/mock-gate.tsx`, `src/components/layout/user-menu.tsx`, `src/lib/dev/mock-settings.ts` — mock controls by mode
-- `src/components/layout/app-sidebar.tsx` — environment card by mode; lead count from `GET /leads`, "1,000+" when capped
-- `src/features/leads/api/` — the backend's lead contract, list, detail, count and create with a reusable idempotency key
+- `src/components/layout/app-sidebar.tsx` — environment card by mode; lead count from `GET /leads/stats`
+- `src/features/leads/api/` — the backend's lead contract, list, detail, stats and create with a reusable idempotency key
 - `src/features/leads/hooks/use-lead-list-params.ts` — URL state: page tokens, stage, single source and type
 - `src/features/leads/components/` — table (tokens, capped total, stale links), toolbar (single-choice pills, lookup sources), columns, lead page, New lead form, sales tab; `lead-status-badge.tsx` → `lead-stage-badge.tsx`
 - `src/features/leads/lib/lead-labels.ts`, `create-lead-errors.ts`, `lead-table-layout.ts` — nine stages, priorities, partner types, duplicate wording; 422 field mapping
@@ -84,7 +85,7 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 - `src/hooks/use-debounced-value.ts` — search as you type
 - `src/features/auth/` — imports `readFieldErrors` from its new home
 - `src/features/dashboard/` — stage labels and source names (mocked contract, RPT-001)
-- `src/mocks/` — leads, lookups and territories in the backend's format; lead, lookup, dashboard and message handlers
+- `src/mocks/` — leads, lookups and territories in the backend's format; lead (with `/leads/stats`, sharing the list's filters), lookup, dashboard and message handlers
 - `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — LEAD-001…004 in progress on the dev API, LEAD-004 re-described, MSTR-002 registered
 - `Docs/Environments.md`, `Docs/Frontend-Scope.md`, `Docs/Design-System.md`, `.env.example` — the dev API, what leads cannot show yet, questions for the backend, new components
 - `eslint.config.mjs` — `RadioGroupItem` counts as a labelled control
@@ -93,7 +94,7 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 
 ## Tests
 
-- `src/features/leads/api/leads.test.ts` — `[LEAD-001]` first page and total, parameters sent, cursor paging to the last page, stages (merged only when asked), source and type, search by inquiry number and mobile, capped total, refused cursor; `[LEAD-003]` shape and duplicates, 404; `[LEAD-004]` count and capped count; `[LEAD-002]` create, duplicate flagged, retry replayed, key reused → 409, uncovered territory on its field; form schema; 422 field mapping
+- `src/features/leads/api/leads.test.ts` — `[LEAD-001]` first page and total, parameters sent, cursor paging to the last page, stages (merged only when asked), source and type, search by inquiry number and mobile, capped total, refused cursor; `[LEAD-003]` shape and duplicates, 404; `[LEAD-004]` stats match the list's scope (merged left out) by stage, priority and owner, the bare object is read, a broken body is a contract violation; `[LEAD-002]` create, duplicate flagged, retry replayed, key reused → 409, uncovered territory on its field; form schema; 422 field mapping
 - `src/features/leads/components/leads-ui.test.tsx` — `[LEAD-001]` skeleton → rows and total, source names, next and previous page with the URL, "1,000+", emptied later page, stale link, empty and filtered-empty, server error, contract violation; `[LEAD-002]` every required field explained
 - `src/features/lookups/` — `[MSTR-002]` lookup lists, inactive rows, territory search, labels, `TerritoryPicker` (districts on open, search and choose, nothing matches)
 - `src/components/patterns/filter-pill.test.tsx`, `data-table/data-table.test.tsx` — single-choice pill; range, capped total, cursor-decided next page

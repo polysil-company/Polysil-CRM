@@ -37,7 +37,7 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 - New states: a page link the backend no longer accepts ("This page link no longer works", with a way back to the first page); a later page that has emptied since the link was made. Clicking "Next" twice while a page loads no longer skips a page.
 - The selection bar adds the selected leads' values exactly, in whole paise.
 
-**The lead count (LEAD-004)** — the sidebar badge and the Sales tab ask `GET /leads` for one row and the count, and show "1,000+" when it is capped. The tab no longer asks when the user cannot see leads.
+**The lead count (LEAD-004)** — the sidebar badge and the Sales tab read `GET /leads/stats`: the exact number of leads the user can see, never capped, and no lead rows fetched just to count them. The stats also carry counts by stage and priority and the unassigned total, parsed and ready for the dashboard tiles. The tab no longer asks when the user cannot see leads.
 
 **The lead page (LEAD-003)** — the real record: stage and priority badges; mobile, email, territory with its level, village, irrigation system, estimated value, owner and office (or "Unassigned · office"), channel partner and type, score, first contact, last activity, created on and by, times reopened, and for a lost lead its reason and note. A merged lead points to the lead it was merged into; possible duplicates are listed with how they matched ("same mobile number"). Land, crops, follow-up, win probability and engagement show "—".
 
@@ -60,6 +60,7 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 - **Lookups (MSTR-002)** are fetched once and shared by every cell, filter and form (ten minutes fresh). A code shows in readable form ("farmer_meeting" → "Farmer meeting") until its name arrives. The form offers active rows only; filters keep inactive ones, because old leads still carry them.
 - **Partial mode's one seam:** messages are still mocked but leads are real. The mock now accepts a real lead linked in a message and names it "Lead", instead of refusing every real lead.
 - **Mocks follow the backend:** seeded sources, irrigation systems and lost reasons from its migrations; the territory tree and partners shaped like its showcase seed; its search rules, default stage filter, 1,000 ceiling, cursor refusal, idempotency replay and 409, duplicate flagging, and `territory_without_org_unit` (Dang has no office in the mock, to preview it). The dashboard mock assumes a follow-up three days after the last activity, since the backend records none.
+- **The count comes from `GET /leads/stats`**, which the backend added after this branch was cut (backend PR #12), instead of asking `GET /leads` for one row with `include_total`. It is one count query with no rows, the same scope and filters as the list, and exact, so the badge no longer needs "1,000+". It is a bare object, not `{ data }`. Stage keys are read as open strings, so a stage the backend adds later cannot hide the badge.
 - **Asked of the backend** (Frontend-Scope §10, questions 14–18): sorting; a follow-up date; crops and acreage; win probability and weekly activity (or confirmation that the score and timeline replace them); which territory levels a lead may sit in.
 - **Not done:** honouring `must_change_password` (AUTH-002); the lead timeline, stage changes, assignment and merging (their endpoints exist); integration on staging.
 
@@ -68,8 +69,8 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 - `src/lib/env/client.ts` — `partial` mode, refused in staging and production
 - `src/mocks/handlers/index.ts`, `src/mocks/browser.ts` — the still-mocked list; leads and lookups leave it
 - `src/components/providers/mock-gate.tsx`, `src/components/layout/user-menu.tsx`, `src/lib/dev/mock-settings.ts` — mock controls by mode
-- `src/components/layout/app-sidebar.tsx` — environment card by mode; lead count from `GET /leads`, "1,000+" when capped
-- `src/features/leads/api/` — the backend's lead contract, list, detail, count and create with a reusable idempotency key
+- `src/components/layout/app-sidebar.tsx` — environment card by mode; lead count from `GET /leads/stats`
+- `src/features/leads/api/` — the backend's lead contract, list, detail, stats and create with a reusable idempotency key
 - `src/features/leads/hooks/use-lead-list-params.ts` — URL state: page tokens, stage, single source and type
 - `src/features/leads/components/` — table (tokens, capped total, stale links), toolbar (single-choice pills, lookup sources), columns, lead page, New lead form, sales tab; `lead-status-badge.tsx` → `lead-stage-badge.tsx`
 - `src/features/leads/lib/lead-labels.ts`, `create-lead-errors.ts`, `lead-table-layout.ts` — nine stages, priorities, partner types, duplicate wording; 422 field mapping
@@ -81,7 +82,7 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 - `src/hooks/use-debounced-value.ts` — search as you type
 - `src/features/auth/` — imports `readFieldErrors` from its new home
 - `src/features/dashboard/` — stage labels and source names (mocked contract, RPT-001)
-- `src/mocks/` — leads, lookups and territories in the backend's format; lead, lookup, dashboard and message handlers
+- `src/mocks/` — leads, lookups and territories in the backend's format; lead (with `/leads/stats`, sharing the list's filters), lookup, dashboard and message handlers
 - `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — LEAD-001…004 in progress on the dev API, LEAD-004 re-described, MSTR-002 registered
 - `Docs/Environments.md`, `Docs/Frontend-Scope.md`, `Docs/Design-System.md`, `.env.example` — the dev API, what leads cannot show yet, questions for the backend, new components
 - `eslint.config.mjs` — `RadioGroupItem` counts as a labelled control
@@ -90,12 +91,65 @@ Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summar
 
 #### Tests
 
-- `src/features/leads/api/leads.test.ts` — `[LEAD-001]` first page and total, parameters sent, cursor paging to the last page, stages (merged only when asked), source and type, search by inquiry number and mobile, capped total, refused cursor; `[LEAD-003]` shape and duplicates, 404; `[LEAD-004]` count and capped count; `[LEAD-002]` create, duplicate flagged, retry replayed, key reused → 409, uncovered territory on its field; form schema; 422 field mapping
+- `src/features/leads/api/leads.test.ts` — `[LEAD-001]` first page and total, parameters sent, cursor paging to the last page, stages (merged only when asked), source and type, search by inquiry number and mobile, capped total, refused cursor; `[LEAD-003]` shape and duplicates, 404; `[LEAD-004]` stats match the list's scope (merged left out) by stage, priority and owner, the bare object is read, a broken body is a contract violation; `[LEAD-002]` create, duplicate flagged, retry replayed, key reused → 409, uncovered territory on its field; form schema; 422 field mapping
 - `src/features/leads/components/leads-ui.test.tsx` — `[LEAD-001]` skeleton → rows and total, source names, next and previous page with the URL, "1,000+", emptied later page, stale link, empty and filtered-empty, server error, contract violation; `[LEAD-002]` every required field explained
 - `src/features/lookups/` — `[MSTR-002]` lookup lists, inactive rows, territory search, labels, `TerritoryPicker` (districts on open, search and choose, nothing matches)
 - `src/components/patterns/filter-pill.test.tsx`, `data-table/data-table.test.tsx` — single-choice pill; range, capped total, cursor-decided next page
 - `src/lib/format/format.test.ts`, `src/lib/api/pagination.test.ts`, `url-and-errors.test.ts`, `src/hooks/use-debounced-value.test.ts`, `src/mocks/data/leads.test.ts`, `src/mocks/handlers/index.test.ts`, `src/lib/env/client.test.ts` — money strings and paise totals, page metadata, field errors, debounce, mock data against the contract, the mocked list, `partial` mode
 - By hand, with `.env.local` pointing at the dev API: sign in as `admin@`, `asha@` and `ravi@polysil.in` — the caption shows each one's own total (74, 34, 23); page forward, refresh, and land on the same page; filter by stage, source and type; open a lead; create one with a taluka from the picker; create another with the same mobile and see the duplicate warning. Check at 360px and on a wide screen, in light and dark.
+
+### One odd lead no longer blanks the page, and a source the administrators renamed still filters
+
+`fix` · `LEAD-001` `LEAD-002` `MSTR-002` `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-22--fix--LEAD-001--one-odd-lead-no-longer-blanks-the-page.md)
+
+#### Before
+
+Six things the leads screens got wrong once the dev API — rather than the mock backend — was answering:
+
+- **One malformed lead failed the whole page.** `GET /leads` was read as `z.array(leadSchema)`, so a single record the backend sent with an empty name, territory or system replaced twenty-four good leads with "We received data we couldn't read". The count endpoint already guarded against exactly this; the list did not.
+- **A source code outside `[a-z0-9_]` silently disappeared.** The URL parser only accepted lowercase words joined by underscores. The lists are edited by administrators, so the day someone adds `agri-fair`, choosing that source wrote it to the URL, the parser read it back as nothing, and the pill snapped to unset — a filter that looked like it did nothing at all.
+- **A chosen Source could not be un-chosen.** Source is optional on the New lead form, but `LookupSelect` offered no way back to "not set": once picked, it could only be swapped.
+- **The New lead dialog left a timer running.** After a save it waits 700 ms before closing. Nothing cancelled that timer, and `useAsyncAction` calls `onSuccess` whether or not the dialog is still mounted, so leaving the page inside that window reset a form that was gone and wrote to the next page's URL.
+- **"Loading sources…" was shown for a list that had loaded and was empty**, because the pill's message only told an error apart from everything else.
+- **"Previous page" stayed clickable while a page loaded** and silently did nothing. "Next page" disabled itself properly; the two behaved differently for the same reason.
+
+#### Now
+
+- **The list reads leads one at a time.** A lead that breaks the contract is left out, counted, and logged (`left out 1 lead(s) that did not match the contract`), and the rest of the page is shown. A page where _no_ lead matches is still a contract violation — that is a change of shape, not one bad record. The new `cursorPageSchema` in `lib/api/pagination.ts` does this for any cursor-paged list, so quotations and orders inherit it; `CursorPage` carries `skipped` alongside the rows.
+- **Lookup codes are checked for shape, not spelling:** letters, digits, `_`, `-` and `.`. `agri-fair` and `qr.code` filter as they should. A code the backend does not know is still the backend's to refuse.
+- **Optional lookup fields can be emptied.** `LookupSelect` takes `clearable`, which adds a "Not set" row; the field then shows its placeholder again. Fields that need a value — Irrigation system — do not get the row, and ignore a null.
+- **The dialog's close timer is cancelled** when the dialog unmounts and whenever the form resets.
+- **The Source pill says which of the three it is:** loading, failed, or nothing set up yet.
+- **Both paging buttons are disabled together** while a page change is in flight. `DataTable` takes `isPaging` instead of the caller folding it into `hasNextPage`.
+- **The search term is trimmed once**, in `useLeadListParams`, so a hand-edited `?q=%20` no longer counts as an active filter while sending nothing.
+
+#### Discussion
+
+The row-tolerance change is the one with a real trade-off: a backend that quietly drops a required field now shows a slightly short page instead of failing loudly. That is the right way round for a sales team working a list — but only because the drop is never silent for us: it is counted on the page and logged as a warning with the Data ID, and a page where nothing parses still fails hard. The alternative, relaxing `.min(1)` across the wire schema, would have bought the same resilience by giving up the contract itself.
+
+`clearable` is opt-in rather than the default because most lookups back a required field, and a "Not set" row on those is a way to make a form invalid by accident.
+
+The widened code pattern is deliberately a shape check, not an allow-list: the frontend cannot know what an administrator will type next, and the backend rejects codes it does not have. Worth confirming with the backend what its lookup codes actually allow (Frontend-Scope §10).
+
+#### Files changed
+
+- `src/lib/api/pagination.ts` — `cursorPageSchema`, `skipped` on `CursorPage`, `PageMetaWire`.
+- `src/features/leads/api/leads.schemas.ts`, `leads.api.ts` — the list uses it; `listLeads` logs what was left out.
+- `src/features/leads/hooks/use-lead-list-params.ts` — widened code pattern, search trimmed once.
+- `src/features/lookups/components/lookup-select.tsx` — `clearable`, placeholder helper.
+- `src/features/leads/components/new-lead-dialog.tsx` — cancelled timer, clearable Source.
+- `src/features/leads/components/leads-toolbar.tsx` — three messages for the Source pill.
+- `src/components/patterns/data-table/data-table.tsx`, `leads-table.tsx` — `isPaging`, with a `Paging` story.
+
+#### Tests
+
+11 new unit tests, 360 passing.
+
+- `lib/api/pagination.test.ts` — a clean page, a page with two bad rows, a page where nothing parses (and the message naming the first failure), an empty page.
+- `features/leads/api/leads.test.ts` — `listLeads` keeps the good lead and counts the bad one; a page where nothing matches still fails as `CONTRACT_VIOLATION`.
+- `features/leads/components/leads-ui.test.tsx` — `?source=agri-fair` reaches the request instead of being dropped.
+- `features/lookups/components/lookup-select.test.tsx` — the list's rows by name, emptying a clearable field, and no "Not set" row on a required one.
+- `components/patterns/data-table/data-table.test.tsx` — both paging buttons disabled while a page loads.
 
 ## 21 September 2026
 

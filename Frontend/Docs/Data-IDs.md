@@ -134,7 +134,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-001 | List leads with filters, sorting and pagination (`GET /leads`) | shared | in-progress |
 | LEAD-002 | Create lead (`POST /leads`) | shared | in-progress |
 | LEAD-003 | Lead detail (`GET /leads/{leadId}`) | shared | in-progress |
-| LEAD-004 | Lead count — navigation badge and sales tab (`GET /leads`, one row with the total) | shared | in-progress |
+| LEAD-004 | Lead stats — navigation badge and sales tab (`GET /leads/stats`) | shared | in-progress |
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | mocked |
 | RPT-002 | Reports | shared | planned |
 | QUOT-001 | Quotations list | shared | planned |
