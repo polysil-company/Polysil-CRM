@@ -49,7 +49,10 @@ in the same shape. Never renumber or reuse a number.
 - [ ] **BE-013** · Fix the pagination row in the API docs' conventions · OBS-002 · low
 - [ ] **BE-014** · Approval threshold amounts per role · APPR-001 · normal
 
-**Quotations** — added as the quotation screens are built (QUOT-001).
+**Quotations** — added as the quotation screens are built (QUOT-001…).
+
+- [ ] **BE-015** · Point quotation share links at the app: set `PUBLIC_WEB_URL` · QUOT-002 · high
+- [ ] **BE-016** · Say whether the dev API renders real PDFs · QUOT-003 · normal
 
 ---
 
@@ -229,5 +232,32 @@ in the same shape. Never renumber or reuse a number.
 - **Why:** quotation discount approval and order approval depend on them; the screens show the
   backend's answer, but the demo should use the client's numbers.
 - **Done when:** the client's figures are in the seed or configured, or the notes say who owes them.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-015 · Point quotation share links at the app: set `PUBLIC_WEB_URL`
+
+- **Status:** ⬜ Open
+- **Asked:** 27 Sep 2026 · QUOT-002, QUOT-003
+- **What:** set `PUBLIC_WEB_URL` on the dev API (and later staging) to the frontend's origin for that
+  environment. It defaults to `http://localhost:3000`, and `share_url` on every sent quotation is built
+  from it.
+- **Why:** the quotation page shows the customer link with a Copy button, and the WhatsApp message
+  carries it. With the default, every link sent from the dev API points at localhost. The public page
+  `/q/{token}` is being built on the frontend (QUOT, a later slice).
+- **Done when:** a quotation sent on the dev API has a `share_url` on the frontend's dev origin. Write
+  the origin in the notes.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-016 · Say whether the dev API renders real PDFs
+
+- **Status:** ⬜ Open
+- **Asked:** 27 Sep 2026 · QUOT-003
+- **What:** `pdf_renderer` can be `html` on a box without WeasyPrint, storing the rendered HTML as the
+  document. Say which the dev API uses, and switch it to `weasyprint` if it can.
+- **Why:** **Open PDF** opens the signed link in a new tab; if the dev API serves HTML, what the
+  frontend developer checks there is not what the farmer receives.
+- **Done when:** decided and noted (💬 is fine).
 - **Done in:** —
 - **Backend notes:** —

@@ -1,14 +1,18 @@
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
+import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 
 import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
+import { generateQuotations } from "./data/quotations";
 
 export interface MockDb {
   /** Newest first, in the backend's wire format. */
   leads: LeadWire[];
+  /** Newest first, full documents; list rows are derived from them. */
+  quotations: QuotationWire[];
   notifications: NotificationWire[];
   conversations: ConversationWire[];
   messages: MessageWire[];
@@ -31,6 +35,7 @@ function createMockDb(): MockDb {
   const { conversations, messages } = generateConversations(leads);
   return {
     leads,
+    quotations: generateQuotations(leads),
     notifications: generateNotifications(leads),
     conversations,
     messages,

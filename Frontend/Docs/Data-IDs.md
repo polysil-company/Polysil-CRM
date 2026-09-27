@@ -141,7 +141,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-008 | Assign a lead — owner and channel partner (`POST /leads/{leadId}/assign`, `GET /leads/assignees`, `GET /lookups/partners`) | shared | in-progress |
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | mocked |
 | RPT-002 | Reports | shared | planned |
-| QUOT-001 | Quotations list | shared | planned |
+| QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
+| QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
+| QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
 | SO-001 | Sales orders list | shared | planned |
 | APPR-001 | Approval inbox — amount-based escalation | shared | planned |
 | CMPL-001 | Complaints list and QA review | shared | planned |

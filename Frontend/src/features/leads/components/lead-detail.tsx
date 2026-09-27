@@ -32,6 +32,7 @@ import {
 import { LookupName } from "@/features/lookups/components/lookup-name";
 import { formatTerritory } from "@/features/lookups/lib/lookup-labels";
 import { toShareParam } from "@/features/messages/lib/share-attachment";
+import { LeadQuotations } from "@/features/quotations/components/lead-quotations";
 import { useCan, useSession } from "@/features/session/hooks/use-session";
 import { isApiError } from "@/lib/api/errors";
 import {
@@ -154,6 +155,7 @@ function LeadNotices({ lead }: { lead: Lead }): React.JSX.Element | null {
 function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
   const { data: session } = useSession();
   const canEdit = useCan("leads", "edit");
+  const canSeeQuotations = useCan("quotations");
   const whatsappNumber = lead.phone.replace(/\D/g, "");
   const lost = lead.stage === "lost";
 
@@ -295,6 +297,9 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
               </dl>
             </CardContent>
           </Card>
+
+          {/* QUOT-001 · The lead's quotations, for whoever may see quotations. */}
+          {canSeeQuotations ? <LeadQuotations leadId={lead.id} /> : null}
 
           {/* LEAD-005, LEAD-006 · Notes and the lead's history. A merged lead is read-only. */}
           <Card>
