@@ -178,7 +178,7 @@ describe("[LEAD-006] LeadNoteComposer", () => {
     await waitFor(() => {
       expect(box).toHaveValue("");
     });
-    expect(mockDb.leadNotes.get(lead.id)?.[0]?.payload?.note).toBe("Line one\nLine two");
+    expect(mockDb.leadEvents.get(lead.id)?.[0]?.payload?.note).toBe("Line one\nLine two");
   });
 
   it("keeps the text after a failed save, and retries with the same key", async () => {

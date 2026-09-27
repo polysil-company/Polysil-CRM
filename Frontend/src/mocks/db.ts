@@ -1,4 +1,4 @@
-import type { LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
+import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 
@@ -14,10 +14,16 @@ export interface MockDb {
   messages: MessageWire[];
   /** POST /leads replays: Idempotency-Key → the request body and the lead it created. */
   leadCreations: Map<string, { body: string; leadId: string }>;
-  /** Notes added through POST /leads/{id}/notes, by lead; merged into the derived timeline. */
-  leadNotes: Map<string, TimelineEventWire[]>;
+  /** Events written through the mock (notes, stage changes), by lead, newest first. */
+  leadEvents: Map<string, TimelineEventWire[]>;
   /** POST /leads/{id}/notes replays: Idempotency-Key → the request body and the event. */
   noteCreations: Map<string, { body: string; event: TimelineEventWire }>;
+  /** Stage changes and reopenings: Idempotency-Key → the request, for replay and 409. */
+  stageChanges: Map<string, { body: string; leadId: string }>;
+  /** The stage each lead was lost from, for reopening (the backend's `lost_from`). */
+  lostFrom: Map<string, LeadStage>;
+  /** How many events the mock has written, for their ids. */
+  writtenEvents: number;
 }
 
 function createMockDb(): MockDb {
@@ -29,8 +35,11 @@ function createMockDb(): MockDb {
     conversations,
     messages,
     leadCreations: new Map(),
-    leadNotes: new Map(),
+    leadEvents: new Map(),
     noteCreations: new Map(),
+    stageChanges: new Map(),
+    lostFrom: new Map(),
+    writtenEvents: 1,
   };
 }
 

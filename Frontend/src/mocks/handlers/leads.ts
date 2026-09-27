@@ -2,12 +2,16 @@ import { http, HttpResponse } from "msw";
 
 import {
   addLeadNoteRequestSchema,
+  assignLeadRequestSchema,
   createLeadRequestSchema,
+  reopenLeadRequestSchema,
+  transitionLeadRequestSchema,
   LEAD_STAGES,
   type CreateLeadRequest,
   type LeadPageWire,
   type LeadResponseWire,
   type LeadStage,
+  type AssigneeListWire,
   type LeadStatsWire,
   type TimelineEventWire,
   type TimelinePageWire,
@@ -15,7 +19,10 @@ import {
 } from "@/features/leads/api/leads.schemas";
 import { summarizeSchemaIssues } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
-import { MOCK_ID_SPACE, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
+import { readMockRole } from "@/lib/dev/mock-settings";
+import { mockLookupRows } from "@/mocks/data/lookups";
+import { mockPermissionsFor } from "@/mocks/data/permissions";
+import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
 import { findMockTerritory, mockOfficeFor, toTerritoryRef } from "@/mocks/data/territories";
 import { mockTimelineFor, newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
@@ -26,8 +33,10 @@ import { applyScenario } from "./scenario";
  * LEAD-001 … LEAD-004 · The backend's lead endpoints (backend/docs/api/leads.md), as far as
  * the frontend uses them: search rules, the default stage filter, cursor paging, the capped
  * total, the stats, idempotent create, and duplicates that are flagged rather than refused.
- * LEAD-005, LEAD-006 · The timeline (derived from each lead, plus the notes added here) and
- * notes, with the backend's Idempotency-Key replay and 409.
+ * LEAD-008 · Assignees (by the previewed role's scope) and assignment.
+ * LEAD-005…007 · The timeline (derived from each lead once, plus what is written here),
+ * notes, stage changes and reopening, with the backend's stage rules, Idempotency-Key replay
+ * and 409s.
  */
 
 /** The backend stops counting here and says so with `total_capped`. */
@@ -235,6 +244,116 @@ function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
   return lead;
 }
 
+/**
+ * A lead's timeline in the mock, newest first. The history derived from the seeded lead is
+ * snapshotted on first use, so a later stage change adds one event rather than re-deriving
+ * the whole walk from the new stage.
+ */
+function eventsOf(lead: LeadWire): TimelineEventWire[] {
+  const known = mockDb.leadEvents.get(lead.id);
+  if (known !== undefined) {
+    return known;
+  }
+  const derived = mockTimelineFor(lead);
+  mockDb.leadEvents.set(lead.id, derived);
+  return derived;
+}
+
+function recordEvent(
+  lead: LeadWire,
+  kind: string,
+  payload: Record<string, unknown>,
+): TimelineEventWire {
+  const events = eventsOf(lead);
+  const event: TimelineEventWire = {
+    id: mockUuid(MOCK_ID_SPACE.timeline, 900_000_000 + mockDb.writtenEvents),
+    kind,
+    occurred_at: new Date().toISOString(),
+    actor: MOCK_CREATOR ?? null,
+    payload: { actor_name: MOCK_CREATOR?.full_name ?? "", ...payload },
+  };
+  mockDb.writtenEvents += 1;
+  mockDb.leadEvents.set(lead.id, [event, ...events]);
+  lead.last_activity_at = event.occurred_at;
+  return event;
+}
+
+/** The backend's stage machine (backend/api/domain/leads.py). */
+const MOCK_TRANSITIONS: Readonly<Partial<Record<LeadStage, readonly LeadStage[]>>> = {
+  new: ["contacted", "lost"],
+  contacted: ["qualified", "lost"],
+  qualified: ["quoted", "lost"],
+  quoted: ["negotiation", "won", "lost"],
+  negotiation: ["won", "lost"],
+};
+const TERMINAL_STAGES: readonly LeadStage[] = ["won", "lost", "merged"];
+
+/**
+ * TODO(QUOT-001): the mock has no quotations yet. It treats a lead in negotiation as having
+ * an accepted quotation, so both answers to "Mark as won" can be previewed: a quoted lead
+ * is refused with quotation_required, a lead in negotiation is won.
+ */
+function hasAcceptedQuotation(lead: LeadWire): boolean {
+  return lead.stage === "negotiation";
+}
+
+/** Idempotency-Key handling shared by the stage endpoints: 400, replay or 409. */
+function replayStageChange(
+  request: Request,
+  leadId: string,
+  body: unknown,
+): { kind: "fresh"; key: string; serialized: string } | { kind: "respond"; response: Response } {
+  const key = request.headers.get("idempotency-key")?.trim() ?? "";
+  if (key === "") {
+    return {
+      kind: "respond",
+      response: errorResponse(
+        400,
+        "idempotency_key_required",
+        "An Idempotency-Key header is required on this request.",
+      ),
+    };
+  }
+  const serialized = JSON.stringify({ path: new URL(request.url).pathname, leadId, body });
+  const replay = mockDb.stageChanges.get(key);
+  if (replay === undefined) {
+    return { kind: "fresh", key, serialized };
+  }
+  if (replay.body !== serialized) {
+    return {
+      kind: "respond",
+      response: errorResponse(
+        409,
+        "idempotency_key_reused",
+        "This Idempotency-Key was already used for a different request.",
+      ),
+    };
+  }
+  const lead = mockDb.leads.find((item) => item.id === replay.leadId);
+  return {
+    kind: "respond",
+    response: lead
+      ? HttpResponse.json({ data: lead } satisfies LeadResponseWire)
+      : errorResponse(404, "not_found", "No such lead."),
+  };
+}
+
+/**
+ * Who the previewed role may make an owner: everyone for a global or office-tree lead
+ * scope, nobody otherwise — as the backend's GET /leads/assignees answers.
+ */
+function mockAssignees(): AssigneeListWire["data"] {
+  const scope = mockPermissionsFor(readMockRole()).find((grant) => grant.module === "leads")?.scope;
+  if (scope !== "global" && scope !== "org_subtree") {
+    return [];
+  }
+  return MOCK_STAFF.map((person) => ({
+    id: person.id,
+    full_name: person.full_name,
+    org_unit: null,
+  }));
+}
+
 export const leadHandlers = [
   http.get(buildApiUrl("/leads"), async ({ request }) => {
     const { scenario, failure } = await applyScenario();
@@ -294,6 +413,15 @@ export const leadHandlers = [
     return HttpResponse.json(statsOf(matches));
   }),
 
+  // Before /leads/:leadId, as on the backend, so "assignees" is never read as a lead ID.
+  http.get(buildApiUrl("/leads/assignees"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const body: AssigneeListWire = { data: mockAssignees() };
+    return HttpResponse.json(body);
+  }),
+
   http.get(buildApiUrl("/leads/:leadId"), async ({ params }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
@@ -335,10 +463,7 @@ export const leadHandlers = [
       });
     }
 
-    const events =
-      scenario === "empty"
-        ? []
-        : [...(mockDb.leadNotes.get(lead.id) ?? []), ...mockTimelineFor(lead)].sort(newestFirst);
+    const events = scenario === "empty" ? [] : [...eventsOf(lead)].sort(newestFirst);
     const hasMore = offset + limit < events.length;
     const body: TimelinePageWire = {
       data: events.slice(offset, offset + limit),
@@ -387,19 +512,215 @@ export const leadHandlers = [
       return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
     }
 
-    const now = new Date().toISOString();
-    const notes = mockDb.leadNotes.get(lead.id) ?? [];
-    const event: TimelineEventWire = {
-      id: mockUuid(MOCK_ID_SPACE.timeline, 900_000_000 + mockDb.noteCreations.size + 1),
-      kind: "lead.note_added",
-      occurred_at: now,
-      actor: MOCK_CREATOR ?? null,
-      payload: { actor_name: MOCK_CREATOR?.full_name ?? "", note: parsed.data.note },
-    };
-    mockDb.leadNotes.set(lead.id, [event, ...notes]);
+    const event = recordEvent(lead, "lead.note_added", { note: parsed.data.note });
     mockDb.noteCreations.set(key, { body: serialized, event });
-    lead.last_activity_at = now;
     return HttpResponse.json({ data: event }, { status: 201 });
+  }),
+
+  http.post(buildApiUrl("/leads/:leadId/transition"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const leadId = String(params.leadId);
+    const idempotency = replayStageChange(request, leadId, raw);
+    if (idempotency.kind === "respond") return idempotency.response;
+
+    const lead = mockDb.leads.find((item) => item.id === leadId);
+    if (!lead) {
+      return errorResponse(404, "not_found", "No such lead.");
+    }
+    const parsed = transitionLeadRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      const fields = Object.fromEntries(
+        summarizeSchemaIssues(parsed.error).map((issue) => [issue.path, issue.message]),
+      );
+      return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+    }
+    const body = parsed.data;
+    const current = lead.stage;
+
+    if (body.expected_stage !== current) {
+      return errorResponse(
+        409,
+        "stage_changed",
+        "The lead has moved to a different stage since you loaded it.",
+        { stage: current },
+      );
+    }
+    if (TERMINAL_STAGES.includes(current)) {
+      return errorResponse(422, "stage_terminal", "This lead is closed and cannot change stage.", {
+        stage: current,
+      });
+    }
+    if (!(MOCK_TRANSITIONS[current] ?? []).includes(body.to_stage)) {
+      return errorResponse(
+        422,
+        "invalid_transition",
+        `A ${current} lead cannot move to ${body.to_stage}.`,
+        {
+          to_stage: body.to_stage,
+        },
+      );
+    }
+    if (body.to_stage === "quoted" || body.to_stage === "negotiation") {
+      return errorResponse(
+        422,
+        "quotation_required",
+        "This stage is reached by sending a quotation, not from here.",
+        {
+          to_stage: body.to_stage,
+        },
+      );
+    }
+    if (body.to_stage === "won" && !hasAcceptedQuotation(lead)) {
+      return errorResponse(
+        422,
+        "quotation_required",
+        "This stage needs an accepted quotation on the lead.",
+        {
+          to_stage: body.to_stage,
+        },
+      );
+    }
+
+    const payload: Record<string, unknown> = { from: current, to: body.to_stage };
+    if (body.to_stage === "lost") {
+      const reason = mockLookupRows("lost-reasons").find(
+        (row) => row.id === body.lost_reason_id && row.is_active,
+      );
+      if (reason === undefined) {
+        return errorResponse(422, "validation_error", "Some fields need correcting.", {
+          lost_reason_id: body.lost_reason_id
+            ? "not an active lost reason"
+            : "a lost reason is required",
+        });
+      }
+      payload.lost_reason_id = reason.id;
+      payload.lost_note = body.lost_note;
+      lead.lost_reason = { id: reason.id, code: reason.code, name: reason.name };
+      lead.lost_note = body.lost_note;
+      mockDb.lostFrom.set(lead.id, current);
+    }
+
+    recordEvent(lead, "lead.stage_changed", payload);
+    lead.stage = body.to_stage;
+    if (body.to_stage === "contacted" && lead.first_contacted_at === null) {
+      lead.first_contacted_at = lead.last_activity_at;
+    }
+    mockDb.stageChanges.set(idempotency.key, { body: idempotency.serialized, leadId: lead.id });
+    return HttpResponse.json({ data: lead } satisfies LeadResponseWire);
+  }),
+
+  http.post(buildApiUrl("/leads/:leadId/reopen"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const leadId = String(params.leadId);
+    const idempotency = replayStageChange(request, leadId, raw);
+    if (idempotency.kind === "respond") return idempotency.response;
+
+    const lead = mockDb.leads.find((item) => item.id === leadId);
+    if (!lead) {
+      return errorResponse(404, "not_found", "No such lead.");
+    }
+    const parsed = reopenLeadRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      const fields = Object.fromEntries(
+        summarizeSchemaIssues(parsed.error).map((issue) => [issue.path, issue.message]),
+      );
+      return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+    }
+    if (lead.stage !== "lost") {
+      return errorResponse(422, "stage_terminal", "Only a lost lead can be reopened.", {
+        stage: lead.stage,
+      });
+    }
+
+    const lostEvent = eventsOf(lead).find(
+      (event) => event.kind === "lead.stage_changed" && event.payload?.to === "lost",
+    );
+    const seededFrom = LEAD_STAGES.find((stage) => stage === lostEvent?.payload?.from);
+    const target = mockDb.lostFrom.get(lead.id) ?? seededFrom ?? "new";
+    recordEvent(lead, "lead.reopened", {
+      from: "lost",
+      to: target,
+      lost_reason_id: lead.lost_reason?.id ?? null,
+      lost_note: lead.lost_note,
+      note: parsed.data.note,
+    });
+    lead.stage = target;
+    lead.lost_reason = null;
+    lead.lost_note = null;
+    lead.reopen_count += 1;
+    mockDb.lostFrom.delete(lead.id);
+    mockDb.stageChanges.set(idempotency.key, { body: idempotency.serialized, leadId: lead.id });
+    return HttpResponse.json({ data: lead } satisfies LeadResponseWire);
+  }),
+
+  http.post(buildApiUrl("/leads/:leadId/assign"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const leadId = String(params.leadId);
+    const idempotency = replayStageChange(request, leadId, raw);
+    if (idempotency.kind === "respond") return idempotency.response;
+
+    const parsed = assignLeadRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      const fields = Object.fromEntries(
+        summarizeSchemaIssues(parsed.error).map((issue) => [issue.path, issue.message]),
+      );
+      return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+    }
+    const body = parsed.data;
+    const owner =
+      body.owner_user_id === undefined || body.owner_user_id === null
+        ? null
+        : mockAssignees().find((person) => person.id === body.owner_user_id);
+    if (owner === undefined) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        owner_user_id: "not assignable by you",
+      });
+    }
+
+    const lead = mockDb.leads.find((item) => item.id === leadId);
+    if (!lead) {
+      return errorResponse(404, "not_found", "No such lead.");
+    }
+    if (TERMINAL_STAGES.includes(lead.stage)) {
+      return errorResponse(422, "stage_terminal", "This lead is closed and cannot be reassigned.", {
+        stage: lead.stage,
+      });
+    }
+
+    const payload: Record<string, unknown> = {};
+    if (body.owner_user_id !== undefined) {
+      lead.owner = owner === null ? null : { id: owner.id, full_name: owner.full_name };
+      payload.owner_user_id = body.owner_user_id;
+    }
+    if (body.assigned_partner_id !== undefined) {
+      const partner =
+        body.assigned_partner_id === null
+          ? null
+          : MOCK_PARTNERS.find((item) => item.id === body.assigned_partner_id);
+      if (partner === undefined) {
+        return errorResponse(422, "validation_error", "Some fields need correcting.", {
+          assigned_partner_id: "not in your scope",
+        });
+      }
+      lead.assigned_partner =
+        partner === null
+          ? null
+          : { id: partner.id, name: partner.name, partner_type: partner.partner_type };
+      payload.assigned_partner_id = body.assigned_partner_id;
+    }
+
+    recordEvent(lead, "lead.assigned", payload);
+    mockDb.stageChanges.set(idempotency.key, { body: idempotency.serialized, leadId: lead.id });
+    return HttpResponse.json({ data: lead } satisfies LeadResponseWire);
   }),
 
   http.post(buildApiUrl("/leads"), async ({ request }) => {

@@ -21,7 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { leadDetailQueryOptions } from "@/features/leads/api/leads.queries";
-import type { Lead } from "@/features/leads/api/leads.schemas";
+import type { Lead, LeadStage } from "@/features/leads/api/leads.schemas";
 import {
   DUPLICATE_SIGNAL_LABELS,
   LEAD_INQUIRY_TYPE_LABELS,
@@ -43,9 +43,14 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { LeadAssignDialog } from "./lead-assign-dialog";
 import { LeadNoteComposer } from "./lead-note-composer";
 import { LeadStageBadge } from "./lead-stage-badge";
+import { LeadStageMenu } from "./lead-stage-menu";
 import { LeadTimeline, LeadTimelineSkeleton } from "./lead-timeline";
+
+/** Stages the backend closes to reassignment (`TERMINAL` in backend/api/domain/leads.py). */
+const CLOSED_STAGES: ReadonlySet<LeadStage> = new Set(["won", "lost", "merged"]);
 
 /** Detail rows that always render — the skeleton draws the same number. */
 const DETAIL_ROW_COUNT = 15;
@@ -205,6 +210,8 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
               Share with a colleague
             </Link>
           ) : null}
+          {/* LEAD-007 · The main action on a lead, for whoever may edit it. */}
+          {canEdit ? <LeadStageMenu lead={lead} /> : null}
         </div>
       </div>
 
@@ -215,6 +222,8 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle level={3}>Details</CardTitle>
+              {/* LEAD-008 · A closed lead (won, lost, merged) cannot be reassigned. */}
+              {canEdit && !CLOSED_STAGES.has(lead.stage) ? <LeadAssignDialog lead={lead} /> : null}
             </CardHeader>
             <CardContent>
               <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">

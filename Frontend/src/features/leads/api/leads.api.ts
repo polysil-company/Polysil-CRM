@@ -9,8 +9,15 @@ import {
   TIMELINE_PAGE_SIZE,
   timelineEventResponseSchema,
   timelinePageSchema,
+  assigneeListResponseSchema,
+  partnerPickListResponseSchema,
   type AddLeadNoteRequest,
+  type AssignLeadRequest,
+  type Assignee,
+  type PartnerPick,
   type CreateLeadRequest,
+  type ReopenLeadRequest,
+  type TransitionLeadRequest,
   type Lead,
   type LeadListParams,
   type LeadPage,
@@ -167,5 +174,98 @@ export function addLeadNote({
     body,
     idempotencyKey,
     schema: timelineEventResponseSchema,
+  });
+}
+
+export interface TransitionLeadInput {
+  readonly leadId: string;
+  readonly body: TransitionLeadRequest;
+  /** The same key for a retry of the same move, so a lost reply never moves it twice. */
+  readonly idempotencyKey: string;
+}
+
+/** LEAD-007 · POST /leads/{leadId}/transition — returns the lead after the move. */
+export function transitionLead({
+  leadId,
+  body,
+  idempotencyKey,
+}: TransitionLeadInput): Promise<Lead> {
+  return apiRequest({
+    dataId: "LEAD-007",
+    logger: log,
+    fn: "transitionLead",
+    method: "POST",
+    path: `/leads/${encodeURIComponent(leadId)}/transition`,
+    body,
+    idempotencyKey,
+    schema: leadResponseSchema,
+  });
+}
+
+export interface ReopenLeadInput {
+  readonly leadId: string;
+  readonly body: ReopenLeadRequest;
+  readonly idempotencyKey: string;
+}
+
+/** LEAD-007 · POST /leads/{leadId}/reopen — returns the lead at the stage it was lost from. */
+export function reopenLead({ leadId, body, idempotencyKey }: ReopenLeadInput): Promise<Lead> {
+  return apiRequest({
+    dataId: "LEAD-007",
+    logger: log,
+    fn: "reopenLead",
+    method: "POST",
+    path: `/leads/${encodeURIComponent(leadId)}/reopen`,
+    body,
+    idempotencyKey,
+    schema: leadResponseSchema,
+  });
+}
+
+/** LEAD-008 · GET /leads/assignees — who the caller may make the owner. */
+export function listAssignees(signal?: AbortSignal): Promise<Assignee[]> {
+  return apiRequest({
+    dataId: "LEAD-008",
+    logger: log,
+    fn: "listAssignees",
+    path: "/leads/assignees",
+    schema: assigneeListResponseSchema,
+    signal,
+  });
+}
+
+/** How many partners one search returns. */
+export const PARTNER_SEARCH_LIMIT = 20;
+
+/** LEAD-008 · GET /lookups/partners — channel partners in scope, by name or code. */
+export function searchPartners(q: string, signal?: AbortSignal): Promise<PartnerPick[]> {
+  return apiRequest({
+    dataId: "LEAD-008",
+    logger: log,
+    fn: "searchPartners",
+    path: "/lookups/partners",
+    query: { q, limit: PARTNER_SEARCH_LIMIT },
+    schema: partnerPickListResponseSchema,
+    signal,
+  });
+}
+
+export interface AssignLeadInput {
+  readonly leadId: string;
+  readonly body: AssignLeadRequest;
+  readonly idempotencyKey: string;
+}
+
+/** LEAD-008 · POST /leads/{leadId}/assign — returns the lead with its new owner or partner. */
+export function assignLead({ leadId, body, idempotencyKey }: AssignLeadInput): Promise<Lead> {
+  return apiRequest({
+    dataId: "LEAD-008",
+    logger: log,
+    fn: "assignLead",
+    method: "POST",
+    path: `/leads/${encodeURIComponent(leadId)}/assign`,
+    body,
+    idempotencyKey,
+    schema: leadResponseSchema,
   });
 }

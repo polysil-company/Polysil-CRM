@@ -273,7 +273,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 ## 9. Integration status — frontend ↔ backend
 
-> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **27 September 2026**, after PR #8 and PR #18 merged into `integration`.
+> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **27 September 2026**: PR #8 and PR #18 merged; lead actions (LEAD-005…008) built on `claude/integration-branch-review-gw0r1g`.
 
 **How the two sides meet.** The browser calls `/api/v1` on the app's own origin; `next.config.ts` forwards it to `API_PROXY_TARGET`. Every call goes through `apiRequest` (`src/lib/api/client.ts`): Zod-validated responses, `x-request-id` / `x-data-id`, `Idempotency-Key` on mutations, one refresh-and-retry on a 401. The backend's contract is `backend/docs/api/*.md` (generated) and the dev API's `/openapi.json`. `NEXT_PUBLIC_API_MOCKING=partial` sends everything to the dev API except the modules listed in `unbuiltHandlers` (`src/mocks/handlers/index.ts`).
 
@@ -287,6 +287,11 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Lead page — the real record and possible duplicates | LEAD-003 | `GET /leads/{id}` |
 | Lead count — sidebar badge and Sales tab, exact | LEAD-004 | `GET /leads/stats` |
 | Lookups — sources, irrigation systems, lost reasons, territories | MSTR-002 | `/lookups/*`, `/territories` |
+| Lead history and notes — the Activity card on the lead page | LEAD-005, LEAD-006 | `GET /leads/{id}/timeline`, `POST /leads/{id}/notes` |
+| Stage change and reopen — Update stage menu, lost reason, won and reopen dialogs | LEAD-007 | `POST /leads/{id}/transition`, `POST /leads/{id}/reopen` |
+| Assign owner and channel partner | LEAD-008 | `POST /leads/{id}/assign`, `GET /leads/assignees`, `GET /lookups/partners` |
+
+LEAD-005…008 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 
@@ -310,18 +315,17 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
-| **Lead actions** — timeline, note, stage change and reopen, assign owner and partner | `GET /leads/{id}/timeline`, `POST /leads/{id}/notes`, `/transition`, `/reopen`, `/assign`, `GET /leads/assignees` | `backend/docs/api/leads.md` | **1 — in progress** (LEAD-005…008) |
-| Quotations — draft, lines with GST pricing, send, PDF, discount approval, revisions | `/quotations/*`, `POST /pricing/quote-lines` | `backend/docs/handover/quotations-api-contract.md` | 2 |
-| Sales orders, approvals, dispatch | `/orders/*`, `/approvals/*`, `/dispatches/*` | `backend/docs/handover/orders-api-contract.md` | 3 |
-| Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 4 |
-| Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 5 |
-| Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 6 |
+| **Quotations** — draft, lines with GST pricing, send, PDF, discount approval, revisions. Also what moves a lead to quoted, negotiation and won | `/quotations/*`, `POST /pricing/quote-lines` | `backend/docs/handover/quotations-api-contract.md` | **1 — next** |
+| Sales orders, approvals, dispatch | `/orders/*`, `/approvals/*`, `/dispatches/*` | `backend/docs/handover/orders-api-contract.md` | 2 |
+| Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 3 |
+| Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 4 |
+| Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 5 |
 
 **On `backend-foundation`, not yet in `integration`:** the tasks and planner contract (FS-014) and the complaints contract (FS-015).
 
 ### 9.4 Asked of the backend
 
-Sorting on the lead list; a follow-up date; crops and acreage; win probability and weekly activity (or confirmation that the score and timeline replace them); which territory levels a lead may sit in (Frontend-Scope §10, questions 14–18). Dashboard, notifications and messaging endpoints (§9.2).
+Sorting on the lead list; names in the `lead.assigned` timeline payload (it carries ids only, so the history says "changed the owner" rather than who); a follow-up date; crops and acreage; win probability and weekly activity (or confirmation that the score and timeline replace them); which territory levels a lead may sit in (Frontend-Scope §10, questions 14–18). Dashboard, notifications and messaging endpoints (§9.2).
 
 ### 9.5 Housekeeping
 

@@ -185,6 +185,9 @@ function stageName(stage: LeadStage | null): string {
 }
 
 function assignmentSentence(owner: ChangeKind, partner: ChangeKind): string {
+  if (owner === "set" && partner === "set") {
+    return "changed the owner and the channel partner";
+  }
   const parts: string[] = [];
   if (owner === "set") parts.push("changed the owner");
   if (owner === "cleared") parts.push("unassigned the owner");

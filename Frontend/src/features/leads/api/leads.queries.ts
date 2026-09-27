@@ -1,6 +1,13 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 
-import { getLead, getLeadStats, getLeadTimeline, listLeads } from "./leads.api";
+import {
+  getLead,
+  getLeadStats,
+  getLeadTimeline,
+  listAssignees,
+  listLeads,
+  searchPartners,
+} from "./leads.api";
 import type { LeadListParams } from "./leads.schemas";
 
 /**
@@ -16,6 +23,8 @@ export const leadKeys = {
   detail: (leadId: string) => [...leadKeys.details(), leadId] as const,
   timeline: (leadId: string) => [...leadKeys.details(), leadId, "timeline"] as const,
   stats: () => [...leadKeys.all, "stats"] as const,
+  assignees: () => [...leadKeys.all, "assignees"] as const,
+  partners: (q: string) => [...leadKeys.all, "partners", q] as const,
 };
 
 /** Keeps the previous page on screen while the next one loads — no skeleton flash on paging. */
@@ -60,5 +69,26 @@ export function leadTimelineQueryOptions(leadId: string) {
     initialPageParam: NEWEST_TIMELINE_PAGE,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     meta: { dataId: "LEAD-005" },
+  });
+}
+
+/** LEAD-008 · Who may be made the owner. Staff lists change rarely: five minutes is fresh enough. */
+export function leadAssigneesQueryOptions() {
+  return queryOptions({
+    queryKey: leadKeys.assignees(),
+    queryFn: ({ signal }) => listAssignees(signal),
+    staleTime: 5 * 60_000,
+    meta: { dataId: "LEAD-008" },
+  });
+}
+
+/** LEAD-008 · Partners matching `q`; the previous results stay while the next search loads. */
+export function partnerSearchQueryOptions(q: string) {
+  return queryOptions({
+    queryKey: leadKeys.partners(q),
+    queryFn: ({ signal }) => searchPartners(q, signal),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    meta: { dataId: "LEAD-008" },
   });
 }

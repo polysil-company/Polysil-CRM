@@ -25,7 +25,8 @@ function actorOf(lead: LeadWire): { id: string; full_name: string } | null {
  * LEAD-005 · A believable history for a seeded lead, derived from the lead itself so it
  * always agrees with the lead page: created → each stage it passed → lost or merged, plus
  * a duplicate flag. Newest first, as the backend returns it. Notes added through the mock
- * are kept separately in `mockDb.leadNotes` and merged in by the handler.
+ * and stage changes made through the mock are kept in `mockDb.leadEvents` and merged in
+ * by the handler.
  */
 export function mockTimelineFor(lead: LeadWire): TimelineEventWire[] {
   const createdAt = Date.parse(lead.created_at);

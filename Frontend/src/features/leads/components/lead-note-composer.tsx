@@ -9,10 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAddLeadNote } from "@/features/leads/api/leads.mutations";
 import { LEAD_NOTE_MAX_LENGTH } from "@/features/leads/api/leads.schemas";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { useModifierKeyLabel } from "@/hooks/use-modifier-key";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { readFieldErrors } from "@/lib/api/errors";
-import { createRequestId } from "@/lib/api/request-id";
 import { formatNumber } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
@@ -42,9 +42,9 @@ export interface LeadNoteComposerProps {
 export function LeadNoteComposer({ leadId }: LeadNoteComposerProps): React.JSX.Element {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const lastAttempt = useRef<{ note: string; key: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const addNote = useAddLeadNote();
+  const idempotency = useIdempotencyKey();
   const modifier = useModifierKeyLabel();
   const fieldId = useId();
   const hintId = `${fieldId}-hint`;
@@ -54,25 +54,18 @@ export function LeadNoteComposer({ leadId }: LeadNoteComposerProps): React.JSX.E
   const remaining = LEAD_NOTE_MAX_LENGTH - draft.length;
   const tooLong = remaining < 0;
 
-  const idempotencyKeyFor = (text: string): string => {
-    if (lastAttempt.current?.note !== text) {
-      lastAttempt.current = { note: text, key: createRequestId() };
-    }
-    return lastAttempt.current.key;
-  };
-
   const save = useAsyncAction({
     action: (text: string) =>
       addNote.mutateAsync({
         leadId,
         body: { note: text },
-        idempotencyKey: idempotencyKeyFor(text),
+        idempotencyKey: idempotency.keyFor({ leadId, note: text }),
       }),
     logger: log,
     fn: "handleAddNote",
     dataId: "LEAD-006",
     onSuccess: () => {
-      lastAttempt.current = null;
+      idempotency.reset();
       setDraft("");
       setError(null);
     },

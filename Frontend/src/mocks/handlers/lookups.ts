@@ -1,5 +1,6 @@
 import { http, HttpResponse } from "msw";
 
+import type { PartnerPickListWire } from "@/features/leads/api/leads.schemas";
 import {
   LOOKUP_LISTS,
   type LookupListWire,
@@ -7,12 +8,14 @@ import {
 } from "@/features/lookups/api/lookups.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { mockLookupRows } from "@/mocks/data/lookups";
+import { MOCK_PARTNERS } from "@/mocks/data/reference";
 import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 
 import { applyScenario } from "./scenario";
 
 const DEFAULT_TERRITORY_LIMIT = 50;
 const MAX_TERRITORY_LIMIT = 100;
+const DEFAULT_PARTNER_LIMIT = 50;
 
 /**
  * MSTR-002 · GET /lookups/* as the backend serves them (backend/docs/api/lookups.md). The
@@ -29,6 +32,47 @@ export const lookupHandlers = [
       return HttpResponse.json(body);
     }),
   ),
+
+  /**
+   * LEAD-008 · GET /lookups/partners — every mock partner (the mock does not scope them), by
+   * name or code containing `q`, ordered by name.
+   */
+  http.get(buildApiUrl("/lookups/partners"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const url = new URL(request.url);
+    const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+    const limit = Math.min(
+      MAX_TERRITORY_LIMIT,
+      Number(url.searchParams.get("limit") ?? DEFAULT_PARTNER_LIMIT) || DEFAULT_PARTNER_LIMIT,
+    );
+    const body: PartnerPickListWire = {
+      data:
+        scenario === "empty"
+          ? []
+          : MOCK_PARTNERS.map((partner, index) => ({
+              id: partner.id,
+              code: `CP-${String(index + 1).padStart(3, "0")}`,
+              name: partner.name,
+              partner_type: partner.partner_type,
+              territory:
+                MOCK_TERRITORIES.filter(
+                  (territory) =>
+                    territory.level === "district" && territory.name === partner.district,
+                ).map(({ id, name, level }) => ({ id, name, level }))[0] ?? null,
+            }))
+              .filter(
+                (partner) =>
+                  q === "" ||
+                  partner.name.toLowerCase().includes(q) ||
+                  partner.code.toLowerCase().includes(q),
+              )
+              .sort((a, b) => a.name.localeCompare(b.name, "en-IN"))
+              .slice(0, limit),
+    };
+    return HttpResponse.json(body);
+  }),
 
   /** Name contains `q` (any case), optionally one `level` and one `parent_id`, ordered by name. */
   http.get(buildApiUrl("/lookups/territories"), async ({ request }) => {

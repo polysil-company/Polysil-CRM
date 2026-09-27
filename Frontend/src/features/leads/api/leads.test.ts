@@ -1,22 +1,32 @@
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { createLeadFieldErrors } from "@/features/leads/lib/create-lead-errors";
 import { ApiError } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
+import { writeMockRole } from "@/lib/dev/mock-settings";
+import { mockLookupRows } from "@/mocks/data/lookups";
+import { MOCK_PARTNERS, MOCK_STAFF } from "@/mocks/data/reference";
 import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 
 import {
   addLeadNote,
+  assignLead,
   createLead,
   getLead,
   getLeadStats,
   getLeadTimeline,
+  listAssignees,
   listLeads,
+  reopenLead,
+  searchPartners,
+  transitionLead,
 } from "./leads.api";
 import {
+  LEAD_STAGES,
   TIMELINE_PAGE_SIZE,
   createLeadFormSchema,
   createLeadRequestSchema,
@@ -607,5 +617,243 @@ describe("[LEAD-006] addLeadNote", () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 422, details: { fields: { note: expect.any(String) } } });
+  });
+});
+
+describe("[LEAD-007] transitionLead and reopenLead", () => {
+  afterEach(() => {
+    resetMockDb();
+  });
+
+  function leadAt(stage: (typeof mockDb.leads)[number]["stage"]): (typeof mockDb.leads)[number] {
+    const lead = mockDb.leads.find((item) => item.stage === stage);
+    if (lead === undefined) {
+      throw new Error(`No ${stage} lead in the mock database`);
+    }
+    return lead;
+  }
+
+  const move = (to: "contacted" | "qualified" | "won" | "quoted", expected: string) => ({
+    to_stage: to,
+    lost_reason_id: null,
+    lost_note: null,
+    expected_stage: z.enum(LEAD_STAGES).parse(expected),
+  });
+
+  it("moves a new lead to contacted and records it on the timeline", async () => {
+    const lead = leadAt("new");
+
+    const moved = await transitionLead({
+      leadId: lead.id,
+      body: move("contacted", "new"),
+      idempotencyKey: "t-1",
+    });
+
+    expect(moved.stage).toBe("contacted");
+    const page = await getLeadTimeline({ leadId: lead.id, cursor: null });
+    expect(page.items[0]).toMatchObject({
+      kind: "lead.stage_changed",
+      payload: { from: "new", to: "contacted" },
+    });
+    expect(page.items.filter((item) => item.kind === "lead.stage_changed")).toHaveLength(1);
+  });
+
+  it("refuses to act on a stale view with 409 stage_changed and the current stage", async () => {
+    const lead = leadAt("contacted");
+
+    await expect(
+      transitionLead({ leadId: lead.id, body: move("contacted", "new"), idempotencyKey: "t-2" }),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "stage_changed",
+      details: { fields: { stage: "contacted" } },
+    });
+  });
+
+  it("refuses quoted from here, and won without an accepted quotation", async () => {
+    await expect(
+      transitionLead({
+        leadId: leadAt("qualified").id,
+        body: move("quoted", "qualified"),
+        idempotencyKey: "t-3",
+      }),
+    ).rejects.toMatchObject({ status: 422, code: "quotation_required" });
+    await expect(
+      transitionLead({
+        leadId: leadAt("quoted").id,
+        body: move("won", "quoted"),
+        idempotencyKey: "t-4",
+      }),
+    ).rejects.toMatchObject({ status: 422, code: "quotation_required" });
+  });
+
+  it("needs an active lost reason to mark a lead lost", async () => {
+    const lead = leadAt("contacted");
+
+    await expect(
+      transitionLead({
+        leadId: lead.id,
+        body: {
+          to_stage: "lost",
+          lost_reason_id: null,
+          lost_note: null,
+          expected_stage: "contacted",
+        },
+        idempotencyKey: "t-5",
+      }),
+    ).rejects.toMatchObject({
+      status: 422,
+      details: { fields: { lost_reason_id: expect.any(String) } },
+    });
+  });
+
+  it("reopens a lost lead at the stage it was lost from", async () => {
+    const lead = leadAt("contacted");
+    const reason = mockLookupRows("lost-reasons")[0];
+    await transitionLead({
+      leadId: lead.id,
+      body: {
+        to_stage: "lost",
+        lost_reason_id: reason?.id ?? null,
+        lost_note: "Went quiet",
+        expected_stage: "contacted",
+      },
+      idempotencyKey: "t-6",
+    });
+
+    const reopened = await reopenLead({
+      leadId: lead.id,
+      body: { note: "Called back" },
+      idempotencyKey: "r-1",
+    });
+
+    expect(reopened).toMatchObject({ stage: "contacted", lostReason: null, reopenCount: 1 });
+    const page = await getLeadTimeline({ leadId: lead.id, cursor: null });
+    expect(page.items[0]).toMatchObject({
+      kind: "lead.reopened",
+      payload: { to: "contacted", note: "Called back" },
+    });
+  });
+
+  it("reopens only a lost lead", async () => {
+    await expect(
+      reopenLead({ leadId: leadAt("won").id, body: { note: null }, idempotencyKey: "r-2" }),
+    ).rejects.toMatchObject({ status: 422, code: "stage_terminal" });
+  });
+
+  it("replays a retried move instead of moving the lead twice", async () => {
+    const lead = leadAt("new");
+    const input = { leadId: lead.id, body: move("contacted", "new"), idempotencyKey: "t-7" };
+
+    await transitionLead(input);
+    const retry = await transitionLead(input);
+
+    expect(retry.stage).toBe("contacted");
+    const page = await getLeadTimeline({ leadId: lead.id, cursor: null });
+    expect(page.items.filter((item) => item.kind === "lead.stage_changed")).toHaveLength(1);
+  });
+});
+
+describe("[LEAD-008] assignment", () => {
+  afterEach(() => {
+    writeMockRole("state_manager");
+    resetMockDb();
+  });
+
+  function openLead(): (typeof mockDb.leads)[number] {
+    const lead = mockDb.leads.find(
+      (item) => item.stage === "contacted" && item.merged_into === null,
+    );
+    if (lead === undefined) {
+      throw new Error("No open lead in the mock database");
+    }
+    return lead;
+  }
+
+  it("lists the people a manager may make the owner", async () => {
+    const people = await listAssignees();
+
+    expect(people.map((person) => person.name)).toEqual(
+      MOCK_STAFF.map((person) => person.full_name),
+    );
+  });
+
+  it("lists nobody for a role that may not set owners", async () => {
+    writeMockRole("employee");
+
+    await expect(listAssignees()).resolves.toEqual([]);
+  });
+
+  it("searches partners by name, with their type and district", async () => {
+    const partners = await searchPartners("khodiyar");
+
+    expect(partners).toEqual([
+      expect.objectContaining({
+        name: "Khodiyar Irrigation",
+        partnerType: "dealer",
+        territoryName: "Rajkot",
+      }),
+    ]);
+  });
+
+  it("sets the owner and the partner, and records the assignment", async () => {
+    const lead = openLead();
+    const person = MOCK_STAFF[2];
+    const partner = MOCK_PARTNERS[0];
+
+    const assigned = await assignLead({
+      leadId: lead.id,
+      body: { owner_user_id: person?.id ?? null, assigned_partner_id: partner?.id ?? null },
+      idempotencyKey: "a-1",
+    });
+
+    expect(assigned.owner).toEqual({ id: person?.id, name: person?.full_name });
+    expect(assigned.channelPartner?.name).toBe(partner?.name);
+    const page = await getLeadTimeline({ leadId: lead.id, cursor: null });
+    expect(page.items[0]).toMatchObject({
+      kind: "lead.assigned",
+      payload: { owner_user_id: person?.id, assigned_partner_id: partner?.id },
+    });
+  });
+
+  it("leaves a field it was not sent alone, and clears one sent as null", async () => {
+    const lead = openLead();
+    const ownerBefore = lead.owner;
+
+    const assigned = await assignLead({
+      leadId: lead.id,
+      body: { assigned_partner_id: null },
+      idempotencyKey: "a-2",
+    });
+
+    expect(assigned.channelPartner).toBeNull();
+    expect(assigned.owner?.id).toBe(ownerBefore?.id);
+  });
+
+  it("refuses an owner the caller may not assign, on owner_user_id", async () => {
+    writeMockRole("employee");
+
+    await expect(
+      assignLead({
+        leadId: openLead().id,
+        body: { owner_user_id: MOCK_STAFF[1]?.id ?? null },
+        idempotencyKey: "a-3",
+      }),
+    ).rejects.toMatchObject({
+      status: 422,
+      details: { fields: { owner_user_id: expect.any(String) } },
+    });
+  });
+
+  it("refuses to reassign a closed lead", async () => {
+    const won = mockDb.leads.find((item) => item.stage === "won");
+
+    await expect(
+      assignLead({
+        leadId: won?.id ?? "",
+        body: { assigned_partner_id: null },
+        idempotencyKey: "a-4",
+      }),
+    ).rejects.toMatchObject({ status: 422, code: "stage_terminal" });
   });
 });

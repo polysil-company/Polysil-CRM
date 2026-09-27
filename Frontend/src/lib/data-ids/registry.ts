@@ -220,7 +220,7 @@ export const DATA_IDS = {
     domain: "LEAD",
     title: "Move a lead's stage — contact, qualify, mark lost, reopen",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
     endpoints: ["POST /leads/{leadId}/transition", "POST /leads/{leadId}/reopen"],
     notes:
       "Quoted and negotiation are reached through a quotation; won needs an accepted quotation. Lost needs a lost reason.",
@@ -229,8 +229,10 @@ export const DATA_IDS = {
     domain: "LEAD",
     title: "Assign a lead — owner and channel partner",
     owner: "shared",
-    status: "planned",
-    endpoints: ["POST /leads/{leadId}/assign", "GET /leads/assignees"],
+    status: "in-progress",
+    endpoints: ["POST /leads/{leadId}/assign", "GET /leads/assignees", "GET /lookups/partners"],
+    notes:
+      "Only what changed is sent. Owners come from GET /leads/assignees, which is empty for roles that may not set one; a closed lead cannot be reassigned.",
   },
   "RPT-001": {
     domain: "RPT",
