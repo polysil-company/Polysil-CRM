@@ -1,6 +1,6 @@
 "use client";
 
-import { Invoice03Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Invoice03Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import type * as React from "react";
@@ -8,14 +8,19 @@ import type * as React from "react";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { QueryView } from "@/components/patterns/query-view";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { LeadStage } from "@/features/leads/api/leads.schemas";
 import { quotationListQueryOptions } from "@/features/quotations/api/quotations.queries";
 import type {
   QuotationListParams,
   QuotationSummary,
 } from "@/features/quotations/api/quotations.schemas";
-import { quotationTitle } from "@/features/quotations/lib/quotation-labels";
+import { quotationBlockedReason, quotationTitle } from "@/features/quotations/lib/quotation-labels";
+import { useCan } from "@/features/session/hooks/use-session";
 import { formatDate, formatInr, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -39,10 +44,19 @@ function paramsFor(leadId: string): QuotationListParams {
 
 /**
  * QUOT-001 · The lead's quotations, newest first — every version, older ones muted — including
- * those on leads merged into it. TODO(QUOT-004): "New quotation" arrives with the builder.
+ * those on leads merged into it. QUOT-004: "New quotation" for whoever may create one, on a
+ * lead that may be quoted; otherwise the button says what has to happen first.
  */
-export function LeadQuotations({ leadId }: { leadId: string }): React.JSX.Element {
+export function LeadQuotations({
+  leadId,
+  leadStage,
+}: {
+  leadId: string;
+  leadStage: LeadStage;
+}): React.JSX.Element {
   const query = useQuery(quotationListQueryOptions(paramsFor(leadId)));
+  const canCreate = useCan("quotations", "create");
+  const blocked = quotationBlockedReason(leadStage);
 
   return (
     <Card>
@@ -51,6 +65,28 @@ export function LeadQuotations({ leadId }: { leadId: string }): React.JSX.Elemen
           <CardTitle level={3}>Quotations</CardTitle>
           <CardDescription>Every version, newest first</CardDescription>
         </div>
+        {canCreate && leadStage !== "merged" ? (
+          blocked === null ? (
+            <Link
+              href={`/quotations/new?lead=${encodeURIComponent(leadId)}`}
+              transitionTypes={["nav-forward"]}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <Icon icon={Add01Icon} />
+              New quotation
+            </Link>
+          ) : (
+            <div className="flex flex-col items-end gap-1">
+              <Button variant="outline" size="sm" disabled aria-describedby="new-quotation-blocked">
+                <Icon icon={Add01Icon} />
+                New quotation
+              </Button>
+              <span id="new-quotation-blocked" className="text-xs text-muted-foreground">
+                {blocked}
+              </span>
+            </div>
+          )
+        ) : null}
       </CardHeader>
       <CardContent>
         <QueryView

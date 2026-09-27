@@ -299,7 +299,7 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
           </Card>
 
           {/* QUOT-001 · The lead's quotations, for whoever may see quotations. */}
-          {canSeeQuotations ? <LeadQuotations leadId={lead.id} /> : null}
+          {canSeeQuotations ? <LeadQuotations leadId={lead.id} leadStage={lead.stage} /> : null}
 
           {/* LEAD-005, LEAD-006 · Notes and the lead's history. A merged lead is read-only. */}
           <Card>

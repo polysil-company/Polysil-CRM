@@ -265,6 +265,27 @@ export const DATA_IDS = {
     endpoints: ["GET /quotations/{quotationId}/pdf"],
     notes: "A signed URL valid for ten minutes, opened in a new tab; never fetched with the token.",
   },
+  "QUOT-004": {
+    domain: "QUOT",
+    title: "Quotation builder — create and edit a draft",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /quotations",
+      "PATCH /quotations/{quotationId}",
+      "PUT /quotations/{quotationId}/lines",
+    ],
+    notes:
+      "Saves what the preview priced; 409 rate_changed names the lines whose rate or slab moved, and the builder re-prices.",
+  },
+  "QUOT-005": {
+    domain: "QUOT",
+    title: "Live pricing — the quotation preview",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /pricing/quote-lines"],
+    notes: "Stores nothing; called on every change, debounced. Every printed figure comes back.",
+  },
   "SO-001": {
     domain: "SO",
     title: "Sales orders list",
@@ -313,6 +334,15 @@ export const DATA_IDS = {
     title: "Masters — products, stock, price lists, territories",
     owner: "shared",
     status: "planned",
+  },
+  "MSTR-003": {
+    domain: "MSTR",
+    title: "Product picker — search the catalogue",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /products"],
+    notes:
+      "Active products by description; the rate is not here — it comes from the pricing preview.",
   },
   "MSTR-002": {
     domain: "MSTR",

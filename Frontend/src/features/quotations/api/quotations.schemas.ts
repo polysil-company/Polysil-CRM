@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { LEAD_STAGES } from "@/features/leads/api/leads.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
+import { normalizeIndianMobile } from "@/lib/format";
 
 /**
  * Quotations contract (QUOT-001 … QUOT-003), from the backend's `Quotation`,
@@ -189,31 +190,75 @@ const quotationLineWireSchema = z.object({
 
 export type QuotationLineWire = z.input<typeof quotationLineWireSchema>;
 
-const quotationLineSchema = quotationLineWireSchema.transform((wire) => ({
-  lineNo: wire.line_no,
-  productId: wire.product_id,
-  description: wire.description,
-  hsnCode: wire.hsn_code,
-  uom: wire.uom,
-  qty: wire.qty,
-  rate: wire.rate,
-  gross: wire.gross,
-  discounts: [
-    { pct: wire.discount_pct, amount: wire.discount1_amt, after: wire.after_discount1 },
-    { pct: wire.discount2_pct, amount: wire.discount2_amt, after: wire.after_discount2 },
-    { pct: wire.discount3_pct, amount: wire.discount3_amt, after: wire.taxable },
-  ],
-  discount: wire.discount,
-  taxable: wire.taxable,
-  gstSlab: wire.gst_slab,
-  cgst: { rate: wire.cgst_rate, amount: wire.cgst },
-  sgst: { rate: wire.sgst_rate, amount: wire.sgst },
-  igst: { rate: wire.igst_rate, amount: wire.igst },
-  total: wire.total,
-  provisionalFields: wire.provisional_fields,
-}));
+interface DiscountTier {
+  readonly pct: string;
+  readonly amount: string;
+  /** The balance after this tier; after the third it is the taxable value. */
+  readonly after: string;
+}
 
-export type QuotationLine = z.output<typeof quotationLineSchema>;
+interface TaxPart {
+  readonly rate: string;
+  readonly amount: string;
+}
+
+/** One line's printed figures, in print order. Every figure is the backend's. */
+export interface QuotationLine {
+  readonly lineNo: number;
+  readonly productId: string;
+  readonly description: string;
+  readonly hsnCode: string;
+  readonly uom: string;
+  readonly qty: string;
+  readonly rate: string;
+  readonly gross: string;
+  readonly discounts: readonly [DiscountTier, DiscountTier, DiscountTier];
+  readonly discount: string;
+  readonly taxable: string;
+  readonly gstSlab: string;
+  readonly cgst: TaxPart;
+  readonly sgst: TaxPart;
+  readonly igst: TaxPart;
+  readonly total: string;
+  /** From the price list and tax rate that priced it; a save sends them back to be compared. */
+  readonly priceListItemId: string;
+  readonly gstRateId: string;
+  readonly provisionalFields: readonly string[];
+}
+
+/** The printed figures of one line, shared by a saved quotation and the pricing preview. */
+function toLine(
+  wire: Omit<z.output<typeof quotationLineWireSchema>, "line_no">,
+  lineNo: number,
+): QuotationLine {
+  return {
+    lineNo,
+    productId: wire.product_id,
+    description: wire.description,
+    hsnCode: wire.hsn_code,
+    uom: wire.uom,
+    qty: wire.qty,
+    rate: wire.rate,
+    gross: wire.gross,
+    discounts: [
+      { pct: wire.discount_pct, amount: wire.discount1_amt, after: wire.after_discount1 },
+      { pct: wire.discount2_pct, amount: wire.discount2_amt, after: wire.after_discount2 },
+      { pct: wire.discount3_pct, amount: wire.discount3_amt, after: wire.taxable },
+    ],
+    discount: wire.discount,
+    taxable: wire.taxable,
+    gstSlab: wire.gst_slab,
+    cgst: { rate: wire.cgst_rate, amount: wire.cgst },
+    sgst: { rate: wire.sgst_rate, amount: wire.sgst },
+    igst: { rate: wire.igst_rate, amount: wire.igst },
+    total: wire.total,
+    priceListItemId: wire.price_list_item_id,
+    gstRateId: wire.gst_rate_id,
+    provisionalFields: wire.provisional_fields,
+  };
+}
+
+const quotationLineSchema = quotationLineWireSchema.transform((wire) => toLine(wire, wire.line_no));
 
 const approvalWireSchema = z.object({
   request_id: z.string().min(1),
@@ -348,6 +393,16 @@ export const quotationSchema = quotationWireSchema.transform((wire) => ({
   shareUrl: wire.share_url,
   pdfState: wire.pdf_state,
   pdfError: wire.pdf_error,
+  /** On a draft: the discount against the owner's limit, and what Send will do. */
+  discount:
+    wire.discount === null || wire.discount === undefined
+      ? null
+      : {
+          effectivePct: wire.discount.effective_pct,
+          ownerLimitPct: wire.discount.owner_limit_pct,
+          approvalRequired: wire.discount.approval_required,
+          sendGate: wire.discount.send_gate,
+        },
   createdAt: wire.created_at,
   createdBy: toUser(wire.created_by),
 }));
@@ -378,3 +433,150 @@ export const pdfLinkResponseSchema = z
 
 export type PdfLink = z.output<typeof pdfLinkResponseSchema>;
 export type PdfLinkWire = z.input<typeof pdfLinkResponseSchema>;
+
+// ── the builder (QUOT-004, QUOT-005, MSTR-003) ────────────────────────────────
+
+/** GET /products — the picker's rows. The rate is not here: the pricing preview gives it. */
+export const productPageSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        id: z.string().min(1),
+        item_code: z.string().nullable(),
+        description: z.string().min(1),
+        uom: z.string().min(1),
+        /** Decimal places the unit admits: a NOS. item cannot be 1.5. */
+        uom_decimals: z.number().int().nonnegative(),
+        hsn_code: z.string().nullable(),
+        gst_slab: z.string().nullable(),
+        pack_multiple: z.string().nullable(),
+        is_active: z.boolean(),
+      }),
+    ),
+    meta: z.object({ page: z.number().int(), limit: z.number().int(), total: z.number().int() }),
+  })
+  .transform(({ data, meta }) => ({
+    items: data.map((wire) => ({
+      id: wire.id,
+      code: wire.item_code,
+      description: wire.description,
+      uom: wire.uom,
+      uomDecimals: wire.uom_decimals,
+      hsnCode: wire.hsn_code,
+      gstSlab: wire.gst_slab,
+      packMultiple: wire.pack_multiple,
+    })),
+    total: meta.total,
+  }));
+
+export type ProductPick = z.output<typeof productPageSchema>["items"][number];
+export type ProductPageWire = z.input<typeof productPageSchema>;
+
+/** POST /pricing/quote-lines request, as the backend reads it. */
+export interface QuoteLinesRequest {
+  readonly place_of_supply_territory_id: string;
+  readonly lines: readonly {
+    readonly product_id: string;
+    readonly qty: string;
+    readonly discount_pct: string;
+    readonly discount2_pct: string;
+    readonly discount3_pct: string;
+  }[];
+  readonly as_of?: string;
+  readonly partner_id?: string;
+}
+
+const previewLineWireSchema = quotationLineWireSchema.omit({ line_no: true });
+
+/** POST /pricing/quote-lines — every printed figure of every line, and the totals. */
+export const quotePreviewResponseSchema = z
+  .object({
+    data: z.object({
+      as_of: isoDate,
+      intra_state: z.boolean(),
+      price_list_ids: z.array(z.string()),
+      lines: z.array(previewLineWireSchema),
+      totals: totalsSchema,
+      warnings: z.array(z.string()),
+    }),
+  })
+  .transform(({ data }) => ({
+    asOf: data.as_of,
+    intraState: data.intra_state,
+    lines: data.lines.map((line, index) => toLine(line, index + 1)),
+    totals: data.totals,
+    warnings: data.warnings,
+  }));
+
+export type QuotePreview = z.output<typeof quotePreviewResponseSchema>;
+export type QuotePreviewWire = z.input<typeof quotePreviewResponseSchema>;
+
+/** A saved line: what the preview priced, with the ids a save re-resolves and compares. */
+export interface QuotationLineRequest {
+  readonly product_id: string;
+  readonly qty: string;
+  readonly discount_pct: string;
+  readonly discount2_pct: string;
+  readonly discount3_pct: string;
+  readonly price_list_item_id?: string;
+  readonly gst_rate_id?: string;
+}
+
+/** The party printed on the quotation; defaults from the lead. */
+export interface PartyRequest {
+  readonly name: string;
+  readonly mobile: string;
+  readonly address: string | null;
+  readonly gstin: string | null;
+}
+
+/** POST /quotations — a draft on a lead. Fields left out default from the lead. */
+export interface CreateQuotationRequest {
+  readonly lead_id: string;
+  readonly sales_type: SalesType;
+  readonly party: PartyRequest;
+  readonly terms: string | null;
+  readonly lines: readonly QuotationLineRequest[];
+}
+
+/** PATCH /quotations/{id} — a draft's header; the response re-prices the lines. */
+export interface PatchQuotationRequest {
+  readonly sales_type?: SalesType;
+  readonly party?: PartyRequest;
+  readonly terms?: string | null;
+  readonly expected_status: "draft";
+}
+
+/** PUT /quotations/{id}/lines — the whole basket, in order. */
+export interface ReplaceLinesRequest {
+  readonly lines: readonly QuotationLineRequest[];
+  readonly expected_status: "draft";
+}
+
+/** The sales types the backend prices today; the rest answer `sales_type_unsupported`. */
+export const PRICED_SALES_TYPES = [
+  "commercial",
+  "industrial",
+] as const satisfies readonly SalesType[];
+
+/** The builder's header form. */
+export const quotationHeaderFormSchema = z.object({
+  salesType: z.enum(PRICED_SALES_TYPES),
+  partyName: z.string().trim().min(1, { message: "Enter who the quotation is for" }).max(200),
+  partyMobile: z
+    .string()
+    .trim()
+    .refine((value) => normalizeIndianMobile(value) !== null, {
+      message: "Enter a 10-digit Indian mobile number",
+    }),
+  partyAddress: z.string().trim().max(500, { message: "Keep the address under 500 characters" }),
+  partyGstin: z
+    .string()
+    .trim()
+    .regex(/^$|^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][0-9A-Za-z]{3}$/, {
+      message: "A GSTIN is 15 characters, like 24AAACP1234A1Z5",
+    }),
+  terms: z.string().trim().max(2000, { message: "Keep the terms under 2,000 characters" }),
+});
+
+export type QuotationHeaderForm = z.infer<typeof quotationHeaderFormSchema>;

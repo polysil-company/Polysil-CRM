@@ -1,4 +1,5 @@
 import type { BadgeVariant } from "@/components/ui/badge";
+import type { LeadStage } from "@/features/leads/api/leads.schemas";
 import type {
   PdfState,
   QuotationStatus,
@@ -100,4 +101,28 @@ export function parseWarnings(warnings: readonly string[]): QuotationWarning[] {
         message === "" ? warning.trim() : `${message.charAt(0).toUpperCase()}${message.slice(1)}`,
     };
   });
+}
+
+/**
+ * Why a lead cannot get a new quotation, or null when it can. The backend allows qualified,
+ * quoted, negotiation and won leads (a second unit on a deal already won) and answers
+ * `lead_not_qualified` or `lead_not_open` otherwise; the button says so before anyone tries.
+ */
+export function quotationBlockedReason(stage: LeadStage): string | null {
+  switch (stage) {
+    case "qualified":
+    case "quoted":
+    case "negotiation":
+    case "won":
+      return null;
+    case "new":
+    case "contacted":
+      return "Qualify the lead first";
+    case "lost":
+      return "Reopen the lead first";
+    case "merged":
+      return "Quote the lead it was merged into";
+    case "dormant":
+      return "The lead is dormant";
+  }
 }

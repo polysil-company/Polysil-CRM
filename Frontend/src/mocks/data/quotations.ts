@@ -12,8 +12,7 @@ import { MOCK_ID_SPACE, mockUuid } from "./reference";
 const DAY = 24 * 60 * 60 * 1000;
 const VALIDITY_DAYS = 45;
 
-/** A handful of the client's products, with the HSN and slab the price list carries. */
-const MOCK_PRODUCTS = [
+const PRODUCT_SEEDS = [
   {
     name: "UPVC PIPE 90 MM 4 KG/CM2 CLASS - 2 IS: 4985",
     hsn: "3917",
@@ -27,6 +26,27 @@ const MOCK_PRODUCTS = [
   { name: "VENTURI INJECTOR 1.5 INCH", hsn: "8424", uom: "NOS", rate: 129000, slab: 12 },
   { name: "SPRINKLER SET 1 INCH WITH RISER", hsn: "8424", uom: "SET", rate: 86000, slab: 12 },
 ] as const;
+
+export interface MockProduct {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly hsn: string;
+  readonly uom: string;
+  /** Metres take two decimals; pieces and sets none. */
+  readonly uomDecimals: number;
+  /** Paise, on the mock's one price list. */
+  readonly rate: number;
+  readonly slab: number;
+}
+
+/** A handful of the client's products, with the HSN and slab the price list carries. */
+export const MOCK_PRODUCTS: readonly MockProduct[] = PRODUCT_SEEDS.map((seed, index) => ({
+  ...seed,
+  id: mockUuid(MOCK_ID_SPACE.quotation, 100 + index),
+  code: `PL-${String(1001 + index)}`,
+  uomDecimals: seed.uom === "MTR" ? 2 : 0,
+}));
 
 export const MOCK_SELLER = {
   id: mockUuid(MOCK_ID_SPACE.quotation, 1),
@@ -62,12 +82,15 @@ function percentOf(amount: number, percent: number): number {
  */
 export function mockLine(
   lineNo: number,
-  product: (typeof MOCK_PRODUCTS)[number],
+  product: MockProduct,
   qty: number,
   discounts: readonly [number, number, number],
   provisional: boolean,
+  priceVersion = 0,
 ): QuotationLineWire {
-  const gross = product.rate * qty;
+  // A later price version moves the rate 5% a step, as a newly published list would.
+  const rate = Math.round(product.rate * (1 + 0.05 * priceVersion));
+  const gross = Math.round(rate * qty);
   const d1 = percentOf(gross, discounts[0]);
   const after1 = gross - d1;
   const d2 = percentOf(after1, discounts[1]);
@@ -79,12 +102,12 @@ export function mockLine(
 
   return {
     line_no: lineNo,
-    product_id: mockUuid(MOCK_ID_SPACE.quotation, 100 + MOCK_PRODUCTS.indexOf(product)),
+    product_id: product.id,
     description: product.name,
     hsn_code: product.hsn,
     uom: product.uom,
-    qty: `${String(qty)}.000`,
-    rate: paise(product.rate),
+    qty: qty.toFixed(3),
+    rate: paise(rate),
     gross: paise(gross),
     discount_pct: rate3(discounts[0]),
     discount1_amt: paise(d1),
@@ -105,10 +128,18 @@ export function mockLine(
     igst: "0.00",
     total: paise(taxable + cgst + sgst),
     price_list_id: PRICE_LIST.id,
-    price_list_item_id: mockUuid(MOCK_ID_SPACE.quotation, 200 + MOCK_PRODUCTS.indexOf(product)),
+    price_list_item_id: priceListItemId(product, priceVersion),
     gst_rate_id: mockUuid(MOCK_ID_SPACE.quotation, 300 + product.slab),
     provisional_fields: provisional ? ["rate"] : [],
   };
+}
+
+/** The price list row that priced a product; a new price version is a new row. */
+export function priceListItemId(product: MockProduct, priceVersion: number): string {
+  return mockUuid(
+    MOCK_ID_SPACE.quotation,
+    200 + MOCK_PRODUCTS.indexOf(product) + 1000 * priceVersion,
+  );
 }
 
 function sumField(lines: readonly QuotationLineWire[], field: keyof QuotationLineWire): string {
@@ -321,5 +352,86 @@ export function toQuotationSummary(quotation: QuotationWire): QuotationSummaryWi
     pdf_state: quotation.pdf_state,
     superseded_by: quotation.superseded_by,
     created_at: quotation.created_at,
+  };
+}
+
+/** The stand-in limit the backend seeds for a field officer's discount (5 %). */
+const MOCK_OWNER_LIMIT_PCT = 5;
+
+/** What the customer saves off the list price, across every tier, as the backend reports it. */
+function discountInfo(lines: readonly QuotationLineWire[]): QuotationWire["discount"] {
+  const gross = lines.reduce((sum, line) => sum + Math.round(Number(line.gross) * 100), 0);
+  const discount = lines.reduce((sum, line) => sum + Math.round(Number(line.discount) * 100), 0);
+  const effective = gross === 0 ? 0 : (discount / gross) * 100;
+  const required = effective > MOCK_OWNER_LIMIT_PCT;
+  return {
+    effective_pct: effective.toFixed(2),
+    owner_limit_pct: MOCK_OWNER_LIMIT_PCT.toFixed(2),
+    approval_required: required,
+    send_gate: required ? "required" : "none_needed",
+  };
+}
+
+export interface MockDraftInput {
+  readonly id: string;
+  readonly lead: LeadWire;
+  readonly salesType: QuotationWire["sales_type"];
+  readonly party: QuotationWire["party"];
+  readonly terms: string | null;
+  readonly lines: readonly QuotationLineWire[];
+  readonly createdAt: string;
+}
+
+/** QUOT-004 · A draft as the backend saves it: no number, no link, priced lines and totals. */
+export function mockDraft(input: MockDraftInput): QuotationWire {
+  const { lead } = input;
+  const lines = [...input.lines];
+  const provisional = lines.some((line) => line.provisional_fields.length > 0);
+  return {
+    id: input.id,
+    quote_no: null,
+    version: 1,
+    status: "draft",
+    sales_type: input.salesType,
+    source: "internal",
+    lead: { id: lead.id, inquiry_no: lead.inquiry_no, stage: lead.stage },
+    party: input.party,
+    partner: lead.assigned_partner,
+    owner: lead.owner,
+    owner_org_unit: lead.owner_org_unit,
+    territory: lead.territory,
+    seller_gstin: MOCK_SELLER,
+    place_of_supply: { territory: lead.territory, state: "GJ" },
+    intra_state: true,
+    price_effective_date: input.createdAt.slice(0, 10),
+    price_list: PRICE_LIST,
+    price_list_ids: [PRICE_LIST.id],
+    lines,
+    totals: totalsOf(lines),
+    is_provisional: provisional,
+    warnings: provisional
+      ? [
+          `provisional_pricing: ${String(lines.filter((line) => line.provisional_fields.length > 0).length)} of ${String(lines.length)} lines use stand-in rates or tax slabs`,
+        ]
+      : [],
+    terms: input.terms,
+    valid_until: null,
+    sent_at: null,
+    viewed_at: null,
+    open_count: 0,
+    accepted_at: null,
+    rejected_at: null,
+    decided_by: null,
+    decision_remark: null,
+    supersedes: null,
+    superseded_by: null,
+    share_url: null,
+    pdf_state: null,
+    pdf_error: null,
+    discount: discountInfo(lines),
+    approval: null,
+    created_at: input.createdAt,
+    created_by: lead.owner,
+    updated_at: new Date().toISOString(),
   };
 }

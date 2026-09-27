@@ -167,7 +167,7 @@ describe("[QUOT-002] QuotationDetail", () => {
 describe("[QUOT-001] LeadQuotations", () => {
   it("lists every version of a lead's quotations, the older one marked superseded", async () => {
     const revised = mockQuotation((quotation) => quotation.supersedes !== null);
-    renderWithProviders(<LeadQuotations leadId={revised.lead?.id ?? ""} />);
+    renderWithProviders(<LeadQuotations leadId={revised.lead?.id ?? ""} leadStage="negotiation" />);
 
     const list = await screen.findByRole("list", { name: "Quotations on this lead" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
@@ -178,7 +178,9 @@ describe("[QUOT-001] LeadQuotations", () => {
     const lead = mockDb.leads.find(
       (item) => !mockDb.quotations.some((quotation) => quotation.lead?.id === item.id),
     );
-    renderWithProviders(<LeadQuotations leadId={lead?.id ?? ""} />);
+    renderWithProviders(
+      <LeadQuotations leadId={lead?.id ?? ""} leadStage={lead?.stage ?? "new"} />,
+    );
 
     expect(await screen.findByText("No quotations yet")).toBeInTheDocument();
   });
