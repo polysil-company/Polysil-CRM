@@ -8,7 +8,7 @@ import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 
-import { countLeads, createLead, getLead, listLeads } from "./leads.api";
+import { createLead, getLead, getLeadStats, listLeads } from "./leads.api";
 import {
   createLeadFormSchema,
   createLeadRequestSchema,
@@ -230,25 +230,49 @@ describe("[LEAD-003] getLead", () => {
   });
 });
 
-describe("[LEAD-004] countLeads", () => {
-  it("counts the leads the list would show", async () => {
-    await expect(countLeads()).resolves.toEqual({
-      total: visibleMockLeads().length,
-      capped: false,
-    });
+describe("[LEAD-004] getLeadStats", () => {
+  it("counts the leads the list would show, by stage, priority and owner", async () => {
+    const visible = visibleMockLeads();
+
+    const stats = await getLeadStats();
+
+    expect(stats.total).toBe(visible.length);
+    expect(stats.byStage.merged).toBe(0);
+    expect(stats.byStage.new).toBe(visible.filter((lead) => lead.stage === "new").length);
+    expect(stats.byPriority.hot).toBe(visible.filter((lead) => lead.priority === "hot").length);
+    expect(stats.unassigned).toBe(visible.filter((lead) => lead.owner === null).length);
   });
 
-  it("reports a capped count", async () => {
+  it("reads the bare stats object, not a { data } envelope", async () => {
     server.use(
-      http.get(buildApiUrl("/leads"), () =>
+      http.get(buildApiUrl("/leads/stats"), () =>
         HttpResponse.json({
-          data: [{}],
-          meta: { limit: 1, next_cursor: "x", total: 1000, total_capped: true },
+          total: 1234,
+          by_stage: { new: 1000, contacted: 234 },
+          by_priority: { hot: 10, warm: 20, cold: 30 },
+          unassigned: 7,
         }),
       ),
     );
 
-    await expect(countLeads()).resolves.toEqual({ total: 1000, capped: true });
+    await expect(getLeadStats()).resolves.toEqual({
+      total: 1234,
+      byStage: { new: 1000, contacted: 234 },
+      byPriority: { hot: 10, warm: 20, cold: 30 },
+      unassigned: 7,
+    });
+  });
+
+  it("reports a stats body that breaks the contract", async () => {
+    server.use(
+      http.get(buildApiUrl("/leads/stats"), () => HttpResponse.json({ data: { total: 12 } })),
+    );
+
+    await expect(getLeadStats()).rejects.toMatchObject({
+      kind: "contract",
+      code: "CONTRACT_VIOLATION",
+      dataId: "LEAD-004",
+    });
   });
 });
 

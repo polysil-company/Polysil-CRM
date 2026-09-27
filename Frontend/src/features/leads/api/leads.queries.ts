@@ -1,6 +1,6 @@
 import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
-import { countLeads, getLead, listLeads } from "./leads.api";
+import { getLead, getLeadStats, listLeads } from "./leads.api";
 import type { LeadListParams } from "./leads.schemas";
 
 /**
@@ -14,7 +14,7 @@ export const leadKeys = {
   list: (params: LeadListParams) => [...leadKeys.lists(), params] as const,
   details: () => [...leadKeys.all, "detail"] as const,
   detail: (leadId: string) => [...leadKeys.details(), leadId] as const,
-  count: () => [...leadKeys.all, "count"] as const,
+  stats: () => [...leadKeys.all, "stats"] as const,
 };
 
 /** Keeps the previous page on screen while the next one loads — no skeleton flash on paging. */
@@ -35,11 +35,11 @@ export function leadDetailQueryOptions(leadId: string) {
   });
 }
 
-/** The count changes slowly and is shown in navigation: one minute is fresh enough. */
-export function leadCountQueryOptions() {
+/** The counts change slowly and are shown in navigation: one minute is fresh enough. */
+export function leadStatsQueryOptions() {
   return queryOptions({
-    queryKey: leadKeys.count(),
-    queryFn: ({ signal }) => countLeads(signal),
+    queryKey: leadKeys.stats(),
+    queryFn: ({ signal }) => getLeadStats(signal),
     staleTime: 60_000,
     meta: { dataId: "LEAD-004" },
   });

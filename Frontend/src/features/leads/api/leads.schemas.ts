@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-import {
-  cursorPageSchema,
-  pageMetaSchema,
-  type CursorPage,
-  type PageMetaWire,
-} from "@/lib/api/pagination";
+import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 import { normalizeIndianMobile } from "@/lib/format";
 
 /**
@@ -166,15 +161,31 @@ export const leadPageSchema = cursorPageSchema(leadSchema);
 /** The backend's JSON for one page, as the mock backend must produce it. */
 export type LeadPageWire = { data: LeadWire[]; meta: PageMetaWire };
 
-/**
- * LEAD-004 · How many leads the caller can see: GET /leads?limit=1&include_total=true.
- * Only the count is read, so one odd row can never hide the badge.
- */
-export const leadCountSchema = z
-  .object({ data: z.array(z.unknown()), meta: pageMetaSchema })
-  .transform(({ meta }) => ({ total: meta.total, capped: meta.totalCapped }));
+const countSchema = z.number().int().nonnegative();
 
-export type LeadCount = z.output<typeof leadCountSchema>;
+/**
+ * LEAD-004 · GET /leads/stats — counts over the caller's scope, with the list's default
+ * filter (merged leads left out). A bare object, not `{ data }`, and never capped.
+ * Stage keys stay open strings so a stage the backend adds never hides the counts.
+ */
+export const leadStatsSchema = z
+  .object({
+    total: countSchema,
+    by_stage: z.record(z.string(), countSchema),
+    by_priority: z.record(z.enum(LEAD_PRIORITIES), countSchema),
+    unassigned: countSchema,
+  })
+  .transform((wire) => ({
+    total: wire.total,
+    byStage: wire.by_stage,
+    byPriority: wire.by_priority,
+    unassigned: wire.unassigned,
+  }));
+
+export type LeadStats = z.output<typeof leadStatsSchema>;
+
+/** The backend's JSON for the stats, as the mock backend must produce it. */
+export type LeadStatsWire = z.input<typeof leadStatsSchema>;
 
 /**
  * Sort columns. TODO(LEAD-001): the backend lists newest first and does not sort yet — the

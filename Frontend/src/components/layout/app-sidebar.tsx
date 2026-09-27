@@ -12,12 +12,12 @@ import { Icon } from "@/components/ui/icon";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { leadCountQueryOptions } from "@/features/leads/api/leads.queries";
+import { leadStatsQueryOptions } from "@/features/leads/api/leads.queries";
 import { conversationListQueryOptions } from "@/features/messages/api/messages.queries";
 import { useSession } from "@/features/session/hooks/use-session";
 import { useModifierKeyLabel } from "@/hooks/use-modifier-key";
 import { clientEnv, type ApiMockingMode, type AppEnv } from "@/lib/env/client";
-import { formatCount, formatNumber } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
 import { useSidebar } from "@/lib/sidebar/use-sidebar";
 import { cn } from "@/lib/utils";
 
@@ -330,15 +330,15 @@ function SidebarItem({
   );
 }
 
-/** LEAD-004 · How many leads the user can see — "1,000+" when the backend stops counting. */
+/** LEAD-004 · How many leads the user can see, from the lead stats. */
 function LeadsCount(): React.JSX.Element | null {
-  const { data } = useQuery(leadCountQueryOptions());
-  if (data === undefined || data.total === null) {
+  const { data } = useQuery(leadStatsQueryOptions());
+  if (data === undefined) {
     return null;
   }
   return (
     <span className="text-xs text-subtle-foreground tabular-nums sidebar-collapsed:hidden">
-      {formatCount(data.total, { atLeast: data.capped })}
+      {formatNumber(data.total)}
     </span>
   );
 }

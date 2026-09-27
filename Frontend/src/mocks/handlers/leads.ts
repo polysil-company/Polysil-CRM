@@ -7,6 +7,7 @@ import {
   type LeadPageWire,
   type LeadResponseWire,
   type LeadStage,
+  type LeadStatsWire,
   type LeadWire,
 } from "@/features/leads/api/leads.schemas";
 import { summarizeSchemaIssues } from "@/lib/api/errors";
@@ -20,7 +21,7 @@ import { applyScenario } from "./scenario";
 /**
  * LEAD-001 … LEAD-004 · The backend's lead endpoints (backend/docs/api/leads.md), as far as
  * the frontend uses them: search rules, the default stage filter, cursor paging, the capped
- * total, idempotent create, and duplicates that are flagged rather than refused.
+ * total, the stats, idempotent create, and duplicates that are flagged rather than refused.
  */
 
 /** The backend stops counting here and says so with `total_capped`. */
@@ -96,6 +97,48 @@ function compareLeads(a: LeadWire, b: LeadWire, sort: string): number {
 /** The list omits duplicate links; only the detail endpoint carries them. */
 function toListRow(lead: LeadWire): LeadWire {
   return { ...lead, duplicates: [] };
+}
+
+/**
+ * The filters GET /leads and GET /leads/stats share, so a count and its list always agree.
+ * No stage filter means every stage except merged, as on the backend.
+ */
+function filterLeads(params: URLSearchParams): LeadWire[] {
+  const stages = (params.get("stage") ?? "")
+    .split(",")
+    .map((stage) => stage.trim())
+    .filter(isStage);
+  const source = params.get("source");
+  const inquiryType = params.get("inquiry_type");
+  const q = params.get("q") ?? "";
+
+  return mockDb.leads.filter((lead) => {
+    if (stages.length > 0 ? !stages.includes(lead.stage) : lead.stage === "merged") {
+      return false;
+    }
+    if (source !== null && source !== "" && lead.source !== source) return false;
+    if (inquiryType !== null && inquiryType !== "" && lead.inquiry_type !== inquiryType) {
+      return false;
+    }
+    return matchesSearch(lead, q);
+  });
+}
+
+/** Every stage and priority is present, 0 when empty — as the backend promises. */
+function statsOf(leads: readonly LeadWire[]): LeadStatsWire {
+  const byStage = Object.fromEntries(LEAD_STAGES.map((stage) => [stage, 0]));
+  const byPriority: LeadStatsWire["by_priority"] = { hot: 0, warm: 0, cold: 0 };
+  let unassigned = 0;
+  for (const lead of leads) {
+    byStage[lead.stage] = (byStage[lead.stage] ?? 0) + 1;
+    if (lead.priority !== null) {
+      byPriority[lead.priority] += 1;
+    }
+    if (lead.owner === null) {
+      unassigned += 1;
+    }
+  }
+  return { total: leads.length, by_stage: byStage, by_priority: byPriority, unassigned };
 }
 
 function nextInquiryNumber(): string {
@@ -207,29 +250,10 @@ export const leadHandlers = [
       return HttpResponse.json({ data: [{ id: 42, farmer_name: null }], meta: { limit: "25" } });
     }
 
-    const stages = (url.searchParams.get("stage") ?? "")
-      .split(",")
-      .map((stage) => stage.trim())
-      .filter(isStage);
-    const source = url.searchParams.get("source");
-    const inquiryType = url.searchParams.get("inquiry_type");
-    const q = url.searchParams.get("q") ?? "";
     const sort = url.searchParams.get("sort") ?? "created_at";
     const direction = url.searchParams.get("order") === "asc" ? 1 : -1;
 
-    const matches =
-      scenario === "empty"
-        ? []
-        : mockDb.leads.filter((lead) => {
-            if (stages.length > 0 ? !stages.includes(lead.stage) : lead.stage === "merged") {
-              return false;
-            }
-            if (source !== null && source !== "" && lead.source !== source) return false;
-            if (inquiryType !== null && inquiryType !== "" && lead.inquiry_type !== inquiryType) {
-              return false;
-            }
-            return matchesSearch(lead, q);
-          });
+    const matches = scenario === "empty" ? [] : filterLeads(url.searchParams);
 
     const sorted = [...matches].sort((a, b) => compareLeads(a, b, sort) * direction);
     const page = sorted.slice(offset, offset + limit);
@@ -246,6 +270,20 @@ export const leadHandlers = [
       },
     };
     return HttpResponse.json(body);
+  }),
+
+  // Before /leads/:leadId, as on the backend, so "stats" is never read as a lead ID.
+  http.get(buildApiUrl("/leads/stats"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    if (scenario === "contract") {
+      // Deliberately wrong shape: exercises CONTRACT_VIOLATION handling end to end.
+      return HttpResponse.json({ total: "12", by_stage: null });
+    }
+
+    const matches = scenario === "empty" ? [] : filterLeads(new URL(request.url).searchParams);
+    return HttpResponse.json(statsOf(matches));
   }),
 
   http.get(buildApiUrl("/leads/:leadId"), async ({ params }) => {

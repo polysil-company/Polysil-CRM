@@ -24,7 +24,7 @@ Six things the leads screens got wrong once the dev API — rather than the mock
 
 ## Now
 
-- **The list reads leads one at a time.** A lead that breaks the contract is left out, counted, and logged (`left out 1 lead(s) that did not match the contract`), and the rest of the page is shown. A page where *no* lead matches is still a contract violation — that is a change of shape, not one bad record. The new `cursorPageSchema` in `lib/api/pagination.ts` does this for any cursor-paged list, so quotations and orders inherit it; `CursorPage` carries `skipped` alongside the rows.
+- **The list reads leads one at a time.** A lead that breaks the contract is left out, counted, and logged (`left out 1 lead(s) that did not match the contract`), and the rest of the page is shown. A page where _no_ lead matches is still a contract violation — that is a change of shape, not one bad record. The new `cursorPageSchema` in `lib/api/pagination.ts` does this for any cursor-paged list, so quotations and orders inherit it; `CursorPage` carries `skipped` alongside the rows.
 - **Lookup codes are checked for shape, not spelling:** letters, digits, `_`, `-` and `.`. `agri-fair` and `qr.code` filter as they should. A code the backend does not know is still the backend's to refuse.
 - **Optional lookup fields can be emptied.** `LookupSelect` takes `clearable`, which adds a "Not set" row; the field then shows its placeholder again. Fields that need a value — Irrigation system — do not get the row, and ignore a null.
 - **The dialog's close timer is cancelled** when the dialog unmounts and whenever the form resets.

@@ -20,7 +20,7 @@ export function useCreateLead(): UseMutationResult<Lead, Error, CreateLeadInput>
     onSuccess: (lead) => {
       queryClient.setQueryData(leadKeys.detail(lead.id), lead);
       void queryClient.invalidateQueries({ queryKey: leadKeys.lists() });
-      void queryClient.invalidateQueries({ queryKey: leadKeys.count() });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.stats() });
     },
   });
 }

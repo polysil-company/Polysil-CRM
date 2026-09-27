@@ -3,14 +3,14 @@ import { createLogger } from "@/lib/logger";
 
 import {
   LEAD_SORT_WIRE_FIELDS,
-  leadCountSchema,
   leadPageSchema,
   leadResponseSchema,
+  leadStatsSchema,
   type CreateLeadRequest,
   type Lead,
-  type LeadCount,
   type LeadListParams,
   type LeadPage,
+  type LeadStats,
 } from "./leads.schemas";
 
 const log = createLogger({ file: "features/leads/api/leads.api.ts", dataId: "LEAD-001" });
@@ -42,10 +42,14 @@ export async function listLeads(params: LeadListParams, signal?: AbortSignal): P
 
   if (page.skipped > 0) {
     // A backend-side issue: the page is still shown, so it would otherwise go unnoticed.
-    log.warn("listLeads", `left out ${String(page.skipped)} lead(s) that did not match the contract`, {
-      dataId: "LEAD-001",
-      context: { skipped: page.skipped, kept: page.items.length },
-    });
+    log.warn(
+      "listLeads",
+      `left out ${String(page.skipped)} lead(s) that did not match the contract`,
+      {
+        dataId: "LEAD-001",
+        context: { skipped: page.skipped, kept: page.items.length },
+      },
+    );
   }
 
   return page;
@@ -63,15 +67,17 @@ export function getLead(leadId: string, signal?: AbortSignal): Promise<Lead> {
   });
 }
 
-/** LEAD-004 · How many leads the caller can see, for navigation: one row plus the count. */
-export function countLeads(signal?: AbortSignal): Promise<LeadCount> {
+/**
+ * LEAD-004 · GET /leads/stats — how many leads the caller can see, by stage and priority,
+ * and how many wait unassigned. One count query on the backend, no lead rows.
+ */
+export function getLeadStats(signal?: AbortSignal): Promise<LeadStats> {
   return apiRequest({
     dataId: "LEAD-004",
     logger: log,
-    fn: "countLeads",
-    path: "/leads",
-    query: { limit: 1, include_total: true },
-    schema: leadCountSchema,
+    fn: "getLeadStats",
+    path: "/leads/stats",
+    schema: leadStatsSchema,
     signal,
   });
 }
