@@ -44,6 +44,8 @@ The lead page showed the record and nothing else. There was no way to see what h
 
 **Plan (docs)** — `Docs/Plan.md` gains **§9 Integration status**: what runs on the real backend, what is still mocked and what the backend owes, what the backend serves that has no screen yet in build order, why `/leads/summary` is gone and how `/leads/stats` differs, questions for the backend, and housekeeping. A line at the top points to it. It is updated in the same pull request that connects a screen.
 
+**Backend tasks** — `docs/Backend-Tasks.md` at the repository root lists everything the frontend needs from the backend as a checklist (BE-001…BE-014): the lead gaps (sorting, follow-up date, crops and land, win probability, territory levels, names in assignment events, stats by source), the modules still mocked (dashboard, notifications, messages), merging the tasks and complaints contracts, the dev API, a docs fix and the approval thresholds. The backend developer ticks a task, sets its status and writes the commit and notes there.
+
 **Data IDs** — LEAD-005 (timeline), LEAD-006 (notes), LEAD-007 (stage change and reopen) and LEAD-008 (assign owner and partner) registered, in progress.
 
 #### Discussion
@@ -77,7 +79,9 @@ The lead page showed the record and nothing else. There was no way to see what h
 - `src/mocks/data/timeline.ts` — new: a history derived from each seeded lead
 - `src/mocks/handlers/leads.ts`, `lookups.ts`, `src/mocks/db.ts`, `src/mocks/data/reference.ts` — timeline, notes, transition, reopen, assignees (by the previewed role), partners and assign, with the backend's stage rules, paging, 404, Idempotency-Key replay, 409 and 422; each lead's history is snapshotted once so a later change adds one event
 - `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — LEAD-005…008
-- `Docs/Plan.md` — §9 Integration status
+- `Docs/Plan.md` — §9 Integration status; §9.4 points to the backend task list
+- `Docs/Frontend-Scope.md` — §10 points to the backend task list
+- `../docs/Backend-Tasks.md` — new, at the repository root: every ask of the backend as a checklist (BE-001…BE-014) the backend developer ticks, with the commit and notes
 
 #### Tests
 

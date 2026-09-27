@@ -325,7 +325,7 @@ LEAD-005…008 are built on the backend's contract and tested against the mock b
 
 ### 9.4 Asked of the backend
 
-Sorting on the lead list; names in the `lead.assigned` timeline payload (it carries ids only, so the history says "changed the owner" rather than who); a follow-up date; crops and acreage; win probability and weekly activity (or confirmation that the score and timeline replace them); which territory levels a lead may sit in (Frontend-Scope §10, questions 14–18). Dashboard, notifications and messaging endpoints (§9.2).
+Every open ask — sorting, a follow-up date, crops and land, win probability, territory levels, names in assignment events, stats by source, the dashboard, notifications and messages endpoints, the dev API — is a task with a checkbox in **[`docs/Backend-Tasks.md`](../../docs/Backend-Tasks.md)** (BE-001…). The backend developer ticks it and writes the commit and any notes there; the frontend reads it after each merge.
 
 ### 9.5 Housekeeping
 
