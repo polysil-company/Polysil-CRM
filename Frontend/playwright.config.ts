@@ -41,6 +41,10 @@ export default defineConfig({
           url: baseURL,
           reuseExistingServer: !isCI,
           timeout: 180_000,
+          // The journeys sign in with the mock backend's demo credentials. Pinned here so a
+          // local .env.local pointing at the dev API can't change that (the process
+          // environment wins over .env files). A dev server already running is reused as it is.
+          env: { NEXT_PUBLIC_API_MOCKING: "enabled" },
         },
       }
     : {}),

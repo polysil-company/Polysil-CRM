@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { toUserFacingError } from "./error-messages";
-import { ApiError, parseErrorBody, type ApiErrorInit } from "./errors";
+import { ApiError, parseErrorBody, readFieldErrors, type ApiErrorInit } from "./errors";
 import { createRequestId } from "./request-id";
 import { buildApiUrl } from "./url";
 
@@ -93,6 +93,23 @@ describe("[OBS-002] parseErrorBody", () => {
   it("falls back to a short plain-text body", () => {
     expect(parseErrorBody("Gateway timeout").message).toBe("Gateway timeout");
     expect(parseErrorBody(undefined).message).toBeUndefined();
+  });
+});
+
+describe("[OBS-002] readFieldErrors", () => {
+  it("returns the field errors of a 422, keyed by the backend's field path", () => {
+    const error = apiError({
+      status: 422,
+      details: { fields: { "estimated_value.float": "Bad" } },
+    });
+
+    expect(readFieldErrors(error)).toEqual({ "estimated_value.float": "Bad" });
+  });
+
+  it("returns null for anything that is not a field validation failure", () => {
+    expect(readFieldErrors(apiError({ status: 500, details: { fields: { a: "b" } } }))).toBeNull();
+    expect(readFieldErrors(apiError({ status: 422, details: { issues: 2 } }))).toBeNull();
+    expect(readFieldErrors(new Error("offline"))).toBeNull();
   });
 });
 

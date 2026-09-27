@@ -1,4 +1,4 @@
-import type { Lead } from "@/features/leads/api/leads.schemas";
+import type { LeadWire } from "@/features/leads/api/leads.schemas";
 import type {
   ConversationWire,
   MessageWire,
@@ -147,8 +147,8 @@ export function findMockStaff(id: string): PersonWire | undefined {
 }
 
 /** How a lead is named when it is linked from a message or notification. */
-export function mockLeadLabel(lead: Lead): string {
-  return `${lead.customerName} · ${lead.code}`;
+export function mockLeadLabel(lead: LeadWire): string {
+  return `${lead.farmer_name} · ${lead.inquiry_no}`;
 }
 
 function minutesAgo(now: number, minutes: number): string {
@@ -157,7 +157,7 @@ function minutesAgo(now: number, minutes: number): string {
 
 /** Seeded conversations for the signed-in staff user, with a lead linked here and there. */
 export function generateConversations(
-  leads: readonly Lead[],
+  leads: readonly LeadWire[],
   now: number = Date.now(),
 ): { conversations: ConversationWire[]; messages: MessageWire[] } {
   const conversations: ConversationWire[] = [];

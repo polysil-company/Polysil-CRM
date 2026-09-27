@@ -91,7 +91,7 @@ describe("[MSG-003] sendMessage", () => {
     expect(message.resource).toEqual({
       type: "lead",
       id: lead.id,
-      label: `${lead.customerName} · ${lead.code}`,
+      label: `${lead.farmer_name} · ${lead.inquiry_no}`,
     });
   });
 

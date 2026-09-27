@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
 
@@ -44,15 +42,4 @@ export function describeSignInError(error: unknown): SignInErrorView {
 
   const view = toUserFacingError(error);
   return { title: view.title, description: view.description, reference: view.reference };
-}
-
-const fieldErrorsSchema = z.object({ fields: z.record(z.string(), z.string()) });
-
-/** Field errors from a 422, keyed by request field name, or null. */
-export function readFieldErrors(error: unknown): Readonly<Record<string, string>> | null {
-  if (!isApiError(error) || error.status !== 422) {
-    return null;
-  }
-  const parsed = fieldErrorsSchema.safeParse(error.details);
-  return parsed.success ? parsed.data.fields : null;
 }

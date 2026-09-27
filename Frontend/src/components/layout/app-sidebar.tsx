@@ -12,11 +12,11 @@ import { Icon } from "@/components/ui/icon";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { leadSummaryQueryOptions } from "@/features/leads/api/leads.queries";
+import { leadStatsQueryOptions } from "@/features/leads/api/leads.queries";
 import { conversationListQueryOptions } from "@/features/messages/api/messages.queries";
 import { useSession } from "@/features/session/hooks/use-session";
 import { useModifierKeyLabel } from "@/hooks/use-modifier-key";
-import { clientEnv, type AppEnv } from "@/lib/env/client";
+import { clientEnv, type ApiMockingMode, type AppEnv } from "@/lib/env/client";
 import { formatNumber } from "@/lib/format";
 import { useSidebar } from "@/lib/sidebar/use-sidebar";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,13 @@ const ENVIRONMENT_LABELS: Readonly<Record<AppEnv, string>> = {
   feature: "Preview",
   staging: "Staging",
   production: "Production",
+};
+
+/** What the environment card calls the backend, by mocking mode. */
+const BACKEND_LABELS: Readonly<Record<ApiMockingMode, string>> = {
+  enabled: "Mock backend",
+  partial: "Dev API + mocks",
+  disabled: "Live API",
 };
 
 /** Clears the 56px rail, so a tooltip never covers the sidebar edge. */
@@ -323,8 +330,9 @@ function SidebarItem({
   );
 }
 
+/** LEAD-004 · How many leads the user can see, from the lead stats. */
 function LeadsCount(): React.JSX.Element | null {
-  const { data } = useQuery(leadSummaryQueryOptions());
+  const { data } = useQuery(leadStatsQueryOptions());
   if (data === undefined) {
     return null;
   }
@@ -383,7 +391,7 @@ function SidebarEnvironmentCard({ collapsed }: { collapsed: boolean }): React.JS
     return null;
   }
 
-  const backend = clientEnv.apiMocking === "enabled" ? "Mock backend" : "Live API";
+  const backend = BACKEND_LABELS[clientEnv.apiMocking];
 
   return (
     <>
@@ -395,7 +403,9 @@ function SidebarEnvironmentCard({ collapsed }: { collapsed: boolean }): React.JS
         <p className="mt-1 text-muted-foreground">
           {clientEnv.apiMocking === "enabled"
             ? "Preview any role or state from your account menu."
-            : clientEnv.apiBaseUrl}
+            : clientEnv.apiMocking === "partial"
+              ? "Real sign-in. Leads, dashboard, notifications and messages are still mocked."
+              : clientEnv.apiBaseUrl}
         </p>
       </div>
       {/* The rail keeps the environment signal as a dot; its name is in the tooltip. */}

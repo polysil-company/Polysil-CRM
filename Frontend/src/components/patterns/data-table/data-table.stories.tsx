@@ -128,9 +128,11 @@ function sortPartners(rows: readonly ChannelPartner[], sorting: SortingState): C
 function ChannelPartnersTable({
   rows,
   isFetching = false,
+  isPaging = false,
 }: {
   rows: readonly ChannelPartner[];
   isFetching?: boolean;
+  isPaging?: boolean;
 }): React.JSX.Element {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 });
@@ -160,6 +162,7 @@ function ChannelPartnersTable({
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
           isFetching={isFetching}
+          isPaging={isPaging}
           className="min-h-0 flex-1"
         />
       </div>
@@ -194,6 +197,14 @@ export const Default: Story = {
 /** A background refetch: rows stay readable while the progress line runs. */
 export const Refreshing: Story = {
   render: () => <ChannelPartnersTable rows={PARTNERS} isFetching />,
+};
+
+/**
+ * A page change that has not landed: the rows still belong to the previous page, so both
+ * paging buttons wait rather than reading the next click against the wrong page.
+ */
+export const Paging: Story = {
+  render: () => <ChannelPartnersTable rows={PARTNERS} isFetching isPaging />,
 };
 
 export const SinglePage: Story = {

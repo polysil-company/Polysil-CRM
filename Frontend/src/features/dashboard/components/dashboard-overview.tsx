@@ -23,7 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { dashboardOverviewQueryOptions } from "@/features/dashboard/api/dashboard.queries";
 import type { DashboardOverview as Overview } from "@/features/dashboard/api/dashboard.schemas";
-import { LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/features/leads/lib/lead-labels";
+import { LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
 import { formatInrCompact, formatNumber, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -127,7 +127,7 @@ function PipelineCard({
           {pipeline.map((stage) => (
             <li key={stage.status} className="grid grid-cols-[6.5rem_1fr_auto] items-center gap-3">
               <span className="truncate text-sm text-muted-foreground">
-                {LEAD_STATUS_LABELS[stage.status]}
+                {LEAD_STAGE_LABELS[stage.status]}
               </span>
               <ProportionBar
                 value={stage.count}
@@ -220,9 +220,7 @@ function SourcesCard({ sources }: { sources: Overview["sources"] }): React.JSX.E
           {sources.map((item) => (
             <li key={item.source} className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate text-muted-foreground">
-                  {LEAD_SOURCE_LABELS[item.source]}
-                </span>
+                <span className="truncate text-muted-foreground">{item.name}</span>
                 <span className="font-medium whitespace-nowrap text-foreground tabular-nums">
                   {formatNumber(item.count)}
                   <span className="ml-1.5 font-normal text-subtle-foreground">

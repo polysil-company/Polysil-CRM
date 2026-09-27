@@ -2,38 +2,57 @@ import { apiRequest } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
-  leadListResponseSchema,
-  leadSchema,
-  leadSummarySchema,
+  LEAD_SORT_WIRE_FIELDS,
+  leadPageSchema,
+  leadResponseSchema,
+  leadStatsSchema,
   type CreateLeadRequest,
   type Lead,
   type LeadListParams,
-  type LeadListResponse,
-  type LeadSummary,
+  type LeadPage,
+  type LeadStats,
 } from "./leads.schemas";
 
 const log = createLogger({ file: "features/leads/api/leads.api.ts", dataId: "LEAD-001" });
 
-/** LEAD-001 · GET /leads */
-export function listLeads(params: LeadListParams, signal?: AbortSignal): Promise<LeadListResponse> {
-  return apiRequest({
+/**
+ * LEAD-001 · GET /leads — one page, newest first, with the matching total.
+ * `include_total` costs the backend a second query; the list shows "1–25 of 74", so it asks.
+ */
+export async function listLeads(params: LeadListParams, signal?: AbortSignal): Promise<LeadPage> {
+  const page = await apiRequest({
     dataId: "LEAD-001",
     logger: log,
     fn: "listLeads",
     path: "/leads",
     query: {
-      page: params.page,
-      pageSize: params.pageSize,
-      sort: params.sort,
-      order: params.order,
+      limit: params.pageSize,
+      cursor: params.cursor,
+      include_total: true,
       q: params.q,
-      status: params.status,
+      stage: params.stage.join(","),
       source: params.source,
-      type: params.type,
+      inquiry_type: params.type,
+      sort: LEAD_SORT_WIRE_FIELDS[params.sort],
+      order: params.order,
     },
-    schema: leadListResponseSchema,
+    schema: leadPageSchema,
     signal,
   });
+
+  if (page.skipped > 0) {
+    // A backend-side issue: the page is still shown, so it would otherwise go unnoticed.
+    log.warn(
+      "listLeads",
+      `left out ${String(page.skipped)} lead(s) that did not match the contract`,
+      {
+        dataId: "LEAD-001",
+        context: { skipped: page.skipped, kept: page.items.length },
+      },
+    );
+  }
+
+  return page;
 }
 
 /** LEAD-003 · GET /leads/{leadId} */
@@ -43,25 +62,38 @@ export function getLead(leadId: string, signal?: AbortSignal): Promise<Lead> {
     logger: log,
     fn: "getLead",
     path: `/leads/${encodeURIComponent(leadId)}`,
-    schema: leadSchema,
+    schema: leadResponseSchema,
     signal,
   });
 }
 
-/** LEAD-004 · GET /leads/summary */
-export function getLeadSummary(signal?: AbortSignal): Promise<LeadSummary> {
+/**
+ * LEAD-004 · GET /leads/stats — how many leads the caller can see, by stage and priority,
+ * and how many wait unassigned. One count query on the backend, no lead rows.
+ */
+export function getLeadStats(signal?: AbortSignal): Promise<LeadStats> {
   return apiRequest({
     dataId: "LEAD-004",
     logger: log,
-    fn: "getLeadSummary",
-    path: "/leads/summary",
-    schema: leadSummarySchema,
+    fn: "getLeadStats",
+    path: "/leads/stats",
+    schema: leadStatsSchema,
     signal,
   });
 }
 
+export interface CreateLeadInput {
+  readonly body: CreateLeadRequest;
+  /**
+   * Send the same key when retrying the same body: the backend replays the first result
+   * instead of creating a second lead. A different body needs a new key (the same key with
+   * a different body is a 409).
+   */
+  readonly idempotencyKey: string;
+}
+
 /** LEAD-002 · POST /leads */
-export function createLead(body: CreateLeadRequest): Promise<Lead> {
+export function createLead({ body, idempotencyKey }: CreateLeadInput): Promise<Lead> {
   return apiRequest({
     dataId: "LEAD-002",
     logger: log,
@@ -69,6 +101,7 @@ export function createLead(body: CreateLeadRequest): Promise<Lead> {
     method: "POST",
     path: "/leads",
     body,
-    schema: leadSchema,
+    idempotencyKey,
+    schema: leadResponseSchema,
   });
 }

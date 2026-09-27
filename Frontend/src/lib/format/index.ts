@@ -1,4 +1,4 @@
-export { formatInr, formatInrCompact } from "./currency";
+export { formatInr, formatInrCompact, sumRupees, toRupeeNumber } from "./currency";
 export {
   formatDate,
   formatDateTime,
@@ -11,5 +11,5 @@ export {
   type DateInput,
 } from "./date";
 export { describeCountdown, formatCountdown } from "./duration";
-export { EMPTY_VALUE, formatDelta, formatNumber, formatPercent } from "./number";
+export { EMPTY_VALUE, formatCount, formatDelta, formatNumber, formatPercent } from "./number";
 export { formatIndianPhone, normalizeIndianMobile } from "./phone";

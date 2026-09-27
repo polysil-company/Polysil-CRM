@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { LEAD_SOURCES, LEAD_STATUSES } from "@/features/leads/api/leads.schemas";
+import { LEAD_STAGES } from "@/features/leads/api/leads.schemas";
 
 // TODO(RPT-001): agree the dashboard contract with the backend developer.
 
@@ -24,14 +24,16 @@ export const dashboardOverviewSchema = z.object({
   }),
   pipeline: z.array(
     z.object({
-      status: z.enum(LEAD_STATUSES),
+      status: z.enum(LEAD_STAGES),
       count: z.number().int().nonnegative(),
       value: z.number().nonnegative(),
     }),
   ),
   sources: z.array(
     z.object({
-      source: z.enum(LEAD_SOURCES),
+      /** A lead-source code; `name` comes with it, since administrators edit the list. */
+      source: z.string().min(1),
+      name: z.string().min(1),
       count: z.number().int().nonnegative(),
     }),
   ),

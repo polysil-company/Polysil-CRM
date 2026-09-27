@@ -15,9 +15,8 @@ import {
   type StaffSignInFormInput,
   type StaffSignInRequest,
 } from "@/features/auth/api/auth.schemas";
-import { readFieldErrors } from "@/features/auth/lib/sign-in-errors";
 import { useAsyncAction } from "@/hooks/use-async-action";
-import { isApiError } from "@/lib/api/errors";
+import { isApiError, readFieldErrors } from "@/lib/api/errors";
 import type { SessionTokens } from "@/lib/auth/tokens";
 import { createLogger } from "@/lib/logger";
 

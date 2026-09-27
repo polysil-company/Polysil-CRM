@@ -2,7 +2,9 @@ import { ROLES, type PartnerRole, type Role, type StaffRole } from "@/lib/auth/r
 
 /**
  * Developer controls for the mock backend (MSW). Only meaningful when
- * NEXT_PUBLIC_API_MOCKING=enabled; stored per browser in localStorage.
+ * NEXT_PUBLIC_API_MOCKING is `enabled` — or `partial`, for the modules still mocked there;
+ * the mock role does nothing in `partial`, where the real session decides. Stored per
+ * browser in localStorage.
  *
  * Scenarios let anyone preview every UI state in the real app without
  * editing code: slow network, empty results, server error, contract violation.

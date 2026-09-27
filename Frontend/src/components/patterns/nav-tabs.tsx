@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import type * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { formatNumber } from "@/lib/format";
+import { formatCount } from "@/lib/format";
 import { SPRING } from "@/lib/motion/tokens";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,8 @@ export interface NavTab {
   readonly href: Route;
   readonly label: string;
   readonly count?: number | undefined;
+  /** The count is a lower bound (the API stopped counting): shown as "1,000+". */
+  readonly countCapped?: boolean;
   /** Shown but not navigable (e.g. a module that is not built yet). */
   readonly disabled?: boolean;
 }
@@ -53,7 +55,7 @@ export function NavTabs({ tabs, label, indicatorId, className }: NavTabsProps): 
             {tab.label}
             {tab.count === undefined ? null : (
               <Badge size="sm" variant={active ? "primary" : "neutral"}>
-                {formatNumber(tab.count)}
+                {formatCount(tab.count, { atLeast: tab.countCapped === true })}
               </Badge>
             )}
             {active ? (

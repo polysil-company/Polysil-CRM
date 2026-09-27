@@ -15,6 +15,7 @@ import {
 import { buildApiUrl } from "@/lib/api/url";
 import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
+import { clientEnv } from "@/lib/env/client";
 import {
   findMockStaff,
   MOCK_CURRENT_STAFF_ID,
@@ -251,7 +252,11 @@ export const messageHandlers = [
     const { resource } = parsed.data;
     const lead =
       resource?.type === "lead" ? mockDb.leads.find((item) => item.id === resource.id) : undefined;
-    if (resource !== null && lead === undefined) {
+    // In partial mode leads come from the real API, which this mock cannot see: it trusts the
+    // id of a linked lead and names it generically, rather than refusing every real lead.
+    const trustedLeadId =
+      clientEnv.apiMocking === "partial" && resource?.type === "lead" ? resource.id : null;
+    if (resource !== null && lead === undefined && trustedLeadId === null) {
       return HttpResponse.json(
         {
           error: {
@@ -268,7 +273,11 @@ export const messageHandlers = [
       conversation_id: conversation.id,
       sender_id: MOCK_CURRENT_STAFF_ID,
       body: parsed.data.body,
-      resource: lead ? { type: "lead", id: lead.id, label: mockLeadLabel(lead) } : null,
+      resource: lead
+        ? { type: "lead", id: lead.id, label: mockLeadLabel(lead) }
+        : trustedLeadId === null
+          ? null
+          : { type: "lead", id: trustedLeadId, label: "Lead" },
       created_at: new Date().toISOString(),
     };
     appendMessage(message, 0);

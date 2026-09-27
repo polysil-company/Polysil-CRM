@@ -21,6 +21,14 @@ export function formatNumber(value: number | null | undefined, decimals = 0): st
   }).format(value);
 }
 
+/**
+ * A count that may be a lower bound. Some list endpoints stop counting at a ceiling
+ * and say so (`total_capped`): 1000 with `atLeast` → "1,000+", never a false exact figure.
+ */
+export function formatCount(value: number, options: { atLeast?: boolean } = {}): string {
+  return `${formatNumber(value)}${options.atLeast ? "+" : ""}`;
+}
+
 /** 42 → "42%". Input is a percentage (0–100), not a ratio. */
 export function formatPercent(value: number | null | undefined, decimals = 0): string {
   if (!isFiniteNumber(value)) {
