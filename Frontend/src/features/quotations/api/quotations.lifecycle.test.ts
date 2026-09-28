@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { decideApprovalStep } from "@/features/approvals/api/approvals.api";
 import type { LeadStage } from "@/features/leads/api/leads.schemas";
 import { isApiError } from "@/lib/api/errors";
 import { MOCK_PRODUCTS } from "@/mocks/data/quotations";
@@ -147,8 +148,12 @@ describe("[QUOT-007] requestQuotationApproval", () => {
     });
     await expect(refusal(send(asked))).resolves.toEqual({ status: 409, code: "approval_pending" });
 
-    // The mock's stand-in manager decides on the next read once the time has come.
-    mockDb.approvalDecideAt.set(draft.id, 0);
+    // A State Manager (the mock's default role) approves it from the inbox (APPR-001).
+    const stepId = asked.approval?.steps[0]?.id ?? "";
+    await decideApprovalStep(stepId, {
+      body: { decision: "approve", remark: null },
+      idempotencyKey: key(),
+    });
     const approved = await getQuotation(draft.id);
     expect(approved.discount?.sendGate).toBe("approved");
     await expect(send(approved)).resolves.toMatchObject({ status: "sent" });

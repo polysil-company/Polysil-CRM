@@ -23,6 +23,7 @@ export const MOCK_ID_SPACE = {
   lookup: 0x10,
   timeline: 0x71,
   quotation: 0x9707,
+  approval: 0xa991,
 } as const;
 
 export const MOCK_STATE = { name: "Gujarat", code: "GJ" } as const;

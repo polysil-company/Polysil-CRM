@@ -195,3 +195,32 @@ test.describe("[QUOT-012] A customer's quotation link", () => {
     await expectNoAccessibilityViolations(page);
   });
 });
+
+test.describe("[APPR-001] Approvals", () => {
+  test("lists what waits on the manager and asks for a reason to reject", async ({ page }) => {
+    await signIn(page, "/approvals");
+
+    const inbox = page.getByRole("list", { name: /Waiting for your decision/ });
+    await expect(inbox.getByRole("listitem").first()).toBeVisible();
+    await inbox
+      .getByRole("listitem")
+      .first()
+      .getByRole("button", { name: /^Reject/ })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Reject" }).click();
+    await expect(dialog.getByText("Say why — the person who asked reads it")).toBeVisible();
+  });
+
+  test("has no automatically detectable accessibility violations", async ({ page }) => {
+    await signIn(page, "/approvals");
+    await expect(
+      page
+        .getByRole("list", { name: /Waiting for your decision/ })
+        .getByRole("listitem")
+        .first(),
+    ).toBeVisible();
+
+    await expectNoAccessibilityViolations(page);
+  });
+});

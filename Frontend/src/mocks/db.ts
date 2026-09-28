@@ -3,6 +3,7 @@ import type { ConversationWire, MessageWire } from "@/features/messages/api/mess
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 
+import { seedApprovals, type MockApprovalStep } from "./data/approvals";
 import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
@@ -21,8 +22,10 @@ export interface MockDb {
   quotationEvents: Map<string, TimelineEventWire[]>;
   /** When a just-sent quotation's PDF is ready (epoch ms); read by the next GET. */
   pdfReadyAt: Map<string, number>;
-  /** When the mock's stand-in manager approves a pending discount request (epoch ms). */
-  approvalDecideAt: Map<string, number>;
+  /** The approval queue: quotation discounts and sales orders, oldest first (APPR-001). */
+  approvalSteps: MockApprovalStep[];
+  /** Decision replays: Idempotency-Key → the request and the step it decided. */
+  approvalDecisions: Map<string, { body: string; stepId: string }>;
   /** DELETE /quotations/{id} replays: Idempotency-Key → the request. */
   quotationDeletes: Map<string, string>;
   notifications: NotificationWire[];
@@ -45,14 +48,17 @@ export interface MockDb {
 function createMockDb(): MockDb {
   const leads = generateLeads();
   const { conversations, messages } = generateConversations(leads);
+  const quotations = generateQuotations(leads);
+  const approvalSteps = seedApprovals(quotations, leads);
   return {
     leads,
-    quotations: generateQuotations(leads),
+    quotations,
     quotationWrites: new Map(),
     priceVersion: 0,
     quotationEvents: new Map(),
     pdfReadyAt: new Map(),
-    approvalDecideAt: new Map(),
+    approvalSteps,
+    approvalDecisions: new Map(),
     quotationDeletes: new Map(),
     notifications: generateNotifications(leads),
     conversations,

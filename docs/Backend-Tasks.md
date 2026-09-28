@@ -55,6 +55,10 @@ in the same shape. Never renumber or reuse a number.
 - [ ] **BE-016** · Say whether the dev API renders real PDFs · QUOT-003 · normal
 - [ ] **BE-017** · Name the quotation on its events in the lead's timeline · QUOT-010 · normal
 
+**Approvals** — added as the approval screens are built (APPR-001…).
+
+- [ ] **BE-018** · Name the Accounts role code in the approval queue · APPR-001 · normal
+
 ---
 
 ## Details
@@ -274,5 +278,20 @@ in the same shape. Never renumber or reuse a number.
   which quotation or link to it when a lead has more than one (a revision, or a second unit).
 - **Done when:** the payloads carry the three fields; say in the notes if a dealer should not see
   any of them.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-018 · Name the Accounts role code in the approval queue
+
+- **Status:** ⬜ Open
+- **Asked:** 28 Sep 2026 · APPR-001
+- **What:** say which `role` value a `GET /approvals/pending` row carries for an Accounts step (and
+  for QA and Dispatch, if they appear there), and confirm that a remark is required on every
+  Accounts decision, approve included.
+- **Why:** the decision dialog asks for a remark when the backend will require one. Today it treats
+  any role containing "account" as Accounts (`TODO(APPR-001)` in
+  `Frontend/src/features/approvals/lib/approval-labels.ts`), and the role's name on screen comes
+  from the frontend's role list — an unknown code shows humanised.
+- **Done when:** the codes are in the notes (or `backend/docs/api/approvals.md`).
 - **Done in:** —
 - **Backend notes:** —
