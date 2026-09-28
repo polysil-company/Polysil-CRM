@@ -37,6 +37,9 @@ TEMPLATE_LEAD_VERIFY: Final = "lead.verify"
 TEMPLATE_ORDER_CONFIRMED: Final = "order.confirmed"
 TEMPLATE_APPROVAL_WAITING: Final = "approval.waiting"
 TEMPLATE_ORDER_DECIDED: Final = "order.decided"
+# FS-015: the complainant's two messages, switched on the same way (GAP-153)
+TEMPLATE_COMPLAINT_REGISTERED: Final = "complaint.registered"
+TEMPLATE_COMPLAINT_UPDATED: Final = "complaint.updated"
 PAYLOAD_TEMPLATE_KEY: Final = "_template"
 
 # FS-007 rule 16: the channel the sign-in code goes out on, a deployment constant
@@ -78,6 +81,10 @@ TEMPLATES: Final[dict[str, TemplateSpec]] = {
                                                    "total"), None, timedelta(hours=24)),
     TEMPLATE_ORDER_DECIDED: TemplateSpec(None, ("owner_name", "order_no", "party_name",
                                                 "outcome"), None, timedelta(hours=24)),
+    TEMPLATE_COMPLAINT_REGISTERED: TemplateSpec(None, ("contact_name", "complaint_no"), None,
+                                                timedelta(hours=24)),
+    TEMPLATE_COMPLAINT_UPDATED: TemplateSpec(None, ("contact_name", "complaint_no", "status"), None,
+                                             timedelta(hours=24)),
     TEMPLATE_QUOTATION_SHARE: TemplateSpec("whatsapp_template_quotation_share",
                                            ("party_name", "quote_no", "link"), None,
                                            timedelta(days=7)),
@@ -113,6 +120,14 @@ _BODIES: Final[dict[str, str]] = {
     TEMPLATE_ORDER_DECIDED: (
         "Hello {owner_name}, order {order_no} for {party_name} has been {outcome}. "
         "Please check the Polysil CRM for details."
+    ),
+    TEMPLATE_COMPLAINT_REGISTERED: (
+        "Hello {contact_name}, your complaint {complaint_no} is registered with Polysil "
+        "Irrigation. We will keep you informed."
+    ),
+    TEMPLATE_COMPLAINT_UPDATED: (
+        "Hello {contact_name}, your complaint {complaint_no} has been {status}. "
+        "We will keep you informed."
     ),
 }
 

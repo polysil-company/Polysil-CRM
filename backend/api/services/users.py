@@ -192,6 +192,14 @@ async def _force_admin_floor(db: AsyncSession) -> None:
         raise
 
 
+async def _open_tasks(db: AsyncSession, user_id: str) -> int:
+    """FS-014 rule 9b: counted by a definer, since the caller's own tasks scope
+    need not reach the person."""
+    n: int = (await db.execute(text("SELECT user_open_tasks(CAST(:u AS uuid))"),
+                               {"u": user_id})).scalar_one()
+    return n
+
+
 async def _open_leads(db: AsyncSession, ids: list[str]) -> dict[str, int]:
     """Unscoped counts through the definer (rule 12); users.view is its guard."""
     if not ids:
@@ -664,6 +672,9 @@ async def patch_user(db: AsyncSession, caller: Caller, user_id: str,
     active_change: str | None = None
     if "is_active" in fields and body.is_active is not None and body.is_active != row.is_active:
         if not body.is_active:
+            if staff and await _open_tasks(db, user_id):
+                raise ValidationFailed(
+                    fields={"is_active": "hand over their open tasks first"})
             changed["sessions_revoked"] = revoked_early   # revoked above, before the lock
             active_change = "user.deactivated"
         else:
@@ -754,8 +765,9 @@ async def unlock(db: AsyncSession, caller: Caller, user_id: str) -> UnlockResult
 async def handover(db: AsyncSession, caller: Caller, user_id: str,
                    body: HandoverRequest) -> HandoverResult:
     """Move the leaver's open leads to someone who can work them (rule 11), at most
-    500 per call, one `lead.assigned` event each; optionally deactivate the leaver
-    once nothing remains. Both people are locked first, in id order (rule 20)."""
+    500 per call, one `lead.assigned` event each, and all their open tasks (FS-014
+    rule 9b); optionally deactivate the leaver once nothing remains. Both people are
+    locked first, in id order (rule 20)."""
     _refuse_principal(user_id)
     _refuse_principal(body.to_user_id, "to_user_id")
     if body.to_user_id == user_id:
@@ -804,6 +816,13 @@ async def handover(db: AsyncSession, caller: Caller, user_id: str,
                                   previous_owner_user_id=user_id, handover=True)
         await leads_service._rescore(db, lid)
 
+    # FS-014 rule 9b: every open task goes with this call, one task.reassigned each
+    tasks_moved = 0
+    if leaver.user_type == "staff":
+        tasks_moved = (await db.execute(text(
+            "SELECT user_tasks_handover(CAST(:f AS uuid), CAST(:t AS uuid))"),
+            {"f": user_id, "t": body.to_user_id})).scalar_one()
+
     remaining = (await _open_leads(db, [user_id])).get(user_id, 0)
     deactivated = False
     if body.deactivate:
@@ -819,13 +838,16 @@ async def handover(db: AsyncSession, caller: Caller, user_id: str,
             await _force_admin_floor(db)
         deactivated = True
     await _emit(db, user_id=user_id, kind="user.handover", actor_id=caller.user_id,
-                to_user_id=body.to_user_id, leads_moved=len(lead_ids), remaining=remaining)
-    return HandoverResult(leads_moved=len(lead_ids), remaining=remaining, deactivated=deactivated)
+                to_user_id=body.to_user_id, leads_moved=len(lead_ids), remaining=remaining,
+                tasks_moved=tasks_moved)
+    return HandoverResult(leads_moved=len(lead_ids), remaining=remaining,
+                          tasks_moved=tasks_moved, deactivated=deactivated)
 
 
 async def delete_user(db: AsyncSession, caller: Caller, user_id: str) -> None:
-    """Soft delete (users.delete). Refused while they own an open lead, for the
-    caller's own row, the last administrator and the principal. A repeat is a no-op."""
+    """Soft delete (users.delete). Refused while they own an open lead or hold an
+    open task, for the caller's own row, the last administrator and the principal.
+    A repeat is a no-op."""
     _refuse_principal(user_id)
     if user_id == caller.user_id:
         raise ValidationFailed(fields={"id": "you cannot delete yourself"})
@@ -849,6 +871,8 @@ async def delete_user(db: AsyncSession, caller: Caller, user_id: str) -> None:
         if row.user_type == "staff" else 0
     if open_leads > 0:
         raise ValidationFailed(fields={"open_leads": "hand over their open leads first"})
+    if row.user_type == "staff" and await _open_tasks(db, user_id):
+        raise ValidationFailed(fields={"open_tasks": "hand over their open tasks first"})
     await _execute_mapped(db, text(
         "UPDATE app_user SET deleted_at = now(), is_active = false, "
         "updated_by = CAST(:me AS uuid) WHERE id = CAST(:id AS uuid)"),

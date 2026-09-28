@@ -164,6 +164,19 @@ class LeadStats(BaseModel):
                     "as on the list.")
     by_priority: dict[str, int] = Field(description="hot, warm and cold.")
     unassigned: int = Field(description="Leads with no owner: the assignment queue.")
+    by_source: dict[str, int] = Field(
+        description="Lead source code (GET /lookups/lead-sources) to count; every source, "
+                    "switched-off ones included, 0 when empty.")
+    by_inquiry_type: dict[str, int] = Field(
+        description="commercial, subsidised and industrial, 0 when empty.")
+    follow_ups_due_today: int | None = Field(
+        default=None,
+        description="Open tasks (calls, visits, meetings, follow-ups) on these leads, due today "
+                    "(IST), that you can see. Null when you hold no tasks permission (dealers).")
+    follow_ups_overdue: int | None = Field(
+        default=None,
+        description="Open tasks on these leads due before today (IST), up to 90 days back, as the "
+                    "planner counts them. Null when you hold no tasks permission.")
 
 
 class LeadPage(BaseModel):

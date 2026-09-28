@@ -6,9 +6,12 @@ dev box only, where its "presigned" URL is one the API signs itself and serves
 from disk; settings refuse it anywhere else, because user media on the database
 volume means a full disk takes the database with it.
 
-Nothing here runs inside a database transaction. The worker renders and uploads
-between two short transactions (the lease and its completion), and the API only
-ever hands out a URL.
+Nothing here runs inside a database transaction, with one exception: a complaint
+attachment is written inside its request (ADR-041), through the bounded client
+(`get_storage(..., bounded=True)`: connect 3 s, read 10 s without progress, no
+retries), so a slow bucket holds a pooled connection for seconds, not a minute
+(ISS-103). The worker renders and uploads between two short transactions (the
+lease and its completion).
 """
 
 from __future__ import annotations
@@ -36,7 +39,8 @@ class Storage(Protocol):
 
     def put(self, key: str, data: bytes, content_type: str) -> None: ...
     def get(self, key: str) -> tuple[bytes, str]: ...
-    def presign_get(self, key: str, *, filename: str) -> tuple[str, dt.datetime]: ...
+    def presign_get(self, key: str, *, filename: str,
+                    disposition: str = "inline") -> tuple[str, dt.datetime]: ...
     def probe(self) -> str | None:
         """None when the store answers; otherwise one line saying why not. Logged at
         startup, never raised: a broken bucket fails render jobs with a recorded
@@ -93,7 +97,8 @@ class LocalStorage:
             return None
         return key if expires > now else None
 
-    def presign_get(self, key: str, *, filename: str) -> tuple[str, dt.datetime]:
+    def presign_get(self, key: str, *, filename: str,
+                    disposition: str = "inline") -> tuple[str, dt.datetime]:
         expires = dt.datetime.now(tz=dt.UTC) + PRESIGN_TTL
         sig = self.sign(key, expires)
         return f"{self.public_base}/public/files/{sig}?name={quote(filename)}", expires
@@ -124,12 +129,13 @@ class R2Storage:
         obj = self.client.get_object(Bucket=self.bucket, Key=key)
         return obj["Body"].read(), str(obj.get("ContentType") or "application/pdf")
 
-    def presign_get(self, key: str, *, filename: str) -> tuple[str, dt.datetime]:
+    def presign_get(self, key: str, *, filename: str,
+                    disposition: str = "inline") -> tuple[str, dt.datetime]:
         expires = dt.datetime.now(tz=dt.UTC) + PRESIGN_TTL
         url = self.client.generate_presigned_url(
             "get_object",
             Params={"Bucket": self.bucket, "Key": key,
-                    "ResponseContentDisposition": f'inline; filename="{filename}"'},
+                    "ResponseContentDisposition": f'{disposition}; filename="{filename}"'},
             ExpiresIn=int(PRESIGN_TTL.total_seconds()))
         return str(url), expires
 
@@ -157,16 +163,19 @@ class UnconfiguredStorage:
     def get(self, key: str) -> tuple[bytes, str]:
         raise RuntimeError(self.reason)
 
-    def presign_get(self, key: str, *, filename: str) -> tuple[str, dt.datetime]:
+    def presign_get(self, key: str, *, filename: str,
+                    disposition: str = "inline") -> tuple[str, dt.datetime]:
         raise RuntimeError(self.reason)
 
     def probe(self) -> str | None:
         return self.reason
 
 
-def get_storage(settings: Settings) -> Storage:
+def get_storage(settings: Settings, *, bounded: bool = False) -> Storage:
     """R2 when it is configured, the directory on the dev box, and otherwise an
-    adapter that refuses every call with the reason."""
+    adapter that refuses every call with the reason. `bounded` is for writes inside
+    a request (ADR-041): shorter timeouts and no retries, so the caller answers 503
+    rather than waiting."""
     if not settings.storage_configured:
         return UnconfiguredStorage()
     if settings.r2_endpoint:
@@ -178,7 +187,9 @@ def get_storage(settings: Settings) -> Storage:
             aws_access_key_id=settings.r2_access_key_id,
             aws_secret_access_key=(settings.r2_secret_access_key.get_secret_value()
                                    if settings.r2_secret_access_key else None),
-            config=Config(connect_timeout=5, read_timeout=30, retries={"max_attempts": 2}))
+            config=(Config(connect_timeout=3, read_timeout=10, retries={"max_attempts": 0})
+                    if bounded else
+                    Config(connect_timeout=5, read_timeout=30, retries={"max_attempts": 2})))
         return R2Storage(client=client, bucket=str(settings.r2_bucket))
     root = pathlib.Path(settings.storage_dir)
     if not root.is_absolute():

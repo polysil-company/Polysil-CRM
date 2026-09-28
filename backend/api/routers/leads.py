@@ -583,6 +583,54 @@ async def edit_mis_system(item_id: ItemId, body: LookupUpdate, db: DbSession, cl
     return await _update(db, claims, idem, "mis-systems", "mis_system", item_id, body)
 
 
+@lookups.get("/meeting-types", response_model=Envelope[list[LookupItem]], responses=_ERRORS)
+async def meeting_types(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
+    """The meeting types a meeting on a lead is one of (FS-014): By call, Survey &
+    Design, C & D understanding, Won or wait, Follow-up, and any an admin added.
+    Switched-off types come back with `is_active` false: show active ones only."""
+    return Envelope(data=await service.list_meeting_types(db))
+
+
+@lookups.post("/meeting-types", response_model=Envelope[LookupItem],
+              status_code=status.HTTP_201_CREATED, responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def add_meeting_type(body: LookupCreate, db: DbSession, claims: Claims,
+                           idem: IdemKey) -> JSONResponse:
+    """Add a meeting type."""
+    return await _create(db, claims, idem, "meeting-types", "meeting_type", body)
+
+
+@lookups.patch("/meeting-types/{item_id}", response_model=Envelope[LookupItem],
+               responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def edit_meeting_type(item_id: ItemId, body: LookupUpdate, db: DbSession, claims: Claims,
+                            idem: IdemKey) -> JSONResponse:
+    """Switch a meeting type on or off, or reorder it."""
+    return await _update(db, claims, idem, "meeting-types", "meeting_type", item_id, body)
+
+
+@lookups.get("/complaint-types", response_model=Envelope[list[LookupItem]], responses=_ERRORS)
+async def complaint_types(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
+    """The complaint types (FS-015): Short Material, Dripline / Lateral / PVC,
+    Components, OEM's Components, Material Handling, and any an admin added.
+    Switched-off types come back with `is_active` false: show active ones only."""
+    return Envelope(data=await service.list_complaint_types(db))
+
+
+@lookups.post("/complaint-types", response_model=Envelope[LookupItem],
+              status_code=status.HTTP_201_CREATED, responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def add_complaint_type(body: LookupCreate, db: DbSession, claims: Claims,
+                             idem: IdemKey) -> JSONResponse:
+    """Add a complaint type."""
+    return await _create(db, claims, idem, "complaint-types", "complaint_type", body)
+
+
+@lookups.patch("/complaint-types/{item_id}", response_model=Envelope[LookupItem],
+               responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def edit_complaint_type(item_id: ItemId, body: LookupUpdate, db: DbSession, claims: Claims,
+                              idem: IdemKey) -> JSONResponse:
+    """Switch a complaint type on or off, or reorder it."""
+    return await _update(db, claims, idem, "complaint-types", "complaint_type", item_id, body)
+
+
 @lookups.get("/scoring", response_model=Envelope[list[ScoringItem]], responses=_ERRORS)
 async def get_scoring(db: DbSession, _: Claims) -> Envelope[list[ScoringItem]]:
     """The priority-score weights, caps and thresholds. Readable by anyone signed

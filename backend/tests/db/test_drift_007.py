@@ -54,6 +54,13 @@ def _statements() -> dict[str, str]:
             match = _HEAD.search(stmt)
             assert match and match.group(1) in out, stmt[:80]
             out[match.group(1)] = stmt
+    # 018 extends both to tasks (FS-014); its text is the live one
+    m18 = _load("018_tasks_planner")
+    if m18 is not None:
+        for stmt in m18._after():
+            match = _HEAD.search(stmt)
+            if match and match.group(1) in out:
+                out[match.group(1)] = stmt
     return out
 
 

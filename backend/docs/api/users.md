@@ -410,6 +410,7 @@ failed attempts stay on record. A partner user has nothing to unlock
 |---|---|---|---|
 | `leads_moved` | integer | yes | Open leads moved by this call, at most 500. |
 | `remaining` | integer | yes | Open leads the leaver still owns. Repeat the call with a new Idempotency-Key until it is 0. |
+| `tasks_moved` | integer |  | Open tasks moved. All of them go on every call. Default `0`. |
 | `deactivated` | boolean | yes |  |
 
 **`OrgUnitRef`**

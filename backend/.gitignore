@@ -28,3 +28,6 @@ infra/.staging-password
 
 # the shared-repo push script and its clone; never committed, never snapshotted
 scripts/local/
+
+# the dev box's local file store (LocalStorage): PDFs and complaint uploads
+infra/storage/

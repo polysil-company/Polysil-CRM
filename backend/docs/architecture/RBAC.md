@@ -314,6 +314,7 @@ BEGIN
     WHEN 'quotation' THEN
       UPDATE quotation SET status = p_status
        WHERE id = p_entity_id AND status = 'sent';
+    -- complaints are not on the engine (ADR-042); this arm is historical
     WHEN 'complaint' THEN
       UPDATE complaint SET status = p_status
        WHERE id = p_entity_id AND status = 'under_review';
@@ -402,7 +403,7 @@ The first version passed `'approved'` / `'rejected'` straight through to the doc
 |---|---|---|
 | `sales_order` | `submitted` → **`approved`** | `submitted` → **`draft`** — back to the raiser (ADR-031) |
 | `quotation` | **no status change** — approval gates the *send action* | `draft` → stays `draft`, the request is what carries the rejection |
-| `complaint` | `under_review` → **`under_qc`** | `under_review` → **`draft`** |
+| `complaint` | not on the engine: ADR-042. `complaint_check()` moves `submitted` → **`under_qc`** | a return moves `submitted` → **`draft`** (FS-015) |
 
 The quotation row is the one worth pausing on. What gets approved there is a **discount above threshold**, not the document — so approval does not move the quotation, it unblocks sending it. `POST /quotations/{id}/send` checks there is no pending approval request; that is the gate.
 
@@ -419,6 +420,7 @@ BEGIN
        WHERE id = p_entity_id AND status = 'submitted';
     WHEN 'quotation' THEN
       NULL;                       -- deliberate: approval gates sending, not state
+    -- complaints are not on the engine (ADR-042); this arm is historical
     WHEN 'complaint' THEN
       UPDATE complaint
          SET status = CASE p_outcome WHEN 'approve' THEN 'under_qc'::complaint_status

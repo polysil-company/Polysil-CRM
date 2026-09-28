@@ -36,7 +36,10 @@ PORTAL_REMARK: Final = "Returned for changes; your contact at Polysil will expla
 _DECIDER_KINDS: Final = frozenset({"order.returned", "order.approved",
                                     # FS-013: the discount's decision is internal too
                                     "quotation.approval_approved",
-                                    "quotation.approval_returned"})
+                                    "quotation.approval_returned",
+                                    # FS-015: the check and the QC verdict (question 15.14's rule)
+                                    "complaint.returned", "complaint.approved",
+                                    "complaint.qc_approved", "complaint.qc_rejected"})
 
 
 def actor_hidden_from_partner(kind: str) -> bool:

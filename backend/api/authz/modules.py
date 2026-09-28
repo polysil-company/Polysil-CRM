@@ -88,4 +88,33 @@ SPECS: dict[str, ScopeSpec] = {
         parents={"lead_id": "lead", "territory_id": "territory",
                  "owner_org_unit_id": "org_unit", "partner_id": "channel_partner"},
     ),
+    # FS-014: a task is its assignee's (own) and sits under the assignee's office
+    # (org_subtree), which is where a manager and the assigner read it (ADR-034
+    # assigns only downwards). No partner branch: portal roles hold no tasks (RBAC
+    # 6.3, GAP-141). No soft delete: a task is cancelled, never deleted. The three
+    # links are parents, so a caller cannot hang a task off something they cannot see.
+    "tasks": ScopeSpec(
+        module="tasks",
+        table="task",
+        own="assigned_to",
+        org_subtree="owner_org_unit_id",
+        soft_delete=None,
+        parents={"lead_id": "lead", "partner_id": "channel_partner",
+                 "sales_order_id": "sales_order", "owner_org_unit_id": "org_unit"},
+    ),
+    # FS-015: the officer responsible (own), the owning office (org_subtree) and the
+    # dealer involved (partner_subtree), all set at create and following nothing
+    # (GAP-152). No territory branch: no role holds complaints at territory scope.
+    # The links are parents, so nobody raises a complaint on something they cannot
+    # see.
+    "complaints": ScopeSpec(
+        module="complaints",
+        table="complaint",
+        own="owner_user_id",
+        org_subtree="owner_org_unit_id",
+        partner_subtree="partner_id",
+        parents={"lead_id": "lead", "sales_order_id": "sales_order",
+                 "partner_id": "channel_partner", "owner_org_unit_id": "org_unit",
+                 "territory_id": "territory"},
+    ),
 }

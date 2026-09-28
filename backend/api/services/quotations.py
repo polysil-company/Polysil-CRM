@@ -734,6 +734,9 @@ async def timeline(db: AsyncSession, quotation_id: str, *, limit: int = 100,
             if remark:
                 payload["remark"] = remark
         hidden = portal and order_domain.actor_hidden_from_partner(r.kind)
+        if hidden:
+            # the decider's name rides in the payload too (FS-015 code review F-1)
+            payload = {k: v for k, v in payload.items() if k != "actor_name"}
         actor = (UserRef(id=str(r.actor_id), full_name=payload.get("actor_name") or "")
                  if r.actor_id is not None and not hidden else None)
         events.append(TimelineEvent(id=str(r.id), kind=r.kind,

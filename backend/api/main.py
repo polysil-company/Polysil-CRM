@@ -27,6 +27,7 @@ from api.errors import (
 )
 from api.routers import (
     auth,
+    complaints,
     lead_qr,
     leads,
     masters,
@@ -36,8 +37,10 @@ from api.routers import (
     public,
     quotations,
     subsidy,
+    tasks,
     users,
 )
+from api.upload_limit import BodyTooLarge, UploadLimit, body_too_large_handler
 
 log = structlog.get_logger()
 
@@ -65,6 +68,12 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         lifespan=lifespan,
     )
+
+    # FS-015 rule 10: the attachment size cap, before the form is read. Added first,
+    # so it sits innermost, next to the router: outside request_context (a
+    # BaseHTTPMiddleware, which reads through its own task group) the raised
+    # BodyTooLarge reached FastAPI wrapped and came back a 400 (executed).
+    app.add_middleware(UploadLimit)
 
     @app.middleware("http")
     async def request_context(
@@ -145,6 +154,7 @@ def create_app() -> FastAPI:
     # And everything else, so a 500 is the envelope too rather than Starlette's
     # plain-text default (ISS-072). The body carries no detail.
     app.add_exception_handler(Exception, internal_error_handler)
+    app.add_exception_handler(BodyTooLarge, body_too_large_handler)
 
     # Base path is /api/v1. The version is in the path rather than a header so a
     # breaking change can run alongside its predecessor (ADR-028).
@@ -166,6 +176,11 @@ def create_app() -> FastAPI:
     app.include_router(orders.router, prefix=API_PREFIX)
     app.include_router(orders.approvals, prefix=API_PREFIX)
     app.include_router(orders.dispatches, prefix=API_PREFIX)
+    app.include_router(tasks.router, prefix=API_PREFIX)
+    app.include_router(tasks.planner, prefix=API_PREFIX)
+    app.include_router(tasks.minutes, prefix=API_PREFIX)
+    app.include_router(complaints.router, prefix=API_PREFIX)
+    app.include_router(complaints.policies, prefix=API_PREFIX)
     # The farmer's link: /public, not /api/v1. No session, two definer functions
     # on app_anon, and a file route the local storage adapter alone uses (FS-005 4).
     app.include_router(public.router)

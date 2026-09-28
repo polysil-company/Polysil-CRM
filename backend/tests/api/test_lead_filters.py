@@ -107,3 +107,55 @@ async def test_the_counts_match_the_list_under_the_same_filter(
                              params={"territory_id": shop.state})).json()
     mine = mine.get("data", mine)
     assert mine["total"] == 2 and mine["unassigned"] == 0, "a field officer counts only their own"
+
+
+async def test_stats_count_sources_types_and_follow_ups(
+        client: httpx.AsyncClient, shop: Shop, sessions: Callable[[], AsyncSession]) -> None:
+    """BE-007 and BE-002: by source and by inquiry type over the same scope, and the
+    open tasks on those leads due today and overdue, by the planner's IST days."""
+    s = sessions()
+    tag = uuid.uuid4().hex[:8]
+    leads = []
+    try:
+        for i, (source, kind) in enumerate((("employee", "commercial"), ("employee", "subsidised"),
+                                            ("website", "commercial"))):
+            leads.append(str((await s.execute(text(
+                "INSERT INTO lead (inquiry_no, inquiry_type, mis_system_id, lead_source_id, farmer_name, "
+                "mobile, territory_id, owner_user_id, owner_org_unit_id, created_by) "
+                "VALUES (:no, CAST(:k AS inquiry_type), (SELECT id FROM mis_system WHERE code = 'drip'), "
+                "(SELECT id FROM lead_source WHERE code = :src), 'Stats Farmer', :mob, CAST(:t AS uuid), "
+                "CAST(:o AS uuid), CAST(:ou AS uuid), CAST(:o AS uuid)) RETURNING id"),
+                {"no": f"STATS-{tag}-{i}", "k": kind, "src": source,
+                 "mob": "+9197" + f"{uuid.uuid4().int % 10**8:08d}", "t": shop.district,
+                 "o": shop.ids["field_officer"], "ou": shop.office})).scalar_one()))
+        fo = shop.ids["field_officer"]
+        # due today (late evening IST), overdue by two days, tomorrow, and a done one today
+        for lead, due, status in ((leads[0], "today 23:00", "open"), (leads[1], "-2 days", "open"),
+                                  (leads[2], "+1 day", "open"), (leads[2], "today 23:00", "done")):
+            await s.execute(text(
+                "INSERT INTO task (title, task_type, status, due_at, assigned_to, assigned_by, "
+                "owner_org_unit_id, lead_id, completed_at, outcome) VALUES ('Call', 'followup', "
+                "CAST(:st AS task_status), CASE :due "
+                "  WHEN 'today 23:00' THEN (date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') + interval '23 hours') AT TIME ZONE 'Asia/Kolkata' "
+                "  WHEN '-2 days' THEN now() - interval '2 days' ELSE now() + interval '1 day' END, "
+                "CAST(:fo AS uuid), CAST(:fo AS uuid), CAST(:ou AS uuid), CAST(:l AS uuid), "
+                "CASE WHEN :st = 'done' THEN now() END, CASE WHEN :st = 'done' THEN 'Spoke' END)"),
+                {"st": status, "due": due, "fo": fo, "ou": shop.office, "l": lead})
+        await s.commit()
+    finally:
+        await s.close()
+
+    h = await endpoints._as(client, shop, "field_officer")
+    got = (await client.get(f"{V1}/leads/stats", headers=h, params={"territory_id": shop.state})).json()
+    got = got.get("data", got)
+    assert got["total"] == 3
+    assert got["by_source"]["employee"] == 2 and got["by_source"]["website"] == 1
+    assert all(v == 0 for k, v in got["by_source"].items() if k not in ("employee", "website")), \
+        "every source is present, 0 when empty"
+    assert got["by_inquiry_type"] == {"commercial": 2, "subsidised": 1, "industrial": 0}
+    assert got["follow_ups_due_today"] == 1, "the open one today; not the done one, not tomorrow's"
+    assert got["follow_ups_overdue"] == 1
+    narrowed = (await client.get(f"{V1}/leads/stats", headers=h,
+                                 params={"territory_id": shop.state, "stage": "new"})).json()
+    narrowed = narrowed.get("data", narrowed)
+    assert narrowed["follow_ups_due_today"] <= got["follow_ups_due_today"], "the same filters apply"

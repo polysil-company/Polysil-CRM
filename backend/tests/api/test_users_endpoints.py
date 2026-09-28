@@ -331,14 +331,16 @@ async def test_handover_moves_open_leads_and_can_deactivate_the_leaver(
     r = await client.post(f"{V1}/users/{leaver['id']}/handover",
                           json={"to_user_id": target["id"]}, headers={**h, **key})
     assert r.status_code == 200, r.text
-    assert r.json()["data"] == {"leads_moved": 1, "remaining": 1, "deactivated": False}
+    assert r.json()["data"] == {"leads_moved": 1, "remaining": 1, "tasks_moved": 0,
+                                  "deactivated": False}
     replay = await client.post(f"{V1}/users/{leaver['id']}/handover",
                                json={"to_user_id": target["id"]}, headers={**h, **key})
     assert replay.json() == r.json()   # the same key moves nothing more
     monkeypatch.setattr(users_service, "HANDOVER_BATCH", 500)
     r = await client.post(f"{V1}/users/{leaver['id']}/handover",
                           json={"to_user_id": target["id"]}, headers={**h, **_key()})
-    assert r.json()["data"] == {"leads_moved": 1, "remaining": 0, "deactivated": False}
+    assert r.json()["data"] == {"leads_moved": 1, "remaining": 0, "tasks_moved": 0,
+                                  "deactivated": False}
     owned = await client.get(f"{V1}/leads", params={"owner_user_id": target["id"]}, headers=h)
     assert {x["id"] for x in owned.json()["data"]} == set(leads[:2])
     timeline = await client.get(f"{V1}/leads/{leads[0]}/timeline", headers=h)
@@ -349,7 +351,8 @@ async def test_handover_moves_open_leads_and_can_deactivate_the_leaver(
                              json={"to_user_id": target["id"], "deactivate": True},
                              headers={**h, **_key()})
     assert done.status_code == 200, done.text
-    assert done.json()["data"] == {"leads_moved": 0, "remaining": 0, "deactivated": True}
+    assert done.json()["data"] == {"leads_moved": 0, "remaining": 0, "tasks_moved": 0,
+                                     "deactivated": True}
     assert (await client.get(f"{V1}/users/{leaver['id']}", headers=h)
             ).json()["data"]["is_active"] is False
 

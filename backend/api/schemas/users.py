@@ -179,6 +179,8 @@ class HandoverResult(BaseModel):
     remaining: int = Field(
         description="Open leads the leaver still owns. Repeat the call with a new "
         "Idempotency-Key until it is 0.")
+    tasks_moved: int = Field(default=0, description="Open tasks moved. All of them go on "
+                             "every call.")
     deactivated: bool
 
 

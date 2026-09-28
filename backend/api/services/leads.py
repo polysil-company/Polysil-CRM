@@ -28,6 +28,7 @@ from api.authz.modules import SPECS
 from api.authz.predicate import Caller, scope_predicate
 from api.config import get_settings
 from api.domain import leads as domain
+from api.domain import tasks as task_domain
 from api.domain.orders import actor_hidden_from_partner
 from api.errors import ForbiddenError, NotFoundError, StageChangedError, ValidationFailed
 from api.integrations.messages import TEMPLATE_LEAD_ACK
@@ -66,6 +67,7 @@ from api.schemas.leads import (
     UserRef,
 )
 from api.services import people
+from api.services.clock import today_ist
 
 _LEADS = SPECS["leads"]
 
@@ -650,6 +652,10 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
         actor = None
         # question 15.14: a partner never learns which approver decided an order
         hidden = caller.partner_id is not None and actor_hidden_from_partner(r.kind)
+        if hidden and isinstance(payload, dict):
+            # the name travels in the payload too; hiding `actor` alone left it there
+            # (FS-015 code review F-1, executed)
+            payload = {k: v for k, v in payload.items() if k != "actor_name"}
         if r.actor_id is not None and not hidden:
             actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name") or "")
         events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso_req(r.occurred_at),
@@ -1010,6 +1016,8 @@ _LOOKUP_COLS: dict[str, frozenset[str]] = {
     "lead_source": frozenset({"sort_order", "quality"}),
     "mis_system": frozenset(),
     "won_lost_reason": frozenset({"sort_order", "kind"}),
+    "meeting_type": frozenset({"sort_order"}),  # FS-014
+    "complaint_type": frozenset({"sort_order"}),  # FS-015
 }
 
 
@@ -1254,14 +1262,22 @@ async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) ->
     where = await _lead_filters(db, caller, **filters)
     stage = sa.cast(lead_t.c.stage, sa.Text)
     priority = sa.cast(lead_t.c.priority, sa.Text)
+    inquiry = sa.cast(lead_t.c.inquiry_type, sa.Text)
     rows = (await db.execute(
         sa.select(stage.label("stage"), priority.label("priority"),
                   (lead_t.c.owner_user_id.is_(None)).label("unassigned"),
+                  lead_t.c.lead_source_id.label("source_id"), inquiry.label("inquiry"),
                   sa.func.count().label("n"))
         .select_from(lead_t).where(sa.and_(*where))
-        .group_by(stage, priority, lead_t.c.owner_user_id.is_(None)))).all()
+        .group_by(stage, priority, lead_t.c.owner_user_id.is_(None),
+                  lead_t.c.lead_source_id, inquiry))).all()
+    sources = {str(r.id): r.code for r in (await db.execute(text(
+        "SELECT id, code::text AS code FROM lead_source WHERE deleted_at IS NULL "
+        "ORDER BY sort_order, code"))).all()}
     by_stage = dict.fromkeys(domain.STAGES, 0)
     by_priority = dict.fromkeys(_PRIORITIES, 0)
+    by_source = dict.fromkeys(sources.values(), 0)
+    by_inquiry_type = dict.fromkeys(_INQUIRY_TYPES, 0)
     unassigned = total = 0
     for r in rows:
         total += r.n
@@ -1270,8 +1286,43 @@ async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) ->
             by_priority[r.priority] = by_priority.get(r.priority, 0) + r.n
         if r.unassigned:
             unassigned += r.n
+        code = sources.get(str(r.source_id))
+        if code is not None:
+            by_source[code] += r.n
+        if r.inquiry:
+            by_inquiry_type[r.inquiry] = by_inquiry_type.get(r.inquiry, 0) + r.n
+    due_today, overdue = await _follow_ups(db, caller, where)
     return LeadStats(total=total, by_stage=by_stage, by_priority=by_priority,
-                     unassigned=unassigned)
+                     unassigned=unassigned, by_source=by_source,
+                     by_inquiry_type=by_inquiry_type, follow_ups_due_today=due_today,
+                     follow_ups_overdue=overdue)
+
+
+_INQUIRY_TYPES = ("commercial", "subsidised", "industrial")
+
+
+async def _follow_ups(db: AsyncSession, caller: Caller, where: list[Any]
+                      ) -> tuple[int | None, int | None]:
+    """Open tasks on the filtered leads (FS-014), under the tasks policies: due today
+    and overdue by the planner's own IST windows. None without a tasks scope, so a
+    dealer's dashboard shows no figure rather than a false zero (BE-002, BE-007)."""
+    if "tasks" not in caller.scopes:
+        return None, None
+    today = today_ist()
+    start, end = task_domain.day_bounds(today)
+    window = task_domain.overdue_window(today, today)
+    assert window is not None
+    leads = sa.select(lead_t.c.id).where(sa.and_(*where))
+    task_t = sa.table("task", sa.column("lead_id", _UUID), sa.column("status"),
+                      sa.column("due_at", sa.DateTime(timezone=True)))
+    open_ = sa.cast(task_t.c.status, sa.Text) == "open"
+    row = (await db.execute(sa.select(
+        sa.func.count().filter(sa.and_(task_t.c.due_at >= start, task_t.c.due_at < end)),
+        sa.func.count().filter(sa.and_(task_t.c.due_at >= window[0],
+                                       task_t.c.due_at < window[1])))
+        .select_from(task_t)
+        .where(open_, task_t.c.lead_id.in_(leads.scalar_subquery())))).one()
+    return int(row[0]), int(row[1])
 
 
 def _under(closure: str, ancestor: str) -> Any:
@@ -1327,6 +1378,24 @@ async def list_mis_systems(db: AsyncSession) -> list[LookupItem]:
     rows = (await db.execute(text(
         "SELECT id, code, name, is_active FROM mis_system "
         "WHERE deleted_at IS NULL ORDER BY name"))).all()
+    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
+            for r in rows]
+
+
+async def list_meeting_types(db: AsyncSession) -> list[LookupItem]:
+    """FS-014: switched-off types included with `is_active` false, as for lost reasons."""
+    rows = (await db.execute(text(
+        "SELECT id, code, name, is_active FROM meeting_type "
+        "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
+    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
+            for r in rows]
+
+
+async def list_complaint_types(db: AsyncSession) -> list[LookupItem]:
+    """FS-015: switched-off types included with `is_active` false."""
+    rows = (await db.execute(text(
+        "SELECT id, code, name, is_active FROM complaint_type "
+        "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
     return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
             for r in rows]
 

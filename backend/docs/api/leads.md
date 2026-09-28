@@ -193,7 +193,7 @@ other scopes. Names and org units only, no contact details.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `Envelope_list_Assignee__` | Successful Response |
+| `200` | `api__schemas__auth__Envelope_list_Assignee____1` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
@@ -625,14 +625,6 @@ with the current stage in `fields.stage`.
 
 ## Models
 
-**`Assignee`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `full_name` | string | yes |  |
-| `org_unit` | OrgUnitRef \| null |  |  |
-
 **`DismissResult`**
 
 | Field | Type | Required | Notes |
@@ -693,12 +685,6 @@ with the current stage in `fields.stage`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | TimelineEvent | yes |  |
-
-**`Envelope_list_Assignee__`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `data` | Assignee[] | yes |  |
 
 **`ErrorBody`**
 
@@ -814,6 +800,10 @@ with the current stage in `fields.stage`.
 | `by_stage` | object | yes | Every stage. merged is 0 unless the stage filter asks for it, as on the list. |
 | `by_priority` | object | yes | hot, warm and cold. |
 | `unassigned` | integer | yes | Leads with no owner: the assignment queue. |
+| `by_source` | object | yes | Lead source code (GET /lookups/lead-sources) to count; every source, switched-off ones included, 0 when empty. |
+| `by_inquiry_type` | object | yes | commercial, subsidised and industrial, 0 when empty. |
+| `follow_ups_due_today` | integer \| null |  | Open tasks (calls, visits, meetings, follow-ups) on these leads, due today (IST), that you can see. Null when you hold no tasks permission (dealers). |
+| `follow_ups_overdue` | integer \| null |  | Open tasks on these leads due before today (IST), up to 90 days back, as the planner counts them. Null when you hold no tasks permission. |
 
 **`LeadTransition`**
 
@@ -916,6 +906,20 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
+
+**`api__schemas__auth__Envelope_list_Assignee____1`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | api__schemas__leads__Assignee[] | yes |  |
+
+**`api__schemas__leads__Assignee`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+| `org_unit` | OrgUnitRef \| null |  |  |
 
 **`api__schemas__leads__PartnerRef`**
 
