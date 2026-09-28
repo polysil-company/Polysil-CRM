@@ -38,6 +38,14 @@ const timeOnly = new Intl.DateTimeFormat("en-IN", {
 
 const yearOnly = new Intl.DateTimeFormat("en-IN", { timeZone: APP_TIME_ZONE, year: "numeric" });
 
+/** en-CA writes dates as YYYY-MM-DD, the API's calendar-date format. */
+const isoDay = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 const relative = new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" });
 
 export type DateInput = string | Date | null | undefined;
@@ -77,6 +85,14 @@ export function formatDateTime(value: DateInput): string {
 export function formatTime(value: DateInput): string {
   const date = toDate(value);
   return date ? timeOnly.format(date) : EMPTY_VALUE;
+}
+
+/**
+ * Today's calendar date in India as "YYYY-MM-DD" — the form the API uses for dates such as a
+ * quotation's `valid_until`, so the two compare as strings.
+ */
+export function todayInIndia(now: Date = new Date()): string {
+  return isoDay.format(now);
 }
 
 /** True when both fall on the same calendar day in India. */

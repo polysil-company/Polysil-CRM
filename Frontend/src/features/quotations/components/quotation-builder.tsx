@@ -604,6 +604,16 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
                 . Above it, the quotation needs a manager&apos;s approval before it is sent.
               </p>
             ) : null}
+            {/* QUOT-007 · The approval is for the figures the approver saw. */}
+            {source.mode === "edit" &&
+            (source.quotation.approval?.status === "pending" ||
+              source.quotation.approval?.status === "approved") ? (
+              <p role="note" className="rounded-md bg-warning-soft p-3 text-xs text-foreground">
+                {source.quotation.approval.status === "pending"
+                  ? "Saving withdraws the discount approval request that is waiting."
+                  : "Saving cancels the discount approval: ask again if the discount is still above your limit."}
+              </p>
+            ) : null}
             <div className="flex flex-col gap-2 border-t border-border pt-4">
               <Button
                 type="submit"

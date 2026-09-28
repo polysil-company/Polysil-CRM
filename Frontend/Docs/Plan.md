@@ -296,8 +296,14 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Quotation builder — a new draft from a lead, editing a draft's header and items | QUOT-004 | `POST /quotations`, `PATCH /quotations/{id}`, `PUT /quotations/{id}/lines` |
 | Live pricing while items are entered | QUOT-005 | `POST /pricing/quote-lines` |
 | Product picker | MSTR-003 | `GET /products` |
+| Send a quotation | QUOT-006 | `POST /quotations/{id}/send` |
+| Ask for discount approval | QUOT-007 | `POST /quotations/{id}/request-approval` |
+| Record the customer's answer | QUOT-008 | `POST /quotations/{id}/transition` |
+| Revise, and versions | QUOT-009 | `POST /quotations/{id}/revise`, `GET /quotations/{id}/versions` |
+| A quotation's history | QUOT-010 | `GET /quotations/{id}/timeline` |
+| Delete a draft | QUOT-011 | `DELETE /quotations/{id}` |
 
-LEAD-005…008, QUOT-001…005 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+LEAD-005…008, QUOT-001…011 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 
@@ -321,7 +327,7 @@ LEAD-005…008, QUOT-001…005 and MSTR-003 are built on the backend's contract 
 
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
-| **Quotations, the rest** — send and discount approval; accept, reject, negotiation (what moves a lead to quoted, negotiation and won); revise, versions, timeline, delete; the public `/q/{token}` page | `POST /quotations/{id}/send` and the other actions, `DELETE /quotations/{id}`, `/public/q/*` | `backend/docs/handover/quotations-api-contract.md` | **1 — in progress** (reads and the builder done: QUOT-001…005) |
+| **Quotations, the rest** — the public `/q/{token}` page; the approvals inbox's quotation rows (with APPR-001) | `/public/q/*`; `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` | `backend/docs/handover/quotations-api-contract.md` §5, §4 | **1 — in progress** (QUOT-001…011 done) |
 | Sales orders, approvals, dispatch | `/orders/*`, `/approvals/*`, `/dispatches/*` | `backend/docs/handover/orders-api-contract.md` | 2 |
 | Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 3 |
 | Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 4 |

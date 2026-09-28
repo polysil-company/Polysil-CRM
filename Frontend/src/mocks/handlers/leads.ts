@@ -13,7 +13,6 @@ import {
   type LeadStage,
   type AssigneeListWire,
   type LeadStatsWire,
-  type TimelineEventWire,
   type TimelinePageWire,
   type LeadWire,
 } from "@/features/leads/api/leads.schemas";
@@ -24,9 +23,10 @@ import { mockLookupRows } from "@/mocks/data/lookups";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
 import { findMockTerritory, mockOfficeFor, toTerritoryRef } from "@/mocks/data/territories";
-import { mockTimelineFor, newestFirst } from "@/mocks/data/timeline";
+import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
+import { MOCK_CREATOR, leadEventsOf, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse } from "./shared";
 
@@ -46,9 +46,6 @@ const DEFAULT_LIMIT = 50;
 /** GET /leads/{id}/timeline returns 100 events unless asked for fewer. */
 const TIMELINE_DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 100;
-
-/** The signed-in staff user in the mock (usr-001 in the session mock owns what they create). */
-const MOCK_CREATOR = MOCK_STAFF[0];
 
 function isStage(value: string): value is LeadStage {
   return LEAD_STAGES.some((stage) => stage === value);
@@ -214,40 +211,6 @@ function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
   }
 
   return lead;
-}
-
-/**
- * A lead's timeline in the mock, newest first. The history derived from the seeded lead is
- * snapshotted on first use, so a later stage change adds one event rather than re-deriving
- * the whole walk from the new stage.
- */
-function eventsOf(lead: LeadWire): TimelineEventWire[] {
-  const known = mockDb.leadEvents.get(lead.id);
-  if (known !== undefined) {
-    return known;
-  }
-  const derived = mockTimelineFor(lead);
-  mockDb.leadEvents.set(lead.id, derived);
-  return derived;
-}
-
-function recordEvent(
-  lead: LeadWire,
-  kind: string,
-  payload: Record<string, unknown>,
-): TimelineEventWire {
-  const events = eventsOf(lead);
-  const event: TimelineEventWire = {
-    id: mockUuid(MOCK_ID_SPACE.timeline, 900_000_000 + mockDb.writtenEvents),
-    kind,
-    occurred_at: new Date().toISOString(),
-    actor: MOCK_CREATOR ?? null,
-    payload: { actor_name: MOCK_CREATOR?.full_name ?? "", ...payload },
-  };
-  mockDb.writtenEvents += 1;
-  mockDb.leadEvents.set(lead.id, [event, ...events]);
-  lead.last_activity_at = event.occurred_at;
-  return event;
 }
 
 /** The backend's stage machine (backend/api/domain/leads.py). */
@@ -435,7 +398,7 @@ export const leadHandlers = [
       });
     }
 
-    const events = scenario === "empty" ? [] : [...eventsOf(lead)].sort(newestFirst);
+    const events = scenario === "empty" ? [] : [...leadEventsOf(lead)].sort(newestFirst);
     const hasMore = offset + limit < events.length;
     const body: TimelinePageWire = {
       data: events.slice(offset, offset + limit),
@@ -484,7 +447,7 @@ export const leadHandlers = [
       return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
     }
 
-    const event = recordEvent(lead, "lead.note_added", { note: parsed.data.note });
+    const event = recordLeadEvent(lead, "lead.note_added", { note: parsed.data.note });
     mockDb.noteCreations.set(key, { body: serialized, event });
     return HttpResponse.json({ data: event }, { status: 201 });
   }),
@@ -575,7 +538,7 @@ export const leadHandlers = [
       mockDb.lostFrom.set(lead.id, current);
     }
 
-    recordEvent(lead, "lead.stage_changed", payload);
+    recordLeadEvent(lead, "lead.stage_changed", payload);
     lead.stage = body.to_stage;
     if (body.to_stage === "contacted" && lead.first_contacted_at === null) {
       lead.first_contacted_at = lead.last_activity_at;
@@ -610,12 +573,12 @@ export const leadHandlers = [
       });
     }
 
-    const lostEvent = eventsOf(lead).find(
+    const lostEvent = leadEventsOf(lead).find(
       (event) => event.kind === "lead.stage_changed" && event.payload?.to === "lost",
     );
     const seededFrom = LEAD_STAGES.find((stage) => stage === lostEvent?.payload?.from);
     const target = mockDb.lostFrom.get(lead.id) ?? seededFrom ?? "new";
-    recordEvent(lead, "lead.reopened", {
+    recordLeadEvent(lead, "lead.reopened", {
       from: "lost",
       to: target,
       lost_reason_id: lead.lost_reason?.id ?? null,
@@ -690,7 +653,7 @@ export const leadHandlers = [
       payload.assigned_partner_id = body.assigned_partner_id;
     }
 
-    recordEvent(lead, "lead.assigned", payload);
+    recordLeadEvent(lead, "lead.assigned", payload);
     mockDb.stageChanges.set(idempotency.key, { body: idempotency.serialized, leadId: lead.id });
     return HttpResponse.json({ data: lead } satisfies LeadResponseWire);
   }),
