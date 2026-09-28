@@ -296,7 +296,8 @@ async def list_policies(db: DbSession) -> Envelope[list[SlaPolicy]]:
                responses=_MUTATION_ERRORS, dependencies=[Depends(require("masters", "edit"))])
 async def set_policy(body: SlaPolicyIn, db: DbSession, claims: Claims, idem: IdemKey) -> Response:
     """Set a target from a date. The target in force then ends that day; complaints
-    already submitted keep theirs. `409 target_exists` when one already starts that day."""
+    already submitted keep theirs. `409 target_exists` when one already starts that day;
+    `422 target_in_the_past` for a date before today (IST)."""
     return await _idem(db, claims, idem, "POST /api/v1/complaint-sla-policies", body,
                        lambda: _policies(db, body), 201)
 

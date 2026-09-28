@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import uuid
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
@@ -1359,7 +1360,8 @@ def _decode_cursor(cursor: str) -> tuple[datetime, str]:
     try:
         raw = base64.urlsafe_b64decode(cursor.encode()).decode()
         ts, _, lead_id = raw.partition("|")
-        return datetime.fromisoformat(ts), lead_id
+        # the id goes into CAST(... AS uuid): a bad one was a 500, not a 422 (PR 25 review)
+        return datetime.fromisoformat(ts), str(uuid.UUID(lead_id))
     except (ValueError, binascii.Error) as exc:
         raise ValidationFailed(fields={"cursor": "malformed cursor"}) from exc
 

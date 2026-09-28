@@ -141,6 +141,24 @@ async def test_stats_count_sources_types_and_follow_ups(
                 "CAST(:fo AS uuid), CAST(:fo AS uuid), CAST(:ou AS uuid), CAST(:l AS uuid), "
                 "CASE WHEN :st = 'done' THEN now() END, CASE WHEN :st = 'done' THEN 'Spoke' END)"),
                 {"st": status, "due": due, "fo": fo, "ou": shop.office, "l": lead})
+        # noise the officer's counts must not include: the manager's own lead with a
+        # task due today, and a personal task of the officer's with no lead
+        dm = shop.ids["district_manager"]
+        other = str((await s.execute(text(
+            "INSERT INTO lead (inquiry_no, inquiry_type, mis_system_id, lead_source_id, farmer_name, "
+            "mobile, territory_id, owner_user_id, owner_org_unit_id, created_by) "
+            "VALUES (:no, 'commercial', (SELECT id FROM mis_system WHERE code = 'drip'), "
+            "(SELECT id FROM lead_source WHERE code = 'website'), 'Other Farmer', :mob, CAST(:t AS uuid), "
+            "CAST(:o AS uuid), CAST(:ou AS uuid), CAST(:o AS uuid)) RETURNING id"),
+            {"no": f"STATS-{tag}-dm", "mob": "+9197" + f"{uuid.uuid4().int % 10**8:08d}",
+             "t": shop.district, "o": dm, "ou": shop.office})).scalar_one())
+        today_2300 = ("(date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') + interval '23 hours') "
+                      "AT TIME ZONE 'Asia/Kolkata'")
+        for who, lead in ((dm, other), (fo, None)):
+            await s.execute(text(
+                "INSERT INTO task (title, task_type, due_at, assigned_to, assigned_by, owner_org_unit_id, "
+                f"lead_id) VALUES ('Call', 'followup', {today_2300}, CAST(:u AS uuid), CAST(:u AS uuid), "
+                "CAST(:ou AS uuid), CAST(:l AS uuid))"), {"u": who, "ou": shop.office, "l": lead})
         await s.commit()
     finally:
         await s.close()
@@ -150,12 +168,26 @@ async def test_stats_count_sources_types_and_follow_ups(
     got = got.get("data", got)
     assert got["total"] == 3
     assert got["by_source"]["employee"] == 2 and got["by_source"]["website"] == 1
+    c = sessions()
+    sources = set((await c.execute(text(
+        "SELECT code FROM lead_source WHERE deleted_at IS NULL"))).scalars())
+    await c.close()
+    assert set(got["by_source"]) == {str(x) for x in sources}, "every source is present"
     assert all(v == 0 for k, v in got["by_source"].items() if k not in ("employee", "website")), \
-        "every source is present, 0 when empty"
+        "0 when empty"
     assert got["by_inquiry_type"] == {"commercial": 2, "subsidised": 1, "industrial": 0}
     assert got["follow_ups_due_today"] == 1, "the open one today; not the done one, not tomorrow's"
     assert got["follow_ups_overdue"] == 1
     narrowed = (await client.get(f"{V1}/leads/stats", headers=h,
-                                 params={"territory_id": shop.state, "stage": "new"})).json()
+                                 params={"territory_id": shop.state, "stage": "won"})).json()
     narrowed = narrowed.get("data", narrowed)
-    assert narrowed["follow_ups_due_today"] <= got["follow_ups_due_today"], "the same filters apply"
+    assert (narrowed["follow_ups_due_today"], narrowed["follow_ups_overdue"]) == (0, 0), \
+        "the lead filters apply to the follow-ups: no lead is won"
+
+
+async def test_no_tasks_scope_means_no_follow_up_figure() -> None:
+    """A dealer's dashboard shows no figure rather than a false zero."""
+    from api.authz.predicate import Caller
+    from api.services import leads as service
+    dealer = Caller(str(uuid.uuid4()), None, str(uuid.uuid4()), scopes={"leads": "partner_subtree"})
+    assert await service._follow_ups(None, dealer, []) == (None, None)  # type: ignore[arg-type]

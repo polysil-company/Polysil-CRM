@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SECRET = os.environ["WEBHOOK_SECRET"].encode()
 BRANCH = os.environ.get("DEPLOY_BRANCH", "integration")
-MAX_BODY = 5 * 1024 * 1024          # GitHub caps a delivery at 25 MB; a push is far smaller
+MAX_BODY = 1024 * 1024              # a push payload lists at most 20 commits; well under this
 LOG = "/srv/redeploy.log"
 
 _lock = threading.Lock()
@@ -34,18 +34,31 @@ def _log(line: str) -> None:
     print(f"{stamp} {line}", flush=True)
 
 
-def _run_builds() -> None:
-    while True:
-        with _lock:
-            if not _state["pending"]:
-                _state["running"] = False
-                return
-            _state["pending"] = False
+def _build_once() -> None:
+    try:
         with open(LOG, "a", encoding="utf-8") as out:
-            result = subprocess.run(["/opt/hook/redeploy.sh"], stdout=out, stderr=subprocess.STDOUT,
-                                    check=False)
+            result = subprocess.run(["/opt/hook/redeploy.sh"], stdout=out,
+                                    stderr=subprocess.STDOUT, check=False)
         _state["last"] = "ok" if result.returncode == 0 else f"failed ({result.returncode})"
-        _log(f"redeploy {_state['last']}")
+    except Exception as exc:  # a full disk or a missing script must not wedge the queue
+        _state["last"] = f"error: {exc}"
+    _log(f"redeploy {_state['last']}")
+
+
+def _run_builds() -> None:
+    try:
+        while True:
+            with _lock:
+                if not _state["pending"]:
+                    return
+                _state["pending"] = False
+            _build_once()
+    finally:
+        with _lock:
+            _state["running"] = False
+            again = _state["pending"]
+        if again:
+            _trigger()
 
 
 def _trigger() -> str:
@@ -59,6 +72,10 @@ def _trigger() -> str:
 
 
 class Hook(BaseHTTPRequestHandler):
+    # the body is read before the signature can be checked: a client that sends
+    # a length and then stalls gives up its thread after this many seconds
+    timeout = 10
+
     def _answer(self, status: int, body: dict[str, object]) -> None:
         data = json.dumps(body).encode()
         self.send_response(status)
@@ -77,13 +94,18 @@ class Hook(BaseHTTPRequestHandler):
         if self.path.rstrip("/") != "/hooks/github":
             self._answer(404, {"error": "not found"})
             return
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._answer(400, {"error": "length"})
+            return
         if length <= 0 or length > MAX_BODY:
             self._answer(413, {"error": "body size"})
             return
         body = self.rfile.read(length)
-        expected = "sha256=" + hmac.new(SECRET, body, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected, self.headers.get("X-Hub-Signature-256", "")):
+        expected = ("sha256=" + hmac.new(SECRET, body, hashlib.sha256).hexdigest()).encode()
+        given = self.headers.get("X-Hub-Signature-256", "").encode("utf-8", "replace")
+        if len(body) != length or not hmac.compare_digest(expected, given):
             _log("refused: bad signature")
             self._answer(401, {"error": "signature"})
             return

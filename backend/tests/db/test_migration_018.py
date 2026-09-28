@@ -6,6 +6,7 @@ negative case: office A's manager must not see office B's tasks."""
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -391,7 +392,19 @@ async def test_a_manager_cannot_update_another_offices_task(db: AsyncSession) ->
     await m13._as(db, w.dm)
     r = await db.execute(text("UPDATE task SET notes = 'x' WHERE id = CAST(:t AS uuid)"), {"t": theirs})
     await m13._as_owner(db)
-    assert r.rowcount == 0, "the UPDATE policy's USING, not only its CHECK"
+    assert r.rowcount == 0, "another office's task is out of reach"
+    # the positive control: the same statement on the manager's own office lands
+    ours = await _task(db, to=w.officer, by=w.dm, office=w.a)
+    await m13._as(db, w.dm)
+    r = await db.execute(text("UPDATE task SET notes = 'x' WHERE id = CAST(:t AS uuid)"), {"t": ours})
+    await m13._as_owner(db)
+    assert r.rowcount == 1, "the manager's own office"
+    # the SELECT policy alone would give the 0 above, so the UPDATE policy's USING
+    # is asserted directly: present and not a pass-through (PR 25 review)
+    quals = [q for (q,) in (await db.execute(text(
+        "SELECT qual FROM pg_policies WHERE tablename = 'task' AND cmd = 'UPDATE' "
+        "AND permissive = 'PERMISSIVE'"))).all()]
+    assert quals and all(q and q.strip("() ") != "true" for q in quals), quals
 
 
 async def test_no_shared_task_no_name(db: AsyncSession) -> None:
@@ -407,5 +420,5 @@ async def test_each_task_column_has_one_index_and_the_people_lookups_have_theirs
     defs = [r[0] for r in (await db.execute(text(
         "SELECT indexdef FROM pg_indexes WHERE tablename = 'task'"))).all()]
     for column in ("partner_id", "sales_order_id", "assigned_by", "completed_by"):
-        single = [d for d in defs if d.split(" USING btree ")[1].startswith(f"({column})")]
+        single = [d for d in defs if re.search(rf" USING \w+ \({column}\)", d)]
         assert len(single) == 1, (column, single)

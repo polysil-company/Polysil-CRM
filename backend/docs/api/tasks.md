@@ -29,7 +29,8 @@ Conventions for every endpoint in this file:
 
 **List Minutes**
 
-A lead's or a dealer's minutes, newest first. Staff only.
+A lead's or a dealer's minutes, newest first. Staff only. Give exactly one of
+`lead_id` and `partner_id`; none or both is a `422`.
 
 **Parameters**
 
@@ -57,6 +58,9 @@ A lead's or a dealer's minutes, newest first. Staff only.
 Record a meeting on a lead or a dealer, with its action items. One save: a
 bad action item refuses the whole request, with `fields.action_items[i]`.
 `task_id`, the meeting being recorded, is completed if still open.
+`422 task_link_mismatch`: that task is on another lead or dealer.
+`422 task_not_a_meeting`: it is a call or a visit. `409`: it was cancelled.
+`422 lead_merged` or `lead_deleted`: use the lead it was merged into.
 
 **Parameters**
 
@@ -215,7 +219,8 @@ Log a call, visit, meeting or follow-up, for yourself or someone below you,
 optionally about one lead, dealer or order. A meeting on a lead carries one of
 the lead's meeting types. `422 not_assignable`: that person is not yours to
 assign to. `422 link_not_visible_to_assignee`: they cannot open the lead or
-order the task is about.
+order the task is about. `422 lead_merged` or `lead_deleted`: use the lead it
+was merged into.
 
 **Parameters**
 

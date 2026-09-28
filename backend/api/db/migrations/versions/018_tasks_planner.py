@@ -171,7 +171,7 @@ HAND_POLICIES: list[tuple[str, str]] = [
     ("meeting_minutes", f"CREATE POLICY meeting_minutes_sel ON meeting_minutes FOR SELECT USING (\n  {_MINUTES_READ}\n)"),
     ("meeting_minutes", f"CREATE POLICY meeting_minutes_ins ON meeting_minutes FOR INSERT WITH CHECK (\n  {_MINUTES_READ}\n  AND (SELECT app_has_permission('tasks', 'create'))\n  AND created_by = (SELECT app_current_user_id())\n)"),
     # activity_event gains the task and meeting_minutes arms (api/authz/activity.py
-    # ENTITY_BY_ID); supersedes 017's literal, and the drift test compares the
+    # ENTITY_BY_ID); supersedes 015's literal, and the drift test compares the
     # union's last-wins
     ("activity_event", "CREATE POLICY activity_event_sel ON activity_event FOR SELECT USING (\n  CASE entity_type\n    WHEN 'app_user' THEN entity_id = (SELECT app_current_user_id()) OR EXISTS (SELECT 1 FROM app_user u WHERE u.id = entity_id)\n    WHEN 'channel_partner' THEN EXISTS (SELECT 1 FROM channel_partner c WHERE c.id = partner_id)\n    WHEN 'lead' THEN EXISTS (SELECT 1 FROM lead c WHERE c.id = lead_id)\n    WHEN 'org_unit' THEN EXISTS (SELECT 1 FROM org_unit c WHERE c.id = entity_id)\n    WHEN 'territory' THEN EXISTS (SELECT 1 FROM territory c WHERE c.id = entity_id)\n    WHEN 'quotation' THEN EXISTS (SELECT 1 FROM quotation c WHERE c.id = entity_id)\n    WHEN 'sales_order' THEN EXISTS (SELECT 1 FROM sales_order c WHERE c.id = entity_id)\n    WHEN 'lead_qr_code' THEN EXISTS (SELECT 1 FROM lead_qr_code c WHERE c.id = entity_id)\n    WHEN 'task' THEN EXISTS (SELECT 1 FROM task c WHERE c.id = entity_id)\n    WHEN 'meeting_minutes' THEN EXISTS (SELECT 1 FROM meeting_minutes c WHERE c.id = entity_id)\n    ELSE (SELECT app_is_system())\n  END\n)"),
 ]

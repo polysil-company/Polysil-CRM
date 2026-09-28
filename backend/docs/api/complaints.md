@@ -49,7 +49,8 @@ The response and resolution targets, in force and past, in working hours
 **Set Policy**
 
 Set a target from a date. The target in force then ends that day; complaints
-already submitted keep theirs. `409 target_exists` when one already starts that day.
+already submitted keep theirs. `409 target_exists` when one already starts that day;
+`422 target_in_the_past` for a date before today (IST).
 
 **Parameters**
 
