@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApiUrl } from "@/lib/api/url";
-import { mockDb } from "@/mocks/db";
+import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 
 import { getQuotation, getQuotationPdf, listQuotations } from "./quotations.api";
@@ -106,6 +106,27 @@ describe("[QUOT-002] getQuotation", () => {
       status: 404,
       dataId: "QUOT-002",
     });
+  });
+});
+
+describe("[QUOT-002] names the backend may leave blank", () => {
+  afterEach(() => {
+    resetMockDb();
+  });
+
+  it("reads a quotation whose office, territory, price list or seller name is blank", async () => {
+    const wire = mockQuotation((quotation) => quotation.price_list !== null);
+    wire.owner_org_unit = { ...wire.owner_org_unit, name: "" };
+    wire.territory = { ...wire.territory, name: " ", level: "" };
+    wire.price_list = wire.price_list === null ? null : { ...wire.price_list, name: "" };
+    wire.seller_gstin = { ...wire.seller_gstin, legal_name: "" };
+
+    const quotation = await getQuotation(wire.id);
+
+    expect(quotation.ownerOrgUnit.name).toBe("—");
+    expect(quotation.territory).toMatchObject({ name: "—", level: "—" });
+    expect(quotation.priceList?.name).toBe("—");
+    expect(quotation.seller.legalName).toBe("—");
   });
 });
 

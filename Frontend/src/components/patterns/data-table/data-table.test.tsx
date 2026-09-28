@@ -140,6 +140,16 @@ describe("[DS-001] DataTable", () => {
     expect(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
   });
 
+  it("keeps Next past a capped total when the caller doesn't say whether there is more", () => {
+    renderTable({
+      rowCount: 1000,
+      rowCountCapped: true,
+      pagination: { pageIndex: 499, pageSize: 2 },
+    });
+
+    expect(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
+  });
+
   it("disables both paging buttons while a page change is still loading", () => {
     renderTable({
       rowCount: 60,

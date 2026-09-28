@@ -39,6 +39,8 @@ function paramsFor(leadId: string): QuotationListParams {
     // Every version: an older one shows muted, "superseded by v2".
     currentOnly: false,
     leadId,
+    // The card shows no total, so the backend is not asked to count.
+    countTotal: false,
   };
 }
 

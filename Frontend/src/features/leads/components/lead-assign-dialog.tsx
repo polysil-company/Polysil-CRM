@@ -158,8 +158,9 @@ function AssignForm({ lead, onClose }: { lead: Lead; onClose: () => void }): Rea
     onError: (error) => {
       const fields = readFieldErrors(error);
       if (fields?.owner_user_id !== undefined || fields?.assigned_partner_id !== undefined) {
-        if (fields.owner_user_id !== undefined)
+        if (fields.owner_user_id !== undefined) {
           setOwnerError("You can't make this person the owner");
+        }
         if (fields.assigned_partner_id !== undefined) {
           setPartnerError("This partner isn't in your area");
         }
@@ -311,6 +312,22 @@ function OwnerField({
   );
 }
 
+/** What the partner search is doing: failed, searching, or nothing to say. */
+function searchStatus(failed: boolean, waiting: boolean): React.ReactNode {
+  if (failed) {
+    return "Partners couldn't be loaded. Check your connection, then type again.";
+  }
+  if (waiting) {
+    return (
+      <>
+        <Spinner />
+        Searching…
+      </>
+    );
+  }
+  return null;
+}
+
 function PartnerField({
   value,
   error,
@@ -350,16 +367,7 @@ function PartnerField({
         invalid={error !== null}
         describedBy={error === null ? "assign-partner-description" : "assign-partner-error"}
         emptyText={term === "" ? "No partners in your area." : `No partner matches “${term}”.`}
-        status={
-          query.isError ? (
-            "Partners couldn't be loaded. Check your connection, then type again."
-          ) : waiting ? (
-            <>
-              <Spinner />
-              Searching…
-            </>
-          ) : null
-        }
+        status={searchStatus(query.isError, waiting)}
       />
       {error === null ? (
         <FieldDescription id="assign-partner-description">

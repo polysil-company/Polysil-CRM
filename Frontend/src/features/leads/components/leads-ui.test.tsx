@@ -25,6 +25,17 @@ describe("[LEAD-001] LeadsTable", () => {
     expect(screen.getByText(/^1–25 of \d+$/)).toBeInTheDocument();
   });
 
+  it("offers no sort arrows until the backend sorts (BE-001)", async () => {
+    renderWithProviders(<LeadsTable />);
+
+    const table = await screen.findByRole("table", { name: "Leads" });
+    for (const name of ["Customer", "Value"]) {
+      const header = within(table).getByRole("columnheader", { name });
+      expect(within(header).queryByRole("button")).not.toBeInTheDocument();
+      expect(header).not.toHaveAttribute("aria-sort");
+    }
+  });
+
   it("names each source from the admin-edited list", async () => {
     renderWithProviders(<LeadsTable />, { searchParams: "?source=agri_fair" });
 

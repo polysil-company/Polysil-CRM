@@ -137,8 +137,12 @@ export function DataTable<TData extends RowData>({
   const firstRowIndex = pagination.pageIndex * pagination.pageSize;
   const pageCount =
     rowCount === null ? null : Math.max(1, Math.ceil(rowCount / pagination.pageSize));
+  // Without `hasNextPage`, the count decides — but a capped count is a lower bound, so it
+  // never ends the list: there may be more pages past it.
   const canNext =
-    !isPaging && (hasNextPage ?? (pageCount !== null && pagination.pageIndex + 1 < pageCount));
+    !isPaging &&
+    (hasNextPage ??
+      (pageCount !== null && (rowCountCapped || pagination.pageIndex + 1 < pageCount)));
   const canPrevious = !isPaging && pagination.pageIndex > 0;
   // -1 tells assistive tech the total is unknown, rather than announcing a wrong one.
   const ariaRowCount = rowCount === null || rowCountCapped ? -1 : rowCount + 1;

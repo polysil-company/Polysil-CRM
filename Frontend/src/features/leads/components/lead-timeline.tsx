@@ -151,6 +151,17 @@ function TimelineItem({
   );
 }
 
+/** Red for lost, green for won, blue for every other move. */
+function stageTone(to: LeadStage | null): Tone {
+  if (to === "lost") {
+    return "danger";
+  }
+  if (to === "won") {
+    return "success";
+  }
+  return "info";
+}
+
 function appearanceOf(entry: TimelineEntry): { icon: IconGlyph; tone: Tone } {
   switch (entry.type) {
     case "created":
@@ -158,10 +169,7 @@ function appearanceOf(entry: TimelineEntry): { icon: IconGlyph; tone: Tone } {
     case "note":
       return { icon: Note01Icon, tone: "primary" };
     case "stage":
-      return {
-        icon: ArrowRight02Icon,
-        tone: entry.to === "lost" ? "danger" : entry.to === "won" ? "success" : "info",
-      };
+      return { icon: ArrowRight02Icon, tone: stageTone(entry.to) };
     case "reopened":
       return { icon: RotateLeft01Icon, tone: "warning" };
     case "assigned":

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { LEAD_STAGES } from "@/features/leads/api/leads.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
-import { normalizeIndianMobile } from "@/lib/format";
+import { EMPTY_VALUE, normalizeIndianMobile } from "@/lib/format";
 
 /**
  * Quotations contract (QUOT-001 … QUOT-003), from the backend's `Quotation`,
@@ -42,9 +42,14 @@ const isoDateTime = z.iso.datetime({ offset: true });
 const isoDate = z.iso.date();
 /** A plain decimal string: "1667.50", "2.500", "-12.00". */
 const decimal = z.string().regex(/^-?\d+(\.\d+)?$/);
-const ref = z.object({ id: z.string().min(1), name: z.string().min(1) });
+/**
+ * A name the backend does not guarantee non-empty (an office, a territory, a price list, the
+ * seller's block): a blank one prints "—" instead of failing the whole quotation.
+ */
+const displayText = z.string().transform((value) => (value.trim() === "" ? EMPTY_VALUE : value));
+const ref = z.object({ id: z.string().min(1), name: displayText });
 const userRef = z.object({ id: z.string().min(1), full_name: z.string() });
-const territoryRef = ref.extend({ level: z.string().min(1) });
+const territoryRef = ref.extend({ level: displayText });
 const versionRef = z.object({ id: z.string().min(1), version: z.number().int().positive() });
 const leadRef = z.object({
   id: z.string().min(1),
@@ -150,6 +155,8 @@ export interface QuotationListParams {
   readonly currentOnly: boolean;
   /** Quotations on one lead, and on leads merged into it. */
   readonly leadId: string | null;
+  /** Ask for the matching total ("1–25 of 49"). It costs the backend a count; off where unused. */
+  readonly countTotal?: boolean;
 }
 
 // ── the document (QUOT-002) ───────────────────────────────────────────────────
@@ -311,12 +318,12 @@ export const quotationWireSchema = z.object({
   territory: territoryRef,
   seller_gstin: z.object({
     id: z.string().min(1),
-    gstin: z.string().min(1),
-    legal_name: z.string().min(1),
+    gstin: displayText,
+    legal_name: displayText,
     address: z.string().nullish(),
-    state: z.string().min(1),
+    state: displayText,
   }),
-  place_of_supply: z.object({ territory: territoryRef, state: z.string().min(1) }),
+  place_of_supply: z.object({ territory: territoryRef, state: displayText }),
   intra_state: z.boolean(),
   price_effective_date: isoDate,
   /** Null when the lines drew from more than one list; `price_list_ids` names them all. */
@@ -679,7 +686,7 @@ export const publicQuotationResponseSchema = z
       version: z.number().int().positive(),
       status: z.enum(QUOTATION_STATUSES),
       sales_type: z.enum(SALES_TYPES),
-      seller: z.object({ legal_name: z.string().min(1), gstin: z.string().min(1) }),
+      seller: z.object({ legal_name: displayText, gstin: displayText }),
       sent_at: isoDateTime.nullable(),
       valid_until: isoDate.nullable(),
       expired: z.boolean(),

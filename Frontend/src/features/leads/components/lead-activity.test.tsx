@@ -226,6 +226,18 @@ describe("[LEAD-006] LeadNoteComposer", () => {
     expect(box).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("button", { name: "Add note" })).toBeDisabled();
   });
+
+  it("doesn't count spaces at the ends against the limit, as the backend trims them", async () => {
+    const user = userEvent.setup();
+    const lead = mockLead((item) => item.stage === "contacted");
+    renderWithProviders(<LeadNoteComposer leadId={lead.id} />);
+
+    await user.click(screen.getByRole("textbox", { name: "Note" }));
+    await user.paste(`${"x".repeat(2000)}   `);
+
+    expect(screen.getByText("0 characters left")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add note" })).toBeEnabled();
+  });
 });
 
 describe("[LEAD-006] LeadDetail activity", () => {
