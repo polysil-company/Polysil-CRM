@@ -190,4 +190,4 @@ async def test_no_tasks_scope_means_no_follow_up_figure() -> None:
     from api.authz.predicate import Caller
     from api.services import leads as service
     dealer = Caller(str(uuid.uuid4()), None, str(uuid.uuid4()), scopes={"leads": "partner_subtree"})
-    assert await service._follow_ups(None, dealer, []) == (None, None)  # type: ignore[arg-type]
+    assert await service.follow_ups(None, dealer, []) == (None, None)  # type: ignore[arg-type]

@@ -10,9 +10,10 @@ any endpoint change, so it is always current rather than a snapshot.
 | Approvals | 5 | [`approvals.md`](approvals.md) |
 | Auth | 7 | [`auth.md`](auth.md) |
 | Complaints | 18 | [`complaints.md`](complaints.md) |
+| Dashboard | 1 | [`dashboard.md`](dashboard.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
 | Leads | 17 | [`leads.md`](leads.md) |
-| Lookups | 20 | [`lookups.md`](lookups.md) |
+| Lookups | 23 | [`lookups.md`](lookups.md) |
 | Orders | 14 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 6 | [`partners.md`](partners.md) |
@@ -38,7 +39,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Money | decimal **string** — `"1234.56"` |
 | Time | ISO-8601 UTC, rendered IST |
 | Idempotency | `Idempotency-Key` on every POST/PATCH, except the `/auth` mutations |
-| Pagination | `page`, `limit`, `sort`, `q` |
+| Pagination | by cursor, not page number: `limit`, then the previous page's `meta.next_cursor` as `cursor`; absent on the last page. `include_total=true` adds `meta.total` (capped, see `meta.total_capped`) where a list offers it |
 
 **Empty list versus 403.** Rows are scoped by permission in the database. An empty
 collection means nothing is in the caller's scope; `403` means the action itself is

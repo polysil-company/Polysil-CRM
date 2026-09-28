@@ -10,12 +10,33 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 InquiryType = Literal["commercial", "subsidised", "industrial"]
 Stage = Literal["new", "contacted", "qualified", "quoted", "negotiation",
                 "won", "lost", "merged", "dormant"]
 Priority = Literal["hot", "warm", "cold"]
+
+MAX_CROPS = 10   # GAP-157: ours, not the client's
+
+
+def _crop_codes(v: list[str]) -> list[str]:
+    """Lower case and trimmed; the same crop twice or an empty code is refused
+    here, the unknown ones by the service (FS-016 EC-8)."""
+    codes = [c.strip().lower() for c in v]
+    if any(not c for c in codes):
+        raise ValueError("a crop code cannot be empty")
+    if len(set(codes)) != len(codes):
+        raise ValueError("each crop once")
+    return codes
+
+
+CropCodes = Annotated[list[str], Field(max_length=MAX_CROPS,
+    description="Crop codes from GET /lookups/crops, at most 10. [] for none."),
+    AfterValidator(_crop_codes)]
+Acres = Annotated[Decimal, Field(gt=0, le=Decimal("99999.99"), decimal_places=2,
+    description="Land in acres, a decimal string with at most two decimals.",
+    examples=["4.50"])]
 
 # Every id the client sends is validated to this shape, so a malformed id is a
 # 422 with the envelope rather than a driver error and a 500 (cross-vendor P2).
@@ -34,7 +55,8 @@ class LeadCreate(BaseModel):
     email: Annotated[str | None, Field(default=None, max_length=254,
         description="Optional. Used for duplicate matching.")]
     territory_id: Annotated[str, Field(pattern=UUID_RE,
-        description="The taluka or district the farmer is in, from GET /lookups/territories.")]
+        description="The district, taluka or village the farmer is in, from "
+        "GET /lookups/territories?levels=district,taluka,village. A state is refused.")]
     village: Annotated[str | None, Field(default=None, max_length=200,
         description="Optional. Used for duplicate matching.")]
     inquiry_type: Annotated[InquiryType, Field(
@@ -50,6 +72,8 @@ class LeadCreate(BaseModel):
         examples=["125000.00"])]
     note: Annotated[str | None, Field(default=None, max_length=2000,
         description="Optional. Becomes the first entry on the lead's timeline.")]
+    crops: CropCodes = Field(default_factory=list)
+    land_acres: Acres | None = None
 
 
 class UserRef(BaseModel):
@@ -60,7 +84,7 @@ class UserRef(BaseModel):
 class TerritoryRef(BaseModel):
     id: str
     name: str
-    level: str = Field(description="state, district or taluka.")
+    level: str = Field(description="state, district, taluka or village.")
 
 
 class OrgUnitRef(BaseModel):
@@ -78,6 +102,13 @@ class ReasonRef(BaseModel):
     id: str
     code: str
     name: str
+
+
+class CropRef(BaseModel):
+    code: str
+    name: str
+    is_active: bool = Field(description="False once the crop is switched off. It stays on "
+                            "the leads that have it; show it greyed.")
 
 
 class MergedRef(BaseModel):
@@ -114,6 +145,8 @@ class Lead(BaseModel):
     score: str | None = Field(description="Decimal string, or null before scoring.")
     priority: Priority | None
     estimated_value: str | None
+    crops: list[CropRef] = Field(description="In the order they were sent. [] for none.")
+    land_acres: str | None = Field(description="Land in acres, a decimal string.")
     lost_reason: ReasonRef | None
     lost_note: str | None
     reopen_count: int
@@ -289,7 +322,7 @@ class Assignee(BaseModel):
 
 class LeadPatch(BaseModel):
     """Correct the lead's own fields. Send only what changes: a field left out is
-    unchanged. email, village and estimated_value may be sent null to clear them;
+    unchanged. email, village, estimated_value and land_acres may be sent null to clear them;
     the others are required on a lead and cannot be cleared. The stage, owner and
     partner have their own endpoints."""
 
@@ -307,6 +340,10 @@ class LeadPatch(BaseModel):
     source: Annotated[str | None, Field(default=None, description="A code from the lookup.")]
     estimated_value: Annotated[Decimal | None, Field(default=None, ge=0,
         description="Decimal string. Feeds the priority score.")]
+    crops: Annotated[CropCodes | None, Field(default=None,
+        description="Replaces the list. [] clears it; null is refused. A switched-off crop "
+        "already on the lead may be sent again.")]
+    land_acres: Acres | None = Field(default=None, description="null clears it.")
 
 
 # ── duplicates ───────────────────────────────────────────────────────────────

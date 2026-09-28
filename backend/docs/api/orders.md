@@ -898,7 +898,7 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `level` | string | yes | state, district or taluka. |
+| `level` | string | yes | state, district, taluka or village. |
 
 **`TimelineEvent`**
 

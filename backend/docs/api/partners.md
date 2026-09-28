@@ -375,4 +375,4 @@ many, and each is reactivated through `PATCH /users/{id}`.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `level` | string | yes | state, district or taluka. |
+| `level` | string | yes | state, district, taluka or village. |

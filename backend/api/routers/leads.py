@@ -9,7 +9,7 @@ document the frontend track builds against. They say what the endpoint is *for*.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
@@ -139,6 +139,10 @@ async def list_leads(
         description="Also count how many leads match, for a \"1 to 25 of 137\" caption. "
                     "Off by default: it costs a second query over everything in your "
                     "scope, and most screens do not need it.")] = False,
+    sort: Annotated[Literal["created_at", "farmer_name", "estimated_value"], Query(
+        description="The column to sort by. `farmer_name` ignores case; leads with no "
+                    "`estimated_value` come last in both orders.")] = "created_at",
+    order: Annotated[Literal["asc", "desc"], Query(description="asc or desc.")] = "desc",
 ) -> LeadPage:
     """The lead list, filtered and in scope.
 
@@ -164,7 +168,7 @@ async def list_leads(
         owner=owner, territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
         assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
         created_from=created_from, created_to=created_to, q=q, limit=limit, cursor=cursor,
-        include_total=include_total)
+        include_total=include_total, sort=sort, order=order)
 
 
 @router.get(
@@ -456,6 +460,13 @@ async def lead_sources(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
     return Envelope(data=await service.list_lead_sources(db))
 
 
+@lookups.get("/crops", response_model=Envelope[list[LookupItem]], responses=_ERRORS)
+async def crops(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
+    """The crops for a lead's crop picker. A switched-off crop is listed with
+    `is_active: false`: offer it only when it is already on the lead."""
+    return Envelope(data=await service.list_crops(db))
+
+
 @lookups.get("/mis-systems", response_model=Envelope[list[LookupItem]], responses=_ERRORS)
 async def mis_systems(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
     """The micro-irrigation systems for the new-lead form."""
@@ -476,15 +487,19 @@ async def territories(
     db: DbSession,
     _: Claims,
     level: Annotated[str | None, Query(description="state, district, taluka or village.")] = None,
+    levels: Annotated[str | None, Query(
+        description="Several levels, comma-separated: `district,taluka,village` for the "
+        "new-lead form, where a state is refused. Not together with `level`.")] = None,
     parent_id: Annotated[str | None, Query(pattern=UUID_RE,
                                             description="Only children of this territory.")] = None,
     q: Annotated[str | None, Query(description="Name substring.")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> Envelope[list[TerritoryPick]]:
     """The territory picker for the new-lead form. Pick a district, then its
-    talukas by passing `parent_id`, or search by name with `q`."""
+    talukas by passing `parent_id`, or search by name with `q`. `422` on `levels`
+    for an unknown level, or with `level` as well."""
     return Envelope(data=await service.list_territories(
-        db, level=level, parent_id=parent_id, q=q, limit=limit))
+        db, level=level, levels=levels, parent_id=parent_id, q=q, limit=limit))
 
 
 @lookups.get("/partners", response_model=Envelope[list[PartnerPick]], responses=_ERRORS,
@@ -549,6 +564,22 @@ async def edit_lost_reason(item_id: ItemId, body: LookupUpdate, db: DbSession, c
                            idem: IdemKey) -> JSONResponse:
     """Switch a reason on or off, or reorder it. Names never change in place."""
     return await _update(db, claims, idem, "lost-reasons", "won_lost_reason", item_id, body)
+
+
+@lookups.post("/crops", response_model=Envelope[LookupItem],
+              status_code=status.HTTP_201_CREATED, responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def add_crop(body: LookupCreate, db: DbSession, claims: Claims,
+                   idem: IdemKey) -> JSONResponse:
+    """Add a crop to the list."""
+    return await _create(db, claims, idem, "crops", "crop", body)
+
+
+@lookups.patch("/crops/{item_id}", response_model=Envelope[LookupItem],
+               responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def edit_crop(item_id: ItemId, body: LookupUpdate, db: DbSession, claims: Claims,
+                    idem: IdemKey) -> JSONResponse:
+    """Switch a crop on or off, or reorder it. Names never change in place."""
+    return await _update(db, claims, idem, "crops", "crop", item_id, body)
 
 
 @lookups.post("/lead-sources", response_model=Envelope[LookupItem],

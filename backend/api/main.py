@@ -28,6 +28,7 @@ from api.errors import (
 from api.routers import (
     auth,
     complaints,
+    dashboard,
     lead_qr,
     leads,
     masters,
@@ -181,6 +182,7 @@ def create_app() -> FastAPI:
     app.include_router(tasks.minutes, prefix=API_PREFIX)
     app.include_router(complaints.router, prefix=API_PREFIX)
     app.include_router(complaints.policies, prefix=API_PREFIX)
+    app.include_router(dashboard.router, prefix=API_PREFIX)
     # The farmer's link: /public, not /api/v1. No session, two definer functions
     # on app_anon, and a file route the local storage adapter alone uses (FS-005 4).
     app.include_router(public.router)

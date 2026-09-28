@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import base64
 import binascii
+import datetime as dt
 import json
 import uuid
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import Any, Literal
 
 import sqlalchemy as sa
 from sqlalchemy import text
@@ -35,6 +36,7 @@ from api.errors import ForbiddenError, NotFoundError, StageChangedError, Validat
 from api.integrations.messages import TEMPLATE_LEAD_ACK
 from api.schemas.leads import (
     Assignee,
+    CropRef,
     DismissResult,
     DuplicatePage,
     DuplicatePair,
@@ -92,6 +94,7 @@ lead_t = sa.table(
     sa.column("lead_source_id", _UUID),
     sa.column("inquiry_type"),
     sa.column("deleted_at", _TS),
+    sa.column("estimated_value", sa.Numeric()),
     sa.column("farmer_name"),
     sa.column("mobile"),
     sa.column("inquiry_no"),
@@ -112,7 +115,11 @@ SELECT l.id, l.inquiry_no, l.stage, l.inquiry_type,
        l.owner_user_id, ow.full_name AS owner_name,
        l.owner_org_unit_id, ou.name AS owner_org_unit_name,
        l.assigned_partner_id, cp.name AS partner_name, cp.partner_type AS partner_type,
-       l.score, l.priority, l.estimated_value,
+       l.score, l.priority, l.estimated_value, l.land_acres,
+       COALESCE((SELECT json_agg(json_build_object('code', c.code, 'name', c.name,
+                                                   'is_active', c.is_active) ORDER BY x.ord)
+                   FROM unnest(l.crops) WITH ORDINALITY AS x(code, ord)
+                   JOIN crop c ON c.code = x.code), '[]'::json) AS crops_json,
        l.lost_reason_id, wlr.code AS lost_reason_code, wlr.name AS lost_reason_name,
        l.lost_note, l.reopen_count,
        l.merged_into_id, mi.inquiry_no AS merged_into_no,
@@ -241,6 +248,8 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate, *,
     # edit either waits for this transaction and is then refused by the counter it
     # finds, or commits first and this read returns the new code (FS-006 rule 15,
     # cross-vendor P2-3).
+    await check_lead_territory(db, str(body.territory_id))
+    crops = await _crop_codes(db, body.crops)
     state_code = (await db.execute(text("SELECT lead_state_code(CAST(:tid AS uuid))"),
                                    {"tid": str(body.territory_id)})).scalar_one_or_none()
     if not state_code:
@@ -288,16 +297,17 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate, *,
         INSERT INTO lead (inquiry_no, stage, inquiry_type, mis_system_id, lead_source_id,
             farmer_name, mobile, email, territory_id, village, owner_user_id,
             owner_org_unit_id, assigned_partner_id, score, priority, estimated_value,
-            created_by, qr_code_id)
+            created_by, qr_code_id, crops, land_acres)
         VALUES (:no, 'new', CAST(:it AS inquiry_type), :mis, :src, :name, :mob, :email,
             :tid, :village, :owner, :oou, :ap, :score, CAST(:prio AS lead_priority),
-            :est, :me, :qr)
+            :est, :me, :qr, CAST(:crops AS citext[]), :acres)
         RETURNING id"""), {
         "no": inquiry_no, "it": body.inquiry_type, "mis": mis.id, "src": src.id,
         "name": body.farmer_name, "mob": mobile, "email": body.email,
         "tid": str(body.territory_id), "village": body.village, "owner": owner_user_id,
         "oou": owner_org_unit_id, "ap": assigned_partner_id, "score": score,
         "prio": priority, "est": body.estimated_value, "me": caller.user_id, "qr": qr_code_id,
+        "crops": crops, "acres": body.land_acres,
     })).scalar_one()
 
     # 8. the event (CLAUDE.md rule 7, FS-003 rule 14). actor_id must be the caller:
@@ -477,6 +487,42 @@ _LEAD_PEOPLE = [("owner_user_id", "owner_name"), ("created_by", "created_by_name
 _LEAD_PARTNERS = [("assigned_partner_id", "partner_name")]
 
 
+def _json_list(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, str):
+        value = json.loads(value)
+    return list(value or [])
+
+
+async def _crop_codes(db: AsyncSession, codes: list[str], *, keep: frozenset[str] = frozenset(),
+                      ) -> list[str]:
+    """The list's own codes for `codes`, in the order sent. Unknown is refused; a
+    switched-off crop only when it is being added, so a form re-sending the whole
+    record works (FS-016 EC-9)."""
+    if not codes:
+        return []
+    rows = {str(r.code).lower(): r for r in (await db.execute(text(
+        "SELECT code::text AS code, is_active AND deleted_at IS NULL AS usable FROM crop "
+        "WHERE code = ANY(CAST(:codes AS citext[]))"), {"codes": codes})).all()}
+    unknown = [c for c in codes if c not in rows]
+    if unknown:
+        raise ValidationFailed(fields={"crops": f"not in the crop list: {', '.join(unknown)}"})
+    off = [c for c in codes if not rows[c].usable and c not in keep]
+    if off:
+        raise ValidationFailed(fields={"crops": f"switched off: {', '.join(off)}"})
+    return [str(rows[c].code) for c in codes]
+
+
+async def check_lead_territory(db: AsyncSession, territory_id: str,
+                           field: str = "territory_id") -> None:
+    """A lead sits in a district, taluka or village: a state is too coarse to route
+    (FS-016 rule 2; the village is allowed until the client says, GAP-155)."""
+    level = (await db.execute(text(
+        "SELECT level::text FROM territory WHERE id = CAST(:t AS uuid)"),
+        {"t": territory_id})).scalar_one_or_none()
+    if level == "state":
+        raise ValidationFailed(fields={field: "a district, taluka or village"})
+
+
 def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
                  names: people.Names | None = None) -> Lead:
     """The non-person fields, plus the people: from the RLS-filtered joins, and
@@ -496,6 +542,8 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
         assigned_partner=names.partner(row.assigned_partner_id, row.partner_name,
                                        row.partner_type),
         score=_dec(row.score), priority=row.priority, estimated_value=_dec(row.estimated_value),
+        crops=[CropRef(**c) for c in _json_list(row.crops_json)],
+        land_acres=_dec(row.land_acres),
         lost_reason=ReasonRef(id=str(row.lost_reason_id), code=row.lost_reason_code,
                               name=row.lost_reason_name) if row.lost_reason_id else None,
         lost_note=row.lost_note, reopen_count=row.reopen_count,
@@ -516,7 +564,8 @@ async def _lock(db: AsyncSession, lead_id: str) -> Any:
     return (await db.execute(text(
         "SELECT stage::text AS stage, first_contacted_at, lost_from_stage::text AS lost_from, "
         "lost_reason_id, lost_note, territory_id, owner_user_id, owner_org_unit_id, "
-        "assigned_partner_id, deleted_at FROM lead WHERE id = :id FOR UPDATE"),
+        "assigned_partner_id, deleted_at, crops::text[] AS crops "
+        "FROM lead WHERE id = :id FOR UPDATE"),
         {"id": lead_id})).one_or_none()
 
 
@@ -623,6 +672,52 @@ async def add_note(db: AsyncSession, caller: Caller, lead_id: str,
                          payload={"actor_name": actor, "note": body.note})
 
 
+# lead.assigned: each person id and the name key beside it (FS-016, BE-006)
+_ASSIGNED_NAMES = (("owner_user_id", "owner_name"), ("assigned_partner_id", "partner_name"),
+                   ("previous_owner_user_id", "previous_owner_name"))
+
+
+async def _timeline_refs(db: AsyncSession, lead_id: str, rows: Any,
+                         ) -> tuple[dict[str, str], dict[str, Any]]:
+    """The names an assignment event refers to and the quotations the page's
+    quotation events are about, one query each and only when the page needs them.
+    Names through lead_event_people(): whoever sees the lead sees the people its
+    history names, which people_names() cannot answer for a past owner (plan
+    review B-2). Quotations under the reader's own policies: lead_timeline() has
+    already dropped the events of any the reader cannot see (EC-7)."""
+    people_on: dict[str, str] = {}
+    if any(r.kind == "lead.assigned" for r in rows):
+        people_on = {str(p.id): p.name for p in (await db.execute(text(
+            "SELECT id, name FROM lead_event_people(CAST(:l AS uuid))"),
+            {"l": lead_id})).all()}
+    quote_ids = sorted({str(r.entity_id) for r in rows
+                        if r.entity_type == "quotation" and r.entity_id})
+    quotes: dict[str, Any] = {}
+    if quote_ids:
+        quotes = {str(q.id): q for q in (await db.execute(text(
+            "SELECT id, quote_no, version FROM quotation WHERE id = ANY(CAST(:ids AS uuid[]))"),
+            {"ids": quote_ids})).all()}
+    return people_on, quotes
+
+
+def _enrich(r: Any, payload: dict[str, Any], people_on: dict[str, str],
+            quotes: dict[str, Any]) -> dict[str, Any]:
+    """Read-time additions, so old events carry them too. A name key is present
+    whenever its id key is, null when the id is null (EC-6)."""
+    if r.kind == "lead.assigned":
+        payload = dict(payload)
+        for id_key, name_key in _ASSIGNED_NAMES:
+            if id_key in payload:
+                ref = payload[id_key]
+                payload[name_key] = people_on.get(str(ref)) if ref else None
+    elif r.entity_type == "quotation" and r.entity_id:
+        q = quotes.get(str(r.entity_id))
+        payload = {**payload, "quotation_id": str(r.entity_id),
+                   "quote_no": q.quote_no if q else None,
+                   "version": q.version if q else None}
+    return payload
+
+
 async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int = 100,
                    cursor: str | None = None) -> TimelinePage:
     """A lead's history, newest first, keyset-paged by (occurred_at, id). Reads
@@ -635,7 +730,7 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
     if cursor:
         before_at, before_id = _decode_cursor(cursor)
     rows = (await db.execute(text(
-        "SELECT id, kind, occurred_at, actor_id, payload "
+        "SELECT id, kind, occurred_at, actor_id, payload, entity_type, entity_id "
         "FROM lead_timeline(:id, :bat, :bid, :lim)"),
         {"id": lead_id, "bat": before_at, "bid": before_id, "lim": limit + 1})).all()
 
@@ -644,6 +739,7 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
         last = rows[limit - 1]
         next_cursor = _encode_cursor(last.occurred_at, str(last.id))
         rows = rows[:limit]
+    people_on, quotes = await _timeline_refs(db, lead_id, rows)
 
     events: list[TimelineEvent] = []
     for r in rows:
@@ -659,6 +755,8 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
             payload = {k: v for k, v in payload.items() if k != "actor_name"}
         if r.actor_id is not None and not hidden:
             actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name") or "")
+        if isinstance(payload, dict):
+            payload = _enrich(r, payload, people_on, quotes)
         events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso_req(r.occurred_at),
                                     actor=actor, payload=payload or {}))
     return TimelinePage(data=events, meta=PageMeta(limit=limit, next_cursor=next_cursor))
@@ -814,9 +912,23 @@ async def patch_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadP
         sets.append("estimated_value = :est")
         params["est"] = body.estimated_value
         changed["estimated_value"] = _dec(body.estimated_value)
+    if "crops" in fields:
+        if body.crops is None:
+            raise ValidationFailed(fields={"crops": "send [] to clear"})
+        codes = await _crop_codes(db, body.crops,
+                                  keep=frozenset(c.lower() for c in (row.crops or [])))
+        sets.append("crops = CAST(:crops AS citext[])")
+        params["crops"] = codes
+        changed["crops"] = codes
+    if "land_acres" in fields:
+        sets.append("land_acres = :acres")
+        params["acres"] = body.land_acres
+        changed["land_acres"] = _dec(body.land_acres)   # a string: the payload is JSON (EC-5)
 
     territory_id = body.territory_id  # None only when unsent: it is in _PATCH_REQUIRED
     if territory_id is not None and territory_id != str(row.territory_id):
+        # checked only on a change: a form re-sending the same territory is never refused
+        await check_lead_territory(db, territory_id)
         # Rule 4: with an owner the unit is the owner's (path A, kept as-is, GAP-061);
         # with no owner it is routed by the new territory (path B).
         new_oou = str(row.owner_org_unit_id)
@@ -1019,6 +1131,7 @@ _LOOKUP_COLS: dict[str, frozenset[str]] = {
     "won_lost_reason": frozenset({"sort_order", "kind"}),
     "meeting_type": frozenset({"sort_order"}),  # FS-014
     "complaint_type": frozenset({"sort_order"}),  # FS-015
+    "crop": frozenset({"sort_order"}),  # FS-016
 }
 
 
@@ -1188,13 +1301,86 @@ async def _lead_filters(db: AsyncSession, caller: Caller, *, stage: str | None =
     if created_from:
         where.append(lead_t.c.created_at >= _parse_ts(created_from, "created_from"))
     if created_to:
-        where.append(lead_t.c.created_at <= _parse_ts(created_to, "created_to"))
+        if _date_only(created_to):
+            # an inclusive IST date, as the order list reads it (FS-017 code review)
+            where.append(lead_t.c.created_at < _parse_ts(created_to, "created_to")
+                         + dt.timedelta(days=1))
+        else:
+            where.append(lead_t.c.created_at <= _parse_ts(created_to, "created_to"))
     if q:
         where.append(_search_clause(q))
     # Everything above narrows the set the caller asked for. The cursor below
     # narrows it to one page, so the total is counted from `filters` and not from
     # `where`: a total that shrank as the user paged would be worse than none.
     return where
+
+
+SortKey = Literal["created_at", "farmer_name", "estimated_value"]
+SortOrder = Literal["asc", "desc"]
+
+
+def _sort_column(sort: str) -> Any:
+    if sort == "farmer_name":
+        return sa.func.lower(lead_t.c.farmer_name)
+    if sort == "estimated_value":
+        return lead_t.c.estimated_value
+    return lead_t.c.created_at
+
+
+def _encode_list_cursor(sort: str, order: str, value: Any, lead_id: str) -> str:
+    """JSON, so a name holding any character survives (FS-016 EC-3). The value is a
+    string or null: a timestamp in ISO form, a Decimal as its text."""
+    v = None if value is None else (value.isoformat() if isinstance(value, datetime)
+                                    else str(value))
+    raw = json.dumps({"s": sort, "o": order, "v": v, "id": lead_id}, separators=(",", ":"))
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _decode_list_cursor(cursor: str, sort: str, order: str) -> tuple[Any, str]:
+    """(value, id) for this sort. A cursor made for another sort is refused. The
+    old `ts|id` form still reads as the default order (EC-4)."""
+    bad = ValidationFailed(fields={"cursor": "malformed cursor"})
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode()).decode()
+    except (ValueError, binascii.Error) as exc:
+        raise bad from exc
+    if not raw.startswith("{"):
+        if (sort, order) != ("created_at", "desc"):
+            raise ValidationFailed(fields={"cursor": "made for another sort; start again"})
+        return _decode_cursor(cursor)
+    try:
+        c = json.loads(raw)
+        if (c["s"], c["o"]) != (sort, order):
+            raise ValidationFailed(fields={"cursor": "made for another sort; start again"})
+        lead_id = str(uuid.UUID(str(c["id"])))
+        v = c["v"]
+        if v is None:
+            if sort != "estimated_value":
+                raise bad
+            return None, lead_id
+        if sort == "created_at":
+            return datetime.fromisoformat(v), lead_id
+        if sort == "estimated_value":
+            d = Decimal(v)
+            if not d.is_finite():
+                raise bad
+            return d, lead_id
+        return str(v), lead_id
+    except (ValueError, KeyError, TypeError, AttributeError, ArithmeticError) as exc:
+        raise bad from exc
+
+
+def _after(sort: str, order: str, value: Any, lead_id: str) -> Any:
+    """The rows after (value, id) in this order, nulls last in both (EC-1)."""
+    key = _sort_column(sort)
+    desc = order == "desc"
+    tie = lead_t.c.id < lead_id if desc else lead_t.c.id > lead_id
+    if value is None:   # the cursor is already in the null tail
+        return sa.and_(key.is_(None), tie)
+    beyond = key < value if desc else key > value
+    if sort != "estimated_value":
+        return sa.or_(beyond, sa.and_(key == value, tie))
+    return sa.or_(key.is_(None), beyond, sa.and_(key == value, tie))
 
 
 async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = None,
@@ -1206,8 +1392,10 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
                      created_from: str | None = None, created_to: str | None = None,
                      q: str | None = None, limit: int = 50,
                      cursor: str | None = None,
-                     include_total: bool = False) -> LeadPage:
-    """The lead list, scoped and filtered, keyset-paged by (created_at desc, id).
+                     include_total: bool = False,
+                     sort: SortKey = "created_at", order: SortOrder = "desc") -> LeadPage:
+    """The lead list, scoped and filtered, keyset-paged by (sort key, id); by
+    default (created_at desc, id). Missing values sort last (FS-016).
 
     Enforcer 1 is scope_predicate; RLS re-checks the same rows underneath. No total
     (ISS-014): counting a scoped table on every page is the cost this avoids.
@@ -1220,24 +1408,29 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
         assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
         created_from=created_from, created_to=created_to, q=q)
     filters = list(where)
+    legacy = (sort, order) == ("created_at", "desc")
     if cursor:
-        c_ts, c_id = _decode_cursor(cursor)
-        where.append(sa.or_(lead_t.c.created_at < c_ts,
-                            sa.and_(lead_t.c.created_at == c_ts, lead_t.c.id < c_id)))
+        c_val, c_id = _decode_list_cursor(cursor, sort, order)
+        where.append(_after(sort, order, c_val, c_id))
 
     total, total_capped = (await _capped_total(db, lead_t, filters)
                            if include_total else (None, False))
 
+    key = _sort_column(sort)
+    by_key = key.desc().nulls_last() if order == "desc" else key.asc().nulls_last()
+    by_lead = lead_t.c.id.desc() if order == "desc" else lead_t.c.id.asc()
     page = (await db.execute(
-        sa.select(lead_t.c.id, lead_t.c.created_at)
+        sa.select(lead_t.c.id, key.label("k"))
         .where(sa.and_(*where))
-        .order_by(lead_t.c.created_at.desc(), lead_t.c.id.desc())
+        .order_by(by_key, by_lead)
         .limit(limit + 1))).all()
 
     next_cursor = None
     if len(page) > limit:
         last = page[limit - 1]
-        next_cursor = _encode_cursor(last.created_at, str(last.id))
+        # the default order keeps the cursor form clients already hold
+        next_cursor = (_encode_cursor(last.k, str(last.id)) if legacy
+                       else _encode_list_cursor(sort, order, last.k, str(last.id)))
         page = page[:limit]
 
     ids = [str(r.id) for r in page]
@@ -1292,7 +1485,7 @@ async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) ->
             by_source[code] += r.n
         if r.inquiry:
             by_inquiry_type[r.inquiry] = by_inquiry_type.get(r.inquiry, 0) + r.n
-    due_today, overdue = await _follow_ups(db, caller, where)
+    due_today, overdue = await follow_ups(db, caller, where)
     return LeadStats(total=total, by_stage=by_stage, by_priority=by_priority,
                      unassigned=unassigned, by_source=by_source,
                      by_inquiry_type=by_inquiry_type, follow_ups_due_today=due_today,
@@ -1302,18 +1495,20 @@ async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) ->
 _INQUIRY_TYPES = ("commercial", "subsidised", "industrial")
 
 
-async def _follow_ups(db: AsyncSession, caller: Caller, where: list[Any]
-                      ) -> tuple[int | None, int | None]:
+async def follow_ups(db: AsyncSession, caller: Caller, where: list[Any],
+                     today: dt.date | None = None) -> tuple[int | None, int | None]:
     """Open tasks on the filtered leads (FS-014), under the tasks policies: due today
     and overdue by the planner's own IST windows. None without a tasks scope, so a
     dealer's dashboard shows no figure rather than a false zero (BE-002, BE-007)."""
     if "tasks" not in caller.scopes:
         return None, None
-    today = today_ist()
+    today = today or today_ist()
     start, end = task_domain.day_bounds(today)
     window = task_domain.overdue_window(today, today)
     assert window is not None
-    leads = sa.select(lead_t.c.id).where(sa.and_(*where))
+    # a deleted lead's task is no one's follow-up, even for a caller who may read
+    # the lead (FS-017 rule 6, code review F-3)
+    leads = sa.select(lead_t.c.id).where(sa.and_(*where, lead_t.c.deleted_at.is_(None)))
     task_t = sa.table("task", sa.column("lead_id", _UUID), sa.column("status"),
                       sa.column("due_at", sa.DateTime(timezone=True)))
     open_ = sa.cast(task_t.c.status, sa.Text) == "open"
@@ -1343,12 +1538,23 @@ def _search_clause(q: str) -> Any:
     return sa.or_(*clauses)
 
 
+def _date_only(value: str) -> bool:
+    return len(value) == 10 and "T" not in value
+
+
 def _parse_ts(value: str, field: str) -> datetime:
+    """A date alone is the start of that IST day, as every other list reads it; a
+    time without a zone is UTC, as before (FS-017 code review: 00:30 IST was the
+    day before)."""
     try:
-        dt = datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value)
     except ValueError as exc:
         raise ValidationFailed(fields={field: "not an ISO date"}) from exc
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+    if parsed.tzinfo:
+        return parsed
+    if _date_only(value):
+        return parsed.replace(tzinfo=task_domain.IST)
+    return parsed.replace(tzinfo=UTC)
 
 
 def _encode_cursor(created_at: datetime, lead_id: str) -> str:
@@ -1371,6 +1577,15 @@ def _decode_cursor(cursor: str) -> tuple[datetime, str]:
 async def list_lead_sources(db: AsyncSession) -> list[LookupItem]:
     rows = (await db.execute(text(
         "SELECT id, code, name, is_active FROM lead_source "
+        "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
+    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
+            for r in rows]
+
+
+async def list_crops(db: AsyncSession) -> list[LookupItem]:
+    """Switched-off crops included, so a lead that has one still names it."""
+    rows = (await db.execute(text(
+        "SELECT id, code, name, is_active FROM crop "
         "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
     return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
             for r in rows]
@@ -1432,12 +1647,25 @@ async def list_partners(db: AsyncSession, *, q: str | None = None,
         for r in rows]
 
 
+_TERRITORY_LEVELS = ("state", "district", "taluka", "village")
+
+
 async def list_territories(db: AsyncSession, *, level: str | None = None,
+                           levels: str | None = None,
                            parent_id: str | None = None, q: str | None = None,
                            limit: int = 50) -> list[TerritoryPick]:
     """The territory picker for the new-lead form. territory is readable by any
-    authenticated caller; q is a name substring."""
+    authenticated caller; q is a name substring. `levels` is a comma list (FS-016)."""
     limit = max(1, min(limit, _MAX_LIMIT))
+    wanted: list[str] | None = None
+    if levels is not None:
+        if level is not None:
+            raise ValidationFailed(fields={"levels": "send levels or level, not both"})
+        wanted = [x.strip() for x in levels.split(",") if x.strip()]
+        unknown = [x for x in wanted if x not in _TERRITORY_LEVELS]
+        if unknown or not wanted:
+            raise ValidationFailed(fields={"levels": f"unknown level: {', '.join(unknown)}"
+                                           if unknown else "at least one level"})
     like = _contains(q) if q else None
     # Each optional filter casts its bind explicitly: a bare `:p IS NULL` leaves
     # asyncpg unable to infer the parameter type (AmbiguousParameterError).
@@ -1447,10 +1675,12 @@ async def list_territories(db: AsyncSession, *, level: str | None = None,
           FROM territory t
           LEFT JOIN territory p ON p.id = t.parent_id
          WHERE (CAST(:level AS text) IS NULL OR t.level::text = CAST(:level AS text))
+           AND (CAST(:levels AS text[]) IS NULL OR t.level::text = ANY(CAST(:levels AS text[])))
            AND (CAST(:parent AS uuid) IS NULL OR t.parent_id = CAST(:parent AS uuid))
            AND (CAST(:like AS text) IS NULL OR t.name ILIKE CAST(:like AS text))
          ORDER BY t.name LIMIT :lim"""),
-        {"level": level, "parent": parent_id, "like": like, "lim": limit})).all()
+        {"level": level, "levels": wanted, "parent": parent_id, "like": like,
+         "lim": limit})).all()
     return [TerritoryPick(
         id=str(r.id), name=r.name, level=r.level, code=r.code,
         parent=TerritoryParent(id=str(r.parent_id), name=r.parent_name,
