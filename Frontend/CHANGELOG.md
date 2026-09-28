@@ -43,6 +43,8 @@ What a user can do — and how far each feature was tested — was spread over f
 - **`Docs/screenshots/`** — 29 screenshots from the checks of the lead actions, the quotation screens, the builder, the lifecycle walk-through and the customer's page, by module, as WebP (1.2 MB instead of 3.9 MB as PNG).
 - **An index at the top of `CHANGELOG.md`** — one line per change: date, title linking to its entry, type and Data IDs. Generated like the rest, so it never drifts.
 - `AGENTS.md` §1 and `changelog/README.md` point to the new file.
+- **`AGENTS.md` §11, "The records every pull request keeps current"** — the rules, so every contributor and every new AI session keeps them without being asked: the changelog entry, the Data IDs, `Plan.md` §9, `docs/Backend-Tasks.md` for anything asked of the backend, `Tested-Features.md` for every user-facing change, screenshots saved as JPEG under `Docs/screenshots/<module>/`, and the pull request template (stacked pull requests say so first).
+- **`docs/Backend-Tasks.md`** — BE-002 (answered: follow-ups are tasks), BE-007 and BE-011 marked done in #25, which merged into `integration` without ticking them; the notes say what #25 changed.
 
 #### Discussion
 
@@ -56,7 +58,9 @@ What a user can do — and how far each feature was tested — was spread over f
 - `Docs/Tested-Features.md` — new
 - `Docs/screenshots/leads/`, `quotations/`, `public/` — new, 29 WebP screenshots
 - `scripts/changelog/lib.ts` — `renderIndex`, rendered at the top of `CHANGELOG.md`; `CHANGELOG.md` regenerated
-- `changelog/README.md`, `AGENTS.md` — point to the index and the new file
+- `changelog/README.md`, `AGENTS.md` — point to the index and the new file; `AGENTS.md` §11 lists the records every pull request keeps current
+- `../docs/Backend-Tasks.md` — BE-002, BE-007, BE-011 recorded from #25
+- `Docs/Plan.md` — §9.3: tasks and complaints are on `integration` (#25), with the new lead stats
 
 #### Tests
 

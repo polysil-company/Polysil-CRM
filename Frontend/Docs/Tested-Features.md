@@ -2,7 +2,7 @@
 
 One place to see every feature a user can use today, how far each one is tested, and where it lives. Read it before trying the app by hand: if a story is here with its checks, it has been exercised, and the list of cases tells you what was covered.
 
-**Keep it current.** Update this file in the same pull request that adds or changes a feature, as with [Plan.md §9](Plan.md). New screenshots go in [`screenshots/`](screenshots) (WebP, one folder per module).
+**Keep it current.** Update this file in the same pull request that adds or changes a feature, as with [Plan.md §9](Plan.md) — the full list of records is in [AGENTS.md §11](../AGENTS.md). New screenshots go in [`screenshots/`](screenshots), one folder per module, as JPEG at quality 80 (the first ones are WebP).
 
 ## How to read it
 
