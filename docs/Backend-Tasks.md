@@ -53,6 +53,7 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-015** · Point quotation share links at the app: set `PUBLIC_WEB_URL` · QUOT-002 · high
 - [ ] **BE-016** · Say whether the dev API renders real PDFs · QUOT-003 · normal
+- [ ] **BE-017** · Name the quotation on its events in the lead's timeline · QUOT-010 · normal
 
 ---
 
@@ -259,5 +260,19 @@ in the same shape. Never renumber or reuse a number.
 - **Why:** **Open PDF** opens the signed link in a new tab; if the dev API serves HTML, what the
   frontend developer checks there is not what the farmer receives.
 - **Done when:** decided and noted (💬 is fine).
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-017 · Name the quotation on its events in the lead's timeline
+
+- **Status:** ⬜ Open
+- **Asked:** 28 Sep 2026 · QUOT-010, LEAD-005
+- **What:** on every `quotation.*` event that `GET /leads/{id}/timeline` returns, add `quotation_id`,
+  `quote_no` (null on a draft) and `version` to the payload. The contract lists `from`, `to`, `remark`
+  and `actor_name` only.
+- **Why:** a lead's history shows "Quotation sent", "Quotation accepted" and so on, but cannot say
+  which quotation or link to it when a lead has more than one (a revision, or a second unit).
+- **Done when:** the payloads carry the three fields; say in the notes if a dealer should not see
+  any of them.
 - **Done in:** —
 - **Backend notes:** —

@@ -1,13 +1,26 @@
+import {
+  TIMELINE_PAGE_SIZE,
+  timelinePageSchema,
+  type TimelinePage,
+} from "@/features/leads/api/leads.schemas";
 import { apiRequest } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
+  noContentSchema,
   productPageSchema,
+  quotationVersionsResponseSchema,
   quotePreviewResponseSchema,
   pdfLinkResponseSchema,
   quotationPageSchema,
   quotationResponseSchema,
   type CreateQuotationRequest,
+  type DeleteQuotationRequest,
+  type RequestApprovalRequest,
+  type ReviseQuotationRequest,
+  type SendQuotationRequest,
+  type TransitionQuotationRequest,
+  type QuotationSummary,
   type PatchQuotationRequest,
   type PdfLink,
   type ProductPick,
@@ -177,5 +190,136 @@ export function replaceQuotationLines(
     body,
     idempotencyKey,
     schema: quotationResponseSchema,
+  });
+}
+
+/** QUOT-006 · POST /quotations/{id}/send — numbers the draft; the PDF follows within seconds. */
+export function sendQuotation(
+  quotationId: string,
+  { body, idempotencyKey }: SaveInput<SendQuotationRequest>,
+): Promise<Quotation> {
+  return apiRequest({
+    dataId: "QUOT-006",
+    logger: log,
+    fn: "sendQuotation",
+    method: "POST",
+    path: `/quotations/${encodeURIComponent(quotationId)}/send`,
+    body,
+    idempotencyKey,
+    schema: quotationResponseSchema,
+  });
+}
+
+/** QUOT-007 · POST /quotations/{id}/request-approval — asks a manager to approve the discount. */
+export function requestQuotationApproval(
+  quotationId: string,
+  { body, idempotencyKey }: SaveInput<RequestApprovalRequest>,
+): Promise<Quotation> {
+  return apiRequest({
+    dataId: "QUOT-007",
+    logger: log,
+    fn: "requestQuotationApproval",
+    method: "POST",
+    path: `/quotations/${encodeURIComponent(quotationId)}/request-approval`,
+    body,
+    idempotencyKey,
+    schema: quotationResponseSchema,
+  });
+}
+
+/** QUOT-008 · POST /quotations/{id}/transition — the customer's answer. */
+export function transitionQuotation(
+  quotationId: string,
+  { body, idempotencyKey }: SaveInput<TransitionQuotationRequest>,
+): Promise<Quotation> {
+  return apiRequest({
+    dataId: "QUOT-008",
+    logger: log,
+    fn: "transitionQuotation",
+    method: "POST",
+    path: `/quotations/${encodeURIComponent(quotationId)}/transition`,
+    body,
+    idempotencyKey,
+    schema: quotationResponseSchema,
+  });
+}
+
+/** QUOT-009 · POST /quotations/{id}/revise — a new draft of the same number, re-priced. */
+export function reviseQuotation(
+  quotationId: string,
+  { body, idempotencyKey }: SaveInput<ReviseQuotationRequest>,
+): Promise<Quotation> {
+  return apiRequest({
+    dataId: "QUOT-009",
+    logger: log,
+    fn: "reviseQuotation",
+    method: "POST",
+    path: `/quotations/${encodeURIComponent(quotationId)}/revise`,
+    body,
+    idempotencyKey,
+    schema: quotationResponseSchema,
+  });
+}
+
+/** QUOT-009 · GET /quotations/{id}/versions — every version of the number, oldest first. */
+export function listQuotationVersions(
+  quotationId: string,
+  signal?: AbortSignal,
+): Promise<QuotationSummary[]> {
+  return apiRequest({
+    dataId: "QUOT-009",
+    logger: log,
+    fn: "listQuotationVersions",
+    path: `/quotations/${encodeURIComponent(quotationId)}/versions`,
+    schema: quotationVersionsResponseSchema,
+    signal,
+  });
+}
+
+export interface QuotationTimelineParams {
+  readonly quotationId: string;
+  /** From the previous page's `nextCursor`; null for the newest events. */
+  readonly cursor: string | null;
+}
+
+/** QUOT-010 · GET /quotations/{id}/timeline — one page of the quotation's history, newest first. */
+export async function getQuotationTimeline(
+  { quotationId, cursor }: QuotationTimelineParams,
+  signal?: AbortSignal,
+): Promise<TimelinePage> {
+  const page = await apiRequest({
+    dataId: "QUOT-010",
+    logger: log,
+    fn: "getQuotationTimeline",
+    path: `/quotations/${encodeURIComponent(quotationId)}/timeline`,
+    query: { limit: TIMELINE_PAGE_SIZE, cursor },
+    schema: timelinePageSchema,
+    signal,
+  });
+  if (page.skipped > 0) {
+    // A backend-side issue: the rest of the history is still shown.
+    log.warn(
+      "getQuotationTimeline",
+      `left out ${String(page.skipped)} event(s) that did not match the contract`,
+      { dataId: "QUOT-010", context: { skipped: page.skipped, kept: page.items.length } },
+    );
+  }
+  return page;
+}
+
+/** QUOT-011 · DELETE /quotations/{id} — a draft only; 204 with no body. */
+export async function deleteQuotation(
+  quotationId: string,
+  { body, idempotencyKey }: SaveInput<DeleteQuotationRequest>,
+): Promise<void> {
+  await apiRequest({
+    dataId: "QUOT-011",
+    logger: log,
+    fn: "deleteQuotation",
+    method: "DELETE",
+    path: `/quotations/${encodeURIComponent(quotationId)}`,
+    body,
+    idempotencyKey,
+    schema: noContentSchema,
   });
 }

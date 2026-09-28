@@ -5,7 +5,6 @@ import {
   ArrowLeft01Icon,
   CheckmarkCircle02Icon,
   Copy01Icon,
-  Edit02Icon,
   InformationCircleIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -19,7 +18,6 @@ import { QueryView } from "@/components/patterns/query-view";
 import { RelativeDate } from "@/components/patterns/relative-date";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,7 +32,7 @@ import {
   parseWarnings,
   quotationTitle,
 } from "@/features/quotations/lib/quotation-labels";
-import { useCan } from "@/features/session/hooks/use-session";
+import { draftSendNotice } from "@/features/quotations/lib/quotation-lifecycle";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { isApiError } from "@/lib/api/errors";
 import {
@@ -46,8 +44,10 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { QuotationPdfButton } from "./quotation-pdf-button";
+import { QuotationActions } from "./quotation-actions";
+import { QuotationHistory } from "./quotation-history";
 import { QuotationStatusBadge } from "./quotation-status-badge";
+import { QuotationVersions } from "./quotation-versions";
 
 /** QUOT-002 · The quotation as the backend prints it. A 404 renders the route's not-found page. */
 export function QuotationDetail({ quotationId }: { quotationId: string }): React.JSX.Element {
@@ -71,7 +71,6 @@ export function QuotationDetail({ quotationId }: { quotationId: string }): React
 
 function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX.Element {
   const sent = quotation.status !== "draft";
-  const canEdit = useCan("quotations", "edit");
 
   return (
     <div className="flex flex-col gap-5">
@@ -106,22 +105,7 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
             )}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {sent && quotation.pdfState !== null ? (
-            <QuotationPdfButton quotationId={quotation.id} pdfState={quotation.pdfState} />
-          ) : null}
-          {/* QUOT-004 · A draft is edited; a sent quotation is revised instead. */}
-          {!sent && canEdit ? (
-            <Link
-              href={`/quotations/${quotation.id}/edit`}
-              transitionTypes={["nav-forward"]}
-              className={buttonVariants({ variant: "outline" })}
-            >
-              <Icon icon={Edit02Icon} />
-              Edit draft
-            </Link>
-          ) : null}
-        </div>
+        <QuotationActions quotation={quotation} />
       </div>
 
       <QuotationNotices quotation={quotation} />
@@ -181,89 +165,104 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
               </CardContent>
             </Card>
           )}
+          <QuotationVersions quotation={quotation} />
         </div>
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle level={3}>Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-              <DetailItem label="Owner">
-                {quotation.owner === null ? (
-                  <span className="text-muted-foreground">
-                    Unassigned · {quotation.ownerOrgUnit.name}
-                  </span>
-                ) : (
-                  <AvatarLabel
-                    name={quotation.owner.name}
-                    secondary={quotation.ownerOrgUnit.name}
-                    size="xs"
-                  />
-                )}
-              </DetailItem>
-              <DetailItem label="Channel partner">
-                {quotation.partner === null
-                  ? "Direct sale"
-                  : `${quotation.partner.name}${quotation.partner.partnerType === null ? "" : ` · ${partnerTypeLabel(quotation.partner.partnerType)}`}`}
-              </DetailItem>
-              <DetailItem label="Place of supply">
-                {quotation.placeOfSupply.territory.name} · {quotation.placeOfSupply.state}
-                <span className="block text-xs text-muted-foreground">
-                  {quotation.intraState
-                    ? "Within the state — CGST and SGST"
-                    : "Across states — IGST"}
-                </span>
-              </DetailItem>
-              <DetailItem label="Seller">
-                {quotation.seller.legalName}
-                <span className="block font-mono text-xs text-muted-foreground">
-                  {quotation.seller.gstin}
-                </span>
-              </DetailItem>
-              <DetailItem label="Prices as of">
-                {formatFullDate(quotation.priceEffectiveDate)}
-                {quotation.priceList === null ? null : (
-                  <span className="block text-xs text-muted-foreground">
-                    {quotation.priceList.name}
-                  </span>
-                )}
-              </DetailItem>
-              <DetailItem label="Valid until">
-                {quotation.validUntil === null
-                  ? "Set when sent"
-                  : formatFullDate(quotation.validUntil)}
-              </DetailItem>
-              <DetailItem label="Sent">
-                {quotation.sentAt === null ? "Not yet" : <RelativeDate value={quotation.sentAt} />}
-              </DetailItem>
-              {sent ? (
-                <DetailItem label="Opened by the customer">
-                  {quotation.viewedAt === null ? (
-                    "Not yet"
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle level={3}>Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                <DetailItem label="Owner">
+                  {quotation.owner === null ? (
+                    <span className="text-muted-foreground">
+                      Unassigned · {quotation.ownerOrgUnit.name}
+                    </span>
                   ) : (
-                    <>
-                      <RelativeDate value={quotation.viewedAt} />
-                      <span className="text-muted-foreground">
-                        {" "}
-                        ·{" "}
-                        {quotation.openCount === 1
-                          ? "once"
-                          : `${formatNumber(quotation.openCount)} times`}
-                      </span>
-                    </>
+                    <AvatarLabel
+                      name={quotation.owner.name}
+                      secondary={quotation.ownerOrgUnit.name}
+                      size="xs"
+                    />
                   )}
                 </DetailItem>
-              ) : null}
-              <DetailItem label="Created">
-                {formatFullDate(quotation.createdAt)}
-                {quotation.createdBy === null ? null : (
-                  <span className="text-muted-foreground"> · by {quotation.createdBy.name}</span>
-                )}
-              </DetailItem>
-            </dl>
-            {quotation.shareUrl === null ? null : <ShareLink url={quotation.shareUrl} />}
-          </CardContent>
-        </Card>
+                <DetailItem label="Channel partner">
+                  {quotation.partner === null
+                    ? "Direct sale"
+                    : `${quotation.partner.name}${quotation.partner.partnerType === null ? "" : ` · ${partnerTypeLabel(quotation.partner.partnerType)}`}`}
+                </DetailItem>
+                <DetailItem label="Place of supply">
+                  {quotation.placeOfSupply.territory.name} · {quotation.placeOfSupply.state}
+                  <span className="block text-xs text-muted-foreground">
+                    {quotation.intraState
+                      ? "Within the state — CGST and SGST"
+                      : "Across states — IGST"}
+                  </span>
+                </DetailItem>
+                <DetailItem label="Seller">
+                  {quotation.seller.legalName}
+                  <span className="block font-mono text-xs text-muted-foreground">
+                    {quotation.seller.gstin}
+                  </span>
+                </DetailItem>
+                <DetailItem label="Prices as of">
+                  {formatFullDate(quotation.priceEffectiveDate)}
+                  {quotation.priceList === null ? null : (
+                    <span className="block text-xs text-muted-foreground">
+                      {quotation.priceList.name}
+                    </span>
+                  )}
+                </DetailItem>
+                <DetailItem label="Valid until">
+                  {quotation.validUntil === null
+                    ? "Set when sent"
+                    : formatFullDate(quotation.validUntil)}
+                </DetailItem>
+                <DetailItem label="Sent">
+                  {quotation.sentAt === null ? (
+                    "Not yet"
+                  ) : (
+                    <RelativeDate value={quotation.sentAt} />
+                  )}
+                </DetailItem>
+                {sent ? (
+                  <DetailItem label="Opened by the customer">
+                    {quotation.viewedAt === null ? (
+                      "Not yet"
+                    ) : (
+                      <>
+                        <RelativeDate value={quotation.viewedAt} />
+                        <span className="text-muted-foreground">
+                          {" "}
+                          ·{" "}
+                          {quotation.openCount === 1
+                            ? "once"
+                            : `${formatNumber(quotation.openCount)} times`}
+                        </span>
+                      </>
+                    )}
+                  </DetailItem>
+                ) : null}
+                <DetailItem label="Created">
+                  {formatFullDate(quotation.createdAt)}
+                  {quotation.createdBy === null ? null : (
+                    <span className="text-muted-foreground"> · by {quotation.createdBy.name}</span>
+                  )}
+                </DetailItem>
+              </dl>
+              {quotation.shareUrl === null ? null : <ShareLink url={quotation.shareUrl} />}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle level={3}>History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <QuotationHistory quotationId={quotation.id} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -327,7 +326,18 @@ function QuotationNotices({ quotation }: { quotation: Quotation }): React.JSX.El
     (warning) => warning.code !== "provisional_pricing",
   );
   const notices: React.ReactNode[] = [];
+  const sendNotice = draftSendNotice(quotation);
 
+  if (sendNotice !== null) {
+    notices.push(
+      <Notice key="send" tone={sendNotice.tone}>
+        <p className="font-medium">{sendNotice.title}</p>
+        {sendNotice.detail === null ? null : (
+          <p className="text-muted-foreground">{sendNotice.detail}</p>
+        )}
+      </Notice>,
+    );
+  }
   if (quotation.supersededBy !== null) {
     notices.push(
       <Notice key="superseded" tone="info">

@@ -6,29 +6,57 @@ import { leadKeys } from "@/features/leads/api/leads.queries";
 
 import {
   createQuotation,
+  deleteQuotation,
   patchQuotation,
   replaceQuotationLines,
+  requestQuotationApproval,
+  reviseQuotation,
+  sendQuotation,
+  transitionQuotation,
   type SaveInput,
 } from "./quotations.api";
 import { quotationKeys } from "./quotations.queries";
 import type {
   CreateQuotationRequest,
+  DeleteQuotationRequest,
   PatchQuotationRequest,
   Quotation,
   ReplaceLinesRequest,
+  RequestApprovalRequest,
+  ReviseQuotationRequest,
+  SendQuotationRequest,
+  TransitionQuotationRequest,
 } from "./quotations.schemas";
 
-/** A saved draft: it takes the backend's answer, and every list — a lead's too — refetches. */
+/**
+ * A quotation the backend just wrote: its document is the answer, and everything that shows
+ * it refetches — the lists (a lead's too), its versions and history, and the lead, whose
+ * stage a send or an answer may have moved.
+ */
 function useApplySaved(): (quotation: Quotation) => void {
   const queryClient = useQueryClient();
   return (quotation) => {
     queryClient.setQueryData(quotationKeys.detail(quotation.id), quotation);
     void queryClient.invalidateQueries({ queryKey: quotationKeys.lists() });
+    void queryClient.invalidateQueries({ queryKey: quotationKeys.versionLists() });
+    void queryClient.invalidateQueries({ queryKey: quotationKeys.timelines() });
+    if (quotation.supersedes !== null) {
+      // Sending a revision marks the version it replaces.
+      void queryClient.invalidateQueries({
+        queryKey: quotationKeys.detail(quotation.supersedes.id),
+      });
+    }
     if (quotation.lead !== null) {
-      // The lead's history gains a quotation event.
-      void queryClient.invalidateQueries({ queryKey: leadKeys.timeline(quotation.lead.id) });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.detail(quotation.lead.id) });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.lists() });
     }
   };
+}
+
+/** An action on one quotation, with its body and the key that makes a retry safe. */
+export interface QuotationActionInput<TBody> {
+  readonly quotationId: string;
+  readonly input: SaveInput<TBody>;
 }
 
 /** QUOT-004 · Create a draft on a lead. */
@@ -69,5 +97,87 @@ export function useUpdateDraft(): UseMutationResult<Quotation, Error, UpdateDraf
     },
     meta: { dataId: "QUOT-004" },
     onSuccess: applySaved,
+  });
+}
+
+/** QUOT-006 · Send a draft. */
+export function useSendQuotation(): UseMutationResult<
+  Quotation,
+  Error,
+  QuotationActionInput<SendQuotationRequest>
+> {
+  const applySaved = useApplySaved();
+  return useMutation({
+    mutationKey: [...quotationKeys.all, "send"],
+    mutationFn: ({ quotationId, input }) => sendQuotation(quotationId, input),
+    meta: { dataId: "QUOT-006" },
+    onSuccess: applySaved,
+  });
+}
+
+/** QUOT-007 · Ask for the discount to be approved. */
+export function useRequestQuotationApproval(): UseMutationResult<
+  Quotation,
+  Error,
+  QuotationActionInput<RequestApprovalRequest>
+> {
+  const applySaved = useApplySaved();
+  return useMutation({
+    mutationKey: [...quotationKeys.all, "request-approval"],
+    mutationFn: ({ quotationId, input }) => requestQuotationApproval(quotationId, input),
+    meta: { dataId: "QUOT-007" },
+    onSuccess: applySaved,
+  });
+}
+
+/** QUOT-008 · Record the customer's answer. */
+export function useTransitionQuotation(): UseMutationResult<
+  Quotation,
+  Error,
+  QuotationActionInput<TransitionQuotationRequest>
+> {
+  const applySaved = useApplySaved();
+  return useMutation({
+    mutationKey: [...quotationKeys.all, "transition"],
+    mutationFn: ({ quotationId, input }) => transitionQuotation(quotationId, input),
+    meta: { dataId: "QUOT-008" },
+    onSuccess: applySaved,
+  });
+}
+
+/** QUOT-009 · Revise into a new draft; the answer is the new version. */
+export function useReviseQuotation(): UseMutationResult<
+  Quotation,
+  Error,
+  QuotationActionInput<ReviseQuotationRequest>
+> {
+  const applySaved = useApplySaved();
+  return useMutation({
+    mutationKey: [...quotationKeys.all, "revise"],
+    mutationFn: ({ quotationId, input }) => reviseQuotation(quotationId, input),
+    meta: { dataId: "QUOT-009" },
+    onSuccess: applySaved,
+  });
+}
+
+/**
+ * QUOT-011 · Delete a draft. The page leaves the draft on success, so only what lists it
+ * refetches; its own cache entry expires unobserved.
+ */
+export function useDeleteQuotation(
+  leadId: string | null,
+): UseMutationResult<void, Error, QuotationActionInput<DeleteQuotationRequest>> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...quotationKeys.all, "delete"],
+    mutationFn: ({ quotationId, input }) => deleteQuotation(quotationId, input),
+    meta: { dataId: "QUOT-011" },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: quotationKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: quotationKeys.versionLists() });
+      if (leadId !== null) {
+        void queryClient.invalidateQueries({ queryKey: leadKeys.timeline(leadId) });
+      }
+    },
   });
 }

@@ -8,6 +8,7 @@ export {
   isPast,
   isSameDay,
   toDate,
+  todayInIndia,
   type DateInput,
 } from "./date";
 export { describeCountdown, formatCountdown } from "./duration";

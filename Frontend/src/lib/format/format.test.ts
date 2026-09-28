@@ -16,6 +16,7 @@ import {
   normalizeIndianMobile,
   sumRupees,
   toRupeeNumber,
+  todayInIndia,
 } from "@/lib/format";
 
 const NOW = new Date("2026-09-14T10:00:00+05:30");
@@ -109,6 +110,11 @@ describe("[DS-001] date formatting (India Standard Time)", () => {
       "3 hours ago",
     );
     expect(formatRelativeTime(new Date(NOW.getTime() + 20_000), NOW)).toBe("now");
+  });
+
+  it("gives today's date in India, already tomorrow there late in the UTC evening", () => {
+    expect(todayInIndia(NOW)).toBe("2026-09-14");
+    expect(todayInIndia(new Date("2026-09-14T19:00:00Z"))).toBe("2026-09-15");
   });
 
   it("handles missing and invalid dates without throwing", () => {

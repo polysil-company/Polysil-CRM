@@ -1,10 +1,19 @@
-import { keepPreviousData, queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 
-import { getQuotation, listQuotations, previewQuoteLines, searchProducts } from "./quotations.api";
+import {
+  getQuotation,
+  getQuotationTimeline,
+  listQuotationVersions,
+  listQuotations,
+  previewQuoteLines,
+  searchProducts,
+} from "./quotations.api";
 import type { QuoteLinesRequest, QuotationListParams } from "./quotations.schemas";
 
 /** How often a just-sent quotation is re-read while its PDF renders (a few seconds). */
 export const PDF_PENDING_POLL_MS = 3000;
+/** How often a draft waiting on a discount approval is re-read: a manager decides in minutes. */
+export const APPROVAL_PENDING_POLL_MS = 30_000;
 
 /**
  * Query keys for quotations. Invalidate by prefix:
@@ -17,6 +26,10 @@ export const quotationKeys = {
   list: (params: QuotationListParams) => [...quotationKeys.lists(), params] as const,
   details: () => [...quotationKeys.all, "detail"] as const,
   detail: (quotationId: string) => [...quotationKeys.details(), quotationId] as const,
+  timelines: () => [...quotationKeys.all, "timeline"] as const,
+  timeline: (quotationId: string) => [...quotationKeys.timelines(), quotationId] as const,
+  versionLists: () => [...quotationKeys.all, "versions"] as const,
+  versions: (quotationId: string) => [...quotationKeys.versionLists(), quotationId] as const,
   products: (q: string) => [...quotationKeys.all, "products", q] as const,
   previews: () => [...quotationKeys.all, "preview"] as const,
   preview: (request: QuoteLinesRequest) => [...quotationKeys.previews(), request] as const,
@@ -32,13 +45,20 @@ export function quotationListQueryOptions(params: QuotationListParams) {
   });
 }
 
-/** QUOT-002 · Re-reads every few seconds while the PDF is being rendered, then stops. */
+/**
+ * QUOT-002 · Re-reads every few seconds while the PDF is being rendered, and now and then
+ * while a discount approval is pending (QUOT-007), then stops.
+ */
 export function quotationDetailQueryOptions(quotationId: string) {
   return queryOptions({
     queryKey: quotationKeys.detail(quotationId),
     queryFn: ({ signal }) => getQuotation(quotationId, signal),
-    refetchInterval: (query) =>
-      query.state.data?.pdfState === "pending" ? PDF_PENDING_POLL_MS : false,
+    refetchInterval: (query) => {
+      const quotation = query.state.data;
+      if (quotation?.pdfState === "pending") return PDF_PENDING_POLL_MS;
+      if (quotation?.approval?.status === "pending") return APPROVAL_PENDING_POLL_MS;
+      return false;
+    },
     meta: { dataId: "QUOT-002" },
   });
 }
@@ -67,5 +87,29 @@ export function quotePreviewQueryOptions(request: QuoteLinesRequest) {
     staleTime: 60_000,
     retry: false,
     meta: { dataId: "QUOT-005" },
+  });
+}
+
+/** The first timeline page has no cursor. */
+const NEWEST_TIMELINE_PAGE: string | null = null;
+
+/** QUOT-009 · Every version of the quotation's number, oldest first. */
+export function quotationVersionsQueryOptions(quotationId: string) {
+  return queryOptions({
+    queryKey: quotationKeys.versions(quotationId),
+    queryFn: ({ signal }) => listQuotationVersions(quotationId, signal),
+    meta: { dataId: "QUOT-009" },
+  });
+}
+
+/** QUOT-010 · The quotation's history, newest first, a page at a time. */
+export function quotationTimelineQueryOptions(quotationId: string) {
+  return infiniteQueryOptions({
+    queryKey: quotationKeys.timeline(quotationId),
+    queryFn: ({ pageParam, signal }) =>
+      getQuotationTimeline({ quotationId, cursor: pageParam }, signal),
+    initialPageParam: NEWEST_TIMELINE_PAGE,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    meta: { dataId: "QUOT-010" },
   });
 }
