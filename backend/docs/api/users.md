@@ -463,7 +463,7 @@ failed attempts stay on record. A partner user has nothing to unlock
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `level` | string | yes | state, district or taluka. |
+| `level` | string | yes | state, district, taluka or village. |
 
 **`UnlockResult`**
 

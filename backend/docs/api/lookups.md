@@ -117,6 +117,97 @@ Switch a complaint type on or off, or reorder it.
 
 ---
 
+## `GET /api/v1/lookups/crops`
+
+**Crops**
+
+The crops for a lead's crop picker. A switched-off crop is listed with
+`is_active: false`: offer it only when it is already on the lead.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_LookupItem__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/lookups/crops`
+
+**Add Crop**
+
+Add a crop to the list.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`LookupCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
+| `name` | string | yes | Display name. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `PATCH /api/v1/lookups/crops/{item_id}`
+
+**Edit Crop**
+
+Switch a crop on or off, or reorder it. Names never change in place.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `item_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`LookupUpdate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/lookups/lead-sources`
 
 **Lead Sources**
@@ -584,13 +675,15 @@ computation (the next create, transition, note, assign or reopen).
 **Territories**
 
 The territory picker for the new-lead form. Pick a district, then its
-talukas by passing `parent_id`, or search by name with `q`.
+talukas by passing `parent_id`, or search by name with `q`. `422` on `levels`
+for an unknown level, or with `level` as well.
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `level` | query | string \| null |  | state, district, taluka or village. |
+| `levels` | query | string \| null |  | Several levels, comma-separated: `district,taluka,village` for the new-lead form, where a state is refused. Not together with `level`. |
 | `parent_id` | query | string \| null |  | Only children of this territory. |
 | `q` | query | string \| null |  | Name substring. |
 | `limit` | query | integer |  |  |

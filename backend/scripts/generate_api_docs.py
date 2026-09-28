@@ -245,7 +245,9 @@ def main() -> None:
         "| Money | decimal **string** — `\"1234.56\"` |",
         "| Time | ISO-8601 UTC, rendered IST |",
         "| Idempotency | `Idempotency-Key` on every POST/PATCH, except the `/auth` mutations |",
-        "| Pagination | `page`, `limit`, `sort`, `q` |",
+        "| Pagination | by cursor, not page number: `limit`, then the previous page's "
+        "`meta.next_cursor` as `cursor`; absent on the last page. `include_total=true` "
+        "adds `meta.total` (capped, see `meta.total_capped`) where a list offers it |",
         "",
         "**Empty list versus 403.** Rows are scoped by permission in the database. An empty",
         "collection means nothing is in the caller's scope; `403` means the action itself is",

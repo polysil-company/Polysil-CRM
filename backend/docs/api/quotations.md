@@ -845,7 +845,7 @@ Every version of the number, oldest first. Any version's id works.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `level` | string | yes | state, district or taluka. |
+| `level` | string | yes | state, district, taluka or village. |
 
 **`TimelineEvent`**
 

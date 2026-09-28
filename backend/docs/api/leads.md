@@ -115,6 +115,8 @@ day it is the slowest thing on the screen.
 | `limit` | query | integer |  |  |
 | `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 | `include_total` | query | boolean |  | Also count how many leads match, for a "1 to 25 of 137" caption. Off by default: it costs a second query over everything in your scope, and most screens do not need it. |
+| `sort` | query | `created_at` \| `farmer_name` \| `estimated_value` |  | The column to sort by. `farmer_name` ignores case; leads with no `estimated_value` come last in both orders. |
+| `order` | query | `asc` \| `desc` |  | asc or desc. |
 
 **Responses**
 
@@ -160,13 +162,15 @@ the stored `201` and creates nothing; the same key with a different body is
 | `farmer_name` | string | yes | The enquirer's name. Shown on the lead and on generated documents. |
 | `mobile` | string | yes | Any Indian form: 10 digits, or with 0, 91 or +91. Spaces, dashes and brackets are fine. Stored as +91XXXXXXXXXX. |
 | `email` | string \| null |  | Optional. Used for duplicate matching. |
-| `territory_id` | string | yes | The taluka or district the farmer is in, from GET /lookups/territories. |
+| `territory_id` | string | yes | The district, taluka or village the farmer is in, from GET /lookups/territories?levels=district,taluka,village. A state is refused. |
 | `village` | string \| null |  | Optional. Used for duplicate matching. |
 | `inquiry_type` | `commercial` \| `subsidised` \| `industrial` | yes | commercial, subsidised or industrial. |
 | `mis_system` | string | yes | The micro-irrigation system, a code from GET /lookups/mis-systems. |
 | `source` | string \| null |  | A code from GET /lookups/lead-sources. Defaults by who you are: employee for staff, dealer for a partner user. |
 | `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
 | `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
+| `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
+| `land_acres` | number \| string \| null |  |  |
 
 **Responses**
 
@@ -378,6 +382,8 @@ the change. A closed lead (won, lost, merged) is `422 stage_terminal`.
 | `mis_system` | string \| null |  | A code from the lookup. |
 | `source` | string \| null |  | A code from the lookup. |
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
+| `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
+| `land_acres` | number \| string \| null |  | null clears it. |
 
 **Responses**
 
@@ -625,6 +631,14 @@ with the current stage in `fields.stage`.
 
 ## Models
 
+**`CropRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+| `is_active` | boolean | yes | False once the crop is switched off. It stays on the leads that have it; show it greyed. |
+
 **`DismissResult`**
 
 | Field | Type | Required | Notes |
@@ -721,6 +735,8 @@ with the current stage in `fields.stage`.
 | `score` | string \| null | yes | Decimal string, or null before scoring. |
 | `priority` | `hot` \| `warm` \| `cold` \| null | yes |  |
 | `estimated_value` | string \| null | yes |  |
+| `crops` | CropRef[] | yes | In the order they were sent. [] for none. |
+| `land_acres` | string \| null | yes | Land in acres, a decimal string. |
 | `lost_reason` | ReasonRef \| null | yes |  |
 | `lost_note` | string \| null | yes |  |
 | `reopen_count` | integer | yes |  |
@@ -745,13 +761,15 @@ with the current stage in `fields.stage`.
 | `farmer_name` | string | yes | The enquirer's name. Shown on the lead and on generated documents. |
 | `mobile` | string | yes | Any Indian form: 10 digits, or with 0, 91 or +91. Spaces, dashes and brackets are fine. Stored as +91XXXXXXXXXX. |
 | `email` | string \| null |  | Optional. Used for duplicate matching. |
-| `territory_id` | string | yes | The taluka or district the farmer is in, from GET /lookups/territories. |
+| `territory_id` | string | yes | The district, taluka or village the farmer is in, from GET /lookups/territories?levels=district,taluka,village. A state is refused. |
 | `village` | string \| null |  | Optional. Used for duplicate matching. |
 | `inquiry_type` | `commercial` \| `subsidised` \| `industrial` | yes | commercial, subsidised or industrial. |
 | `mis_system` | string | yes | The micro-irrigation system, a code from GET /lookups/mis-systems. |
 | `source` | string \| null |  | A code from GET /lookups/lead-sources. Defaults by who you are: employee for staff, dealer for a partner user. |
 | `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
 | `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
+| `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
+| `land_acres` | number \| string \| null |  |  |
 
 **`LeadMerge`**
 
@@ -785,6 +803,8 @@ with the current stage in `fields.stage`.
 | `mis_system` | string \| null |  | A code from the lookup. |
 | `source` | string \| null |  | A code from the lookup. |
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
+| `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
+| `land_acres` | number \| string \| null |  | null clears it. |
 
 **`LeadReopen`**
 
@@ -881,7 +901,7 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `level` | string | yes | state, district or taluka. |
+| `level` | string | yes | state, district, taluka or village. |
 
 **`TimelineEvent`**
 

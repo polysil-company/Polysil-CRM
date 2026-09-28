@@ -217,6 +217,9 @@ async def create_qr(db: AsyncSession, caller: Caller, body: sch.QrCodeCreate) ->
             "AND deleted_at IS NULL"), {"p": body.partner_id})).one_or_none()
         if seen is None:
             raise ValidationFailed(fields={"partner_id": "not found"})
+    if body.territory_id is not None:
+        # the form it prefills would refuse a state after the farmer's code (FS-016 EC-11)
+        await lead_service.check_lead_territory(db, str(body.territory_id))
     for _ in range(5):
         code = "".join(secrets.choice(QR_ALPHABET) for _ in range(QR_LENGTH))
         try:
