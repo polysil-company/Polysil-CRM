@@ -260,16 +260,29 @@ function toLine(
 
 const quotationLineSchema = quotationLineWireSchema.transform((wire) => toLine(wire, wire.line_no));
 
+/** What Send will do with a draft's discount (DiscountInfo.send_gate). */
+export const SEND_GATES = [
+  "none_needed",
+  "required",
+  "pending",
+  "approved",
+  "void",
+  "returned",
+] as const;
+export type SendGate = (typeof SEND_GATES)[number];
+
+export const APPROVAL_STATUSES = ["pending", "approved", "rejected", "cancelled"] as const;
+
 const approvalWireSchema = z.object({
   request_id: z.string().min(1),
-  status: z.string().min(1),
+  status: z.enum(APPROVAL_STATUSES),
   steps: z.array(
     z.object({
       id: z.string().min(1),
       seq: z.number().int(),
       role: z.string().min(1),
       decided_role: z.string().nullish(),
-      decision: z.string().nullish(),
+      decision: z.enum(["approve", "reject"]).nullish(),
       by: userRef.nullish(),
       remark: z.string().nullish(),
       decided_at: isoDateTime.nullish(),
@@ -333,7 +346,7 @@ export const quotationWireSchema = z.object({
       effective_pct: decimal,
       owner_limit_pct: decimal.nullable(),
       approval_required: z.boolean(),
-      send_gate: z.string().min(1),
+      send_gate: z.enum(SEND_GATES),
     })
     .nullish(),
   approval: approvalWireSchema.nullish(),
@@ -402,6 +415,23 @@ export const quotationSchema = quotationWireSchema.transform((wire) => ({
           ownerLimitPct: wire.discount.owner_limit_pct,
           approvalRequired: wire.discount.approval_required,
           sendGate: wire.discount.send_gate,
+        },
+  /** The latest discount approval request, or null. A dealer sees no names or remarks. */
+  approval:
+    wire.approval === null || wire.approval === undefined
+      ? null
+      : {
+          status: wire.approval.status,
+          requestRemark: wire.approval.request_remark ?? null,
+          steps: wire.approval.steps.map((step) => ({
+            id: step.id,
+            role: step.role,
+            decidedRole: step.decided_role ?? null,
+            decision: step.decision ?? null,
+            by: toUser(step.by ?? null),
+            remark: step.remark ?? null,
+            decidedAt: step.decided_at ?? null,
+          })),
         },
   createdAt: wire.created_at,
   createdBy: toUser(wire.created_by),
@@ -580,3 +610,102 @@ export const quotationHeaderFormSchema = z.object({
 });
 
 export type QuotationHeaderForm = z.infer<typeof quotationHeaderFormSchema>;
+
+// ── the lifecycle (QUOT-006 … QUOT-011) ───────────────────────────────────────
+
+/** POST /quotations/{id}/send. `none`: no message; the officer shares the link. */
+export interface SendQuotationRequest {
+  readonly channel: "whatsapp" | "none";
+  readonly expected_status: "draft";
+}
+
+/** POST /quotations/{id}/request-approval. */
+export interface RequestApprovalRequest {
+  readonly remark: string | null;
+}
+
+/** The customer's answers a sent quotation can record. */
+export const QUOTATION_ANSWERS = ["accepted", "negotiation", "rejected"] as const;
+export type QuotationAnswer = (typeof QUOTATION_ANSWERS)[number];
+
+/** POST /quotations/{id}/transition. */
+export interface TransitionQuotationRequest {
+  readonly to: QuotationAnswer;
+  readonly remark: string | null;
+  readonly expected_status: QuotationStatus;
+}
+
+/** POST /quotations/{id}/revise — today's prices unless a date is given. */
+export interface ReviseQuotationRequest {
+  readonly price_effective_date: string | null;
+  readonly expected_status: QuotationStatus;
+}
+
+/** DELETE /quotations/{id} — drafts only. */
+export interface DeleteQuotationRequest {
+  readonly expected_status: "draft";
+}
+
+/** GET /quotations/{id}/versions — every version of the number, oldest first. */
+export const quotationVersionsResponseSchema = z
+  .object({ data: z.array(quotationSummarySchema) })
+  .transform(({ data }) => data);
+export type QuotationVersionsWire = z.input<typeof quotationVersionsResponseSchema>;
+
+/** DELETE answers 204 with no body. */
+export const noContentSchema = z.undefined();
+
+/** The longest remark the screens accept; the backend stores it as text. */
+export const QUOTATION_REMARK_MAX_LENGTH = 1000;
+
+/** A remark on an answer or an approval request; optional. */
+export const quotationRemarkFormSchema = z.object({
+  remark: z.string().trim().max(QUOTATION_REMARK_MAX_LENGTH, {
+    message: "Keep the remark under 1,000 characters",
+  }),
+});
+export type QuotationRemarkForm = z.infer<typeof quotationRemarkFormSchema>;
+
+// ── the customer's page (QUOT-012) ──────────────────────────────────────────────
+
+/**
+ * GET /public/q/{token} — what a shared link shows before the PDF. No party, no mobile, no
+ * lines: a link forwarded to the wrong person learns a number and a total, nothing else.
+ */
+export const publicQuotationResponseSchema = z
+  .object({
+    data: z.object({
+      quote_no: z.string().min(1),
+      version: z.number().int().positive(),
+      status: z.enum(QUOTATION_STATUSES),
+      sales_type: z.enum(SALES_TYPES),
+      seller: z.object({ legal_name: z.string().min(1), gstin: z.string().min(1) }),
+      sent_at: isoDateTime.nullable(),
+      valid_until: isoDate.nullable(),
+      expired: z.boolean(),
+      superseded: z.boolean(),
+      totals: totalsSchema,
+      line_count: z.number().int().nonnegative(),
+      pdf_ready: z.boolean(),
+      /** Relative to the API: `/public/q/{token}/pdf`, which records the view and redirects. */
+      pdf_url: z.string().startsWith("/"),
+    }),
+  })
+  .transform(({ data }) => ({
+    quoteNo: data.quote_no,
+    version: data.version,
+    status: data.status,
+    salesType: data.sales_type,
+    seller: { legalName: data.seller.legal_name, gstin: data.seller.gstin },
+    sentAt: data.sent_at,
+    validUntil: data.valid_until,
+    expired: data.expired,
+    superseded: data.superseded,
+    totals: data.totals,
+    lineCount: data.line_count,
+    pdfReady: data.pdf_ready,
+    pdfPath: data.pdf_url,
+  }));
+
+export type PublicQuotation = z.output<typeof publicQuotationResponseSchema>;
+export type PublicQuotationWire = z.input<typeof publicQuotationResponseSchema>;

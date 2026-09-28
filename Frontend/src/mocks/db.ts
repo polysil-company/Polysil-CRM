@@ -17,6 +17,14 @@ export interface MockDb {
   quotationWrites: Map<string, { body: string; quotationId: string }>;
   /** Bumped to publish a new price list: saves priced before it get 409 rate_changed. */
   priceVersion: number;
+  /** Each quotation's history, newest first: derived once from the seed, then written to. */
+  quotationEvents: Map<string, TimelineEventWire[]>;
+  /** When a just-sent quotation's PDF is ready (epoch ms); read by the next GET. */
+  pdfReadyAt: Map<string, number>;
+  /** When the mock's stand-in manager approves a pending discount request (epoch ms). */
+  approvalDecideAt: Map<string, number>;
+  /** DELETE /quotations/{id} replays: Idempotency-Key → the request. */
+  quotationDeletes: Map<string, string>;
   notifications: NotificationWire[];
   conversations: ConversationWire[];
   messages: MessageWire[];
@@ -42,6 +50,10 @@ function createMockDb(): MockDb {
     quotations: generateQuotations(leads),
     quotationWrites: new Map(),
     priceVersion: 0,
+    quotationEvents: new Map(),
+    pdfReadyAt: new Map(),
+    approvalDecideAt: new Map(),
+    quotationDeletes: new Map(),
     notifications: generateNotifications(leads),
     conversations,
     messages,

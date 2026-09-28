@@ -29,12 +29,12 @@ in the same shape. Never renumber or reuse a number.
 **Leads**
 
 - [ ] **BE-001** · Sorting on `GET /leads` · LEAD-001 · normal
-- [ ] **BE-002** · A next follow-up date on a lead · LEAD-001, LEAD-003, RPT-001 · high
+- [x] **BE-002** · A next follow-up date on a lead · LEAD-001, LEAD-003, RPT-001 · high
 - [ ] **BE-003** · Crops and land (acres) on a lead · LEAD-003 · normal
 - [ ] **BE-004** · Win probability and weekly activity — or confirm they are replaced · LEAD-001, LEAD-003 · low
 - [ ] **BE-005** · Which territory levels a lead may sit in · LEAD-002 · normal
 - [ ] **BE-006** · Names in the `lead.assigned` timeline payload · LEAD-005 · low
-- [ ] **BE-007** · Lead counts by source and by inquiry type on `GET /leads/stats` · LEAD-004, RPT-001 · normal
+- [x] **BE-007** · Lead counts by source and by inquiry type on `GET /leads/stats` · LEAD-004, RPT-001 · normal
 
 **Modules the frontend still mocks**
 
@@ -44,7 +44,7 @@ in the same shape. Never renumber or reuse a number.
 
 **Repository and environments**
 
-- [ ] **BE-011** · Merge the tasks (FS-014) and complaints (FS-015) contracts into `integration` · TASK-001, CMPL-001 · normal
+- [x] **BE-011** · Merge the tasks (FS-014) and complaints (FS-015) contracts into `integration` · TASK-001, CMPL-001 · normal
 - [ ] **BE-012** · Keep the dev API on the latest `integration`, and share the test password · OBS-002 · high
 - [ ] **BE-013** · Fix the pagination row in the API docs' conventions · OBS-002 · low
 - [ ] **BE-014** · Approval threshold amounts per role · APPR-001 · normal
@@ -53,6 +53,7 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-015** · Point quotation share links at the app: set `PUBLIC_WEB_URL` · QUOT-002 · high
 - [ ] **BE-016** · Say whether the dev API renders real PDFs · QUOT-003 · normal
+- [ ] **BE-017** · Name the quotation on its events in the lead's timeline · QUOT-010 · normal
 
 ---
 
@@ -72,15 +73,15 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-002 · A next follow-up date on a lead
 
-- **Status:** ⬜ Open
+- **Status:** 💬 Answered
 - **Asked:** 22 Sep 2026 · LEAD-001, LEAD-003, RPT-001 · Frontend-Scope §10 question 15
 - **What:** a `next_follow_up_at` (ISO date-time, nullable) on `Lead`, settable when a note is added
   or by a small `PATCH`, and a filter `follow_up_due=today|overdue` on `GET /leads`.
 - **Why:** the Follow-up column and field show "—"; the dashboard's "overdue follow-ups" figure and
   list cannot be real without it.
 - **Done when:** a lead carries the date, it can be set and cleared, and the list can filter on it.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #25 (merged into `integration` 28 Sep 2026)
+- **Backend notes:** Follow-ups are **tasks**, not a field on the lead. A lead's own follow-ups are `GET /tasks?lead_id=`; `GET /leads/stats` counts `follow_ups_due_today` and `follow_ups_overdue` from open tasks (null for dealers). Contract: `backend/docs/handover/tasks-and-planner-contract.md`. _Recorded by the frontend from #25's description._
 
 ### BE-003 · Crops and land (acres) on a lead
 
@@ -133,15 +134,15 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-007 · Lead counts by source and by inquiry type on `GET /leads/stats`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 27 Sep 2026 · LEAD-004, RPT-001
 - **What:** `by_source` (source code → count) and `by_inquiry_type` (type → count) in `LeadStats`,
   over the same scope and filters as today.
 - **Why:** the old guessed `/leads/summary` had them and the dashboard's "Leads by source" chart
   needs them. With these, the dashboard can use `/leads/stats` instead of a mock for that chart.
 - **Done when:** both maps are present, every known code included with 0 when empty.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #25 (merged into `integration` 28 Sep 2026)
+- **Backend notes:** `GET /leads/stats` gains `by_source`, `by_inquiry_type`, `follow_ups_due_today` and `follow_ups_overdue` (the last two null for dealers). _Recorded by the frontend from #25's description._
 
 ### BE-008 · Dashboard figures
 
@@ -191,14 +192,14 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-011 · Merge the tasks and complaints contracts into `integration`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 27 Sep 2026 · TASK-001, CMPL-001
 - **What:** `backend-foundation` has two commits `integration` does not: "Tasks and planner
   contract (FS-014)" and "Complaints contract for the frontend track (FS-015)".
 - **Why:** the frontend builds from `integration`; those contracts are not visible there yet.
 - **Done when:** merged into `integration`.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #25 (merged into `integration` 28 Sep 2026)
+- **Backend notes:** Tasks and the planner (`/tasks`, `/planner`, `/planner/team`, `/minutes`, `/lookups/meeting-types`) and complaints to the quality check (`/complaints`, `/complaint-sla-policies`, `/lookups/complaint-types`) are on `integration`. Contracts: `backend/docs/handover/tasks-and-planner-contract.md`, `complaints-contract.md`. _Recorded by the frontend from #25's description._
 
 ### BE-012 · Keep the dev API on the latest `integration`, and share the test password
 
@@ -259,5 +260,19 @@ in the same shape. Never renumber or reuse a number.
 - **Why:** **Open PDF** opens the signed link in a new tab; if the dev API serves HTML, what the
   frontend developer checks there is not what the farmer receives.
 - **Done when:** decided and noted (💬 is fine).
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-017 · Name the quotation on its events in the lead's timeline
+
+- **Status:** ⬜ Open
+- **Asked:** 28 Sep 2026 · QUOT-010, LEAD-005
+- **What:** on every `quotation.*` event that `GET /leads/{id}/timeline` returns, add `quotation_id`,
+  `quote_no` (null on a draft) and `version` to the payload. The contract lists `from`, `to`, `remark`
+  and `actor_name` only.
+- **Why:** a lead's history shows "Quotation sent", "Quotation accepted" and so on, but cannot say
+  which quotation or link to it when a lead has more than one (a revision, or a second unit).
+- **Done when:** the payloads carry the three fields; say in the notes if a dealer should not see
+  any of them.
 - **Done in:** —
 - **Backend notes:** —

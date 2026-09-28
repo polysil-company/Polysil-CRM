@@ -146,6 +146,13 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
 | QUOT-004 | Quotation builder — create and edit a draft (`POST /quotations`, `PATCH /quotations/{quotationId}`, `PUT /quotations/{quotationId}/lines`) | shared | in-progress |
 | QUOT-005 | Live pricing — the quotation preview (`POST /pricing/quote-lines`) | shared | in-progress |
+| QUOT-006 | Send a quotation — number it, share the link, render the PDF (`POST /quotations/{quotationId}/send`) | shared | in-progress |
+| QUOT-007 | Ask a manager to approve a quotation's discount (`POST /quotations/{quotationId}/request-approval`) | shared | in-progress |
+| QUOT-008 | Record the customer's answer — accepted, rejected or negotiation (`POST /quotations/{quotationId}/transition`) | shared | in-progress |
+| QUOT-009 | Revise a quotation, and its versions (`POST /quotations/{quotationId}/revise`, `GET /quotations/{quotationId}/versions`) | shared | in-progress |
+| QUOT-010 | A quotation's history (`GET /quotations/{quotationId}/timeline`) | shared | in-progress |
+| QUOT-011 | Delete a draft quotation (`DELETE /quotations/{quotationId}`) | shared | in-progress |
+| QUOT-012 | The customer's quotation page — /q/{token} (`GET /public/q/{token}`, `GET /public/q/{token}/pdf`) | shared | in-progress |
 | SO-001 | Sales orders list | shared | planned |
 | APPR-001 | Approval inbox — amount-based escalation | shared | planned |
 | CMPL-001 | Complaints list and QA review | shared | planned |

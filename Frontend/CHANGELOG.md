@@ -5,7 +5,67 @@
 Every change to this repository, newest first. Each entry records what existed before, what exists now, the discussion behind the change, the files it touched and how it is tested.
 How to write an entry: [changelog/README.md](changelog/README.md).
 
+## Index
+
+15 changes, newest first. Each title opens its entry.
+
+| Date | Change | Type | Data IDs |
+| --- | --- | --- | --- |
+| 2026-09-28 | [A tested-features log with screenshots, and an index at the top of the changelog](changelog/entries/2026-09-28--docs--REPO-001--a-tested-features-log-with-screenshots-and-an-index-at-the.md) | `docs` | `REPO-001` |
+| 2026-09-28 | [Quotations: the list, the document and its PDF, and a lead's quotations](changelog/entries/2026-09-28--feature--QUOT-001--quotations-list-and-detail.md) | `feature` | `QUOT-001` `QUOT-002` `QUOT-003` |
+| 2026-09-28 | [Quotations: make and edit a draft, priced live](changelog/entries/2026-09-28--feature--QUOT-004--quotations-make-and-edit-a-draft-priced-live.md) | `feature` | `QUOT-004` `QUOT-005` `MSTR-003` |
+| 2026-09-28 | [Quotations: send, discount approval, the customer's answer, revise and delete](changelog/entries/2026-09-28--feature--QUOT-006--quotations-send-discount-approval-the-customer-s-answer.md) | `feature` | `QUOT-006` `QUOT-007` `QUOT-008` `QUOT-009` `QUOT-010` `QUOT-011` |
+| 2026-09-28 | [Quotations: the customer's page for a shared link](changelog/entries/2026-09-28--feature--QUOT-012--quotations-the-customer-s-page-for-a-shared-link.md) | `feature` | `QUOT-012` |
+| 2026-09-27 | [The lead page shows its history, takes notes, moves the lead's stage and assigns it](changelog/entries/2026-09-27--feature--LEAD-005--lead-timeline-and-notes.md) | `feature` | `LEAD-005` `LEAD-006` `LEAD-007` `LEAD-008` `MSTR-002` |
+| 2026-09-22 | [Leads run on the backend's dev API — list, lead page and New lead form, with real lookups](changelog/entries/2026-09-22--api-integration--LEAD-001--leads-on-the-dev-api.md) **(breaking)** | `api-integration` | `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `MSTR-002` `OBS-002` `APP-004` `AUTH-004` `DS-001` |
+| 2026-09-22 | [One odd lead no longer blanks the page, and a source the administrators renamed still filters](changelog/entries/2026-09-22--fix--LEAD-001--one-odd-lead-no-longer-blanks-the-page.md) | `fix` | `LEAD-001` `LEAD-002` `MSTR-002` `DS-001` |
+| 2026-09-21 | [Small grey text and teal links meet WCAG AA contrast in light mode](changelog/entries/2026-09-21--fix--DS-001--text-colours-meet-wcag-aa-contrast.md) | `fix` | `DS-001` |
+| 2026-09-16 | [The leads table shares leftover width instead of pooling it in one column](changelog/entries/2026-09-16--design--LEAD-001--leads-table-shares-leftover-width-on-large-monitors.md) | `design` | `LEAD-001` `DS-001` |
+| 2026-09-16 | [Shift and the mouse wheel scroll a wide table sideways](changelog/entries/2026-09-16--feature--DS-001--shift-wheel-scrolls-wide-tables-sideways.md) | `feature` | `DS-001` |
+| 2026-09-15 | [Collapsible desktop sidebar, and page titles with descriptions in the top bar](changelog/entries/2026-09-15--feature--APP-005--collapsible-sidebar-and-page-titles-in-the-top-bar.md) **(breaking)** | `feature` | `APP-005` `APP-001` `DS-001` |
+| 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
+| 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
+| 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
 ## 28 September 2026
+
+### A tested-features log with screenshots, and an index at the top of the changelog
+
+`docs` · `REPO-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--docs--REPO-001--a-tested-features-log-with-screenshots-and-an-index-at-the.md)
+
+#### Before
+
+What a user can do — and how far each feature was tested — was spread over fourteen changelog entries, pull requests and chat. The screenshots taken while checking screens lived only on the machine that took them. `CHANGELOG.md` had no overview: to find a change you scrolled 865 lines.
+
+#### Now
+
+- **`Docs/Tested-Features.md`** — every user story built so far, by module, from the user's side: who can do what, the cases checked, and how far each is tested — 🧪 automated, 🌐 end to end, 👀 walked through in a browser, 🔌 checked on the backend's dev API — with where it lives (`integration` or an open pull request), links to the screenshots and to the changelog entry with the test files. A table at the top gives each module at a glance; the end lists what the backend serves that has no screen yet. Only leads (list, create, open) and staff sign-in are marked 🔌 — everything else still needs its dev-API check before staging, and the file says so.
+- **`Docs/screenshots/`** — 29 screenshots from the checks of the lead actions, the quotation screens, the builder, the lifecycle walk-through and the customer's page, by module, as WebP (1.2 MB instead of 3.9 MB as PNG).
+- **An index at the top of `CHANGELOG.md`** — one line per change: date, title linking to its entry, type and Data IDs. Generated like the rest, so it never drifts.
+- `AGENTS.md` §1 and `changelog/README.md` point to the new file.
+- **`AGENTS.md` §11, "The records every pull request keeps current"** — the rules, so every contributor and every new AI session keeps them without being asked: the changelog entry, the Data IDs, `Plan.md` §9, `docs/Backend-Tasks.md` for anything asked of the backend, `Tested-Features.md` for every user-facing change, screenshots saved as JPEG under `Docs/screenshots/<module>/`, and the pull request template (stacked pull requests say so first).
+- **`docs/Backend-Tasks.md`** — BE-002 (answered: follow-ups are tasks), BE-007 and BE-011 marked done in #25, which merged into `integration` without ticking them; the notes say what #25 changed.
+
+#### Discussion
+
+- **Why one file for features, apart from the changelog:** the changelog answers "what changed, when and why"; this answers "what works today, and can I trust it" without reading history. It is updated in the same pull request that adds a feature, like `Plan.md` §9.
+- **Why not split the changelog into volumes:** nothing is appended to a long file — each change is its own short entry, and `CHANGELOG.md` is rebuilt from them every commit. The index keeps the generated file navigable however long it grows. If it ever gets too long to open, the build can split it by month without touching the entries.
+- **Screenshots are WebP**, converted with the `sharp` already installed by Next.js; GitHub shows them inline. Walk-through scripts can save straight into this folder.
+- The earlier quotation screenshots were captured before the action bar (#22); the file says so.
+
+#### Files changed
+
+- `Docs/Tested-Features.md` — new
+- `Docs/screenshots/leads/`, `quotations/`, `public/` — new, 29 WebP screenshots
+- `scripts/changelog/lib.ts` — `renderIndex`, rendered at the top of `CHANGELOG.md`; `CHANGELOG.md` regenerated
+- `changelog/README.md`, `AGENTS.md` — point to the index and the new file; `AGENTS.md` §11 lists the records every pull request keeps current
+- `../docs/Backend-Tasks.md` — BE-002, BE-007, BE-011 recorded from #25
+- `Docs/Plan.md` — §9.3: tasks and complaints are on `integration` (#25), with the new lead stats
+
+#### Tests
+
+- `scripts/changelog/lib.test.ts` — `[REPO-001]` the index: one row per change, newest first, linking to its entry, marking breaking changes, before the entries
+- Every relative link in `Docs/Tested-Features.md` was checked to resolve to a file.
 
 ### Quotations: the list, the document and its PDF, and a lead's quotations
 
@@ -129,6 +189,112 @@ The quotation builder, on the backend's contract (`backend/docs/handover/quotati
 - `src/features/quotations/components/quotation-builder.test.tsx` — `[QUOT-004]` an item priced as it is entered, then saved and opened; `rate_changed` explained, re-priced and saved; Save off until an item is complete; no lead, a lead not yet qualified; a draft loaded for editing, a sent quotation not edited
 - `src/features/quotations/components/quotations-ui.test.tsx` — the lead's Quotations card with the lead's stage
 - By hand (`npm run dev`): open a qualified lead → New quotation; add a UPVC pipe with 10% and 5%, and an HDPE lateral (indicative rate); watch each item and the totals price; save and see the same figures on the draft; Edit draft, change the terms and a quantity, save. Try a new lead (explained). `rate_changed` needs the price list to move mid-edit, so the tests cover it. At 360px and on a wide screen, in light and dark.
+
+### Quotations: send, discount approval, the customer's answer, revise and delete
+
+`feature` · `QUOT-006` `QUOT-007` `QUOT-008` `QUOT-009` `QUOT-010` `QUOT-011` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--feature--QUOT-006--quotations-send-discount-approval-the-customer-s-answer.md)
+
+#### Before
+
+A draft could be made and edited (QUOT-004), but it stopped there: it could not be sent, a discount above the owner's limit could not be approved, the customer's answer could not be recorded, and a sent quotation could not be revised. A lead never moved to Quoted, Negotiation or Won through its quotation.
+
+#### Now
+
+The quotation's lifecycle, on the backend's contract (`backend/docs/handover/quotations-api-contract.md` §2 and §4). A quotation's page shows only the actions its status and the user's permissions allow.
+
+**Send (QUOT-006)** — a draft within the owner's discount limit has **Send**. The dialog offers **Send on WhatsApp** (to the party's mobile, once the PDF is ready) or **Don't send a message** (share the link by hand), and says what happens: the quotation gets its number and 45 days' validity, a qualified lead moves to Quoted, and a sent quotation is revised, not edited. A quotation on stand-in rates says the PDF carries the Indicative pricing banner. After sending, the page shows the number, "Preparing PDF…", then **Open PDF**.
+
+**Discount approval (QUOT-007)** — a draft above the limit shows **Ask for approval** instead of Send, and a notice with the discount and the limit ("11.8% off the list price is above your limit of 5%"). The request takes an optional reason. Then the notice reads "Waiting for a State Manager to approve…", Send becomes a disabled **Waiting for approval**, and the page re-reads itself every 30 seconds. Approved: **Send** and "Discount approved" with who approved. Refused: the approver's remark and **Ask for approval** again. Void (the figures changed after approval): says so and asks again. The builder warns that saving withdraws a waiting request, or cancels a granted approval.
+
+**The customer's answer (QUOT-008)** — **Record answer** on a sent, viewed or negotiating quotation: **Accepted…** (the lead moves to Won), **In negotiation…** (the lead moves to Negotiation), **Rejected…** (the lead does not move). Each asks for what the customer said (optional), kept on the history. Past its validity date no answer is offered, even before the nightly job marks it expired.
+
+**Revise and versions (QUOT-009)** — **Revise** on a sent, viewed, negotiating, rejected or expired quotation makes the next version as a draft at today's prices, and opens it; any repriced line is pointed out. A **Versions** card lists every version of the number with its status, date and total, the one on screen marked; sending the new version marks the old one replaced.
+
+**History (QUOT-010)** — a **History** card, newest first: drafted, edited, items changed, sent (on WhatsApp or by hand), opened (with the count), the answer with its remark, revised, and the discount approval's steps; older events a page at a time. The lead's history names the new quotation events too.
+
+**Delete a draft (QUOT-011)** — for roles holding `quotations.delete`, **More actions → Delete draft…** confirms, deletes and returns to the lead. A sent quotation is never deleted.
+
+**Refusals** — each is in words with what to do next. When someone else moved the quotation (`status_changed`, `quotation_not_draft`, `quotation_superseded`, `approval_pending`, `quotation_expired`, `predecessor_accepted`, `revision_exists`…) the dialog closes, a toast says what happened, and the page shows the latest. `rate_changed` and `no_lines` stay in the dialog with **Open the draft**; `no_approver` asks to lower the discount; `lead_not_open` says to reopen the lead.
+
+#### Discussion
+
+- **One action bar, driven by one rule.** `quotationActions()` decides from the status, `superseded_by`, the discount's `send_gate`, the validity date and the permissions; the backend still enforces every rule. A superseded version offers nothing: its notice links to the newer one.
+- **Permissions, not roles.** Send, approval, answers and revise need `quotations.edit`; delete needs `quotations.delete`, which only Admin holds in the mock.
+- **Every action is idempotent**: a retry reuses its `Idempotency-Key`; a new request (after `rate_changed`, or after success) gets a new one.
+- **Polling:** every 3 seconds while a PDF renders (as before), every 30 seconds while an approval waits. Both stop by themselves.
+- **"Today" is India's today** (`todayInIndia()` in `lib/format`), so the validity check matches the backend's dates.
+- **The mock** follows the contract's state machine and refusals and moves the lead beside the document. Two things only the mock does, so the flows can be tried end to end: a just-sent PDF is ready about 2.5 seconds later, and a request for approval is approved by a stand-in manager after 8 seconds, because the approvals inbox (APPR-001) is not built yet. Mock approvers: District 10%, State 15%, Regional 20%; above that, `no_approver`.
+- **Asked of the backend** (`docs/Backend-Tasks.md`): BE-017, put `quotation_id`, `quote_no` and `version` on quotation events in the lead's timeline, so the lead's history can say which quotation.
+- **Next:** the public `/q/{token}` page (QUOT-012), then the approvals inbox's quotation rows with APPR-001.
+
+#### Files changed
+
+- `src/features/quotations/api/quotations.schemas.ts` — send gates and approval statuses as enums; the approval request on the document; the send, approval, answer, revise and delete requests; versions; the remark form
+- `src/features/quotations/api/quotations.api.ts`, `quotations.queries.ts`, `quotations.mutations.ts` — `sendQuotation`, `requestQuotationApproval`, `transitionQuotation`, `reviseQuotation`, `listQuotationVersions`, `getQuotationTimeline`, `deleteQuotation`; versions and history queries; one mutation each, refreshing the document, lists, versions, history and the lead; polling while an approval waits
+- `src/features/quotations/lib/quotation-lifecycle.ts` — new: the actions a quotation offers, the send step by `send_gate`, the draft's discount notice, refusals in words, history lines
+- `src/features/quotations/components/` — new: `QuotationActions`, `QuotationActionDialog` (send, approval, answer, revise, delete), `QuotationVersions`, `QuotationHistory`; `QuotationDetail` — the action bar, the discount notice, the Versions and History cards; `QuotationBuilder` — the warning before saving over an approval
+- `src/features/leads/lib/timeline-entries.ts` — labels for the new quotation events on a lead's history
+- `src/lib/format/date.ts` — `todayInIndia()`
+- `src/mocks/handlers/quotations.ts` — the lifecycle endpoints; saves cancel an approval and keep a revision's version; history per quotation; `src/mocks/handlers/lead-events.ts` — new: the lead-event writer, now shared with quotations; `src/mocks/data/quotations.ts` — `withLines`, the seeded drafts' real discount; `src/mocks/db.ts` — history, PDF and approval timers, delete replays
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — QUOT-006…011
+- `Docs/Plan.md` — §9: the lifecycle connected
+- `../docs/Backend-Tasks.md` — BE-017
+
+#### Tests
+
+- `src/features/quotations/lib/quotation-lifecycle.test.ts` — `[QUOT-006]` the send step for each gate, refusals marked stale or kept; `[QUOT-008]` the actions for a draft, a sent, negotiating, rejected, expired, accepted, lapsed and superseded quotation, and without permissions; `[QUOT-007]` the discount notice for each gate with the approver's role and remark; `[QUOT-010]` history lines, unknown and odd events
+- `src/features/quotations/api/quotations.lifecycle.test.ts` — `[QUOT-006]` a send numbers, links and moves the lead; `discount_approval_required`, `no_lines`; `[QUOT-007]` a request to the right manager, `approval_pending`, then sent once approved; `approval_not_required`, `no_approver`; `[QUOT-008]` negotiation then acceptance wins the lead; `status_changed`, `invalid_transition`; `[QUOT-009]` version 2 of the same number supersedes version 1 once sent, `revision_exists`, no revising a draft; `[QUOT-010]` history newest first; `[QUOT-011]` delete and replay, never a sent one
+- `src/features/quotations/components/quotation-actions.test.tsx` — `[QUOT-006]` send without a message and see the number; a stale refusal closes the dialog; `[QUOT-007]` ask for approval, then wait; `[QUOT-008]` mark accepted; `[QUOT-009]` revise opens version 2; `[QUOT-011]` delete as Admin returns to the lead, no delete for a State Manager
+- `src/lib/format/format.test.ts` — `todayInIndia()` across midnight in India
+- By hand (`npm run dev`, role Admin): open a draft above the limit → Ask for approval → wait for "Discount approved" → Send → Open PDF once ready → Record answer → In negotiation → Revise → the new draft with Versions → More actions → Delete draft. At 360px and on a wide screen, in light and dark.
+
+### Quotations: the customer's page for a shared link
+
+`feature` · `QUOT-012` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--feature--QUOT-012--quotations-the-customer-s-page-for-a-shared-link.md)
+
+#### Before
+
+A sent quotation carries a customer link, `/q/{token}`, which the WhatsApp message also carries, but the app had no page there: a customer who tapped it was sent to sign in.
+
+#### Now
+
+**The customer's page (QUOT-012)** — `/q/{token}` opens without signing in, for anyone, signed in or not. It is built for a phone, in one narrow column:
+
+- **Quotation** and its number (with the version once there is more than one), **From** the seller and their GSTIN.
+- **Total, including GST**, large; the number of items, the date sent and **Valid until**.
+- **View quotation** opens the PDF in a new tab. Until the PDF is ready: "Preparing the PDF…", and the page checks again every few seconds.
+- An expired quotation says so ("Prices may have changed; ask for a new one"), and a replaced one says a newer version was sent. Both still open.
+- A link that doesn't match a quotation: "This link doesn't open a quotation", with what to do.
+
+Nothing personal is on the page — no name, mobile, address or items — as the backend's contract requires: a forwarded link shows a number and a total.
+
+#### Discussion
+
+- **The PDF opens only from the button, never on load.** Messengers fetch a link to draw its preview the moment it is sent; the backend records a view when the PDF is opened, so a page that fetched it would count every preview as the customer. The button is a real link, so it works however the phone opens it.
+- **No sign-in, and no redirect:** `/q/…` is an open path in the sign-in routing (`isOpenPath`), for signed-out and signed-in visitors alike. The page calls only the backend's `/public` endpoint, without a token.
+- **The token stays on the page:** the layout sets `referrer: no-referrer`, so the link's secret is not passed on when the PDF opens on another host.
+- **The mock** serves the page for every sent quotation, and its share links now point at the app's own origin, so **Copy** on a quotation gives a link that opens here. Opening the PDF records the view (the first moves a sent quotation to Viewed). The browser opens that link in a new tab, which the mock cannot answer (it has no PDFs), as with **Open PDF** — `TODO(QUOT-012)`.
+- **Backend:** BE-015 (`PUBLIC_WEB_URL`) decides where the real links point; until it is set, links from the dev API open localhost.
+- **Next:** the approvals inbox's quotation rows, with APPR-001.
+
+#### Files changed
+
+- `src/app/(public)/layout.tsx`, `src/app/(public)/q/[token]/page.tsx` — new: the route group for signed-out pages and the customer's page
+- `src/features/quotations/components/shared-quotation.tsx` — new: `SharedQuotation` and its skeleton
+- `src/features/quotations/api/quotations.schemas.ts`, `quotations.api.ts`, `quotations.queries.ts` — the public quotation contract, `getPublicQuotation` (no token), and its query, re-reading while the PDF renders
+- `src/lib/auth/redirects.ts` — `/q/…` is an open path
+- `src/lib/api/url.ts` — `asApiPath`, for a path an API response hands back
+- `src/mocks/handlers/quotations.ts` — `GET /public/q/{token}` and `GET /public/q/{token}/pdf`; `src/mocks/data/quotations.ts` — share links on the app's origin
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — QUOT-012
+- `Docs/Plan.md` — §9: the public page connected
+- `e2e/smoke.spec.ts` — the link opens signed out, with no accessibility violations
+
+#### Tests
+
+- `src/features/quotations/components/shared-quotation.test.tsx` — `[QUOT-012]` read without an `Authorization` header and with nothing personal; an unknown link is 404; the number, total and a new-tab link to the PDF; "Preparing the PDF…" with no link; expired and replaced, still opening; an unknown link explained
+- `src/lib/auth/redirects.test.ts` — `[AUTH-006]` a quotation link opens signed in or out; `/quotations` still needs a session
+- `e2e/smoke.spec.ts` — `[QUOT-012]` opens signed out on desktop and phone, the link opens a new tab, `no-referrer`, and axe finds no violations
+- By hand (`npm run dev`): sign out, open `/q/mock-3`, then `/q/anything`; signed in, copy a quotation's customer link and open it. At 360px and on a wide screen, in light and dark.
 
 ## 27 September 2026
 

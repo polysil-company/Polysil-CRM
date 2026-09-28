@@ -169,3 +169,29 @@ test.describe("[LEAD-001] Leads", () => {
     await expectNoAccessibilityViolations(page);
   });
 });
+
+test.describe("[QUOT-012] A customer's quotation link", () => {
+  /** A sent quotation in the seeded mock data (src/mocks/data/quotations.ts: mock-{index}). */
+  const SHARED_LINK = "/q/mock-3";
+
+  test("opens without signing in and offers the PDF, never opening it by itself", async ({
+    page,
+  }) => {
+    await page.goto(SHARED_LINK);
+
+    await expect(page).toHaveURL(new RegExp(`${escapeRegExp(SHARED_LINK)}$`));
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("QT/GJ/");
+    await expect(page.getByRole("link", { name: "View quotation" })).toHaveAttribute(
+      "target",
+      "_blank",
+    );
+    await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
+  });
+
+  test("has no automatically detectable accessibility violations", async ({ page }) => {
+    await page.goto(SHARED_LINK);
+    await expect(page.getByRole("link", { name: "View quotation" })).toBeVisible();
+
+    await expectNoAccessibilityViolations(page);
+  });
+});

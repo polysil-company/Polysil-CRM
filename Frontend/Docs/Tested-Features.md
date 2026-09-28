@@ -1,0 +1,129 @@
+# Tested features — what works, from the user's side
+
+One place to see every feature a user can use today, how far each one is tested, and where it lives. Read it before trying the app by hand: if a story is here with its checks, it has been exercised, and the list of cases tells you what was covered.
+
+**Keep it current.** Update this file in the same pull request that adds or changes a feature, as with [Plan.md §9](Plan.md) — the full list of records is in [AGENTS.md §11](../AGENTS.md). New screenshots go in [`screenshots/`](screenshots), one folder per module, as JPEG at quality 80 (the first ones are WebP).
+
+## How to read it
+
+Each story says who can do what, then the cases that were checked, then how:
+
+| Mark | Means |
+| --- | --- |
+| 🧪 | **Automated** — unit and component tests (Vitest, Testing Library) against the mock backend, which follows the backend's contract. Run with `npm test`. |
+| 🌐 | **End to end** — the Playwright smoke suite, on desktop and phone, with axe accessibility checks. Runs in CI. |
+| 👀 | **Walked through** — clicked through in a real browser against the mock backend, at 360px and on desktop, light and dark, with screenshots. |
+| 🔌 | **Real backend** — checked by hand against the backend's dev API. **Only the stories marked 🔌 have been.** Everything else still needs this before staging ([Plan.md §9.1](Plan.md)). |
+
+**Where it is:** `integration` means merged. `PR #n` means built and passing locally but still in review. A story in an open PR is not on `integration` yet.
+
+## At a glance
+
+| Module | Stories | Tested | Where |
+| --- | --- | --- | --- |
+| [Sign-in and session](#sign-in-and-session) | 4 | 🧪 🌐 🔌 | `integration` |
+| [App shell](#app-shell) | 3 | 🧪 🌐 | `integration` |
+| [Leads — list, create, open](#leads--list-create-open) | 4 | 🧪 🌐 🔌 | `integration` |
+| [Leads — history, notes, stage, assign](#leads--history-notes-stage-assign) | 4 | 🧪 👀 | `integration` |
+| [Quotations — reading](#quotations--reading) | 4 | 🧪 👀 | `integration` |
+| [Quotations — the builder](#quotations--the-builder) | 5 | 🧪 👀 | PR #21 |
+| [Quotations — send, approve, answer, revise, delete](#quotations--send-approve-answer-revise-delete) | 7 | 🧪 👀 | PR #22 |
+| [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | PR #23 |
+| [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 | `integration`, **mock only** |
+
+Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
+
+---
+
+## Sign-in and session
+
+Details and tests: [changelog entry](../changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md). 🔌 here means signing in as staff on the dev API, as part of the leads check below.
+
+- **AUTH-003 · Staff sign in with work email and password.** Show-password toggle, Caps Lock warning; a wrong password clears only the password; a locked account says so. 🧪 🌐 🔌
+- **AUTH-001 · A channel partner signs in with a one-time code** sent to their mobile, typed any common way. The screen never claims a code was sent to an unknown number. 🧪 🌐
+- **AUTH-004 · Staying signed in.** The session renews itself before it expires, when the tab comes back and when the connection returns; a reload keeps you signed in. 🧪 🌐
+- **AUTH-005, AUTH-006 · Signing out, or a session the backend ends,** clears everything and opens sign-in in every tab; after an expiry you return to the page you were on. A signed-out visitor sent to a page lands back on it after signing in. 🧪 🌐
+
+## App shell
+
+Details and tests: [foundation](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [sidebar and titles](../changelog/entries/2026-09-15--feature--APP-005--collapsible-sidebar-and-page-titles-in-the-top-bar.md).
+
+- **APP-001 · Navigation follows permissions.** The sidebar, command menu, sales tabs and "New lead" show only what the role may use. 🧪 🌐
+- **APP-005 · The sidebar collapses** to an icon rail on desktop (Ctrl/⌘ + B); the page title and description sit in the top bar. 🧪
+- **APP-001 · Command menu** opens and closes from the keyboard; light and dark themes. 🧪 🌐
+
+## Leads — list, create, open
+
+Details and tests: [leads on the dev API](../changelog/entries/2026-09-22--api-integration--LEAD-001--leads-on-the-dev-api.md). Checked by hand on the dev API as admin, Asha and Ravi, each seeing their own total.
+
+- **LEAD-001 · Browse leads.** Pages forward and back with the page in the URL (refresh and shared links land on the same page); filter by several stages, one source, one type; search by name, part of the mobile, or the exact inquiry number; "1–25 of 74", or "1,000+" when the backend stops counting. States: skeleton, empty, nothing matches, a page link that no longer works, an emptied page, server error, a broken row left out instead of blanking the page. 🧪 🌐 🔌
+- **LEAD-002 · Create a lead.** Territory picker (districts on open, any taluka or village by typing), lookups from the administrators' lists, a safe retry that never creates two leads, a duplicate flagged rather than refused, field errors on their fields. 🧪 🔌
+- **LEAD-003 · Open a lead.** The real record: stage and priority, contact, territory, owner and office or "Unassigned", partner, score, dates, the lost reason, a merged lead pointing to the lead it went into, possible duplicates with how they matched. 🧪 🌐 🔌
+- **LEAD-004 · The lead count** in the sidebar and Sales tab is exact (`GET /leads/stats`), never capped. 🧪
+
+## Leads — history, notes, stage, assign
+
+Details and tests: [changelog entry](../changelog/entries/2026-09-27--feature--LEAD-005--lead-timeline-and-notes.md). Screens: [lost lead with its history](screenshots/leads/lead-lost-activity-desktop-light.webp) ([dark](screenshots/leads/lead-lost-activity-desktop-dark.webp), [phone](screenshots/leads/lead-activity-phone-light.webp)), [stage menu](screenshots/leads/lead-stage-menu.webp), [mark as lost](screenshots/leads/lead-mark-lost-dialog.webp), [assign](screenshots/leads/lead-assign-dialog.webp), [phone header, dark](screenshots/leads/lead-header-phone-dark.webp).
+
+- **LEAD-005 · Read a lead's history** as sentences ("Ravi Joshi moved the lead from Qualified to Lost", with the reason and note), newest first, 20 at a time with "Show older activity". Covers notes, stage changes, reopenings, assignments, edits, merges, duplicate flags and quotation events; an unknown kind still reads well. States: skeleton, "No activity yet", error with retry, an older page failing without losing what is shown. 🧪 👀
+- **LEAD-006 · Add a note** (anyone with `leads.edit`, not on a merged lead). Ctrl/⌘ + Enter saves, Enter adds a line; the note appears at the top at once; a counter near the 2,000-character limit; a failed save keeps the text, and a retry never adds it twice. 🧪 👀
+- **LEAD-007 · Move the stage.** Update stage offers only the moves allowed from the current stage: Contacted and Qualified in one click; Lost needs a reason (note optional); Won confirms; a lost lead can be reopened. Steps that happen on a quotation are listed but disabled with where they happen. If someone else moved the lead first, it says so and shows the latest; Won without an accepted quotation is explained. No menu on a won, merged or dormant lead, or without `leads.edit`. 🧪 👀
+- **LEAD-008 · Assign the owner and channel partner** on an open lead: the people you may assign (or "Unassigned"), partners in your area by name or code. Only what changed is sent; an employee is told only a manager can change the owner; a refused partner shows on its field; no Assign on a closed lead. 🧪 👀
+
+## Quotations — reading
+
+Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--QUOT-001--quotations-list-and-detail.md). Screens: [list](screenshots/quotations/quotations-list.webp), [a quotation in negotiation](screenshots/quotations/quotation-detail-negotiation.webp), [on a phone](screenshots/quotations/quotation-detail-phone.webp), [a lead's quotations](screenshots/quotations/lead-quotations-card.webp). These were captured before the action bar (PR #22) was added.
+
+- **QUOT-001 · Browse quotations** newest first: number (or Draft), version, lead, party, a labelled status chip, type, owner, dates, total. Search by number, name or mobile; several statuses at once; one sales type; "Show older versions" marks replaced ones "Superseded by v2". Filters and page in the URL. States as on the lead list. 🧪 👀
+- **QUOT-002 · Read a quotation** exactly as the backend prints it — the screen never adds up a figure. Notices, most important first: replaced by a newer version (with a link), indicative pricing, the customer's decision, the PDF preparing (the page checks again by itself) or failed, and the backend's warnings. Items in the client's columns (three discount tiers, taxable value, GST as CGST + SGST or IGST, total), cards on a phone; totals; party, terms, details and the customer link with Copy. A quotation outside your scope is "not found". 🧪 👀
+- **QUOT-003 · Open the PDF** in a new tab from a ten-minute link, never fetched with the sign-in token. A pop-up blocker gets a toast with the link; "Preparing PDF…" while it renders; a refusal says why. 🧪 👀
+- **QUOT-001 · A lead's quotations** — a card on the lead page listing every version, the older ones muted. 🧪 👀
+
+## Quotations — the builder
+
+Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--QUOT-004--quotations-make-and-edit-a-draft-priced-live.md). Screens: [priced items](screenshots/quotations/builder-priced-desktop.webp), [dark](screenshots/quotations/builder-desktop-dark.webp), [phone](screenshots/quotations/builder-phone-light.webp), [the saved draft](screenshots/quotations/builder-saved-draft.webp). Walked through: two items (a pipe with 10% + 5%, an HDPE lateral on a stand-in rate), totals ₹25,485.01, saved, the draft showing the same figures. The figures on one line were checked by hand.
+
+- **QUOT-004 · Start a quotation from a lead** with New quotation (for those who may create). A lead that can't be quoted says why: "Qualify the lead first", "Reopen the lead first", dormant, merged. No lead given: "Start from a lead". 🧪 👀
+- **MSTR-003 · Pick products** by typing: searched on the server, each option naming its unit, HSN and code; the quantity shows the unit. 🧪 👀
+- **QUOT-005 · See prices as you type.** When typing pauses, the whole basket is priced by the backend: rate, taxable value, GST split as the backend split it, total, "Indicative rate" on stand-ins; old figures stay dimmed while new ones come. A row says what it still needs ("Choose a product", "Enter a quantity above 0", "Discounts are percentages from 0 to 100"). 🧪 👀
+- **QUOT-004 · Save the draft.** Save stays off until every item is complete and priced, and says why. A double click or retry never makes two drafts. Customer and terms are validated (Indian mobile, GSTIN format) in the browser and by the backend, whose field errors land on the right field or item. If prices changed since you priced them: "Prices changed since you priced this", the items show the new rate, the basket re-prices, and the next save goes through. 🧪 👀
+- **QUOT-004 · Edit a draft** from its page; only a changed header is sent. A sent quotation can't be edited — the page says to revise it. 🧪 👀
+
+## Quotations — send, approve, answer, revise, delete
+
+Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--QUOT-006--quotations-send-discount-approval-the-customer-s-answer.md). Walked through in one run as Admin: ask for approval → approved → send → PDF ready → negotiation → revise → delete, with no page errors. Screens: [needs approval](screenshots/quotations/draft-needs-approval.webp), [waiting](screenshots/quotations/draft-waiting-for-approval.webp), [send dialog](screenshots/quotations/send-dialog.webp), [sent, in negotiation](screenshots/quotations/sent-in-negotiation.webp), [answer dialog](screenshots/quotations/answer-dialog-desktop-dark.webp) ([phone](screenshots/quotations/answer-dialog-phone.webp)), [version 2 draft](screenshots/quotations/revision-v2-draft.webp), [history and versions](screenshots/quotations/history-and-versions-desktop-dark.webp) ([phone](screenshots/quotations/history-phone-light.webp)), [back on the lead after deleting](screenshots/quotations/lead-after-draft-deleted.webp).
+
+- **QUOT-006 · Send a quotation** within the owner's discount limit: on WhatsApp to the party's mobile (once the PDF is ready), or without a message to share the link by hand. It gets its number and 45 days' validity, and a qualified lead moves to Quoted; "Preparing PDF…" then Open PDF. Refusals: no items, prices changed since the save (with "Open the draft"), the lead closed. 🧪 👀
+- **QUOT-007 · Ask for discount approval** when the discount is above the limit: the notice shows the discount and the limit, and the request takes a reason. Then "Waiting for a State Manager to approve…" with Send off (the page checks every 30 seconds), "Discount approved" with Send, "refused" with the approver's remark, or "no longer applies" after the figures changed. The builder warns that saving withdraws a waiting request. No manager's limit covers it: lower the discount. 🧪 👀
+- **QUOT-008 · Record the customer's answer** on a sent, viewed or negotiating quotation: Accepted (the lead is Won), In negotiation (the lead moves to Negotiation), Rejected (the lead stays), each with what the customer said. Nothing to answer past the validity date, on an accepted or a replaced version. 🧪 👀
+- **QUOT-009 · Revise** a sent, viewed, negotiating, rejected or expired quotation into the next version, a draft at today's prices, and open it; one open revision at a time; sending it marks the old one replaced, and it keeps the same number. **Versions** lists them all. 🧪 👀
+- **QUOT-010 · Read a quotation's history**: drafted, edited, sent (how), opened (how often), the answer with its remark, revised, and each step of the discount approval; older events a page at a time. The lead's history names the same events. 🧪 👀
+- **QUOT-011 · Delete a draft** (only roles holding `quotations.delete` — Admin in the mock) and return to the lead. A sent quotation is never deleted; a State Manager sees no Delete. 🧪 👀
+- **QUOT-006 … 011 · When someone else got there first** (sent it, answered it, revised it), the dialog closes, a toast says what happened, and the page shows the latest. 🧪
+
+## Quotations — the customer's link
+
+Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--QUOT-012--quotations-the-customer-s-page-for-a-shared-link.md). Screens: [phone](screenshots/public/shared-quotation-phone-light.webp), [desktop, dark](screenshots/public/shared-quotation-desktop-dark.webp), [unknown link](screenshots/public/unknown-link-phone-light.webp) ([dark](screenshots/public/unknown-link-desktop-dark.webp)).
+
+- **QUOT-012 · A customer opens their link** (`/q/…`) without signing in: the number, who it's from, the total including GST, the items count, when it was sent and until when it's valid, and **View quotation** opening the PDF in a new tab. The PDF opens only when tapped, so a WhatsApp preview is never counted as a view. While the PDF is made: "Preparing the PDF…", checked again by itself. Expired or replaced quotations still open, with a note. Nothing personal is shown, and the link's secret isn't passed on to the PDF's host. 🧪 🌐 👀
+- **QUOT-012 · A wrong or cut-off link** says "This link doesn't open a quotation", with what to do. 🧪 👀
+
+## Dashboard, notifications, messages
+
+These run on the mock backend only — the backend has no endpoints for them yet (BE-008…BE-010 in [Backend-Tasks.md](../../docs/Backend-Tasks.md)). Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
+
+- **RPT-001 · The dashboard's key figures.** 🧪 🌐
+- **NOTIF-001, NOTIF-002 · The notification bell** in the top bar, marking read. 🧪
+- **MSG-001 … MSG-005 · Direct messages between staff**, and sharing a lead with a colleague from its page. 🧪
+
+---
+
+## Not built yet
+
+The backend serves these, and the frontend has no screen for them — in the order of [Plan.md §9.3](Plan.md):
+
+1. The approvals inbox (APPR-001): a manager approves or refuses quotation discounts and orders. Until then, the mock approves quotation discount requests by itself after a few seconds.
+2. Sales orders, their approvals and dispatch.
+3. Editing and deleting a lead, the duplicates queue and merging.
+4. Lead QR codes and the public enquiry form.
+5. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.

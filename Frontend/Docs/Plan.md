@@ -273,7 +273,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 ## 9. Integration status — frontend ↔ backend
 
-> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **27 September 2026**: PR #8 and PR #18 merged; lead actions (LEAD-005…008) built on `claude/integration-branch-review-gw0r1g`.
+> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **28 September 2026**: PR #8 and PR #18 merged; lead actions (LEAD-005…008) built on `claude/integration-branch-review-gw0r1g`.
 
 **How the two sides meet.** The browser calls `/api/v1` on the app's own origin; `next.config.ts` forwards it to `API_PROXY_TARGET`. Every call goes through `apiRequest` (`src/lib/api/client.ts`): Zod-validated responses, `x-request-id` / `x-data-id`, `Idempotency-Key` on mutations, one refresh-and-retry on a 401. The backend's contract is `backend/docs/api/*.md` (generated) and the dev API's `/openapi.json`. `NEXT_PUBLIC_API_MOCKING=partial` sends everything to the dev API except the modules listed in `unbuiltHandlers` (`src/mocks/handlers/index.ts`).
 
@@ -296,8 +296,15 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Quotation builder — a new draft from a lead, editing a draft's header and items | QUOT-004 | `POST /quotations`, `PATCH /quotations/{id}`, `PUT /quotations/{id}/lines` |
 | Live pricing while items are entered | QUOT-005 | `POST /pricing/quote-lines` |
 | Product picker | MSTR-003 | `GET /products` |
+| Send a quotation | QUOT-006 | `POST /quotations/{id}/send` |
+| Ask for discount approval | QUOT-007 | `POST /quotations/{id}/request-approval` |
+| Record the customer's answer | QUOT-008 | `POST /quotations/{id}/transition` |
+| Revise, and versions | QUOT-009 | `POST /quotations/{id}/revise`, `GET /quotations/{id}/versions` |
+| A quotation's history | QUOT-010 | `GET /quotations/{id}/timeline` |
+| Delete a draft | QUOT-011 | `DELETE /quotations/{id}` |
+| The customer's quotation page `/q/{token}` (no sign-in) | QUOT-012 | `GET /public/q/{token}`, `GET /public/q/{token}/pdf` |
 
-LEAD-005…008, QUOT-001…005 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+LEAD-005…008, QUOT-001…012 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 
@@ -321,13 +328,16 @@ LEAD-005…008, QUOT-001…005 and MSTR-003 are built on the backend's contract 
 
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
-| **Quotations, the rest** — send and discount approval; accept, reject, negotiation (what moves a lead to quoted, negotiation and won); revise, versions, timeline, delete; the public `/q/{token}` page | `POST /quotations/{id}/send` and the other actions, `DELETE /quotations/{id}`, `/public/q/*` | `backend/docs/handover/quotations-api-contract.md` | **1 — in progress** (reads and the builder done: QUOT-001…005) |
+| **Quotations, the rest** — the approvals inbox's quotation rows (with APPR-001) | `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` | `backend/docs/handover/quotations-api-contract.md` §4 | **1 — in progress** (QUOT-001…012 done) |
 | Sales orders, approvals, dispatch | `/orders/*`, `/approvals/*`, `/dispatches/*` | `backend/docs/handover/orders-api-contract.md` | 2 |
 | Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 3 |
 | Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 4 |
 | Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 5 |
 
-**On `backend-foundation`, not yet in `integration`:** the tasks and planner contract (FS-014) and the complaints contract (FS-015).
+| Tasks, the planner, meetings and minutes — lead follow-ups are tasks (BE-002) | `/tasks`, `/planner`, `/planner/team`, `/minutes`, `/lookups/meeting-types` | `backend/docs/handover/tasks-and-planner-contract.md` | 6 |
+| Complaints, from entry to the quality check | `/complaints`, `/complaint-sla-policies`, `/lookups/complaint-types` | `backend/docs/handover/complaints-contract.md` | 7 |
+
+Tasks and complaints reached `integration` in #25 (BE-011), with `GET /leads/stats` gaining `by_source`, `by_inquiry_type`, `follow_ups_due_today` and `follow_ups_overdue` (BE-007) — the dashboard's source breakdown and follow-up tiles can use them once it is connected (BE-008).
 
 ### 9.4 Asked of the backend
 

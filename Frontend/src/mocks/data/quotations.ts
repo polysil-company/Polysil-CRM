@@ -162,6 +162,15 @@ export function totalsOf(lines: readonly QuotationLineWire[]): QuotationWire["to
   };
 }
 
+/**
+ * The customer link for a token, on the app's own origin so the mock's links open this app's
+ * `/q/{token}` page (the backend builds it from `PUBLIC_WEB_URL`, BE-015).
+ */
+export function mockShareUrl(token: string): string {
+  const origin = typeof window === "undefined" ? "http://localhost:3000" : window.location.origin;
+  return `${origin}/q/${token}`;
+}
+
 function isoDate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
@@ -248,17 +257,10 @@ function buildQuotation(seed: QuotationSeed, index: number, random: Random): Quo
           : null,
     supersedes: null,
     superseded_by: null,
-    share_url: sent ? `https://crm.polysil.example/q/mock-${String(index)}` : null,
+    share_url: sent ? mockShareUrl(`mock-${String(index)}`) : null,
     pdf_state: sent ? seed.pdfState : null,
     pdf_error: sent && seed.pdfState === "failed" ? "The PDF renderer timed out." : null,
-    discount: sent
-      ? null
-      : {
-          effective_pct: "7.50",
-          owner_limit_pct: "5.00",
-          approval_required: true,
-          send_gate: "required",
-        },
+    discount: sent ? null : discountInfo(lines),
     approval: null,
     created_at: new Date(seed.createdAt).toISOString(),
     created_by: lead.owner,
@@ -359,7 +361,7 @@ export function toQuotationSummary(quotation: QuotationWire): QuotationSummaryWi
 const MOCK_OWNER_LIMIT_PCT = 5;
 
 /** What the customer saves off the list price, across every tier, as the backend reports it. */
-function discountInfo(lines: readonly QuotationLineWire[]): QuotationWire["discount"] {
+export function discountInfo(lines: readonly QuotationLineWire[]): QuotationWire["discount"] {
   const gross = lines.reduce((sum, line) => sum + Math.round(Number(line.gross) * 100), 0);
   const discount = lines.reduce((sum, line) => sum + Math.round(Number(line.discount) * 100), 0);
   const effective = gross === 0 ? 0 : (discount / gross) * 100;
@@ -380,6 +382,36 @@ export interface MockDraftInput {
   readonly terms: string | null;
   readonly lines: readonly QuotationLineWire[];
   readonly createdAt: string;
+}
+
+/** "provisional_pricing: 1 of 3 lines …" when any line carries a stand-in, as the backend warns. */
+function provisionalWarnings(lines: readonly QuotationLineWire[]): string[] {
+  const provisional = lines.filter((line) => line.provisional_fields.length > 0).length;
+  return provisional > 0
+    ? [
+        `provisional_pricing: ${String(provisional)} of ${String(lines.length)} lines use stand-in rates or tax slabs`,
+      ]
+    : [];
+}
+
+/**
+ * QUOT-004 · A draft with a new basket: the backend re-prices, re-totals and re-checks the
+ * discount, and keeps everything else — its version, what it revises, the approval request.
+ */
+export function withLines(
+  draft: QuotationWire,
+  lines: readonly QuotationLineWire[],
+  extraWarnings: readonly string[] = [],
+): QuotationWire {
+  return {
+    ...draft,
+    lines: [...lines],
+    totals: totalsOf(lines),
+    is_provisional: lines.some((line) => line.provisional_fields.length > 0),
+    warnings: [...provisionalWarnings(lines), ...extraWarnings],
+    discount: discountInfo(lines),
+    updated_at: new Date().toISOString(),
+  };
 }
 
 /** QUOT-004 · A draft as the backend saves it: no number, no link, priced lines and totals. */
@@ -409,11 +441,7 @@ export function mockDraft(input: MockDraftInput): QuotationWire {
     lines,
     totals: totalsOf(lines),
     is_provisional: provisional,
-    warnings: provisional
-      ? [
-          `provisional_pricing: ${String(lines.filter((line) => line.provisional_fields.length > 0).length)} of ${String(lines.length)} lines use stand-in rates or tax slabs`,
-        ]
-      : [],
+    warnings: provisionalWarnings(lines),
     terms: input.terms,
     valid_until: null,
     sent_at: null,
