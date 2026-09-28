@@ -353,8 +353,10 @@ export const DATA_IDS = {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",
     owner: "shared",
-    status: "planned",
-    notes: "Account, QA and Dispatch gates apply only to requests raised by a State Manager.",
+    status: "in-progress",
+    endpoints: ["GET /approvals/pending", "POST /approvals/steps/{stepId}/decision"],
+    notes:
+      "Quotation discounts and sales orders side by side. Account, QA and Dispatch gates apply only to requests raised by a State Manager.",
   },
   "CMPL-001": {
     domain: "CMPL",

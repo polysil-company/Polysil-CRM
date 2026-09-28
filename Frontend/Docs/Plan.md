@@ -303,8 +303,9 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | A quotation's history | QUOT-010 | `GET /quotations/{id}/timeline` |
 | Delete a draft | QUOT-011 | `DELETE /quotations/{id}` |
 | The customer's quotation page `/q/{token}` (no sign-in) | QUOT-012 | `GET /public/q/{token}`, `GET /public/q/{token}/pdf` |
+| Approvals inbox — quotation discounts and sales orders, approve or reject with a reason, sidebar count | APPR-001 | `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` |
 
-LEAD-005…008, QUOT-001…012 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+LEAD-005…008, QUOT-001…012, APPR-001 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 
@@ -328,14 +329,13 @@ LEAD-005…008, QUOT-001…012 and MSTR-003 are built on the backend's contract 
 
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
-| **Quotations, the rest** — the approvals inbox's quotation rows (with APPR-001) | `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` | `backend/docs/handover/quotations-api-contract.md` §4 | **1 — in progress** (QUOT-001…012 done) |
-| Sales orders, approvals, dispatch | `/orders/*`, `/approvals/*`, `/dispatches/*` | `backend/docs/handover/orders-api-contract.md` | 2 |
-| Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 3 |
-| Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 4 |
-| Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 5 |
+| **Sales orders and dispatch** — the approvals inbox already decides orders; their pages come here. Also the approval limits screen for admins | `/orders/*`, `/dispatches/*`, `GET`/`PUT /approvals/thresholds` | `backend/docs/handover/orders-api-contract.md`, `backend/docs/api/approvals.md` | **1 — next** |
+| Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 2 |
+| Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 3 |
+| Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 6 |
 
-| Tasks, the planner, meetings and minutes — lead follow-ups are tasks (BE-002) | `/tasks`, `/planner`, `/planner/team`, `/minutes`, `/lookups/meeting-types` | `backend/docs/handover/tasks-and-planner-contract.md` | 6 |
-| Complaints, from entry to the quality check | `/complaints`, `/complaint-sla-policies`, `/lookups/complaint-types` | `backend/docs/handover/complaints-contract.md` | 7 |
+| Tasks, the planner, meetings and minutes — lead follow-ups are tasks (BE-002) | `/tasks`, `/planner`, `/planner/team`, `/minutes`, `/lookups/meeting-types` | `backend/docs/handover/tasks-and-planner-contract.md` | 4 |
+| Complaints, from entry to the quality check | `/complaints`, `/complaint-sla-policies`, `/lookups/complaint-types` | `backend/docs/handover/complaints-contract.md` | 5 |
 
 Tasks and complaints reached `integration` in #25 (BE-011), with `GET /leads/stats` gaining `by_source`, `by_inquiry_type`, `follow_ups_due_today` and `follow_ups_overdue` (BE-007) — the dashboard's source breakdown and follow-up tiles can use them once it is connected (BE-008).
 

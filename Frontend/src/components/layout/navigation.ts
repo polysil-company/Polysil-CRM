@@ -37,7 +37,7 @@ export interface NavItem {
   /** Who the item is for. "staff" hides it from partner users, whatever their permissions. */
   readonly audience?: "staff";
   /** A live count shown next to the label. */
-  readonly countSource?: "leads" | "messages";
+  readonly countSource?: "leads" | "messages" | "approvals";
 }
 
 export interface NavSection {
@@ -116,9 +116,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "approvals",
         label: "Approvals",
+        description: "Quotation discounts and sales orders waiting for your decision.",
         icon: CheckmarkBadge01Icon,
         module: "approvals",
         dataId: "APPR-001",
+        href: "/approvals",
+        countSource: "approvals",
       },
       {
         id: "subsidy",

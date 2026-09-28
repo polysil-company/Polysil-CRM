@@ -29,6 +29,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — the builder](#quotations--the-builder) | 5 | 🧪 👀 | PR #21 |
 | [Quotations — send, approve, answer, revise, delete](#quotations--send-approve-answer-revise-delete) | 7 | 🧪 👀 | PR #22 |
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | PR #23 |
+| [Approvals](#approvals) | 4 | 🧪 🌐 👀 | PR #26 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 | `integration`, **mock only** |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -94,7 +95,7 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--Q
 Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--QUOT-006--quotations-send-discount-approval-the-customer-s-answer.md). Walked through in one run as Admin: ask for approval → approved → send → PDF ready → negotiation → revise → delete, with no page errors. Screens: [needs approval](screenshots/quotations/draft-needs-approval.webp), [waiting](screenshots/quotations/draft-waiting-for-approval.webp), [send dialog](screenshots/quotations/send-dialog.webp), [sent, in negotiation](screenshots/quotations/sent-in-negotiation.webp), [answer dialog](screenshots/quotations/answer-dialog-desktop-dark.webp) ([phone](screenshots/quotations/answer-dialog-phone.webp)), [version 2 draft](screenshots/quotations/revision-v2-draft.webp), [history and versions](screenshots/quotations/history-and-versions-desktop-dark.webp) ([phone](screenshots/quotations/history-phone-light.webp)), [back on the lead after deleting](screenshots/quotations/lead-after-draft-deleted.webp).
 
 - **QUOT-006 · Send a quotation** within the owner's discount limit: on WhatsApp to the party's mobile (once the PDF is ready), or without a message to share the link by hand. It gets its number and 45 days' validity, and a qualified lead moves to Quoted; "Preparing PDF…" then Open PDF. Refusals: no items, prices changed since the save (with "Open the draft"), the lead closed. 🧪 👀
-- **QUOT-007 · Ask for discount approval** when the discount is above the limit: the notice shows the discount and the limit, and the request takes a reason. Then "Waiting for a State Manager to approve…" with Send off (the page checks every 30 seconds), "Discount approved" with Send, "refused" with the approver's remark, or "no longer applies" after the figures changed. The builder warns that saving withdraws a waiting request. No manager's limit covers it: lower the discount. 🧪 👀
+- **QUOT-007 · Ask for discount approval** when the discount is above the limit: the notice shows the discount and the limit, and the request takes a reason. Then "Waiting for a State Manager to approve…" with Send off (the page checks every 30 seconds), "Discount approved" with Send, "refused" with the approver's remark, or "no longer applies" after the figures changed. The builder warns that saving withdraws a waiting request. No manager's limit covers it: lower the discount. The request waits in the manager's [Approvals](#approvals) inbox. 🧪 👀
 - **QUOT-008 · Record the customer's answer** on a sent, viewed or negotiating quotation: Accepted (the lead is Won), In negotiation (the lead moves to Negotiation), Rejected (the lead stays), each with what the customer said. Nothing to answer past the validity date, on an accepted or a replaced version. 🧪 👀
 - **QUOT-009 · Revise** a sent, viewed, negotiating, rejected or expired quotation into the next version, a draft at today's prices, and open it; one open revision at a time; sending it marks the old one replaced, and it keeps the same number. **Versions** lists them all. 🧪 👀
 - **QUOT-010 · Read a quotation's history**: drafted, edited, sent (how), opened (how often), the answer with its remark, revised, and each step of the discount approval; older events a page at a time. The lead's history names the same events. 🧪 👀
@@ -107,6 +108,15 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--Q
 
 - **QUOT-012 · A customer opens their link** (`/q/…`) without signing in: the number, who it's from, the total including GST, the items count, when it was sent and until when it's valid, and **View quotation** opening the PDF in a new tab. The PDF opens only when tapped, so a WhatsApp preview is never counted as a view. While the PDF is made: "Preparing the PDF…", checked again by itself. Expired or replaced quotations still open, with a note. Nothing personal is shown, and the link's secret isn't passed on to the PDF's host. 🧪 🌐 👀
 - **QUOT-012 · A wrong or cut-off link** says "This link doesn't open a quotation", with what to do. 🧪 👀
+
+## Approvals
+
+Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--APPR-001--approvals-inbox.md). Walked through as a State Manager: 7 requests; a rejection without a reason refused, then rejected with one; a quotation discount approved; lower steps added; on a phone in dark mode; an Employee sees no Approvals. Screens: [the inbox](screenshots/approvals/inbox-state-manager-desktop-light.jpg), [a reason to reject](screenshots/approvals/reject-needs-a-reason-desktop-light.jpg), [with steps below](screenshots/approvals/inbox-including-steps-below-desktop-light.jpg), [phone, dark](screenshots/approvals/inbox-phone-dark.jpg), [approve on a phone](screenshots/approvals/approve-dialog-phone-dark.jpg).
+
+- **APPR-001 · See what waits on me** (managers with `approvals`): quotation discounts and sales orders side by side, oldest first — what it is, its number (or "Draft quotation"), the party, the total, the discount asked, stand-in pricing, who raised it and when, how long it has waited, and "Open the quotation". A count in the sidebar (with a dot on the collapsed rail); the inbox and the count check every minute. States: skeleton, "Nothing waits on you", an error, a later page failing without losing what is shown. 🧪 🌐 👀
+- **APPR-001 · Cover for a manager on leave:** "Include steps below me" (kept in the URL) adds lower managers' steps, each marked whose it is. A step nobody of its role covers always shows, marked "No District Manager to decide". 🧪 👀
+- **APPR-001 · Approve or reject.** Rejecting needs a reason, which the person who asked reads; approving takes one optionally. The request leaves the inbox and the count drops; an approved quotation discount turns the officer's button into Send, a rejected one shows the reason on the draft. 🧪 🌐 👀
+- **APPR-001 · When the request moved on** — decided by someone else, withdrawn, or its draft edited after the request — the dialog closes, a toast says which, and the inbox shows the latest. Without the `approvals.approve` permission the rows show, the buttons don't. 🧪
 
 ## Dashboard, notifications, messages
 
@@ -122,8 +132,9 @@ These run on the mock backend only — the backend has no endpoints for them yet
 
 The backend serves these, and the frontend has no screen for them — in the order of [Plan.md §9.3](Plan.md):
 
-1. The approvals inbox (APPR-001): a manager approves or refuses quotation discounts and orders. Until then, the mock approves quotation discount requests by itself after a few seconds.
-2. Sales orders, their approvals and dispatch.
-3. Editing and deleting a lead, the duplicates queue and merging.
-4. Lead QR codes and the public enquiry form.
-5. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.
+1. Sales orders and dispatch — the approvals inbox already decides orders, but an order has no page yet. Also the approval limits screen for admins (`/approvals/thresholds`).
+2. Editing and deleting a lead, the duplicates queue and merging.
+3. Lead QR codes and the public enquiry form.
+4. Tasks, the planner, meetings and minutes (on `integration` since #25).
+5. Complaints, from entry to the quality check (on `integration` since #25).
+6. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.

@@ -23,6 +23,7 @@ import {
   type QuotationWire,
 } from "@/features/quotations/api/quotations.schemas";
 import { buildApiUrl } from "@/lib/api/url";
+import { quotationApproverFor } from "@/mocks/data/approvals";
 import {
   MOCK_PRODUCTS,
   mockDraft,
@@ -33,7 +34,7 @@ import {
   totalsOf,
   withLines,
 } from "@/mocks/data/quotations";
-import { MOCK_ID_SPACE, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
+import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
@@ -54,9 +55,8 @@ import { decodeCursor, encodeCursor, errorResponse } from "./shared";
  *
  * QUOT-012 · The customer's page: the shared view, and the PDF open that records the view.
  *
- * Two things only the mock does, so the flows can be tried end to end: a just-sent PDF is
- * ready a few seconds later, and a pending discount request is approved by a stand-in
- * manager after a few seconds (the approvals inbox, APPR-001, is not built yet).
+ * Only the mock does this, so the flow can be tried end to end: a just-sent PDF is ready a
+ * few seconds later. A discount request waits in the approvals inbox (handlers/approvals.ts).
  */
 
 const DEFAULT_LIMIT = 25;
@@ -268,8 +268,6 @@ const VALIDITY_DAYS = 45;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** How long the mock's PDF "renders" after a send. */
 const PDF_RENDER_MS = 2500;
-/** How long the mock's stand-in manager takes to approve a discount request. */
-const APPROVAL_AUTO_DECIDE_MS = 8000;
 const REMARK_MAX_LENGTH = 1000;
 /** Answers are recorded on a quotation the customer has; negotiation → negotiation is not a move. */
 const ANSWERABLE_STATUSES: readonly QuotationStatus[] = ["sent", "viewed", "negotiation"];
@@ -280,24 +278,12 @@ const REVISABLE_STATUSES: readonly QuotationStatus[] = [
   "rejected",
   "expired",
 ];
-/**
- * The lowest manager whose stand-in limit covers the discount (District 10 %, State 15 %,
- * Regional 20 %). Above that the backend asks Admin-Sales, whom the mock does not seed, so
- * it answers `no_approver`.
- */
-const APPROVER_LIMITS: readonly { readonly upToPct: number; readonly role: string }[] = [
-  { upToPct: 10, role: "district_manager" },
-  { upToPct: 15, role: "state_manager" },
-  { upToPct: 20, role: "regional_manager" },
-];
-/** Who approves in the mock. */
-const MOCK_APPROVER = MOCK_STAFF[3] ?? null;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function findQuotation(quotationId: string): QuotationWire | undefined {
+export function findQuotation(quotationId: string): QuotationWire | undefined {
   return mockDb.quotations.find((item) => item.id === quotationId);
 }
 
@@ -324,7 +310,7 @@ function sendGateFor(quotation: QuotationWire): SendGate {
   }
 }
 
-function refreshGate(quotation: QuotationWire): void {
+export function refreshGate(quotation: QuotationWire): void {
   if (quotation.discount !== null && quotation.discount !== undefined) {
     quotation.discount = { ...quotation.discount, send_gate: sendGateFor(quotation) };
   }
@@ -389,7 +375,7 @@ function quotationEventsOf(quotation: QuotationWire): TimelineEventWire[] {
 }
 
 /** Writes an event on the quotation and, as the backend does, on its lead. */
-function recordQuotationEvent(
+export function recordQuotationEvent(
   quotation: QuotationWire,
   kind: string,
   payload: Record<string, unknown>,
@@ -437,46 +423,30 @@ function leadNotOpen(quotation: QuotationWire): Response | null {
   );
 }
 
-/**
- * What time has done since the last read: a sent PDF finished rendering, and a pending
- * discount request was approved by the stand-in manager.
- */
-function settle(quotation: QuotationWire): QuotationWire {
-  const now = Date.now();
+/** What time has done since the last read: a sent PDF finished rendering. */
+export function settle(quotation: QuotationWire): QuotationWire {
   const readyAt = mockDb.pdfReadyAt.get(quotation.id);
-  if (readyAt !== undefined && now >= readyAt && quotation.pdf_state === "pending") {
+  if (readyAt !== undefined && Date.now() >= readyAt && quotation.pdf_state === "pending") {
     quotation.pdf_state = "ready";
     mockDb.pdfReadyAt.delete(quotation.id);
-  }
-  const decideAt = mockDb.approvalDecideAt.get(quotation.id);
-  if (decideAt !== undefined && now >= decideAt && quotation.approval?.status === "pending") {
-    const decidedAt = new Date(now).toISOString();
-    quotation.approval = {
-      ...quotation.approval,
-      status: "approved",
-      steps: quotation.approval.steps.map((step) => ({
-        ...step,
-        decision: "approve",
-        by: MOCK_APPROVER,
-        decided_at: decidedAt,
-      })),
-    };
-    mockDb.approvalDecideAt.delete(quotation.id);
-    refreshGate(quotation);
-    recordQuotationEvent(quotation, "quotation.approval_approved", {
-      role: quotation.approval.steps[0]?.role ?? null,
-    });
   }
   return quotation;
 }
 
-/** An edit or a delete cancels a pending or granted approval: it was for other figures. */
-function voidApproval(quotation: QuotationWire): void {
+/**
+ * An edit or a delete cancels a pending or granted approval: it was for other figures. A
+ * waiting request leaves the approver's inbox.
+ */
+function voidApproval(quotation: QuotationWire, reason: "edited" | "deleted"): void {
   const approval = quotation.approval;
   if (approval !== null && approval !== undefined && approval.status !== "rejected") {
     if (approval.status === "pending" || approval.status === "approved") {
       quotation.approval = { ...approval, status: "cancelled" };
-      mockDb.approvalDecideAt.delete(quotation.id);
+      for (const step of mockDb.approvalSteps) {
+        if (step.requestId === approval.request_id && step.decision === null) {
+          step.closed = reason;
+        }
+      }
       recordQuotationEvent(quotation, "quotation.approval_cancelled", {});
     }
   }
@@ -759,7 +729,7 @@ export const quotationHandlers = [
       quotation.terms = body.terms ?? null;
     }
     quotation.updated_at = new Date().toISOString();
-    voidApproval(quotation);
+    voidApproval(quotation, "edited");
     recordQuotationEvent(quotation, "quotation.updated", {});
     mockDb.quotationWrites.set(replay.key, { body: replay.serialized, quotationId: quotation.id });
     return HttpResponse.json({ data: quotation });
@@ -797,7 +767,7 @@ export const quotationHandlers = [
     }
     const updated = withLines(draft.quotation, priced.lines);
     mockDb.quotations = mockDb.quotations.map((item) => (item.id === updated.id ? updated : item));
-    voidApproval(updated);
+    voidApproval(updated, "edited");
     recordQuotationEvent(updated, "quotation.lines_replaced", { line_count: updated.lines.length });
     mockDb.quotationWrites.set(replay.key, { body: replay.serialized, quotationId: updated.id });
     return HttpResponse.json({ data: updated });
@@ -926,22 +896,24 @@ export const quotationHandlers = [
         return errorResponse(409, "approval_pending", "A request is already waiting.");
       }
       const effective = Number(quotation.discount?.effective_pct ?? "0");
-      const approver = APPROVER_LIMITS.find((limit) => effective <= limit.upToPct);
-      if (approver === undefined) {
+      const approverRole = quotationApproverFor(effective);
+      if (approverRole === null) {
         return errorResponse(
           422,
           "no_approver",
           "No manager's limit covers this discount. Lower it, or ask an administrator.",
         );
       }
+      const requestId = mockUuid(MOCK_ID_SPACE.approval, 70_000 + mockDb.writtenEvents);
+      const stepId = mockUuid(MOCK_ID_SPACE.approval, 80_000 + mockDb.writtenEvents);
       quotation.approval = {
-        request_id: mockUuid(MOCK_ID_SPACE.quotation, 70_000 + mockDb.writtenEvents),
+        request_id: requestId,
         status: "pending",
         steps: [
           {
-            id: mockUuid(MOCK_ID_SPACE.quotation, 80_000 + mockDb.writtenEvents),
+            id: stepId,
             seq: 1,
-            role: approver.role,
+            role: approverRole,
             decided_role: null,
             decision: null,
             by: null,
@@ -952,9 +924,28 @@ export const quotationHandlers = [
         request_remark: parsed.data.remark ?? null,
       };
       refreshGate(quotation);
-      mockDb.approvalDecideAt.set(quotation.id, Date.now() + APPROVAL_AUTO_DECIDE_MS);
+      // Waits in the approver's inbox (APPR-001) until a manager decides it.
+      mockDb.approvalSteps.push({
+        stepId,
+        requestId,
+        role: approverRole,
+        stalled: false,
+        docType: "quotation",
+        docId: quotation.id,
+        number: null,
+        partyName: quotation.party.name,
+        total: quotation.totals.total,
+        isProvisional: quotation.is_provisional,
+        discountPct: quotation.discount?.effective_pct ?? null,
+        raisedBy: MOCK_CREATOR ?? null,
+        raisedAt: new Date().toISOString(),
+        decision: null,
+        remark: null,
+        decidedAt: null,
+        closed: null,
+      });
       recordQuotationEvent(quotation, "quotation.approval_requested", {
-        role: approver.role,
+        role: approverRole,
         remark: parsed.data.remark ?? null,
       });
       mockDb.quotationWrites.set(replay.key, {
@@ -1210,7 +1201,7 @@ export const quotationHandlers = [
     if (!draft.ok) return draft.response;
 
     const { quotation } = draft;
-    voidApproval(quotation);
+    voidApproval(quotation, "deleted");
     mockDb.quotations = mockDb.quotations.filter((item) => item.id !== quotation.id);
     const lead = leadOf(quotation);
     if (lead !== undefined) {

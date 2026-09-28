@@ -12,12 +12,13 @@ import { Icon } from "@/components/ui/icon";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { approvalCountQueryOptions } from "@/features/approvals/api/approvals.queries";
 import { leadStatsQueryOptions } from "@/features/leads/api/leads.queries";
 import { conversationListQueryOptions } from "@/features/messages/api/messages.queries";
-import { useSession } from "@/features/session/hooks/use-session";
+import { useCan, useSession } from "@/features/session/hooks/use-session";
 import { useModifierKeyLabel } from "@/hooks/use-modifier-key";
 import { clientEnv, type ApiMockingMode, type AppEnv } from "@/lib/env/client";
-import { formatNumber } from "@/lib/format";
+import { formatCount, formatNumber } from "@/lib/format";
 import { useSidebar } from "@/lib/sidebar/use-sidebar";
 import { cn } from "@/lib/utils";
 
@@ -283,6 +284,8 @@ function SidebarItem({
         <LeadsCount />
       ) : item.countSource === "messages" ? (
         <UnreadMessagesCount />
+      ) : item.countSource === "approvals" ? (
+        <ApprovalsCount />
       ) : null}
     </>
   );
@@ -340,6 +343,27 @@ function LeadsCount(): React.JSX.Element | null {
     <span className="text-xs text-subtle-foreground tabular-nums sidebar-collapsed:hidden">
       {formatNumber(data.total)}
     </span>
+  );
+}
+
+/** APPR-001 · Requests waiting on the user, for those who may decide them. */
+function ApprovalsCount(): React.JSX.Element | null {
+  const canApprove = useCan("approvals", "approve");
+  const { data } = useQuery({ ...approvalCountQueryOptions(), enabled: canApprove });
+  if (!canApprove || data === undefined || data.total === 0) {
+    return null;
+  }
+  return (
+    <>
+      <Badge size="sm" variant="primary" className="tabular-nums sidebar-collapsed:hidden">
+        <span className="sr-only">Waiting for your decision: </span>
+        {formatCount(data.total, { atLeast: data.capped })}
+      </Badge>
+      <span
+        aria-hidden="true"
+        className="absolute top-1 right-1 hidden size-2 rounded-full bg-primary ring-2 ring-sidebar sidebar-collapsed:block"
+      />
+    </>
   );
 }
 

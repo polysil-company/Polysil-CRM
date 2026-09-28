@@ -154,7 +154,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-011 | Delete a draft quotation (`DELETE /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-012 | The customer's quotation page — /q/{token} (`GET /public/q/{token}`, `GET /public/q/{token}/pdf`) | shared | in-progress |
 | SO-001 | Sales orders list | shared | planned |
-| APPR-001 | Approval inbox — amount-based escalation | shared | planned |
+| APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | CMPL-001 | Complaints list and QA review | shared | planned |
 | TASK-001 | Tasks and daily planner | shared | planned |
 | CHNL-001 | Channel partners list and detail | shared | planned |
