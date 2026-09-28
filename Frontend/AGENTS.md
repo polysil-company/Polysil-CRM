@@ -22,6 +22,7 @@ When a rule and the code disagree, fix the code — or change the rule here, in 
 | Add a feature or route | [Docs/Frontend-Architecture.md](Docs/Frontend-Architecture.md)                                                         |
 | Call an API            | [Docs/Data-IDs.md](Docs/Data-IDs.md), [Docs/Logging.md](Docs/Logging.md), [Docs/Environments.md](Docs/Environments.md) |
 | Decide what to build   | [Docs/Frontend-Scope.md](Docs/Frontend-Scope.md) — roles, modules, open questions                                      |
+| Try or demo a feature  | [Docs/Tested-Features.md](Docs/Tested-Features.md) — every user story, how far it is tested                            |
 | Commit                 | [changelog/README.md](changelog/README.md)                                                                             |
 
 ### The design system has two sources — only two
