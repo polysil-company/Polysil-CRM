@@ -5,6 +5,7 @@ import {
   ArrowLeft01Icon,
   CheckmarkCircle02Icon,
   Copy01Icon,
+  Edit02Icon,
   InformationCircleIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -18,6 +19,7 @@ import { QueryView } from "@/components/patterns/query-view";
 import { RelativeDate } from "@/components/patterns/relative-date";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,6 +34,7 @@ import {
   parseWarnings,
   quotationTitle,
 } from "@/features/quotations/lib/quotation-labels";
+import { useCan } from "@/features/session/hooks/use-session";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { isApiError } from "@/lib/api/errors";
 import {
@@ -68,6 +71,7 @@ export function QuotationDetail({ quotationId }: { quotationId: string }): React
 
 function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX.Element {
   const sent = quotation.status !== "draft";
+  const canEdit = useCan("quotations", "edit");
 
   return (
     <div className="flex flex-col gap-5">
@@ -102,11 +106,22 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
             )}
           </p>
         </div>
-        {sent && quotation.pdfState !== null ? (
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {sent && quotation.pdfState !== null ? (
             <QuotationPdfButton quotationId={quotation.id} pdfState={quotation.pdfState} />
-          </div>
-        ) : null}
+          ) : null}
+          {/* QUOT-004 · A draft is edited; a sent quotation is revised instead. */}
+          {!sent && canEdit ? (
+            <Link
+              href={`/quotations/${quotation.id}/edit`}
+              transitionTypes={["nav-forward"]}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <Icon icon={Edit02Icon} />
+              Edit draft
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <QuotationNotices quotation={quotation} />

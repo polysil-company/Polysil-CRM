@@ -13,6 +13,10 @@ export interface MockDb {
   leads: LeadWire[];
   /** Newest first, full documents; list rows are derived from them. */
   quotations: QuotationWire[];
+  /** Quotation saves: Idempotency-Key → the request and the quotation it made or changed. */
+  quotationWrites: Map<string, { body: string; quotationId: string }>;
+  /** Bumped to publish a new price list: saves priced before it get 409 rate_changed. */
+  priceVersion: number;
   notifications: NotificationWire[];
   conversations: ConversationWire[];
   messages: MessageWire[];
@@ -36,6 +40,8 @@ function createMockDb(): MockDb {
   return {
     leads,
     quotations: generateQuotations(leads),
+    quotationWrites: new Map(),
+    priceVersion: 0,
     notifications: generateNotifications(leads),
     conversations,
     messages,

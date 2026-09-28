@@ -144,6 +144,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
+| QUOT-004 | Quotation builder — create and edit a draft (`POST /quotations`, `PATCH /quotations/{quotationId}`, `PUT /quotations/{quotationId}/lines`) | shared | in-progress |
+| QUOT-005 | Live pricing — the quotation preview (`POST /pricing/quote-lines`) | shared | in-progress |
 | SO-001 | Sales orders list | shared | planned |
 | APPR-001 | Approval inbox — amount-based escalation | shared | planned |
 | CMPL-001 | Complaints list and QA review | shared | planned |
@@ -153,6 +155,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SCHM-001 | Schemes — set by Admin, visible to everyone | shared | planned |
 | MSTR-001 | Masters — products, stock, price lists, territories | shared | planned |
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
+| MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
 | SUBS-001 | Subsidy forms and case status | shared | planned |
 | ACCT-001 | Accounts work queue | shared | planned |
 | DISP-001 | Dispatch work queue | shared | planned |

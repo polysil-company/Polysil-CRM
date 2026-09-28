@@ -2,10 +2,18 @@ import { apiRequest } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
+  productPageSchema,
+  quotePreviewResponseSchema,
   pdfLinkResponseSchema,
   quotationPageSchema,
   quotationResponseSchema,
+  type CreateQuotationRequest,
+  type PatchQuotationRequest,
   type PdfLink,
+  type ProductPick,
+  type QuotePreview,
+  type QuoteLinesRequest,
+  type ReplaceLinesRequest,
   type Quotation,
   type QuotationListParams,
   type QuotationPage,
@@ -75,5 +83,99 @@ export function getQuotationPdf(quotationId: string): Promise<PdfLink> {
     fn: "getQuotationPdf",
     path: `/quotations/${encodeURIComponent(quotationId)}/pdf`,
     schema: pdfLinkResponseSchema,
+  });
+}
+
+/** How many products one picker search returns. */
+export const PRODUCT_SEARCH_LIMIT = 20;
+
+/** MSTR-003 · GET /products — active products whose description contains `q`. */
+export async function searchProducts(q: string, signal?: AbortSignal): Promise<ProductPick[]> {
+  const page = await apiRequest({
+    dataId: "MSTR-003",
+    logger: log,
+    fn: "searchProducts",
+    path: "/products",
+    query: { q, active: true, limit: PRODUCT_SEARCH_LIMIT },
+    schema: productPageSchema,
+    signal,
+  });
+  return page.items;
+}
+
+/**
+ * QUOT-005 · POST /pricing/quote-lines — prices a basket without storing anything. A read in
+ * all but method, so it runs as a query: abandoned previews are cancelled.
+ */
+export function previewQuoteLines(
+  request: QuoteLinesRequest,
+  signal?: AbortSignal,
+): Promise<QuotePreview> {
+  return apiRequest({
+    dataId: "QUOT-005",
+    logger: log,
+    fn: "previewQuoteLines",
+    method: "POST",
+    path: "/pricing/quote-lines",
+    body: request,
+    schema: quotePreviewResponseSchema,
+    signal,
+  });
+}
+
+export interface SaveInput<TBody> {
+  readonly body: TBody;
+  /** The same key for a retry of the same save; a new one after `rate_changed`. */
+  readonly idempotencyKey: string;
+}
+
+/** QUOT-004 · POST /quotations — a new draft on a lead. */
+export function createQuotation({
+  body,
+  idempotencyKey,
+}: SaveInput<CreateQuotationRequest>): Promise<Quotation> {
+  return apiRequest({
+    dataId: "QUOT-004",
+    logger: log,
+    fn: "createQuotation",
+    method: "POST",
+    path: "/quotations",
+    body,
+    idempotencyKey,
+    schema: quotationResponseSchema,
+  });
+}
+
+/** QUOT-004 · PATCH /quotations/{id} — a draft's header. */
+export function patchQuotation(
+  quotationId: string,
+  { body, idempotencyKey }: SaveInput<PatchQuotationRequest>,
+): Promise<Quotation> {
+  return apiRequest({
+    dataId: "QUOT-004",
+    logger: log,
+    fn: "patchQuotation",
+    method: "PATCH",
+    path: `/quotations/${encodeURIComponent(quotationId)}`,
+    body,
+    idempotencyKey,
+    schema: quotationResponseSchema,
+  });
+}
+
+/** QUOT-004 · PUT /quotations/{id}/lines — a draft's whole basket, in order. */
+export function replaceQuotationLines(
+  quotationId: string,
+  { body, idempotencyKey }: SaveInput<ReplaceLinesRequest>,
+): Promise<Quotation> {
+  return apiRequest({
+    dataId: "QUOT-004",
+    logger: log,
+    fn: "replaceQuotationLines",
+    method: "PUT",
+    path: `/quotations/${encodeURIComponent(quotationId)}/lines`,
+    body,
+    idempotencyKey,
+    schema: quotationResponseSchema,
   });
 }
