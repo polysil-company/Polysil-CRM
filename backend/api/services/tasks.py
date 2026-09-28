@@ -239,6 +239,28 @@ async def _link_visible_as(db: AsyncSession, caller_id: str, user_id: str,
                            fields={field: "cannot see the lead, dealer or order"})
 
 
+async def _lead_still_open(db: AsyncSession, lead_id: str | None) -> None:
+    """A task or minutes on a merged or deleted lead would sit where the default
+    list hides it, and nothing moves it later (PR 25 review). Checked after the
+    insert: the foreign key has locked the lead row by then, so a merge waits for
+    this transaction, and one that committed first is visible to this read."""
+    if lead_id is None:
+        return
+    row = (await db.execute(text(
+        "SELECT l.stage::text AS stage, l.deleted_at, mi.inquiry_no AS survivor "
+        "FROM lead l LEFT JOIN lead mi ON mi.id = l.merged_into_id "
+        "WHERE l.id = CAST(:l AS uuid)"), {"l": lead_id})).one_or_none()
+    if row is None:
+        return
+    if row.stage == "merged":
+        where = f" into {row.survivor}" if row.survivor else ""
+        raise ValidationFailed(f"That lead was merged{where}. Use the lead it was merged into.",
+                               code="lead_merged", fields={"lead_id": f"merged{where}"})
+    if row.deleted_at is not None:
+        raise ValidationFailed("That lead was deleted.", code="lead_deleted",
+                               fields={"lead_id": "deleted"})
+
+
 async def _meeting_type_active(db: AsyncSession, meeting_type_id: str | None) -> None:
     if meeting_type_id is None:
         return
@@ -311,6 +333,7 @@ async def create_task(db: AsyncSession, caller: Caller, body: sch.TaskCreate) ->
                             assignee=assignee, office=office, lead_id=body.lead_id,
                             partner_id=body.partner_id, order_id=body.sales_order_id,
                             meeting_type_id=body.meeting_type_id, notes=body.notes)
+    await _lead_still_open(db, body.lead_id)
     return await get_task(db, task_id)
 
 
@@ -559,6 +582,7 @@ async def create_minutes(db: AsyncSession, caller: Caller, body: sch.MinutesCrea
             raise ValidationFailed(fields={"partner_id" if body.partner_id else "lead_id":
                                            "not found or not yours"}) from exc
         raise
+    await _lead_still_open(db, body.lead_id)
     if body.task_id:
         await _record_meeting(db, caller, body)
     # all or nothing (EC-7): the first bad item refuses the request, and the

@@ -28,6 +28,11 @@ polysil.pranayx.tech {
 		reverse_proxy polysil-api:8000
 	}
 
+	# the hook reads a body before it can check the signature; a push is small
+	request_body /hooks/* {
+		max_size 1MB
+	}
+
 	handle /hooks/* {
 		reverse_proxy polysil-deploy-hook:9000
 	}

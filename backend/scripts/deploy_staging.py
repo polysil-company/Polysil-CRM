@@ -400,7 +400,7 @@ def frontend_provision(env: dict[str, str]) -> None:
                     f"-C polysil-staging-frontend -f {d}/infra/frontend/keys/deploy_key")
     run_remote(env, f"docker compose -f {d}/{HOOK_COMPOSE} --env-file {d}/infra/.env.staging "
                     f"up -d --build")
-    print("\n  Add this as a READ-ONLY deploy key on github.com/polysil-crm/Polysil-CRM "
+    print("\n  Add this as a READ-ONLY deploy key on github.com/polysil-company/Polysil-CRM "
           "(Settings > Deploy keys):\n")
     run_remote(env, f"cat {d}/infra/frontend/keys/deploy_key.pub")
     print("\n  Then: python scripts/deploy_staging.py frontend   (the first build)\n")
@@ -416,7 +416,8 @@ CADDY_CONTAINER = "distributed-file-system-web-1"
 
 
 def frontend_caddy(env: dict[str, str]) -> None:
-    """Append polysil.pranayx.tech to the Caddyfile the box's proxy serves, once.
+    """Put polysil.pranayx.tech in the Caddyfile the box's proxy serves, replacing
+    the block if it is there already, so a change to the block reaches the box.
     The file belongs to another project: it is backed up first, and restored if
     Caddy refuses the result, so their site is never left on a broken config."""
     text = (INFRA / "caddy" / "polysil-app.caddy").read_text(encoding="utf-8")
@@ -424,14 +425,18 @@ def frontend_caddy(env: dict[str, str]) -> None:
     f = shlex.quote(CADDYFILE)
     backup = shlex.quote(CADDYFILE + ".bak-polysil-app")
     c = CADDY_CONTAINER
+    # drop the old block: from its opening line to the first closing brace at column 0
+    strip = ("awk 'index($0, \"polysil.pranayx.tech {\") == 1 {skip=1} "
+             "skip && /^}/ {skip=0; next} !skip'")
+    # `cat > file` keeps the inode: the Caddyfile is bind-mounted into the proxy
     script = (
-        f"if grep -q '^polysil.pranayx.tech {{' {f}; then echo '  caddy    block already present'; "
-        f"else cp {f} {backup} && printf '\\n' >> {f} && cat >> {f} && "
+        f"cp {f} {backup} && {strip} {backup} > {f}.new && printf '\\n' >> {f}.new && "
+        f"cat >> {f}.new && cat {f}.new > {f} && rm -f {f}.new && "
         f"if docker exec {c} caddy validate --config /etc/caddy/Caddyfile "
         f"--adapter caddyfile >/dev/null 2>&1; "
-        f"then echo '  caddy    block added and valid'; "
+        f"then echo '  caddy    block written and valid'; "
         f"else cp {backup} {f}; echo '  caddy    refused, the original is restored' >&2; "
-        f"exit 1; fi; fi && "
+        f"exit 1; fi && "
         f"docker exec {c} caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile && "
         f"echo '  caddy    reloaded'"
     )

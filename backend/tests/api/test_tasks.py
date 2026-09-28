@@ -129,7 +129,7 @@ async def test_a_meeting_on_a_lead_carries_its_type_and_only_a_meeting_shows_a_g
     r = await _create(client, h, task_type="meeting", lead_id=lead)
     assert r.status_code == 422 and "meeting_type_id" in r.json()["error"]["fields"], r.text
     r = await _create(client, h, task_type="call", meeting_type_id=await _meeting_type(client, h))
-    assert r.status_code == 422, r.text
+    assert r.status_code == 422 and "meeting_type_id" in r.json()["error"]["fields"], r.text
     r = await _create(client, h, task_type="meeting", lead_id=lead,
                       meeting_type_id=await _meeting_type(client, h))
     assert r.status_code == 201, r.text
@@ -137,14 +137,14 @@ async def test_a_meeting_on_a_lead_carries_its_type_and_only_a_meeting_shows_a_g
     call = (await _create(client, h)).json()["data"]
     r = await client.post(f"{V1}/tasks/{call['id']}/complete", headers={**h, **_key()},
                           json={"outcome": "Spoke", "gift_shown": True})
-    assert r.status_code == 422, r.text
+    assert r.status_code == 422 and "gift_shown" in r.json()["error"]["fields"], r.text
 
 
 async def test_one_link_at_most(client: httpx.AsyncClient, shop: Shop) -> None:
     h = await _as(client, shop, "field_officer")
     lead = await _lead(client, shop, h)
     r = await _create(client, h, lead_id=lead, partner_id=shop.partner)
-    assert r.status_code == 422, r.text
+    assert r.status_code == 422 and "lead_id" in r.json()["error"]["fields"], r.text
 
 
 # ── the life of a task ───────────────────────────────────────────────────────
@@ -182,9 +182,12 @@ async def test_reopen_closes_after_seven_days(client: httpx.AsyncClient, shop: S
     await client.post(f"{V1}/tasks/{task['id']}/complete", headers={**h, **_key()},
                       json={"outcome": "Done"})
     s = sessions()
-    await s.execute(text("UPDATE task SET completed_at = now() - interval '8 days' "
-                         "WHERE id = CAST(:t AS uuid)"), {"t": task["id"]})
-    await s.commit()
+    try:
+        await s.execute(text("UPDATE task SET completed_at = now() - interval '8 days' "
+                             "WHERE id = CAST(:t AS uuid)"), {"t": task["id"]})
+        await s.commit()
+    finally:
+        await s.close()
     r = await client.post(f"{V1}/tasks/{task['id']}/reopen", headers={**h, **_key()})
     assert r.status_code == 409 and _code(r) == "reopen_window_passed", r.text
 
@@ -210,8 +213,14 @@ async def test_a_dealer_has_no_tasks_and_no_minutes(client: httpx.AsyncClient, s
     officer = await _as(client, shop, "field_officer")
     lead = await _lead(client, shop, officer)
     task = (await _create(client, officer, lead_id=lead)).json()["data"]
-    await client.post(f"{V1}/minutes", headers={**officer, **_key()}, json={
+    r = await client.post(f"{V1}/minutes", headers={**officer, **_key()}, json={
         "lead_id": lead, "held_at": dt.datetime.now(domain.IST).isoformat(), "notes": "Met"})
+    assert r.status_code == 201, r.text
+    # the positive case first: staff see both on the lead's timeline, so their
+    # absence for the dealer below is the rule, not missing events
+    staff_kinds = {e["kind"] for e in (await client.get(
+        f"{V1}/leads/{lead}/timeline", headers=officer)).json()["data"]}
+    assert "task.created" in staff_kinds and any(k.startswith("minutes.") for k in staff_kinds), staff_kinds
     s = sessions()
     mobile = str((await s.execute(text("SELECT mobile FROM app_user WHERE id = CAST(:u AS uuid)"),
                                   {"u": shop.ids["dealer"]})).scalar_one())
@@ -257,7 +266,9 @@ async def test_the_planner_splits_due_and_overdue_by_the_ist_day(client: httpx.A
     late = (await _create(client, h, due_at=(today - dt.timedelta(days=3)).isoformat())).json()["data"]
     now = (await _create(client, h, due_at=today.isoformat())).json()["data"]
     later = (await _create(client, h, due_at=(today + dt.timedelta(days=4)).isoformat())).json()["data"]
-    day = (await client.get(f"{V1}/planner", headers=h)).json()["data"]
+    # the date is given: a run crossing midnight IST must not compare two days
+    day = (await client.get(f"{V1}/planner", headers=h,
+                            params={"date": today.isoformat()})).json()["data"]
     assert day["date"] == today.isoformat()
     assert now["id"] in {t["id"] for t in day["due"]}
     assert late["id"] in {t["id"] for t in day["overdue"]}
@@ -486,7 +497,8 @@ async def test_the_branches_the_review_found_untested(client: httpx.AsyncClient,
                            json={"title": "Call again", "expected_status": "done"})
     assert r.status_code == 409 and _code(r) == "status_changed", r.text
     far = (today_ist() + dt.timedelta(days=800)).isoformat()
-    assert (await _create(client, h, due_at=far)).status_code == 422
+    r = await _create(client, h, due_at=far)
+    assert r.status_code == 422 and "due_at" in r.json()["error"]["fields"], r.text
     meeting = (await _create(client, h, task_type="meeting", lead_id=lead,
                              meeting_type_id=await _meeting_type(client, h))).json()["data"]
     r = await client.post(f"{V1}/tasks/{meeting['id']}/complete", headers={**h, **_key()},
@@ -557,3 +569,37 @@ async def test_minutes_complete_only_a_meeting(client: httpx.AsyncClient, shop: 
     assert r.status_code == 422 and _code(r) == "task_not_a_meeting", r.text
     still = (await client.get(f"{V1}/tasks/{call['id']}", headers=h)).json()["data"]
     assert still["status"] == "open"
+
+
+async def test_a_merged_lead_takes_no_new_tasks_or_minutes(client: httpx.AsyncClient,
+                                                           shop: Shop) -> None:
+    """PR 25 review: the merge moves tasks once, so a task added to the loser
+    afterwards (a stale screen, an offline sync) sat on a hidden lead for good."""
+    officer = await _as(client, shop, "field_officer")
+    survivor = await _lead(client, shop, officer)
+    loser = await _lead(client, shop, officer)
+    r = await client.post(f"{V1}/leads/{loser}/merge", json={"into_lead_id": survivor},
+                          headers={**officer, **_key()})
+    assert r.status_code == 200, r.text
+    r = await _create(client, officer, lead_id=loser)
+    assert r.status_code == 422 and _code(r) == "lead_merged", r.text
+    assert "lead_id" in r.json()["error"]["fields"]
+    r = await client.post(f"{V1}/minutes", headers={**officer, **_key()}, json={
+        "lead_id": loser, "held_at": _held(0), "notes": "Met"})
+    assert r.status_code == 422 and _code(r) == "lead_merged", r.text
+    # the survivor still takes both
+    assert (await _create(client, officer, lead_id=survivor)).status_code == 201
+    r = await client.post(f"{V1}/minutes", headers={**officer, **_key()}, json={
+        "lead_id": survivor, "held_at": _held(0), "notes": "Met"})
+    assert r.status_code == 201, r.text
+
+
+async def test_a_list_cursor_with_a_bad_id_is_a_422(client: httpx.AsyncClient, shop: Shop) -> None:
+    """PR 25 review: F-9 fixed the team cursor only; the shared decoder let a bad id
+    reach CAST(... AS uuid) on the task and complaint lists."""
+    import base64
+    h = await _as(client, shop, "field_officer")
+    cursor = base64.urlsafe_b64encode(b"2026-08-01T00:00:00+00:00|not-a-uuid").decode()
+    for path in ("/tasks", "/complaints", "/leads"):
+        r = await client.get(f"{V1}{path}", headers=h, params={"cursor": cursor})
+        assert r.status_code == 422 and "cursor" in r.json()["error"]["fields"], (path, r.text)

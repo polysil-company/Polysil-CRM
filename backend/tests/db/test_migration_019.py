@@ -407,15 +407,44 @@ async def test_the_targets_never_overlap_and_a_new_one_closes_the_old(db: AsyncS
         "INSERT INTO complaint_sla_policy (severity, response_hours, resolution_hours, effective_from) "
         "VALUES ('high', 2, 9, DATE '2026-08-01')", {}, "23P01")
     await _call(db, w.admin,
-                "SELECT complaint_sla_policy_set('high', NULL, 2, 9, true, DATE '2026-11-01')", {})
+                "SELECT complaint_sla_policy_set('high', NULL, 2, 9, true, DATE '2099-11-01')", {})
     rows = (await db.execute(text(
         "SELECT response_hours, effective_from, effective_to FROM complaint_sla_policy "
         "WHERE severity = 'high' AND complaint_type_id IS NULL ORDER BY effective_from"))).all()
-    assert [tuple(r) for r in rows][-2:] == [(4, dt.date(2026, 4, 1), dt.date(2026, 11, 1)),
-                                             (2, dt.date(2026, 11, 1), None)]
+    assert [tuple(r) for r in rows][-2:] == [(4, dt.date(2026, 4, 1), dt.date(2099, 11, 1)),
+                                             (2, dt.date(2099, 11, 1), None)]
     await _refused(db, w.officer,
-                   "SELECT complaint_sla_policy_set('high', NULL, 2, 9, true, DATE '2026-12-01')", {}, "42501")
+                   "SELECT complaint_sla_policy_set('high', NULL, 2, 9, true, DATE '2099-12-01')", {}, "42501")
 
+
+
+async def test_a_target_cannot_start_in_the_past(db: AsyncSession) -> None:
+    """020 (PR 25 review): a past start closed the target in force early, and a
+    resubmit then restated the targets of complaints already submitted."""
+    w = await _world(db)
+    before = (await db.execute(text(
+        "SELECT id, effective_to FROM complaint_sla_policy ORDER BY id"))).all()
+    yesterday = domain.ist_today(dt.datetime.now(dt.UTC)) - dt.timedelta(days=1)
+    await _refused(db, w.admin,
+                   "SELECT complaint_sla_policy_set('high', NULL, 5, 20, true, :d)", {"d": yesterday}, "CMPPD")
+    after = (await db.execute(text(
+        "SELECT id, effective_to FROM complaint_sla_policy ORDER BY id"))).all()
+    assert after == before, "the refused call changed nothing"
+
+
+async def test_working_hours_are_strict_and_refuse_negative_hours(db: AsyncSession) -> None:
+    """020: a NULL looped until the statement timeout; -3 hours went before opening time."""
+    for args in ({"s": None, "h": 5}, {"s": dt.datetime.now(dt.UTC), "h": None}):
+        assert (await db.execute(text("SELECT complaint_add_working_hours(:s, :h)"), args)).scalar_one() is None
+    assert (await db.execute(text("SELECT complaint_due(NULL, 4, true)"))).scalar_one() is None
+    await m13._refused(db, "SELECT complaint_add_working_hours(now(), -3)", {}, "22023")
+
+
+async def test_the_duplicate_complaint_indexes_are_gone(db: AsyncSession) -> None:
+    names = set((await db.execute(text(
+        "SELECT indexname FROM pg_indexes WHERE tablename = 'complaint'"))).scalars())
+    assert not names & {"ix_complaint_lead", "ix_complaint_order"}, names
+    assert {"ix_complaint_lead_id", "ix_complaint_sales_order_id"} <= names, "the generated ones stay"
 
 async def test_no_target_row_means_no_target(db: AsyncSession) -> None:
     w = await _world(db)

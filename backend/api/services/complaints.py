@@ -100,6 +100,9 @@ def _refusal(exc: DBAPIError) -> Exception | None:
         return ValidationFailed(fields={"decision": _message(exc)})
     if state == "CMPSP":
         return ConflictError("A target already starts that day.", code="target_exists")
+    if state == "CMPPD":
+        return ValidationFailed("A target cannot start in the past.", code="target_in_the_past",
+                                fields={"effective_from": "today or later"})
     return None
 
 
@@ -427,7 +430,9 @@ async def _from_dispatch(db: AsyncSession, order_id: str) -> tuple[str | None, d
     """The challan and supply date of the order's latest dispatch, when the caller
     can read it."""
     row = (await db.execute(text(
-        "SELECT dc_no, COALESCE(dc_date, dispatched_at::date) AS day FROM dispatch "
+        # the IST day: the session runs in UTC (PR 25 review)
+        "SELECT dc_no, COALESCE(dc_date, (dispatched_at AT TIME ZONE 'Asia/Kolkata')::date) "
+        "AS day FROM dispatch "
         "WHERE sales_order_id = CAST(:o AS uuid) AND dc_no IS NOT NULL "
         "ORDER BY dispatched_at DESC NULLS LAST LIMIT 1"), {"o": order_id})).one_or_none()
     return (row.dc_no, row.day) if row else (None, None)

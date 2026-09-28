@@ -139,12 +139,19 @@ async def test_the_list_and_the_queue(client: httpx.AsyncClient, shop: Shop) -> 
     await _post(client, officer, f"/{c['id']}/submit")
     queue = (await client.get(f"{V1}/complaints", headers=dm, params={"awaiting": "me"})).json()["data"]
     assert c["id"] in {x["id"] for x in queue}
-    mine = (await client.get(f"{V1}/complaints", headers=officer, params={"awaiting": "me"})).json()["data"]
-    assert c["id"] not in {x["id"] for x in mine}, "nobody checks their own"
+    # nobody checks their own: a manager who could check it raises it (PR 25 review:
+    # the officer holds no approve, so their queue proved nothing)
+    own = await _create(client, shop, dm)
+    assert (await _post(client, dm, f"/{own['id']}/submit")).status_code == 200
+    mine = (await client.get(f"{V1}/complaints", headers=dm, params={"awaiting": "me"})).json()["data"]
+    assert own["id"] not in {x["id"] for x in mine}, "nobody checks their own"
+    sm = await _as(client, shop, "state_manager")
+    above = (await client.get(f"{V1}/complaints", headers=sm, params={"awaiting": "me"})).json()["data"]
+    assert own["id"] in {x["id"] for x in above}, "the manager above does"
     found = (await client.get(f"{V1}/complaints", headers=officer, params={"q": "43210"})).json()["data"]
     assert c["id"] in {x["id"] for x in found}
     stats = (await client.get(f"{V1}/complaints/stats", headers=dm)).json()["data"]
-    assert stats["by_status"]["submitted"] >= 1 and isinstance(stats["storage_available"], bool)
+    assert stats["by_status"]["submitted"] == 2 and isinstance(stats["storage_available"], bool)
 
 
 # ── refusals ─────────────────────────────────────────────────────────────────
@@ -315,9 +322,23 @@ async def test_a_dealer_raises_for_themselves_and_never_sees_who_decided(
     dealer, mobile = await _dealer(client, shop, sessions)
     try:
         type_id = (await client.get(f"{V1}/lookups/complaint-types", headers=dealer)).json()["data"][0]["id"]
-        r = await client.post(f"{V1}/complaints", headers={**dealer, **_key()},
-                              json=_body(shop, type_id, partner_id=str(uuid.uuid4())))
-        assert r.status_code == 422, "a dealer does not raise for another"
+        # a real sibling in the same district, not a random id that fails as unknown
+        s = sessions()
+        sibling = str((await s.execute(text(
+            "INSERT INTO channel_partner (partner_type, code, name, mobile, territory_id, price_tier) "
+            "VALUES ('dealer', :c, 'Patel Drip', :m, CAST(:t AS uuid), 'dealer') RETURNING id"),
+            {"c": f"SIB{uuid.uuid4().hex[:8]}".upper(), "m": "9194" + f"{uuid.uuid4().int % 10**8:08d}",
+             "t": shop.district})).scalar_one())
+        await s.commit()
+        try:
+            r = await client.post(f"{V1}/complaints", headers={**dealer, **_key()},
+                                  json=_body(shop, type_id, partner_id=sibling))
+            assert r.status_code == 422 and "partner_id" in r.json()["error"]["fields"], \
+                "a dealer does not raise for another"
+        finally:
+            await s.execute(text("DELETE FROM channel_partner WHERE id = CAST(:p AS uuid)"), {"p": sibling})
+            await s.commit()
+            await s.close()
         r = await client.post(f"{V1}/complaints", headers={**dealer, **_key()}, json=_body(shop, type_id))
         assert r.status_code == 201, r.text
         c = r.json()["data"]
@@ -366,10 +387,11 @@ async def test_only_an_admin_sets_a_target(client: httpx.AsyncClient, shop: Shop
     admin = await _as(client, shop, "admin_sales")
     body = {"severity": "low", "response_hours": 9, "resolution_hours": 45,
             "effective_from": (dt.date.today() + dt.timedelta(days=4000)).isoformat()}
-    r = await client.post(f"{V1}/complaint-sla-policies", json=body, headers={**officer, **_key()})
-    assert r.status_code == 403
-    r = await client.post(f"{V1}/complaint-sla-policies", json=body, headers={**admin, **_key()})
     try:
+        # inside the try: a wrong 201 here must still be cleaned up
+        r = await client.post(f"{V1}/complaint-sla-policies", json=body, headers={**officer, **_key()})
+        assert r.status_code == 403
+        r = await client.post(f"{V1}/complaint-sla-policies", json=body, headers={**admin, **_key()})
         assert r.status_code == 201, r.text
         assert any(p["effective_from"] == body["effective_from"] for p in r.json()["data"])
     finally:
@@ -567,7 +589,8 @@ async def test_a_dealer_cannot_see_or_touch_a_complaint_without_them(
     try:
         assert (await client.get(f"{V1}/complaints/{c['id']}", headers=dealer)).status_code == 404
         assert (await _upload(client, dealer, c["id"], JPEG)).status_code == 404
-        assert (await _post(client, dealer, f"/{c['id']}/submit")).status_code in (403, 404)
+        # a 403 would tell the dealer the complaint exists
+        assert (await _post(client, dealer, f"/{c['id']}/submit")).status_code == 404
     finally:
         await _forget(sessions, mobile)
 
@@ -594,3 +617,37 @@ async def test_the_cancel_reason_can_be_read_back(client: httpx.AsyncClient, sho
     assert got["reason"] == "Raised on the wrong farmer" and got["by"]["id"] == shop.ids["field_officer"]
     fresh = (await client.get(f"{V1}/complaints/{c['id']}", headers=h)).json()["data"]
     assert fresh["cancellation"]["reason"] == "Raised on the wrong farmer"
+
+
+async def test_the_supply_date_from_a_dispatch_is_the_ist_day(client: httpx.AsyncClient,
+                                                              shop: Shop) -> None:
+    """PR 25 review: with no challan date, a dispatch at 02:00 IST was read as the
+    UTC day before, and that date bounds the courier and QC dates."""
+    officer = await _as(client, shop, "field_officer")
+    draft = await endpoints._create(client, officer, endpoints._direct(shop, partner_id=shop.partner))
+    order = await endpoints._approve_all(client, shop, await endpoints._submit(client, officer, draft["id"]))
+    day = domain.ist_today(dt.datetime.now(dt.UTC)) - dt.timedelta(days=3)
+    early = dt.datetime.combine(day, dt.time(2), tzinfo=domain.IST)
+    hd = await _as(client, shop, "dispatch_manager")
+    r = await client.post(f"{V1}/orders/{order['id']}/dispatches", headers={**hd, **_key()},
+                          json={"dc_no": "DC-EARLY", "dispatched_at": early.isoformat(),
+                                "lines": [{"order_line_id": draft["lines"][0]["id"], "qty": "4"}]})
+    assert r.status_code == 201, r.text
+    body = _body(shop, await _type(client, officer), partner_id=shop.partner,
+                 sales_order_id=order["id"])
+    del body["dc_no"], body["supply_date"]
+    r = await client.post(f"{V1}/complaints", json=body, headers={**officer, **_key()})
+    assert r.status_code == 201, r.text
+    got = r.json()["data"]
+    assert (got["dc_no"], got["supply_date"]) == ("DC-EARLY", day.isoformat())
+
+
+async def test_a_target_starting_in_the_past_is_a_422(client: httpx.AsyncClient, shop: Shop) -> None:
+    """020: the setter refuses a past start, and the API names the field."""
+    admin = await _as(client, shop, "admin_sales")
+    past = domain.ist_today(dt.datetime.now(dt.UTC)) - dt.timedelta(days=1)
+    r = await client.post(f"{V1}/complaint-sla-policies", headers={**admin, **_key()}, json={
+        "severity": "high", "response_hours": 5, "resolution_hours": 20,
+        "effective_from": past.isoformat()})
+    assert r.status_code == 422 and _code(r) == "target_in_the_past", r.text
+    assert "effective_from" in r.json()["error"]["fields"]

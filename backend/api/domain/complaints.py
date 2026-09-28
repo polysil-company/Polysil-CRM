@@ -14,11 +14,10 @@ from typing import Final
 
 IST: Final = dt.timezone(dt.timedelta(hours=5, minutes=30))
 
-# Rule 9: Monday to Saturday, 09:30 to 18:30 IST, no holidays (stand-ins, GAP).
+# Rule 9: Monday to Saturday, 09:30 to 18:30 IST, no holidays (stand-ins, GAP-147).
 WORK_START: Final = dt.time(9, 30)
 WORK_END: Final = dt.time(18, 30)
 WORK_DAYS: Final = frozenset(range(6))            # Monday 0 .. Saturday 5
-WORKDAY_HOURS: Final = 9
 
 MAX_LINES: Final = 20
 MAX_ATTACHMENTS: Final = 10
@@ -167,7 +166,7 @@ def line_problems(lines: list[Line]) -> dict[str, str]:
 
 def nothing_defective(lines: list[Line]) -> bool:
     """To submit, at least one line has a defective quantity (rule 1, a guessed
-    rule, GAP)."""
+    rule, GAP-148)."""
     return not any(line.defective_qty > 0 for line in lines)
 
 

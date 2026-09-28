@@ -77,7 +77,8 @@ async def create_task(body: TaskCreate, db: DbSession, caller: CallerDep, claims
     optionally about one lead, dealer or order. A meeting on a lead carries one of
     the lead's meeting types. `422 not_assignable`: that person is not yours to
     assign to. `422 link_not_visible_to_assignee`: they cannot open the lead or
-    order the task is about."""
+    order the task is about. `422 lead_merged` or `lead_deleted`: use the lead it
+    was merged into."""
     return await _idem(db, claims, idem, "POST /api/v1/tasks", body,
                        lambda: service.create_task(db, caller, body), 201)
 
@@ -196,7 +197,10 @@ async def create_minutes(body: MinutesCreate, db: DbSession, caller: CallerDep, 
                          idem: IdemKey) -> Response:
     """Record a meeting on a lead or a dealer, with its action items. One save: a
     bad action item refuses the whole request, with `fields.action_items[i]`.
-    `task_id`, the meeting being recorded, is completed if still open."""
+    `task_id`, the meeting being recorded, is completed if still open.
+    `422 task_link_mismatch`: that task is on another lead or dealer.
+    `422 task_not_a_meeting`: it is a call or a visit. `409`: it was cancelled.
+    `422 lead_merged` or `lead_deleted`: use the lead it was merged into."""
     return await _idem(db, claims, idem, "POST /api/v1/minutes", body,
                        lambda: service.create_minutes(db, caller, body), 201)
 
@@ -207,7 +211,8 @@ async def list_minutes(db: DbSession,
                        lead_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
                        partner_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
                        ) -> Envelope[list[Minutes]]:
-    """A lead's or a dealer's minutes, newest first. Staff only."""
+    """A lead's or a dealer's minutes, newest first. Staff only. Give exactly one of
+    `lead_id` and `partner_id`; none or both is a `422`."""
     return Envelope(data=await service.list_minutes(db, lead_id=lead_id, partner_id=partner_id))
 
 
