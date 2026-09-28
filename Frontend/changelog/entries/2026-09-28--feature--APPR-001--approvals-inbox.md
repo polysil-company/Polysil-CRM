@@ -32,6 +32,7 @@ A discount above an officer's limit could be sent for approval (QUOT-007), but n
 - **Cards, not a table:** each row carries a decision; on a phone the buttons sit full width under the figures.
 - **The remark rule:** the backend requires a remark to reject and on every Accounts decision. The Accounts role code isn't in the contract's examples, so any role naming "account" asks for one — `TODO(APPR-001)`, asked as **BE-018**.
 - **Not in this slice:** the approval limits screen for admins (`GET`/`PUT /approvals/thresholds`), and deciding from the quotation page itself.
+- **Stacked pull requests:** #22, #23 and #24 were merged into the branch below them, not into `integration`, because GitHub retargets a stacked pull request only when the merged branch is deleted. #28 carried them over. `AGENTS.md` §11 now says to retarget a stacked pull request to `integration` before merging it.
 - `Docs/Plan.md` §9.3 is renumbered: sales orders next, then lead edit and merge, QR codes, tasks and the planner, complaints, then the admin screens.
 
 ## Files changed
@@ -42,6 +43,7 @@ A discount above an officer's limit could be sent for approval (QUOT-007), but n
 - `src/mocks/data/approvals.ts`, `src/mocks/handlers/approvals.ts` — new: the queue and the decision; `handlers/quotations.ts` — requests wait in the queue, edits and deletes withdraw them, no auto-approval; `db.ts`, `data/reference.ts`, `handlers/index.ts` — registered
 - `src/features/quotations/api/quotations.lifecycle.test.ts` — approval now decided from the inbox
 - `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — APPR-001 in progress, with its endpoints
+- `AGENTS.md` §11 — retarget a stacked pull request to `integration` before merging it
 - `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `../docs/Backend-Tasks.md` (BE-018), `Docs/screenshots/approvals/`
 - `e2e/smoke.spec.ts` — the inbox and a reason to reject, with axe
 
