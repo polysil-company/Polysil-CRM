@@ -12,6 +12,7 @@ import {
   quotationVersionsResponseSchema,
   quotePreviewResponseSchema,
   pdfLinkResponseSchema,
+  publicQuotationResponseSchema,
   quotationPageSchema,
   quotationResponseSchema,
   type CreateQuotationRequest,
@@ -23,6 +24,7 @@ import {
   type QuotationSummary,
   type PatchQuotationRequest,
   type PdfLink,
+  type PublicQuotation,
   type ProductPick,
   type QuotePreview,
   type QuoteLinesRequest,
@@ -321,5 +323,21 @@ export async function deleteQuotation(
     body,
     idempotencyKey,
     schema: noContentSchema,
+  });
+}
+
+/**
+ * QUOT-012 · GET /public/q/{token} — the customer's page, without signing in. The answer holds
+ * no personal data (no party, mobile or lines), so it is logged like any other read.
+ */
+export function getPublicQuotation(token: string, signal?: AbortSignal): Promise<PublicQuotation> {
+  return apiRequest({
+    dataId: "QUOT-012",
+    logger: log,
+    fn: "getPublicQuotation",
+    path: `/public/q/${encodeURIComponent(token)}`,
+    auth: "none",
+    schema: publicQuotationResponseSchema,
+    signal,
   });
 }

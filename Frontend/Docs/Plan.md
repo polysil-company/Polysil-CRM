@@ -302,8 +302,9 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Revise, and versions | QUOT-009 | `POST /quotations/{id}/revise`, `GET /quotations/{id}/versions` |
 | A quotation's history | QUOT-010 | `GET /quotations/{id}/timeline` |
 | Delete a draft | QUOT-011 | `DELETE /quotations/{id}` |
+| The customer's quotation page `/q/{token}` (no sign-in) | QUOT-012 | `GET /public/q/{token}`, `GET /public/q/{token}/pdf` |
 
-LEAD-005…008, QUOT-001…011 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+LEAD-005…008, QUOT-001…012 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 
@@ -327,7 +328,7 @@ LEAD-005…008, QUOT-001…011 and MSTR-003 are built on the backend's contract 
 
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
-| **Quotations, the rest** — the public `/q/{token}` page; the approvals inbox's quotation rows (with APPR-001) | `/public/q/*`; `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` | `backend/docs/handover/quotations-api-contract.md` §5, §4 | **1 — in progress** (QUOT-001…011 done) |
+| **Quotations, the rest** — the approvals inbox's quotation rows (with APPR-001) | `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` | `backend/docs/handover/quotations-api-contract.md` §4 | **1 — in progress** (QUOT-001…012 done) |
 | Sales orders, approvals, dispatch | `/orders/*`, `/approvals/*`, `/dispatches/*` | `backend/docs/handover/orders-api-contract.md` | 2 |
 | Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 3 |
 | Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 4 |

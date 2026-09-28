@@ -665,3 +665,47 @@ export const quotationRemarkFormSchema = z.object({
   }),
 });
 export type QuotationRemarkForm = z.infer<typeof quotationRemarkFormSchema>;
+
+// ── the customer's page (QUOT-012) ──────────────────────────────────────────────
+
+/**
+ * GET /public/q/{token} — what a shared link shows before the PDF. No party, no mobile, no
+ * lines: a link forwarded to the wrong person learns a number and a total, nothing else.
+ */
+export const publicQuotationResponseSchema = z
+  .object({
+    data: z.object({
+      quote_no: z.string().min(1),
+      version: z.number().int().positive(),
+      status: z.enum(QUOTATION_STATUSES),
+      sales_type: z.enum(SALES_TYPES),
+      seller: z.object({ legal_name: z.string().min(1), gstin: z.string().min(1) }),
+      sent_at: isoDateTime.nullable(),
+      valid_until: isoDate.nullable(),
+      expired: z.boolean(),
+      superseded: z.boolean(),
+      totals: totalsSchema,
+      line_count: z.number().int().nonnegative(),
+      pdf_ready: z.boolean(),
+      /** Relative to the API: `/public/q/{token}/pdf`, which records the view and redirects. */
+      pdf_url: z.string().startsWith("/"),
+    }),
+  })
+  .transform(({ data }) => ({
+    quoteNo: data.quote_no,
+    version: data.version,
+    status: data.status,
+    salesType: data.sales_type,
+    seller: { legalName: data.seller.legal_name, gstin: data.seller.gstin },
+    sentAt: data.sent_at,
+    validUntil: data.valid_until,
+    expired: data.expired,
+    superseded: data.superseded,
+    totals: data.totals,
+    lineCount: data.line_count,
+    pdfReady: data.pdf_ready,
+    pdfPath: data.pdf_url,
+  }));
+
+export type PublicQuotation = z.output<typeof publicQuotationResponseSchema>;
+export type PublicQuotationWire = z.input<typeof publicQuotationResponseSchema>;

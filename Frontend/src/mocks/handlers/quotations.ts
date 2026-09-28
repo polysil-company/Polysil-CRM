@@ -11,6 +11,7 @@ import {
   QUOTATION_ANSWERS,
   QUOTATION_STATUSES,
   SALES_TYPES,
+  type PublicQuotationWire,
   type QuotationVersionsWire,
   type SendGate,
   type PdfLinkWire,
@@ -26,6 +27,7 @@ import {
   MOCK_PRODUCTS,
   mockDraft,
   mockLine,
+  mockShareUrl,
   priceListItemId,
   toQuotationSummary,
   totalsOf,
@@ -49,6 +51,8 @@ import { decodeCursor, encodeCursor, errorResponse } from "./shared";
  * QUOT-006 … QUOT-011 · The lifecycle: send (with the discount gate), discount approval,
  * the customer's answer, revise and versions, the history, and deleting a draft — with the
  * lead moving beside the document as on the backend.
+ *
+ * QUOT-012 · The customer's page: the shared view, and the PDF open that records the view.
  *
  * Two things only the mock does, so the flows can be tried end to end: a just-sent PDF is
  * ready a few seconds later, and a pending discount request is approved by a stand-in
@@ -289,11 +293,6 @@ const APPROVER_LIMITS: readonly { readonly upToPct: number; readonly role: strin
 /** Who approves in the mock. */
 const MOCK_APPROVER = MOCK_STAFF[3] ?? null;
 
-/** The app's own origin, so a share link opens this app's public page. */
-function appOrigin(): string {
-  return typeof window === "undefined" ? "http://localhost:3000" : window.location.origin;
-}
-
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -511,6 +510,11 @@ function versionsOf(quotation: QuotationWire): QuotationWire[] {
 }
 
 const remarkSchema = z.string().trim().max(REMARK_MAX_LENGTH).nullish();
+
+/** The sent quotation a customer link points at. Drafts have no link. */
+function sharedQuotation(token: string): QuotationWire | undefined {
+  return mockDb.quotations.find((item) => item.share_url?.endsWith(`/q/${token}`) === true);
+}
 
 export const quotationHandlers = [
   http.get(buildApiUrl("/quotations"), async ({ request }) => {
@@ -871,7 +875,7 @@ export const quotationHandlers = [
     quotation.status = "sent";
     quotation.sent_at = new Date(now).toISOString();
     quotation.valid_until = new Date(now + VALIDITY_DAYS * DAY_MS).toISOString().slice(0, 10);
-    quotation.share_url = `${appOrigin()}/q/${token}`;
+    quotation.share_url = mockShareUrl(token);
     quotation.pdf_state = "pending";
     quotation.pdf_error = null;
     quotation.discount = null;
@@ -1217,6 +1221,68 @@ export const quotationHandlers = [
     }
     mockDb.quotationDeletes.set(key, serialized);
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get(buildApiUrl("/public/q/:token"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const found = sharedQuotation(String(params.token));
+    if (found === undefined) {
+      return errorResponse(404, "not_found", "Unknown link.");
+    }
+    const quotation = settle(found);
+    const body: PublicQuotationWire = {
+      data: {
+        quote_no: quotation.quote_no ?? "",
+        version: quotation.version,
+        status: quotation.status,
+        sales_type: quotation.sales_type,
+        seller: {
+          legal_name: quotation.seller_gstin.legal_name,
+          gstin: quotation.seller_gstin.gstin,
+        },
+        sent_at: quotation.sent_at,
+        valid_until: quotation.valid_until,
+        expired:
+          quotation.status === "expired" ||
+          (quotation.valid_until !== null && quotation.valid_until < today()),
+        superseded: quotation.superseded_by !== null,
+        totals: quotation.totals,
+        line_count: quotation.lines.length,
+        pdf_ready: quotation.pdf_state === "ready",
+        pdf_url: `/public/q/${String(params.token)}/pdf`,
+      },
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.get(buildApiUrl("/public/q/:token/pdf"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const found = sharedQuotation(String(params.token));
+    if (found === undefined) {
+      return errorResponse(404, "not_found", "Unknown link.");
+    }
+    const quotation = settle(found);
+    if (quotation.pdf_state !== "ready") {
+      return errorResponse(409, "pdf_pending", "The PDF is not ready yet.");
+    }
+    // The customer's tap is the view: the first open moves a sent quotation to viewed.
+    const now = new Date().toISOString();
+    quotation.open_count += 1;
+    quotation.viewed_at ??= now;
+    if (quotation.status === "sent") {
+      quotation.status = "viewed";
+    }
+    recordQuotationEvent(quotation, "quotation.viewed", { open_count: quotation.open_count });
+    const filename = `${(quotation.quote_no ?? "quotation").replace(/\//g, "-")}-v${String(quotation.version)}.pdf`;
+    // TODO(QUOT-012): the mock has no PDFs; the backend redirects to a signed storage URL.
+    return new HttpResponse(null, {
+      status: 302,
+      headers: { Location: `https://files.polysil.example/quotations/${filename}` },
+    });
   }),
 
   http.get(buildApiUrl("/quotations/:quotationId"), async ({ params }) => {

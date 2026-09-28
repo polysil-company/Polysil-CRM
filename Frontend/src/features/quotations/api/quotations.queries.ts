@@ -1,6 +1,7 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 
 import {
+  getPublicQuotation,
   getQuotation,
   getQuotationTimeline,
   listQuotationVersions,
@@ -12,6 +13,8 @@ import type { QuoteLinesRequest, QuotationListParams } from "./quotations.schema
 
 /** How often a just-sent quotation is re-read while its PDF renders (a few seconds). */
 export const PDF_PENDING_POLL_MS = 3000;
+/** How often the customer's page checks whether the PDF is ready. */
+export const PUBLIC_PDF_POLL_MS = 4000;
 /** How often a draft waiting on a discount approval is re-read: a manager decides in minutes. */
 export const APPROVAL_PENDING_POLL_MS = 30_000;
 
@@ -30,6 +33,7 @@ export const quotationKeys = {
   timeline: (quotationId: string) => [...quotationKeys.timelines(), quotationId] as const,
   versionLists: () => [...quotationKeys.all, "versions"] as const,
   versions: (quotationId: string) => [...quotationKeys.versionLists(), quotationId] as const,
+  shared: (token: string) => [...quotationKeys.all, "shared", token] as const,
   products: (q: string) => [...quotationKeys.all, "products", q] as const,
   previews: () => [...quotationKeys.all, "preview"] as const,
   preview: (request: QuoteLinesRequest) => [...quotationKeys.previews(), request] as const,
@@ -111,5 +115,19 @@ export function quotationTimelineQueryOptions(quotationId: string) {
     initialPageParam: NEWEST_TIMELINE_PAGE,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     meta: { dataId: "QUOT-010" },
+  });
+}
+
+/**
+ * QUOT-012 · The customer's page. Checks every few seconds until the PDF is ready. A 404 is
+ * an unknown link — retrying cannot help.
+ */
+export function publicQuotationQueryOptions(token: string) {
+  return queryOptions({
+    queryKey: quotationKeys.shared(token),
+    queryFn: ({ signal }) => getPublicQuotation(token, signal),
+    refetchInterval: (query) => (query.state.data?.pdfReady === false ? PUBLIC_PDF_POLL_MS : false),
+    retry: false,
+    meta: { dataId: "QUOT-012" },
   });
 }

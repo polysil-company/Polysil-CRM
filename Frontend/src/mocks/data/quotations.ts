@@ -162,6 +162,15 @@ export function totalsOf(lines: readonly QuotationLineWire[]): QuotationWire["to
   };
 }
 
+/**
+ * The customer link for a token, on the app's own origin so the mock's links open this app's
+ * `/q/{token}` page (the backend builds it from `PUBLIC_WEB_URL`, BE-015).
+ */
+export function mockShareUrl(token: string): string {
+  const origin = typeof window === "undefined" ? "http://localhost:3000" : window.location.origin;
+  return `${origin}/q/${token}`;
+}
+
 function isoDate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
@@ -248,7 +257,7 @@ function buildQuotation(seed: QuotationSeed, index: number, random: Random): Quo
           : null,
     supersedes: null,
     superseded_by: null,
-    share_url: sent ? `https://crm.polysil.example/q/mock-${String(index)}` : null,
+    share_url: sent ? mockShareUrl(`mock-${String(index)}`) : null,
     pdf_state: sent ? seed.pdfState : null,
     pdf_error: sent && seed.pdfState === "failed" ? "The PDF renderer timed out." : null,
     discount: sent ? null : discountInfo(lines),
