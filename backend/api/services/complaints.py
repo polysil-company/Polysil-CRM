@@ -416,7 +416,7 @@ async def _check_links(db: AsyncSession, partner_id: str | None, lead_id: str | 
                                        {"i": value})).first() is None:
             raise ValidationFailed(fields={field: "not found or not yours"})
     if order_id:
-        order_partner = (await db.execute(text(
+        order_partner: Any = (await db.execute(text(
             "SELECT partner_id FROM sales_order WHERE id = CAST(:o AS uuid)"), {"o": order_id})).scalar_one()
         expected = partner_for_order if partner_for_order is not None else partner_id
         if order_partner is not None and str(order_partner) != (expected or ""):
@@ -463,7 +463,7 @@ async def _write_lines(db: AsyncSession, complaint_id: str, lines: list[sch.Line
             if mapped is not None:
                 raise mapped from exc
             raise
-    found = (await db.execute(text("SELECT count(*) FROM complaint_line WHERE complaint_id = CAST(:c AS uuid)"),
+    found: int = (await db.execute(text("SELECT count(*) FROM complaint_line WHERE complaint_id = CAST(:c AS uuid)"),
                               {"c": complaint_id})).scalar_one()
     if found != len(lines):
         raise ValidationFailed(fields={"lines": "a product was not found"})

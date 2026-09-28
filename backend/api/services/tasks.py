@@ -272,7 +272,7 @@ async def _insert(db: AsyncSession, caller: Caller, *, title: str, task_type: st
                   notes: str | None, minutes_id: str | None = None) -> str:
     try:
         async with db.begin_nested():
-            task_id = (await db.execute(text(
+            task_id: Any = (await db.execute(text(
                 "INSERT INTO task (title, task_type, due_at, assigned_to, assigned_by, "
                 "owner_org_unit_id, lead_id, partner_id, sales_order_id, meeting_type_id, "
                 "minutes_id, notes, created_by, updated_by) VALUES (:title, "
@@ -480,7 +480,7 @@ async def team(db: AsyncSession, caller: Caller, day: dt.date, org_unit_id: str 
     where = ["true"]
     if org_unit_id:
         # every signed-in caller reads every office, so reach is the closure's
-        reach = (await db.execute(text(
+        reach: bool = (await db.execute(text(
             "SELECT app_scope('tasks') = 'global' OR EXISTS (SELECT 1 FROM org_closure "
             "WHERE ancestor_id = app_current_org_unit() AND descendant_id = CAST(:o AS uuid))"),
             {"o": org_unit_id})).scalar_one()
