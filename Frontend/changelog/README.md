@@ -10,7 +10,9 @@ Every change to this repository ships with a changelog entry: one short Markdown
 | **Files changed** | Which files changed, one line each. Group many similar files by folder.                                      |
 | **Tests**         | Which tests cover the change, and how to check it by hand. No automated test? Say why.                       |
 
-[`CHANGELOG.md`](../CHANGELOG.md) at the repository root is **generated** from the entries. Never edit it by hand.
+[`CHANGELOG.md`](../CHANGELOG.md) at the repository root is **generated** from the entries. Never edit it by hand. It opens with an **index** — one line per change: date, title (linking to its entry), type and Data IDs — then every entry in full, newest first. Nothing is appended to a long file: each change is its own entry, so no file grows without bound except the generated one, which is rebuilt from scratch every time.
+
+What a user can do today, and how far each feature is tested, is in [Docs/Tested-Features.md](../Docs/Tested-Features.md).
 
 ## Write an entry
 

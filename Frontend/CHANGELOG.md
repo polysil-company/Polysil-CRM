@@ -5,7 +5,67 @@
 Every change to this repository, newest first. Each entry records what existed before, what exists now, the discussion behind the change, the files it touched and how it is tested.
 How to write an entry: [changelog/README.md](changelog/README.md).
 
+## Index
+
+15 changes, newest first. Each title opens its entry.
+
+| Date | Change | Type | Data IDs |
+| --- | --- | --- | --- |
+| 2026-09-28 | [A tested-features log with screenshots, and an index at the top of the changelog](changelog/entries/2026-09-28--docs--REPO-001--a-tested-features-log-with-screenshots-and-an-index-at-the.md) | `docs` | `REPO-001` |
+| 2026-09-28 | [Quotations: the list, the document and its PDF, and a lead's quotations](changelog/entries/2026-09-28--feature--QUOT-001--quotations-list-and-detail.md) | `feature` | `QUOT-001` `QUOT-002` `QUOT-003` |
+| 2026-09-28 | [Quotations: make and edit a draft, priced live](changelog/entries/2026-09-28--feature--QUOT-004--quotations-make-and-edit-a-draft-priced-live.md) | `feature` | `QUOT-004` `QUOT-005` `MSTR-003` |
+| 2026-09-28 | [Quotations: send, discount approval, the customer's answer, revise and delete](changelog/entries/2026-09-28--feature--QUOT-006--quotations-send-discount-approval-the-customer-s-answer.md) | `feature` | `QUOT-006` `QUOT-007` `QUOT-008` `QUOT-009` `QUOT-010` `QUOT-011` |
+| 2026-09-28 | [Quotations: the customer's page for a shared link](changelog/entries/2026-09-28--feature--QUOT-012--quotations-the-customer-s-page-for-a-shared-link.md) | `feature` | `QUOT-012` |
+| 2026-09-27 | [The lead page shows its history, takes notes, moves the lead's stage and assigns it](changelog/entries/2026-09-27--feature--LEAD-005--lead-timeline-and-notes.md) | `feature` | `LEAD-005` `LEAD-006` `LEAD-007` `LEAD-008` `MSTR-002` |
+| 2026-09-22 | [Leads run on the backend's dev API — list, lead page and New lead form, with real lookups](changelog/entries/2026-09-22--api-integration--LEAD-001--leads-on-the-dev-api.md) **(breaking)** | `api-integration` | `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `MSTR-002` `OBS-002` `APP-004` `AUTH-004` `DS-001` |
+| 2026-09-22 | [One odd lead no longer blanks the page, and a source the administrators renamed still filters](changelog/entries/2026-09-22--fix--LEAD-001--one-odd-lead-no-longer-blanks-the-page.md) | `fix` | `LEAD-001` `LEAD-002` `MSTR-002` `DS-001` |
+| 2026-09-21 | [Small grey text and teal links meet WCAG AA contrast in light mode](changelog/entries/2026-09-21--fix--DS-001--text-colours-meet-wcag-aa-contrast.md) | `fix` | `DS-001` |
+| 2026-09-16 | [The leads table shares leftover width instead of pooling it in one column](changelog/entries/2026-09-16--design--LEAD-001--leads-table-shares-leftover-width-on-large-monitors.md) | `design` | `LEAD-001` `DS-001` |
+| 2026-09-16 | [Shift and the mouse wheel scroll a wide table sideways](changelog/entries/2026-09-16--feature--DS-001--shift-wheel-scrolls-wide-tables-sideways.md) | `feature` | `DS-001` |
+| 2026-09-15 | [Collapsible desktop sidebar, and page titles with descriptions in the top bar](changelog/entries/2026-09-15--feature--APP-005--collapsible-sidebar-and-page-titles-in-the-top-bar.md) **(breaking)** | `feature` | `APP-005` `APP-001` `DS-001` |
+| 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
+| 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
+| 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
 ## 28 September 2026
+
+### A tested-features log with screenshots, and an index at the top of the changelog
+
+`docs` · `REPO-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--docs--REPO-001--a-tested-features-log-with-screenshots-and-an-index-at-the.md)
+
+#### Before
+
+What a user can do — and how far each feature was tested — was spread over fourteen changelog entries, pull requests and chat. The screenshots taken while checking screens lived only on the machine that took them. `CHANGELOG.md` had no overview: to find a change you scrolled 865 lines.
+
+#### Now
+
+- **`Docs/Tested-Features.md`** — every user story built so far, by module, from the user's side: who can do what, the cases checked, and how far each is tested — 🧪 automated, 🌐 end to end, 👀 walked through in a browser, 🔌 checked on the backend's dev API — with where it lives (`integration` or an open pull request), links to the screenshots and to the changelog entry with the test files. A table at the top gives each module at a glance; the end lists what the backend serves that has no screen yet. Only leads (list, create, open) and staff sign-in are marked 🔌 — everything else still needs its dev-API check before staging, and the file says so.
+- **`Docs/screenshots/`** — 29 screenshots from the checks of the lead actions, the quotation screens, the builder, the lifecycle walk-through and the customer's page, by module, as WebP (1.2 MB instead of 3.9 MB as PNG).
+- **An index at the top of `CHANGELOG.md`** — one line per change: date, title linking to its entry, type and Data IDs. Generated like the rest, so it never drifts.
+- `AGENTS.md` §1 and `changelog/README.md` point to the new file.
+- **`AGENTS.md` §11, "The records every pull request keeps current"** — the rules, so every contributor and every new AI session keeps them without being asked: the changelog entry, the Data IDs, `Plan.md` §9, `docs/Backend-Tasks.md` for anything asked of the backend, `Tested-Features.md` for every user-facing change, screenshots saved as JPEG under `Docs/screenshots/<module>/`, and the pull request template (stacked pull requests say so first).
+- **`docs/Backend-Tasks.md`** — BE-002 (answered: follow-ups are tasks), BE-007 and BE-011 marked done in #25, which merged into `integration` without ticking them; the notes say what #25 changed.
+
+#### Discussion
+
+- **Why one file for features, apart from the changelog:** the changelog answers "what changed, when and why"; this answers "what works today, and can I trust it" without reading history. It is updated in the same pull request that adds a feature, like `Plan.md` §9.
+- **Why not split the changelog into volumes:** nothing is appended to a long file — each change is its own short entry, and `CHANGELOG.md` is rebuilt from them every commit. The index keeps the generated file navigable however long it grows. If it ever gets too long to open, the build can split it by month without touching the entries.
+- **Screenshots are WebP**, converted with the `sharp` already installed by Next.js; GitHub shows them inline. Walk-through scripts can save straight into this folder.
+- The earlier quotation screenshots were captured before the action bar (#22); the file says so.
+
+#### Files changed
+
+- `Docs/Tested-Features.md` — new
+- `Docs/screenshots/leads/`, `quotations/`, `public/` — new, 29 WebP screenshots
+- `scripts/changelog/lib.ts` — `renderIndex`, rendered at the top of `CHANGELOG.md`; `CHANGELOG.md` regenerated
+- `changelog/README.md`, `AGENTS.md` — point to the index and the new file; `AGENTS.md` §11 lists the records every pull request keeps current
+- `../docs/Backend-Tasks.md` — BE-002, BE-007, BE-011 recorded from #25
+- `Docs/Plan.md` — §9.3: tasks and complaints are on `integration` (#25), with the new lead stats
+
+#### Tests
+
+- `scripts/changelog/lib.test.ts` — `[REPO-001]` the index: one row per change, newest first, linking to its entry, marking breaking changes, before the entries
+- Every relative link in `Docs/Tested-Features.md` was checked to resolve to a file.
 
 ### Quotations: the list, the document and its PDF, and a lead's quotations
 

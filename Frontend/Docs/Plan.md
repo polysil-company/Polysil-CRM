@@ -273,7 +273,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 ## 9. Integration status — frontend ↔ backend
 
-> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **27 September 2026**: PR #8 and PR #18 merged; lead actions (LEAD-005…008) built on `claude/integration-branch-review-gw0r1g`.
+> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **28 September 2026**: PR #8 and PR #18 merged; lead actions (LEAD-005…008) built on `claude/integration-branch-review-gw0r1g`.
 
 **How the two sides meet.** The browser calls `/api/v1` on the app's own origin; `next.config.ts` forwards it to `API_PROXY_TARGET`. Every call goes through `apiRequest` (`src/lib/api/client.ts`): Zod-validated responses, `x-request-id` / `x-data-id`, `Idempotency-Key` on mutations, one refresh-and-retry on a 401. The backend's contract is `backend/docs/api/*.md` (generated) and the dev API's `/openapi.json`. `NEXT_PUBLIC_API_MOCKING=partial` sends everything to the dev API except the modules listed in `unbuiltHandlers` (`src/mocks/handlers/index.ts`).
 
@@ -334,7 +334,10 @@ LEAD-005…008, QUOT-001…012 and MSTR-003 are built on the backend's contract 
 | Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 4 |
 | Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 5 |
 
-**On `backend-foundation`, not yet in `integration`:** the tasks and planner contract (FS-014) and the complaints contract (FS-015).
+| Tasks, the planner, meetings and minutes — lead follow-ups are tasks (BE-002) | `/tasks`, `/planner`, `/planner/team`, `/minutes`, `/lookups/meeting-types` | `backend/docs/handover/tasks-and-planner-contract.md` | 6 |
+| Complaints, from entry to the quality check | `/complaints`, `/complaint-sla-policies`, `/lookups/complaint-types` | `backend/docs/handover/complaints-contract.md` | 7 |
+
+Tasks and complaints reached `integration` in #25 (BE-011), with `GET /leads/stats` gaining `by_source`, `by_inquiry_type`, `follow_ups_due_today` and `follow_ups_overdue` (BE-007) — the dashboard's source breakdown and follow-up tiles can use them once it is connected (BE-008).
 
 ### 9.4 Asked of the backend
 
