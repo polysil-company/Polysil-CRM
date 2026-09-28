@@ -334,6 +334,15 @@ export const DATA_IDS = {
     endpoints: ["DELETE /quotations/{quotationId}"],
     notes: "Drafts only, with quotations.delete. A sent quotation is never deleted.",
   },
+  "QUOT-012": {
+    domain: "QUOT",
+    title: "The customer's quotation page — /q/{token}",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /public/q/{token}", "GET /public/q/{token}/pdf"],
+    notes:
+      "No sign-in. Shows the number, seller, validity and total only; the PDF opens from the button, never on load, so a link preview is not a view.",
+  },
   "SO-001": {
     domain: "SO",
     title: "Sales orders list",

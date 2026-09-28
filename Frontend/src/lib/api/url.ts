@@ -9,6 +9,15 @@ export type QueryParams = Readonly<Record<string, QueryValue>>;
 
 export type ApiPath = `/${string}`;
 
+function isApiPath(path: string): path is ApiPath {
+  return path.startsWith("/") && !path.startsWith("//");
+}
+
+/** A path an API response hands back (`/public/q/…/pdf`), or null when it is not one. */
+export function asApiPath(path: string): ApiPath | null {
+  return isApiPath(path) ? path : null;
+}
+
 /**
  * Builds a request URL from the configured API base and a path.
  *

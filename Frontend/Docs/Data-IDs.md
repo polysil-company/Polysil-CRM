@@ -152,6 +152,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-009 | Revise a quotation, and its versions (`POST /quotations/{quotationId}/revise`, `GET /quotations/{quotationId}/versions`) | shared | in-progress |
 | QUOT-010 | A quotation's history (`GET /quotations/{quotationId}/timeline`) | shared | in-progress |
 | QUOT-011 | Delete a draft quotation (`DELETE /quotations/{quotationId}`) | shared | in-progress |
+| QUOT-012 | The customer's quotation page — /q/{token} (`GET /public/q/{token}`, `GET /public/q/{token}/pdf`) | shared | in-progress |
 | SO-001 | Sales orders list | shared | planned |
 | APPR-001 | Approval inbox — amount-based escalation | shared | planned |
 | CMPL-001 | Complaints list and QA review | shared | planned |
