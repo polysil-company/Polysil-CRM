@@ -52,7 +52,7 @@ export async function listQuotations(
     query: {
       limit: params.pageSize,
       cursor: params.cursor,
-      include_total: true,
+      include_total: params.countTotal ?? true,
       q: params.q,
       status: params.status.join(","),
       sales_type: params.salesType,

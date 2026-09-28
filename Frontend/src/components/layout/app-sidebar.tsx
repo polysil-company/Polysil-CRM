@@ -410,6 +410,18 @@ function SidebarNavSkeleton(): React.JSX.Element {
   );
 }
 
+/** The line under the environment card's title: what is real and what is mocked. */
+function backendNote(mode: ApiMockingMode): string {
+  switch (mode) {
+    case "enabled":
+      return "Preview any role or state from your account menu.";
+    case "partial":
+      return "Real sign-in, leads, quotations and approvals. Dashboard, notifications and messages are still mocked.";
+    case "disabled":
+      return clientEnv.apiBaseUrl;
+  }
+}
+
 function SidebarEnvironmentCard({ collapsed }: { collapsed: boolean }): React.JSX.Element | null {
   if (clientEnv.appEnv === "production") {
     return null;
@@ -424,13 +436,7 @@ function SidebarEnvironmentCard({ collapsed }: { collapsed: boolean }): React.JS
           <span aria-hidden="true" className="size-1.5 rounded-full bg-highlight" />
           {backend}
         </p>
-        <p className="mt-1 text-muted-foreground">
-          {clientEnv.apiMocking === "enabled"
-            ? "Preview any role or state from your account menu."
-            : clientEnv.apiMocking === "partial"
-              ? "Real sign-in. Leads, dashboard, notifications and messages are still mocked."
-              : clientEnv.apiBaseUrl}
-        </p>
+        <p className="mt-1 text-muted-foreground">{backendNote(clientEnv.apiMocking)}</p>
       </div>
       {/* The rail keeps the environment signal as a dot; its name is in the tooltip. */}
       <Tooltip disabled={!collapsed}>

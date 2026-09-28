@@ -51,7 +51,8 @@ export function LeadNoteComposer({ leadId }: LeadNoteComposerProps): React.JSX.E
   const errorId = `${fieldId}-error`;
 
   const note = draft.trim();
-  const remaining = LEAD_NOTE_MAX_LENGTH - draft.length;
+  // The backend applies its limit to the trimmed note, so spaces at the ends don't count.
+  const remaining = LEAD_NOTE_MAX_LENGTH - note.length;
   const tooLong = remaining < 0;
 
   const save = useAsyncAction({
