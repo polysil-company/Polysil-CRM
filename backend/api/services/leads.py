@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import datetime as dt
 import json
 import uuid
 from datetime import UTC, datetime
@@ -1300,7 +1301,12 @@ async def _lead_filters(db: AsyncSession, caller: Caller, *, stage: str | None =
     if created_from:
         where.append(lead_t.c.created_at >= _parse_ts(created_from, "created_from"))
     if created_to:
-        where.append(lead_t.c.created_at <= _parse_ts(created_to, "created_to"))
+        if _date_only(created_to):
+            # an inclusive IST date, as the order list reads it (FS-017 code review)
+            where.append(lead_t.c.created_at < _parse_ts(created_to, "created_to")
+                         + dt.timedelta(days=1))
+        else:
+            where.append(lead_t.c.created_at <= _parse_ts(created_to, "created_to"))
     if q:
         where.append(_search_clause(q))
     # Everything above narrows the set the caller asked for. The cursor below
@@ -1479,7 +1485,7 @@ async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) ->
             by_source[code] += r.n
         if r.inquiry:
             by_inquiry_type[r.inquiry] = by_inquiry_type.get(r.inquiry, 0) + r.n
-    due_today, overdue = await _follow_ups(db, caller, where)
+    due_today, overdue = await follow_ups(db, caller, where)
     return LeadStats(total=total, by_stage=by_stage, by_priority=by_priority,
                      unassigned=unassigned, by_source=by_source,
                      by_inquiry_type=by_inquiry_type, follow_ups_due_today=due_today,
@@ -1489,18 +1495,20 @@ async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) ->
 _INQUIRY_TYPES = ("commercial", "subsidised", "industrial")
 
 
-async def _follow_ups(db: AsyncSession, caller: Caller, where: list[Any]
-                      ) -> tuple[int | None, int | None]:
+async def follow_ups(db: AsyncSession, caller: Caller, where: list[Any],
+                     today: dt.date | None = None) -> tuple[int | None, int | None]:
     """Open tasks on the filtered leads (FS-014), under the tasks policies: due today
     and overdue by the planner's own IST windows. None without a tasks scope, so a
     dealer's dashboard shows no figure rather than a false zero (BE-002, BE-007)."""
     if "tasks" not in caller.scopes:
         return None, None
-    today = today_ist()
+    today = today or today_ist()
     start, end = task_domain.day_bounds(today)
     window = task_domain.overdue_window(today, today)
     assert window is not None
-    leads = sa.select(lead_t.c.id).where(sa.and_(*where))
+    # a deleted lead's task is no one's follow-up, even for a caller who may read
+    # the lead (FS-017 rule 6, code review F-3)
+    leads = sa.select(lead_t.c.id).where(sa.and_(*where, lead_t.c.deleted_at.is_(None)))
     task_t = sa.table("task", sa.column("lead_id", _UUID), sa.column("status"),
                       sa.column("due_at", sa.DateTime(timezone=True)))
     open_ = sa.cast(task_t.c.status, sa.Text) == "open"
@@ -1530,12 +1538,23 @@ def _search_clause(q: str) -> Any:
     return sa.or_(*clauses)
 
 
+def _date_only(value: str) -> bool:
+    return len(value) == 10 and "T" not in value
+
+
 def _parse_ts(value: str, field: str) -> datetime:
+    """A date alone is the start of that IST day, as every other list reads it; a
+    time without a zone is UTC, as before (FS-017 code review: 00:30 IST was the
+    day before)."""
     try:
-        dt = datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value)
     except ValueError as exc:
         raise ValidationFailed(fields={field: "not an ISO date"}) from exc
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+    if parsed.tzinfo:
+        return parsed
+    if _date_only(value):
+        return parsed.replace(tzinfo=task_domain.IST)
+    return parsed.replace(tzinfo=UTC)
 
 
 def _encode_cursor(created_at: datetime, lead_id: str) -> str:
