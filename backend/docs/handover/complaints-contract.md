@@ -48,7 +48,7 @@ All mutations take `Idempotency-Key`. Dates are `YYYY-MM-DD` and cannot be after
 | Call | Notes |
 |---|---|
 | `POST /complaints/{id}/attachments` | `multipart/form-data` with `file` and `kind` (`photo`, `document`, `challan`). Up to 10 MB; JPEG, PNG, WebP, HEIC or PDF, judged by the file's content, not its name. Up to 10 per complaint. `201`, or `200` with the existing one if the same file was already added. `413` too large, `422 attachment_type`, `422 too_many_attachments`, `503 storage_unavailable` (retry later) |
-| `GET /complaints/{id}/attachments/{attachment_id}` | `302` to a link valid for 10 minutes. Use it as an `<img>` source or a download |
+| `GET /complaints/{id}/attachments/{attachment_id}` | `{url, expires_at}`: a link valid for 10 minutes. Put `url` in an `<img>` or open it for a download; never fetch it with the bearer token. Each attachment has `preview`: false for HEIC |
 | `DELETE /complaints/{id}/attachments/{attachment_id}` | in a draft: the uploader or an editor; after submit: the uploader only |
 
 Uploads are allowed while the complaint is a draft or submitted; QC may add while `under_qc`. HEIC (iPhone) photos are stored but cannot be previewed: show a file icon.
@@ -75,6 +75,7 @@ Uploads are allowed while the complaint is a draft or submitted; QC may add whil
   "check": {"decision": "approve", "remark": "…", "by": {"id": "…", "full_name": "…"}, "at": "…"},   // since the latest submit, or null
   "quality": {"verdict": "approved", "remark": "…", "sample_received_on": "…", "tested_on": "…",
               "field_visit_on": null, "by": {…}, "at": "…"},                                       // or null
+  "cancellation": {"reason": "…", "by": {"id": "…", "full_name": "…"}, "at": "…"},   // or null
   "sla": {"policy": "set", "response_due_at": "…", "responded_at": null, "response_breached": false,
           "resolution_due_at": "…", "resolved_at": null, "resolution_breached": false},            // null before the first submit
   "submit_count": 1,
@@ -88,7 +89,7 @@ Uploads are allowed while the complaint is a draft or submitted; QC may add whil
 
 - Quantities are decimal strings.
 - `sla.policy` is `none` when no target applies. Show "no target", never red.
-- A dealer sees each remark but not who decided (`by` is null), and never `internal_note`.
+- A dealer sees each remark but not who decided (`by` is null), and `internal_note` is always null for a dealer.
 - For staff, `check` and `quality` also carry `internal_note`.
 
 ## Targets

@@ -1525,9 +1525,84 @@ def f_tasks() -> None:
     write("14-tasks-and-planner", e)
 
 
+def f_complaints() -> None:
+    e, n = [], {}
+    e += title("Complaints: entry, the manager check, the quality check",
+               sub="A dealer, an officer or support raises it; a manager checks it; QC gives a "
+                   "verdict. Replacement and refund are FS-015b.",
+               status="BUILT. FS-015: /complaints, /complaint-sla-policies, "
+                      "/lookups/complaint-types, migration 019.",
+               status_colour=GREEN)
+
+    steps = [
+        ("c1", "POST /complaints (draft)\nproducts: supplied and defective\n"
+               "challan and supply date optional until submit", BLUE),
+        ("c2", "POST /attachments: sniffed by content, 10 MB, 10 files\n"
+               "stored before the row, outside any lock (ADR-041)", VIOLET),
+        ("c3", "POST /submit -> complaint_submit()\nfirst time: Poly/Comp./FY/GJ/01 and the targets\n"
+               "422 missing_for_submit / nothing_defective / no_checker", BLUE),
+        ("c4", "POST /check -> complaint_check()\napprove: under_qc (severity, owner)\n"
+               "return: draft, the remark to the raiser", GREEN),
+        ("c5", "POST /qc -> complaint_qc()\napproved or rejected, with sample and test dates\n"
+               "resolved_at set", GREEN),
+        ("c6", "qc_approved waits for FS-015b:\nreplacement order or refund, then closed", YELLOW),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(steps):
+        els = node(eid, 0, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid])
+        prev = eid
+
+    side = [
+        ("r1", "complaint_refusal(id, action): the one rule\nfor the definers, `can` and ?awaiting=me", VIOLET),
+        ("r2", "manager check: a line role above the owner's\nline level (approval_owner_level), not raiser or owner;\n"
+               "at the top, another top-level manager", BLUE),
+        ("r3", "QC: a functional role with complaints.approve\n(the QC Manager), not raiser or owner", BLUE),
+        ("r4", "targets: working hours Mon-Sat 09:30-18:30 IST,\nthe policy of the first submit's date;\n"
+               "breached = met late, or past and unmet", YELLOW),
+        ("r5", "messages: complaint.registered / .updated\nseeded off until 11za approves the templates", YELLOW),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(side):
+        els = node(eid, 620, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid], dashed=True)
+        prev = eid
+
+    e += note("nRed1", 1240, 0,
+              "A DEALER NEVER SEES WHO DECIDED\n\n"
+              "Each decision's remark reaches the dealer (they must\n"
+              "know why it came back). The decider is null on the\n"
+              "complaint and the timeline, people_names never names\n"
+              "them to a partner, and the internal note lives in its\n"
+              "own table whose policy refuses a partner claim.", w=420, colour=RED)
+    e += note("nRed2", 1240, 260,
+              "THE SIZE CAP SITS INSIDE request_context\n\n"
+              "FastAPI reads the whole form before any handler, so\n"
+              "the cap is ASGI middleware. Outside the app's\n"
+              "BaseHTTPMiddleware its exception came back as a 400\n"
+              "(executed). It is registered first, so it is innermost.", w=420, colour=RED)
+    e += note("nRed3", 1240, 520,
+              "THE FILE LINK IS JSON, NOT A REDIRECT\n\n"
+              "The app sends a bearer token; an <img> cannot.\n"
+              "GET .../attachments/{id} answers {url, expires_at}.\n"
+              "No storage (staging today): 503, nothing kept.", w=420, colour=RED)
+    e += note("nGreen1", 1240, 780,
+              "Both enforcers agree: status, the number and the\n"
+              "targets have no UPDATE grant; only the definers\n"
+              "write them. A submitted complaint's lines are frozen\n"
+              "by a trigger as well as by the service.", w=420, colour=GREEN)
+    write("15-complaints", e)
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
     f_approval(); f_subsidy(); f_outbox(); f_money(); f_pricing()
-    f_quotation(); f_order(); f_auth(); f_admin(); f_tasks()
+    f_quotation(); f_order(); f_auth(); f_admin(); f_tasks(); f_complaints()
     print(f"\nwrote to {OUT}")

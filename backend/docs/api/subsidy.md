@@ -60,7 +60,7 @@ sum of the crops by a paisa of rounding.
 | `system_type` | `drip` \| `mini_sprinkler` \| `sprinkler` | yes | Which of the three calculation models to run. |
 | `as_of` | date \| null |  | The masters in force on this date. Today in India by default; a future date is refused. |
 | `crops` | CropRequest[] | yes |  |
-| `head_lines` | Line[] |  | The head unit, sent once for the whole quotation and shared across crops by area. |
+| `head_lines` | Line-Input[] |  | The head unit, sent once for the whole quotation and shared across crops by area. |
 | `sump` | Sump \| null |  |  |
 | `group_total_area` | number \| string \| null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
 | `installation_rate_per_ha` | number \| string |  | The installation line's rate; its quantity is the area. Default `0`. |
@@ -201,7 +201,7 @@ treated as no crop at all.
 | `system_type` | `drip` \| `mini_sprinkler` \| `sprinkler` | yes | Which of the three calculation models to run. |
 | `as_of` | date \| null |  | The masters in force on this date. Today in India by default; a future date is refused. |
 | `crops` | CropRequest[] | yes |  |
-| `head_lines` | Line[] |  | The head unit, sent once for the whole quotation and shared across crops by area. |
+| `head_lines` | Line-Input[] |  | The head unit, sent once for the whole quotation and shared across crops by area. |
 | `sump` | Sump \| null |  |  |
 | `group_total_area` | number \| string \| null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
 | `installation_rate_per_ha` | number \| string |  | The installation line's rate; its quantity is the area. Default `0`. |
@@ -284,7 +284,7 @@ treated as no crop at all.
 | `area` | number \| string | yes | Hectares, at most three decimals. |
 | `crop_spacing` | string |  | Free text such as '1.37 x 0.50'. Echoed on the document; the calculation does not read it. Default ``. |
 | `lateral_spacing` | number \| string | yes | The designed lateral spacing in metres. |
-| `lines` | Line[] |  | Field-unit lines only. Empty for Sprinkler, which derives its own. |
+| `lines` | Line-Input[] |  | Field-unit lines only. Empty for Sprinkler, which derives its own. |
 
 **`Envelope_CalculateResponse_`**
 
@@ -339,7 +339,7 @@ treated as no crop at all.
 | `regular_for_cap` | string | yes | What the subsidy is actually capped on: the figure above, pro-rated for a Mini Sprinkler block below 0.2 Ha. Equal to `regular_with_sump` everywhere else. This is the unit cost the scheme's own sheet prints. |
 | `seven_year` | string \| null | yes | Null when the area is outside the window. |
 
-**`Line`**
+**`Line-Input`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|

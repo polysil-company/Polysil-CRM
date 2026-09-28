@@ -1,0 +1,43 @@
+# The webhook receiver that rebuilds the frontend on a push to integration.
+#
+#   docker compose -f infra/frontend/docker-compose.hook.yml --env-file infra/.env.staging up -d --build
+#
+# Run by scripts/deploy_staging.py (frontend-provision, frontend). Its own project,
+# so the backend's deploy never touches it and it never touches the backend.
+
+name: polysil-hook
+
+services:
+  deploy-hook:
+    build:
+      context: .
+      dockerfile: hook.Dockerfile
+    image: polysil-deploy-hook:staging
+    # Caddy routes /hooks/github on polysil.pranayx.tech to this name.
+    container_name: polysil-deploy-hook
+    restart: unless-stopped
+    environment:
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?set WEBHOOK_SECRET}
+      DEPLOY_BRANCH: ${DEPLOY_BRANCH:-integration}
+      # a fine-grained read-only token, when the org refuses deploy keys
+      DEPLOY_TOKEN: ${DEPLOY_TOKEN:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # the read-only deploy key GitHub knows; created by frontend-provision
+      - ./keys:/keys:ro
+      # the checkout, known_hosts and the build log
+      - frontend-src:/srv
+    networks:
+      proxy:
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  frontend-src:
+
+networks:
+  proxy:
+    external: true
+    name: distributed-file-system_default

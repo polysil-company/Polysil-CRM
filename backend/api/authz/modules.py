@@ -102,4 +102,19 @@ SPECS: dict[str, ScopeSpec] = {
         parents={"lead_id": "lead", "partner_id": "channel_partner",
                  "sales_order_id": "sales_order", "owner_org_unit_id": "org_unit"},
     ),
+    # FS-015: the officer responsible (own), the owning office (org_subtree) and the
+    # dealer involved (partner_subtree), all set at create and following nothing
+    # (GAP-152). No territory branch: no role holds complaints at territory scope.
+    # The links are parents, so nobody raises a complaint on something they cannot
+    # see.
+    "complaints": ScopeSpec(
+        module="complaints",
+        table="complaint",
+        own="owner_user_id",
+        org_subtree="owner_org_unit_id",
+        partner_subtree="partner_id",
+        parents={"lead_id": "lead", "sales_order_id": "sales_order",
+                 "partner_id": "channel_partner", "owner_org_unit_id": "org_unit",
+                 "territory_id": "territory"},
+    ),
 }

@@ -27,6 +27,13 @@
 polysil-api.pranayx.tech {
 	encode zstd gzip
 
+	# FS-015 rule 10: the outer belt on complaint attachment uploads (the API's
+	# own cap is 10 MB plus the multipart framing). The other complaint routes
+	# take small JSON bodies, so the prefix match costs them nothing.
+	request_body /api/v1/complaints/* {
+		max_size 12MB
+	}
+
 	# polysil-api is the container name, fixed in infra/docker-compose.staging.yml
 	# for exactly this. It resolves once that container is connected to this
 	# network; port 8000 is the container's port, not a host port. Nothing about

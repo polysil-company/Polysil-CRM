@@ -328,7 +328,8 @@ def _before() -> dict[str, str]:
             "people_names": m017._people_names(extended=True)}
 
 
-def _after() -> list[str]:
+def _after_map() -> dict[str, str]:
+    """Each replaced function as this migration leaves it, by name (019 builds on it)."""
     f = _before()
     for name in ("authz_user_assignable", "staff_directory"):
         body = f[name]
@@ -361,7 +362,11 @@ def _after() -> list[str]:
     UPDATE meeting_minutes SET lead_id = p_survivor
      WHERE lead_id IN (SELECT id FROM lead WHERE merged_into_id = p_survivor);
 END $fn$"""
-    return list(f.values())
+    return f
+
+
+def _after() -> list[str]:
+    return list(_after_map().values())
 
 
 def upgrade() -> None:

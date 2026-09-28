@@ -9,9 +9,10 @@ any endpoint change, so it is always current rather than a snapshot.
 |---|---|---|
 | Approvals | 5 | [`approvals.md`](approvals.md) |
 | Auth | 7 | [`auth.md`](auth.md) |
+| Complaints | 18 | [`complaints.md`](complaints.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
 | Leads | 17 | [`leads.md`](leads.md) |
-| Lookups | 17 | [`lookups.md`](lookups.md) |
+| Lookups | 20 | [`lookups.md`](lookups.md) |
 | Orders | 14 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 6 | [`partners.md`](partners.md) |

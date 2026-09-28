@@ -36,7 +36,7 @@ pytestmark = pytest.mark.db
 
 AS_OF = "2020-06-15"
 ROLES = ("field_officer", "district_manager", "state_manager", "regional_manager",
-         "account_manager", "dispatch_manager", "admin_sales")
+         "account_manager", "dispatch_manager", "admin_sales", "qc_manager")
 
 
 @dataclass
@@ -128,6 +128,17 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
         leads = "(SELECT id FROM lead WHERE territory_id = CAST(:d AS uuid))"
         quotations = "(SELECT id FROM quotation WHERE territory_id = CAST(:d AS uuid))"
         for stmt in (
+            # FS-015: complaints point at people, leads, orders and products
+            "DELETE FROM complaint_decision_note WHERE decision_id IN (SELECT d.id FROM complaint_decision d JOIN complaint c ON c.id = d.complaint_id WHERE c.territory_id = CAST(:d AS uuid))",
+            "DELETE FROM complaint_decision WHERE complaint_id IN (SELECT id FROM complaint WHERE territory_id = CAST(:d AS uuid))",
+            "DELETE FROM complaint_attachment WHERE complaint_id IN (SELECT id FROM complaint WHERE territory_id = CAST(:d AS uuid))",
+            # the line guard holds every writer to a draft parent
+            "UPDATE complaint SET status = 'draft' WHERE territory_id = CAST(:d AS uuid)",
+            "DELETE FROM complaint_line WHERE complaint_id IN (SELECT id FROM complaint WHERE territory_id = CAST(:d AS uuid))",
+            "DELETE FROM notification_outbox WHERE template_key LIKE 'complaint.%' AND payload->>'complaint_no' IN (SELECT complaint_no::text FROM complaint WHERE territory_id = CAST(:d AS uuid))",
+            "DELETE FROM activity_event WHERE entity_type = 'complaint' AND entity_id IN (SELECT id FROM complaint WHERE territory_id = CAST(:d AS uuid))",
+            "DELETE FROM complaint WHERE territory_id = CAST(:d AS uuid)",
+            "DELETE FROM complaint_counter WHERE state_code = :c",
             # FS-014: tasks and minutes point at people, leads and each other
             "UPDATE meeting_minutes SET task_id = NULL WHERE created_by = ANY(CAST(:people AS uuid[]))",
             "DELETE FROM task WHERE assigned_to = ANY(CAST(:people AS uuid[])) OR assigned_by = ANY(CAST(:people AS uuid[]))",

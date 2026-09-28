@@ -358,6 +358,8 @@ async def test_over_http_a_dealer_sees_neither_names_remarks_nor_the_limit(
                 assert not leaked, (path, e)
                 if e["kind"] in ("approval.decided", "quotation.approval_approved"):
                     assert e["actor"] is None, (path, e)
+                    # FS-015 code review F-1: the name rode in the payload too
+                    assert "actor_name" not in e["payload"], (path, e)
     finally:
         c = sessions()
         for stmt in ("DELETE FROM notification_outbox WHERE recipient IN (:m, :raw)",

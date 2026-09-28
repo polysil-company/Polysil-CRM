@@ -414,15 +414,22 @@ async def reopen_task(db: AsyncSession, caller: Caller, task_id: str) -> sch.Tas
                             code="reopen_window_passed")
     # the assigner asks the directory, not app_user: a row the users scope does not
     # reach read as "active" and reopened a leaver's task (code review F-2)
-    if str(row.assigned_to) != caller.user_id and not (await db.execute(text(
-            "SELECT EXISTS (SELECT 1 FROM staff_directory('tasks') WHERE id = CAST(:u AS uuid))"),
-            {"u": str(row.assigned_to)})).scalar_one():
-        raise ConflictError("The assignee is no longer active or no longer in your team.",
-                            code="assignee_inactive")
+    if str(row.assigned_to) == caller.user_id:
+        office = caller.org_unit_id
+    else:
+        office = (await db.execute(text(
+            "SELECT org_unit_id FROM staff_directory('tasks') WHERE id = CAST(:u AS uuid)"),
+            {"u": str(row.assigned_to)})).scalar_one_or_none()
+        if office is None:
+            raise ConflictError("The assignee is no longer active or no longer in your team.",
+                                code="assignee_inactive")
+    # the office-move trigger moves open tasks only, so a done task kept the old
+    # office; reopened, it follows the assignee (rule 12; astra P1, reproduced)
     await db.execute(text(
         "UPDATE task SET status = 'open', outcome = NULL, gift_shown = NULL, completed_at = NULL, "
-        "completed_by = NULL, updated_by = CAST(:me AS uuid) WHERE id = CAST(:id AS uuid)"),
-        {"me": caller.user_id, "id": task_id})
+        "completed_by = NULL, owner_org_unit_id = COALESCE(CAST(:ou AS uuid), owner_org_unit_id), "
+        "updated_by = CAST(:me AS uuid) WHERE id = CAST(:id AS uuid)"),
+        {"me": caller.user_id, "id": task_id, "ou": str(office) if office else None})
     await _emit(db, entity_type="task", entity_id=task_id, lead_id=row.lead_id,
                 kind="task.reopened", actor_id=caller.user_id)
     return await get_task(db, task_id)
@@ -587,6 +594,11 @@ async def _record_meeting(db: AsyncSession, caller: Caller, body: sch.MinutesCre
     if not same:
         raise ValidationFailed("That task is on something else.", code="task_link_mismatch",
                                fields={"task_id": "not on this lead or dealer"})
+    if row.task_type != "meeting":
+        # a call or a visit on the same lead would otherwise be completed as
+        # "Minutes recorded" (astra, reproduced)
+        raise ValidationFailed("That task is not a meeting.", code="task_not_a_meeting",
+                               fields={"task_id": "not a meeting"})
     if row.status == "cancelled":
         raise ConflictError("That task was cancelled.", code="task_not_open")
     if row.status == "open":

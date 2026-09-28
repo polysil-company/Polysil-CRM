@@ -245,7 +245,7 @@ allowed on a draft; sending needs at least one.
 
 **Request body**
 
-**`LinesReplace`**
+**`api__schemas__quotations__LinesReplace`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -617,13 +617,6 @@ Every version of the number, oldest first. Any version's id works.
 | `inquiry_no` | string | yes |  |
 | `stage` | `new` \| `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` \| `merged` \| `dormant` | yes |  |
 
-**`LinesReplace`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `lines` | QuotationLineIn[] | yes | The whole basket, in order. |
-| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
-
 **`OrgUnitRef`**
 
 | Field | Type | Required | Notes |
@@ -912,3 +905,10 @@ Every version of the number, oldest first. Any version's id works.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 | `partner_type` | string | yes | distributor, dealer or sub_dealer. |
+
+**`api__schemas__quotations__LinesReplace`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `lines` | QuotationLineIn[] | yes | The whole basket, in order. |
+| `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |

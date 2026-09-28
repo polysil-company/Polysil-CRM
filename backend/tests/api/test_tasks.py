@@ -507,3 +507,53 @@ async def test_the_branches_the_review_found_untested(client: httpx.AsyncClient,
     minutes = r.json()["data"]
     assert minutes["partner"]["partner_type"] == "dealer"
     assert minutes["action_items"][0]["partner"]["id"] == shop.partner
+
+
+
+# ── cross-vendor review (astra) ──────────────────────────────────────────────
+
+async def test_a_reopened_task_follows_its_assignee_to_the_new_office(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """Astra P1, reproduced: the office-move trigger moves open tasks only, so a done
+    task reopened after a move stayed in the old office."""
+    h = await _as(client, shop, "field_officer")
+    task = (await _create(client, h)).json()["data"]
+    await client.post(f"{V1}/tasks/{task['id']}/complete", headers={**h, **_key()}, json={"outcome": "Done"})
+    s = sessions()
+    new_office = str((await s.execute(text(
+        "INSERT INTO org_unit (name, role_level, territory_id) VALUES (:n, 2, CAST(:t AS uuid)) RETURNING id"),
+        {"n": f"astra office {uuid.uuid4().hex[:6]}", "t": shop.district})).scalar_one())
+    await s.execute(text("UPDATE app_user SET org_unit_id = CAST(:o AS uuid) WHERE id = CAST(:u AS uuid)"),
+                    {"o": new_office, "u": shop.ids["field_officer"]})
+    await s.commit()
+    await s.close()
+    try:
+        h = await _as(client, shop, "field_officer")          # the claim carries the new office
+        r = await client.post(f"{V1}/tasks/{task['id']}/reopen", headers={**h, **_key()})
+        assert r.status_code == 200, r.text
+        c = sessions()
+        office = (await c.execute(text("SELECT owner_org_unit_id::text FROM task WHERE id = CAST(:t AS uuid)"),
+                                  {"t": task["id"]})).scalar_one()
+        await c.close()
+        assert office == new_office
+    finally:
+        c = sessions()
+        await c.execute(text("UPDATE app_user SET org_unit_id = CAST(:o AS uuid) WHERE id = CAST(:u AS uuid)"),
+                        {"o": shop.office, "u": shop.ids["field_officer"]})
+        await c.execute(text("UPDATE task SET owner_org_unit_id = CAST(:o AS uuid) WHERE owner_org_unit_id = CAST(:n AS uuid)"),
+                        {"o": shop.office, "n": new_office})
+        await c.execute(text("DELETE FROM org_unit WHERE id = CAST(:n AS uuid)"), {"n": new_office})
+        await c.commit()
+        await c.close()
+
+
+async def test_minutes_complete_only_a_meeting(client: httpx.AsyncClient, shop: Shop) -> None:
+    """Astra P2, reproduced: a call on the same lead was completed as 'Minutes recorded'."""
+    h = await _as(client, shop, "field_officer")
+    lead = await _lead(client, shop, h)
+    call = (await _create(client, h, lead_id=lead)).json()["data"]
+    r = await client.post(f"{V1}/minutes", headers={**h, **_key()}, json={
+        "lead_id": lead, "task_id": call["id"], "held_at": _held(1), "notes": "Met"})
+    assert r.status_code == 422 and _code(r) == "task_not_a_meeting", r.text
+    still = (await client.get(f"{V1}/tasks/{call['id']}", headers=h)).json()["data"]
+    assert still["status"] == "open"
