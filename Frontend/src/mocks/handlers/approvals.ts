@@ -8,6 +8,7 @@ import { stepIsOpen, stepVisibleTo, type MockApprovalStep } from "@/mocks/data/a
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb } from "@/mocks/db";
 
+import { decideOrderStep, findOrder } from "./orders";
 import { findQuotation, recordQuotationEvent, refreshGate } from "./quotations";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse } from "./shared";
@@ -16,7 +17,8 @@ import { decodeCursor, encodeCursor, errorResponse } from "./shared";
  * APPR-001 · The backend's approval inbox (backend/docs/api/approvals.md): what waits on the
  * previewed role, oldest first, with lower steps on request and stalled ones always; and the
  * decision, which answers with the quotation or order it decided. Refusals: not_your_step,
- * step_already_decided, request_closed, figures_changed, a missing reason to reject.
+ * self_approval, step_already_decided, request_closed, figures_changed, remark_required (to
+ * return, and on every Accounts decision).
  */
 
 const DEFAULT_LIMIT = 25;
@@ -27,7 +29,7 @@ const TOTAL_CEILING = 1000;
 function toRow(step: MockApprovalStep): QueuePageWire["data"][number] {
   return {
     step_id: step.stepId,
-    seq: 1,
+    seq: step.seq,
     role: step.role,
     stalled: step.stalled,
     doc_type: step.docType,
@@ -131,10 +133,16 @@ export const approvalHandlers = [
       if (step.decision !== null) {
         return errorResponse(409, "step_already_decided", "Someone has decided this step.");
       }
+      const me = mockMeFor(role).data;
+      if (step.raisedBy?.id === me.id) {
+        return errorResponse(403, "self_approval", "You cannot decide on your own request.");
+      }
       const remark = parsed.data.remark ?? null;
-      if (parsed.data.decision === "reject" && (remark === null || remark === "")) {
-        return errorResponse(422, "validation_error", "Some fields need correcting.", {
-          remark: "required to reject",
+      const remarkNeeded = parsed.data.decision === "reject" || step.role === "account_manager";
+      if (remarkNeeded && (remark === null || remark === "")) {
+        return errorResponse(422, "remark_required", "Say why.", {
+          remark:
+            parsed.data.decision === "reject" ? "required to return" : "required from Accounts",
         });
       }
       const decidedAt = new Date().toISOString();
@@ -146,7 +154,6 @@ export const approvalHandlers = [
       if (step.docType === "quotation") {
         const quotation = findQuotation(step.docId);
         if (quotation?.approval !== null && quotation?.approval !== undefined) {
-          const me = mockMeFor(role).data;
           quotation.approval = {
             ...quotation.approval,
             status: step.decision === "approve" ? "approved" : "rejected",
@@ -172,6 +179,11 @@ export const approvalHandlers = [
             { role: step.role, remark },
           );
         }
+      } else {
+        const order = findOrder(step.docId);
+        if (order !== undefined) {
+          decideOrderStep(order, step.stepId, parsed.data.decision, remark, role);
+        }
       }
     }
 
@@ -181,14 +193,9 @@ export const approvalHandlers = [
         ? errorResponse(404, "not_found", "The quotation is gone.")
         : HttpResponse.json({ data: { ...quotation, doc_type: "quotation" } });
     }
-    // Sales orders have no module in the mock: the answer carries what the inbox reads.
-    return HttpResponse.json({
-      data: {
-        doc_type: "sales_order",
-        id: step.docId,
-        number: step.number,
-        status: step.decision === "approve" ? "approved" : "draft",
-      },
-    });
+    const order = findOrder(step.docId);
+    return order === undefined
+      ? errorResponse(404, "not_found", "The order is gone.")
+      : HttpResponse.json({ data: { ...order, doc_type: "sales_order" } });
   }),
 ];

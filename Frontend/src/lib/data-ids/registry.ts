@@ -347,7 +347,40 @@ export const DATA_IDS = {
     domain: "SO",
     title: "Sales orders list",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
+    endpoints: ["GET /orders"],
+    notes:
+      "Cursor paging with include_total; each row carries dispatched_pct and approval_waiting_on.",
+  },
+  "SO-002": {
+    domain: "SO",
+    title: "A sales order — the document, its approval chain, PDF and history",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /orders/{orderId}",
+      "GET /orders/{orderId}/pdf",
+      "GET /orders/{orderId}/timeline",
+    ],
+    notes: "Every figure comes from the backend. Blocks the caller may not see come back null.",
+  },
+  "SO-003": {
+    domain: "SO",
+    title: "New order from accepted quotations, and a draft's header",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders", "PATCH /orders/{orderId}", "DELETE /orders/{orderId}"],
+    notes:
+      "Quotations must agree on partner, place of supply, seller, price date, office and territory.",
+  },
+  "SO-004": {
+    domain: "SO",
+    title: "Submit an order for approval, and cancel it",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders/{orderId}/submit", "POST /orders/{orderId}/cancel"],
+    notes:
+      "Submit numbers the order and builds the chain by value: managers, then Accounts, then Dispatch.",
   },
   "APPR-001": {
     domain: "APPR",
@@ -446,6 +479,19 @@ export const DATA_IDS = {
     title: "Accounts work queue",
     owner: "shared",
     status: "planned",
+  },
+  "DISP-002": {
+    domain: "DISP",
+    title: "Record a dispatch on an order, void it, close the rest short",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /orders/{orderId}/dispatches",
+      "POST /dispatches/{dispatchId}/void",
+      "POST /orders/{orderId}/close-short",
+    ],
+    notes:
+      "Line by line, at most the open quantity, in the unit's precision; the system records invoices, never issues them.",
   },
   "DISP-001": {
     domain: "DISP",

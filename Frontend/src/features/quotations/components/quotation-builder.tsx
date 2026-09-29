@@ -688,7 +688,7 @@ function TextField({
     <Field data-invalid={error ? true : undefined} className={className}>
       <FieldLabel htmlFor={id}>
         {label}
-        {optional ? <span className="font-normal text-subtle-foreground">(optional)</span> : null}
+        {optional ? <span className="font-normal text-muted-foreground">(optional)</span> : null}
       </FieldLabel>
       {children({
         id,

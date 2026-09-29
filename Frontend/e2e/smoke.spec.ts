@@ -224,3 +224,24 @@ test.describe("[APPR-001] Approvals", () => {
     await expectNoAccessibilityViolations(page);
   });
 });
+
+test.describe("[SO-001] Sales orders", () => {
+  test("lists orders and opens one with its approval chain and dispatches", async ({ page }) => {
+    await signIn(page, "/sales-orders?status=partially_dispatched");
+
+    const table = page.getByRole("table", { name: "Sales orders" });
+    await expect(table.getByRole("row").nth(1)).toBeVisible();
+    await table.getByRole("row").nth(1).getByRole("link").first().click();
+    await expect(page.getByRole("list", { name: "Approval steps, in order" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Dispatches, newest first" })).toBeVisible();
+  });
+
+  test("has no automatically detectable accessibility violations", async ({ page }) => {
+    await signIn(page, "/sales-orders");
+    await expect(
+      page.getByRole("table", { name: "Sales orders" }).getByRole("row").nth(1),
+    ).toBeVisible();
+
+    await expectNoAccessibilityViolations(page);
+  });
+});

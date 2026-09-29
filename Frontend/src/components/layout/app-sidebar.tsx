@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { approvalCountQueryOptions } from "@/features/approvals/api/approvals.queries";
 import { leadStatsQueryOptions } from "@/features/leads/api/leads.queries";
 import { conversationListQueryOptions } from "@/features/messages/api/messages.queries";
-import { useCan, useSession } from "@/features/session/hooks/use-session";
+import { useCanApprove, useSession } from "@/features/session/hooks/use-session";
 import { useModifierKeyLabel } from "@/hooks/use-modifier-key";
 import { clientEnv, type ApiMockingMode, type AppEnv } from "@/lib/env/client";
 import { formatCount, formatNumber } from "@/lib/format";
@@ -348,7 +348,7 @@ function LeadsCount(): React.JSX.Element | null {
 
 /** APPR-001 · Requests waiting on the user, for those who may decide them. */
 function ApprovalsCount(): React.JSX.Element | null {
-  const canApprove = useCan("approvals", "approve");
+  const canApprove = useCanApprove();
   const { data } = useQuery({ ...approvalCountQueryOptions(), enabled: canApprove });
   if (!canApprove || data === undefined || data.total === 0) {
     return null;

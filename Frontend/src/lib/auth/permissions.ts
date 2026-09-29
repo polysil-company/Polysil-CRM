@@ -11,17 +11,16 @@ export const PERMISSION_ACTIONS = ["view", "create", "edit", "approve", "delete"
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
 
 /**
- * Backend module codes the UI gates on. `leads`, `partners`, `users` and `masters`
- * exist in the backend today; the others are the expected codes for modules that
- * are not built yet.
+ * Backend module codes the UI gates on. `leads`, `quotations`, `sales_orders`, `dispatch`,
+ * `partners`, `users` and `masters` exist in the backend (backend/docs/architecture/RBAC.md
+ * §6); the others are the expected codes for modules that are not built yet.
  *
  * TODO(AUTH-002): confirm the codes of unbuilt modules against the backend's RBAC matrix.
  */
 export const MODULE_CODES = [
   "leads",
   "quotations",
-  "orders",
-  "approvals",
+  "sales_orders",
   "subsidy",
   "complaints",
   "tasks",
@@ -44,6 +43,15 @@ export interface ModulePermission {
   readonly actions: readonly string[];
   /** own, org_subtree, territory, partner_subtree or global: how far the `view` grant reaches. */
   readonly scope: string | null;
+}
+
+/**
+ * Whether the user decides approvals. The backend has no approvals module: a step is decided
+ * with `sales_orders.approve` (orders) or `quotations.approve` (a quotation discount), per
+ * backend/docs/architecture/RBAC.md §6.
+ */
+export function canApprove(permissions: readonly ModulePermission[]): boolean {
+  return can(permissions, "sales_orders", "approve") || can(permissions, "quotations", "approve");
 }
 
 /** Whether the permission list grants `action` on `module`. */

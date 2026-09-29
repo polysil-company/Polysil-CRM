@@ -1,19 +1,13 @@
 "use client";
 
-import {
-  AlertCircleIcon,
-  ArrowLeft01Icon,
-  CheckmarkCircle02Icon,
-  Copy01Icon,
-  InformationCircleIcon,
-  Tick02Icon,
-} from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type * as React from "react";
 
 import { AvatarLabel } from "@/components/patterns/avatar-label";
+import { Notice } from "@/components/patterns/notice";
 import { QueryView } from "@/components/patterns/query-view";
 import { RelativeDate } from "@/components/patterns/relative-date";
 import { Badge } from "@/components/ui/badge";
@@ -279,42 +273,6 @@ function DetailItem({
     <div className="flex min-w-0 flex-col gap-1">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="min-w-0 text-sm wrap-break-word text-foreground">{children}</dd>
-    </div>
-  );
-}
-
-type NoticeTone = "info" | "warning" | "danger" | "success";
-
-const NOTICE_CLASSES: Readonly<Record<NoticeTone, { box: string; icon: string }>> = {
-  info: { box: "bg-info-soft", icon: "text-info" },
-  warning: { box: "bg-warning-soft", icon: "text-warning" },
-  danger: { box: "bg-danger-soft", icon: "text-danger" },
-  success: { box: "bg-success-soft", icon: "text-success" },
-};
-
-const NOTICE_ICONS = {
-  info: InformationCircleIcon,
-  success: CheckmarkCircle02Icon,
-  warning: AlertCircleIcon,
-  danger: AlertCircleIcon,
-} as const satisfies Record<NoticeTone, unknown>;
-
-function Notice({
-  tone,
-  children,
-}: {
-  tone: NoticeTone;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-2.5 rounded-lg border border-border p-3 text-sm text-foreground",
-        NOTICE_CLASSES[tone].box,
-      )}
-    >
-      <Icon icon={NOTICE_ICONS[tone]} className={cn("mt-0.5", NOTICE_CLASSES[tone].icon)} />
-      <div className="flex min-w-0 flex-col gap-1">{children}</div>
     </div>
   );
 }

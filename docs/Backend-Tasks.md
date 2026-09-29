@@ -62,6 +62,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [x] **BE-018** · Name the Accounts role code in the approval queue · APPR-001 · normal
 
+**Sales orders** — added as the order screens are built (SO-001…, DISP-002).
+
+- [ ] **BE-019** · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders` · SO-003 · low
+
 ---
 
 ## Details
@@ -356,3 +360,18 @@ in the same shape. Never renumber or reuse a number.
   - QA (`qc_manager`) never appears there: complaints have their own queue, `GET /complaints?awaiting=me`.
   - `decided_role` is set when a higher manager decided a step in place of its own role.
   - A remark is required on every `reject`, and on **every** Accounts decision, approve included.
+
+### BE-019 · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders`
+
+- **Status:** ⬜ Open
+- **Asked:** 29 Sep 2026 · SO-003
+- **What:** accept `quotation_id` on `GET /orders` (orders whose `quotations` include it), or add
+  `quotation_ids` to `OrderSummary`.
+- **Why:** an accepted quotation's page offers "Place order", or "Open order" when a live order
+  already carries it — `POST /orders` answers `409 quotation_on_order` otherwise. The list rows
+  carry no quotation ids, so today the page lists the lead's orders and reads each live one
+  (up to ten) to find the match. One filtered call would do.
+- **Done when:** `GET /orders?quotation_id=…` returns the order(s) carrying that quotation, in the
+  caller's scope.
+- **Done in:** —
+- **Backend notes:** —
