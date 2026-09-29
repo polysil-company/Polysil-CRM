@@ -183,7 +183,7 @@ async def mark_read(db: AsyncSession, caller: Caller, conversation_id: str,
     _staff(caller)
     try:
         async with db.begin_nested():
-            ok = (await db.execute(text(
+            ok: bool = (await db.execute(text(
                 "SELECT conversation_mark_read(CAST(:c AS uuid), CAST(:u AS uuid))"),
                 {"c": conversation_id, "u": body.up_to})).scalar_one()
     except DBAPIError as exc:
