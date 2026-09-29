@@ -5,10 +5,13 @@ import {
   QUEUE_PAGE_SIZE,
   decisionResultSchema,
   queuePageSchema,
+  thresholdsResponseSchema,
   type DecisionRequest,
   type DecisionResult,
   type QueuePage,
   type QueueParams,
+  type Threshold,
+  type ThresholdPutRequest,
 } from "./approvals.schemas";
 
 const log = createLogger({ file: "features/approvals/api/approvals.api.ts", dataId: "APPR-001" });
@@ -60,5 +63,40 @@ export function decideApprovalStep(
     body,
     idempotencyKey,
     schema: decisionResultSchema,
+  });
+}
+
+/** APPR-002 · GET /approvals/thresholds — every role's limit, company-wide and per territory. */
+export function getApprovalThresholds(signal?: AbortSignal): Promise<Threshold[]> {
+  return apiRequest({
+    dataId: "APPR-002",
+    logger: log,
+    fn: "getApprovalThresholds",
+    path: "/approvals/thresholds",
+    schema: thresholdsResponseSchema,
+    signal,
+  });
+}
+
+/**
+ * APPR-002 · PUT /approvals/thresholds — one role's limit. Answers with every row. Applies to
+ * orders submitted and discounts asked from now on.
+ */
+export function putApprovalThreshold({
+  body,
+  idempotencyKey,
+}: {
+  body: ThresholdPutRequest;
+  idempotencyKey: string;
+}): Promise<Threshold[]> {
+  return apiRequest({
+    dataId: "APPR-002",
+    logger: log,
+    fn: "putApprovalThreshold",
+    method: "PUT",
+    path: "/approvals/thresholds",
+    body,
+    idempotencyKey,
+    schema: thresholdsResponseSchema,
   });
 }

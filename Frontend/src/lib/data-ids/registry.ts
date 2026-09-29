@@ -382,6 +382,15 @@ export const DATA_IDS = {
     notes:
       "Submit numbers the order and builds the chain by value: managers, then Accounts, then Dispatch.",
   },
+  "SO-005": {
+    domain: "SO",
+    title: "A direct order typed in line by line, and a draft's lines",
+    owner: "shared",
+    status: "planned",
+    endpoints: ["POST /orders", "PUT /orders/{orderId}/lines", "POST /pricing/quote-lines"],
+    notes:
+      "Party, place of supply and lines as on a quotation, priced by the backend; a lead is optional.",
+  },
   "APPR-001": {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",
@@ -389,7 +398,16 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /approvals/pending", "POST /approvals/steps/{stepId}/decision"],
     notes:
-      "Quotation discounts and sales orders side by side. Account, QA and Dispatch gates apply only to requests raised by a State Manager.",
+      "Quotation discounts and sales orders side by side. An order's chain is its managers by value, then Accounts, then Dispatch.",
+  },
+  "APPR-002": {
+    domain: "APPR",
+    title: "Approval limits — order value and discount per role",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /approvals/thresholds", "PUT /approvals/thresholds"],
+    notes:
+      "Anyone signed in reads them; masters.edit changes them. Each level stays above the one below.",
   },
   "CMPL-001": {
     domain: "CMPL",

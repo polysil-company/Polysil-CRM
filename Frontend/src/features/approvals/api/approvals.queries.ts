@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import { listPendingApprovals } from "./approvals.api";
+import { getApprovalThresholds, listPendingApprovals } from "./approvals.api";
 import type { QueueParams } from "./approvals.schemas";
 
 /** How often the inbox and its badge look for new requests. */
@@ -14,6 +14,7 @@ export const approvalKeys = {
   all: ["approvals"] as const,
   queue: (params: QueueParams) => [...approvalKeys.all, "queue", params] as const,
   count: () => [...approvalKeys.all, "count"] as const,
+  thresholds: () => [...approvalKeys.all, "thresholds"] as const,
 };
 
 const FIRST_PAGE: string | null = null;
@@ -44,5 +45,14 @@ export function approvalCountQueryOptions() {
     },
     refetchInterval: APPROVALS_POLL_MS,
     meta: { dataId: "APPR-001" },
+  });
+}
+
+/** APPR-002 · The approval limits; they change rarely, so they are not polled. */
+export function approvalThresholdsQueryOptions() {
+  return queryOptions({
+    queryKey: approvalKeys.thresholds(),
+    queryFn: ({ signal }) => getApprovalThresholds(signal),
+    meta: { dataId: "APPR-002" },
   });
 }

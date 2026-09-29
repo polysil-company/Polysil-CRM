@@ -670,7 +670,10 @@ export const orderHandlers = [
     order.approval = {
       request_id: mockUuid(MOCK_ID_SPACE.approval, 80_000 + mockDb.approvalSteps.length),
       status: "pending",
-      steps: chainSteps(chainFor(order.totals.total), 200_000 + mockDb.approvalSteps.length * 10),
+      steps: chainSteps(
+        chainFor(order.totals.total, mockDb.thresholds, order.territory.id),
+        200_000 + mockDb.approvalSteps.length * 10,
+      ),
     };
     enqueue(orderQueueStep(order));
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });

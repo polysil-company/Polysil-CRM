@@ -1,3 +1,4 @@
+import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 import type { Role } from "@/lib/auth/roles";
@@ -34,18 +35,94 @@ export interface MockApprovalStep {
 }
 
 /**
- * The lowest manager whose stand-in limit covers a quotation's discount (District 10 %,
- * State 15 %, Regional 20 %). Above that the backend asks Admin-Sales, whom the mock does
- * not seed, so it answers `no_approver`.
+ * APPR-002 · The backend's stand-in limits (migrations 013 and 017): an order's value
+ * including GST per manager, and a quotation's discount per role. One territory override
+ * shows how a district can differ from the company-wide row.
  */
-const QUOTATION_APPROVER_LIMITS: readonly { readonly upToPct: number; readonly role: string }[] = [
-  { upToPct: 10, role: "district_manager" },
-  { upToPct: 15, role: "state_manager" },
-  { upToPct: 20, role: "regional_manager" },
-];
+export function seedThresholds(overrideTerritory: ThresholdWire["territory"]): ThresholdWire[] {
+  const order = (role: string, amount: string | null): ThresholdWire => ({
+    doc_type: "sales_order",
+    role,
+    territory: null,
+    max_amount: amount,
+    unit: "inr",
+  });
+  const discount = (role: string, pct: string | null): ThresholdWire => ({
+    doc_type: "quotation",
+    role,
+    territory: null,
+    max_amount: pct,
+    unit: "pct",
+  });
+  return [
+    order("district_manager", "100000.00"),
+    order("state_manager", "500000.00"),
+    order("regional_manager", null),
+    ...(overrideTerritory === null
+      ? []
+      : [{ ...order("district_manager", "150000.00"), territory: overrideTerritory }]),
+    discount("field_officer", "5.00"),
+    discount("district_manager", "10.00"),
+    discount("state_manager", "15.00"),
+    discount("regional_manager", "20.00"),
+    discount("admin_sales", null),
+  ];
+}
 
-export function quotationApproverFor(effectivePct: number): string | null {
-  return QUOTATION_APPROVER_LIMITS.find((limit) => effectivePct <= limit.upToPct)?.role ?? null;
+/**
+ * A role's limit for a document: the territory's own row when there is one, else the
+ * company-wide row. `undefined` when the role has no row; `null` for no ceiling.
+ */
+export function limitOf(
+  thresholds: readonly ThresholdWire[],
+  docType: ThresholdWire["doc_type"],
+  role: string,
+  territoryId: string | null,
+): number | null | undefined {
+  const rows = thresholds.filter((row) => row.doc_type === docType && row.role === role);
+  const row =
+    rows.find((item) => territoryId !== null && item.territory?.id === territoryId) ??
+    rows.find((item) => item.territory === null);
+  if (row === undefined) {
+    return undefined;
+  }
+  return row.max_amount === null ? null : Number(row.max_amount);
+}
+
+const ORDER_MANAGERS = ["district_manager", "state_manager", "regional_manager"] as const;
+
+/** An order's managers: each level up to the first whose limit covers its total. */
+export function orderManagersFor(
+  total: string,
+  thresholds: readonly ThresholdWire[],
+  territoryId: string | null,
+): string[] {
+  const amount = Number(total);
+  const managers: string[] = [];
+  for (const role of ORDER_MANAGERS) {
+    managers.push(role);
+    const limit = limitOf(thresholds, "sales_order", role, territoryId);
+    if (limit === null || (limit !== undefined && amount <= limit)) {
+      break;
+    }
+  }
+  return managers;
+}
+
+/**
+ * The lowest manager whose limit covers a quotation's discount. Above Regional the backend
+ * asks Admin-Sales, whom the mock does not seed, so it answers `no_approver`.
+ */
+export function quotationApproverFor(
+  effectivePct: number,
+  thresholds: readonly ThresholdWire[],
+): string | null {
+  return (
+    ORDER_MANAGERS.find((role) => {
+      const limit = limitOf(thresholds, "quotation", role, null);
+      return limit === null || (limit !== undefined && effectivePct <= limit);
+    }) ?? null
+  );
 }
 
 /** How high each approving role sits; a step is someone's when the ranks match. */
@@ -139,6 +216,7 @@ export function orderQueueStep(order: OrderWire, stalled = false): MockApprovalS
 export function seedApprovals(
   quotations: QuotationWire[],
   orders: readonly OrderWire[],
+  thresholds: readonly ThresholdWire[],
 ): MockApprovalStep[] {
   const steps: MockApprovalStep[] = [];
   let index = 0;
@@ -148,7 +226,7 @@ export function seedApprovals(
   );
   for (const [position, quotation] of waiting.entries()) {
     const effective = Number(quotation.discount?.effective_pct ?? "0");
-    const role = quotationApproverFor(effective);
+    const role = quotationApproverFor(effective, thresholds);
     if (position % 2 === 1 || role === null) {
       continue;
     }

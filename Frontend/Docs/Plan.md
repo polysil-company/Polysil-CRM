@@ -309,10 +309,11 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Place an order from an accepted quotation; a draft's delivery, terms and remarks; delete a never-submitted draft | SO-003 | `POST /orders`, `PATCH /orders/{id}`, `DELETE /orders/{id}` |
 | Submit for approval (again, after a return); cancel with a reason | SO-004 | `POST /orders/{id}/submit`, `POST /orders/{id}/cancel` |
 | Record a dispatch, void one, close the rest short | DISP-002 | `POST /orders/{id}/dispatches`, `POST /dispatches/{id}/void`, `POST /orders/{id}/close-short` |
+| Approval limits — order value and discount per role, company-wide and per territory; administrators change one level at a time | APPR-002 | `GET /approvals/thresholds`, `PUT /approvals/thresholds` |
 
 **Permissions follow the backend's module codes** (`backend/docs/architecture/RBAC.md` §6): orders are `sales_orders`, dispatch is `dispatch`, and there is no `approvals` module — whoever holds `sales_orders.approve` or `quotations.approve` sees Approvals. Before this, the frontend asked for `orders` and `approvals`, so on the real backend Sales orders and Approvals would have stayed hidden.
 
-LEAD-005…008, QUOT-001…012, APPR-001, SO-001…004, DISP-002 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+LEAD-005…008, QUOT-001…012, APPR-001…002, SO-001…004, DISP-002 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 
@@ -338,7 +339,7 @@ The backend also finished sorting on `GET /leads` (BE-001), crops and land on a 
 
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
-| **A direct order** typed in line by line (not from quotations), and a **consolidated** one from several leads of one dealer (SO-005); the **approval limits** screen for admins (APPR-002) | `POST /orders` with `lines`, `PUT /orders/{id}/lines`, `GET`/`PUT /approvals/thresholds` | `backend/docs/api/orders.md`, `backend/docs/api/approvals.md` | **1 — next** |
+| **A direct order** typed in line by line (not from quotations), and a **consolidated** one from several leads of one dealer (SO-005). After the backend pick-ups in §9.2 | `POST /orders` with `lines`, `PUT /orders/{id}/lines` | `backend/docs/api/orders.md` | **1 — after §9.2** |
 | Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 2 |
 | Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 3 |
 | Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 6 |

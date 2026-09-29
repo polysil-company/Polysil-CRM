@@ -145,7 +145,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
 | QUOT-004 | Quotation builder — create and edit a draft (`POST /quotations`, `PATCH /quotations/{quotationId}`, `PUT /quotations/{quotationId}/lines`) | shared | in-progress |
-| QUOT-005 | Live pricing — the quotation preview (`POST /pricing/quote-lines`) | shared | in-progress |
+| QUOT-005 | Live pricing — the quotation preview (`POST /pricing/quote-lines`) | shared | planned |
 | QUOT-006 | Send a quotation — number it, share the link, render the PDF (`POST /quotations/{quotationId}/send`) | shared | in-progress |
 | QUOT-007 | Ask a manager to approve a quotation's discount (`POST /quotations/{quotationId}/request-approval`) | shared | in-progress |
 | QUOT-008 | Record the customer's answer — accepted, rejected or negotiation (`POST /quotations/{quotationId}/transition`) | shared | in-progress |
@@ -157,7 +157,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | SO-002 | A sales order — the document, its approval chain, PDF and history (`GET /orders/{orderId}`, `GET /orders/{orderId}/pdf`, `GET /orders/{orderId}/timeline`) | shared | in-progress |
 | SO-003 | New order from accepted quotations, and a draft's header (`POST /orders`, `PATCH /orders/{orderId}`, `DELETE /orders/{orderId}`) | shared | in-progress |
 | SO-004 | Submit an order for approval, and cancel it (`POST /orders/{orderId}/submit`, `POST /orders/{orderId}/cancel`) | shared | in-progress |
+| SO-005 | A direct order typed in line by line, and a draft's lines (`POST /orders`, `PUT /orders/{orderId}/lines`, `POST /pricing/quote-lines`) | shared | planned |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
+| APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
 | CMPL-001 | Complaints list and QA review | shared | planned |
 | TASK-001 | Tasks and daily planner | shared | planned |
 | CHNL-001 | Channel partners list and detail | shared | planned |
