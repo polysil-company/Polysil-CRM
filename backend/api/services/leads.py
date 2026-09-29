@@ -677,6 +677,12 @@ _ASSIGNED_NAMES = (("owner_user_id", "owner_name"), ("assigned_partner_id", "par
                    ("previous_owner_user_id", "previous_owner_name"))
 
 
+def _as_dict(payload: Any) -> dict[str, Any]:
+    if isinstance(payload, str):
+        payload = json.loads(payload)
+    return payload if isinstance(payload, dict) else {}
+
+
 async def _timeline_refs(db: AsyncSession, lead_id: str, rows: Any,
                          ) -> tuple[dict[str, str], dict[str, Any]]:
     """The names an assignment event refers to and the quotations the page's
@@ -686,7 +692,9 @@ async def _timeline_refs(db: AsyncSession, lead_id: str, rows: Any,
     review B-2). Quotations under the reader's own policies: lead_timeline() has
     already dropped the events of any the reader cannot see (EC-7)."""
     people_on: dict[str, str] = {}
-    if any(r.kind == "lead.assigned" for r in rows):
+    unnamed = any(r.actor_id is not None and "actor_name" not in _as_dict(r.payload)
+                  for r in rows)
+    if unnamed or any(r.kind == "lead.assigned" for r in rows):
         people_on = {str(p.id): p.name for p in (await db.execute(text(
             "SELECT id, name FROM lead_event_people(CAST(:l AS uuid))"),
             {"l": lead_id})).all()}
@@ -754,7 +762,10 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
             # (FS-015 code review F-1, executed)
             payload = {k: v for k, v in payload.items() if k != "actor_name"}
         if r.actor_id is not None and not hidden:
-            actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name") or "")
+            # events a definer wrote carry no name: 022 names their actors for staff
+            # (the frontend walk showed "Polysil" as the one who asked)
+            actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name")
+                            or people_on.get(str(r.actor_id)) or "")
         if isinstance(payload, dict):
             payload = _enrich(r, payload, people_on, quotes)
         events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso_req(r.occurred_at),

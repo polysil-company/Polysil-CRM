@@ -814,6 +814,7 @@ Every version of the number, oldest first. Any version's id works.
 | `pdf_state` | `pending` \| `ready` \| `failed` \| null | yes |  |
 | `superseded_by` | VersionRef \| null | yes |  |
 | `created_at` | string | yes |  |
+| `awaiting_approval` | boolean |  | A discount request on this draft is waiting for a manager. Show "Awaiting approval" in lists. Default `False`. |
 
 **`ReviseRequest`**
 

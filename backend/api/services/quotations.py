@@ -117,7 +117,11 @@ SELECT q.id, q.quote_no, q.version, q.status, q.sales_type, q.source,
        q.supersedes_id, sv.version AS supersedes_version,
        q.superseded_by_id, sb.version AS superseded_by_version,
        q.share_token, q.pdf_state, q.pdf_key, q.pdf_error, q.notify_channel,
-       q.created_at, q.created_by, cb.full_name AS created_by_name, q.updated_at
+       q.created_at, q.created_by, cb.full_name AS created_by_name, q.updated_at,
+       -- whoever sees the quotation sees its requests (017's policy): the list's
+       -- "Awaiting approval" (the frontend walk, 29 Sep)
+       EXISTS (SELECT 1 FROM approval_request ar WHERE ar.doc_type = 'quotation'
+                  AND ar.entity_id = q.id AND ar.status = 'pending') AS awaiting_approval
   FROM quotation q
   JOIN org_unit ou ON ou.id = q.owner_org_unit_id
   JOIN territory t ON t.id = q.territory_id
@@ -552,7 +556,7 @@ def _to_summary(row: Any, names: people.Names) -> sch.QuotationSummary:
         superseded_by=(sch.VersionRef(id=str(row.superseded_by_id),
                                       version=row.superseded_by_version)
                        if row.superseded_by_id and row.superseded_by_version else None),
-        created_at=row.created_at.isoformat())
+        created_at=row.created_at.isoformat(), awaiting_approval=row.awaiting_approval)
 
 
 async def get_quotation(db: AsyncSession, quotation_id: str, settings: Settings,
