@@ -14,6 +14,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
 | Leads | 17 | [`leads.md`](leads.md) |
 | Lookups | 23 | [`lookups.md`](lookups.md) |
+| Messages | 6 | [`messages.md`](messages.md) |
 | Notifications | 2 | [`notifications.md`](notifications.md) |
 | Orders | 14 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |

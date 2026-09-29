@@ -65,7 +65,7 @@ are not yours, or already read, are ignored. Answers the new unread count.
 
 **Request body**
 
-**`MarkRead`**
+**`api__schemas__notifications__MarkRead`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -104,13 +104,6 @@ are not yours, or already read, are ignored. Answers the new unread count.
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
-**`MarkRead`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `ids` | string[] \| null |  | Mark these read. Ids not yours, or already read, are ignored. |
-| `all` | boolean \| null |  | Mark everything read. |
-
 **`Notification`**
 
 | Field | Type | Required | Notes |
@@ -120,7 +113,7 @@ are not yours, or already read, are ignored. Answers the new unread count.
 | `title` | string | yes |  |
 | `body` | string \| null | yes |  |
 | `actor` | UserRef \| null | yes | Who caused it. Null for a dealer on a decision: a dealer is never told who decided. |
-| `resource` | ResourceRef \| null | yes |  |
+| `resource` | api__schemas__notifications__ResourceRef \| null | yes |  |
 | `created_at` | string | yes |  |
 | `read_at` | string \| null | yes | Null while unread. |
 
@@ -138,14 +131,6 @@ are not yours, or already read, are ignored. Answers the new unread count.
 | `data` | Notification[] | yes |  |
 | `meta` | NotificationMeta | yes |  |
 
-**`ResourceRef`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `type` | string | yes | lead, task, sales_order, quotation or complaint. |
-| `id` | string | yes |  |
-| `label` | string | yes | The record's number or title, for the link text. |
-
 **`UnreadCount`**
 
 | Field | Type | Required | Notes |
@@ -158,3 +143,18 @@ are not yours, or already read, are ignored. Answers the new unread count.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
+
+**`api__schemas__notifications__MarkRead`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `ids` | string[] \| null |  | Mark these read. Ids not yours, or already read, are ignored. |
+| `all` | boolean \| null |  | Mark everything read. |
+
+**`api__schemas__notifications__ResourceRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `type` | string | yes | lead, task, sales_order, quotation or complaint. |
+| `id` | string | yes |  |
+| `label` | string | yes | The record's number or title, for the link text. |
