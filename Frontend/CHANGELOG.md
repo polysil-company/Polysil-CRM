@@ -92,7 +92,7 @@ The frontend also asked for permission modules the backend does not have: `order
 - `src/app/(app)/(sales)/sales-orders/` — the list (replacing the placeholder), `loading.tsx`; `[orderId]/page.tsx`, `loading.tsx`, `not-found.tsx`
 - `src/components/patterns/notice.tsx`, `pdf-link-button.tsx` — new, shared; `src/features/quotations/components/quotation-detail.tsx`, `quotation-pdf-button.tsx` use them
 - `src/features/quotations/components/quotation-actions.tsx` — Place order / Open order on an accepted quotation
-- `src/features/approvals/components/approvals-inbox.tsx` — Open the order; `approval-labels.ts` — the Accounts remark rule by its role code
+- `src/features/approvals/components/approvals-inbox.tsx` — Open the order; `approval-labels.ts` — the Accounts remark rule by its role code; `approvals.mutations.ts` — a decision re-reads the order it decided and the order lists
 - `src/lib/auth/permissions.ts` — `sales_orders` for `orders`, no `approvals` module, `canApprove`; `src/components/layout/navigation.ts`, `app-sidebar.tsx`, `src/features/session/hooks/use-session.ts` (`useCanApprove`), `src/features/leads/components/sales-tabs.tsx`
 - `src/mocks/data/orders.ts`, `src/mocks/handlers/orders.ts` — new; `data/approvals.ts` — order steps from real orders, one at a time, `seq`; `handlers/approvals.ts` — the chain moves on, `remark_required`, `self_approval`; `data/permissions.ts` — RBAC.md's grants; `data/reference.ts`, `db.ts`, `handlers/index.ts`, `handlers/quotations.ts` — registered
 - `src/features/quotations/components/quotation-builder.tsx`, `quotation-action-dialog.tsx`, `src/features/approvals/components/approval-decision-dialog.tsx` — "(optional)" contrast
