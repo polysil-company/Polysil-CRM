@@ -236,7 +236,7 @@ def main() -> None:
         distributor = uuid.uuid5(uuid.NAMESPACE_DNS, "polysil.demo.distributor")
         partner = uuid.uuid5(uuid.NAMESPACE_DNS, "polysil.demo.dealer")
         for pid, parent, ptype, code, name in (
-            (distributor, None, "distributor", "DEMO-DIST", "Saurashtra Agro Distributors"),
+            (distributor, None, "distributor", "DEMO-DIST", "Rajkot Agro Distributors"),
             (partner, distributor, "dealer", "DEMO-DLR", "Shah Irrigation, Rajkot"),
         ):
             cur.execute(

@@ -304,3 +304,28 @@ async def test_a_quotation_event_names_its_quotation(client: httpx.AsyncClient, 
     for e in quote_events:
         p = e["payload"]
         assert p["quotation_id"] == q["id"] and p["quote_no"] == q["quote_no"] and p["version"] == 1, e
+
+
+async def test_a_discount_request_names_who_asked(client: httpx.AsyncClient, shop: Shop) -> None:
+    """The frontend walk (29 Sep): an event a definer writes carries no name, and the
+    history read "Polysil asked"; 022 names the actor for staff."""
+    from tests.api import test_quotation_approval as qa
+    h = await endpoints._as(client, shop, "field_officer")
+    q = await qa._draft(client, shop, h, "8")
+    r = await qa._ask(client, h, q["id"])
+    assert r.status_code == 200, r.text
+    tl = (await client.get(f"{V1}/leads/{q['lead']['id']}/timeline", headers=h)).json()["data"]
+    asked = next(e for e in tl if e["kind"] == "quotation.approval_requested")
+    assert asked["actor"]["full_name"] and asked["actor"]["id"] == shop.ids["field_officer"], asked
+
+
+async def test_the_quotation_list_says_awaiting_approval(client: httpx.AsyncClient, shop: Shop) -> None:
+    """The frontend walk: the list showed a waiting draft as a plain "Draft"."""
+    from tests.api import test_quotation_approval as qa
+    h = await endpoints._as(client, shop, "field_officer")
+    q = await qa._draft(client, shop, h, "8")
+    listed = (await client.get(f"{V1}/quotations", headers=h, params={"lead_id": q["lead"]["id"]})).json()["data"]
+    assert [x["awaiting_approval"] for x in listed if x["id"] == q["id"]] == [False]
+    assert (await qa._ask(client, h, q["id"])).status_code == 200
+    listed = (await client.get(f"{V1}/quotations", headers=h, params={"lead_id": q["lead"]["id"]})).json()["data"]
+    assert [x["awaiting_approval"] for x in listed if x["id"] == q["id"]] == [True]

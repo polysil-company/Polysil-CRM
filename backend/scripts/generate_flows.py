@@ -1525,6 +1525,69 @@ def f_tasks() -> None:
     write("14-tasks-and-planner", e)
 
 
+def f_bell_and_messages() -> None:
+    e, n = [], {}
+    e += title("The bell and staff messages",
+               sub="In-app notifications from the event log (FS-018) and one-to-one staff "
+                   "conversations with a lead link (FS-019).",
+               status="BUILT. /notifications, /conversations, /staff-directory; "
+                      "migrations 023 and 024.",
+               status_colour=GREEN)
+    steps = [
+        ("b1", "any write: API, worker or a definer\nactivity_event row, same transaction", BLUE),
+        ("b2", "trigger notify_from_event (023), filtered by kind\n"
+               "assigned, a note, waiting for you, decided for you", VIOLET),
+        ("b3", "who may decide: approval_refusal() / complaint_refusal()\n"
+               "asked as each candidate, the claim swapped and restored", VIOLET),
+        ("b4", "notification rows: recipient only, read_at the only write\n"
+               "GET /notifications; POST /notifications/read", GREEN),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(steps):
+        els = node(eid, 0, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid])
+        prev = eid
+    side = [
+        ("m1", "GET /staff-directory -> POST /conversations\nfind or open the pair (user_a < user_b)", BLUE),
+        ("m2", "POST /conversations/{id}/messages\nbody 1-2000, a lead the sender can see", BLUE),
+        ("m3", "message_stamp(): under the conversation's row lock\n"
+               "created_at strictly increasing; the sender's own mark", VIOLET),
+        ("m4", "POST /read {up_to}: up to what the screen showed\n"
+               "unread = their messages after my mark", GREEN),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(side):
+        els = node(eid, 620, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid])
+        prev = eid
+    e += note("nRed1", 1240, 0,
+              "A NOTIFICATION FAULT NEVER BLOCKS THE WRITE\n\n"
+              "The trigger's body sits in one exception block. A fault\n"
+              "is logged in notification_failure with a warning.\n"
+              "An outage, a cancel, a deadlock or class XX still\n"
+              "fails the write.", w=420, colour=RED)
+    e += note("nRed2", 1240, 260,
+              "A DEALER IS NEVER TOLD WHO DECIDED\n\n"
+              "Titles never name the decider; the actor is dropped at\n"
+              "write time for a partner recipient. A reject does not\n"
+              "notify the next step's role.", w=420, colour=RED)
+    e += note("nRed3", 1240, 520,
+              "MARK READ UP TO A MESSAGE, NEVER 'NOW'\n\n"
+              "A message committing while the reader marks read would\n"
+              "otherwise be counted read unseen. No UPDATE grant on\n"
+              "conversation: one side cannot reset the other's mark.", w=420, colour=RED)
+    e += note("nYellow1", 1240, 780,
+              "Not yet: push, groups, attachments, a bell for a new\n"
+              "message, retention (GAP-160 to GAP-168).", w=420, colour=YELLOW)
+    write("16-bell-and-messages", e)
+
+
 def f_complaints() -> None:
     e, n = [], {}
     e += title("Complaints: entry, the manager check, the quality check",
@@ -1604,5 +1667,5 @@ if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
     f_approval(); f_subsidy(); f_outbox(); f_money(); f_pricing()
-    f_quotation(); f_order(); f_auth(); f_admin(); f_tasks(); f_complaints()
+    f_quotation(); f_order(); f_auth(); f_admin(); f_tasks(); f_complaints(); f_bell_and_messages()
     print(f"\nwrote to {OUT}")

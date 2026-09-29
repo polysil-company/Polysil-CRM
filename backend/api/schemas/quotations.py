@@ -381,6 +381,9 @@ class QuotationSummary(BaseModel):
     pdf_state: PdfState | None
     superseded_by: VersionRef | None
     created_at: str
+    awaiting_approval: bool = Field(
+        default=False, description="A discount request on this draft is waiting for a "
+        "manager. Show \"Awaiting approval\" in lists.")
 
 
 class QuotationPage(BaseModel):
