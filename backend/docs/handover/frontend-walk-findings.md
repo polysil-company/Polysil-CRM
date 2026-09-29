@@ -5,7 +5,7 @@ A walk through https://polysil.pranayx.tech as the field officer and the distric
 ## 1 · The approver cannot decide a discount (APPR-001)
 
 - **Seen:** `/approvals` lists a quotation's discount request, but has only "Open the quotation". The quotation page shows a disabled "Waiting for approval" button. There is no Approve or Return.
-- **Backend:** the discount step is an ordinary row of `GET /approvals/pending`, with `doc_type: "quotation"`. It is decided like an order step: `POST /approvals/{step_id}/decide` with `{ "decision": "approve" | "reject", "remark": "..." }`. The answer is a `DecisionResult`, discriminated by `doc_type`. See `backend/docs/api/approvals.md`.
+- **Backend:** the discount step is an ordinary row of `GET /approvals/pending`, with `doc_type: "quotation"`. It is decided like an order step: `POST /approvals/steps/{step_id}/decision` with `{ "decision": "approve" | "reject", "remark": "..." }`. The answer is a `DecisionResult`, discriminated by `doc_type`. See `backend/docs/api/approvals.md`.
 - **Ask:** Approve and Return buttons on the approvals row, and on the quotation page when the viewer is the approver. The pending row's `role` says whose step it is.
 
 ## 2 · No Approvals link in the sidebar
