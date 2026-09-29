@@ -8,8 +8,9 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from api.schemas.complaints import Ref
-from api.schemas.leads import UUID_RE, TerritoryRef, UserRef
+from api.schemas.complaints import Ref as Ref
+from api.schemas.leads import UUID_RE, UserRef
+from api.schemas.leads import TerritoryRef as TerritoryRef
 from api.schemas.subsidy import CalculateRequest
 
 Status = Literal["open", "full_fp_received", "cancelled"]
