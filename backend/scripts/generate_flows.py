@@ -1663,9 +1663,77 @@ def f_complaints() -> None:
     write("15-complaints", e)
 
 
+def f_subsidy_applications() -> None:
+    e, n = [], {}
+    e += title("Subsidy applications: from a won lead to the last payment",
+               sub="A subsidised lead is forwarded; GGRC stages 4 to 17 are recorded as they "
+                   "happen; the application closes itself on the last payment.",
+               status="BUILT. FS-009: /subsidy-applications, /subsidy-stages, "
+                      "/subsidy-document-types, migration 025.",
+               status_colour=GREEN)
+    steps = [
+        ("s1", "a subsidised lead: qualified, quoted, negotiation or won\n"
+               "drip, mini sprinkler or sprinkler", BLUE),
+        ("s2", "POST /subsidy-applications {lead, category, calculation}\n"
+               "the engine runs again; the calculation is stored, never recomputed", VIOLET),
+        ("s3", "subsidy_application_create(): locks the lead\n"
+               "SA/GJ/2026-27/00001, stage 4 today, the lead moves to won", GREEN),
+        ("s4", "POST /{id}/stages {stage, date, values}\n"
+               "any stage; back or same needs a remark; no future date", BLUE),
+        ("s5", "stage 16: the amounts cleared\nstage 17: the date each one arrived", BLUE),
+        ("s6", "full_fp_received: every amount above 0\nhas its date (rule 7)", GREEN),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(steps):
+        els = node(eid, 0, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid])
+        prev = eid
+    side = [
+        ("d1", "GET /subsidy-stages: the stages and their fields\n"
+               "are data (subsidy_stage_def / _field), not code", YELLOW),
+        ("d2", "POST /{id}/documents: 20-item checklist, none required\n"
+               "sniffed, 10 MB, 40 files, stored before the row", VIOLET),
+        ("d3", "GET /{id}/pims.xlsx: one row per line\n"
+               "education CR 01, installation BQ 01, head, field", BLUE),
+        ("d4", "POST /{id}/cancel {reason}\nthe lead can be forwarded again", GREY),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(side):
+        els = node(eid, 620, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid], dashed=True)
+        prev = eid
+    e += note("nRed1", 1240, 0,
+              "THE STATE CO-ORDINATOR HAS NO leads.edit\n\n"
+              "It forwards leads in its state. The definer locks the\n"
+              "lead itself and reads the state code itself:\n"
+              "lead_state_code() gates on leads.create and refused\n"
+              "the co-ordinator (found by the tests).", w=420, colour=RED)
+    e += note("nRed2", 1240, 260,
+              "CLOSURE READS THE LATEST VALUE PER FIELD\n\n"
+              "Across every entry, newest first. Null clears a field:\n"
+              "a stage-16 amount cleared back out is owed no date.\n"
+              "total_fp_amt has no pair and never blocks closure.", w=420, colour=RED)
+    e += note("nRed3", 1240, 520,
+              "A VIEWER'S UPLOAD NEVER REACHES STORAGE\n\n"
+              "The route gate is subsidy.view. The service checks\n"
+              "create-or-edit before the put, then the lock re-checks.", w=420, colour=RED)
+    e += note("nYellow1", 1240, 780,
+              "Not yet: the printed GGRC documents (FS-009a, needs R2),\n"
+              "admin edits to stages and the checklist, required\n"
+              "documents, dealer applications (GAP-170 to GAP-178).", w=420, colour=YELLOW)
+    write("17-subsidy-applications", e)
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
     f_approval(); f_subsidy(); f_outbox(); f_money(); f_pricing()
     f_quotation(); f_order(); f_auth(); f_admin(); f_tasks(); f_complaints(); f_bell_and_messages()
+    f_subsidy_applications()
     print(f"\nwrote to {OUT}")

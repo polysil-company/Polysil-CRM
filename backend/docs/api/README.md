@@ -24,6 +24,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Public | 6 | [`public.md`](public.md) |
 | Quotations | 13 | [`quotations.md`](quotations.md) |
 | Subsidy | 4 | [`subsidy.md`](subsidy.md) |
+| Subsidy Applications | 13 | [`subsidy-applications.md`](subsidy-applications.md) |
 | Tasks | 13 | [`tasks.md`](tasks.md) |
 | Territories | 4 | [`territories.md`](territories.md) |
 | Users | 9 | [`users.md`](users.md) |

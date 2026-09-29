@@ -26,10 +26,14 @@ from argon2 import PasswordHasher
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.authz.predicate import Caller
+from api.schemas import subsidy_applications as sch
 from api.schemas.subsidy import CalculateRequest, CalculateResponse
 from api.services import subsidy_applications as service
 from api.services.clock import today_ist
 from api.storage import UnconfiguredStorage
+from tests.api import test_complaints as complaints
+from tests.api import test_order_concurrency as conc
 from tests.api import test_order_endpoints as endpoints
 from tests.api.conftest import PASSWORD, V1, _key, _login
 from tests.domain.subsidy_masters import needs_samples
@@ -163,7 +167,7 @@ def _calc(o: Office, system: str = "drip") -> dict[str, Any]:
     return {"system_type": system, "installation_rate_per_ha": "2000",
             "crops": [{"crop": "Cotton", "area": "1.5", "lateral_spacing": "1.2",
                        "lines": [{"description": "16 mm lateral", "uom": "m", "rate": "12.50",
-                                  "qty": "100", "product_id": o.shop.product}]},
+                                  "qty": "100", "product_id": o.shop.product.upper()}]},
                       {"crop": "Castor", "area": "0.75", "lateral_spacing": "1.2", "lines": []}],
             "head_lines": [{"description": "Screen filter", "uom": "No", "rate": "3500", "qty": "1"}]}
 
@@ -363,6 +367,8 @@ async def test_stage_values_are_checked_field_by_field(
         ("farmer_share", {"farmer_share_amt": "-1"}, "values.farmer_share_amt"),
         ("farmer_share", {"farmer_share_amt": "NaN"}, "values.farmer_share_amt"),
         ("farmer_share", {"farmer_share_amt": "lots"}, "values.farmer_share_amt"),
+        ("farmer_share", {"farmer_share_amt": "1000000000000"}, "values.farmer_share_amt"),
+        ("farmer_share", {"farmer_share_amt": "1e30"}, "values.farmer_share_amt"),
         ("tr_pending", {"tpia_name": "x" * 501}, "values.tpia_name"),
         ("no_such_stage", {}, "stage_code"),
     ]
@@ -374,7 +380,10 @@ async def test_stage_values_are_checked_field_by_field(
     assert r.status_code == 422 and "occurred_on" in _fields(r), r.text
     entries = (await client.get(f"{APPS}/{app['id']}/stages", headers=fo)).json()["data"]
     assert len(entries) == 1, "no refusal wrote an entry"
-    r = await _record(client, fo, app["id"], "farmer_share", values={"farmer_share_amt": 17500.25, "supply": None})
+    r = await _record(client, fo, app["id"], "farmer_share", values={"farmer_share_amt": "999999999999.99"})
+    assert r.status_code == 201, "the widest amount the column holds"
+    r = await _record(client, fo, app["id"], "farmer_share", remark="Corrected",
+                      values={"farmer_share_amt": 17500.25, "supply": None})
     assert r.status_code == 201, r.text
     entries = (await client.get(f"{APPS}/{app['id']}/stages", headers=fo)).json()["data"]
     assert entries[-1]["values"] == {"farmer_share_amt": "17500.25", "supply": None}
@@ -399,6 +408,17 @@ async def test_the_registration_number_and_the_inward_date_follow_the_latest_ent
     assert r.json()["data"]["reg_no"] == "GGRC/24/002"
     page = (await client.get(APPS, headers=fo, params={"q": "GGRC/24/002"})).json()["data"]
     assert [a["id"] for a in page] == [app["id"]]
+    # null or blank withdraws it (review F-2)
+    r = await _record(client, fo, app["id"], "application_in_process", days_ago=1, remark="Withdrawn",
+                      values={"reg_no": None})
+    assert r.json()["data"]["reg_no"] is None, r.text
+    await _record(client, fo, app["id"], "application_in_process", days_ago=1, remark="Again",
+                  values={"reg_no": "GGRC/24/003"})
+    r = await _record(client, fo, app["id"], "application_in_process", days_ago=1, remark="Blank",
+                      values={"reg_no": "   "})
+    assert r.json()["data"]["reg_no"] is None, r.text
+    entries = (await client.get(f"{APPS}/{app['id']}/stages", headers=fo)).json()["data"]
+    assert entries[-1]["values"] == {"reg_no": None}, "blank text is stored as cleared"
 
 
 async def test_the_application_closes_when_every_paid_amount_has_its_date(
@@ -428,10 +448,24 @@ async def test_the_application_closes_when_every_paid_amount_has_its_date(
     assert app["id"] in [a["id"] for a in page]
 
 
-async def test_a_cleared_date_reopens_nothing_but_a_cleared_amount_waits(
+async def test_a_cleared_date_holds_closure_back_and_a_cleared_amount_releases_it(
         client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest]) -> None:
-    """Null clears a field: an amount cleared back out is no longer owed a date."""
+    """Null clears a field: a cleared date is owed again, and an amount cleared
+    back out is no longer owed a date."""
     fo = await _as(client, office, "field_officer")
+    app = await _app(client, office, fo)
+    await _record(client, fo, app["id"], "fp_cleared_pay_pending", days_ago=5,
+                  values={"pfms_amt": "10.00", "state_share_amt": "20.00"})
+    await _record(client, fo, app["id"], "payment_received", days_ago=4, values={"pfms_received": _ago(4)})
+    r = await _record(client, fo, app["id"], "payment_received", days_ago=4, remark="Wrong date",
+                      values={"pfms_received": None})
+    assert r.json()["data"]["status"] == "open"
+    r = await _record(client, fo, app["id"], "payment_received", days_ago=3, remark="State share",
+                      values={"state_share_received": _ago(3)})
+    assert r.json()["data"]["status"] == "open", "the cleared PFMS date is owed again"
+    r = await _record(client, fo, app["id"], "payment_received", days_ago=2, remark="PFMS",
+                      values={"pfms_received": _ago(2)})
+    assert r.json()["data"]["status"] == "full_fp_received", r.text
     app = await _app(client, office, fo)
     await _record(client, fo, app["id"], "fp_cleared_pay_pending", days_ago=3,
                   values={"pfms_amt": "100.00", "dept_hold_amt": "5.00"})
@@ -645,3 +679,95 @@ async def test_the_drip_sample_forwards_with_the_engines_own_figures(
     assert app["figures"]["total_cost"] == result["total"]["blocks"]["total_incl_gst"]
     stored = (await client.get(f"{APPS}/{app['id']}/calculation", headers=fo)).json()["data"]
     assert stored == result
+
+
+# ── code review (Fable, on the build) ────────────────────────────────────────
+
+async def test_a_dealer_is_refused_on_every_subsidy_route(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest],
+        sessions: Sessions) -> None:
+    """F-5: no dealer role holds subsidy."""
+    fo = await _as(client, office, "field_officer")
+    app = await _app(client, office, fo)
+    dealer, mobile = await complaints._dealer(client, office.shop, sessions)
+    try:
+        for method, path in (("GET", APPS), ("GET", f"{APPS}/{app['id']}"),
+                             ("GET", f"{APPS}/{app['id']}/stages"), ("GET", f"{APPS}/{app['id']}/pims.xlsx"),
+                             ("GET", f"{APPS}/{app['id']}/documents"), ("GET", f"{V1}/subsidy-stages"),
+                             ("GET", f"{V1}/subsidy-document-types")):
+            r = await client.request(method, path, headers=dealer)
+            assert r.status_code == 403, (path, r.status_code)
+        r = await _record(client, dealer, app["id"], "technical_in_process")
+        assert r.status_code == 403
+        r = await _forward(client, dealer, app["lead"]["id"], office)
+        assert r.status_code == 403
+    finally:
+        await complaints._forget(sessions, mobile)
+
+
+def _caller(o: Office) -> Caller:
+    return Caller(o.shop.ids["field_officer"], o.shop.office, None, scopes={"subsidy": "own"})
+
+
+async def test_two_forwards_of_one_lead_leave_one_application(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest],
+        sessions: Sessions) -> None:
+    """F-3: the second waits on the first's lead lock, then finds the application."""
+    fo = await _as(client, office, "field_officer")
+    lead = await _lead(client, office, fo)
+    body = sch.ApplicationCreate.model_validate(
+        {"lead_id": lead["id"], "category_code": "small_farmer", "calculation": _calc(office)})
+
+    async def work(s: AsyncSession) -> Any:
+        return await service.create(s, _caller(office), body)
+    me = office.shop.ids["field_officer"]
+    got, waited = await conc._race(sessions, (me, work), (me, work))
+    assert waited, "the second forward did not wait: the race was not a race"
+    assert sorted(conc._outcome(g) for g in got) == ["already_forwarded", "ok"], got
+
+
+async def test_two_closing_entries_close_once(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest],
+        sessions: Sessions) -> None:
+    """F-3: the second waits on the application's lock and finds it closed.
+    Without the lock both entries land and the application closes twice."""
+    fo = await _as(client, office, "field_officer")
+    app = await _app(client, office, fo)
+    await _record(client, fo, app["id"], "fp_cleared_pay_pending", days_ago=2, values={"pfms_amt": "10.00"})
+    body = sch.StageRecord.model_validate({"stage_code": "payment_received", "occurred_on": _ago(1),
+                                           "values": {"pfms_received": _ago(1)}, "remark": "Paid"})
+
+    async def work(s: AsyncSession) -> Any:
+        return await service.record(s, app["id"], body)
+    me = office.shop.ids["field_officer"]
+    got, waited = await conc._race(sessions, (me, work), (me, work))
+    assert waited, "the second entry did not wait: the race was not a race"
+    assert sorted(conc._outcome(g) for g in got) == ["ok", "status_changed"], got
+    timeline = (await client.get(f"{V1}/leads/{app['lead']['id']}/timeline", headers=fo)).json()["data"]
+    assert sum(e["kind"] == "subsidy.closed" for e in timeline) == 1
+
+
+async def test_two_uploads_at_the_cap_leave_forty(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest],
+        sessions: Sessions) -> None:
+    """F-3: at 39 files the second upload waits on the first's lock and counts 40."""
+    fo = await _as(client, office, "field_officer")
+    app = await _app(client, office, fo)
+    s = sessions()
+    await s.execute(text(
+        "INSERT INTO subsidy_document (application_id, document_type_id, storage_key, content_type, size_bytes, sha256, uploaded_by) "
+        "SELECT CAST(:a AS uuid), (SELECT id FROM subsidy_document_type ORDER BY sort_order LIMIT 1), 'k' || g, 'image/jpeg', 1, "
+        "md5(g::text) || md5(:a || g::text), CAST(:u AS uuid) FROM generate_series(1, :n) g"),
+        {"a": app["id"], "u": office.shop.ids["field_officer"], "n": service.MAX_DOCUMENTS - 1})
+    await s.commit()
+    await s.close()
+
+    def upload(data: bytes) -> conc.Work:
+        async def work(db: AsyncSession) -> Any:
+            return await service.add_document(db, _caller(office), app["id"], document_type="form_16",
+                                              filename="f.pdf", data=data, storage=_Counting())
+        return work
+    me = office.shop.ids["field_officer"]
+    got, waited = await conc._race(sessions, (me, upload(PDF)), (me, upload(PDF + b"other")))
+    assert waited, "the second upload did not wait: the race was not a race"
+    assert sorted(conc._outcome(g) for g in got) == ["ok", "too_many_documents"], got

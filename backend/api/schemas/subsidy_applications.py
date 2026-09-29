@@ -8,7 +8,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from api.schemas.leads import UUID_RE, UserRef
+from api.schemas.complaints import Ref
+from api.schemas.leads import UUID_RE, TerritoryRef, UserRef
 from api.schemas.subsidy import CalculateRequest
 
 Status = Literal["open", "full_fp_received", "cancelled"]
@@ -47,20 +48,9 @@ class Figures(BaseModel):
                               "the crops.")
 
 
-class Ref(BaseModel):
-    id: str
-    name: str
-
-
-class LeadRef(BaseModel):
+class ApplicationLeadRef(BaseModel):
     id: str
     inquiry_no: str
-
-
-class TerritoryRef(BaseModel):
-    id: str
-    name: str
-    level: str
 
 
 class DocumentCount(BaseModel):
@@ -74,7 +64,7 @@ class Ageing(BaseModel):
                                           "the first stage-4 entry's date without it.")
 
 
-class Cancellation(BaseModel):
+class ApplicationCancellation(BaseModel):
     reason: str
 
 
@@ -88,7 +78,7 @@ class Application(BaseModel):
     scheme: str
     system_type: str
     category: Category
-    lead: LeadRef
+    lead: ApplicationLeadRef
     farmer_name: str
     mobile: str
     village: str | None
@@ -104,16 +94,16 @@ class Application(BaseModel):
     ageing: Ageing
     full_fp_received_on: str | None
     created_at: str
-    cancellation: Cancellation | None
+    cancellation: ApplicationCancellation | None
 
 
-class PageMeta(BaseModel):
+class ApplicationPageMeta(BaseModel):
     next_cursor: str | None
 
 
 class ApplicationPage(BaseModel):
     data: list[Application]
-    meta: PageMeta
+    meta: ApplicationPageMeta
 
 
 class FieldDef(BaseModel):

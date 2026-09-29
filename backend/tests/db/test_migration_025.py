@@ -179,6 +179,8 @@ async def test_a_bad_value_writes_no_entry(db: AsyncSession) -> None:
     for stage, values, state in (("technical_in_process", {"tech_received": "not a date"}, "SAPFV"),
                                  ("farmer_share", {"farmer_share_amt": "1.001"}, "SAPFV"),
                                  ("farmer_share", {"farmer_share_amt": "-5"}, "SAPFV"),
+                                 ("farmer_share", {"farmer_share_amt": "NaN"}, "SAPFV"),
+                                 ("farmer_share", {"farmer_share_amt": "10000000000000"}, "SAPFV"),
                                  ("farmer_share", {"tech_received": "2020-01-01"}, "SAPFK")):
         message = await m13._refused(db, sql, {"a": app, "s": stage, "v": json.dumps(values)}, state)
         assert next(iter(values)) in message
@@ -209,3 +211,25 @@ async def test_a_document_is_the_callers_and_never_on_a_cancelled_application(db
     await m13._refused(db, _DOC, {"a": app, "h": "d" * 64, "u": w.officer}, "42501")
     status, files = (await db.execute(text("SELECT * FROM subsidy_document_lock(CAST(:a AS uuid))"), {"a": app})).one()
     assert (status, files) == ("cancelled", 1)
+
+
+# ── code review (Fable, on the build) ────────────────────────────────────────
+
+async def test_the_table_refuses_a_nan_amount(db: AsyncSession) -> None:
+    """F-4: numeric NaN sorts above every number, so `>= 0` alone admits it."""
+    w = await _world(db)
+    app = await _create(db, await _lead(db, w, w.officer), w.officer)
+    entry = (await db.execute(text("SELECT id FROM subsidy_stage_entry WHERE application_id = CAST(:a AS uuid)"),
+                              {"a": app})).scalar_one()
+    await m13._refused(db, "INSERT INTO subsidy_stage_value (entry_id, field_key, value_amount) "
+                           "VALUES (CAST(:e AS uuid), 'pfms_amt', 'NaN')", {"e": str(entry)}, "23514")
+
+
+async def test_a_field_key_is_unique_across_its_scheme(db: AsyncSession) -> None:
+    """F-7: values and closure key on field_key across all of an application's entries."""
+    await m13._refused(db, "INSERT INTO subsidy_stage_field (scheme_id, stage_def_id, field_key, label, type) "
+                           "SELECT d.scheme_id, d.id, 'pfms_amt', 'Again', 'amount' FROM subsidy_stage_def d "
+                           "WHERE d.code = 'farmer_share'", {}, "23505")
+    await m13._refused(db, "INSERT INTO subsidy_stage_field (scheme_id, stage_def_id, field_key, label, type) "
+                           "SELECT gen_random_uuid(), d.id, 'new_key', 'Elsewhere', 'date' FROM subsidy_stage_def d "
+                           "WHERE d.code = 'farmer_share'", {}, "23503")

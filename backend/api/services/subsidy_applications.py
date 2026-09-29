@@ -42,6 +42,7 @@ from api.storage import Storage
 log = structlog.get_logger(__name__)
 
 MAX_DOCUMENTS = 40          # edge case 19; the checklist has 20 items
+MAX_AMOUNT = Decimal("1e12")  # numeric(14,2) holds twelve digits before the point
 _LIMIT = 100
 _MONEY = Decimal("0.01")
 
@@ -128,6 +129,9 @@ async def create(db: AsyncSession, caller: Caller, body: sch.ApplicationCreate) 
         if state in _CREATE_ERRORS:
             code, why = _CREATE_ERRORS[state]
             raise ValidationFailed(code=code, fields={"lead_id": why}) from exc
+        if state == "23505":  # the partial unique index, behind the lead lock (review F-3)
+            code, why = _CREATE_ERRORS["SAPDU"]
+            raise ValidationFailed(code=code, fields={"lead_id": why}) from exc
         if state == "42501":
             raise ForbiddenError("You may not start subsidy applications.") from exc
         raise
@@ -168,7 +172,7 @@ def _to_app(r: Any, names: people.Names) -> sch.Application:
                                    since=r.current_since.isoformat()),
         scheme=r.scheme_code, system_type=r.system_type,
         category=sch.Category(code=r.category_code, name=r.category_name, pct=_dec(r.category_pct) or "0"),
-        lead=sch.LeadRef(id=str(r.lead_id), inquiry_no=r.inquiry_no or ""),
+        lead=sch.ApplicationLeadRef(id=str(r.lead_id), inquiry_no=r.inquiry_no or ""),
         farmer_name=r.farmer_name, mobile=r.mobile, village=r.village, survey_no=r.survey_no,
         territory=sch.TerritoryRef(id=str(r.territory_id), name=r.territory_name, level=r.territory_level),
         partner=sch.Ref(id=str(r.partner_id), name=r.partner_name or "") if r.partner_id else None,
@@ -181,7 +185,7 @@ def _to_app(r: Any, names: people.Names) -> sch.Application:
                           days_since_inward=(today - r.inward_on).days if r.inward_on else None),
         full_fp_received_on=r.full_fp_received_on.isoformat() if r.full_fp_received_on else None,
         created_at=r.created_at.isoformat(),
-        cancellation=sch.Cancellation(reason=r.cancel_reason) if r.cancel_reason else None)
+        cancellation=sch.ApplicationCancellation(reason=r.cancel_reason) if r.cancel_reason else None)
 
 
 async def get(db: AsyncSession, app_id: str) -> sch.Application:
@@ -219,7 +223,7 @@ async def list_applications(db: AsyncSession, *, status: str | None = None, stag
         next_cursor = _encode_cursor(rows[-1].created_at, str(rows[-1].id))
     names = await people.resolve_ids(db, {str(r.owner_user_id) for r in rows if r.owner_user_id})
     return sch.ApplicationPage(data=[_to_app(r, names) for r in rows],
-                               meta=sch.PageMeta(next_cursor=next_cursor))
+                               meta=sch.ApplicationPageMeta(next_cursor=next_cursor))
 
 
 async def calculation(db: AsyncSession, app_id: str) -> dict[str, Any]:
@@ -289,12 +293,14 @@ def _check_value(kind: str, key: str, value: Any) -> None:
         if day > today_ist():
             raise ValidationFailed(fields={f"values.{key}": "not after today"})
     elif kind == "amount":
+        # the quantize raises on a huge value, so it sits in the try (review F-1)
         try:
             amt = Decimal(raw)
+            ok = amt.is_finite() and 0 <= amt < MAX_AMOUNT and amt == amt.quantize(_MONEY)
         except InvalidOperation as exc:
             raise ValidationFailed(fields={f"values.{key}": "a decimal amount"}) from exc
-        if not amt.is_finite() or amt < 0 or amt != amt.quantize(_MONEY):
-            raise ValidationFailed(fields={f"values.{key}": "an amount, 0 or more, two decimals at most"})
+        if not ok:
+            raise ValidationFailed(fields={f"values.{key}": "an amount, 0 or more, under 1,00,00,00,00,000, two decimals at most"})
     elif len(raw) > 500 or "\x00" in raw:
         raise ValidationFailed(fields={f"values.{key}": "500 characters at most"})
 
@@ -318,7 +324,8 @@ async def record(db: AsyncSession, app_id: str, body: sch.StageRecord) -> sch.Ap
         if key not in fields:
             raise ValidationFailed(fields={f"values.{key}": "not a field of this stage"})
         _check_value(fields[key], key, value)
-    values = {k: (None if v is None else str(v).strip()) for k, v in body.values.items()}
+    # blank text is a cleared field, as null is (review F-2)
+    values = {k: (None if v is None or str(v).strip() == "" else str(v).strip()) for k, v in body.values.items()}
     try:
         async with db.begin_nested():
             await db.execute(text(
@@ -515,8 +522,8 @@ async def pims_rows(db: AsyncSession, app_id: str) -> list[tuple[Any, ...]]:
         raise NotFoundError("No such application.")
     req = row.calculation_request if isinstance(row.calculation_request, dict) else json.loads(row.calculation_request)
     calc = row.calculation if isinstance(row.calculation, dict) else json.loads(row.calculation)
-    ids = {line["product_id"] for c in req.get("crops", []) for line in c.get("lines", []) if line.get("product_id")}
-    ids |= {line["product_id"] for line in req.get("head_lines", []) if line.get("product_id")}
+    ids = {line["product_id"].lower() for c in req.get("crops", []) for line in c.get("lines", []) if line.get("product_id")}
+    ids |= {line["product_id"].lower() for line in req.get("head_lines", []) if line.get("product_id")}
     codes: dict[str, str] = {}
     if ids:
         codes = {str(r.id): r.item_code or "" for r in (await db.execute(text(
@@ -525,7 +532,7 @@ async def pims_rows(db: AsyncSession, app_id: str) -> list[tuple[Any, ...]]:
 
     def line_row(cost_type: str, crop: str, line: dict[str, Any], size: str = "") -> tuple[Any, ...]:
         rate, qty = Decimal(str(line["rate"])), Decimal(str(line["qty"]))
-        return (cost_type, crop, codes.get(line.get("product_id") or "", ""), line["description"], size,
+        return (cost_type, crop, codes.get((line.get("product_id") or "").lower(), ""), line["description"], size,
                 line["uom"], rate, qty, rate * qty, "")
 
     rows: list[tuple[Any, ...]] = []
