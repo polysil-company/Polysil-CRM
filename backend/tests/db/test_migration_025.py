@@ -230,6 +230,44 @@ async def test_a_field_key_is_unique_across_its_scheme(db: AsyncSession) -> None
     await m13._refused(db, "INSERT INTO subsidy_stage_field (scheme_id, stage_def_id, field_key, label, type) "
                            "SELECT d.scheme_id, d.id, 'pfms_amt', 'Again', 'amount' FROM subsidy_stage_def d "
                            "WHERE d.code = 'farmer_share'", {}, "23505")
+    # a real second scheme, so only the composite key can refuse it
+    other = (await db.execute(text("INSERT INTO subsidy_scheme (code, name) VALUES (:c, 'Other') RETURNING id"),
+                              {"c": "T" + uuid.uuid4().hex[:8]})).scalar_one()
     await m13._refused(db, "INSERT INTO subsidy_stage_field (scheme_id, stage_def_id, field_key, label, type) "
-                           "SELECT gen_random_uuid(), d.id, 'new_key', 'Elsewhere', 'date' FROM subsidy_stage_def d "
-                           "WHERE d.code = 'farmer_share'", {}, "23503")
+                           "SELECT CAST(:s AS uuid), d.id, 'new_key', 'Elsewhere', 'date' FROM subsidy_stage_def d "
+                           "JOIN subsidy_scheme g ON g.id = d.scheme_id AND g.code = 'GGRC' "
+                           "WHERE d.code = 'farmer_share'", {"s": str(other)}, "23503")
+
+
+# ── OpenCodeReview (PR 33) ───────────────────────────────────────────────────
+
+async def test_a_write_moves_updated_at_and_is_audited(db: AsyncSession) -> None:
+    w = await _world(db)
+    app = await _create(db, await _lead(db, w, w.officer), w.officer)
+    await db.execute(text("UPDATE subsidy_application SET created_at = created_at - interval '1 day', "
+                          "updated_at = updated_at - interval '1 day' WHERE id = CAST(:a AS uuid)"), {"a": app})
+    await m13._as(db, w.officer)
+    await db.execute(text("SELECT subsidy_stage_record(CAST(:a AS uuid), 'technical_in_process', current_date, '{}', NULL)"),
+                     {"a": app})
+    await m13._as_owner(db)
+    moved = (await db.execute(text("SELECT updated_at > created_at + interval '1 hour' FROM subsidy_application "
+                                   "WHERE id = CAST(:a AS uuid)"), {"a": app})).scalar_one()
+    assert moved, "set_updated_at on the application"
+    actions = (await db.execute(text("SELECT array_agg(DISTINCT action ORDER BY action) FROM audit_log "
+                                     "WHERE table_name = 'subsidy_application' AND row_id = CAST(:a AS uuid)"),
+                                {"a": app})).scalar_one()
+    assert actions == ["INSERT", "UPDATE"], actions
+
+
+async def test_a_direct_document_update_only_soft_deletes_as_the_caller(db: AsyncSession) -> None:
+    w = await _world(db)
+    app = await _create(db, await _lead(db, w, w.officer), w.officer)
+    await m13._as(db, w.officer)
+    doc = str((await db.execute(text(_DOC + " RETURNING id"), {"a": app, "h": "e" * 64, "u": w.officer})).scalar_one())
+    await m13._refused(db, "UPDATE subsidy_document SET deleted_at = now(), deleted_by = CAST(:u AS uuid) "
+                           "WHERE id = CAST(:d AS uuid)", {"d": doc, "u": w.officer_b}, "42501")
+    await db.execute(text("UPDATE subsidy_document SET deleted_at = now(), deleted_by = CAST(:u AS uuid) "
+                          "WHERE id = CAST(:d AS uuid)"), {"d": doc, "u": w.officer})
+    restored = (await db.execute(text("UPDATE subsidy_document SET deleted_at = NULL, deleted_by = NULL "
+                                      "WHERE id = CAST(:d AS uuid)"), {"d": doc})).rowcount
+    assert restored == 0, "a deleted document is not restored by a direct update"

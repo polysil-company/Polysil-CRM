@@ -96,12 +96,14 @@ async def office(shop: Shop, sessions: Sessions) -> AsyncIterator[Office]:
             "DELETE FROM idempotency_record WHERE user_id = ANY(CAST(:people AS uuid[]))",
             "DELETE FROM activity_event WHERE actor_id = ANY(CAST(:people AS uuid[]))",
             "DELETE FROM session WHERE user_id = ANY(CAST(:people AS uuid[]))",
+            "DELETE FROM login_attempt WHERE identifier = ANY(CAST(:emails AS citext[]))",
             "DELETE FROM user_territory WHERE user_id = ANY(CAST(:people AS uuid[]))",
             "DELETE FROM app_user WHERE id = ANY(CAST(:people AS uuid[]))",
             "UPDATE product SET item_code = NULL WHERE id = CAST(:p AS uuid)",
         ):
             await c.execute(text(stmt), {"d": shop.district, "c": shop.code, "people": people,
-                                         "p": shop.product})
+                                         "p": shop.product,
+                                         "emails": [f"sa_sc_{tag}@polysil.in", f"sa_stranger_{tag}@polysil.in"]})
         await c.commit()
         await c.close()
 
@@ -234,6 +236,12 @@ def _ago(days: int) -> str:
     return (today_ist() - dt.timedelta(days=days)).isoformat()
 
 
+def _days(iso: str) -> int:
+    """Days from `iso` to today, read after the response: a run that crosses IST
+    midnight during a request still agrees with the server."""
+    return (today_ist() - dt.date.fromisoformat(iso)).days
+
+
 # ── forwarding a lead (rules 1 to 4) ─────────────────────────────────────────
 
 async def test_forwarding_a_lead_wins_it_and_stores_the_category_figures(
@@ -245,13 +253,14 @@ async def test_forwarding_a_lead_wins_it_and_stores_the_category_figures(
     app = r.json()["data"]
     assert app["application_no"].startswith(f"SA/{office.shop.code}/"), app["application_no"]
     assert app["status"] == "open" and app["current_stage"]["seq"] == 4
-    assert app["current_stage"]["since"] == today_ist().isoformat()
+    assert _days(app["current_stage"]["since"]) == 0
     # the per-crop figures of the chosen category, summed (review B-6)
     assert app["figures"] == {"total_cost": "95000.75", "subsidy": "70000.50", "farmer_share": "17500.25"}
     assert app["category"]["code"] == "small_farmer" and app["total_area"] == "2.250"
     assert app["farmer_name"] == "Rameshbhai Patel" and app["survey_no"] == "112/2"
     assert app["lead"]["id"] == lead["id"] and app["owner"]["id"] == office.shop.ids["field_officer"]
-    assert app["reg_no"] is None and app["ageing"] == {"days_in_stage": 0, "days_since_inward": 0}
+    since = app["current_stage"]["since"]
+    assert app["reg_no"] is None and app["ageing"] == {"days_in_stage": _days(since), "days_since_inward": _days(since)}
     assert app["documents"]["uploaded"] == 0 and app["documents"]["listed"] >= 20
 
     r = await client.get(f"{V1}/leads/{lead['id']}", headers=fo)
@@ -341,7 +350,8 @@ async def test_stages_move_forward_freely_and_back_only_with_a_remark(
                       values={"tech_received": _ago(3)})
     assert r.status_code == 201, r.text
     assert r.json()["data"]["current_stage"]["code"] == "technical_in_process"
-    assert r.json()["data"]["ageing"]["days_in_stage"] == 3
+    data = r.json()["data"]
+    assert data["ageing"]["days_in_stage"] == _days(data["current_stage"]["since"]) >= 3
     r = await _record(client, fo, app["id"], "application_in_process", days_ago=1)
     assert r.status_code == 422 and "remark" in _fields(r), r.text
     r = await _record(client, fo, app["id"], "application_in_process", days_ago=1, remark="   ")
@@ -383,7 +393,7 @@ async def test_stage_values_are_checked_field_by_field(
     r = await _record(client, fo, app["id"], "farmer_share", values={"farmer_share_amt": "999999999999.99"})
     assert r.status_code == 201, "the widest amount the column holds"
     r = await _record(client, fo, app["id"], "farmer_share", remark="Corrected",
-                      values={"farmer_share_amt": 17500.25, "supply": None})
+                      values={"farmer_share_amt": "17500.25", "supply": None})
     assert r.status_code == 201, r.text
     entries = (await client.get(f"{APPS}/{app['id']}/stages", headers=fo)).json()["data"]
     assert entries[-1]["values"] == {"farmer_share_amt": "17500.25", "supply": None}
@@ -393,16 +403,20 @@ async def test_the_registration_number_and_the_inward_date_follow_the_latest_ent
         client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest]) -> None:
     fo = await _as(client, office, "field_officer")
     app = await _app(client, office, fo)
+    inward = _ago(10)
     r = await _record(client, fo, app["id"], "application_in_process", days_ago=10, remark="Filed",
-                      values={"reg_no": " GGRC/24/001 ", "app_inward": _ago(10)})
+                      values={"reg_no": " GGRC/24/001 ", "app_inward": inward})
     assert r.status_code == 201, r.text
-    assert r.json()["data"]["reg_no"] == "GGRC/24/001"
-    assert r.json()["data"]["ageing"] == {"days_in_stage": 10, "days_since_inward": 10}
-    await _record(client, fo, app["id"], "technical_in_process", days_ago=9)
-    r = await _record(client, fo, app["id"], "application_in_process", days_ago=8, remark="Re-filed",
-                      values={"reg_no": "GGRC/24/002", "app_inward": _ago(8)})
     data = r.json()["data"]
-    assert data["reg_no"] == "GGRC/24/002" and data["ageing"] == {"days_in_stage": 8, "days_since_inward": 8}
+    assert data["reg_no"] == "GGRC/24/001"
+    assert data["ageing"] == {"days_in_stage": _days(data["current_stage"]["since"]), "days_since_inward": _days(inward)}
+    await _record(client, fo, app["id"], "technical_in_process", days_ago=9)
+    inward = _ago(8)
+    r = await _record(client, fo, app["id"], "application_in_process", days_ago=8, remark="Re-filed",
+                      values={"reg_no": "GGRC/24/002", "app_inward": inward})
+    data = r.json()["data"]
+    assert data["reg_no"] == "GGRC/24/002"
+    assert data["ageing"] == {"days_in_stage": _days(data["current_stage"]["since"]), "days_since_inward": _days(inward)}
     # a later entry without the number keeps it
     r = await _record(client, fo, app["id"], "technical_in_process", days_ago=2)
     assert r.json()["data"]["reg_no"] == "GGRC/24/002"
@@ -721,8 +735,8 @@ async def test_two_forwards_of_one_lead_leave_one_application(
     async def work(s: AsyncSession) -> Any:
         return await service.create(s, _caller(office), body)
     me = office.shop.ids["field_officer"]
-    got, waited = await conc._race(sessions, (me, work), (me, work))
-    assert waited, "the second forward did not wait: the race was not a race"
+    got, waited = await conc._race(sessions, (me, work), (me, work), on="lead")
+    assert waited, "the second forward did not queue on the lead's row lock"
     assert sorted(conc._outcome(g) for g in got) == ["already_forwarded", "ok"], got
 
 
@@ -771,3 +785,95 @@ async def test_two_uploads_at_the_cap_leave_forty(
     got, waited = await conc._race(sessions, (me, upload(PDF)), (me, upload(PDF + b"other")))
     assert waited, "the second upload did not wait: the race was not a race"
     assert sorted(conc._outcome(g) for g in got) == ["ok", "too_many_documents"], got
+
+
+# ── OpenCodeReview (PR 33) ───────────────────────────────────────────────────
+
+async def test_stage_values_are_strings_only(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest]) -> None:
+    """A JSON number would be a float for money; lax mode read `true` as 1."""
+    fo = await _as(client, office, "field_officer")
+    app = await _app(client, office, fo)
+    for value in (17500.25, 100, True):
+        r = await _record(client, fo, app["id"], "farmer_share", values={"farmer_share_amt": value})
+        assert r.status_code == 422, (value, r.text)
+
+
+async def test_a_blank_date_or_amount_clears_the_field(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest]) -> None:
+    """An emptied date input sends an empty string."""
+    fo = await _as(client, office, "field_officer")
+    app = await _app(client, office, fo)
+    r = await _record(client, fo, app["id"], "farmer_share", values={"supply": "", "farmer_share_amt": " "})
+    assert r.status_code == 201, r.text
+    entries = (await client.get(f"{APPS}/{app['id']}/stages", headers=fo)).json()["data"]
+    assert entries[-1]["values"] == {"supply": None, "farmer_share_amt": None}
+
+
+async def test_values_on_a_hidden_application_or_an_unknown_stage_name_the_right_field(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest]) -> None:
+    fo = await _as(client, office, "field_officer")
+    app = await _app(client, office, fo)
+    stranger = await _as(client, office, "stranger")
+    r = await _record(client, stranger, app["id"], "technical_in_process", values={"tech_received": _ago(1)})
+    assert r.status_code == 404, r.text
+    r = await _record(client, fo, app["id"], "no_such_stage", values={"tech_received": _ago(1)})
+    assert r.status_code == 422 and _fields(r) == {"stage_code": "not a stage of this scheme"}, r.text
+
+
+async def test_a_reused_application_number_is_a_fault_not_already_forwarded(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest],
+        sessions: Sessions) -> None:
+    """Only the one-live-application index means `already_forwarded`."""
+    from sqlalchemy.exc import DBAPIError
+
+    fo = await _as(client, office, "field_officer")
+    await _app(client, office, fo)
+    s = sessions()
+    await s.execute(text("UPDATE subsidy_app_counter SET last_value = 0 WHERE state_code = :c"),
+                    {"c": office.shop.code})
+    await s.commit()
+    await s.close()
+    lead = await _lead(client, office, fo)
+    try:
+        r = await _forward(client, fo, lead["id"], office)
+    except DBAPIError as exc:  # the test client re-raises what the app does not map
+        assert getattr(exc.orig, "sqlstate", None) == "23505", exc
+    else:
+        assert r.status_code == 500, r.text
+
+
+def test_a_definer_message_loses_any_class_prefix() -> None:
+    """SQLAlchemy 2.0's asyncpg adapter prefixes the exception class."""
+    from sqlalchemy.exc import DBAPIError
+
+    for raw in ("tech_received", "<class 'asyncpg.exceptions.RaiseError'>: tech_received"):
+        assert service._message(DBAPIError("SELECT 1", {}, Exception(raw))) == "tech_received"
+
+
+def test_the_upload_route_documents_its_refusals() -> None:
+    from api.main import app as api
+
+    op = api.openapi()["paths"]["/api/v1/subsidy-applications/{app_id}/documents"]["post"]
+    assert {"403", "409", "413", "422", "503"} <= set(op["responses"])
+    for code in ("too_many_documents", "attachment_type", "not on the checklist"):
+        assert code in op["description"], code
+    link = api.openapi()["paths"]["/api/v1/subsidy-applications/{app_id}/documents/{doc_id}"]["get"]
+    assert "503" in link["responses"]
+
+
+def test_the_violated_constraint_is_read_from_the_driver_error_or_its_cause() -> None:
+    """asyncpg's error sits under the adapter's as `__cause__`; psycopg's under `diag`."""
+    from types import SimpleNamespace
+
+    from sqlalchemy.exc import DBAPIError
+
+    cause = Exception("duplicate")
+    cause.constraint_name = "uq_subsidy_application_live_lead"  # type: ignore[attr-defined]
+    adapted = Exception("wrapped")
+    adapted.__cause__ = cause
+    assert service._constraint(DBAPIError("x", {}, adapted)) == "uq_subsidy_application_live_lead"
+    psycopg_like = Exception("dup")
+    psycopg_like.diag = SimpleNamespace(constraint_name="uq_subsidy_document_file")  # type: ignore[attr-defined]
+    assert service._constraint(DBAPIError("x", {}, psycopg_like)) == "uq_subsidy_document_file"
+    assert service._constraint(DBAPIError("x", {}, Exception("other"))) is None

@@ -52,7 +52,18 @@ def _state(exc: DBAPIError) -> str | None:
 
 
 def _message(exc: DBAPIError) -> str:
-    return str(getattr(exc.orig, "args", [""])[0] or exc.orig).split("\n")[0]
+    """The RAISE text alone: some driver adapters prefix the exception class."""
+    text_ = str(exc.orig).split("\n")[0]
+    return text_.split(": ", 1)[-1] if ": " in text_ else text_
+
+
+def _constraint(exc: DBAPIError) -> str | None:
+    """The violated constraint's name, from the driver error or its cause."""
+    for err in (exc.orig, getattr(exc.orig, "__cause__", None)):
+        name = getattr(err, "constraint_name", None) or getattr(getattr(err, "diag", None), "constraint_name", None)
+        if name:
+            return str(name)
+    return None
 
 
 def _dec(v: Any) -> str | None:
@@ -129,7 +140,9 @@ async def create(db: AsyncSession, caller: Caller, body: sch.ApplicationCreate) 
         if state in _CREATE_ERRORS:
             code, why = _CREATE_ERRORS[state]
             raise ValidationFailed(code=code, fields={"lead_id": why}) from exc
-        if state == "23505":  # the partial unique index, behind the lead lock (review F-3)
+        # the partial unique index, behind the lead lock (review F-3). Any other
+        # unique clash, a reused application number, is a fault and stays a 500
+        if state == "23505" and _constraint(exc) == "uq_subsidy_application_live_lead":
             code, why = _CREATE_ERRORS["SAPDU"]
             raise ValidationFailed(code=code, fields={"lead_id": why}) from exc
         if state == "42501":
@@ -282,9 +295,9 @@ async def entries(db: AsyncSession, app_id: str) -> list[sch.Entry]:
 
 def _check_value(kind: str, key: str, value: Any) -> None:
     """The per-field 422 before the definer's generic one (review R-7)."""
-    if value is None:
+    raw = "" if value is None else str(value).strip()
+    if raw == "":  # null or blank clears a field of any type
         return
-    raw = str(value).strip()
     if kind == "date":
         try:
             day = dt.date.fromisoformat(raw)
@@ -315,11 +328,19 @@ _STAGE_ERRORS = {
 async def record(db: AsyncSession, app_id: str, body: sch.StageRecord) -> sch.Application:
     if body.occurred_on > today_ist():
         raise ValidationFailed(fields={"occurred_on": "not after today"})
+    # the application and the stage first, so a hidden application is a 404 and not
+    # "not a field of this stage" (PR 33 review)
+    stage = (await db.execute(text(
+        "SELECT a.id AS app, d.id AS stage FROM subsidy_application a "
+        "LEFT JOIN subsidy_stage_def d ON d.scheme_id = a.scheme_id AND d.code = :s AND d.is_active "
+        "WHERE a.id = CAST(:a AS uuid)"), {"a": app_id, "s": body.stage_code})).one_or_none()
+    if stage is None:
+        raise NotFoundError("No such application.")
+    if stage.stage is None:
+        raise ValidationFailed(fields={"stage_code": "not a stage of this scheme"})
     fields = {r.field_key: r.type for r in (await db.execute(text(
-        "SELECT f.field_key, f.type::text AS type FROM subsidy_stage_field f "
-        "JOIN subsidy_stage_def d ON d.id = f.stage_def_id "
-        "JOIN subsidy_application a ON a.scheme_id = d.scheme_id AND a.id = CAST(:a AS uuid) "
-        "WHERE d.code = :s AND f.is_active"), {"a": app_id, "s": body.stage_code})).all()}
+        "SELECT field_key, type::text AS type FROM subsidy_stage_field "
+        "WHERE stage_def_id = CAST(:d AS uuid) AND is_active"), {"d": str(stage.stage)})).all()}
     for key, value in body.values.items():
         if key not in fields:
             raise ValidationFailed(fields={f"values.{key}": "not a field of this stage"})
@@ -473,7 +494,7 @@ async def add_document(db: AsyncSession, caller: Caller, app_id: str, *, documen
                 {"a": app_id, "t": str(dtype), "k": key, "ct": sniffed.content_type, "sz": len(data),
                  "h": digest, "fn": safe, "me": caller.user_id})).scalar_one())
     except DBAPIError as exc:
-        if _state(exc) == "23505":
+        if _state(exc) == "23505" and _constraint(exc) == "uq_subsidy_document_file":
             again = (await db.execute(text(
                 "SELECT id FROM subsidy_document WHERE application_id = CAST(:a AS uuid) AND sha256 = :h "
                 "AND deleted_at IS NULL"), {"a": app_id, "h": digest})).scalar_one()

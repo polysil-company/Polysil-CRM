@@ -195,9 +195,11 @@ HAND_POLICIES: list[tuple[str, str]] = [
     ("subsidy_stage_value", "CREATE POLICY subsidy_stage_value_sel ON subsidy_stage_value FOR SELECT USING (EXISTS (SELECT 1 FROM subsidy_stage_entry e WHERE e.id = entry_id))"),
     ("subsidy_document", "CREATE POLICY subsidy_document_sel ON subsidy_document FOR SELECT USING (EXISTS (SELECT 1 FROM subsidy_application a WHERE a.id = application_id))"),
     ("subsidy_document", "CREATE POLICY subsidy_document_ins ON subsidy_document FOR INSERT WITH CHECK (uploaded_by = (SELECT app_current_user_id()) AND ((SELECT app_has_permission('subsidy', 'create')) OR (SELECT app_has_permission('subsidy', 'edit'))) AND EXISTS (SELECT 1 FROM subsidy_application a WHERE a.id = application_id AND a.status <> 'cancelled'))"),
-    ("subsidy_document", "CREATE POLICY subsidy_document_upd ON subsidy_document FOR UPDATE USING (((SELECT app_has_permission('subsidy', 'create')) OR (SELECT app_has_permission('subsidy', 'edit'))) AND EXISTS (SELECT 1 FROM subsidy_application a WHERE a.id = application_id)) WITH CHECK (EXISTS (SELECT 1 FROM subsidy_application a WHERE a.id = application_id))"),
+    ("subsidy_document", "CREATE POLICY subsidy_document_upd ON subsidy_document FOR UPDATE USING (deleted_at IS NULL AND ((SELECT app_has_permission('subsidy', 'create')) OR (SELECT app_has_permission('subsidy', 'edit'))) AND EXISTS (SELECT 1 FROM subsidy_application a WHERE a.id = application_id)) WITH CHECK (deleted_at IS NOT NULL AND deleted_by = (SELECT app_current_user_id()) AND EXISTS (SELECT 1 FROM subsidy_application a WHERE a.id = application_id))"),
     ("activity_event", "CREATE POLICY activity_event_sel ON activity_event FOR SELECT USING (\n  CASE entity_type\n    WHEN 'app_user' THEN entity_id = (SELECT app_current_user_id()) OR EXISTS (SELECT 1 FROM app_user u WHERE u.id = entity_id)\n    WHEN 'channel_partner' THEN EXISTS (SELECT 1 FROM channel_partner c WHERE c.id = partner_id)\n    WHEN 'lead' THEN EXISTS (SELECT 1 FROM lead c WHERE c.id = lead_id)\n    WHEN 'org_unit' THEN EXISTS (SELECT 1 FROM org_unit c WHERE c.id = entity_id)\n    WHEN 'territory' THEN EXISTS (SELECT 1 FROM territory c WHERE c.id = entity_id)\n    WHEN 'quotation' THEN EXISTS (SELECT 1 FROM quotation c WHERE c.id = entity_id)\n    WHEN 'sales_order' THEN EXISTS (SELECT 1 FROM sales_order c WHERE c.id = entity_id)\n    WHEN 'lead_qr_code' THEN EXISTS (SELECT 1 FROM lead_qr_code c WHERE c.id = entity_id)\n    WHEN 'task' THEN EXISTS (SELECT 1 FROM task c WHERE c.id = entity_id)\n    WHEN 'meeting_minutes' THEN EXISTS (SELECT 1 FROM meeting_minutes c WHERE c.id = entity_id)\n    WHEN 'complaint' THEN EXISTS (SELECT 1 FROM complaint c WHERE c.id = entity_id)\n    WHEN 'subsidy_application' THEN EXISTS (SELECT 1 FROM subsidy_application c WHERE c.id = entity_id)\n    ELSE (SELECT app_is_system())\n  END\n)"),
 ]
+
+TRIGGERED = ('subsidy_application', 'subsidy_stage_def', 'subsidy_stage_field', 'subsidy_document_type')
 
 GRANTS: dict[str, str] = {
     "subsidy_stage_def": "SELECT",
@@ -466,6 +468,13 @@ def upgrade() -> None:
         op.execute(stmt)
     for stmt in PARENT_GUARD:
         op.execute(stmt)
+    # updated_at moves on every write, and the application and its lookups are
+    # audited, as quotations and orders are (PR 33 review)
+    for table in TRIGGERED:
+        op.execute(f"CREATE TRIGGER trg_{table}_updated_at BEFORE UPDATE ON {table} "
+                   "FOR EACH ROW EXECUTE FUNCTION set_updated_at()")
+        op.execute(f"CREATE TRIGGER trg_{table}_audit AFTER INSERT OR UPDATE OR DELETE ON {table} "
+                   "FOR EACH ROW EXECUTE FUNCTION audit_row()")
     for table, stmt in HAND_POLICIES:
         if table == "activity_event":
             op.execute("DROP POLICY activity_event_sel ON activity_event")

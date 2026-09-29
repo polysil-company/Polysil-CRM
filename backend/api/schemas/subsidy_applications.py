@@ -6,7 +6,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, StringConstraints
 
 from api.schemas.complaints import Ref as Ref
 from api.schemas.leads import UUID_RE, UserRef
@@ -132,7 +132,9 @@ class Entry(BaseModel):
     entered_at: str
 
 
-Value = str | int | float | None
+# strings only: a JSON number would be a float on the way in, and lax mode reads
+# `true` as 1 (PR 33 review)
+Value = StrictStr | None
 
 
 class StageRecord(BaseModel):
@@ -141,8 +143,8 @@ class StageRecord(BaseModel):
     stage_code: Annotated[str, Field(min_length=1, max_length=60)]
     occurred_on: dt.date = Field(description="The business date, not after today in India.")
     values: dict[str, Value] = Field(default_factory=dict, description=(
-        "Field key to value: dates as ISO dates, amounts as decimal strings, text. Null "
-        "clears the field."))
+        "Field key to value, every one a string: dates as ISO dates, amounts as decimal "
+        "strings such as \"1250.50\", text. Null or blank clears the field."))
     remark: Annotated[str | None,
                       StringConstraints(strip_whitespace=True, max_length=1000)] = Field(
         default=None, description="Required for a backward or same-stage entry.")

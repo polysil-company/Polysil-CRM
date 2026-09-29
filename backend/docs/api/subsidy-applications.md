@@ -89,7 +89,7 @@ the category's subsidy and farmer share, and moves the lead to won. `422` on
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
-| `409` | `ErrorResponse` | `status_changed`: the application is closed or cancelled. |
+| `409` | `ErrorResponse` | `idempotency_key_reused`: the same key was sent with a different body. |
 | `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
 
 ---
@@ -172,7 +172,7 @@ Withdraw the application, with a reason. The lead can be forwarded again.
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
-| `409` | `ErrorResponse` | `status_changed`: the application is closed or cancelled. |
+| `409` | `ErrorResponse` | `status_changed`: the application is closed or cancelled. `idempotency_key_reused`: the same key was sent with a different body. |
 | `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
 
 ---
@@ -206,8 +206,14 @@ The checklist with the files uploaded against each item.
 **Add Document**
 
 Upload a document against a checklist item: PDF, JPEG, PNG, WebP or HEIC, up
-to 10 MB, judged by content. Up to 40 per application. The same file again
-answers `200` with the one already there. `409` on a cancelled application.
+to 10 MB, judged by content. The same file again answers `200` with the one
+already there. Refusals:
+
+- `422 too_many_documents`: the application has 40 files already;
+- `422 attachment_type`: not one of the allowed types, on `file`;
+- `422` on `file` "empty", or on `document_type` "not on the checklist";
+- `403`: the caller may view applications but not add to them;
+- `409 status_changed`: the application is cancelled.
 
 **Parameters**
 
@@ -222,9 +228,9 @@ answers `200` with the one already there. `409` on a cancelled application.
 |---|---|---|
 | `201` | `Envelope_Document_` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
-| `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
+| `403` | `ErrorResponse` | View only: adding a document needs subsidy create or edit. Hide the upload control. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
-| `409` | `ErrorResponse` | `status_changed`: the application is closed or cancelled. |
+| `409` | `ErrorResponse` | `status_changed`: the application is closed or cancelled. `idempotency_key_reused`: the same key was sent with a different body. |
 | `413` | `ErrorResponse` | Over 10 MB. |
 | `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
 | `503` | `ErrorResponse` | `storage_unavailable`: retry later. |
@@ -236,6 +242,7 @@ answers `200` with the one already there. `409` on a cancelled application.
 **Document Link**
 
 A ten-minute link to the file. Never fetch it with the bearer token.
+`503 storage_unavailable` while file storage is not configured.
 
 **Parameters**
 
@@ -253,6 +260,7 @@ A ten-minute link to the file. Never fetch it with the bearer token.
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
 | `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+| `503` | `ErrorResponse` | `storage_unavailable`: retry later. |
 
 ---
 
@@ -330,7 +338,7 @@ itself once every stage-16 amount has its stage-17 received date. `422` on
 |---|---|---|---|
 | `stage_code` | string | yes |  |
 | `occurred_on` | date | yes | The business date, not after today in India. |
-| `values` | object |  | Field key to value: dates as ISO dates, amounts as decimal strings, text. Null clears the field. |
+| `values` | object |  | Field key to value, every one a string: dates as ISO dates, amounts as decimal strings such as "1250.50", text. Null or blank clears the field. |
 | `remark` | string \| null |  | Required for a backward or same-stage entry. |
 
 **Responses**
@@ -341,7 +349,7 @@ itself once every stage-16 amount has its stage-17 received date. `422` on
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
-| `409` | `ErrorResponse` | `status_changed`: the application is closed or cancelled. |
+| `409` | `ErrorResponse` | `status_changed`: the application is closed or cancelled. `idempotency_key_reused`: the same key was sent with a different body. |
 | `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
 
 ---
@@ -666,7 +674,7 @@ Build "Record stage" from this; the stages are data, not code.
 |---|---|---|---|
 | `stage_code` | string | yes |  |
 | `occurred_on` | date | yes | The business date, not after today in India. |
-| `values` | object |  | Field key to value: dates as ISO dates, amounts as decimal strings, text. Null clears the field. |
+| `values` | object |  | Field key to value, every one a string: dates as ISO dates, amounts as decimal strings such as "1250.50", text. Null or blank clears the field. |
 | `remark` | string \| null |  | Required for a backward or same-stage entry. |
 
 **`StageRef`**

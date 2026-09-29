@@ -65,16 +65,20 @@ def _caller(shop: Shop, role: str) -> Caller:
     return Caller(shop.ids[role], shop.office, None, scopes=_SCOPES)
 
 
-async def _blocked(sessions: Sessions, pid: int) -> bool:
-    """True once the backend `pid` waits on a lock it has not been granted."""
+async def _blocked(sessions: Sessions, pid: int, on: str | None = None) -> bool:
+    """True once the backend `pid` waits on a lock it has not been granted. With
+    `on`, only while it is queued on a row of that table: the waiter holds the
+    row's tuple lock while it waits for the holder's transaction."""
     probe = sessions()
     try:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + BLOCK_TIMEOUT
         while loop.time() < deadline:
             waiting = (await probe.execute(text(
-                "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid = :p AND NOT granted)"),
-                {"p": pid})).scalar_one()
+                "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid = :p AND NOT granted) "
+                "AND (CAST(:on AS text) IS NULL OR EXISTS (SELECT 1 FROM pg_locks WHERE pid = :p "
+                "AND locktype = 'tuple' AND relation = to_regclass(CAST(:on AS text))))"),
+                {"p": pid, "on": on})).scalar_one()
             await probe.rollback()
             if waiting:
                 return True
@@ -324,16 +328,17 @@ async def test_a_step_locked_before_its_order_deadlocks_which_order_first_preven
 # ── one outcome per race ─────────────────────────────────────────────────────
 
 async def _race(sessions: Sessions, first: tuple[str, Work],
-                second: tuple[str, Work]) -> tuple[list[dict[str, Any]], bool]:
+                second: tuple[str, Work],
+                on: str | None = None) -> tuple[list[dict[str, Any]], bool]:
     """`first` runs and holds its locks; `second` starts; `first` commits only
-    once PostgreSQL reports `second` blocked. Returns both outcomes and whether
-    the second really waited."""
+    once PostgreSQL reports `second` blocked (on a row of `on`, when given).
+    Returns both outcomes and whether the second really waited."""
     ready = asyncio.Event()
     second_pid: asyncio.Future[int] = asyncio.get_running_loop().create_future()
     waited: dict[str, bool] = {}
 
     async def hold_until_second_waits() -> None:
-        waited["second"] = await _blocked(sessions, await second_pid)
+        waited["second"] = await _blocked(sessions, await second_pid, on)
 
     got = await asyncio.gather(
         _call(sessions(), first[0], first[1], ready=ready, before_commit=hold_until_second_waits),

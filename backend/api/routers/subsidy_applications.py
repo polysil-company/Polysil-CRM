@@ -46,11 +46,18 @@ _ERRORS: dict[int | str, dict[str, object]] = {
     404: {"model": ErrorResponse, "description": "Not an application (or a lead) in your scope."},
     422: {"model": ErrorResponse, "description": "A field needs correcting; see `fields`."},
 }
+_REUSED = "`idempotency_key_reused`: the same key was sent with a different body."
+_CREATE_ERRORS: dict[int | str, dict[str, object]] = {
+    **_ERRORS,
+    409: {"model": ErrorResponse, "description": _REUSED},
+}
 _MUTATION_ERRORS: dict[int | str, dict[str, object]] = {
     **_ERRORS,
     409: {"model": ErrorResponse, "description": "`status_changed`: the application is closed "
-                                                 "or cancelled."},
+                                                 "or cancelled. " + _REUSED},
 }
+_NO_STORAGE: dict[int | str, dict[str, object]] = {
+    503: {"model": ErrorResponse, "description": "`storage_unavailable`: retry later."}}
 
 
 async def _idem(db: DbSession, claims: Claims, idem: IdemKey, route: str, body: BaseModel,
@@ -80,7 +87,7 @@ async def document_types(db: DbSession) -> Envelope[list[DocumentType]]:
     return Envelope(data=await service.document_types(db))
 
 
-@router.post("", response_model=Envelope[Application], status_code=201, responses=_MUTATION_ERRORS,
+@router.post("", response_model=Envelope[Application], status_code=201, responses=_CREATE_ERRORS,
              dependencies=[Depends(require("subsidy", "create"))])
 async def create(body: ApplicationCreate, db: DbSession, caller: CallerDep, claims: Claims,
                  idem: IdemKey) -> JSONResponse:
@@ -168,18 +175,25 @@ async def checklist(app_id: Id, db: DbSession) -> Envelope[list[ChecklistItem]]:
 
 
 @router.post("/{app_id}/documents", status_code=201, response_model=Envelope[Document],
-             responses={**_MUTATION_ERRORS,
-                        413: {"model": ErrorResponse, "description": "Over 10 MB."},
-                        503: {"model": ErrorResponse,
-                              "description": "`storage_unavailable`: retry later."}},
+             responses={**_MUTATION_ERRORS, **_NO_STORAGE,
+                        403: {"model": ErrorResponse,
+                              "description": "View only: adding a document needs subsidy "
+                                             "create or edit. Hide the upload control."},
+                        413: {"model": ErrorResponse, "description": "Over 10 MB."}},
              dependencies=[Depends(require("subsidy", "view"))])
 async def add_document(app_id: Id, db: DbSession, caller: CallerDep, claims: Claims,
                        idem: IdemKey,
                        file: Annotated[UploadFile, File()],
                        document_type: Annotated[str, Form(max_length=60)]) -> Response:
     """Upload a document against a checklist item: PDF, JPEG, PNG, WebP or HEIC, up
-    to 10 MB, judged by content. Up to 40 per application. The same file again
-    answers `200` with the one already there. `409` on a cancelled application."""
+    to 10 MB, judged by content. The same file again answers `200` with the one
+    already there. Refusals:
+
+    - `422 too_many_documents`: the application has 40 files already;
+    - `422 attachment_type`: not one of the allowed types, on `file`;
+    - `422` on `file` "empty", or on `document_type` "not on the checklist";
+    - `403`: the caller may view applications but not add to them;
+    - `409 status_changed`: the application is cancelled."""
     data = await file.read(upload_rules.MAX_UPLOAD_BYTES + 1)
     if len(data) > upload_rules.MAX_UPLOAD_BYTES:
         raise BodyTooLarge()
@@ -198,10 +212,11 @@ async def add_document(app_id: Id, db: DbSession, caller: CallerDep, claims: Cla
 
 
 @router.get("/{app_id}/documents/{doc_id}", response_model=Envelope[DocumentLink],
-            responses=_ERRORS,
+            responses={**_ERRORS, **_NO_STORAGE},
             dependencies=[Depends(require("subsidy", "view"))])
 async def document_link(app_id: Id, doc_id: Id, db: DbSession) -> Envelope[DocumentLink]:
-    """A ten-minute link to the file. Never fetch it with the bearer token."""
+    """A ten-minute link to the file. Never fetch it with the bearer token.
+    `503 storage_unavailable` while file storage is not configured."""
     return Envelope(data=await service.document_link(db, app_id, doc_id,
                                                      get_storage(get_settings())))
 
