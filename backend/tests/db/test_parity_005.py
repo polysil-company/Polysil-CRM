@@ -57,6 +57,10 @@ TABLES = {
     "complaint": sa.table("complaint", sa.column("id", _ID), sa.column("owner_user_id", _ID),
                           sa.column("owner_org_unit_id", _ID), sa.column("partner_id", _ID),
                           sa.column("deleted_at")),
+    "subsidy_application": sa.table("subsidy_application", sa.column("id", _ID),
+                                    sa.column("owner_user_id", _ID),
+                                    sa.column("owner_org_unit_id", _ID),
+                                    sa.column("territory_id", _ID)),
 }
 
 
@@ -584,7 +588,80 @@ async def complaints_global(db: AsyncSession, ids: Fixtures) -> Witness:
                    {a: True, b: True})
 
 
+# ── witnesses: subsidy applications (FS-009), own, office, state, all ─────────
+
+async def _application(db: AsyncSession, ids: Fixtures, *, owner_user_id: str | None = None,
+                       owner_org_unit_id: str | None = None,
+                       territory_id: str | None = None) -> str:
+    """An application as the table owner, on a lead of its own."""
+    lead = await _lead(db, ids, owner_user_id=owner_user_id, owner_org_unit_id=owner_org_unit_id,
+                       territory_id=territory_id)
+    return str((await db.execute(text(
+        "INSERT INTO subsidy_application (application_no, scheme_id, system_type, category_code, "
+        "category_name, category_pct, lead_id, farmer_name, mobile, territory_id, total_area, "
+        "calculation_request, calculation, total_cost, subsidy, farmer_share, formula_version, "
+        "regular_matrix_id, seven_year_matrix_id, as_of, current_stage_id, current_since, "
+        "owner_user_id, owner_org_unit_id) "
+        "SELECT :no, s.id, 'drip', 'small_farmer', 'Small farmer', 80, CAST(:l AS uuid), 'Farmer', "
+        "'+919812345678', CAST(:t AS uuid), 1, '{}', '{}', 100, 80, 20, 'test', gen_random_uuid(), "
+        "gen_random_uuid(), DATE '2020-06-15', d.id, current_date, CAST(:u AS uuid), "
+        "CAST(:o AS uuid) "
+        "FROM subsidy_scheme s JOIN subsidy_stage_def d ON d.scheme_id = s.id AND d.seq = 4 "
+        "WHERE s.code = 'GGRC' RETURNING id"),
+        {"no": "SA/T/" + uuid.uuid4().hex[:12], "l": lead, "t": territory_id or ids.territory_id,
+         "u": owner_user_id, "o": owner_org_unit_id or ids.org_unit_id})).scalar_one())
+
+
+async def subsidy_own(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "fo")
+    await _grant(db, role, "subsidy", ["view"], "own")
+    me = await _staff(db, ids, role, ids.org_unit_id)
+    other = await _staff(db, ids, role, ids.org_unit_id)
+    mine = await _application(db, ids, owner_user_id=me)
+    theirs = await _application(db, ids, owner_user_id=other)
+    return Witness(Caller(me, ids.org_unit_id, None, {"subsidy": "own"}),
+                   {mine: True, theirs: False})
+
+
+async def subsidy_org_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "dm")
+    await _grant(db, role, "subsidy", ["view"], "org_subtree")
+    manager = await _staff(db, ids, role, ids.org_unit_id)
+    below = await _application(db, ids, owner_org_unit_id=await _org(db, ids, "child",
+                                                                     parent=ids.org_unit_id))
+    outside = await _application(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    return Witness(Caller(manager, ids.org_unit_id, None, {"subsidy": "org_subtree"}),
+                   {below: True, outside: False})
+
+
+async def subsidy_territory(db: AsyncSession, ids: Fixtures) -> Witness:
+    """The State Co-ordinator: the applications in its territories, whoever owns them."""
+    role = await _role(db, ids, "sc")
+    await _grant(db, role, "subsidy", ["view"], "territory")
+    coord = await _staff(db, ids, role, await _org(db, ids, "sc office"))
+    await db.execute(text("INSERT INTO user_territory (user_id, territory_id) VALUES (:u, :t)"),
+                     {"u": coord, "t": ids.territory_id})
+    here = await _application(db, ids, territory_id=ids.territory_id)
+    there = await _application(db, ids, territory_id=await _territory(db, ids, "far"))
+    return Witness(Caller(coord, ids.org_unit_id, None, {"subsidy": "territory"}),
+                   {here: True, there: False})
+
+
+async def subsidy_global(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "subsidy", ["view"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    a = await _application(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    b = await _application(db, ids, territory_id=await _territory(db, ids, "far"))
+    return Witness(Caller(admin, ids.org_unit_id, None, {"subsidy": "global"}),
+                   {a: True, b: True})
+
+
 WITNESSES: dict[tuple[str, str], Builder] = {
+    ("subsidy", "own"): subsidy_own,
+    ("subsidy", "org_subtree"): subsidy_org_subtree,
+    ("subsidy", "territory"): subsidy_territory,
+    ("subsidy", "global"): subsidy_global,
     ("complaints", "own"): complaints_own,
     ("complaints", "org_subtree"): complaints_org_subtree,
     ("complaints", "partner_subtree"): complaints_partner_subtree,

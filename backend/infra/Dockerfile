@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 #
 # The API and the worker, one image. A second stage adds what only the one-shot
-# jobs need, so the image that serves traffic carries neither psycopg nor openpyxl.
+# jobs need, so the image that serves traffic does not carry psycopg. openpyxl is
+# a main dependency since FS-009: the API builds the PIMS sheet.
 #
 #   docker build -f infra/Dockerfile --target runtime -t polysil-api:staging ..
 #   docker build -f infra/Dockerfile --target tools   -t polysil-tools:staging ..
@@ -83,12 +84,12 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
 
 # ── migrations, seeds and the master loaders ──────────────────────────────
-# psycopg because alembic's env.py runs migrations over the sync driver, and
-# openpyxl because the two master loaders read the client's workbooks. Neither
-# belongs in a process that serves requests.
+# psycopg because alembic's env.py runs migrations over the sync driver; it does
+# not belong in a process that serves requests. openpyxl comes from the runtime
+# stage now (FS-009's PIMS sheet); the master loaders use the same install.
 FROM runtime AS tools
 USER root
-RUN pip install --no-cache-dir "psycopg[binary]>=3.2" "openpyxl>=3.1"
+RUN pip install --no-cache-dir "psycopg[binary]>=3.2"
 # scripts/seed_demo.py reads its database credentials from infra/.env and from
 # nowhere else. The one-shot container writes that file itself, from its own
 # environment, on the way into the seed - so the credentials never land on the

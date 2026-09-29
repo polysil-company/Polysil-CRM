@@ -117,4 +117,18 @@ SPECS: dict[str, ScopeSpec] = {
                  "partner_id": "channel_partner", "owner_org_unit_id": "org_unit",
                  "territory_id": "territory"},
     ),
+    # FS-009: an application is its lead's, copied and frozen at create (D5): the
+    # owner (own), the office (org_subtree) and the territory, which is how the
+    # State Co-ordinator reaches it. No partner branch: dealers hold no subsidy
+    # row (RBAC 6.3). No soft delete: an application is cancelled.
+    "subsidy": ScopeSpec(
+        module="subsidy",
+        table="subsidy_application",
+        own="owner_user_id",
+        org_subtree="owner_org_unit_id",
+        territory="territory_id",
+        soft_delete=None,
+        parents={"lead_id": "lead", "territory_id": "territory",
+                 "owner_org_unit_id": "org_unit"},
+    ),
 }
