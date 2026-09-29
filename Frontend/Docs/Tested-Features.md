@@ -30,7 +30,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — send, approve, answer, revise, delete](#quotations--send-approve-answer-revise-delete) | 7 | 🧪 👀 | `integration` |
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | `integration` |
 | [Approvals](#approvals) | 4 | 🧪 🌐 👀 | `integration` |
-| [Sales orders and dispatch](#sales-orders-and-dispatch) | 7 | 🧪 🌐 👀 | PR (sales orders) |
+| [Sales orders and dispatch](#sales-orders-and-dispatch) | 7 | 🧪 🌐 👀 | PR #34 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 | `integration`, **mock only** |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
