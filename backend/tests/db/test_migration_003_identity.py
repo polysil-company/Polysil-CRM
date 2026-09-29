@@ -983,11 +983,19 @@ async def test_the_audit_row_names_its_actor(db: AsyncSession, ids: Fixtures) ->
               "notification_outbox", "activity_event"])
 async def test_infrastructure_tables_are_not_audited(db: AsyncSession,
                                                      table: str) -> None:
-    """Append-and-expire. Auditing them duplicates their own content at volume."""
+    """Append-and-expire. Auditing them duplicates their own content at volume.
+    The one trigger allowed is 023's notifier on activity_event, which writes
+    notifications, not audit rows; it is checked by name, and its function must
+    not call audit_row()."""
     triggers = (await db.execute(text(
         "SELECT tgname FROM pg_trigger WHERE tgrelid = CAST(:t AS regclass) "
-        "AND NOT tgisinternal"), {"t": table})).scalars().all()
+        "AND NOT tgisinternal AND NOT (tgname = 'trg_notify_from_event' AND "
+        "tgrelid = 'activity_event'::regclass)"), {"t": table})).scalars().all()
     assert triggers == [], f"{table} carries {triggers}"
+    if table == "activity_event":
+        body = (await db.execute(text(
+            "SELECT prosrc FROM pg_proc WHERE proname = 'notify_from_event'"))).scalar_one()
+        assert "audit_row" not in body
 
 
 # ── idempotency ──────────────────────────────────────────────────────────────
