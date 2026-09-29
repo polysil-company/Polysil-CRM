@@ -24,6 +24,11 @@ polysil.pranayx.tech {
 		max_size 12MB
 	}
 
+	# FS-009: the same belt on subsidy documents
+	request_body /api/v1/subsidy-applications/* {
+		max_size 12MB
+	}
+
 	handle /api/v1/* {
 		reverse_proxy polysil-api:8000
 	}

@@ -48,7 +48,8 @@ LIVE_TABLES: dict[str, str] = {
 # task or a complaint may carry no lead,
 # and the CHECK would demand one (plan review B-4).
 ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory", "quotation", "sales_order",
-                                 "lead_qr_code", "task", "meeting_minutes", "complaint")
+                                 "lead_qr_code", "task", "meeting_minutes", "complaint",
+                                 "subsidy_application")
 
 # A type in both LIVE_TABLES and ENTITY_BY_ID would emit two `WHEN` arms, the
 # first through its reference column's table and the second dead, and PostgreSQL

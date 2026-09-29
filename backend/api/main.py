@@ -40,6 +40,7 @@ from api.routers import (
     public,
     quotations,
     subsidy,
+    subsidy_applications,
     tasks,
     users,
 )
@@ -188,6 +189,8 @@ def create_app() -> FastAPI:
     app.include_router(notifications.router, prefix=API_PREFIX)
     app.include_router(messages.router, prefix=API_PREFIX)
     app.include_router(messages.directory, prefix=API_PREFIX)
+    app.include_router(subsidy_applications.router, prefix=API_PREFIX)
+    app.include_router(subsidy_applications.lookups, prefix=API_PREFIX)
     # The farmer's link: /public, not /api/v1. No session, two definer functions
     # on app_anon, and a file route the local storage adapter alone uses (FS-005 4).
     app.include_router(public.router)
