@@ -40,6 +40,7 @@ has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)
 | `order_type` | query | string \| null |  | One order type. |
 | `partner_id` | query | string \| null |  | Orders placed through this partner. |
 | `lead_id` | query | string \| null |  | Orders on this lead. |
+| `quotation_id` | query | string \| null |  | Orders this quotation is or was on. A cancelled order released it; add `status` to find the live one. |
 | `owner` | query | string \| null |  | `me`, or a user id. |
 | `q` | query | string \| null |  | Order number, party name or mobile. |
 | `from` | query | string \| null |  | ISO date, IST. |

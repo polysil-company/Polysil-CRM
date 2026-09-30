@@ -123,6 +123,9 @@ async def list_orders(
         pattern=UUID_RE, description="Orders placed through this partner.")] = None,
     lead_id: Annotated[str | None, Query(
         pattern=UUID_RE, description="Orders on this lead.")] = None,
+    quotation_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="Orders this quotation is or was on. A cancelled order "
+                                     "released it; add `status` to find the live one.")] = None,
     owner: Annotated[str | None, Query(pattern=_OWNER_RE,
                                        description="`me`, or a user id.")] = None,
     q: Annotated[str | None, Query(description="Order number, party name or mobile.")] = None,
@@ -137,7 +140,7 @@ async def list_orders(
     return await service.list_orders(
         db, caller, status=status_, order_type=order_type, partner_id=partner_id,
         lead_id=lead_id, owner=owner, q=q, created_from=created_from, created_to=created_to,
-        limit=limit, cursor=cursor, include_total=include_total)
+        limit=limit, cursor=cursor, include_total=include_total, quotation_id=quotation_id)
 
 
 @router.get("/stats", response_model=OrderStats, responses=_ERRORS,

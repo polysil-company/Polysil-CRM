@@ -385,6 +385,33 @@ async def test_an_order_from_an_accepted_quotation_takes_its_lines_and_holds_it(
     assert again["id"] != order["id"]
 
 
+async def test_the_order_list_finds_the_orders_a_quotation_is_on(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    """BE-019: every order the quotation was on, the cancelled one included; `status`
+    narrows it to the live one. Another quotation's order is not among them."""
+    ho = await _as(client, shop, "field_officer")
+    q = await _accepted_quotation(client, shop, ho)
+    other = await _accepted_quotation(client, shop, ho)
+    first = await _create(client, ho, {"quotation_ids": [q["id"]]})
+    elsewhere = await _create(client, ho, {"quotation_ids": [other["id"]]})
+    r = await client.post(f"{V1}/orders/{first['id']}/cancel", json={"remark": "Wrong lead"},
+                          headers={**ho, **_key()})
+    assert r.status_code == 200, r.text
+    live = await _create(client, ho, {"quotation_ids": [q["id"]]})
+
+    async def ids(**params: str) -> set[str]:
+        r = await client.get(f"{V1}/orders", headers=ho, params={"quotation_id": q["id"], **params})
+        assert r.status_code == 200, r.text
+        return {o["id"] for o in r.json()["data"]}
+    assert await ids() == {first["id"], live["id"]}
+    assert elsewhere["id"] not in await ids()
+    assert await ids(status="draft") == {live["id"]}
+    r = await client.get(f"{V1}/orders", headers=ho, params={"quotation_id": str(uuid.uuid4())})
+    assert r.status_code == 200 and r.json()["data"] == []
+    r = await client.get(f"{V1}/orders", headers=ho, params={"quotation_id": "not-a-uuid"})
+    assert r.status_code == 422, r.text
+
+
 # ── dispatch, void, close ────────────────────────────────────────────────────
 
 async def test_dispatch_refuses_what_cannot_ship_and_closes_the_balance_short(

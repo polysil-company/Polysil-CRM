@@ -529,7 +529,8 @@ def _parse_date(value: str, field: str) -> dt.datetime:
 def _order_filters(caller: Caller, *, status: str | None = None,
                    order_type: str | None = None, partner_id: str | None = None,
                    lead_id: str | None = None, owner: str | None = None, q: str | None = None,
-                   created_from: str | None = None, created_to: str | None = None) -> list[Any]:
+                   created_from: str | None = None, created_to: str | None = None,
+                   quotation_id: str | None = None) -> list[Any]:
     """The scope and every filter of the order list, shared with the counts."""
     where: list[Any] = [scope_predicate(_ORDERS, caller, order_t)]
     if status:
@@ -542,6 +543,12 @@ def _order_filters(caller: Caller, *, status: str | None = None,
         where.append(order_t.c.partner_id == partner_id)
     if lead_id:
         where.append(order_t.c.lead_id == lead_id)
+    if quotation_id:
+        # every order the quotation was ever on, a released link included: a cancelled
+        # order shows why the quotation is free again (BE-019)
+        where.append(sa.exists(
+            sa.select(sa.literal(1)).select_from(_oq_t)
+            .where(_oq_t.c.sales_order_id == order_t.c.id, _oq_t.c.quotation_id == quotation_id)))
     if owner == "me":
         where.append(order_t.c.owner_user_id == caller.user_id)
     elif owner:
@@ -557,6 +564,9 @@ def _order_filters(caller: Caller, *, status: str | None = None,
                             order_t.c.party_name.ilike(like), order_t.c.party_mobile.ilike(like)))
     return where
 
+
+_oq_t = sa.table("order_quotation", sa.column("sales_order_id", sa.Uuid),
+                 sa.column("quotation_id", sa.Uuid))
 
 _STATUSES = ("draft", "submitted", "approved", "partially_dispatched", "dispatched",
              "closed_short", "cancelled")
@@ -602,11 +612,13 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
                       lead_id: str | None = None, owner: str | None = None, q: str | None = None,
                       created_from: str | None = None, created_to: str | None = None,
                       limit: int = 25, cursor: str | None = None,
-                      include_total: bool = False) -> sch.OrderPage:
+                      include_total: bool = False,
+                      quotation_id: str | None = None) -> sch.OrderPage:
     limit = max(1, min(limit, _MAX_LIMIT))
     where = _order_filters(caller, status=status, order_type=order_type,
                            partner_id=partner_id, lead_id=lead_id, owner=owner, q=q,
-                           created_from=created_from, created_to=created_to)
+                           created_from=created_from, created_to=created_to,
+                           quotation_id=quotation_id)
     filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)
