@@ -40,6 +40,7 @@ has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)
 | `order_type` | query | string \| null |  | One order type. |
 | `partner_id` | query | string \| null |  | Orders placed through this partner. |
 | `lead_id` | query | string \| null |  | Orders on this lead. |
+| `quotation_id` | query | string \| null |  | Orders this quotation is or was on. A cancelled order released it; add `status` to find the live one. |
 | `owner` | query | string \| null |  | `me`, or a user id. |
 | `q` | query | string \| null |  | Order number, party name or mobile. |
 | `from` | query | string \| null |  | ISO date, IST. |
@@ -666,6 +667,7 @@ and only the outcome to a dealer.
 | `doc_type` | string |  | Always sales_order. Tells an order from a quotation where either can come back. Default `sales_order`. |
 | `id` | string | yes |  |
 | `order_no` | string \| null | yes | Null until the first submit. |
+| `complaint` | OrderComplaintRef \| null |  | A replacement order's complaint (FS-015b). |
 | `status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` | yes |  |
 | `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` | yes |  |
 | `party` | OrderParty | yes | The farmer on one lead; the dealer on a consolidated order. |
@@ -700,6 +702,13 @@ and only the outcome to a dealer.
 | `closed_at` | string \| null | yes |  |
 | `close_remark` | string \| null | yes |  |
 | `created_at` | string | yes |  |
+
+**`OrderComplaintRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `complaint_no` | string \| null | yes |  |
 
 **`OrderCreate`**
 

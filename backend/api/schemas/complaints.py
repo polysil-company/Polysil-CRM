@@ -9,11 +9,13 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from api.domain import complaints as domain
+from api.schemas.approvals import Approval
 from api.schemas.leads import UUID_RE, PageMeta, UserRef
 from api.schemas.tasks import LeadLink, OrderLink, PartnerLink
 
 Severity = Literal["low", "medium", "high"]
-Status = Literal["draft", "submitted", "under_qc", "qc_approved", "qc_rejected", "cancelled"]
+Status = Literal["draft", "submitted", "under_qc", "qc_approved", "qc_rejected", "cancelled",
+                 "remedy_pending", "closed"]
 Kind = Literal["photo", "document", "challan"]
 _Id = Annotated[str, Field(pattern=UUID_RE)]
 _Text = Annotated[str, Field(min_length=1, max_length=domain.TEXT_MAX)]
@@ -105,6 +107,31 @@ class CancelIn(BaseModel):
     reason: _Text
 
 
+_Remark = Annotated[str, Field(min_length=1, max_length=1000)]
+
+
+class RemedyIn(BaseModel):
+    """FS-015b: what QC decides for a `qc_approved` complaint."""
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    kind: Literal["refund", "replacement", "none"] = Field(description=(
+        "`refund`: an amount through approval. `replacement`: a free order of the defective "
+        "lines. `none`: close the complaint now."))
+    amount: Decimal | None = Field(default=None, gt=0, lt=Decimal("1e12"), decimal_places=2,
+                                   description="Refund only: rupees, two decimals at most.")
+    payee_name: Annotated[str, Field(min_length=1, max_length=200)] | None = Field(
+        default=None, description="Refund only: who is paid.")
+    paid_through_partner_id: str | None = Field(
+        default=None, pattern=UUID_RE, description="Refund only: the dealer it is paid through.")
+    remark: _Remark = Field(description="Why this remedy.")
+
+
+class WithdrawIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    remark: _Remark
+
+
 class TypeRef(BaseModel):
     id: str
     code: str
@@ -192,9 +219,44 @@ class Can(BaseModel):
     cancel: bool
     delete: bool
     upload: bool
+    remedy: bool = Field(description="Choose a remedy (FS-015b).")
+    withdraw: bool = Field(description="Withdraw the pending remedy.")
+
+
+class RemedyOrder(BaseModel):
+    id: str
+    order_no: str | None
+    status: str
+
+
+class Refund(BaseModel):
+    amount: str
+    payee_name: str | None = Field(description="Null for a dealer.")
+    paid_through: Ref | None = Field(description="Null for a dealer.")
+    approval: Approval | None = Field(description="This refund's own request. Null for a dealer.")
+    payment_reference: str | None = Field(description="The Account Manager's remark once "
+                                          "paid. Null for a dealer.")
+
+
+class Replacement(BaseModel):
+    order: RemedyOrder | None
+
+
+class Remedy(BaseModel):
+    id: str
+    kind: Literal["refund", "replacement", "none"]
+    status: Literal["pending", "completed", "rejected", "withdrawn", "cancelled"]
+    remark: str | None = Field(description="Null for a dealer.")
+    refund: Refund | None
+    replacement: Replacement | None
+    chosen_by: UserRef | None = Field(description="Null for a dealer.")
+    chosen_at: str
+    completed_at: str | None
 
 
 class Complaint(BaseModel):
+    doc_type: Literal["complaint"] = Field(
+        default="complaint", description="Tells a decided refund apart in `DecisionResult`.")
     id: str
     complaint_no: str | None = Field(description="Null until the first submit.")
     status: Status
@@ -224,6 +286,8 @@ class Complaint(BaseModel):
     owner: UserRef | None
     owner_org_unit: Ref
     raised_by: UserRef | None
+    remedy: Remedy | None = Field(default=None, description="The live or the last remedy.")
+    closed_at: str | None = None
     can: Can
     created_at: str
     updated_at: str

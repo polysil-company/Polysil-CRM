@@ -67,6 +67,12 @@ For a quotation step (`doc_type: quotation` in the queue) it returns the
 quotation: its `discount.send_gate` is `approved` or `returned`, and its status
 stays draft. `409 figures_changed` when the draft was edited under the request.
 
+For a refund step (`doc_type: complaint`, FS-015b) it returns the complaint:
+`remedy_pending`, or `closed` once the Account Manager approves. On the Account
+Manager's step the remark is the payment reference, and required. A rejection
+returns the complaint to `qc_approved`. `409 request_closed` once QC withdrew the
+refund.
+
 **Parameters**
 
 | Name | In | Type | Required | Notes |
@@ -136,8 +142,8 @@ submitted from now on.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `doc_type` | `sales_order` \| `quotation` |  | Default `sales_order`. |
-| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` | yes | An order's rows are for the three managers. A quotation's are for any of the five: the field officer's is the officer's own limit. |
+| `doc_type` | `sales_order` \| `quotation` \| `complaint` |  | Default `sales_order`. |
+| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` | yes | An order's rows are for the three managers, and so are a refund's (`complaint`, rupees). A quotation's are for any of the five: the field officer's is the officer's own limit. |
 | `territory_id` | string \| null |  | Null for the company-wide row. |
 | `max_amount` | number \| string \| null |  | Null for no ceiling. An order's is rupees including GST, above 0; a quotation's is a discount in percent, 0 to 100 (0: no discount without approval). |
 
@@ -202,6 +208,91 @@ One approval chain.
 | `by` | UserRef \| null | yes | Null for a dealer, always. |
 | `remark` | string \| null | yes | Null for a dealer, always. |
 | `decided_at` | string \| null | yes |  |
+
+**`Attachment`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `kind` | `photo` \| `document` \| `challan` | yes |  |
+| `filename` | string | yes |  |
+| `content_type` | string | yes |  |
+| `size_bytes` | integer | yes |  |
+| `preview` | boolean | yes | False for HEIC: show a file icon, not a thumbnail. |
+| `uploaded_by` | UserRef \| null | yes |  |
+| `uploaded_at` | string | yes |  |
+
+**`Can`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `edit` | boolean | yes |  |
+| `submit` | boolean | yes |  |
+| `check` | boolean | yes |  |
+| `qc` | boolean | yes |  |
+| `cancel` | boolean | yes |  |
+| `delete` | boolean | yes |  |
+| `upload` | boolean | yes |  |
+| `remedy` | boolean | yes | Choose a remedy (FS-015b). |
+| `withdraw` | boolean | yes | Withdraw the pending remedy. |
+
+**`Cancellation`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `reason` | string | yes |  |
+| `by` | UserRef \| null | yes |  |
+| `at` | string | yes |  |
+
+**`Check`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `decision` | `approve` \| `return` | yes |  |
+| `remark` | string | yes |  |
+| `by` | UserRef \| null | yes | Null for a dealer. |
+| `at` | string | yes |  |
+| `internal_note` | string \| null |  | Staff only; absent for a dealer. |
+
+**`Complaint`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `doc_type` | string |  | Tells a decided refund apart in `DecisionResult`. Default `complaint`. |
+| `id` | string | yes |  |
+| `complaint_no` | string \| null | yes | Null until the first submit. |
+| `status` | `draft` \| `submitted` \| `under_qc` \| `qc_approved` \| `qc_rejected` \| `cancelled` \| `remedy_pending` \| `closed` | yes |  |
+| `complaint_type` | TypeRef | yes |  |
+| `severity` | `low` \| `medium` \| `high` | yes |  |
+| `description` | string | yes |  |
+| `contact_name` | string | yes |  |
+| `contact_mobile` | string | yes |  |
+| `territory` | Ref | yes |  |
+| `partner` | PartnerLink \| null | yes |  |
+| `lead` | LeadLink \| null | yes |  |
+| `sales_order` | OrderLink \| null | yes |  |
+| `dc_no` | string \| null | yes |  |
+| `supply_date` | string \| null | yes |  |
+| `reg_no` | string \| null | yes |  |
+| `pims_no` | string \| null | yes |  |
+| `sample_courier_date` | string \| null | yes |  |
+| `sample_courier_detail` | string \| null | yes |  |
+| `lines` | Line-Output[] | yes |  |
+| `attachments` | Attachment[] | yes |  |
+| `check` | Check \| null | yes | The manager's decision since the latest submit. |
+| `quality` | Quality \| null | yes |  |
+| `cancellation` | Cancellation \| null |  | Why and by whom, once cancelled. |
+| `sla` | Sla \| null | yes | Null before the first submit. |
+| `submit_count` | integer | yes |  |
+| `owner` | UserRef \| null | yes |  |
+| `owner_org_unit` | Ref | yes |  |
+| `raised_by` | UserRef \| null | yes |  |
+| `remedy` | Remedy \| null |  | The live or the last remedy. |
+| `closed_at` | string \| null |  |  |
+| `can` | Can | yes |  |
+| `created_at` | string | yes |  |
+| `updated_at` | string | yes |  |
+| `submitted_at` | string \| null | yes |  |
 
 **`DecisionRequest`**
 
@@ -295,6 +386,15 @@ One approval chain.
 | `role` | string | yes |  |
 | `at` | string | yes |  |
 
+**`LeadLink`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `hidden` | boolean |  | True when you can no longer see it: show 'not visible'. The other fields are then null. Default `False`. |
+| `inquiry_no` | string \| null |  |  |
+| `farmer_name` | string \| null |  |  |
+
 **`LeadRef`**
 
 | Field | Type | Required | Notes |
@@ -303,6 +403,18 @@ One approval chain.
 | `inquiry_no` | string | yes |  |
 | `stage` | `new` \| `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` \| `merged` \| `dormant` | yes |  |
 
+**`Line-Output`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `product` | ProductRef | yes |  |
+| `uom` | string \| null | yes |  |
+| `supplied_qty` | string | yes |  |
+| `defective_qty` | string | yes |  |
+| `failure_frequency` | string \| null | yes |  |
+| `remark` | string \| null | yes |  |
+
 **`Order`**
 
 | Field | Type | Required | Notes |
@@ -310,6 +422,7 @@ One approval chain.
 | `doc_type` | string |  | Always sales_order. Tells an order from a quotation where either can come back. Default `sales_order`. |
 | `id` | string | yes |  |
 | `order_no` | string \| null | yes | Null until the first submit. |
+| `complaint` | OrderComplaintRef \| null |  | A replacement order's complaint (FS-015b). |
 | `status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` | yes |  |
 | `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` | yes |  |
 | `party` | OrderParty | yes | The farmer on one lead; the dealer on a consolidated order. |
@@ -344,6 +457,13 @@ One approval chain.
 | `closed_at` | string \| null | yes |  |
 | `close_remark` | string \| null | yes |  |
 | `created_at` | string | yes |  |
+
+**`OrderComplaintRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `complaint_no` | string \| null | yes |  |
 
 **`OrderLeadRef`**
 
@@ -389,6 +509,14 @@ One approval chain.
 | `qty_short` | string | yes | Closed short: will never ship. |
 | `qty_open` | string | yes | Still to ship: qty less dispatched less short. |
 
+**`OrderLink`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `hidden` | boolean |  | True when you can no longer see it: show 'not visible'. The other fields are then null. Default `False`. |
+| `order_no` | string \| null |  | Null on a draft. |
+
 **`OrderParty`**
 
 | Field | Type | Required | Notes |
@@ -423,6 +551,15 @@ One approval chain.
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
 
+**`PartnerLink`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `hidden` | boolean |  | True when you can no longer see it: show 'not visible'. The other fields are then null. Default `False`. |
+| `name` | string \| null |  |  |
+| `partner_type` | string \| null |  | dealer or distributor. |
+
 **`Party`**
 
 | Field | Type | Required | Notes |
@@ -445,6 +582,26 @@ One approval chain.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
+
+**`ProductRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `description` | string \| null | yes |  |
+
+**`Quality`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `verdict` | `approved` \| `rejected` | yes |  |
+| `remark` | string | yes |  |
+| `sample_received_on` | string \| null | yes |  |
+| `tested_on` | string \| null | yes |  |
+| `field_visit_on` | string \| null | yes |  |
+| `by` | UserRef \| null | yes | Null for a dealer. |
+| `at` | string | yes |  |
+| `internal_note` | string \| null |  | Staff only; absent for a dealer. |
 
 **`QueueDocument`**
 
@@ -568,6 +725,51 @@ One approval chain.
 | `quote_no` | string \| null | yes |  |
 | `version` | integer | yes |  |
 
+**`Ref`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+
+**`Refund`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes |  |
+| `payee_name` | string \| null | yes | Null for a dealer. |
+| `paid_through` | Ref \| null | yes | Null for a dealer. |
+| `approval` | Approval \| null | yes | This refund's own request. Null for a dealer. |
+| `payment_reference` | string \| null | yes | The Account Manager's remark once paid. Null for a dealer. |
+
+**`Remedy`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `kind` | `refund` \| `replacement` \| `none` | yes |  |
+| `status` | `pending` \| `completed` \| `rejected` \| `withdrawn` \| `cancelled` | yes |  |
+| `remark` | string \| null | yes | Null for a dealer. |
+| `refund` | Refund \| null | yes |  |
+| `replacement` | Replacement \| null | yes |  |
+| `chosen_by` | UserRef \| null | yes | Null for a dealer. |
+| `chosen_at` | string | yes |  |
+| `completed_at` | string \| null | yes |  |
+
+**`RemedyOrder`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `order_no` | string \| null | yes |  |
+| `status` | string | yes |  |
+
+**`Replacement`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `order` | RemedyOrder \| null | yes |  |
+
 **`SellerRef`**
 
 | Field | Type | Required | Notes |
@@ -577,6 +779,18 @@ One approval chain.
 | `legal_name` | string | yes |  |
 | `address` | string \| null |  |  |
 | `state` | string | yes | The state code, e.g. GJ. |
+
+**`Sla`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `policy` | `set` \| `none` | yes | `none`: no target applied; show "no target", never red. |
+| `response_due_at` | string \| null | yes |  |
+| `responded_at` | string \| null | yes |  |
+| `response_breached` | boolean | yes |  |
+| `resolution_due_at` | string \| null | yes |  |
+| `resolved_at` | string \| null | yes |  |
+| `resolution_breached` | boolean | yes |  |
 
 **`TerritoryRef`**
 
@@ -600,8 +814,8 @@ One approval chain.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `doc_type` | `sales_order` \| `quotation` |  | Default `sales_order`. |
-| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` | yes | An order's rows are for the three managers. A quotation's are for any of the five: the field officer's is the officer's own limit. |
+| `doc_type` | `sales_order` \| `quotation` \| `complaint` |  | Default `sales_order`. |
+| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` | yes | An order's rows are for the three managers, and so are a refund's (`complaint`, rupees). A quotation's are for any of the five: the field officer's is the officer's own limit. |
 | `territory_id` | string \| null |  | Null for the company-wide row. |
 | `max_amount` | number \| string \| null |  | Null for no ceiling. An order's is rupees including GST, above 0; a quotation's is a discount in percent, 0 to 100 (0: no discount without approval). |
 
@@ -616,6 +830,14 @@ One approval chain.
 | `sgst` | string | yes |  |
 | `igst` | string | yes |  |
 | `total` | string | yes |  |
+
+**`TypeRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
 
 **`UserRef`**
 

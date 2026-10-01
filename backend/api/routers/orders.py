@@ -123,6 +123,9 @@ async def list_orders(
         pattern=UUID_RE, description="Orders placed through this partner.")] = None,
     lead_id: Annotated[str | None, Query(
         pattern=UUID_RE, description="Orders on this lead.")] = None,
+    quotation_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="Orders this quotation is or was on. A cancelled order "
+                                     "released it; add `status` to find the live one.")] = None,
     owner: Annotated[str | None, Query(pattern=_OWNER_RE,
                                        description="`me`, or a user id.")] = None,
     q: Annotated[str | None, Query(description="Order number, party name or mobile.")] = None,
@@ -137,7 +140,7 @@ async def list_orders(
     return await service.list_orders(
         db, caller, status=status_, order_type=order_type, partner_id=partner_id,
         lead_id=lead_id, owner=owner, q=q, created_from=created_from, created_to=created_to,
-        limit=limit, cursor=cursor, include_total=include_total)
+        limit=limit, cursor=cursor, include_total=include_total, quotation_id=quotation_id)
 
 
 @router.get("/stats", response_model=OrderStats, responses=_ERRORS,
@@ -390,7 +393,8 @@ async def get_request(request_id: Id, db: DbSession, caller: CallerDep) -> dict[
 @approvals.post("/steps/{step_id}/decision", response_model=DecisionResult,
                 responses=_MUTATION_ERRORS,
                 dependencies=[Depends(require_any(("sales_orders", "approve"),
-                                                  ("quotations", "approve")))])
+                                                  ("quotations", "approve"),
+                                                  ("complaints", "approve")))])
 async def decide(step_id: Id, body: DecisionRequest, db: DbSession, caller: CallerDep,
                  claims: Claims, idem: IdemKey) -> Response:
     """Approve or reject a step. A remark is required to reject, and on every Accounts
@@ -400,7 +404,13 @@ async def decide(step_id: Id, body: DecisionRequest, db: DbSession, caller: Call
 
     For a quotation step (`doc_type: quotation` in the queue) it returns the
     quotation: its `discount.send_gate` is `approved` or `returned`, and its status
-    stays draft. `409 figures_changed` when the draft was edited under the request."""
+    stays draft. `409 figures_changed` when the draft was edited under the request.
+
+    For a refund step (`doc_type: complaint`, FS-015b) it returns the complaint:
+    `remedy_pending`, or `closed` once the Account Manager approves. On the Account
+    Manager's step the remark is the payment reference, and required. A rejection
+    returns the complaint to `qc_approved`. `409 request_closed` once QC withdrew the
+    refund."""
     async def work() -> tuple[int, dict[str, Any]]:
         return 200, {"data": (await approval_service.decide(db, caller, step_id, body)
                               ).model_dump(mode="json")}

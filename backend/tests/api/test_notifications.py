@@ -149,6 +149,11 @@ async def test_mark_read_takes_ids_or_all(client: httpx.AsyncClient, shop: Shop,
 async def test_a_notification_fault_never_blocks_the_write(client: httpx.AsyncClient, shop: Shop,
                                                           sessions: Sessions) -> None:
     """Review B-3: a bad payload is logged, the event row stays."""
+    # The bad uuid is cast inside the order arm's WHERE clause, which PostgreSQL
+    # never evaluates against an empty approval_step. A pending step makes the
+    # fault certain whatever ran before (it went green or red with test order).
+    h = await endpoints._as(client, shop, "field_officer")
+    await endpoints._submit(client, h, (await endpoints._create(client, h, endpoints._direct(shop)))["id"])
     s = sessions()
     try:
         eid = str((await s.execute(text(

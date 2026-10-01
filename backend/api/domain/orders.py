@@ -39,7 +39,15 @@ _DECIDER_KINDS: Final = frozenset({"order.returned", "order.approved",
                                     "quotation.approval_returned",
                                     # FS-015: the check and the QC verdict (question 15.14's rule)
                                     "complaint.returned", "complaint.approved",
-                                    "complaint.qc_approved", "complaint.qc_rejected"})
+                                    "complaint.qc_approved", "complaint.qc_rejected",
+                                    # FS-015b: the remedy and its approval
+                                    "complaint.remedy_chosen", "complaint.refund_requested",
+                                    "complaint.refund_paid", "complaint.refund_rejected",
+                                    "complaint.remedy_withdrawn", "complaint.replacement_ordered",
+                                    "complaint.replacement_cancelled", "complaint.closed",
+                                    # a replacement cancelled by its approver or by QC
+                                    # (PR 38 review): a dealer may see the order
+                                    "order.replacement_cancelled"})
 
 
 def actor_hidden_from_partner(kind: str) -> bool:

@@ -9,7 +9,7 @@ any endpoint change, so it is always current rather than a snapshot.
 |---|---|---|
 | Approvals | 5 | [`approvals.md`](approvals.md) |
 | Auth | 7 | [`auth.md`](auth.md) |
-| Complaints | 18 | [`complaints.md`](complaints.md) |
+| Complaints | 20 | [`complaints.md`](complaints.md) |
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
 | Leads | 17 | [`leads.md`](leads.md) |

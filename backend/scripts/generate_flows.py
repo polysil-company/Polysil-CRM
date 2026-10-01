@@ -1592,9 +1592,9 @@ def f_complaints() -> None:
     e, n = [], {}
     e += title("Complaints: entry, the manager check, the quality check",
                sub="A dealer, an officer or support raises it; a manager checks it; QC gives a "
-                   "verdict. Replacement and refund are FS-015b.",
-               status="BUILT. FS-015: /complaints, /complaint-sla-policies, "
-                      "/lookups/complaint-types, migration 019.",
+                   "verdict and chooses the remedy (FS-015b).",
+               status="BUILT. FS-015 and FS-015b: /complaints, /remedy, /complaint-sla-policies, "
+                      "/lookups/complaint-types, migrations 019 and 026.",
                status_colour=GREEN)
 
     steps = [
@@ -1608,7 +1608,11 @@ def f_complaints() -> None:
                "return: draft, the remark to the raiser", GREEN),
         ("c5", "POST /qc -> complaint_qc()\napproved or rejected, with sample and test dates\n"
                "resolved_at set", GREEN),
-        ("c6", "qc_approved waits for FS-015b:\nreplacement order or refund, then closed", YELLOW),
+        ("c6", "POST /remedy (QC): refund, replacement or none\n"
+               "refund: managers by amount, then Accounts pays\n"
+               "replacement: a free order, Dispatch approves, ships", GREEN),
+        ("c7", "closed: refund paid, replacement shipped, or none.\n"
+               "A refused or withdrawn remedy returns it\nto qc_approved", GREEN),
     ]
     prev = None
     for i, (eid, lbl, colour) in enumerate(steps):
@@ -1655,6 +1659,16 @@ def f_complaints() -> None:
               "The app sends a bearer token; an <img> cannot.\n"
               "GET .../attachments/{id} answers {url, expires_at}.\n"
               "No storage (staging today): 503, nothing kept.", w=420, colour=RED)
+    e += note("nRed4", 1240, 1040,
+              "THE ORDER FIRST, THEN THE COMPLAINT\n\n"
+              "Every path touching a replacement order and its\n"
+              "complaint locks the order first: dispatch, cancel,\n"
+              "close short, the decision, and QC's withdraw. The other\n"
+              "order would deadlock QC against Dispatch (delta B-8).", w=420, colour=RED)
+    e += note("nYellow2", 1240, 1300,
+              "Stand-ins: refund limits 25,000 / 1,00,000 / any;\n"
+              "Dispatch alone approves a replacement; QC chooses;\n"
+              "closing is automatic (GAP-179 to GAP-187).", w=420, colour=YELLOW)
     e += note("nGreen1", 1240, 780,
               "Both enforcers agree: status, the number and the\n"
               "targets have no UPDATE grant; only the definers\n"

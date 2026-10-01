@@ -17,6 +17,7 @@ from api.schemas.approvals import Approval as Approval  # re-exported
 from api.schemas.approvals import ApprovalStatus as ApprovalStatus  # re-exported
 from api.schemas.approvals import ApprovalStep as ApprovalStep  # re-exported
 from api.schemas.approvals import Decision
+from api.schemas.complaints import Complaint
 from api.schemas.leads import UUID_RE, OrgUnitRef, PageMeta, PartnerRef, TerritoryRef, UserRef
 from api.schemas.products import MAX_LINES, _places
 from api.schemas.quotations import Quotation, QuotationLineIn, Totals
@@ -179,11 +180,12 @@ class DispatchCreate(BaseModel):
 class ThresholdPut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    doc_type: Literal["sales_order", "quotation"] = "sales_order"
+    doc_type: Literal["sales_order", "quotation", "complaint"] = "sales_order"
     role: Literal["field_officer", "district_manager", "state_manager", "regional_manager",
                   "admin_sales"] = Field(
-        description="An order's rows are for the three managers. A quotation's are for any "
-                    "of the five: the field officer's is the officer's own limit.")
+        description="An order's rows are for the three managers, and so are a refund's "
+                    "(`complaint`, rupees). A quotation's are for any of the five: the field "
+                    "officer's is the officer's own limit.")
     territory_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE, description="Null for the company-wide row.")]
     max_amount: Annotated[Decimal | None, Field(
@@ -289,6 +291,11 @@ class Dispatch(BaseModel):
         description="invoice_before_dc, duplicate_invoice_no. Recorded anyway.")
 
 
+class OrderComplaintRef(BaseModel):
+    id: str
+    complaint_no: str | None
+
+
 class Order(BaseModel):
     doc_type: Literal["sales_order"] = Field(
         default="sales_order", description="Always sales_order. Tells an order from a "
@@ -297,6 +304,8 @@ class Order(BaseModel):
 
     id: str
     order_no: str | None = Field(description="Null until the first submit.")
+    complaint: OrderComplaintRef | None = Field(
+        default=None, description="A replacement order's complaint (FS-015b).")
     status: OrderStatus
     order_type: OrderType
     party: OrderParty = Field(description="The farmer on one lead; the dealer on a "
@@ -422,6 +431,6 @@ class DispatchPage(BaseModel):
 
 class DecisionResult(BaseModel):
     """The decided document: an order, or for a discount approval (FS-013) the
-    quotation. `data.doc_type` says which."""
+    quotation, or for a refund (FS-015b) the complaint. `data.doc_type` says which."""
 
-    data: Annotated[Order | Quotation, Field(discriminator="doc_type")]
+    data: Annotated[Order | Quotation | Complaint, Field(discriminator="doc_type")]

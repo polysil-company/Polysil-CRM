@@ -96,7 +96,7 @@ Complaints in your scope, newest first. A lead's or an order's: `?lead_id=`,
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `status` | query | `draft` \| `submitted` \| `under_qc` \| `qc_approved` \| `qc_rejected` \| `cancelled`[] \| null |  | Repeatable. |
+| `status` | query | `draft` \| `submitted` \| `under_qc` \| `qc_approved` \| `qc_rejected` \| `cancelled` \| `remedy_pending` \| `closed`[] \| null |  | Repeatable. |
 | `complaint_type_id` | query | string \| null |  |  |
 | `severity` | query | `low` \| `medium` \| `high` \| null |  |  |
 | `partner_id` | query | string \| null |  |  |
@@ -556,6 +556,95 @@ supply date; tested not before received.
 
 ---
 
+## `POST /api/v1/complaints/{complaint_id}/remedy`
+
+**Choose Remedy**
+
+Settle a `qc_approved` complaint. `refund`: an amount and a payee, approved by
+the managers by amount, then paid by the Account Manager. `replacement`: a free
+order of the defective lines, approved by the Dispatch Manager. `none`: close
+it now. Answers the complaint, `remedy_pending` or `closed`. Refusals:
+
+- `409 status_changed`: not `qc_approved`;
+- `403`: only QC chooses, and never the complaint's raiser or owner;
+- `422` on `amount`, `payee_name`, `paid_through_partner_id` or `remark`;
+- `422 nothing_defective`: a replacement with no defective quantity;
+- `422 replacement_unpriced`: a defective product has no price today, or its
+  quantity breaks its unit; `fields` names the line;
+- `422 no_approver`: a role the approval needs has nobody active.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `complaint_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`RemedyIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `kind` | `refund` \| `replacement` \| `none` | yes | `refund`: an amount through approval. `replacement`: a free order of the defective lines. `none`: close the complaint now. |
+| `amount` | number \| string \| null |  | Refund only: rupees, two decimals at most. |
+| `payee_name` | string \| null |  | Refund only: who is paid. |
+| `paid_through_partner_id` | string \| null |  | Refund only: the dealer it is paid through. |
+| `remark` | string | yes | Why this remedy. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Complaint_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not yours to do. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | `status_changed`: someone acted first, reload. `complaint_not_draft`: it was submitted. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
+## `POST /api/v1/complaints/{complaint_id}/remedy/withdraw`
+
+**Withdraw Remedy**
+
+QC takes back the pending remedy: a refund while its approval is open, a
+replacement while nothing has shipped (its order is cancelled). The complaint
+returns to `qc_approved`. Refusals: `409 status_changed` once it moved on (decided,
+shipped, or withdrawn already); `403` for anyone but QC, and for the complaint's
+raiser or owner; `422` on `remark`.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `complaint_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`WithdrawIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Complaint_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not yours to do. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | `status_changed`: someone acted first, reload. `complaint_not_draft`: it was submitted. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `POST /api/v1/complaints/{complaint_id}/submit`
 
 **Submit**
@@ -613,6 +702,28 @@ The complaint's events, newest first. A dealer never sees who decided.
 
 ## Models
 
+**`Approval`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `request_id` | string | yes |  |
+| `status` | `pending` \| `approved` \| `rejected` \| `cancelled` | yes | cancelled when the document was cancelled, or a quotation edited, while pending. |
+| `steps` | ApprovalStep[] | yes |  |
+| `request_remark` | string \| null |  | Why the approval was asked for (a quotation discount). Null for a dealer, always. |
+
+**`ApprovalStep`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `seq` | integer | yes | 1 is decided first. |
+| `role` | string | yes | The role code the step waits on. |
+| `decided_role` | string \| null | yes | Set when a higher manager decided this step in place of its own role. |
+| `decision` | `approve` \| `reject` \| null | yes | Null while undecided. |
+| `by` | UserRef \| null | yes | Null for a dealer, always. |
+| `remark` | string \| null | yes | Null for a dealer, always. |
+| `decided_at` | string \| null | yes |  |
+
 **`Attachment`**
 
 | Field | Type | Required | Notes |
@@ -644,6 +755,8 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `cancel` | boolean | yes |  |
 | `delete` | boolean | yes |  |
 | `upload` | boolean | yes |  |
+| `remedy` | boolean | yes | Choose a remedy (FS-015b). |
+| `withdraw` | boolean | yes | Withdraw the pending remedy. |
 
 **`CancelIn`**
 
@@ -683,9 +796,10 @@ The complaint's events, newest first. A dealer never sees who decided.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
+| `doc_type` | string |  | Tells a decided refund apart in `DecisionResult`. Default `complaint`. |
 | `id` | string | yes |  |
 | `complaint_no` | string \| null | yes | Null until the first submit. |
-| `status` | `draft` \| `submitted` \| `under_qc` \| `qc_approved` \| `qc_rejected` \| `cancelled` | yes |  |
+| `status` | `draft` \| `submitted` \| `under_qc` \| `qc_approved` \| `qc_rejected` \| `cancelled` \| `remedy_pending` \| `closed` | yes |  |
 | `complaint_type` | TypeRef | yes |  |
 | `severity` | `low` \| `medium` \| `high` | yes |  |
 | `description` | string | yes |  |
@@ -711,6 +825,8 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `owner` | UserRef \| null | yes |  |
 | `owner_org_unit` | Ref | yes |  |
 | `raised_by` | UserRef \| null | yes |  |
+| `remedy` | Remedy \| null |  | The live or the last remedy. |
+| `closed_at` | string \| null |  |  |
 | `can` | Can | yes |  |
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
@@ -770,7 +886,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `complaint_no` | string \| null | yes |  |
-| `status` | `draft` \| `submitted` \| `under_qc` \| `qc_approved` \| `qc_rejected` \| `cancelled` | yes |  |
+| `status` | `draft` \| `submitted` \| `under_qc` \| `qc_approved` \| `qc_rejected` \| `cancelled` \| `remedy_pending` \| `closed` | yes |  |
 | `complaint_type` | TypeRef | yes |  |
 | `severity` | `low` \| `medium` \| `high` | yes |  |
 | `contact_name` | string | yes |  |
@@ -919,6 +1035,54 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 
+**`Refund`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes |  |
+| `payee_name` | string \| null | yes | Null for a dealer. |
+| `paid_through` | Ref \| null | yes | Null for a dealer. |
+| `approval` | Approval \| null | yes | This refund's own request. Null for a dealer. |
+| `payment_reference` | string \| null | yes | The Account Manager's remark once paid. Null for a dealer. |
+
+**`Remedy`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `kind` | `refund` \| `replacement` \| `none` | yes |  |
+| `status` | `pending` \| `completed` \| `rejected` \| `withdrawn` \| `cancelled` | yes |  |
+| `remark` | string \| null | yes | Null for a dealer. |
+| `refund` | Refund \| null | yes |  |
+| `replacement` | Replacement \| null | yes |  |
+| `chosen_by` | UserRef \| null | yes | Null for a dealer. |
+| `chosen_at` | string | yes |  |
+| `completed_at` | string \| null | yes |  |
+
+**`RemedyIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `kind` | `refund` \| `replacement` \| `none` | yes | `refund`: an amount through approval. `replacement`: a free order of the defective lines. `none`: close the complaint now. |
+| `amount` | number \| string \| null |  | Refund only: rupees, two decimals at most. |
+| `payee_name` | string \| null |  | Refund only: who is paid. |
+| `paid_through_partner_id` | string \| null |  | Refund only: the dealer it is paid through. |
+| `remark` | string | yes | Why this remedy. |
+
+**`RemedyOrder`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `order_no` | string \| null | yes |  |
+| `status` | string | yes |  |
+
+**`Replacement`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `order` | RemedyOrder \| null | yes |  |
+
 **`Sla`**
 
 | Field | Type | Required | Notes |
@@ -995,6 +1159,12 @@ The complaint's events, newest first. A dealer never sees who decided.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
+
+**`WithdrawIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string | yes |  |
 
 **`api__schemas__auth__Envelope_list_Assignee____2`**
 

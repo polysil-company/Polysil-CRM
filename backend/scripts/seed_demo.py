@@ -178,6 +178,19 @@ def main() -> None:
             ON CONFLICT (doc_type, role_id, territory_id) DO NOTHING
             """
         )
+        # FS-015b: the refund each manager may approve, in rupees (question 19.2,
+        # GAP-180); they stack, then Accounts pays. Migration 026 inserts the same
+        # where roles exist; a fresh database seeds its roles after migrating.
+        cur.execute(
+            """
+            INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount)
+            SELECT 'complaint', r.id, NULL, v.amount
+              FROM (VALUES ('district_manager', 25000.00::numeric), ('state_manager', 100000.00),
+                           ('regional_manager', NULL)) v(code, amount)
+              JOIN role r ON r.code = v.code
+            ON CONFLICT (doc_type, role_id, territory_id) DO NOTHING
+            """
+        )
         # FS-013: the discount each role may give on a quotation, in percent
         # (question 6.8, GAP-105). The officer's row is its own limit; Admin-Sales
         # tops the ladder, uncapped. Migration 017 inserts the same where roles exist.
