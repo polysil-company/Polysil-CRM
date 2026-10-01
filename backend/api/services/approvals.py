@@ -20,9 +20,11 @@ from api.authz.predicate import Caller
 from api.config import get_settings
 from api.errors import NotFoundError, ValidationFailed
 from api.schemas import orders as sch
+from api.schemas.complaints import Complaint
 from api.schemas.leads import PageMeta, TerritoryRef
 from api.schemas.quotations import Quotation
 from api.services import approval_view, people
+from api.services import complaints as complaint_service
 from api.services import orders as order_service
 from api.services import quotations as quotation_service
 from api.services.leads import _decode_cursor, _encode_cursor
@@ -81,7 +83,17 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
         "WHERE r.doc_type = 'quotation' AND r.entity_id = q.id "
         "ORDER BY r.created_at DESC, r.id DESC LIMIT 1) ar ON true "
         "LEFT JOIN app_user u ON u.id = ar.requested_by "
-        "WHERE q.id = ANY(CAST(:ids AS uuid[]))"),
+        "WHERE q.id = ANY(CAST(:ids AS uuid[])) "
+        "UNION ALL "
+        # FS-015b: a refund; the party is the complaint's contact, the total the amount
+        "SELECT c.id, c.complaint_no::text, c.contact_name, ar.amount, false, ar.requested_by, "
+        "u.full_name, ar.created_at, c.created_at, NULL::numeric "
+        "FROM complaint c "
+        "JOIN LATERAL (SELECT r.amount, r.requested_by, r.created_at FROM approval_request r "
+        "WHERE r.doc_type = 'complaint' AND r.entity_id = c.id AND r.status = 'pending' "
+        "ORDER BY r.created_at DESC, r.id DESC LIMIT 1) ar ON true "
+        "LEFT JOIN app_user u ON u.id = ar.requested_by "
+        "WHERE c.id = ANY(CAST(:ids AS uuid[]))"),
         {"ids": ids})).all()}
     names = await people.resolve(db, list(docs.values()), [("created_by", "full_name")])
     data = []
@@ -112,6 +124,8 @@ async def get_request(db: AsyncSession, caller: Caller, request_id: str) -> sch.
     # the document's visibility decides, as it does for the document itself
     if row.doc_type == "quotation":
         await quotation_service.get_quotation(db, str(row.entity_id), get_settings())
+    elif row.doc_type == "complaint":
+        await complaint_service.get_complaint(db, caller, str(row.entity_id))
     else:
         await order_service.get_order(db, caller, str(row.entity_id))
     approval, _ = await approval_view.load(db, row.doc_type, str(row.entity_id),
@@ -122,8 +136,9 @@ async def get_request(db: AsyncSession, caller: Caller, request_id: str) -> sch.
 
 
 async def decide(db: AsyncSession, caller: Caller, step_id: str,
-                 body: sch.DecisionRequest) -> sch.Order | Quotation:
-    """The decided document: an order, or for a discount approval the quotation."""
+                 body: sch.DecisionRequest) -> sch.Order | Quotation | Complaint:
+    """The decided document: an order; for a discount approval the quotation; for a
+    refund (FS-015b) the complaint."""
     head = (await db.execute(text(
         "SELECT q.doc_type, q.entity_id FROM approval_step s "
         "JOIN approval_request q ON q.id = s.request_id "
@@ -137,6 +152,8 @@ async def decide(db: AsyncSession, caller: Caller, step_id: str,
         raise order_service.map_db_error(exc) from exc
     if head.doc_type == "quotation":
         return await quotation_service.get_quotation(db, str(head.entity_id), get_settings())
+    if head.doc_type == "complaint":
+        return await complaint_service.get_complaint(db, caller, str(head.entity_id))
     return await order_service.get_order(db, caller, str(head.entity_id))
 
 

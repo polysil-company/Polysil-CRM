@@ -667,6 +667,7 @@ and only the outcome to a dealer.
 | `doc_type` | string |  | Always sales_order. Tells an order from a quotation where either can come back. Default `sales_order`. |
 | `id` | string | yes |  |
 | `order_no` | string \| null | yes | Null until the first submit. |
+| `complaint` | OrderComplaintRef \| null |  | A replacement order's complaint (FS-015b). |
 | `status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` | yes |  |
 | `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` | yes |  |
 | `party` | OrderParty | yes | The farmer on one lead; the dealer on a consolidated order. |
@@ -701,6 +702,13 @@ and only the outcome to a dealer.
 | `closed_at` | string \| null | yes |  |
 | `close_remark` | string \| null | yes |  |
 | `created_at` | string | yes |  |
+
+**`OrderComplaintRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `complaint_no` | string \| null | yes |  |
 
 **`OrderCreate`**
 

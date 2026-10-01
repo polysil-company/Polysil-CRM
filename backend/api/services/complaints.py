@@ -38,7 +38,8 @@ from api.errors import (
 from api.schemas import complaints as sch
 from api.schemas.leads import PageMeta, TimelineEvent, TimelinePage
 from api.schemas.tasks import LeadLink, OrderLink, PartnerLink
-from api.services import people
+from api.services import approval_view, people, pricing
+from api.services.clock import today_ist
 from api.services.leads import _covering_org_unit, _decode_cursor, _encode_cursor
 from api.storage import Storage
 
@@ -100,6 +101,15 @@ def _refusal(exc: DBAPIError) -> Exception | None:
         return ValidationFailed(fields={"decision": _message(exc)})
     if state == "CMPSP":
         return ConflictError("A target already starts that day.", code="target_exists")
+    if state == "CMPRV":
+        field = _message(exc)
+        if field == "lines":
+            return ValidationFailed("The replacement lines no longer match the complaint; reload it.",
+                                    code="replacement_unpriced", fields={"lines": "changed"})
+        return ValidationFailed(fields={field: "not accepted"})
+    if state == "ORDNA":
+        return ValidationFailed("Nobody holds a role this approval needs: ask the admin.",
+                                code="no_approver")
     if state == "CMPPD":
         return ValidationFailed("A target cannot start in the past.", code="target_in_the_past",
                                 fields={"effective_from": "today or later"})
@@ -188,7 +198,9 @@ async def _can(db: AsyncSession, caller: Caller, r: Any) -> sch.Can:
         "SELECT complaint_refusal(CAST(:c AS uuid), 'submit') AS submit, "
         "complaint_refusal(CAST(:c AS uuid), 'check') AS check_, "
         "complaint_refusal(CAST(:c AS uuid), 'qc') AS qc, "
-        "complaint_refusal(CAST(:c AS uuid), 'cancel') AS cancel"), {"c": str(r.id)})).one()
+        "complaint_refusal(CAST(:c AS uuid), 'cancel') AS cancel, "
+        "complaint_refusal(CAST(:c AS uuid), 'remedy') AS remedy, "
+        "complaint_refusal(CAST(:c AS uuid), 'withdraw') AS withdraw"), {"c": str(r.id)})).one()
     perms = await _perms(db)
     draft = r.status_text == "draft"
     mine = caller.user_id in (str(r.raised_by), str(r.owner_user_id) if r.owner_user_id else "")
@@ -197,7 +209,8 @@ async def _can(db: AsyncSession, caller: Caller, r: Any) -> sch.Can:
               or (r.status_text == "under_qc" and refusals.qc is None))
     return sch.Can(edit=edit, submit=refusals.submit is None, check=refusals.check_ is None,
                    qc=refusals.qc is None, cancel=refusals.cancel is None,
-                   delete=draft and r.submit_count == 0 and perms["delete"], upload=upload)
+                   delete=draft and r.submit_count == 0 and perms["delete"], upload=upload,
+                   remedy=refusals.remedy is None, withdraw=refusals.withdraw is None)
 
 
 async def _rows(db: AsyncSession, where: str, params: dict[str, Any]) -> list[Any]:
@@ -278,9 +291,47 @@ async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> 
         owner=names.user(r.owner_user_id, r.owner_name),
         owner_org_unit=sch.Ref(id=str(r.owner_org_unit_id), name=r.office_name or ""),
         raised_by=names.user(r.raised_by, r.raiser_name),
+        remedy=await _remedy(db, complaint_id, portal),
+        closed_at=_iso(r.closed_at),
         can=await _can(db, caller, r),
         created_at=r.created_at.isoformat(), updated_at=r.updated_at.isoformat(),
         submitted_at=_iso(r.submitted_at))
+
+
+async def _remedy(db: AsyncSession, complaint_id: str, portal: bool) -> sch.Remedy | None:
+    """The live remedy, else the latest. A dealer sees the kind, status, amount and
+    the replacement order, never the payee, the approvers or the remark (rule 10)."""
+    m = (await db.execute(text(
+        "SELECT m.*, cp.name AS partner_name FROM complaint_remedy m "
+        "LEFT JOIN channel_partner cp ON cp.id = m.paid_through_partner_id "
+        "WHERE m.complaint_id = CAST(:c AS uuid) "
+        "ORDER BY (m.status = 'pending') DESC, m.chosen_at DESC, m.id DESC LIMIT 1"),
+        {"c": complaint_id})).one_or_none()
+    if m is None:
+        return None
+    refund = replacement = None
+    if m.kind == "refund":
+        approval = None
+        if not portal:
+            approval, _raw = await approval_view.load(db, "complaint", complaint_id, portal,
+                                                      request_id=str(m.approval_request_id))
+        refund = sch.Refund(
+            amount=f"{m.amount:.2f}", payee_name=None if portal else m.payee_name,
+            paid_through=(None if portal or m.paid_through_partner_id is None
+                          else sch.Ref(id=str(m.paid_through_partner_id), name=m.partner_name or "")),
+            approval=approval, payment_reference=None if portal else m.payment_reference)
+    elif m.kind == "replacement":
+        o = (await db.execute(text("SELECT * FROM complaint_remedy_order(CAST(:m AS uuid))"),
+                              {"m": str(m.id)})).one_or_none()
+        replacement = sch.Replacement(order=sch.RemedyOrder(id=str(o.id), order_no=o.order_no,
+                                                            status=o.status) if o else None)
+    chosen_by = None
+    if not portal:
+        chosen_by = (await people.resolve_ids(db, {str(m.chosen_by)})).user(m.chosen_by, None)
+    return sch.Remedy(id=str(m.id), kind=m.kind, status=m.status,
+                      remark=None if portal else m.remark, refund=refund, replacement=replacement,
+                      chosen_by=chosen_by, chosen_at=m.chosen_at.isoformat(),
+                      completed_at=_iso(m.completed_at))
 
 
 _BREACHED = ("((c.response_due_at IS NOT NULL AND COALESCE(c.responded_at, now()) > c.response_due_at) "
@@ -652,6 +703,95 @@ async def qc(db: AsyncSession, caller: Caller, complaint_id: str, body: sch.QcIn
                    {"c": complaint_id, "v": body.verdict, "r": body.remark, "rec": body.sample_received_on,
                     "tst": body.tested_on, "vis": body.field_visit_on,
                     "n": domain.clean_text(body.internal_note)})
+    return await get_complaint(db, caller, complaint_id)
+
+
+async def choose_remedy(db: AsyncSession, caller: Caller, complaint_id: str,
+                        body: sch.RemedyIn) -> sch.Complaint:
+    """FS-015b: a refund into the engine, a free replacement order, or no action."""
+    if body.kind == "refund":
+        missing = {f: "required for a refund" for f, v in
+                   (("amount", body.amount), ("payee_name", body.payee_name)) if v is None}
+        if missing:
+            raise ValidationFailed(fields=missing)
+    elif body.amount is not None or body.payee_name or body.paid_through_partner_id:
+        raise ValidationFailed(fields={"kind": "amount and payee belong to a refund"})
+    if body.kind == "replacement":
+        order, lines = await _replacement_rows(db, complaint_id)
+        await _definer(db, "SELECT complaint_remedy_replacement(CAST(:c AS uuid), CAST(:o AS jsonb), "
+                           "CAST(:l AS jsonb), :r)",
+                       {"c": complaint_id, "o": json.dumps(order, default=str),
+                        "l": json.dumps(lines, default=str), "r": body.remark})
+    else:
+        await _definer(db, "SELECT complaint_remedy_choose(CAST(:c AS uuid), :k, :a, :p, "
+                           "CAST(:pt AS uuid), :r)",
+                       {"c": complaint_id, "k": body.kind, "a": body.amount, "p": body.payee_name,
+                        "pt": body.paid_through_partner_id, "r": body.remark})
+    return await get_complaint(db, caller, complaint_id)
+
+
+# order_line's columns, from the orders service's row (its keys are bind names)
+_LINE_COLUMNS = {"n": "line_no", "product": "product_id", "desc": "description", "hsn": "hsn_code",
+                 "uom": "uom", "dec": "uom_decimals", "qty": "qty", "rate": "rate",
+                 "pl": "price_list_id", "pli": "price_list_item_id", "gr": "gst_rate_id",
+                 "gross": "gross", "d1p": "discount_pct", "d1a": "discount1_amt",
+                 "a1": "after_discount1", "d2p": "discount2_pct", "d2a": "discount2_amt",
+                 "a2": "after_discount2", "d3p": "discount3_pct", "d3a": "discount3_amt",
+                 "disc": "discount", "taxable": "taxable", "slab": "gst_slab",
+                 "cr": "cgst_rate", "sr": "sgst_rate", "ir": "igst_rate", "cgst": "cgst",
+                 "sgst": "sgst", "igst": "igst", "total": "total", "prov": "provisional_fields"}
+
+
+async def _replacement_rows(db: AsyncSession, complaint_id: str
+                            ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """The defective lines priced today with a 100 % first-tier discount, under the
+    caller's own claim (plan review B3). The definer checks them against the
+    complaint again under its lock."""
+    from decimal import Decimal
+
+    from api.services import orders as order_service  # the order row's shape, one source
+
+    c = (await db.execute(text(
+        "SELECT territory_id FROM complaint WHERE id = CAST(:c AS uuid) AND deleted_at IS NULL"),
+        {"c": complaint_id})).one_or_none()
+    if c is None:
+        raise NotFoundError("No such complaint.")
+    defective = (await db.execute(text(
+        "SELECT product_id, defective_qty FROM complaint_line WHERE complaint_id = CAST(:c AS uuid) "
+        "AND defective_qty > 0 ORDER BY line_no"), {"c": complaint_id})).all()
+    if not defective:
+        raise ValidationFailed("At least one product needs a defective quantity.",
+                               code="nothing_defective", fields={"lines": "nothing defective"})
+    specs = [pricing.LineSpec(product_id=str(d.product_id), qty=Decimal(d.defective_qty),
+                              discounts=(Decimal(100), Decimal(0), Decimal(0))) for d in defective]
+    try:
+        ctx = await pricing.price_document(
+            db, partner_id=None, place_of_supply_territory_id=str(c.territory_id), seller_gstin_id=None,
+            as_of=today_ist(), lines=specs, existing=False, tax_as_of=today_ist())
+    except (ValidationFailed, NotFoundError) as exc:
+        fields = getattr(exc, "fields", None) or {"lines": exc.message}
+        raise ValidationFailed("A defective product cannot be priced today.",
+                               code="replacement_unpriced", fields=fields) from exc
+    lines = []
+    for i, line in enumerate(ctx.document.lines):
+        row = order_service._line_row("", i + 1, line, None, None)
+        lines.append({col: row[key] for key, col in _LINE_COLUMNS.items()})
+    t = ctx.document.totals
+    price_lists = {line.rate.price_list.id for line in ctx.document.lines}
+    order = {"seller_gstin_id": ctx.seller_gstin_id, "place_of_supply_territory_id": str(c.territory_id),
+             "place_of_supply_state_id": ctx.place_of_supply_state_id, "intra_state": ctx.intra_state,
+             "price_effective_date": ctx.as_of,
+             "price_list_id": next(iter(price_lists)) if len(price_lists) == 1 else None,
+             "gross": t.gross, "discount": t.discount, "taxable": t.taxable, "cgst": t.cgst,
+             "sgst": t.sgst, "igst": t.igst, "total": t.total,
+             "is_provisional": any(line.provisional_fields for line in ctx.document.lines)}
+    return order, lines
+
+
+async def withdraw_remedy(db: AsyncSession, caller: Caller, complaint_id: str,
+                          body: sch.WithdrawIn) -> sch.Complaint:
+    await _definer(db, "SELECT complaint_remedy_withdraw(CAST(:c AS uuid), :r)",
+                   {"c": complaint_id, "r": body.remark})
     return await get_complaint(db, caller, complaint_id)
 
 

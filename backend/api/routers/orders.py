@@ -393,7 +393,8 @@ async def get_request(request_id: Id, db: DbSession, caller: CallerDep) -> dict[
 @approvals.post("/steps/{step_id}/decision", response_model=DecisionResult,
                 responses=_MUTATION_ERRORS,
                 dependencies=[Depends(require_any(("sales_orders", "approve"),
-                                                  ("quotations", "approve")))])
+                                                  ("quotations", "approve"),
+                                                  ("complaints", "approve")))])
 async def decide(step_id: Id, body: DecisionRequest, db: DbSession, caller: CallerDep,
                  claims: Claims, idem: IdemKey) -> Response:
     """Approve or reject a step. A remark is required to reject, and on every Accounts

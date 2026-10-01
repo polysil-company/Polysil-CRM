@@ -485,8 +485,14 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
     names = await people.resolve(db, [r], [("owner_user_id", "owner_name")],
                                  [("partner_id", "partner_name")])
     partner = names.partner(r.partner_id, r.partner_name, r.partner_type)
+    complaint = None
+    if r.type_text == "replacement":
+        c = (await db.execute(text("SELECT * FROM order_complaint(CAST(:o AS uuid))"),
+                              {"o": order_id})).one_or_none()
+        complaint = sch.OrderComplaintRef(id=str(c.id), complaint_no=c.complaint_no) if c else None
     return sch.Order(
-        id=str(r.id), order_no=r.order_no, status=r.status_text, order_type=r.type_text,
+        id=str(r.id), order_no=r.order_no, complaint=complaint, status=r.status_text,
+        order_type=r.type_text,
         party=sch.OrderParty(name=r.party_name, mobile=r.party_mobile, address=r.party_address,
                              gstin=r.party_gstin),
         partner=partner,

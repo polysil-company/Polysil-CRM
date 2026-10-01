@@ -30,11 +30,13 @@ from api.schemas.complaints import (
     Kind,
     LinesReplace,
     QcIn,
+    RemedyIn,
     Severity,
     SlaPolicy,
     SlaPolicyIn,
     Stats,
     Status,
+    WithdrawIn,
 )
 from api.schemas.leads import UUID_RE, TimelinePage
 from api.services import complaints as service
@@ -196,6 +198,37 @@ async def quality(complaint_id: Id, body: QcIn, db: DbSession, caller: CallerDep
     supply date; tested not before received."""
     return await _idem(db, claims, idem, f"POST /api/v1/complaints/{complaint_id}/qc", body,
                        lambda: service.qc(db, caller, complaint_id, body))
+
+
+@router.post("/{complaint_id}/remedy", response_model=Envelope[Complaint], responses=_MUTATION_ERRORS,
+             dependencies=[Depends(require("complaints", "approve"))])
+async def choose_remedy(complaint_id: Id, body: RemedyIn, db: DbSession, caller: CallerDep,
+                        claims: Claims, idem: IdemKey) -> Response:
+    """Settle a `qc_approved` complaint. `refund`: an amount and a payee, approved by
+    the managers by amount, then paid by the Account Manager. `replacement`: a free
+    order of the defective lines, approved by the Dispatch Manager. `none`: close
+    it now. Answers the complaint, `remedy_pending` or `closed`. Refusals:
+
+    - `409 status_changed`: not `qc_approved`;
+    - `403`: only QC chooses, and never the complaint's raiser or owner;
+    - `422` on `amount`, `payee_name`, `paid_through_partner_id` or `remark`;
+    - `422 nothing_defective`: a replacement with no defective quantity;
+    - `422 replacement_unpriced`: a defective product has no price today, or its
+      quantity breaks its unit; `fields` names the line;
+    - `422 no_approver`: a role the approval needs has nobody active."""
+    return await _idem(db, claims, idem, f"POST /api/v1/complaints/{complaint_id}/remedy", body,
+                       lambda: service.choose_remedy(db, caller, complaint_id, body))
+
+
+@router.post("/{complaint_id}/remedy/withdraw", response_model=Envelope[Complaint],
+             responses=_MUTATION_ERRORS, dependencies=[Depends(require("complaints", "approve"))])
+async def withdraw_remedy(complaint_id: Id, body: WithdrawIn, db: DbSession, caller: CallerDep,
+                          claims: Claims, idem: IdemKey) -> Response:
+    """QC takes back the pending remedy: a refund while its approval is open, a
+    replacement while nothing has shipped (its order is cancelled). The complaint
+    returns to `qc_approved`. `409 status_changed` once it moved on."""
+    return await _idem(db, claims, idem, f"POST /api/v1/complaints/{complaint_id}/remedy/withdraw",
+                       body, lambda: service.withdraw_remedy(db, caller, complaint_id, body))
 
 
 @router.post("/{complaint_id}/cancel", response_model=Envelope[Complaint], responses=_MUTATION_ERRORS,
