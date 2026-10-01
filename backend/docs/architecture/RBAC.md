@@ -592,7 +592,7 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | quotations | V:global | | | **V:territory** | | V:global |
 | sales_orders | V:global A | V:global A | | | | V:global |
 | dispatch | V:global | V:global CEA | | | | V:global |
-| complaints | | | V:global CEA | | | V:global CE |
+| complaints | V:global | | V:global CEA | | | V:global CE |
 | payments | V:global CEA | | | | | |
 | subsidy | V:global | | | **V:territory CE** | | |
 | marketing_material | | | | | V:global CEAD | |
