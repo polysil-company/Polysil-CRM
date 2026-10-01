@@ -1,3 +1,4 @@
+import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
 import type { LeadWire } from "@/features/leads/api/leads.schemas";
 import type {
   DispatchWire,
@@ -7,6 +8,7 @@ import type {
 } from "@/features/orders/api/orders.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 
+import { orderManagersFor } from "./approvals";
 import { MOCK_PRODUCTS, MOCK_SELLER } from "./quotations";
 import { MOCK_ID_SPACE, MOCK_STAFF, mockUuid } from "./reference";
 
@@ -32,23 +34,21 @@ export function qtyText(thousandths: number): string {
 
 // ── the approval chain ───────────────────────────────────────────────────────────
 
-/** The stand-in bands, including GST: District to 1,00,000; State to 5,00,000; Regional above. */
-const DISTRICT_CEILING = 100_000;
-const STATE_CEILING = 500_000;
-
 /**
- * Every manager level up to the order's band, then Accounts, then Dispatch. The mock's owners
- * are field officers, so no level is skipped for the owner's own rank.
+ * Every manager level up to the one whose limit covers the order (APPR-002), then Accounts,
+ * then Dispatch. The mock's owners are field officers, so no level is skipped for the
+ * owner's own rank.
  */
-export function chainFor(total: string): string[] {
-  const amount = Number(total);
-  const managers =
-    amount <= DISTRICT_CEILING
-      ? ["district_manager"]
-      : amount <= STATE_CEILING
-        ? ["district_manager", "state_manager"]
-        : ["district_manager", "state_manager", "regional_manager"];
-  return [...managers, "account_manager", "dispatch_manager"];
+export function chainFor(
+  total: string,
+  thresholds: readonly ThresholdWire[],
+  territoryId: string | null,
+): string[] {
+  return [
+    ...orderManagersFor(total, thresholds, territoryId),
+    "account_manager",
+    "dispatch_manager",
+  ];
 }
 
 type ApprovalWire = NonNullable<OrderWire["approval"]>;
@@ -364,6 +364,7 @@ const SEEDS: readonly Seed[] = [
 export function generateOrders(
   leads: readonly LeadWire[],
   quotations: readonly QuotationWire[],
+  thresholds: readonly ThresholdWire[],
 ): OrderWire[] {
   const accepted = quotations.filter(
     (quotation) => quotation.status === "accepted" && quotation.superseded_by === null,
@@ -386,14 +387,23 @@ export function generateOrders(
       remarks: index % 2 === 0 ? "Deliver before the sowing season." : null,
       createdAt: new Date(createdMs).toISOString(),
     });
-    orders.push(seedState(order, seed, index, createdMs));
+    orders.push(seedState(order, seed, index, createdMs, thresholds));
   }
   return orders.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 }
 
-function seedState(order: OrderWire, seed: Seed, index: number, createdMs: number): OrderWire {
+function seedState(
+  order: OrderWire,
+  seed: Seed,
+  index: number,
+  createdMs: number,
+  thresholds: readonly ThresholdWire[],
+): OrderWire {
   const submittedMs = createdMs + 2 * HOUR;
-  const steps = chainSteps(chainFor(order.totals.total), 50_000 + index * 10);
+  const steps = chainSteps(
+    chainFor(order.totals.total, thresholds, order.territory.id),
+    50_000 + index * 10,
+  );
   order.order_no = orderNumber(index + 1);
   order.submitted_at = new Date(submittedMs).toISOString();
   const approvedMs = submittedMs + (steps.length + 1) * HOUR;

@@ -1,10 +1,11 @@
+import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 
-import { seedApprovals, type MockApprovalStep } from "./data/approvals";
+import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
@@ -32,6 +33,10 @@ export interface MockDb {
   orderEvents: Map<string, TimelineEventWire[]>;
   /** When a just-approved order's PDF is ready (epoch ms); read by the next GET. */
   orderPdfReadyAt: Map<string, number>;
+  /** Approval limits: an order's value and a discount, per role and territory (APPR-002). */
+  thresholds: ThresholdWire[];
+  /** PUT /approvals/thresholds replays: Idempotency-Key → the request. */
+  thresholdWrites: Map<string, string>;
   /** The approval queue: quotation discounts and sales orders, oldest first (APPR-001). */
   approvalSteps: MockApprovalStep[];
   /** Decision replays: Idempotency-Key → the request and the step it decided. */
@@ -59,8 +64,12 @@ function createMockDb(): MockDb {
   const leads = generateLeads();
   const { conversations, messages } = generateConversations(leads);
   const quotations = generateQuotations(leads);
-  const orders = generateOrders(leads, quotations);
-  const approvalSteps = seedApprovals(quotations, orders);
+  const district = leads.find((lead) => lead.territory.level === "district")?.territory;
+  const thresholds = seedThresholds(
+    district === undefined ? null : { id: district.id, name: district.name, level: district.level },
+  );
+  const orders = generateOrders(leads, quotations, thresholds);
+  const approvalSteps = seedApprovals(quotations, orders, thresholds);
   return {
     leads,
     quotations,
@@ -72,6 +81,8 @@ function createMockDb(): MockDb {
     orderWrites: new Map(),
     orderEvents: new Map(),
     orderPdfReadyAt: new Map(),
+    thresholds,
+    thresholdWrites: new Map(),
     approvalSteps,
     approvalDecisions: new Map(),
     quotationDeletes: new Map(),

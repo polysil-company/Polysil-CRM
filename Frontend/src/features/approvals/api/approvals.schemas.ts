@@ -115,3 +115,80 @@ export function decisionFormSchema(
 }
 
 export type DecisionForm = { remark: string };
+
+// ── approval limits (APPR-002) ────────────────────────────────────────────────────
+
+/** An order's limits are for the three managers; a quotation's discount for five roles. */
+export const ORDER_LIMIT_ROLES = ["district_manager", "state_manager", "regional_manager"] as const;
+export const DISCOUNT_LIMIT_ROLES = [
+  "field_officer",
+  "district_manager",
+  "state_manager",
+  "regional_manager",
+  "admin_sales",
+] as const;
+export type LimitRole = (typeof DISCOUNT_LIMIT_ROLES)[number];
+
+const thresholdWireSchema = z.object({
+  doc_type: z.enum(APPROVAL_DOC_TYPES),
+  role: z.string().min(1),
+  territory: z.object({ id: z.string().min(1), name: z.string(), level: z.string() }).nullable(),
+  /** Null: no ceiling. Rupees including GST for an order, a percent for a discount. */
+  max_amount: decimal.nullable(),
+  unit: z.enum(["inr", "pct"]),
+});
+
+export type ThresholdWire = z.input<typeof thresholdWireSchema>;
+
+const thresholdSchema = thresholdWireSchema.transform((wire) => ({
+  docType: wire.doc_type,
+  role: wire.role,
+  territory: wire.territory,
+  maxAmount: wire.max_amount,
+  unit: wire.unit,
+}));
+
+export type Threshold = z.output<typeof thresholdSchema>;
+
+/** GET and PUT /approvals/thresholds both answer with every row. */
+export const thresholdsResponseSchema = z
+  .object({ data: z.array(thresholdSchema) })
+  .transform(({ data }) => data);
+
+/** PUT /approvals/thresholds — one role's limit, company-wide (`territory_id: null`) or for a territory. */
+export interface ThresholdPutRequest {
+  readonly doc_type: ApprovalDocType;
+  readonly role: LimitRole;
+  readonly territory_id: string | null;
+  /** Null for no ceiling. */
+  readonly max_amount: string | null;
+}
+
+/** The limit form: an amount, or no ceiling where the role may have none. */
+export const limitFormSchema = z
+  .object({
+    unit: z.enum(["inr", "pct"]),
+    noLimit: z.boolean(),
+    amount: z.string().trim(),
+  })
+  .superRefine((form, ctx) => {
+    if (form.noLimit) {
+      return;
+    }
+    if (!/^\d+(\.\d{1,2})?$/.test(form.amount)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["amount"],
+        message: form.unit === "inr" ? "An amount in rupees, like 100000" : "A percent, like 12.5",
+      });
+      return;
+    }
+    const value = Number(form.amount);
+    if (form.unit === "inr" && value <= 0) {
+      ctx.addIssue({ code: "custom", path: ["amount"], message: "Above ₹0" });
+    }
+    if (form.unit === "pct" && value > 100) {
+      ctx.addIssue({ code: "custom", path: ["amount"], message: "At most 100%" });
+    }
+  });
+export type LimitForm = z.infer<typeof limitFormSchema>;

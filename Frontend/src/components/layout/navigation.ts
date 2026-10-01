@@ -13,6 +13,7 @@ import {
   PackageIcon,
   RupeeIcon,
   Settings02Icon,
+  SlidersHorizontalIcon,
   Store01Icon,
   Task01Icon,
   UserMultiple02Icon,
@@ -212,6 +213,15 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         icon: Analytics01Icon,
         module: "reports",
         dataId: "RPT-002",
+      },
+      {
+        id: "approval-limits",
+        label: "Approval limits",
+        description: "How much each role may approve: an order's value and a quotation's discount.",
+        icon: SlidersHorizontalIcon,
+        module: "masters",
+        dataId: "APPR-002",
+        href: "/approval-limits",
       },
       {
         id: "masters",

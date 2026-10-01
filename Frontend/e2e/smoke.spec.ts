@@ -245,3 +245,20 @@ test.describe("[SO-001] Sales orders", () => {
     await expectNoAccessibilityViolations(page);
   });
 });
+
+test.describe("[APPR-002] Approval limits", () => {
+  test("an administrator sees both ladders and may change a limit", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("polysil:mock-role", "admin");
+    });
+    await signIn(page, "/approval-limits");
+
+    const orders = page.getByRole("list", { name: "Order value, company-wide" });
+    await expect(orders.getByText("Up to ₹1,00,000")).toBeVisible();
+    await page
+      .getByRole("button", { name: "Change the State Manager limit (Order value, company-wide)" })
+      .click();
+    await expect(page.getByRole("dialog", { name: "State Manager's order limit" })).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+  });
+});

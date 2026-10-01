@@ -1,10 +1,18 @@
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
-import type { QueuePageWire } from "@/features/approvals/api/approvals.schemas";
+import {
+  APPROVAL_DOC_TYPES,
+  DISCOUNT_LIMIT_ROLES,
+  ORDER_LIMIT_ROLES,
+  type QueuePageWire,
+  type ThresholdWire,
+} from "@/features/approvals/api/approvals.schemas";
 import { buildApiUrl } from "@/lib/api/url";
+import { can } from "@/lib/auth/permissions";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { stepIsOpen, stepVisibleTo, type MockApprovalStep } from "@/mocks/data/approvals";
+import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb } from "@/mocks/db";
 
@@ -19,6 +27,10 @@ import { decodeCursor, encodeCursor, errorResponse } from "./shared";
  * decision, which answers with the quotation or order it decided. Refusals: not_your_step,
  * self_approval, step_already_decided, request_closed, figures_changed, remark_required (to
  * return, and on every Accounts decision).
+ *
+ * APPR-002 · The approval limits: anyone signed in reads them; `masters.edit` sets one role's
+ * limit, company-wide or for a territory, as long as each level stays above the one below
+ * (`thresholds_not_increasing`). A new limit decides the next order's chain here too.
  */
 
 const DEFAULT_LIMIT = 25;
@@ -47,12 +59,140 @@ function toRow(step: MockApprovalStep): QueuePageWire["data"][number] {
   };
 }
 
+const thresholdPutSchema = z.object({
+  doc_type: z.enum(APPROVAL_DOC_TYPES).default("sales_order"),
+  role: z.enum(DISCOUNT_LIMIT_ROLES),
+  territory_id: z.string().min(1).nullish(),
+  max_amount: z.union([z.number(), z.string().regex(/^\d+(\.\d+)?$/)]).nullish(),
+});
+
+/** Each role's level in its ladder: a higher level's ceiling stays above a lower one's. */
+const LIMIT_LEVELS: Readonly<Record<ThresholdWire["doc_type"], readonly string[]>> = {
+  sales_order: ORDER_LIMIT_ROLES,
+  quotation: DISCOUNT_LIMIT_ROLES,
+};
+
 const decisionSchema = z.object({
   decision: z.enum(["approve", "reject"]),
   remark: z.string().trim().max(1000).nullish(),
 });
 
 export const approvalHandlers = [
+  http.get(buildApiUrl("/approvals/thresholds"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    return HttpResponse.json({ data: mockDb.thresholds });
+  }),
+
+  http.put(buildApiUrl("/approvals/thresholds"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const key = request.headers.get("idempotency-key")?.trim() ?? "";
+    if (key === "") {
+      return errorResponse(
+        400,
+        "idempotency_key_required",
+        "An Idempotency-Key header is required.",
+      );
+    }
+    const raw: unknown = await request.json();
+    const serialized = JSON.stringify(raw);
+    const replay = mockDb.thresholdWrites.get(key);
+    if (replay !== undefined) {
+      return replay === serialized
+        ? HttpResponse.json({ data: mockDb.thresholds })
+        : errorResponse(409, "idempotency_key_reused", "This Idempotency-Key was already used.");
+    }
+    if (!can(mockPermissionsFor(readMockRole()), "masters", "edit")) {
+      return errorResponse(403, "forbidden", "Only an administrator changes approval limits.");
+    }
+    const parsed = thresholdPutSchema.safeParse(raw);
+    if (!parsed.success) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        max_amount: "a number, or null for no ceiling",
+      });
+    }
+    const { doc_type: docType, role } = parsed.data;
+    const territoryId = parsed.data.territory_id ?? null;
+    const territory =
+      territoryId === null
+        ? null
+        : (mockDb.leads.find((lead) => lead.territory.id === territoryId)?.territory ?? null);
+    if (territoryId !== null && territory === null) {
+      return errorResponse(404, "not_found", "No such territory.");
+    }
+    const amount = parsed.data.max_amount == null ? null : Number(parsed.data.max_amount);
+    const levels = LIMIT_LEVELS[docType];
+    if (!levels.includes(role)) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        role: `no ${docType} limit for this role`,
+      });
+    }
+    if (docType === "quotation" && amount !== null && amount > 100) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        max_amount: "a discount limit is at most 100",
+      });
+    }
+    if (docType === "sales_order" && amount !== null && amount <= 0) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        max_amount: "an order limit is above 0",
+      });
+    }
+    if (docType === "quotation" && amount === null && role !== "admin_sales") {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        max_amount: "only Admin-Sales may have no limit",
+      });
+    }
+    const group = mockDb.thresholds.filter(
+      (row) => row.doc_type === docType && (row.territory?.id ?? null) === territoryId,
+    );
+    const ceilingOf = (level: string): number | null => {
+      if (level === role) {
+        return amount;
+      }
+      const row = group.find((item) => item.role === level);
+      return row === undefined || row.max_amount === null ? null : Number(row.max_amount);
+    };
+    const ceilings = levels.map(ceilingOf).filter((value) => value !== null);
+    const increasing = ceilings.every(
+      (value, index) => index === 0 || value > (ceilings[index - 1] ?? 0),
+    );
+    if (!increasing) {
+      return errorResponse(
+        422,
+        "thresholds_not_increasing",
+        "A higher manager's limit must be above a lower one's.",
+        {
+          max_amount: "not above the level below",
+        },
+      );
+    }
+    const text = amount === null ? null : amount.toFixed(2);
+    const existing = mockDb.thresholds.find(
+      (row) =>
+        row.doc_type === docType &&
+        row.role === role &&
+        (row.territory?.id ?? null) === territoryId,
+    );
+    if (existing !== undefined) {
+      existing.max_amount = text;
+    } else {
+      mockDb.thresholds.push({
+        doc_type: docType,
+        role,
+        territory:
+          territory === null
+            ? null
+            : { id: territory.id, name: territory.name, level: territory.level },
+        max_amount: text,
+        unit: docType === "quotation" ? "pct" : "inr",
+      });
+    }
+    mockDb.thresholdWrites.set(key, serialized);
+    return HttpResponse.json({ data: mockDb.thresholds });
+  }),
+
   http.get(buildApiUrl("/approvals/pending"), async ({ request }) => {
     const { scenario, failure } = await applyScenario();
     if (failure) return failure;

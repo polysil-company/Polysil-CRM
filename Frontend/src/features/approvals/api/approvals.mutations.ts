@@ -5,9 +5,14 @@ import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/r
 import { orderKeys } from "@/features/orders/api/orders.queries";
 import { quotationKeys } from "@/features/quotations/api/quotations.queries";
 
-import { decideApprovalStep } from "./approvals.api";
+import { decideApprovalStep, putApprovalThreshold } from "./approvals.api";
 import { approvalKeys } from "./approvals.queries";
-import type { DecisionRequest, DecisionResult } from "./approvals.schemas";
+import type {
+  DecisionRequest,
+  DecisionResult,
+  Threshold,
+  ThresholdPutRequest,
+} from "./approvals.schemas";
 
 export interface DecideInput {
   readonly stepId: string;
@@ -39,6 +44,23 @@ export function useDecideApproval(): UseMutationResult<DecisionResult, Error, De
         void queryClient.invalidateQueries({ queryKey: orderKeys.lists() });
         void queryClient.invalidateQueries({ queryKey: orderKeys.timeline(result.id) });
       }
+    },
+  });
+}
+
+/** APPR-002 · Set one role's limit; the answer is every row, so the screen shows it at once. */
+export function usePutApprovalThreshold(): UseMutationResult<
+  Threshold[],
+  Error,
+  { body: ThresholdPutRequest; idempotencyKey: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...approvalKeys.thresholds(), "put"],
+    mutationFn: putApprovalThreshold,
+    meta: { dataId: "APPR-002" },
+    onSuccess: (rows) => {
+      queryClient.setQueryData(approvalKeys.thresholds(), rows);
     },
   });
 }

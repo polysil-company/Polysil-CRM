@@ -896,7 +896,7 @@ export const quotationHandlers = [
         return errorResponse(409, "approval_pending", "A request is already waiting.");
       }
       const effective = Number(quotation.discount?.effective_pct ?? "0");
-      const approverRole = quotationApproverFor(effective);
+      const approverRole = quotationApproverFor(effective, mockDb.thresholds);
       if (approverRole === null) {
         return errorResponse(
           422,

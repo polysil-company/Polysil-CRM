@@ -110,3 +110,15 @@ export function decisionRefusal(error: unknown): DecisionRefusal {
     }
   }
 }
+
+/** APPR-002 · Who a limit row is for, as the business says it. */
+export function limitRoleLabel(role: string): string {
+  switch (role) {
+    case "field_officer":
+      return "Field officer";
+    case "admin_sales":
+      return "Admin-Sales";
+    default:
+      return roleLabel(role);
+  }
+}
