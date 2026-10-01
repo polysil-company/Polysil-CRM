@@ -11,7 +11,7 @@ import { useCan } from "@/features/session/hooks/use-session";
 export function SalesTabs(): React.JSX.Element {
   const canSeeLeads = useCan("leads");
   const canSeeQuotations = useCan("quotations");
-  const canSeeOrders = useCan("orders");
+  const canSeeOrders = useCan("sales_orders");
   const { data: stats } = useQuery({ ...leadStatsQueryOptions(), enabled: canSeeLeads });
 
   const tabs: NavTab[] = [

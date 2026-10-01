@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckmarkBadge01Icon, Invoice03Icon } from "@hugeicons/core-free-icons";
+import { CheckmarkBadge01Icon, Invoice03Icon, PackageIcon } from "@hugeicons/core-free-icons";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { parseAsBoolean, useQueryState } from "nuqs";
@@ -26,7 +26,7 @@ import {
 } from "@/features/approvals/lib/approval-labels";
 import { formatRate } from "@/features/quotations/lib/quotation-labels";
 import { roleLabel } from "@/features/quotations/lib/quotation-lifecycle";
-import { useCan, useSession } from "@/features/session/hooks/use-session";
+import { useCanApprove, useSession } from "@/features/session/hooks/use-session";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { formatCount, formatInr } from "@/lib/format";
 
@@ -49,7 +49,7 @@ function approvingRole(code: string | null): string | null {
 export function ApprovalsInbox(): React.JSX.Element {
   const [includeBelow, setIncludeBelow] = useQueryState("below", parseAsBoolean.withDefault(false));
   const query = useInfiniteQuery(approvalQueueQueryOptions({ includeBelow }));
-  const canApprove = useCan("approvals", "approve");
+  const canApprove = useCanApprove();
   const session = useSession();
   const myRole = approvingRole(session.data?.role?.code ?? null);
   const [pending, setPending] = useState<PendingDecision | null>(null);
@@ -217,9 +217,13 @@ function ApprovalRow({
             Open the quotation
           </Link>
         ) : (
-          <span className="text-xs text-muted-foreground">
-            Order details open from Sales orders once that module is built.
-          </span>
+          <Link
+            href={`/sales-orders/${document.id}`}
+            className={buttonVariants({ variant: "ghost", size: "sm", className: "self-start" })}
+          >
+            <Icon icon={PackageIcon} />
+            Open the order
+          </Link>
         )}
         {canDecide ? (
           <div className="flex gap-2">

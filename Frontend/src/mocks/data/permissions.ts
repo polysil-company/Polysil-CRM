@@ -41,7 +41,7 @@ function fieldStaff(scope: Scope): MockModulePermission[] {
   return [
     grant("leads", ["view", "create", "edit"], scope),
     grant("quotations", ["view", "create", "edit"], scope),
-    grant("orders", ["view", "create"], scope),
+    grant("sales_orders", ["view", "create", "edit"], scope),
     grant("subsidy", ["view", "create"], scope),
     grant("complaints", ["view", "create"], scope),
     grant("tasks", ["view", "create", "edit"], scope),
@@ -52,8 +52,13 @@ function fieldStaff(scope: Scope): MockModulePermission[] {
 
 function manager(scope: Scope): MockModulePermission[] {
   return [
-    ...fieldStaff(scope),
-    grant("approvals", ["view", "approve"], scope),
+    // One entry per module, as GET /auth/me returns: the manager's replace the officer's.
+    ...fieldStaff(scope).filter(
+      (entry) => entry.module !== "quotations" && entry.module !== "sales_orders",
+    ),
+    // Managers approve orders and quotation discounts (RBAC.md §6.1).
+    grant("quotations", ["view", "create", "edit", "approve"], scope),
+    grant("sales_orders", ["view", "create", "edit", "approve"], scope),
     grant("reports", ["view"], scope),
   ];
 }
@@ -61,7 +66,7 @@ function manager(scope: Scope): MockModulePermission[] {
 function channelPartner(): MockModulePermission[] {
   return [
     grant("leads", ["view", "edit"], "partner_subtree"),
-    grant("orders", ["view", "create"], "partner_subtree"),
+    grant("sales_orders", ["view", "create", "edit"], "partner_subtree"),
     grant("subsidy", ["view", "create"], "partner_subtree"),
     grant("complaints", ["view", "create"], "partner_subtree"),
     grant("marketing", ["view"], "global"),
@@ -83,13 +88,15 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
     case "account_manager":
       return [
         grant("accounts", ["view", "edit", "approve"], "global"),
-        grant("orders", ["view"], "global"),
+        // Accounts decides the payment step of every order (RBAC.md §6.2).
+        grant("sales_orders", ["view", "approve"], "global"),
         SCHEMES_VIEW,
       ];
     case "dispatch_manager":
       return [
-        grant("dispatch", ["view", "edit"], "global"),
-        grant("orders", ["view"], "global"),
+        // Dispatch approves the last step, then records what left (RBAC.md §6.2).
+        grant("dispatch", ["view", "create", "edit", "approve"], "global"),
+        grant("sales_orders", ["view", "approve"], "global"),
         SCHEMES_VIEW,
       ];
     case "qa_manager":

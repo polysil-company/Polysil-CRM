@@ -928,6 +928,7 @@ export const quotationHandlers = [
       mockDb.approvalSteps.push({
         stepId,
         requestId,
+        seq: 1,
         role: approverRole,
         stalled: false,
         docType: "quotation",

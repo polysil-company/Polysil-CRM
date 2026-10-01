@@ -100,7 +100,7 @@ describe("[APPR-001] decideApprovalStep", () => {
           idempotencyKey: key(),
         }),
       ),
-    ).resolves.toEqual({ status: 422, code: "validation_error" });
+    ).resolves.toEqual({ status: 422, code: "remark_required" });
 
     await decideApprovalStep(stepId, {
       body: { decision: "reject", remark: "Offer 8% instead" },

@@ -273,7 +273,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 ## 9. Integration status — frontend ↔ backend
 
-> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **28 September 2026**: PR #8 and PR #18 merged; lead actions (LEAD-005…008) built on `claude/integration-branch-review-gw0r1g`.
+> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **29 September 2026**: quotations (#21, #28), approvals (#26) and the staging review fixes (#29) merged into `integration`; sales orders and dispatch (SO-001…004, DISP-002) built on `feature/SO-001-sales-orders`. The backend now serves the dashboard, notifications and messages (BE-008…010, #30 and #31) — connecting them is next after orders.
 
 **How the two sides meet.** The browser calls `/api/v1` on the app's own origin; `next.config.ts` forwards it to `API_PROXY_TARGET`. Every call goes through `apiRequest` (`src/lib/api/client.ts`): Zod-validated responses, `x-request-id` / `x-data-id`, `Idempotency-Key` on mutations, one refresh-and-retry on a 401. The backend's contract is `backend/docs/api/*.md` (generated) and the dev API's `/openapi.json`. `NEXT_PUBLIC_API_MOCKING=partial` sends everything to the dev API except the modules listed in `unbuiltHandlers` (`src/mocks/handlers/index.ts`).
 
@@ -304,8 +304,15 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Delete a draft | QUOT-011 | `DELETE /quotations/{id}` |
 | The customer's quotation page `/q/{token}` (no sign-in) | QUOT-012 | `GET /public/q/{token}`, `GET /public/q/{token}/pdf` |
 | Approvals inbox — quotation discounts and sales orders, approve or reject with a reason, sidebar count | APPR-001 | `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` |
+| Sales orders list — status, whom it waits on, how much has shipped; filters and "only mine" in the URL | SO-001 | `GET /orders` |
+| Order page — lines with sent, short and open; the approval chain; notices; history; PDF | SO-002 | `GET /orders/{id}`, `GET /orders/{id}/timeline`, `GET /orders/{id}/pdf` |
+| Place an order from an accepted quotation; a draft's delivery, terms and remarks; delete a never-submitted draft | SO-003 | `POST /orders`, `PATCH /orders/{id}`, `DELETE /orders/{id}` |
+| Submit for approval (again, after a return); cancel with a reason | SO-004 | `POST /orders/{id}/submit`, `POST /orders/{id}/cancel` |
+| Record a dispatch, void one, close the rest short | DISP-002 | `POST /orders/{id}/dispatches`, `POST /dispatches/{id}/void`, `POST /orders/{id}/close-short` |
 
-LEAD-005…008, QUOT-001…012, APPR-001 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+**Permissions follow the backend's module codes** (`backend/docs/architecture/RBAC.md` §6): orders are `sales_orders`, dispatch is `dispatch`, and there is no `approvals` module — whoever holds `sales_orders.approve` or `quotations.approve` sees Approvals. Before this, the frontend asked for `orders` and `approvals`, so on the real backend Sales orders and Approvals would have stayed hidden.
+
+LEAD-005…008, QUOT-001…012, APPR-001, SO-001…004, DISP-002 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 
@@ -317,19 +324,21 @@ LEAD-005…008, QUOT-001…012, APPR-001 and MSTR-003 are built on the backend's
 | `followUpsDueToday` | not served — the backend records no follow-up date yet |
 | — | `by_priority`, `unassigned` (new) |
 
-### 9.2 Still mocked — no backend endpoint yet
+### 9.2 Still mocked — the backend serves them now, the frontend connects next
 
-| Area | Data IDs | Mock endpoints | Needs from the backend |
+| Area | Data IDs | Mock endpoints | Backend |
 |---|---|---|---|
-| Dashboard figures | RPT-001 | `GET /dashboard/overview` | A figures endpoint, or agreement to compose it from `/leads/stats` and `/orders/stats`; source breakdown; follow-ups |
-| Notifications | NOTIF-001, NOTIF-002 | `GET /notifications`, `POST /notifications/read` | The endpoints |
-| Staff messages | MSG-001…005 | `/conversations*`, `/staff-directory` | The endpoints |
+| Dashboard figures | RPT-001 | `GET /dashboard/overview` | Served since #30 (BE-008), in the mock's shape, snake_case: `backend/docs/api/dashboard.md` |
+| Notifications | NOTIF-001, NOTIF-002 | `GET /notifications`, `POST /notifications/read` | Served since #31 (BE-009): `backend/docs/api/notifications.md` |
+| Staff messages | MSG-001…005 | `/conversations*`, `/staff-directory` | Served since #31 (BE-010), with `up_to` on mark-read: `backend/docs/api/messages.md` |
+
+The backend also finished sorting on `GET /leads` (BE-001), crops and land on a lead (BE-003), the territory levels a lead may sit in (BE-005), and names on assignment and quotation events (BE-006, BE-017); win probability and weekly activity are dropped (BE-004). The frontend picks these up in the pull request after sales orders.
 
 ### 9.3 Served by the backend, not yet built on the frontend
 
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
-| **Sales orders and dispatch** — the approvals inbox already decides orders; their pages come here. Also the approval limits screen for admins | `/orders/*`, `/dispatches/*`, `GET`/`PUT /approvals/thresholds` | `backend/docs/handover/orders-api-contract.md`, `backend/docs/api/approvals.md` | **1 — next** |
+| **A direct order** typed in line by line (not from quotations), and a **consolidated** one from several leads of one dealer (SO-005); the **approval limits** screen for admins (APPR-002) | `POST /orders` with `lines`, `PUT /orders/{id}/lines`, `GET`/`PUT /approvals/thresholds` | `backend/docs/api/orders.md`, `backend/docs/api/approvals.md` | **1 — next** |
 | Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 2 |
 | Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 3 |
 | Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 6 |

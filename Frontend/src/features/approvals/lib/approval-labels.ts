@@ -21,12 +21,12 @@ export function documentTitle(docType: ApprovalDocType, number: string | null): 
 }
 
 /**
- * The backend asks for a remark on every Accounts decision. Its role codes for Accounts
- * are not in the contract's examples, so any role naming "account" counts.
- * TODO(APPR-001): confirm the Accounts role code with the backend.
+ * The backend asks for a remark to reject, and on every Accounts decision: Accounts checks
+ * payment outside the system, and the remark is the record (role `account_manager`,
+ * backend migration 013, BE-018).
  */
 export function remarkRequired(decision: "approve" | "reject", role: string): boolean {
-  return decision === "reject" || role.includes("account");
+  return decision === "reject" || role === "account_manager";
 }
 
 /** "State Manager's step" — whose step a row is, for a manager covering a lower one. */

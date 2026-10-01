@@ -184,7 +184,7 @@ function DecisionForm({
           <FieldLabel htmlFor="decision-remark">
             {approve ? "Remark" : "Reason"}
             {required ? null : (
-              <span className="font-normal text-subtle-foreground">(optional)</span>
+              <span className="font-normal text-muted-foreground">(optional)</span>
             )}
           </FieldLabel>
           <Textarea

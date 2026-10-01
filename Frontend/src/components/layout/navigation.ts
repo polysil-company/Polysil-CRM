@@ -20,7 +20,7 @@ import {
 import type { Route } from "next";
 
 import type { IconGlyph } from "@/components/ui/icon";
-import { can, type ModuleCode, type ModulePermission } from "@/lib/auth/permissions";
+import { can, canApprove, type ModuleCode, type ModulePermission } from "@/lib/auth/permissions";
 import type { DataId } from "@/lib/data-ids";
 
 export interface NavItem {
@@ -36,6 +36,8 @@ export interface NavItem {
   readonly href?: Route;
   /** Who the item is for. "staff" hides it from partner users, whatever their permissions. */
   readonly audience?: "staff";
+  /** "approvers": shown to whoever may approve an order or a quotation discount, whatever `module` says. */
+  readonly visibleTo?: "approvers";
   /** A live count shown next to the label. */
   readonly countSource?: "leads" | "messages" | "approvals";
 }
@@ -109,7 +111,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         description:
           "Orders from won leads or placed directly, with dispatch details and payment terms.",
         icon: PackageIcon,
-        module: "orders",
+        module: "sales_orders",
         dataId: "SO-001",
         href: "/sales-orders",
       },
@@ -118,7 +120,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Approvals",
         description: "Quotation discounts and sales orders waiting for your decision.",
         icon: CheckmarkBadge01Icon,
-        module: "approvals",
+        module: "sales_orders",
+        visibleTo: "approvers",
         dataId: "APPR-001",
         href: "/approvals",
         countSource: "approvals",
@@ -239,6 +242,9 @@ export function canSeeNavItem(
 ): boolean {
   if (item.audience === "staff" && userType !== "staff") {
     return false;
+  }
+  if (item.visibleTo === "approvers") {
+    return canApprove(permissions);
   }
   return item.module === null || can(permissions, item.module, "view");
 }

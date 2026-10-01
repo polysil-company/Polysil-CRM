@@ -1,28 +1,29 @@
-import { PackageIcon } from "@hugeicons/core-free-icons";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import type * as React from "react";
 
 import { PageTransition } from "@/components/layout/page-transition";
-import { EmptyState } from "@/components/patterns/empty-state";
+import { OrdersTable, OrdersTableSkeleton } from "@/features/orders/components/orders-table";
+import { OrdersToolbar, OrdersToolbarSkeleton } from "@/features/orders/components/orders-toolbar";
 
 export const metadata: Metadata = { title: "Sales orders" };
 
-// TODO(SO-001): build the sales orders list on the same DataTable, QueryView and filter patterns as leads.
 export default function SalesOrdersPage(): React.JSX.Element {
   return (
     <PageTransition>
-      <section aria-label="Sales orders" className="flex flex-1 flex-col">
-        <EmptyState
-          icon={PackageIcon}
-          title="Sales orders are coming soon"
-          description="Orders created from won leads or directly, with dispatch details and payment terms."
-          action={
-            <code className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-              SO-001
-            </code>
+      <section aria-label="Sales orders" className="flex min-h-0 flex-1 flex-col gap-4">
+        {/* Filters are read from the URL, which needs a Suspense boundary during prerendering. */}
+        <Suspense
+          fallback={
+            <>
+              <OrdersToolbarSkeleton />
+              <OrdersTableSkeleton />
+            </>
           }
-          className="flex-1 rounded-xl border border-dashed border-border"
-        />
+        >
+          <OrdersToolbar />
+          <OrdersTable />
+        </Suspense>
       </section>
     </PageTransition>
   );

@@ -1,17 +1,19 @@
-import type { LeadWire } from "@/features/leads/api/leads.schemas";
+import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 import type { Role } from "@/lib/auth/roles";
 
 import { MOCK_ID_SPACE, mockUuid } from "./reference";
 
 /**
- * APPR-001 · The mock's approval queue: one step per request, for quotation discounts and
- * for sales orders. Orders have no module on the frontend yet, so their rows are seeded here
- * with just what the queue shows.
+ * APPR-001 · The mock's approval queue, for quotation discounts and sales orders. A
+ * quotation's request has one step; an order's chain has several, and only the first
+ * undecided one is in the queue — the next joins it when that one is approved.
  */
 export interface MockApprovalStep {
   readonly stepId: string;
   readonly requestId: string;
+  /** The step's place in its chain, from 1. */
+  readonly seq: number;
   readonly role: string;
   /** Nobody of the step's own role covers it, so a higher manager may decide it. */
   readonly stalled: boolean;
@@ -69,12 +71,18 @@ function rankOfRole(role: Role): number {
   }
 }
 
+/** Accounts and Dispatch decide only their own steps: no manager covers them. */
+const OWN_STEP_ROLES: readonly string[] = ["account_manager", "dispatch_manager"];
+
 /**
  * Whether the signed-in role sees the step in its inbox: its own role's steps; a lower
  * step nobody covers (stalled); and, when asked, every lower step, to cover a manager on
- * leave. Roles that approve nothing see nothing.
+ * leave. Accounts and Dispatch see only their own. Roles that approve nothing see nothing.
  */
 export function stepVisibleTo(step: MockApprovalStep, role: Role, includeBelow: boolean): boolean {
+  if (OWN_STEP_ROLES.includes(step.role)) {
+    return step.role === role;
+  }
   const mine = rankOfRole(role);
   const rank = STEP_RANK[step.role] ?? 0;
   if (mine === 0 || rank === 0) {
@@ -90,13 +98,47 @@ export function stepIsOpen(step: MockApprovalStep): boolean {
 const HOUR = 60 * 60 * 1000;
 
 /**
+ * The queue row for an order's next undecided step, or null when none waits. `stalled`:
+ * nobody holds the step's role in the order's office, so a higher manager sees it.
+ */
+export function orderQueueStep(order: OrderWire, stalled = false): MockApprovalStep | null {
+  const approval = order.approval;
+  const next = approval?.steps.find((step) => (step.decision ?? null) === null);
+  if (approval === null || approval === undefined || next === undefined) {
+    return null;
+  }
+  const previous = approval.steps.filter((step) => step.seq < next.seq).at(-1);
+  return {
+    stepId: next.id,
+    requestId: approval.request_id,
+    seq: next.seq,
+    role: next.role,
+    stalled,
+    docType: "sales_order",
+    docId: order.id,
+    number: order.order_no,
+    partyName: order.party.name,
+    total: order.totals.total,
+    isProvisional: order.is_provisional,
+    discountPct: null,
+    raisedBy:
+      order.owner === null ? null : { id: order.owner.id, full_name: order.owner.full_name },
+    raisedAt: previous?.decided_at ?? order.submitted_at ?? order.created_at,
+    decision: null,
+    remark: null,
+    decidedAt: null,
+    closed: null,
+  };
+}
+
+/**
  * Seeds the queue: every other draft whose discount needs approval is waiting on its
- * manager, and four sales orders wait at District, State and Regional level — one stalled,
- * as when a district has no manager. Mutates the drafts it puts in the queue.
+ * manager, and every submitted order waits on its next step. Mutates the drafts it puts
+ * in the queue.
  */
 export function seedApprovals(
   quotations: QuotationWire[],
-  leads: readonly LeadWire[],
+  orders: readonly OrderWire[],
 ): MockApprovalStep[] {
   const steps: MockApprovalStep[] = [];
   let index = 0;
@@ -137,6 +179,7 @@ export function seedApprovals(
     steps.push({
       stepId,
       requestId,
+      seq: 1,
       role,
       stalled: false,
       docType: "quotation",
@@ -155,39 +198,16 @@ export function seedApprovals(
     });
   }
 
-  const orderLeads = leads.filter((lead) => lead.stage === "won").slice(0, 4);
-  const orderSeeds = [
-    { role: "state_manager", stalled: false, total: "845600.00", hoursAgo: 5 },
-    { role: "state_manager", stalled: false, total: "1267350.50", hoursAgo: 27 },
-    { role: "district_manager", stalled: true, total: "312480.00", hoursAgo: 50 },
-    { role: "regional_manager", stalled: false, total: "2485000.00", hoursAgo: 3 },
-  ] as const;
-  for (const [position, seed] of orderSeeds.entries()) {
-    const lead = orderLeads[position];
-    if (lead === undefined) {
-      break;
+  // The first order waiting at District stalls, as when a district has no manager.
+  let stalledOne = false;
+  for (const order of orders.filter((item) => item.status === "submitted")) {
+    const waitsOn = order.approval?.steps.find((item) => (item.decision ?? null) === null)?.role;
+    const stalled: boolean = !stalledOne && waitsOn === "district_manager";
+    stalledOne ||= stalled;
+    const step = orderQueueStep(order, stalled);
+    if (step !== null) {
+      steps.push(step);
     }
-    index += 1;
-    const serial = String(41 + position).padStart(5, "0");
-    steps.push({
-      stepId: mockUuid(MOCK_ID_SPACE.approval, index),
-      requestId: mockUuid(MOCK_ID_SPACE.approval, 1000 + index),
-      role: seed.role,
-      stalled: seed.stalled,
-      docType: "sales_order",
-      docId: mockUuid(MOCK_ID_SPACE.approval, 2000 + index),
-      number: `SO/GJ/2026-27/${serial}`,
-      partyName: lead.farmer_name,
-      total: seed.total,
-      isProvisional: false,
-      discountPct: null,
-      raisedBy: lead.owner,
-      raisedAt: new Date(Date.now() - seed.hoursAgo * HOUR).toISOString(),
-      decision: null,
-      remark: null,
-      decidedAt: null,
-      closed: null,
-    });
   }
 
   return steps.sort((a, b) => Date.parse(a.raisedAt) - Date.parse(b.raisedAt));

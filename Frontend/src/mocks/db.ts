@@ -1,12 +1,14 @@
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
+import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 
 import { seedApprovals, type MockApprovalStep } from "./data/approvals";
 import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
+import { generateOrders } from "./data/orders";
 import { generateQuotations } from "./data/quotations";
 
 export interface MockDb {
@@ -22,6 +24,14 @@ export interface MockDb {
   quotationEvents: Map<string, TimelineEventWire[]>;
   /** When a just-sent quotation's PDF is ready (epoch ms); read by the next GET. */
   pdfReadyAt: Map<string, number>;
+  /** Sales orders, newest first, full documents (SO-001 … SO-004, DISP-002). */
+  orders: OrderWire[];
+  /** Order writes: Idempotency-Key → the request and the order it made or changed. */
+  orderWrites: Map<string, { body: string; orderId: string }>;
+  /** Each order's history, newest first: derived once from the seed, then written to. */
+  orderEvents: Map<string, TimelineEventWire[]>;
+  /** When a just-approved order's PDF is ready (epoch ms); read by the next GET. */
+  orderPdfReadyAt: Map<string, number>;
   /** The approval queue: quotation discounts and sales orders, oldest first (APPR-001). */
   approvalSteps: MockApprovalStep[];
   /** Decision replays: Idempotency-Key → the request and the step it decided. */
@@ -49,7 +59,8 @@ function createMockDb(): MockDb {
   const leads = generateLeads();
   const { conversations, messages } = generateConversations(leads);
   const quotations = generateQuotations(leads);
-  const approvalSteps = seedApprovals(quotations, leads);
+  const orders = generateOrders(leads, quotations);
+  const approvalSteps = seedApprovals(quotations, orders);
   return {
     leads,
     quotations,
@@ -57,6 +68,10 @@ function createMockDb(): MockDb {
     priceVersion: 0,
     quotationEvents: new Map(),
     pdfReadyAt: new Map(),
+    orders,
+    orderWrites: new Map(),
+    orderEvents: new Map(),
+    orderPdfReadyAt: new Map(),
     approvalSteps,
     approvalDecisions: new Map(),
     quotationDeletes: new Map(),

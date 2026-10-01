@@ -26,10 +26,11 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Leads — list, create, open](#leads--list-create-open) | 4 | 🧪 🌐 🔌 | `integration` |
 | [Leads — history, notes, stage, assign](#leads--history-notes-stage-assign) | 4 | 🧪 👀 | `integration` |
 | [Quotations — reading](#quotations--reading) | 4 | 🧪 👀 | `integration` |
-| [Quotations — the builder](#quotations--the-builder) | 5 | 🧪 👀 | PR #21 |
-| [Quotations — send, approve, answer, revise, delete](#quotations--send-approve-answer-revise-delete) | 7 | 🧪 👀 | PR #22 |
-| [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | PR #23 |
-| [Approvals](#approvals) | 4 | 🧪 🌐 👀 | PR #26 |
+| [Quotations — the builder](#quotations--the-builder) | 5 | 🧪 👀 | `integration` |
+| [Quotations — send, approve, answer, revise, delete](#quotations--send-approve-answer-revise-delete) | 7 | 🧪 👀 | `integration` |
+| [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | `integration` |
+| [Approvals](#approvals) | 4 | 🧪 🌐 👀 | `integration` |
+| [Sales orders and dispatch](#sales-orders-and-dispatch) | 7 | 🧪 🌐 👀 | PR #34 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 | `integration`, **mock only** |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -113,14 +114,26 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--Q
 
 Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--APPR-001--approvals-inbox.md). Walked through as a State Manager: 7 requests; a rejection without a reason refused, then rejected with one; a quotation discount approved; lower steps added; on a phone in dark mode; an Employee sees no Approvals. Screens: [the inbox](screenshots/approvals/inbox-state-manager-desktop-light.jpg), [a reason to reject](screenshots/approvals/reject-needs-a-reason-desktop-light.jpg), [with steps below](screenshots/approvals/inbox-including-steps-below-desktop-light.jpg), [phone, dark](screenshots/approvals/inbox-phone-dark.jpg), [approve on a phone](screenshots/approvals/approve-dialog-phone-dark.jpg).
 
-- **APPR-001 · See what waits on me** (managers with `approvals`): quotation discounts and sales orders side by side, oldest first — what it is, its number (or "Draft quotation"), the party, the total, the discount asked, stand-in pricing, who raised it and when, how long it has waited, and "Open the quotation". A count in the sidebar (with a dot on the collapsed rail); the inbox and the count check every minute. States: skeleton, "Nothing waits on you", an error, a later page failing without losing what is shown. 🧪 🌐 👀
+- **APPR-001 · See what waits on me** (whoever holds `sales_orders.approve` or `quotations.approve`: managers, Accounts, Dispatch): quotation discounts and sales orders side by side, oldest first — what it is, its number (or "Draft quotation"), the party, the total, the discount asked, stand-in pricing, who raised it and when, how long it has waited, and "Open the quotation" or "Open the order". An order's steps come one at a time: the next joins its inbox when the one before is approved. Accounts and Dispatch see only their own steps. A count in the sidebar (with a dot on the collapsed rail); the inbox and the count check every minute. States: skeleton, "Nothing waits on you", an error, a later page failing without losing what is shown. 🧪 🌐 👀
 - **APPR-001 · Cover for a manager on leave:** "Include steps below me" (kept in the URL) adds lower managers' steps, each marked whose it is. A step nobody of its role covers always shows, marked "No District Manager to decide". 🧪 👀
-- **APPR-001 · Approve or reject.** Rejecting needs a reason, which the person who asked reads; approving takes one optionally. The request leaves the inbox and the count drops; an approved quotation discount turns the officer's button into Send, a rejected one shows the reason on the draft. 🧪 🌐 👀
+- **APPR-001 · Approve or reject.** Rejecting needs a reason, which the person who asked reads; approving takes one optionally — except at Accounts, where every decision needs a remark (BE-018). The request leaves the inbox and the count drops; an approved quotation discount turns the officer's button into Send, a rejected one shows the reason on the draft. 🧪 🌐 👀
 - **APPR-001 · When the request moved on** — decided by someone else, withdrawn, or its draft edited after the request — the dialog closes, a toast says which, and the inbox shows the latest. Without the `approvals.approve` permission the rows show, the buttons don't. 🧪
+
+## Sales orders and dispatch
+
+Details and tests: [changelog entry](../changelog/entries/2026-09-30--feature--SO-001--sales-orders-and-dispatch.md). Walked through on the mock backend as a State Manager (list, a returned order edited and submitted again, an order step approved in the inbox), as Dispatch (record with mistakes then correctly, void, close short), and as a field officer on a phone (place an order from an accepted quotation). Screens: [list](screenshots/orders/list-desktop-light.jpg) ([dark](screenshots/orders/list-desktop-dark.jpg), [phone](screenshots/orders/list-phone-light.jpg)), [returned order](screenshots/orders/returned-draft-desktop-light.jpg), [submit](screenshots/orders/submit-dialog-desktop-light.jpg), [waiting on its chain](screenshots/orders/submitted-approval-chain-desktop-light.jpg), [partly dispatched](screenshots/orders/partly-dispatched-desktop-dark.jpg), [record: mistakes](screenshots/orders/record-dispatch-errors-desktop-dark.jpg), [record: filled](screenshots/orders/record-dispatch-filled-desktop-dark.jpg), [dispatched](screenshots/orders/fully-dispatched-desktop-dark.jpg), [voided](screenshots/orders/voided-dispatch-desktop-dark.jpg), [closed short](screenshots/orders/closed-short-desktop-dark.jpg), [place order](screenshots/orders/place-order-dialog-phone-light.jpg), [new draft on a phone](screenshots/orders/new-draft-order-phone-light.jpg), [detail on a phone, dark](screenshots/orders/detail-phone-dark.jpg).
+
+- **SO-001 · Browse orders,** newest first: number (or "Draft order"), dealer or "Direct sale", "Provisional", the party, the status with whom it waits on ("Waiting on Accounts"), how much has shipped (a share and a bar), type, owner, created, total. Filter by several statuses, one type, "Only my orders", and search by number, party or mobile — all kept in the URL. States: skeleton, "No sales orders yet" (orders come from an accepted quotation), nothing matches, a page link that no longer works, an emptied page, errors. 🧪 🌐 👀
+- **SO-002 · Open an order:** the lines with ordered, sent, open and short once approved; totals with CGST and SGST or IGST; the approval chain step by step (who decided, when, their remark, "Waiting now", covered by a higher manager); dispatches; party, quotations it came from, delivery, payment terms, place of supply, seller; its history; "Open PDF" once approved ("Preparing PDF…" while it renders, checked again by itself). Notices: returned with the reason, cancelled or closed short with the reason, indicative pricing, no mobile for the confirmation, the PDF failed. 🧪 🌐 👀
+- **SO-003 · Place an order** from an accepted, current quotation ("Place order" for roles with `sales_orders.create`): order type (commercial or industrial), delivery address (the party's by default), payment terms, remarks; the draft opens. A quotation already on a live order shows "Open order" instead. 🧪 👀
+- **SO-003 · Change a draft's delivery, terms and remarks;** delete a draft that was never submitted (holders of `sales_orders.delete` — Admin in the mock); a numbered draft is cancelled instead. 🧪 👀
+- **SO-004 · Submit for approval,** or "Submit again" after a return: the order gets its number and waits on its managers by value, then Accounts, then Dispatch. Cancel with a reason — the owner while it is a draft or waiting, a holder of delete once approved, nobody once something has shipped. 🧪 👀
+- **DISP-002 · Record a dispatch** (Dispatch, `dispatch.create`): each open item's quantity (or "Everything open"), when it left, challan, invoice, transporter, vehicle. Refused on the field: nothing entered, more than is open, decimals on a whole-unit item, a time in the future. An invoice dated before its challan, or an invoice number already used, is recorded with a warning. The order moves to Partly dispatched or Dispatched. 🧪 👀
+- **DISP-002 · Void a dispatch** with a reason — it stays on record, struck through, and its quantities are open again — and **close the rest short** with a reason. Managers see neither. When someone else moved the order first, the dialog closes, a toast says what happened, and the page shows the latest. 🧪 👀
 
 ## Dashboard, notifications, messages
 
-These run on the mock backend only — the backend has no endpoints for them yet (BE-008…BE-010 in [Backend-Tasks.md](../../docs/Backend-Tasks.md)). Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
+These still run on the mock backend. The backend serves all three since #30 and #31 (BE-008…BE-010 in [Backend-Tasks.md](../../docs/Backend-Tasks.md)); connecting them is the next pull request after sales orders. Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
 
 - **RPT-001 · The dashboard's key figures.** 🧪 🌐
 - **NOTIF-001, NOTIF-002 · The notification bell** in the top bar, marking read. 🧪
@@ -132,7 +145,7 @@ These run on the mock backend only — the backend has no endpoints for them yet
 
 The backend serves these, and the frontend has no screen for them — in the order of [Plan.md §9.3](Plan.md):
 
-1. Sales orders and dispatch — the approvals inbox already decides orders, but an order has no page yet. Also the approval limits screen for admins (`/approvals/thresholds`).
+1. A direct order typed in line by line, a consolidated order from several leads of one dealer, and the approval limits screen for admins (`/approvals/thresholds`).
 2. Editing and deleting a lead, the duplicates queue and merging.
 3. Lead QR codes and the public enquiry form.
 4. Tasks, the planner, meetings and minutes (on `integration` since #25).

@@ -5,6 +5,7 @@ import { leadHandlers } from "./leads";
 import { lookupHandlers } from "./lookups";
 import { messageHandlers } from "./messages";
 import { notificationHandlers } from "./notifications";
+import { orderHandlers } from "./orders";
 import { quotationHandlers } from "./quotations";
 
 /**
@@ -24,7 +25,7 @@ export const unbuiltHandlers = [
 /**
  * Every mock endpoint: the full mock backend (NEXT_PUBLIC_API_MOCKING=enabled) and the
  * unit tests. A new API integration adds its handlers here first. Leads, lookups,
- * quotations and approvals are served by the backend, so in partial mode they go to the real API.
+ * quotations, orders and approvals are served by the backend, so in partial mode they go to the real API.
  */
 export const handlers = [
   ...authHandlers,
@@ -32,5 +33,6 @@ export const handlers = [
   ...leadHandlers,
   ...lookupHandlers,
   ...quotationHandlers,
+  ...orderHandlers,
   ...unbuiltHandlers,
 ];

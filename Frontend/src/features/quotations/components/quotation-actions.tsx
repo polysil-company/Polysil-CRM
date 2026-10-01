@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { PlaceOrder } from "@/features/orders/components/place-order";
 import type { Quotation } from "@/features/quotations/api/quotations.schemas";
 import { QUOTATION_STATUS_LABELS } from "@/features/quotations/lib/quotation-labels";
 import { ANSWER_LABELS, quotationActions } from "@/features/quotations/lib/quotation-lifecycle";
@@ -41,8 +42,9 @@ export interface QuotationActionsProps {
 /**
  * QUOT-003, QUOT-006 … QUOT-011 · The quotation's actions, by its status and the user's
  * permissions. A draft is edited and sent — or, above the owner's discount limit, sent for
- * approval first. A sent quotation records the customer's answer and can be revised. A
- * superseded version offers none: its notice links to the version that replaced it.
+ * approval first. A sent quotation records the customer's answer and can be revised; an
+ * accepted one is placed as an order (SO-003). A superseded version offers none: its notice
+ * links to the version that replaced it.
  */
 export function QuotationActions({ quotation }: QuotationActionsProps): React.JSX.Element | null {
   const canEdit = useCan("quotations", "edit");
@@ -130,6 +132,8 @@ export function QuotationActions({ quotation }: QuotationActionsProps): React.JS
           Revise
         </Button>
       ) : null}
+
+      <PlaceOrder quotation={quotation} />
 
       {actions.draft?.delete === true ? (
         <DropdownMenu>

@@ -210,7 +210,7 @@ function RemarkField({
     <Field data-invalid={errors.remark ? true : undefined}>
       <FieldLabel htmlFor={id}>
         {label}
-        <span className="font-normal text-subtle-foreground">(optional)</span>
+        <span className="font-normal text-muted-foreground">(optional)</span>
       </FieldLabel>
       <Textarea
         id={id}

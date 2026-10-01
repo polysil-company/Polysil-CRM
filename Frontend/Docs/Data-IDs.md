@@ -153,7 +153,10 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-010 | A quotation's history (`GET /quotations/{quotationId}/timeline`) | shared | in-progress |
 | QUOT-011 | Delete a draft quotation (`DELETE /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-012 | The customer's quotation page — /q/{token} (`GET /public/q/{token}`, `GET /public/q/{token}/pdf`) | shared | in-progress |
-| SO-001 | Sales orders list | shared | planned |
+| SO-001 | Sales orders list (`GET /orders`) | shared | in-progress |
+| SO-002 | A sales order — the document, its approval chain, PDF and history (`GET /orders/{orderId}`, `GET /orders/{orderId}/pdf`, `GET /orders/{orderId}/timeline`) | shared | in-progress |
+| SO-003 | New order from accepted quotations, and a draft's header (`POST /orders`, `PATCH /orders/{orderId}`, `DELETE /orders/{orderId}`) | shared | in-progress |
+| SO-004 | Submit an order for approval, and cancel it (`POST /orders/{orderId}/submit`, `POST /orders/{orderId}/cancel`) | shared | in-progress |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | CMPL-001 | Complaints list and QA review | shared | planned |
 | TASK-001 | Tasks and daily planner | shared | planned |
@@ -166,6 +169,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SUBS-001 | Subsidy forms and case status | shared | planned |
 | ACCT-001 | Accounts work queue | shared | planned |
 | DISP-001 | Dispatch work queue | shared | planned |
+| DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |
 | ADMN-001 | Users, roles and approval thresholds | shared | planned |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |
 | NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | mocked |
