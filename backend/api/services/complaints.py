@@ -110,6 +110,10 @@ def _refusal(exc: DBAPIError) -> Exception | None:
     if state == "ORDNA":
         return ValidationFailed("Nobody holds a role this approval needs: ask the admin.",
                                 code="no_approver")
+    if state == "ORDST":
+        return ValidationFailed("The complaint's territory has no coded state.",
+                                code="territory_without_state_code",
+                                fields={"territory_id": "no coded state above it"})
     if state == "CMPPD":
         return ValidationFailed("A target cannot start in the past.", code="target_in_the_past",
                                 fields={"effective_from": "today or later"})
@@ -373,8 +377,10 @@ async def list_complaints(db: AsyncSession, caller: Caller, *, status: list[str]
             # statement and every name search a 500 (astra, reproduced)
             where.append("(c.complaint_no ILIKE :q OR c.contact_name ILIKE :q)")
     if awaiting == "me":
-        where.append("c.status IN ('submitted', 'under_qc') AND "
-                     "(complaint_refusal(c.id, 'check') IS NULL OR complaint_refusal(c.id, 'qc') IS NULL)")
+        where.append("((c.status IN ('submitted', 'under_qc') AND "
+                     "(complaint_refusal(c.id, 'check') IS NULL OR complaint_refusal(c.id, 'qc') IS NULL)) "
+                     # FS-015b: an approved complaint waits on QC for its remedy (code review F-4)
+                     "OR (c.status = 'qc_approved' AND complaint_refusal(c.id, 'remedy') IS NULL))")
         order = "c.first_submitted_at, c.id"
         if cursor:
             raise ValidationFailed(fields={"cursor": "the queue is one page"})
@@ -1000,7 +1006,7 @@ async def remove_attachment(db: AsyncSession, caller: Caller, complaint_id: str,
     if r is None:
         raise NotFoundError("No such file.")
     mine = str(r.uploaded_by) == caller.user_id
-    if status in ("qc_approved", "qc_rejected", "cancelled"):
+    if status in ("qc_approved", "qc_rejected", "cancelled", "remedy_pending", "closed"):
         raise ConflictError("The complaint is closed.", code="complaint_closed_for_upload")
     if status != "draft" and not mine:
         raise ForbiddenError("After submit, only whoever added a file removes it.")

@@ -27,7 +27,7 @@ from api.services import complaints as service
 from tests.api import test_complaints as complaints_t
 from tests.api import test_order_concurrency as conc
 from tests.api import test_order_endpoints as endpoints
-from tests.api.conftest import V1, _key
+from tests.api.conftest import PASSWORD, V1, _key, _login
 
 pytestmark = pytest.mark.db
 
@@ -158,6 +158,10 @@ async def test_a_refund_goes_through_its_managers_and_accounts_and_closes_the_co
     assert c["status"] == "closed" and c["closed_at"] is not None
     assert c["remedy"]["status"] == "completed" and c["remedy"]["refund"]["payment_reference"] == "UTR 4471 0092"
     assert c["sla"]["resolved_at"] is not None, "resolution still ends at the QC verdict (D8)"
+    # code review F-7: the raiser hears "refund paid" once, not also "closed"
+    bells = await client.get(f"{V1}/notifications", headers=await _as(client, shop, "field_officer"))
+    mine = [n["kind"] for n in bells.json()["data"] if (n.get("resource") or {}).get("id") == c["id"]]
+    assert mine.count("complaint_refund_paid") == 1 and "complaint_closed" not in mine, mine
 
 
 async def test_the_managers_stack_by_amount(client: httpx.AsyncClient, remedies: Shop) -> None:
@@ -263,7 +267,7 @@ async def test_a_replacement_is_a_free_order_that_closes_the_complaint_when_ship
 
 
 async def test_a_rejected_replacement_is_cancelled_and_returns_the_complaint(
-        client: httpx.AsyncClient, remedies: Shop) -> None:
+        client: httpx.AsyncClient, remedies: Shop, sessions: Sessions) -> None:
     shop = remedies
     dispatch = await _as(client, shop, "dispatch_manager")
     c, order = await _replacement(client, shop)
@@ -272,6 +276,21 @@ async def test_a_rejected_replacement_is_cancelled_and_returns_the_complaint(
     assert r.json()["data"]["status"] == "cancelled", "cancelled, never an editable draft (B4)"
     c = await _get(client, await _as(client, shop, "qc_manager"), c["id"])
     assert c["status"] == "qc_approved" and c["remedy"]["status"] == "cancelled"
+    # code review F-1: it says cancelled, and nobody is told it came back for changes
+    s = sessions()
+    try:
+        kinds = set((await s.execute(text(
+            "SELECT kind FROM activity_event WHERE entity_id = CAST(:o AS uuid)"), {"o": order["id"]})).scalars())
+        returned = (await s.execute(text(
+            "SELECT count(*) FROM notification WHERE resource_id = CAST(:o AS uuid) AND kind = 'order_returned'"),
+            {"o": order["id"]})).scalar_one()
+        decided = (await s.execute(text(
+            "SELECT count(*) FROM notification_outbox WHERE template_key = 'order.decided' AND payload ->> 'order_no' = :n"),
+            {"n": order["order_no"]})).scalar_one()
+    finally:
+        await s.close()
+    assert "order.cancelled" in kinds and "order.returned" not in kinds, kinds
+    assert returned == 0 and decided == 0
 
 
 async def test_a_replacement_is_withdrawn_until_it_ships(client: httpx.AsyncClient, remedies: Shop) -> None:
@@ -400,6 +419,9 @@ async def test_a_dealer_sees_the_remedy_without_its_people_or_payee(
         timeline = (await client.get(f"{V1}/complaints/{dealer_c['id']}/timeline", headers=dealer)).json()["data"]
         event = next(e for e in timeline if e["kind"] == "complaint.refund_requested")
         assert event["actor"] is None and "chosen_by" not in event["payload"]
+        request_id = (await _get(client, qc, dealer_c["id"]))["remedy"]["refund"]["approval"]["request_id"]
+        r = await client.get(f"{V1}/approvals/{request_id}", headers=dealer)
+        assert r.status_code == 404, "no steps for a dealer (code review F-3)"
     finally:
         await complaints_t._forget(sessions, mobile)
 
@@ -486,3 +508,96 @@ async def test_a_withdraw_racing_a_dispatch_queues_on_the_order_not_a_deadlock(
     assert waited, "the withdraw did not queue on the order"
     assert [conc._outcome(g) for g in got] == ["ok", "status_changed"], got
     assert (await _get(client, await _as(client, shop, "qc_manager"), c["id"]))["status"] == "closed"
+
+
+# ── code review (Fable, on the build) ────────────────────────────────────────
+
+async def test_another_districts_manager_sees_no_refund(client: httpx.AsyncClient, remedies: Shop,
+                                                        sessions: Sessions) -> None:
+    """F-2: the negative case for the remedy's two new read surfaces."""
+    from argon2 import PasswordHasher
+
+    shop = remedies
+    qc = await _as(client, shop, "qc_manager")
+    c = await _qc_approved(client, shop)
+    c = (await _remedy(client, qc, c["id"], **_refund())).json()["data"]
+    request_id = c["remedy"]["refund"]["approval"]["request_id"]
+    tag = uuid.uuid4().hex[:8]
+    s = sessions()
+    district = str((await s.execute(text(
+        "INSERT INTO territory (level, name, parent_id) VALUES ('district', :n, CAST(:p AS uuid)) RETURNING id"),
+        {"n": f"far_district_{tag}", "p": shop.state})).scalar_one())
+    office = str((await s.execute(text(
+        "INSERT INTO org_unit (name, role_level, territory_id) VALUES (:n, 2, CAST(:t AS uuid)) RETURNING id"),
+        {"n": f"far_office_{tag}", "t": district})).scalar_one())
+    email = f"far_dm_{tag}@polysil.in"
+    other = str((await s.execute(text(
+        "INSERT INTO app_user (user_type, email, password_hash, full_name, role_id, org_unit_id) "
+        "SELECT 'staff', :e, :p, 'Far DM', r.id, CAST(:o AS uuid) FROM role r WHERE r.code = 'district_manager' RETURNING id"),
+        {"e": email, "p": PasswordHasher().hash(PASSWORD), "o": office})).scalar_one())
+    await s.commit()
+    await s.close()
+    try:
+        far = await _login(client, email, PASSWORD)
+        assert (await client.get(f"{V1}/complaints/{c['id']}", headers=far)).status_code == 404
+        pending = (await client.get(f"{V1}/approvals/pending", headers=far)).json()["data"]
+        assert c["id"] not in [x["document"]["id"] for x in pending]
+        assert (await client.get(f"{V1}/approvals/{request_id}", headers=far)).status_code == 404
+        r = await _decide(client, far, c["remedy"]["refund"]["approval"]["steps"][0]["id"])
+        assert r.status_code in (403, 404), r.text
+    finally:
+        s = sessions()
+        for stmt in ("DELETE FROM idempotency_record WHERE user_id = CAST(:u AS uuid)",
+                     "DELETE FROM session WHERE user_id = CAST(:u AS uuid)",
+                     "DELETE FROM login_attempt WHERE identifier = CAST(:e AS citext)",
+                     "DELETE FROM activity_event WHERE actor_id = CAST(:u AS uuid) OR entity_id = CAST(:u AS uuid)",
+                     "DELETE FROM app_user WHERE id = CAST(:u AS uuid)",
+                     "DELETE FROM org_unit WHERE id = CAST(:o AS uuid)",
+                     "DELETE FROM territory WHERE id = CAST(:t AS uuid)"):
+            await s.execute(text(stmt), {"u": other, "e": email, "o": office, "t": district})
+        await s.commit()
+        await s.close()
+
+
+async def test_an_approved_complaint_waits_on_qc_in_its_queue(client: httpx.AsyncClient, remedies: Shop) -> None:
+    """F-4: `awaiting=me` feeds the "Choose remedy" screen."""
+    qc = await _as(client, remedies, "qc_manager")
+    c = await _qc_approved(client, remedies)
+
+    async def waiting() -> list[str]:
+        r = await client.get(f"{V1}/complaints", headers=qc, params={"awaiting": "me"})
+        assert r.status_code == 200, r.text
+        return [x["id"] for x in r.json()["data"]]
+    assert c["id"] in await waiting()
+    await _remedy(client, qc, c["id"], kind="none", remark="Settled")
+    assert c["id"] not in await waiting()
+
+
+async def test_a_closed_complaint_keeps_its_files(client: httpx.AsyncClient, remedies: Shop,
+                                                  monkeypatch: pytest.MonkeyPatch) -> None:
+    """F-5: an uploader cannot remove a file once the complaint is settled."""
+    monkeypatch.setattr("api.routers.complaints.get_storage", lambda *a, **k: complaints_t._Counting())
+    shop = remedies
+    officer = await _as(client, shop, "field_officer")
+    qc = await _as(client, shop, "qc_manager")
+    dm = await _as(client, shop, "district_manager")
+    c = await complaints_t._create(client, shop, officer)
+    photo = (await complaints_t._upload(client, officer, c["id"], complaints_t.JPEG)).json()["data"]
+    await complaints_t._post(client, officer, f"/{c['id']}/submit")
+    await complaints_t._post(client, dm, f"/{c['id']}/check", {"decision": "approve", "remark": "Genuine"})
+    await complaints_t._post(client, qc, f"/{c['id']}/qc", {"verdict": "approved", "remark": "Defect"})
+    await _remedy(client, qc, c["id"], kind="none", remark="Settled")
+    r = await client.delete(f"{V1}/complaints/{c['id']}/attachments/{photo['id']}", headers={**officer, **_key()})
+    assert r.status_code == 409, r.text
+
+
+def test_a_state_without_a_code_is_a_field_error() -> None:
+    """F-6: the replacement definer's ORDST is a 422, not a 500."""
+    from sqlalchemy.exc import DBAPIError
+
+    from api.errors import ValidationFailed
+
+    class _OrigError(Exception):
+        sqlstate = "ORDST"
+    mapped = service._refusal(DBAPIError("SELECT 1", {}, _OrigError("no coded state")))
+    assert isinstance(mapped, ValidationFailed) and mapped.code == "territory_without_state_code"

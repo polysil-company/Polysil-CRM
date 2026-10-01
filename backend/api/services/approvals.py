@@ -125,6 +125,8 @@ async def get_request(db: AsyncSession, caller: Caller, request_id: str) -> sch.
     if row.doc_type == "quotation":
         await quotation_service.get_quotation(db, str(row.entity_id), get_settings())
     elif row.doc_type == "complaint":
+        if caller.partner_id is not None:
+            raise NotFoundError("No such approval.")  # spec §4: no steps for a dealer
         await complaint_service.get_complaint(db, caller, str(row.entity_id))
     else:
         await order_service.get_order(db, caller, str(row.entity_id))

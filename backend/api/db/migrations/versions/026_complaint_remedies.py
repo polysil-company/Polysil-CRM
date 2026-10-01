@@ -96,10 +96,11 @@ TABLES = [
     "CREATE INDEX ix_complaint_remedy_request ON complaint_remedy (approval_request_id)",
     "CREATE INDEX ix_complaint_remedy_chosen_by ON complaint_remedy (chosen_by)",
     "ALTER TABLE complaint_remedy ENABLE ROW LEVEL SECURITY",
-    "CREATE POLICY complaint_remedy_sel ON complaint_remedy FOR SELECT USING (EXISTS (SELECT 1 FROM complaint c WHERE c.id = complaint_id))",
-    f"GRANT SELECT ON complaint_remedy TO {APP_ROLE}",
     "CREATE TRIGGER trg_complaint_remedy_audit AFTER INSERT OR UPDATE OR DELETE ON complaint_remedy FOR EACH ROW EXECUTE FUNCTION audit_row()",
 ]
+
+# tests/db/migration_grants.py reads these two, as it does every migration's
+GRANTS: dict[str, str] = {"complaint_remedy": "SELECT"}
 
 # a complaint's refund request is read by whoever sees the complaint (plan review B2)
 APPROVAL_REQUEST_SEL = """CREATE POLICY approval_request_sel ON approval_request FOR SELECT USING (
@@ -110,6 +111,11 @@ APPROVAL_REQUEST_SEL = """CREATE POLICY approval_request_sel ON approval_request
     ELSE (SELECT app_is_system())
   END
 )"""
+
+HAND_POLICIES: list[tuple[str, str]] = [
+    ("complaint_remedy", "CREATE POLICY complaint_remedy_sel ON complaint_remedy FOR SELECT USING (EXISTS (SELECT 1 FROM complaint c WHERE c.id = complaint_id))"),
+    ("approval_request", APPROVAL_REQUEST_SEL),
+]
 
 # ── new functions ────────────────────────────────────────────────────────────
 
@@ -540,6 +546,19 @@ def _engine_patched() -> list[str]:
                          "        RETURN 'approved';\n"
                          "    END IF;\n"
                          "    SELECT lead_id INTO v_lead FROM sales_order WHERE id = v_req.entity_id;\n")
+            # code review F-1: a rejected replacement was cancelled, not returned
+            f = _replace(f, "        PERFORM apply_approval_outcome(v_req.doc_type, v_req.entity_id, 'reject');\n"
+                            "        INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload)\n"
+                            "        VALUES ('sales_order', v_req.entity_id, v_lead, 'order.returned', app_current_user_id(), '{}');\n",
+                         "        PERFORM apply_approval_outcome(v_req.doc_type, v_req.entity_id, 'reject');\n"
+                         "        IF EXISTS (SELECT 1 FROM sales_order WHERE id = v_req.entity_id AND order_type = 'replacement') THEN\n"
+                         "            INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload)\n"
+                         "            VALUES ('sales_order', v_req.entity_id, v_lead, 'order.cancelled', app_current_user_id(),\n"
+                         "                    jsonb_build_object('from', 'approval_rejected'));\n"
+                         "            RETURN 'rejected';\n"
+                         "        END IF;\n"
+                         "        INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload)\n"
+                         "        VALUES ('sales_order', v_req.entity_id, v_lead, 'order.returned', app_current_user_id(), '{}');\n")
         elif name == "record_decision":
             # the complaint first, then the request, then the step (edge case 2)
             f = _replace(f, "    ELSIF v_doc_type = 'quotation' THEN\n        SELECT lead_id INTO v_lead FROM quotation WHERE id = v_entity;",
@@ -654,9 +673,13 @@ def _bell_patched() -> list[str]:
     return list(f.values())
 
 
-def _trigger(kinds: tuple[str, ...]) -> str:
+def _trigger(kinds: tuple[str, ...], quiet_refund_close: bool = False) -> str:
+    # code review F-7: a paid refund already rang (`complaint.refund_paid`)
+    quiet = (" AND NOT (NEW.kind = 'complaint.closed' AND NEW.payload ->> 'how' = 'refund')"
+             if quiet_refund_close else "")
     return ("CREATE TRIGGER trg_notify_from_event AFTER INSERT ON activity_event FOR EACH ROW "
-            "WHEN (NEW.kind IN (" + ", ".join(f"'{k}'" for k in kinds) + ")) EXECUTE FUNCTION notify_from_event()")
+            "WHEN (NEW.kind IN (" + ", ".join(f"'{k}'" for k in kinds) + ")" + quiet + ") "
+            "EXECUTE FUNCTION notify_from_event()")
 
 
 def _seeds() -> list[str]:
@@ -678,15 +701,18 @@ ON CONFLICT (role_id, module, action) DO NOTHING""",
 def upgrade() -> None:
     for stmt in TABLES:
         op.execute(stmt)
+    for table, verbs in GRANTS.items():
+        op.execute(f"GRANT {verbs} ON {table} TO {APP_ROLE}")
     op.execute("DROP POLICY approval_request_sel ON approval_request")
-    op.execute(APPROVAL_REQUEST_SEL)
+    for _table, stmt in HAND_POLICIES:
+        op.execute(stmt)
     op.execute(_refusal_patched())
     for stmt in FUNCTIONS:
         op.execute(stmt)
     for stmt in _engine_patched() + _orders_patched() + [_people_patched()] + _bell_patched():
         op.execute(stmt)
     op.execute("DROP TRIGGER IF EXISTS trg_notify_from_event ON activity_event")
-    op.execute(_trigger(_load("023").KINDS + NEW_KINDS))
+    op.execute(_trigger(_load("023").KINDS + NEW_KINDS, quiet_refund_close=True))
     op.execute("REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC")
     for sig in GRANTED:
         op.execute(f"GRANT EXECUTE ON FUNCTION {sig} TO {APP_ROLE}")
