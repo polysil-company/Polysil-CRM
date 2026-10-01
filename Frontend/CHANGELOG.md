@@ -60,6 +60,7 @@ The approval limits lived only in the backend's seed: District approves orders u
 - **States:** skeleton, a warning when no limits are set, errors with retry.
 
 **The mock** keeps the limits as rows, as the backend does, with one district's own order limit as an example. `PUT` follows the backend's rules:
+
 - only `masters.edit` may change a limit;
 - the levels must stay in order;
 - only Admin-Sales may have no discount limit;
