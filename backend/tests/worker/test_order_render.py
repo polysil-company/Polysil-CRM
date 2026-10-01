@@ -31,7 +31,8 @@ def _doc(*, intra: bool = True) -> dict:
 
 def test_the_html_carries_every_figure_and_the_order_facts() -> None:
     page = _text(job.render_html(_doc()))
-    for figure in ("SO/GJ/2026-27/00007", "1857.42", "185.74", "1588.10", "39.70", "1667.50",
+    for figure in ("SO/GJ/2026-27/00007", "1,857.42", "185.74", "1,588.10", "39.70",
+                   "₹1,667.50",
                    "24AAACP1234A1Z5", "Rameshbhai Patel", "Farm 12, Vadod", "Gujarat",
                    "Full payment"):
         assert figure in page, figure

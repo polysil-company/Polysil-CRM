@@ -22,7 +22,14 @@ from api.domain import orders as domain
 from api.services.clock import today_ist
 from api.storage import Storage, get_storage
 from worker.jobs.outbox import enter_as_principal
-from worker.jobs.quotations import _env, decode_claim, render_pdf, renderer_available
+from worker.jobs.quotations import (
+    _env,
+    decode_claim,
+    discount_columns,
+    discount_tiers,
+    render_pdf,
+    renderer_available,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -31,8 +38,10 @@ def render_html(doc: dict[str, Any]) -> str:
     """Money and rates arrive as strings the filters format; the template does no
     arithmetic. No approver names and no remarks (rule 9): the claim strips them."""
     o = doc["order"]
+    tiers = discount_tiers(doc["lines"])
     return _env.get_template("order.html").render(
-        o=o, lines=doc["lines"], is_provisional=bool(o.get("is_provisional")),
+        o=o, lines=doc["lines"], tiers=tiers, discount_cols=discount_columns(tiers),
+        is_provisional=bool(o.get("is_provisional")),
         intra_state=bool(o.get("intra_state")), rendered_on=today_ist().strftime("%d %b %Y"))
 
 

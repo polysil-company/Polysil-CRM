@@ -275,6 +275,14 @@ def migrate(env: dict[str, str]) -> None:
     sync_templates(env)
 
 
+def requeue_pdfs(env: dict[str, str]) -> None:
+    """Failed quotation and order PDFs back in the render queue, once storage works
+    (ISS-094). Sends nothing by itself; see scripts/requeue_pdfs.py."""
+    guard(env)
+    run_remote(env, compose(env, "run", "--rm", "tools", "python",
+                            "scripts/requeue_pdfs.py", profile="tools"))
+
+
 def sync_templates(env: dict[str, str]) -> None:
     """Switch each order message on only if 11za has approved its template (FS-012
     rule 3). A failed listing leaves the switches alone and the deploy goes on."""
@@ -447,7 +455,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("step", nargs="?", default="deploy",
                         choices=["provision", "deploy", "sync", "build", "up", "migrate",
-                                 "seed", "templates", "status", "logs", "down",
+                                 "seed", "templates", "requeue-pdfs", "status", "logs", "down",
                                  "frontend-provision", "frontend", "frontend-caddy"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
     parser.add_argument("--seed", action="store_true", help="deploy: run the seeds too")
@@ -476,6 +484,8 @@ def main(argv: list[str] | None = None) -> int:
         seed(env, masters=not args.no_masters, showcase=not args.no_showcase)
     elif args.step == "templates":
         sync_templates(env)
+    elif args.step == "requeue-pdfs":
+        requeue_pdfs(env)
     elif args.step == "status":
         status(env)
     elif args.step == "logs":

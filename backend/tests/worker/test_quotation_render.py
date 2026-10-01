@@ -18,7 +18,15 @@ import pytest
 import worker.jobs.quotations as job
 from api.config import get_settings
 from api.domain.quotations import storage_key
-from worker.jobs.quotations import _date, decode_claim, render_html, render_pdf, renderer_available
+from worker.jobs.quotations import (
+    _date,
+    _money,
+    _plain,
+    decode_claim,
+    render_html,
+    render_pdf,
+    renderer_available,
+)
 
 GUJARATI_NAME = "રમેશભાઈ પટેલ"
 HINDI_TERMS = "भुगतान 7 दिनों में"
@@ -63,14 +71,18 @@ def test_the_html_carries_every_figure_as_given() -> None:
     html = render_html(doc)
     flat = _text(html)
     line = doc["lines"][0]
+    # Indian grouping, no trailing zeros on rates (demo walk D-5)
     for key in ("gross", "discount1_amt", "after_discount1", "discount2_amt", "after_discount2",
-                "discount3_amt", "taxable", "cgst", "sgst", "total", "rate"):
-        assert line[key] in flat, key
-    for key in ("discount_pct", "discount2_pct", "discount3_pct", "cgst_rate", "sgst_rate"):
-        assert line[key] in flat, key
+                "taxable", "cgst", "sgst", "total", "rate"):
+        assert _money(line[key]) in flat, key
+    for key in ("discount_pct", "discount2_pct", "cgst_rate", "sgst_rate"):
+        assert _plain(line[key]) + "%" in flat, key
+    assert "1,857.42" in flat and "\u20b91,667.50" in flat and "Amounts in Indian rupees" in flat
+    assert "3rd disc" not in flat, "a tier no line uses prints no columns"
+    assert " 18 " in flat and "10.000" not in flat, "quantities and rates without trailing zeros"
     q = doc["quotation"]
     for key in ("gross", "discount", "taxable", "cgst", "sgst", "total"):
-        assert q[key] in flat, key
+        assert _money(q[key]) in flat, key
     assert q["quote_no"] in flat and q["seller_gstin_no"] in flat and q["party_name"] in flat
     assert "IGST" not in flat, "an intra-state document prints CGST and SGST"
     assert "INDICATIVE PRICING" not in flat.upper()

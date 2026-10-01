@@ -19,7 +19,10 @@
   table { border-collapse: collapse; width: 100%; margin-top: 5mm; font-size: 7.5pt;
           table-layout: auto; }
   th, td { border: 1px solid #999; padding: 0.8mm 1mm; vertical-align: top; }
-  th { overflow-wrap: anywhere; }
+  /* whole words: "Taxable" broke as "Taxabl / e" (demo walk D-5) */
+  th { overflow-wrap: normal; word-break: normal; hyphens: none; }
+  th.n { white-space: nowrap; }
+  .amounts { margin-top: 1.5mm; font-size: 8pt; color: #555; }
   th { background: #eee; font-weight: 600; text-align: left; }
   td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   th.n { text-align: right; }
@@ -63,10 +66,10 @@
     <thead>
       <tr>
         <th>#</th><th>Product</th><th>HSN</th><th>Unit</th>
-        <th class="n">Qty</th><th class="n">Rate</th><th class="n">Total value</th>
-        <th class="n">1st disc %</th><th class="n">1st disc</th><th class="n">After 1st</th>
-        <th class="n">2nd disc %</th><th class="n">2nd disc</th><th class="n">After 2nd</th>
-        <th class="n">3rd disc %</th><th class="n">3rd disc</th>
+        <th class="n">Qty</th><th class="n">Rate</th><th class="n">Value</th>
+        {% if 1 in tiers %}<th class="n">Disc %</th><th class="n">Discount</th><th class="n">After disc</th>{% endif %}
+        {% if 2 in tiers %}<th class="n">2nd disc %</th><th class="n">2nd disc</th><th class="n">After 2nd</th>{% endif %}
+        {% if 3 in tiers %}<th class="n">3rd disc %</th><th class="n">3rd disc</th>{% endif %}
         <th class="n">Taxable</th>
         {% if intra_state %}<th class="n">CGST</th><th class="n">SGST</th>{% else %}<th class="n">IGST</th>{% endif %}
         <th class="n">Line total</th>
@@ -76,10 +79,10 @@
       {% for l in lines %}
       <tr>
         <td>{{ l.line_no }}</td><td>{{ l.description }}</td><td>{{ l.hsn_code }}</td><td>{{ l.uom }}</td>
-        <td class="n">{{ l.qty }}</td><td class="n">{{ l.rate | money }}</td><td class="n">{{ l.gross | money }}</td>
-        <td class="n">{{ l.discount_pct | pct }}</td><td class="n">{{ l.discount1_amt | money }}</td><td class="n">{{ l.after_discount1 | money }}</td>
-        <td class="n">{{ l.discount2_pct | pct }}</td><td class="n">{{ l.discount2_amt | money }}</td><td class="n">{{ l.after_discount2 | money }}</td>
-        <td class="n">{{ l.discount3_pct | pct }}</td><td class="n">{{ l.discount3_amt | money }}</td>
+        <td class="n">{{ l.qty | qty }}</td><td class="n">{{ l.rate | money }}</td><td class="n">{{ l.gross | money }}</td>
+        {% if 1 in tiers %}<td class="n">{{ l.discount_pct | pct }}%</td><td class="n">{{ l.discount1_amt | money }}</td><td class="n">{{ l.after_discount1 | money }}</td>{% endif %}
+        {% if 2 in tiers %}<td class="n">{{ l.discount2_pct | pct }}%</td><td class="n">{{ l.discount2_amt | money }}</td><td class="n">{{ l.after_discount2 | money }}</td>{% endif %}
+        {% if 3 in tiers %}<td class="n">{{ l.discount3_pct | pct }}%</td><td class="n">{{ l.discount3_amt | money }}</td>{% endif %}
         <td class="n">{{ l.taxable | money }}</td>
         {% if intra_state %}
         <td class="n">{{ l.cgst | money }} <span class="muted">({{ l.cgst_rate | pct }}%)</span></td>
@@ -95,17 +98,18 @@
       <tr>
         <td colspan="6">Totals</td>
         <td class="n">{{ o.gross | money }}</td>
-        <td colspan="8" class="n">Total discount {{ o.discount | money }}</td>
+        {% if discount_cols %}<td colspan="{{ discount_cols }}" class="n">Total discount {{ o.discount | money }}</td>{% endif %}
         <td class="n">{{ o.taxable | money }}</td>
         {% if intra_state %}
         <td class="n">{{ o.cgst | money }}</td><td class="n">{{ o.sgst | money }}</td>
         {% else %}
         <td class="n">{{ o.igst | money }}</td>
         {% endif %}
-        <td class="n">{{ o.total | money }}</td>
+        <td class="n">{{ o.total | rupees }}</td>
       </tr>
     </tfoot>
   </table>
+  <div class="amounts">Amounts in Indian rupees (&#8377;).</div>
 
   <div class="terms"><strong>Payment terms</strong><br>{{ o.payment_terms | replace('_', ' ') | capitalize }}</div>
 
