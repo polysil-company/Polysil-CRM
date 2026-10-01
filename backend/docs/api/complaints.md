@@ -612,7 +612,9 @@ it now. Answers the complaint, `remedy_pending` or `closed`. Refusals:
 
 QC takes back the pending remedy: a refund while its approval is open, a
 replacement while nothing has shipped (its order is cancelled). The complaint
-returns to `qc_approved`. `409 status_changed` once it moved on.
+returns to `qc_approved`. Refusals: `409 status_changed` once it moved on (decided,
+shipped, or withdrawn already); `403` for anyone but QC, and for the complaint's
+raiser or owner; `422` on `remark`.
 
 **Parameters**
 

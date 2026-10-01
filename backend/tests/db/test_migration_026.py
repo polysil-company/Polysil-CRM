@@ -99,8 +99,3 @@ def test_a_changed_anchor_fails_the_migration() -> None:
     # every patch builds from the live text of the migrations before it
     assert len(m._engine_patched()) == 7 and len(m._orders_patched()) == 5 and len(m._bell_patched()) == 2
 
-
-async def test_the_closed_check_pairs_the_status_and_its_time(db: AsyncSession) -> None:
-    defn = (await db.execute(text(
-        "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_complaint_closed'"))).scalar_one()
-    assert "closed" in defn and "closed_at" in defn

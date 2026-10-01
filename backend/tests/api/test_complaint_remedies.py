@@ -271,6 +271,12 @@ async def test_a_rejected_replacement_is_cancelled_and_returns_the_complaint(
     shop = remedies
     dispatch = await _as(client, shop, "dispatch_manager")
     c, order = await _replacement(client, shop)
+    owner_mobile = "9197" + f"{uuid.uuid4().int % 10**8:08d}"
+    s = sessions()
+    await s.execute(text("UPDATE app_user SET mobile = :m WHERE id = CAST(:u AS uuid)"),
+                    {"m": owner_mobile, "u": shop.ids["field_officer"]})
+    await s.commit()
+    await s.close()
     r = await _decide(client, dispatch, order["approval"]["steps"][0]["id"], "reject", "Out of stock")
     assert r.status_code == 200, r.text
     assert r.json()["data"]["status"] == "cancelled", "cancelled, never an editable draft (B4)"
@@ -285,11 +291,15 @@ async def test_a_rejected_replacement_is_cancelled_and_returns_the_complaint(
             "SELECT count(*) FROM notification WHERE resource_id = CAST(:o AS uuid) AND kind = 'order_returned'"),
             {"o": order["id"]})).scalar_one()
         decided = (await s.execute(text(
-            "SELECT count(*) FROM notification_outbox WHERE template_key = 'order.decided' AND payload ->> 'order_no' = :n"),
-            {"n": order["order_no"]})).scalar_one()
+            "SELECT count(*) FROM notification_outbox WHERE template_key = 'order.decided' AND recipient = :m"),
+            {"m": "+" + owner_mobile})).scalar_one()
+        await s.execute(text("DELETE FROM notification_outbox WHERE recipient = :m"), {"m": "+" + owner_mobile})
+        await s.execute(text("UPDATE app_user SET mobile = NULL WHERE id = CAST(:u AS uuid)"),
+                        {"u": shop.ids["field_officer"]})
+        await s.commit()
     finally:
         await s.close()
-    assert "order.cancelled" in kinds and "order.returned" not in kinds, kinds
+    assert "order.replacement_cancelled" in kinds and "order.returned" not in kinds, kinds
     assert returned == 0 and decided == 0
 
 
@@ -342,6 +352,8 @@ async def test_an_unpriced_product_refuses_the_replacement_and_writes_nothing(
     await s.close()
     try:
         c = await _qc_approved(client, shop, lines=[{"product_id": other, "supplied_qty": "10", "defective_qty": "2"}])
+        r = await _remedy(client, await _as(client, shop, "district_manager"), c["id"], kind="replacement", remark="Replace")
+        assert r.status_code == 403, "the right before the price (PR 38 review)"
         r = await _remedy(client, qc, c["id"], kind="replacement", remark="Replace")
         assert r.status_code == 422 and _code(r) == "replacement_unpriced", r.text
         assert (await _get(client, qc, c["id"]))["status"] == "qc_approved"
@@ -544,7 +556,7 @@ async def test_another_districts_manager_sees_no_refund(client: httpx.AsyncClien
         assert c["id"] not in [x["document"]["id"] for x in pending]
         assert (await client.get(f"{V1}/approvals/{request_id}", headers=far)).status_code == 404
         r = await _decide(client, far, c["remedy"]["refund"]["approval"]["steps"][0]["id"])
-        assert r.status_code in (403, 404), r.text
+        assert r.status_code == 404, "the step is outside the caller's scope, so it is not there"
     finally:
         s = sessions()
         for stmt in ("DELETE FROM idempotency_record WHERE user_id = CAST(:u AS uuid)",
@@ -601,3 +613,65 @@ def test_a_state_without_a_code_is_a_field_error() -> None:
         sqlstate = "ORDST"
     mapped = service._refusal(DBAPIError("SELECT 1", {}, _OrigError("no coded state")))
     assert isinstance(mapped, ValidationFailed) and mapped.code == "territory_without_state_code"
+
+
+
+# ── OpenCodeReview (PR 38) ───────────────────────────────────────────────────
+
+async def test_a_dealer_never_learns_who_cancelled_its_replacement(
+        client: httpx.AsyncClient, remedies: Shop, sessions: Sessions) -> None:
+    """A dealer's complaint gives its replacement the dealer as partner, so the dealer
+    reads the order's timeline: the approver who rejected it stays unnamed (15.14)."""
+    shop = remedies
+    qc = await _as(client, shop, "qc_manager")
+    dm = await _as(client, shop, "district_manager")
+    dispatch = await _as(client, shop, "dispatch_manager")
+    dealer, mobile = await complaints_t._dealer(client, shop, sessions)
+    try:
+        c = await complaints_t._create(client, shop, dealer)
+        await complaints_t._post(client, dealer, f"/{c['id']}/submit")
+        await complaints_t._post(client, dm, f"/{c['id']}/check", {"decision": "approve", "remark": "Genuine"})
+        await complaints_t._post(client, qc, f"/{c['id']}/qc", {"verdict": "approved", "remark": "Defect"})
+        c = (await _remedy(client, qc, c["id"], kind="replacement", remark="Replace")).json()["data"]
+        order_id = c["remedy"]["replacement"]["order"]["id"]
+        order = (await client.get(f"{V1}/orders/{order_id}", headers=dispatch)).json()["data"]
+        r = await _decide(client, dispatch, order["approval"]["steps"][0]["id"], "reject", "Out of stock")
+        assert r.status_code == 200, r.text
+        r = await client.get(f"{V1}/orders/{order_id}/timeline", headers=dealer)
+        assert r.status_code == 200, r.text
+        event = next(e for e in r.json()["data"] if e["kind"] == "order.replacement_cancelled")
+        assert event["actor"] is None and "actor_name" not in event["payload"], event
+        staff = (await client.get(f"{V1}/orders/{order_id}/timeline", headers=dispatch)).json()["data"]
+        mine = next(e for e in staff if e["kind"] == "order.replacement_cancelled")
+        assert mine["actor"]["id"] == shop.ids["dispatch_manager"], "staff still see who"
+    finally:
+        await complaints_t._forget(sessions, mobile)
+
+
+async def test_the_replacement_definer_refuses_a_duplicated_or_unpriced_line(
+        client: httpx.AsyncClient, remedies: Shop, sessions: Sessions) -> None:
+    """The definer is granted to app_role; its re-check compares the lines as a
+    multiset, and a missing total is not free (PR 38 review)."""
+    import json
+
+    from sqlalchemy.exc import DBAPIError
+
+    shop = remedies
+    c = await _qc_approved(client, shop)
+    s = sessions()
+    try:
+        await conc._as(s, shop.ids["qc_manager"])
+        order, lines = await service._replacement_rows(s, c["id"])
+        doubled = [*lines, {**lines[0], "line_no": 2}]
+        untotalled = [{k: v for k, v in lines[0].items() if k != "total"}]
+        for bad in (doubled, untotalled):
+            await s.execute(text("SAVEPOINT sp"))
+            with pytest.raises(DBAPIError) as caught:
+                await s.execute(text(
+                    "SELECT complaint_remedy_replacement(CAST(:c AS uuid), CAST(:o AS jsonb), CAST(:l AS jsonb), 'x')"),
+                    {"c": c["id"], "o": json.dumps(order, default=str), "l": json.dumps(bad, default=str)})
+            assert getattr(caught.value.orig, "sqlstate", None) == "CMPRV", caught.value
+            await s.execute(text("ROLLBACK TO SAVEPOINT sp"))
+    finally:
+        await s.rollback()
+        await s.close()

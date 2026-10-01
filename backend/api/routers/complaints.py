@@ -226,7 +226,9 @@ async def withdraw_remedy(complaint_id: Id, body: WithdrawIn, db: DbSession, cal
                           claims: Claims, idem: IdemKey) -> Response:
     """QC takes back the pending remedy: a refund while its approval is open, a
     replacement while nothing has shipped (its order is cancelled). The complaint
-    returns to `qc_approved`. `409 status_changed` once it moved on."""
+    returns to `qc_approved`. Refusals: `409 status_changed` once it moved on (decided,
+    shipped, or withdrawn already); `403` for anyone but QC, and for the complaint's
+    raiser or owner; `422` on `remark`."""
     return await _idem(db, claims, idem, f"POST /api/v1/complaints/{complaint_id}/remedy/withdraw",
                        body, lambda: service.withdraw_remedy(db, caller, complaint_id, body))
 

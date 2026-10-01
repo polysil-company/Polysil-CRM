@@ -67,6 +67,12 @@ For a quotation step (`doc_type: quotation` in the queue) it returns the
 quotation: its `discount.send_gate` is `approved` or `returned`, and its status
 stays draft. `409 figures_changed` when the draft was edited under the request.
 
+For a refund step (`doc_type: complaint`, FS-015b) it returns the complaint:
+`remedy_pending`, or `closed` once the Account Manager approves. On the Account
+Manager's step the remark is the payment reference, and required. A rejection
+returns the complaint to `qc_approved`. `409 request_closed` once QC withdrew the
+refund.
+
 **Parameters**
 
 | Name | In | Type | Required | Notes |

@@ -50,7 +50,7 @@ Two new statuses: `remedy_pending` and `closed`. A complaint closes itself; nobo
 | `422 replacement_unpriced` | a defective product has no price today, or its quantity breaks its unit; `fields` names the line |
 | `422 no_approver` | nobody active holds a role the approval needs: tell the user to contact the admin |
 
-`POST /complaints/{id}/remedy/withdraw` takes `{remark}`. A refund can be withdrawn while its approval is open. A replacement can be withdrawn until something has shipped; its order is cancelled. Otherwise it answers `409 status_changed`.
+`POST /complaints/{id}/remedy/withdraw` takes `{remark}`. A refund can be withdrawn while its approval is open. A replacement can be withdrawn until something has shipped; its order is cancelled. Otherwise it answers `409 status_changed`. `403` for anyone but QC (and for the complaint's raiser or owner); `422` on `remark`.
 
 ## Refund approval
 

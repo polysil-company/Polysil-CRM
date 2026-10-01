@@ -282,17 +282,18 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM complaint_line WHERE complaint_id = c.id AND defective_qty > 0) THEN
         RAISE EXCEPTION 'nothing defective' USING ERRCODE = 'CMPZD';
     END IF;
-    -- the lines are exactly the defective lines, and free
+    -- the lines are exactly the defective lines, each once, and free. EXCEPT ALL:
+    -- a duplicated line must not pass as the set it collapses to (PR 38 review)
     IF EXISTS (
         (SELECT product_id, defective_qty FROM complaint_line WHERE complaint_id = c.id AND defective_qty > 0)
-        EXCEPT
+        EXCEPT ALL
         (SELECT x.product_id, x.qty FROM jsonb_to_recordset(p_lines) AS x(product_id uuid, qty numeric)))
        OR EXISTS (
         (SELECT x.product_id, x.qty FROM jsonb_to_recordset(p_lines) AS x(product_id uuid, qty numeric))
-        EXCEPT
+        EXCEPT ALL
         (SELECT product_id, defective_qty FROM complaint_line WHERE complaint_id = c.id AND defective_qty > 0))
-       OR EXISTS (SELECT 1 FROM jsonb_to_recordset(p_lines) AS x(total numeric) WHERE x.total <> 0)
-       OR (p_order ->> 'total')::numeric <> 0 THEN
+       OR EXISTS (SELECT 1 FROM jsonb_to_recordset(p_lines) AS x(total numeric) WHERE x.total IS DISTINCT FROM 0)
+       OR (p_order ->> 'total')::numeric IS DISTINCT FROM 0 THEN
         RAISE EXCEPTION 'lines' USING ERRCODE = 'CMPRV';
     END IF;
     SELECT id INTO v_role FROM role WHERE code = 'dispatch_manager' AND deleted_at IS NULL;
@@ -389,7 +390,9 @@ BEGIN""" + _REMEDY_GATE.format(action="withdraw") + """
     END IF;
     SELECT * INTO c FROM complaint WHERE id = p_complaint FOR UPDATE;
     SELECT * INTO m FROM complaint_remedy WHERE complaint_id = p_complaint AND status = 'pending' FOR UPDATE;
-    IF NOT FOUND OR c.status <> 'remedy_pending' THEN
+    -- the order read before the locks may belong to a remedy since replaced: then
+    -- this one's order is not locked, and the order-first rule would break (PR 38 review)
+    IF NOT FOUND OR c.status <> 'remedy_pending' OR m.sales_order_id IS DISTINCT FROM v_order THEN
         RAISE EXCEPTION 'the remedy moved on' USING ERRCODE = 'CMPSC';
     END IF;
     IF m.kind = 'refund' THEN
@@ -408,7 +411,7 @@ BEGIN""" + _REMEDY_GATE.format(action="withdraw") + """
                cancel_remark = 'Remedy withdrawn: ' || v_remark, updated_by = v_me
          WHERE id = m.sales_order_id AND status NOT IN ('cancelled', 'dispatched', 'closed_short');
         INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload)
-        VALUES ('sales_order', m.sales_order_id, c.lead_id, 'order.cancelled', v_me,
+        VALUES ('sales_order', m.sales_order_id, c.lead_id, 'order.replacement_cancelled', v_me,
                 jsonb_build_object('from', 'remedy_withdrawn'));
     END IF;
     UPDATE complaint_remedy SET status = 'withdrawn', completed_at = now() WHERE id = m.id;
@@ -553,7 +556,7 @@ def _engine_patched() -> list[str]:
                          "        PERFORM apply_approval_outcome(v_req.doc_type, v_req.entity_id, 'reject');\n"
                          "        IF EXISTS (SELECT 1 FROM sales_order WHERE id = v_req.entity_id AND order_type = 'replacement') THEN\n"
                          "            INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload)\n"
-                         "            VALUES ('sales_order', v_req.entity_id, v_lead, 'order.cancelled', app_current_user_id(),\n"
+                         "            VALUES ('sales_order', v_req.entity_id, v_lead, 'order.replacement_cancelled', app_current_user_id(),\n"
                          "                    jsonb_build_object('from', 'approval_rejected'));\n"
                          "            RETURN 'rejected';\n"
                          "        END IF;\n"

@@ -723,6 +723,15 @@ async def choose_remedy(db: AsyncSession, caller: Caller, complaint_id: str,
     elif body.amount is not None or body.payee_name or body.paid_through_partner_id:
         raise ValidationFailed(fields={"kind": "amount and payee belong to a refund"})
     if body.kind == "replacement":
+        # 403 and 409 before any pricing 422 (PR 38 review); the definer checks again
+        refusal: str | None = (await db.execute(text("SELECT complaint_refusal(CAST(:c AS uuid), 'remedy')"),
+                                    {"c": complaint_id})).scalar_one()
+        if refusal == "not_visible":
+            raise NotFoundError("No such complaint.")
+        if refusal == "not_qc_approved":
+            raise ConflictError("The complaint moved on; reload it.", code="status_changed")
+        if refusal is not None:
+            raise ForbiddenError("This is not yours to do on this complaint.")
         order, lines = await _replacement_rows(db, complaint_id)
         await _definer(db, "SELECT complaint_remedy_replacement(CAST(:c AS uuid), CAST(:o AS jsonb), "
                            "CAST(:l AS jsonb), :r)",
