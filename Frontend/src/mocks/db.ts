@@ -86,7 +86,12 @@ function createMockDb(): MockDb {
     approvalSteps,
     approvalDecisions: new Map(),
     quotationDeletes: new Map(),
-    notifications: generateNotifications(leads),
+    notifications: generateNotifications(leads, {
+      quotation: quotations.find(
+        (quotation) => quotation.status === "draft" && quotation.approval?.status === "pending",
+      ),
+      order: orders.find((order) => order.status === "approved"),
+    }),
     conversations,
     messages,
     leadCreations: new Map(),

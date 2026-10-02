@@ -31,7 +31,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | `integration` |
 | [Approvals](#approvals) | 5 | 🧪 🌐 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 7 | 🧪 🌐 👀 | PR #34 |
-| [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 🌐 👀 | dashboard on the backend's contract in PR #41; bell and messages **mock only** |
+| [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 🌐 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -134,11 +134,24 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-30--feature--S
 
 ## Dashboard, notifications, messages
 
-The dashboard reads the backend's real shape since the demo-walk fixes ([changelog](../changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md)); it has not been checked on the dev API by hand yet. The bell and messages still run on the mock backend, though the backend serves them since #31 (BE-009, BE-010 in [Backend-Tasks.md](../../docs/Backend-Tasks.md)). Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
+The dashboard reads the backend's real shape since the demo-walk fixes ([changelog](../changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md)). The bell and messages follow the backend's contracts (BE-009, BE-010) since PR #43 ([changelog](../changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md)). None of the three has been checked on the dev API by hand yet. Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
 
 - **RPT-001 · The dashboard,** read in the backend's own shape (BE-008): open pipeline value, new leads, conversion and overdue follow-ups, each with its change and trend where the backend gives one; the pipeline by stage with value; leads by source; the next follow-ups, marked overdue. Money stays a decimal string until it is printed. Screens: [desktop](screenshots/demo-fixes/dashboard-desktop-light.jpg), [phone, dark](screenshots/demo-fixes/dashboard-phone-dark.jpg). 🧪 🌐 👀
-- **NOTIF-001, NOTIF-002 · The notification bell** in the top bar, marking read. 🧪
-- **MSG-001 … MSG-005 · Direct messages between staff**, and sharing a lead with a colleague from its page. 🧪
+- **NOTIF-001, NOTIF-002 · The notification bell** in the top bar (any signed-in user).
+  - The badge counts the unread, checking every 30 seconds with one notification's worth of data.
+  - Opening it lists the latest 20, each with its own icon for the backend's 14 kinds; an unknown kind gets the plain bell.
+  - A notification opens its lead, quotation or sales order. Tasks and complaints have no screen yet, so theirs only mark read.
+  - Mark one or all read: the badge drops at once, is put back if the call fails, then takes the backend's count.
+  - States: skeleton, "You're all caught up", an error with retry.
+  - Screens: [desktop](screenshots/messages-notifications/notifications-bell-desktop-light.jpg), [phone, dark](screenshots/messages-notifications/notifications-bell-phone-dark.jpg). 🧪 🌐 👀
+- **MSG-001 … MSG-005 · Direct messages between staff** (staff only; partners are told messages are for staff), and sharing a lead with a colleague from its page.
+  - Conversations, most recent first, with unread counts.
+  - The thread, grouped by day. Opening it marks read up to the newest message on screen, so one that arrives meanwhile stays unread.
+  - Enter sends, Shift + Enter adds a line; a failed send puts the text back.
+  - A lead the sender can't see is refused with a reason.
+  - A new conversation keeps its colleague's name until the first message lists it.
+  - A colleague who has left: the conversation stays readable and closed. If the backend refuses a send because they have left, the draft stays to copy.
+  - Screens: [thread](screenshots/messages-notifications/messages-thread-desktop-light.jpg), [colleague who has left, phone dark](screenshots/messages-notifications/messages-colleague-left-phone-dark.jpg). 🧪 🌐 👀
 
 ---
 

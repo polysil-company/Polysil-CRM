@@ -58,6 +58,14 @@ export const MOCK_STAFF_DIRECTORY: readonly PersonWire[] = [
     role_name: "Employee",
     org_unit_name: "Anand Rural",
   },
+  {
+    // Has left Polysil: the old conversation stays readable, the directory no longer lists her.
+    id: "usr-010",
+    full_name: "Meera Iyer",
+    role_name: "Field Officer",
+    org_unit_name: "Bharuch District",
+    is_active: false,
+  },
 ];
 
 interface SeedMessage {
@@ -140,15 +148,28 @@ const CONVERSATION_SEEDS: readonly SeedConversation[] = [
       { from: "me", body: "Great, I'll let the dealer know.", minutesAgo: 4380 },
     ],
   },
+  {
+    id: "conv-005",
+    participantId: "usr-010",
+    unread: 0,
+    messages: [
+      {
+        from: "them",
+        body: "Handing my Bharuch leads to the district team before I leave on Friday.",
+        minutesAgo: 20_000,
+      },
+      { from: "me", body: "Thanks Meera, all the best.", minutesAgo: 19_950 },
+    ],
+  },
 ];
 
 export function findMockStaff(id: string): PersonWire | undefined {
   return MOCK_STAFF_DIRECTORY.find((person) => person.id === id);
 }
 
-/** How a lead is named when it is linked from a message or notification. */
+/** How the backend names a lead linked from a message or notification: its inquiry number. */
 export function mockLeadLabel(lead: LeadWire): string {
-  return `${lead.farmer_name} · ${lead.inquiry_no}`;
+  return lead.inquiry_no;
 }
 
 function minutesAgo(now: number, minutes: number): string {

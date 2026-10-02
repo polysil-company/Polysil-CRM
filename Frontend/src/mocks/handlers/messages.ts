@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import { z } from "zod";
 
 import {
   sendMessageRequestSchema,
@@ -15,7 +16,6 @@ import {
 import { buildApiUrl } from "@/lib/api/url";
 import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
-import { clientEnv } from "@/lib/env/client";
 import {
   findMockStaff,
   MOCK_CURRENT_STAFF_ID,
@@ -25,6 +25,10 @@ import {
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
+import { errorResponse } from "./shared";
+
+/** The mark-read body: `up_to`, the newest message the screen shows, or nothing. */
+const markReadRequestSchema = z.object({ up_to: z.string().min(1).optional() });
 
 /** Mock-only behaviour. vitest.setup.ts turns the automatic reply off. */
 export const mockMessagingOptions: { autoReplyMs: number | null } = { autoReplyMs: 6000 };
@@ -48,23 +52,28 @@ function positiveInt(raw: string | null, fallback: number): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/** The backend's refusal for every dealer, distributor and sub-dealer. */
 function forbidden(): Response {
-  return HttpResponse.json(
-    { error: { code: "FORBIDDEN", message: "Messages are available to Polysil staff only." } },
-    { status: 403 },
-  );
+  return errorResponse(403, "insufficient_permission", "Messages are for Polysil staff.");
 }
 
-function conversationNotFound(conversationId: string): Response {
-  return HttpResponse.json(
-    {
-      error: {
-        code: "CONVERSATION_NOT_FOUND",
-        message: `No conversation with id ${conversationId}`,
-      },
-    },
-    { status: 404 },
-  );
+function conversationNotFound(): Response {
+  return errorResponse(404, "not_found", "No such conversation.");
+}
+
+function validation(fields: Record<string, string>): Response {
+  return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+}
+
+/** Their messages after `upTo`; every one of theirs when `upTo` is null. */
+function unreadAfter(conversation: ConversationWire, upTo: string | null): number {
+  const thread = mockDb.messages
+    .filter((message) => message.conversation_id === conversation.id)
+    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  const from = upTo === null ? thread.length : thread.findIndex((message) => message.id === upTo);
+  return thread
+    .slice(from + 1)
+    .filter((message) => message.sender_id === conversation.participant.id).length;
 }
 
 function findConversation(conversationId: string): ConversationWire | undefined {
@@ -125,12 +134,13 @@ export const messageHandlers = [
       return HttpResponse.json({ data: [{ id: 1, participant: null }], meta: null });
     }
 
+    // A conversation opened but never written in is not listed, as on the backend.
     const conversations =
       scenario === "empty"
         ? []
-        : [...mockDb.conversations].sort(
-            (a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at),
-          );
+        : mockDb.conversations
+            .filter((conversation) => conversation.last_message !== null)
+            .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
     const body: ConversationListResponse = {
       data: conversations,
       meta: { unread_total: scenario === "empty" ? 0 : unreadTotal() },
@@ -145,14 +155,17 @@ export const messageHandlers = [
 
     const url = new URL(request.url);
     const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
-    const limit = Math.min(50, positiveInt(url.searchParams.get("limit"), 20));
+    const limit = Math.min(100, positiveInt(url.searchParams.get("limit"), 50));
+    // Every active colleague: someone who has left is not offered.
     const people =
       scenario === "empty"
         ? []
-        : MOCK_STAFF_DIRECTORY.filter((person) =>
-            [person.full_name, person.role_name ?? "", person.org_unit_name ?? ""].some((field) =>
-              field.toLowerCase().includes(query),
-            ),
+        : MOCK_STAFF_DIRECTORY.filter(
+            (person) =>
+              person.is_active !== false &&
+              [person.full_name, person.role_name ?? "", person.org_unit_name ?? ""].some((field) =>
+                field.toLowerCase().includes(query),
+              ),
           );
 
     const body: StaffDirectoryResponse = { data: people.slice(0, limit) };
@@ -167,16 +180,12 @@ export const messageHandlers = [
     const payload: unknown = await request.json();
     const parsed = startConversationRequestSchema.safeParse(payload);
     const participant = parsed.success ? findMockStaff(parsed.data.participant_id) : undefined;
-    if (participant === undefined || participant.id === MOCK_CURRENT_STAFF_ID) {
-      return HttpResponse.json(
-        {
-          error: {
-            code: "PARTICIPANT_NOT_FOUND",
-            message: "Choose a colleague from the directory.",
-          },
-        },
-        { status: 422 },
-      );
+    if (
+      participant === undefined ||
+      participant.id === MOCK_CURRENT_STAFF_ID ||
+      participant.is_active === false
+    ) {
+      return validation({ participant_id: "not someone you can message" });
     }
 
     const existing = mockDb.conversations.find(
@@ -206,7 +215,7 @@ export const messageHandlers = [
 
     const conversationId = String(params.conversationId);
     if (findConversation(conversationId) === undefined) {
-      return conversationNotFound(conversationId);
+      return conversationNotFound();
     }
 
     const limit = Math.min(100, positiveInt(new URL(request.url).searchParams.get("limit"), 50));
@@ -231,41 +240,27 @@ export const messageHandlers = [
 
     const conversation = findConversation(String(params.conversationId));
     if (conversation === undefined) {
-      return conversationNotFound(String(params.conversationId));
+      return conversationNotFound();
+    }
+
+    if (conversation.participant.is_active === false) {
+      return errorResponse(422, "participant_inactive", "That colleague has left.", {
+        participant: "no longer active",
+      });
     }
 
     const payload: unknown = await request.json();
     const parsed = sendMessageRequestSchema.safeParse(payload);
     if (!parsed.success) {
-      return HttpResponse.json(
-        {
-          error: {
-            code: "VALIDATION_FAILED",
-            message: "The message could not be sent.",
-            details: { fields: { body: "Write a message of up to 2,000 characters." } },
-          },
-        },
-        { status: 422 },
-      );
+      return validation({ body: "a message of 1 to 2,000 characters" });
     }
 
+    // A lead the sender cannot see is never linked.
     const { resource } = parsed.data;
     const lead =
       resource?.type === "lead" ? mockDb.leads.find((item) => item.id === resource.id) : undefined;
-    // In partial mode leads come from the real API, which this mock cannot see: it trusts the
-    // id of a linked lead and names it generically, rather than refusing every real lead.
-    const trustedLeadId =
-      clientEnv.apiMocking === "partial" && resource?.type === "lead" ? resource.id : null;
-    if (resource !== null && lead === undefined && trustedLeadId === null) {
-      return HttpResponse.json(
-        {
-          error: {
-            code: "RESOURCE_NOT_FOUND",
-            message: "The linked record no longer exists.",
-          },
-        },
-        { status: 422 },
-      );
+    if (resource !== null && lead === undefined) {
+      return validation({ resource: "not a lead you can see" });
     }
 
     const message: MessageWire = {
@@ -273,11 +268,7 @@ export const messageHandlers = [
       conversation_id: conversation.id,
       sender_id: MOCK_CURRENT_STAFF_ID,
       body: parsed.data.body,
-      resource: lead
-        ? { type: "lead", id: lead.id, label: mockLeadLabel(lead) }
-        : trustedLeadId === null
-          ? null
-          : { type: "lead", id: trustedLeadId, label: "Lead" },
+      resource: lead ? { type: "lead", id: lead.id, label: mockLeadLabel(lead) } : null,
       created_at: new Date().toISOString(),
     };
     appendMessage(message, 0);
@@ -287,18 +278,34 @@ export const messageHandlers = [
     return HttpResponse.json(body, { status: 201 });
   }),
 
-  http.post(buildApiUrl("/conversations/:conversationId/read"), async ({ params }) => {
+  http.post(buildApiUrl("/conversations/:conversationId/read"), async ({ params, request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     if (isPartnerRole(readMockRole())) return forbidden();
 
-    const conversationId = String(params.conversationId);
-    if (findConversation(conversationId) === undefined) {
-      return conversationNotFound(conversationId);
+    const conversation = findConversation(String(params.conversationId));
+    if (conversation === undefined) {
+      return conversationNotFound();
     }
 
-    mockDb.conversations = mockDb.conversations.map((conversation) =>
-      conversation.id === conversationId ? { ...conversation, unread_count: 0 } : conversation,
+    // Read up to the newest message the screen shows; left out, everything so far.
+    const payload: unknown = await request.json().catch(() => ({}));
+    const upTo = markReadRequestSchema.safeParse(payload).data?.up_to ?? null;
+    if (
+      upTo !== null &&
+      !mockDb.messages.some(
+        (message) => message.id === upTo && message.conversation_id === conversation.id,
+      )
+    ) {
+      return validation({ up_to: "not a message of this conversation" });
+    }
+
+    const unread = unreadAfter(conversation, upTo);
+    mockDb.conversations = mockDb.conversations.map((item) =>
+      // A mark never moves backwards: it only ever lowers the count.
+      item.id === conversation.id
+        ? { ...item, unread_count: Math.min(item.unread_count, unread) }
+        : item,
     );
     const body: MarkConversationReadResponse = { data: { unread_total: unreadTotal() } };
     return HttpResponse.json(body);

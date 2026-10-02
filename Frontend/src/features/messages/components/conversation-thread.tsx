@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft01Icon, BubbleChatIcon } from "@hugeicons/core-free-icons";
-import { useMutationState, useQuery } from "@tanstack/react-query";
+import { useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -18,6 +18,7 @@ import {
   conversationListQueryOptions,
   conversationMessagesQueryOptions,
   messageKeys,
+  startedConversationQueryOptions,
 } from "@/features/messages/api/messages.queries";
 import {
   sendMessageRequestSchema,
@@ -49,12 +50,18 @@ export function ConversationThread({
   conversationId: string;
 }): React.JSX.Element {
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
   const thread = useQuery(conversationMessagesQueryOptions(conversationId));
   const conversations = useQuery(conversationListQueryOptions());
+  const started = useQuery(startedConversationQueryOptions(conversationId));
   const { mutate: markConversationRead } = useMarkConversationRead();
 
-  const conversation = conversations.data?.items.find((item) => item.id === conversationId) ?? null;
+  // A conversation nobody has written in yet is not listed: the "start" answer names it.
+  const conversation =
+    conversations.data?.items.find((item) => item.id === conversationId) ?? started.data ?? null;
   const unreadCount = conversation?.unreadCount ?? 0;
+  const newestShown = thread.data?.items.at(-1)?.id ?? null;
+  const participantLeft = conversation?.participant.isActive === false;
 
   const pendingBodies = useMutationState({
     filters: { mutationKey: [...messageKeys.all, "send", conversationId], status: "pending" },
@@ -64,12 +71,13 @@ export function ConversationThread({
     },
   }).filter((body): body is string => body !== null);
 
-  // Opening the conversation — or new messages arriving while it is open — reads them.
+  // Opening the conversation, or new messages arriving while it is open, reads them, up to the
+  // newest one on screen: a message that lands meanwhile stays unread (MSG-005, `up_to`).
   useEffect(() => {
-    if (unreadCount > 0 && thread.status === "success") {
-      markConversationRead(conversationId);
+    if (unreadCount > 0 && newestShown !== null) {
+      markConversationRead({ conversationId, upTo: newestShown });
     }
-  }, [conversationId, unreadCount, thread.status, markConversationRead]);
+  }, [conversationId, unreadCount, newestShown, markConversationRead]);
 
   if (thread.status === "error" && isApiError(thread.error) && thread.error.status === 404) {
     notFound();
@@ -111,6 +119,14 @@ export function ConversationThread({
         conversationId={conversationId}
         recipientName={participantName}
         disabled={thread.status !== "success"}
+        closedNotice={
+          participantLeft
+            ? `${participantName ?? "This colleague"} has left Polysil. The conversation stays here to read; new messages can't be sent.`
+            : null
+        }
+        onParticipantLeft={() => {
+          void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+        }}
       />
     </div>
   );
