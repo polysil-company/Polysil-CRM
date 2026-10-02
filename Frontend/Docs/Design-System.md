@@ -73,7 +73,7 @@ They use the semantic tokens below.
 | `bg-overlay` | Dialog and sheet backdrop | 32% sand-950 | 55% black |
 | `text-foreground` | Primary text | sand-950 | ink-50 |
 | `text-muted-foreground` | Secondary text, labels | sand-600 | 68% L |
-| `text-subtle-foreground` | Placeholders, meta, disabled | 50% L (as muted) | 60% L |
+| `text-subtle-foreground` | Placeholders, meta, disabled | 50% L (as muted) | 63% L: at least 4.5:1 on the darkest surface it sits on, the popover |
 
 ### Interaction fills (translucent — they work on any surface)
 

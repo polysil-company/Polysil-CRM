@@ -273,7 +273,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 ## 9. Integration status — frontend ↔ backend
 
-> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **2 October 2026**: sales orders (#34) and approval limits (#35) merged into `integration`. The demo walk's fixes connect the dashboard to the backend's real shape (RPT-001), fix the customer link's PDF path, and pick up crops and land (BE-003) and the end of win probability (BE-004). The backend pick-ups follow: lead list sorting (BE-001), the territory levels a lead may sit in (BE-005), names on assignment events (BE-006), "Awaiting approval" in quotation lists, and one call to find a quotation's order (BE-019). Notifications and messages are served by the backend (BE-009, BE-010) and connect next.
+> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **2 October 2026**: sales orders (#34) and approval limits (#35) merged into `integration`. The demo walk's fixes connect the dashboard to the backend's real shape (RPT-001), fix the customer link's PDF path, and pick up crops and land (BE-003) and the end of win probability (BE-004). The backend pick-ups follow: lead list sorting (BE-001), the territory levels a lead may sit in (BE-005), names on assignment events (BE-006), "Awaiting approval" in quotation lists, and one call to find a quotation's order (BE-019). Then notifications and messages connect to the backend (BE-009, BE-010): nothing on screen is mocked against a live backend any more, and `partial` mocking mocks nothing.
 
 **How the two sides meet.** The browser calls `/api/v1` on the app's own origin; `next.config.ts` forwards it to `API_PROXY_TARGET`. Every call goes through `apiRequest` (`src/lib/api/client.ts`): Zod-validated responses, `x-request-id` / `x-data-id`, `Idempotency-Key` on mutations, one refresh-and-retry on a 401. The backend's contract is `backend/docs/api/*.md` (generated) and the dev API's `/openapi.json`. `NEXT_PUBLIC_API_MOCKING=partial` sends everything to the dev API except the modules listed in `unbuiltHandlers` (`src/mocks/handlers/index.ts`).
 
@@ -311,10 +311,12 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Dashboard — key figures, pipeline by stage, lead sources, the next follow-ups, in the backend's shape (decimal strings) | RPT-001 | `GET /dashboard/overview` |
 | Record a dispatch, void one, close the rest short | DISP-002 | `POST /orders/{id}/dispatches`, `POST /dispatches/{id}/void`, `POST /orders/{id}/close-short` |
 | Approval limits — order value and discount per role, company-wide and per territory; administrators change one level at a time | APPR-002 | `GET /approvals/thresholds`, `PUT /approvals/thresholds` |
+| Notification bell — the unread count polled with `limit=1`, the latest read when it opens, links to leads, quotations and sales orders; mark one or all read | NOTIF-001, NOTIF-002 | `GET /notifications`, `POST /notifications/read` |
+| Staff messages — conversations, the thread, send with a linked lead, the directory, read up to the newest message shown (`up_to`); a colleague who has left stays readable | MSG-001…005 | `/conversations*`, `/staff-directory` |
 
 **Permissions follow the backend's module codes** (`backend/docs/architecture/RBAC.md` §6): orders are `sales_orders`, dispatch is `dispatch`, and there is no `approvals` module — whoever holds `sales_orders.approve` or `quotations.approve` sees Approvals. Before this, the frontend asked for `orders` and `approvals`, so on the real backend Sales orders and Approvals would have stayed hidden.
 
-LEAD-005…008, QUOT-001…012, APPR-001…002, SO-001…004, DISP-002 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+LEAD-005…008, QUOT-001…012, APPR-001…002, SO-001…004, DISP-002, NOTIF-001…002, MSG-001…005 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 
@@ -328,10 +330,7 @@ LEAD-005…008, QUOT-001…012, APPR-001…002, SO-001…004, DISP-002 and MSTR-
 
 ### 9.2 Still mocked — the backend serves them now, the frontend connects next
 
-| Area | Data IDs | Mock endpoints | Backend |
-|---|---|---|---|
-| Notifications | NOTIF-001, NOTIF-002 | `GET /notifications`, `POST /notifications/read` | Served since #31 (BE-009): `backend/docs/api/notifications.md` |
-| Staff messages | MSG-001…005 | `/conversations*`, `/staff-directory` | Served since #31 (BE-010), with `up_to` on mark-read: `backend/docs/api/messages.md` |
+Nothing. Notifications and messages were the last (BE-009, BE-010); `unbuiltHandlers` in `src/mocks/handlers/index.ts` is empty, so `partial` mocking sends every request to the real API. A module built before its endpoints exist goes back on that list until it is connected.
 
 Picked up from the backend's finished asks: crops and land on a lead (BE-003: the new-lead form, the lead page and the list), win probability and weekly activity removed (BE-004), quotation numbers with links in a lead's history (BE-017), sorting on `GET /leads` (BE-001), the territory levels filter (BE-005), names on assignment events (BE-006), `awaiting_approval` on quotation list rows, and the `quotation_id` filter on `GET /orders` (BE-019). Nothing the backend marked done is left to pick up. Order events in a lead's history need the order's id and number from the backend (BE-020).
 
@@ -339,7 +338,7 @@ Picked up from the backend's finished asks: crops and land on a lead (BE-003: th
 
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
-| **A direct order** typed in line by line (not from quotations), and a **consolidated** one from several leads of one dealer (SO-005). After the backend pick-ups in §9.2 | `POST /orders` with `lines`, `PUT /orders/{id}/lines` | `backend/docs/api/orders.md` | **1 — after §9.2** |
+| **A direct order** typed in line by line (not from quotations), and a **consolidated** one from several leads of one dealer (SO-005) | `POST /orders` with `lines`, `PUT /orders/{id}/lines` | `backend/docs/api/orders.md` | **1** |
 | Lead edit, delete, duplicates queue, merge | `PATCH`/`DELETE /leads/{id}`, `/leads/duplicates`, `/leads/{id}/merge` | `backend/docs/api/leads.md` | 2 |
 | Lead QR codes, public lead capture | `/lead-qr-codes`, `/public/*` | `backend/docs/handover/public-lead-capture-contract.md` | 3 |
 | Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 6 |

@@ -90,6 +90,29 @@ export const WithoutCounts: Story = {
   args: { label: "Source", options: SOURCE_OPTIONS },
 };
 
+/** Each option says what it means, for terms a newcomer may not know: the popover widens. */
+export const WithDescriptions: Story = {
+  args: {
+    options: [
+      {
+        value: "new",
+        label: "New",
+        description: "Just came in. Nobody has spoken to the farmer yet.",
+      },
+      {
+        value: "merged",
+        label: "Merged",
+        description: "A duplicate, folded into another lead that carries its history.",
+      },
+      {
+        value: "dormant",
+        label: "Dormant",
+        description: "Set by the system after a long time with no activity.",
+      },
+    ],
+  },
+};
+
 /** For filters the API takes one value of: radios, so choosing one replaces the last. */
 export const SingleChoice: Story = {
   render: () => <SingleFilterPillDemo initial="website" options={SOURCE_OPTIONS} />,

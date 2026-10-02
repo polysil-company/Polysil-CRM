@@ -67,6 +67,10 @@ in the same shape. Never renumber or reuse a number.
 - [x] **BE-019** · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders` · SO-003 · low
 - [ ] **BE-020** · Name the order on its events in the lead's timeline · SO-002, LEAD-005 · normal
 
+**Messages** — added as the message screens are connected (MSG-001…).
+
+- [ ] **BE-021** · Read one conversation: `GET /conversations/{id}` · MSG-002, MSG-004 · low
+
 ---
 
 ## Details
@@ -393,5 +397,21 @@ in the same shape. Never renumber or reuse a number.
   are there (`timeline-entries.ts`), so nothing else changes on its side.
 - **Done when:** the order events on a lead's timeline carry both fields, added when read so old
   events have them too.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-021 · Read one conversation: `GET /conversations/{id}`
+
+- **Status:** ⬜ Open
+- **Asked:** 2 Oct 2026 · MSG-002, MSG-004
+- **What:** `GET /conversations/{conversation_id}` answering the `Conversation` (participant,
+  last message, unread count), `404` when it is not the caller's. Or: list a conversation the
+  caller opened even before anyone writes in it.
+- **Why:** a new conversation is not listed until someone writes in it, and nothing else reads
+  one. The thread names the colleague from the `POST /conversations` answer, but after a reload,
+  or from a shared link, an empty conversation's header can only say "Conversation" and the box
+  cannot say whom it writes to.
+- **Done when:** the thread can name the colleague of any conversation the caller is in, written
+  in or not.
 - **Done in:** —
 - **Backend notes:** —

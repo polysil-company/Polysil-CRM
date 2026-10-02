@@ -262,3 +262,37 @@ test.describe("[APPR-002] Approval limits", () => {
     await expectNoAccessibilityViolations(page);
   });
 });
+
+test.describe("[NOTIF-001] Notifications", () => {
+  test("the bell lists the latest and opens the quotation one is about", async ({ page }) => {
+    await signIn(page, "/dashboard");
+
+    await page.getByRole("button", { name: /^Notifications, \d+ unread$/ }).click();
+    const list = page.getByRole("list", { name: "Latest notifications" });
+    await list.getByRole("link", { name: /needs your approval/ }).click();
+    await expect(page).toHaveURL(/\/quotations\/[^/]+$/);
+  });
+});
+
+test.describe("[MSG-002] Messages", () => {
+  test("opens a conversation and sends a message", async ({ page }) => {
+    await signIn(page, "/messages/conv-003");
+
+    const field = page.getByRole("textbox", { name: "Message Sanjay Rao" });
+    await field.fill("Order released.");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(
+      page.getByRole("log", { name: "Messages" }).getByText("Order released."),
+    ).toBeVisible();
+  });
+
+  test("keeps a conversation with a colleague who has left readable, and closed", async ({
+    page,
+  }) => {
+    await signIn(page, "/messages/conv-005");
+
+    await expect(page.getByText(/Meera Iyer has left Polysil/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send message" })).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
+  });
+});

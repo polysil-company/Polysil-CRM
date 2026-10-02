@@ -31,7 +31,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | `integration` |
 | [Approvals](#approvals) | 5 | 🧪 🌐 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 7 | 🧪 🌐 👀 | PR #34 |
-| [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 🌐 👀 | dashboard on the backend's contract in PR #41; bell and messages **mock only** |
+| [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 🌐 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -58,7 +58,7 @@ Details and tests: [foundation](../changelog/entries/2026-09-14--feature--APP-00
 
 Details and tests: [leads on the dev API](../changelog/entries/2026-09-22--api-integration--LEAD-001--leads-on-the-dev-api.md). Checked by hand on the dev API as admin, Asha and Ravi, each seeing their own total.
 
-- **LEAD-001 · Browse leads,** newest first, or sorted by customer or value from the column headers (BE-001; changing the sort starts again from page 1, since a page link belongs to one order) (PR #42: 🧪 👀, [screen](screenshots/backend-pickups/leads-sorted-by-customer-desktop-light.jpg)). Pages forward and back with the page in the URL (refresh and shared links land on the same page); filter by several stages, one source, one type; search by name, part of the mobile, or the exact inquiry number; "1–25 of 74", or "1,000+" when the backend stops counting. States: skeleton, empty, nothing matches, a page link that no longer works, an emptied page, server error, a broken row left out instead of blanking the page. 🧪 🌐 🔌
+- **LEAD-001 · Browse leads,** newest first, or filtered by stage, with each stage explained in the filter (PR #45, [screen](screenshots/stage-help/stage-filter-desktop-light.jpg)), sorted by customer or value from the column headers (BE-001; changing the sort starts again from page 1, since a page link belongs to one order) (PR #42: 🧪 👀, [screen](screenshots/backend-pickups/leads-sorted-by-customer-desktop-light.jpg)). Pages forward and back with the page in the URL (refresh and shared links land on the same page); filter by several stages, one source, one type; search by name, part of the mobile, or the exact inquiry number; "1–25 of 74", or "1,000+" when the backend stops counting. States: skeleton, empty, nothing matches, a page link that no longer works, an emptied page, server error, a broken row left out instead of blanking the page. 🧪 🌐 🔌
 - **LEAD-002 · Create a lead.** Territory picker (districts on open, any district, taluka or village by typing; never the state, which a lead may not sit in: BE-005, PR #42, [screen](screenshots/backend-pickups/new-lead-no-state-desktop-light.jpg)), lookups from the administrators' lists, crops (up to 10, from `GET /lookups/crops`) and land in acres, a safe retry that never creates two leads, field errors on their fields. Dropdowns are not marked wrong just for being opened; they are checked on submit. A flagged duplicate is named in the toast, and several are counted ("3 possible duplicates (A, B and C)"), as on the lead page. 🧪 🔌 (crops, land and the duplicate count 🧪 👀 only)
 - **LEAD-003 · Open a lead.** The real record: stage and priority (hot, warm or cold only while the lead is open), contact, territory, owner and office or "Unassigned", partner, score, crops (a switched-off crop greyed) and land, dates, the lost reason, a merged lead pointing to the lead it went into, possible duplicates with how they matched. No win probability or engagement cards (BE-004). The list shows crops and every value in whole rupees. 🧪 🌐 🔌 (crops and land 🧪 👀 only)
 - **LEAD-004 · The lead count** in the sidebar and Sales tab is exact (`GET /leads/stats`), never capped. 🧪
@@ -69,7 +69,7 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-27--feature--L
 
 - **LEAD-005 · Read a lead's history** as sentences ("Ravi Joshi moved the lead from Qualified to Lost", with the reason and note), newest first, 20 at a time with "Show older activity". Covers notes, stage changes, reopenings, assignments, edits, merges, duplicate flags, quotation events with the quotation's number as a link ("QT/GJ/2026-27/00009 · v2"), approval steps ("approved the District Manager step"), and order and dispatch events with the dispatch number. An order's own number and link wait on BE-020. An unknown kind still reads well. States: skeleton, "No activity yet", error with retry, an older page failing without losing what is shown. 🧪 👀
 - **LEAD-006 · Add a note** (anyone with `leads.edit`, not on a merged lead). Ctrl/⌘ + Enter saves, Enter adds a line; the note appears at the top at once; a counter near the 2,000-character limit; a failed save keeps the text, and a retry never adds it twice. 🧪 👀
-- **LEAD-007 · Move the stage.** Update stage offers only the moves allowed from the current stage: Contacted and Qualified in one click; Lost needs a reason (note optional); Won confirms; a lost lead can be reopened. Steps that happen on a quotation are listed but disabled with where they happen. If someone else moved the lead first, it says so and shows the latest; Won without an accepted quotation is explained. No menu on a won, merged or dormant lead, or without `leads.edit`. 🧪 👀
+- **LEAD-007 · Move the stage.** Update stage says what the current stage means, and what each move does (PR #45, [screen](screenshots/stage-help/stage-menu-phone-dark.jpg)). It offers only the moves allowed from the current stage: Contacted and Qualified in one click; Lost needs a reason (note optional); Won confirms; a lost lead can be reopened. Steps that happen on a quotation are listed but disabled with where they happen. If someone else moved the lead first, it says so and shows the latest; Won without an accepted quotation is explained. No menu on a won, merged or dormant lead, or without `leads.edit`. 🧪 👀
 - **LEAD-008 · Assign the owner and channel partner** on an open lead (the history names them: "assigned the lead to Ravi Joshi and made Khodiyar Irrigation the channel partner", or "handed the lead from Asha Mehta to Ravi Joshi"; BE-006, PR #42, [screen](screenshots/backend-pickups/lead-history-assignment-desktop-light.jpg)): the people you may assign (or "Unassigned"), partners in your area by name or code. Only what changed is sent; an employee is told only a manager can change the owner; a refused partner shows on its field; no Assign on a closed lead. 🧪 👀
 
 ## Quotations — reading
@@ -134,11 +134,24 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-30--feature--S
 
 ## Dashboard, notifications, messages
 
-The dashboard reads the backend's real shape since the demo-walk fixes ([changelog](../changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md)); it has not been checked on the dev API by hand yet. The bell and messages still run on the mock backend, though the backend serves them since #31 (BE-009, BE-010 in [Backend-Tasks.md](../../docs/Backend-Tasks.md)). Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
+The dashboard reads the backend's real shape since the demo-walk fixes ([changelog](../changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md)). The bell and messages follow the backend's contracts (BE-009, BE-010) since PR #43 ([changelog](../changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md)). None of the three has been checked on the dev API by hand yet. Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
 
 - **RPT-001 · The dashboard,** read in the backend's own shape (BE-008): open pipeline value, new leads, conversion and overdue follow-ups, each with its change and trend where the backend gives one; the pipeline by stage with value; leads by source; the next follow-ups, marked overdue. Money stays a decimal string until it is printed. Screens: [desktop](screenshots/demo-fixes/dashboard-desktop-light.jpg), [phone, dark](screenshots/demo-fixes/dashboard-phone-dark.jpg). 🧪 🌐 👀
-- **NOTIF-001, NOTIF-002 · The notification bell** in the top bar, marking read. 🧪
-- **MSG-001 … MSG-005 · Direct messages between staff**, and sharing a lead with a colleague from its page. 🧪
+- **NOTIF-001, NOTIF-002 · The notification bell** in the top bar (any signed-in user).
+  - The badge counts the unread, checking every 30 seconds with one notification's worth of data.
+  - Opening it lists the latest 20, each with its own icon for the backend's 14 kinds; an unknown kind gets the plain bell.
+  - A notification opens its lead, quotation or sales order. Tasks and complaints have no screen yet, so theirs only mark read.
+  - Mark one or all read: the badge drops at once, is put back if the call fails, then takes the backend's count.
+  - States: skeleton, "You're all caught up", an error with retry.
+  - Screens: [desktop](screenshots/messages-notifications/notifications-bell-desktop-light.jpg), [phone, dark](screenshots/messages-notifications/notifications-bell-phone-dark.jpg). 🧪 🌐 👀
+- **MSG-001 … MSG-005 · Direct messages between staff** (staff only; partners are told messages are for staff), and sharing a lead with a colleague from its page.
+  - Conversations, most recent first, with unread counts.
+  - The thread, grouped by day. Opening it marks read up to the newest message on screen, so one that arrives meanwhile stays unread.
+  - Enter sends, Shift + Enter adds a line; a failed send puts the text back.
+  - A lead the sender can't see is refused with a reason.
+  - A new conversation keeps its colleague's name until the first message lists it.
+  - A colleague who has left: the conversation stays readable and closed. If the backend refuses a send because they have left, the draft stays to copy.
+  - Screens: [thread](screenshots/messages-notifications/messages-thread-desktop-light.jpg), [colleague who has left, phone dark](screenshots/messages-notifications/messages-colleague-left-phone-dark.jpg). 🧪 🌐 👀
 
 ---
 

@@ -4,7 +4,11 @@ import { LeadsPageSkeleton } from "@/features/leads/components/leads-page-skelet
 
 export default function LeadsLoading(): React.JSX.Element {
   return (
-    <section aria-label="Loading leads" className="flex min-h-0 flex-1 flex-col gap-4">
+    <section
+      aria-label="Loading leads"
+      data-page-fill
+      className="flex min-h-0 flex-1 flex-col gap-4"
+    >
       <LeadsPageSkeleton />
     </section>
   );
