@@ -32,7 +32,29 @@ export type TimelineEntry =
   | { readonly type: "duplicate-flagged"; readonly count: number }
   | { readonly type: "duplicate-dismissed" }
   | { readonly type: "deleted" }
+  | {
+      readonly type: "approval";
+      readonly decision: "approve" | "reject" | null;
+      /** The step's role code: `district_manager`, `account_manager` … */
+      readonly role: string | null;
+    }
+  | {
+      readonly type: "document";
+      readonly label: string;
+      /** The quotation or order the event is about, when the backend names it. */
+      readonly document: TimelineDocument | null;
+      /** A dispatch's number, on dispatch events. */
+      readonly dispatchNo: string | null;
+    }
   | { readonly type: "other"; readonly label: string };
+
+/** A quotation or sales order an event links to. */
+export interface TimelineDocument {
+  readonly kind: "quotation" | "order";
+  readonly id: string;
+  /** "QT/GJ/2026-27/00003 · v2", "SO/GJ/2026-27/00041"; "Draft" when it has no number yet. */
+  readonly title: string;
+}
 
 /** How an assignment event touched a field: given a value, cleared, or left alone. */
 export type ChangeKind = "set" | "cleared" | "unchanged";
@@ -76,8 +98,42 @@ const OTHER_KIND_LABELS: Readonly<Record<string, string>> = {
   "order.lines_replaced": "Sales order items changed",
   "order.submitted": "Sales order submitted",
   "order.approved": "Sales order approved",
+  "order.returned": "Sales order returned for changes",
+  "order.cancelled": "Sales order cancelled",
+  "order.closed_short": "Sales order closed short",
+  "order.confirmed": "Customer told of the sales order",
+  "order.deleted": "Draft sales order deleted",
+  "dispatch.recorded": "Dispatch recorded",
+  "dispatch.voided": "Dispatch voided",
   "approval.decided": "Approval decided",
 };
+
+const version = z.number().int().positive().nullish().catch(null);
+
+/**
+ * The quotation or order an event names: quotation events carry `quotation_id`, `quote_no`
+ * and `version` (BE-017); order events carry `order_id` and `order_no` once the backend
+ * adds them (BE-020) — until then they name no order.
+ */
+function documentOf(payload: Readonly<Record<string, unknown>>): TimelineDocument | null {
+  const quotationId = optionalText.parse(payload.quotation_id) ?? null;
+  if (quotationId !== null) {
+    const number = optionalText.parse(payload.quote_no) ?? "Draft";
+    const v = version.parse(payload.version) ?? null;
+    return {
+      kind: "quotation",
+      id: quotationId,
+      title: v !== null && v > 1 ? `${number} · v${String(v)}` : number,
+    };
+  }
+  const orderId = optionalText.parse(payload.order_id) ?? null;
+  if (orderId !== null) {
+    return { kind: "order", id: orderId, title: optionalText.parse(payload.order_no) ?? "Draft" };
+  }
+  return null;
+}
+
+const DOCUMENT_KIND = /^(quotation|order|dispatch)\./;
 
 /** "quotation.sent" → "Quotation sent" — for a kind this file does not know yet. */
 export function labelForUnknownKind(kind: string): string {
@@ -158,7 +214,20 @@ export function toTimelineEntry(event: TimelineEvent, leadId: string): TimelineE
     case "lead.deleted":
       return { type: "deleted" };
 
+    case "approval.decided": {
+      const decision =
+        payload.decision === "approve" || payload.decision === "reject" ? payload.decision : null;
+      return { type: "approval", decision, role: optionalText.parse(payload.role) ?? null };
+    }
     default:
+      if (DOCUMENT_KIND.test(event.kind)) {
+        return {
+          type: "document",
+          label: labelForUnknownKind(event.kind),
+          document: documentOf(payload),
+          dispatchNo: optionalText.parse(payload.dispatch_no) ?? null,
+        };
+      }
       return { type: "other", label: labelForUnknownKind(event.kind) };
   }
 }

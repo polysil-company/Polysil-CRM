@@ -458,7 +458,7 @@ export const requiredRemarkFormSchema = z.object({
   remark: z
     .string()
     .trim()
-    .min(1, { message: "Say why — it is kept on the order and its history" })
+    .min(1, { message: "Say why. It is kept on the order and its history." })
     .max(ORDER_REMARK_MAX_LENGTH, { message: "Keep it under 1,000 characters" }),
 });
 export type RequiredRemarkForm = z.infer<typeof requiredRemarkFormSchema>;

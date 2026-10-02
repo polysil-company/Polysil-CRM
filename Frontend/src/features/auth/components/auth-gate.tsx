@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 import type * as React from "react";
+import { toast } from "sonner";
 
 import { ErrorState } from "@/components/patterns/error-state";
 import { Spinner } from "@/components/ui/spinner";
@@ -42,8 +43,10 @@ export function AuthGate({ children }: { children: React.ReactNode }): React.JSX
     if (auth.status !== "signed-out") {
       return;
     }
-    // Another user may sign in next on this device: nothing of this session may remain.
+    // Another user may sign in next on this device: nothing of this session may remain,
+    // not even a toast about something they did.
     queryClient.clear();
+    toast.dismiss();
     const next =
       auth.endReason === "signed-out"
         ? null

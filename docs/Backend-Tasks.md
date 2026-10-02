@@ -65,6 +65,7 @@ in the same shape. Never renumber or reuse a number.
 **Sales orders** — added as the order screens are built (SO-001…, DISP-002).
 
 - [ ] **BE-019** · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders` · SO-003 · low
+- [ ] **BE-020** · Name the order on its events in the lead's timeline · SO-002, LEAD-005 · normal
 
 ---
 
@@ -373,5 +374,21 @@ in the same shape. Never renumber or reuse a number.
   (up to ten) to find the match. One filtered call would do.
 - **Done when:** `GET /orders?quotation_id=…` returns the order(s) carrying that quotation, in the
   caller's scope.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-020 · Name the order on its events in the lead's timeline
+
+- **Status:** ⬜ Open
+- **Asked:** 2 Oct 2026 · SO-002, LEAD-005 (demo walk, D-6)
+- **What:** on every `order.*` and `dispatch.*` event that `GET /leads/{id}/timeline` returns, add
+  `order_id` and `order_no` (null on a never-submitted draft) to the payload, as BE-017 did for
+  quotations (`quotation_id`, `quote_no`, `version`). Several of these events carry `{}` today
+  (`order.approved`, `order.returned`, `order.closed_short`, `order.deleted`).
+- **Why:** the lead's history says "Sales order submitted" or "Dispatch recorded" but cannot
+  say which order or link to it. The frontend already reads `order_id` and `order_no` when they
+  are there (`timeline-entries.ts`), so nothing else changes on its side.
+- **Done when:** the order events on a lead's timeline carry both fields, added when read so old
+  events have them too.
 - **Done in:** —
 - **Backend notes:** —

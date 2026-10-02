@@ -36,7 +36,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }):
             Polysil Irrigation
           </p>
           <p className="max-w-md text-3xl font-semibold text-balance">
-            From the field to head office — every lead, order and subsidy case in one place.
+            From the field to head office: every lead, order and subsidy case in one place.
           </p>
         </div>
       </aside>

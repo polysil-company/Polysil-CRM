@@ -1,6 +1,7 @@
 import type { BadgeVariant } from "@/components/ui/badge";
 import type {
   DuplicateSignal,
+  Lead,
   LeadInquiryType,
   LeadPriority,
   LeadStage,
@@ -65,4 +66,34 @@ const PARTNER_TYPE_LABELS: Readonly<Record<string, string>> = {
 /** "sub_dealer" → "Sub-dealer"; an unknown type is shown as sent. */
 export function partnerTypeLabel(partnerType: string): string {
   return PARTNER_TYPE_LABELS[partnerType] ?? partnerType;
+}
+
+/**
+ * "Ramesh Patel · POL/GJ/2026-27/00123", plus every possible duplicate the backend flagged,
+ * so the toast counts the same as the lead page.
+ */
+export function describeCreatedLead(
+  lead: Pick<Lead, "customerName" | "code" | "duplicates">,
+): string {
+  const created = `${lead.customerName} · ${lead.code}`;
+  const pending = lead.duplicates.filter((candidate) => candidate.state === "pending");
+  const [first] = pending;
+  if (first === undefined) {
+    return created;
+  }
+  if (pending.length === 1) {
+    return `${created}. Possible duplicate of ${first.code} (${DUPLICATE_SIGNAL_LABELS[first.signal]}), flagged for review.`;
+  }
+  const codes = pending.map((candidate) => candidate.code);
+  const listed = `${codes.slice(0, -1).join(", ")} and ${codes.at(-1) ?? ""}`;
+  return `${created}. ${String(pending.length)} possible duplicates (${listed}), flagged for review.`;
+}
+
+/** "4.50" → "4.5", "12.00" → "12": land in acres as people say it. */
+export function formatAcres(acres: string): string {
+  const value = Number(acres);
+  if (!Number.isFinite(value)) {
+    return acres;
+  }
+  return value.toFixed(2).replace(/\.?0+$/, "");
 }

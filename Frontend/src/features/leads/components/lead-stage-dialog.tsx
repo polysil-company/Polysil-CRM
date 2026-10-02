@@ -179,7 +179,7 @@ function MarkLostForm({ lead, onClose }: FormProps): React.JSX.Element {
     if (reason === undefined) {
       form.setError("reasonCode", {
         type: "manual",
-        message: "The list of reasons hasn't loaded — try again",
+        message: "The list of reasons hasn't loaded. Try again.",
       });
       return;
     }

@@ -70,6 +70,12 @@ export const leadWireSchema = z.object({
   priority: z.enum(LEAD_PRIORITIES).nullable(),
   /** Rupees, as a decimal string. */
   estimated_value: z.string().nullable(),
+  /** BE-003 · In the order sent; a crop switched off later stays, `is_active: false`. */
+  crops: z
+    .array(z.object({ code: z.string().min(1), name: z.string(), is_active: z.boolean() }))
+    .optional(),
+  /** BE-003 · Acres, a decimal string at two places. */
+  land_acres: z.string().nullish(),
   lost_reason: refSchema.extend({ code: z.string().min(1) }).nullable(),
   lost_note: z.string().nullable(),
   reopen_count: z.number().int().nonnegative(),
@@ -122,6 +128,12 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   score: wire.score,
   priority: wire.priority,
   estimatedValue: wire.estimated_value,
+  crops: (wire.crops ?? []).map((crop) => ({
+    code: crop.code,
+    name: crop.name.trim() || crop.code,
+    isActive: crop.is_active,
+  })),
+  landAcres: wire.land_acres ?? null,
   lostReason: wire.lost_reason,
   lostNote: wire.lost_note,
   reopenCount: wire.reopen_count,
@@ -400,6 +412,10 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const INDIAN_MOBILE_E164 = /^\+91[6-9]\d{9}$/;
 /** Whole rupees or rupees and paise, no grouping: "125000", "125000.50". */
 const AMOUNT_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
+/** Acres: above 0, at most 99999.99, two decimals (BE-003). */
+const ACRES_PATTERN = /^\d{1,5}(\.\d{1,2})?$/;
+/** The backend takes at most this many crops on a lead. */
+export const MAX_LEAD_CROPS = 10;
 
 /** POST /leads request body (`LeadCreate`) — what the backend receives. */
 export const createLeadRequestSchema = z.object({
@@ -414,6 +430,10 @@ export const createLeadRequestSchema = z.object({
   /** Null lets the backend decide from who is asking: employee for staff, dealer for partners. */
   source: z.string().min(1).nullable(),
   estimated_value: z.string().regex(AMOUNT_PATTERN).nullable(),
+  /** Codes from GET /lookups/crops, at most 10; [] for none. */
+  crops: z.array(z.string().min(1)).max(MAX_LEAD_CROPS),
+  /** Acres as a decimal string; null when not known. */
+  land_acres: z.string().regex(ACRES_PATTERN).nullable(),
   /** Becomes the first entry on the lead's timeline. */
   note: z.string().min(1).max(2000).nullable(),
 });
@@ -487,6 +507,15 @@ export const createLeadFormSchema = z
         "Enter an amount in rupees, e.g. 125000.",
       )
       .transform(emptyToNull),
+    crops: z.array(z.string()).max(MAX_LEAD_CROPS, "Choose at most 10 crops."),
+    landAcres: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value === "" || (ACRES_PATTERN.test(value) && Number(value) > 0),
+        "Enter the land in acres, e.g. 4.5.",
+      )
+      .transform(emptyToNull),
     note: z
       .string()
       .trim()
@@ -503,6 +532,8 @@ export const createLeadFormSchema = z
     mis_system: values.misSystem,
     source: values.source ?? null,
     estimated_value: values.estimatedValue,
+    crops: values.crops,
+    land_acres: values.landAcres,
     note: values.note,
   }));
 

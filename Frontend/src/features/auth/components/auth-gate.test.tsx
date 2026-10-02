@@ -1,6 +1,8 @@
 import { act, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { Toaster } from "@/components/ui/sonner";
 import { acceptSessionTokens, endSession } from "@/lib/auth/session-store";
 import { renderWithProviders } from "@/test/render";
 
@@ -67,10 +69,21 @@ describe("[AUTH-006] AuthGate", () => {
     expect(screen.queryByText("Workspace")).not.toBeInTheDocument();
   });
 
-  it("does not offer to return after a deliberate sign-out", async () => {
+  it("does not offer to return after a deliberate sign-out, and leaves no toast behind", async () => {
     acceptSessionTokens({ accessToken: "mock.0.test", expiresInSeconds: 900 });
     replace.mockClear();
-    renderGate();
+    renderWithProviders(
+      <>
+        <AuthGate>
+          <p>Workspace</p>
+        </AuthGate>
+        <Toaster />
+      </>,
+    );
+    act(() => {
+      toast.success("Order saved");
+    });
+    expect(await screen.findByText("Order saved")).toBeInTheDocument();
 
     act(() => {
       endSession("signed-out");
@@ -78,6 +91,9 @@ describe("[AUTH-006] AuthGate", () => {
 
     await waitFor(() => {
       expect(replace).toHaveBeenCalledWith("/sign-in?reason=signed-out");
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Order saved")).not.toBeInTheDocument();
     });
   });
 });

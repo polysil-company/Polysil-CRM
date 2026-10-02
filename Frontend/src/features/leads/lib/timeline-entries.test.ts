@@ -129,10 +129,69 @@ describe("[LEAD-005] toTimelineEntry", () => {
 
   it("labels quotation, order and unknown events instead of hiding them", () => {
     expect(toTimelineEntry(event("quotation.sent"), LEAD_ID)).toEqual({
-      type: "other",
+      type: "document",
       label: "Quotation sent",
+      document: null,
+      dispatchNo: null,
+    });
+    expect(toTimelineEntry(event("subsidy.case_opened"), LEAD_ID)).toEqual({
+      type: "other",
+      label: "Subsidy case opened",
     });
     expect(labelForUnknownKind("subsidy.case_opened")).toBe("Subsidy case opened");
+  });
+
+  it("names the quotation or order an event is about, and a dispatch's number", () => {
+    expect(
+      toTimelineEntry(
+        event("quotation.sent", {
+          quotation_id: "q-1",
+          quote_no: "QT/GJ/2026-27/00003",
+          version: 2,
+        }),
+        LEAD_ID,
+      ),
+    ).toMatchObject({
+      type: "document",
+      document: { kind: "quotation", id: "q-1", title: "QT/GJ/2026-27/00003 · v2" },
+    });
+    expect(
+      toTimelineEntry(
+        event("quotation.created", { quotation_id: "q-2", quote_no: null, version: 1 }),
+        LEAD_ID,
+      ),
+    ).toMatchObject({ document: { kind: "quotation", title: "Draft" } });
+    expect(
+      toTimelineEntry(
+        event("order.submitted", { order_id: "o-1", order_no: "SO/GJ/2026-27/00041" }),
+        LEAD_ID,
+      ),
+    ).toMatchObject({
+      label: "Sales order submitted",
+      document: { kind: "order", id: "o-1", title: "SO/GJ/2026-27/00041" },
+    });
+    expect(
+      toTimelineEntry(event("dispatch.recorded", { dispatch_no: "D/SO/1/2" }), LEAD_ID),
+    ).toEqual({
+      type: "document",
+      label: "Dispatch recorded",
+      document: null,
+      dispatchNo: "D/SO/1/2",
+    });
+  });
+
+  it("reads an approval decision with its step", () => {
+    expect(
+      toTimelineEntry(
+        event("approval.decided", { seq: 1, role: "district_manager", decision: "approve" }),
+        LEAD_ID,
+      ),
+    ).toEqual({ type: "approval", decision: "approve", role: "district_manager" });
+    expect(toTimelineEntry(event("approval.decided", { decision: "maybe" }), LEAD_ID)).toEqual({
+      type: "approval",
+      decision: null,
+      role: null,
+    });
   });
 });
 

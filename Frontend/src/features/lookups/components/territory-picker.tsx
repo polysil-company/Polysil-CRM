@@ -156,7 +156,7 @@ function PickerStatus({
     );
   }
   if (browsing) {
-    return "Districts — type to find a taluka or village.";
+    return "Districts. Type to find a taluka or village.";
   }
   return null;
 }

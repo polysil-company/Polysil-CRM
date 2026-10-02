@@ -179,7 +179,7 @@ export function lifecycleRefusal(error: unknown): LifecycleRefusal {
     case "approval_not_required":
       return {
         title: "No approval needed",
-        message: "The discount is within your limit — send the quotation.",
+        message: "The discount is within your limit. Send the quotation.",
         stale: true,
       };
     case "no_approver":

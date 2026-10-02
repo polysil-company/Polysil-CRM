@@ -101,7 +101,7 @@ export function MessageComposer({
       )}
       {error === null ? null : (
         <p role="alert" className="mb-2 text-xs text-danger">
-          {error} Your message is back in the box — try sending it again.
+          {error} Your message is back in the box. Try sending it again.
         </p>
       )}
       <div className="flex items-end gap-2">

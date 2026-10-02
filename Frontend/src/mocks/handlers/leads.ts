@@ -152,6 +152,16 @@ function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
     );
   }
 
+  const activeCrops = mockLookupRows("crops").filter((crop) => crop.is_active !== false);
+  const unknownCrop = body.crops.findIndex(
+    (code) => !activeCrops.some((crop) => crop.code === code),
+  );
+  if (unknownCrop !== -1) {
+    return errorResponse(422, "validation_error", "Some fields need correcting.", {
+      [`crops.${String(unknownCrop)}`]: "not an active crop",
+    });
+  }
+
   const now = new Date().toISOString();
   const id = mockUuid(MOCK_ID_SPACE.lead, 100_000 + mockDb.leads.length + 1);
   const inquiryNo = nextInquiryNumber();
@@ -177,6 +187,12 @@ function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
     score: null,
     priority: null,
     estimated_value: body.estimated_value === null ? null : Number(body.estimated_value).toFixed(2),
+    crops: body.crops.map((code) => ({
+      code,
+      name: activeCrops.find((crop) => crop.code === code)?.name ?? code,
+      is_active: true,
+    })),
+    land_acres: body.land_acres === null ? null : Number(body.land_acres).toFixed(2),
     lost_reason: null,
     lost_note: null,
     reopen_count: 0,

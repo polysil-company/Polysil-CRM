@@ -60,7 +60,7 @@ export function ConversationList({
             <EmptyState
               icon={BubbleChatIcon}
               title="No conversations yet"
-              description="Use New message to talk to a colleague — about a lead, an order or anything else."
+              description="Use New message to talk to a colleague about a lead, an order or anything else."
               className="px-6 py-12"
             />
           }

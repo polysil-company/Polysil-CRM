@@ -109,7 +109,7 @@ function SharedQuotationView({ quotation }: { quotation: PublicQuotation }): Rea
 
       {quotation.superseded ? (
         <Note tone="info">
-          A newer version of this quotation was sent. Ask for its link — this one still opens.
+          A newer version of this quotation was sent. Ask for its link; this one still opens.
         </Note>
       ) : null}
       {quotation.expired ? (

@@ -14,7 +14,7 @@ import { fontVariables } from "./fonts";
 
 export const metadata: Metadata = {
   title: { default: "Polysil CRM", template: "%s · Polysil CRM" },
-  description: "Polysil Irrigation — CRM and dealer management.",
+  description: "Polysil Irrigation: CRM and dealer management.",
   applicationName: "Polysil CRM",
   robots: { index: false, follow: false },
 };

@@ -13,6 +13,8 @@ const FORM_FIELD_BY_REQUEST_FIELD: Readonly<Record<keyof CreateLeadRequest, Crea
     mis_system: "misSystem",
     source: "source",
     estimated_value: "estimatedValue",
+    crops: "crops",
+    land_acres: "landAcres",
     note: "note",
   };
 

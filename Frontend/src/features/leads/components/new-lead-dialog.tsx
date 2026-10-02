@@ -37,15 +37,13 @@ import { useCreateLead } from "@/features/leads/api/leads.mutations";
 import {
   createLeadFormSchema,
   LEAD_INQUIRY_TYPES,
+  MAX_LEAD_CROPS,
   type CreateLeadFormValues,
   type CreateLeadRequest,
-  type Lead,
 } from "@/features/leads/api/leads.schemas";
 import { createLeadFieldErrors } from "@/features/leads/lib/create-lead-errors";
-import {
-  DUPLICATE_SIGNAL_LABELS,
-  LEAD_INQUIRY_TYPE_LABELS,
-} from "@/features/leads/lib/lead-labels";
+import { LEAD_INQUIRY_TYPE_LABELS, describeCreatedLead } from "@/features/leads/lib/lead-labels";
+import { CropPicker } from "@/features/lookups/components/crop-picker";
 import { LookupSelect } from "@/features/lookups/components/lookup-select";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
 import { useAsyncAction } from "@/hooks/use-async-action";
@@ -66,6 +64,8 @@ const EMPTY_FORM: DefaultValues<CreateLeadFormValues> = {
   village: "",
   source: null,
   estimatedValue: "",
+  crops: [],
+  landAcres: "",
   note: "",
 };
 
@@ -117,16 +117,6 @@ function FormField({
       <FieldError id={errorId}>{error}</FieldError>
     </Field>
   );
-}
-
-/** "Ramesh Patel · POL/GJ/2026-27/00123", plus a warning when the backend flagged a duplicate. */
-function describeCreatedLead(lead: Lead): string {
-  const created = `${lead.customerName} · ${lead.code}`;
-  const duplicate = lead.duplicates.find((candidate) => candidate.state === "pending");
-  if (duplicate === undefined) {
-    return created;
-  }
-  return `${created}. Possible duplicate of ${duplicate.code} (${DUPLICATE_SIGNAL_LABELS[duplicate.signal]}) — flagged for review.`;
 }
 
 /**
@@ -237,7 +227,7 @@ export function NewLeadDialog(): React.JSX.Element {
           <DialogHeader>
             <DialogTitle>New lead</DialogTitle>
             <DialogDescription>
-              Capture the enquiry now — quotations can be added later.
+              Capture the enquiry now. Quotations can be added later.
             </DialogDescription>
           </DialogHeader>
 
@@ -345,7 +335,7 @@ export function NewLeadDialog(): React.JSX.Element {
                           }
                         }}
                       >
-                        <SelectTrigger {...aria} onBlur={field.onBlur}>
+                        <SelectTrigger {...aria}>
                           <SelectValue placeholder="Choose a type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -377,7 +367,6 @@ export function NewLeadDialog(): React.JSX.Element {
                         placeholder="Choose a system"
                         value={field.value ?? null}
                         onValueChange={field.onChange}
-                        onBlur={field.onBlur}
                       />
                     )}
                   </FormField>
@@ -392,7 +381,7 @@ export function NewLeadDialog(): React.JSX.Element {
                     id="lead-source"
                     label="Source"
                     optional
-                    description="Left empty, it's recorded from who you are — Employee for staff."
+                    description="Left empty, it's recorded from who you are: Employee for staff."
                     error={fieldState.error?.message}
                     className="sm:col-span-2"
                   >
@@ -404,12 +393,54 @@ export function NewLeadDialog(): React.JSX.Element {
                         placeholder="Where the enquiry came from"
                         value={field.value ?? null}
                         onValueChange={field.onChange}
-                        onBlur={field.onBlur}
                       />
                     )}
                   </FormField>
                 )}
               />
+
+              <Controller
+                control={form.control}
+                name="crops"
+                render={({ field, fieldState }) => (
+                  <FormField
+                    id="lead-crops"
+                    label="Crops"
+                    optional
+                    description="Up to 10."
+                    error={fieldState.error?.message}
+                  >
+                    {(aria) => (
+                      <CropPicker
+                        {...aria}
+                        max={MAX_LEAD_CROPS}
+                        value={field.value ?? []}
+                        onValueChange={field.onChange}
+                      />
+                    )}
+                  </FormField>
+                )}
+              />
+
+              <FormField
+                id="lead-land"
+                label="Land"
+                optional
+                description="In acres, e.g. 4.5."
+                error={errors.landAcres?.message}
+              >
+                {(aria) => (
+                  <InputGroup>
+                    <InputGroupInput
+                      inputMode="decimal"
+                      placeholder="4.5"
+                      {...aria}
+                      {...form.register("landAcres")}
+                    />
+                    <InputGroupAddon align="end">acres</InputGroupAddon>
+                  </InputGroup>
+                )}
+              </FormField>
 
               <FormField
                 id="lead-note"

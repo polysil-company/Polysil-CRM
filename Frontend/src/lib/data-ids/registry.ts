@@ -238,8 +238,9 @@ export const DATA_IDS = {
     domain: "RPT",
     title: "Dashboard overview — KPIs, pipeline, follow-ups",
     owner: "shared",
-    status: "mocked",
+    status: "in-progress",
     endpoints: ["GET /dashboard/overview"],
+    notes: "The backend's shape since BE-008: snake_case, every figure a decimal string.",
   },
   "QUOT-001": {
     domain: "QUOT",

@@ -69,7 +69,7 @@ describe("[APPR-001] ApprovalsInbox", () => {
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Reject" }));
     expect(
-      await within(dialog).findByText("Say why — the person who asked reads it"),
+      await within(dialog).findByText("Say why. The person who asked reads it."),
     ).toBeVisible();
     await user.type(within(dialog).getByLabelText(/^Reason/), "Offer 8% instead");
     await user.click(within(dialog).getByRole("button", { name: "Reject" }));

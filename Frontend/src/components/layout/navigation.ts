@@ -73,7 +73,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "messages",
         label: "Messages",
-        description: "Talk to colleagues — about a lead, an order or anything else.",
+        description: "Talk to colleagues about a lead, an order or anything else.",
         icon: BubbleChatIcon,
         module: null,
         audience: "staff",
