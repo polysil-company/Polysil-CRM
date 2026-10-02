@@ -1,8 +1,11 @@
+import { http, HttpResponse } from "msw";
 import { describe, afterEach, expect, it } from "vitest";
 
 import { isApiError } from "@/lib/api/errors";
+import { buildApiUrl } from "@/lib/api/url";
 import { writeMockRole } from "@/lib/dev/mock-settings";
 import { resetMockDb } from "@/mocks/db";
+import { server } from "@/mocks/node";
 
 import { getApprovalThresholds, putApprovalThreshold } from "./approvals.api";
 import type { ThresholdPutRequest } from "./approvals.schemas";
@@ -29,6 +32,50 @@ describe("[APPR-002] approval limits", () => {
   afterEach(() => {
     resetMockDb();
     writeMockRole("state_manager");
+  });
+
+  it("reads a complaint's refund limits, in rupees on the order's managers", async () => {
+    const rows = await getApprovalThresholds();
+
+    expect(rows.filter((row) => row.docType === "complaint")).toEqual([
+      expect.objectContaining({ role: "district_manager", maxAmount: "25000.00", unit: "inr" }),
+      expect.objectContaining({ role: "state_manager", maxAmount: "100000.00" }),
+      expect.objectContaining({ role: "regional_manager", maxAmount: null }),
+    ]);
+  });
+
+  it("leaves out limits for a document it doesn't know, instead of failing the page", async () => {
+    const row = (docType: string): Record<string, unknown> => ({
+      doc_type: docType,
+      role: "district_manager",
+      territory: null,
+      max_amount: "100.00",
+      unit: "inr",
+    });
+    server.use(
+      http.get(buildApiUrl("/approvals/thresholds"), () =>
+        HttpResponse.json({ data: [row("sales_order"), row("complaint"), row("warranty_claim")] }),
+      ),
+    );
+
+    const rows = await getApprovalThresholds();
+
+    expect(rows.map((item) => item.docType)).toEqual(["sales_order", "complaint"]);
+  });
+
+  it("changes a refund limit", async () => {
+    writeMockRole("admin");
+
+    const rows = await put({
+      doc_type: "complaint",
+      role: "district_manager",
+      territory_id: null,
+      max_amount: "30000.00",
+    });
+
+    expect(
+      rows.find((item) => item.docType === "complaint" && item.role === "district_manager"),
+    ).toMatchObject({ maxAmount: "30000.00", unit: "inr" });
   });
 
   it("reads every limit: orders in rupees, discounts in percent", async () => {

@@ -1,7 +1,7 @@
 import {
   DISCOUNT_LIMIT_ROLES,
   ORDER_LIMIT_ROLES,
-  type ApprovalDocType,
+  type ThresholdDocType,
   type LimitRole,
   type Threshold,
 } from "@/features/approvals/api/approvals.schemas";
@@ -11,14 +11,19 @@ import { isApiError, readFieldErrors } from "@/lib/api/errors";
 import { formatInr } from "@/lib/format";
 
 /**
- * APPR-002 · The approval limits as ladders: an order's managers by value, and a quotation's
- * discount from the officer's own limit up to Admin-Sales. The backend checks every rule
+ * APPR-002 · The approval limits as ladders: an order's managers by value, a quotation's
+ * discount from the officer's own limit up to Admin-Sales, and a complaint's refund by value. The backend checks every rule
  * (backend/docs/api/approvals.md, `put_threshold`); these only explain them before saving.
  */
 
-/** The roles of a document's ladder, lowest first. */
-export function ladderRoles(docType: ApprovalDocType): readonly LimitRole[] {
-  return docType === "sales_order" ? ORDER_LIMIT_ROLES : DISCOUNT_LIMIT_ROLES;
+/** The roles of a document's ladder, lowest first: a refund climbs the order's managers. */
+export function ladderRoles(docType: ThresholdDocType): readonly LimitRole[] {
+  return docType === "quotation" ? DISCOUNT_LIMIT_ROLES : ORDER_LIMIT_ROLES;
+}
+
+/** Rupees for an order's value and a refund; percent for a quotation's discount. */
+export function limitUnit(docType: ThresholdDocType): Threshold["unit"] {
+  return docType === "quotation" ? "pct" : "inr";
 }
 
 /** One step of a ladder: the role and its row, or no row yet. */
@@ -30,7 +35,7 @@ export interface LadderStep {
 /** A ladder — company-wide (`territoryId` null) or one territory's own rows. */
 export function ladderFor(
   rows: readonly Threshold[],
-  docType: ApprovalDocType,
+  docType: ThresholdDocType,
   territoryId: string | null,
 ): LadderStep[] {
   return ladderRoles(docType).map((role) => ({
@@ -48,7 +53,7 @@ export function ladderFor(
 /** The territories with rows of their own for a document, by name. */
 export function overrideTerritories(
   rows: readonly Threshold[],
-  docType: ApprovalDocType,
+  docType: ThresholdDocType,
 ): NonNullable<Threshold["territory"]>[] {
   const seen = new Map<string, NonNullable<Threshold["territory"]>>();
   for (const row of rows) {
@@ -63,7 +68,7 @@ export function overrideTerritories(
  * Only the top of a ladder may have no ceiling: a discount below Admin-Sales without a limit
  * would switch the gate off for that role, and an order's lower managers always stop somewhere.
  */
-export function mayBeUnlimited(docType: ApprovalDocType, role: LimitRole): boolean {
+export function mayBeUnlimited(docType: ThresholdDocType, role: LimitRole): boolean {
   return ladderRoles(docType).at(-1) === role;
 }
 

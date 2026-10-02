@@ -11,6 +11,14 @@ import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/
 export const APPROVAL_DOC_TYPES = ["sales_order", "quotation"] as const;
 export type ApprovalDocType = (typeof APPROVAL_DOC_TYPES)[number];
 
+/**
+ * The documents with approval limits: an order's value, a quotation's discount, and a
+ * complaint's refund (FS-015b, rupees, the order's three managers, then Accounts).
+ * TODO(CMPL-001): refund steps join the inbox (`APPROVAL_DOC_TYPES`) with the complaint screens.
+ */
+export const THRESHOLD_DOC_TYPES = ["sales_order", "quotation", "complaint"] as const;
+export type ThresholdDocType = (typeof THRESHOLD_DOC_TYPES)[number];
+
 const isoDateTime = z.iso.datetime({ offset: true });
 const decimal = z.string().regex(/^-?\d+(\.\d+)?$/);
 
@@ -133,7 +141,8 @@ export const DISCOUNT_LIMIT_ROLES = [
 export type LimitRole = (typeof DISCOUNT_LIMIT_ROLES)[number];
 
 const thresholdWireSchema = z.object({
-  doc_type: z.enum(APPROVAL_DOC_TYPES),
+  /** Any document the backend has limits for; rows of one the screen doesn't know are left out. */
+  doc_type: z.string().min(1),
   role: z.string().min(1),
   territory: z.object({ id: z.string().min(1), name: z.string(), level: z.string() }).nullable(),
   /** Null: no ceiling. Rupees including GST for an order, a percent for a discount. */
@@ -143,24 +152,42 @@ const thresholdWireSchema = z.object({
 
 export type ThresholdWire = z.input<typeof thresholdWireSchema>;
 
-const thresholdSchema = thresholdWireSchema.transform((wire) => ({
-  docType: wire.doc_type,
-  role: wire.role,
-  territory: wire.territory,
-  maxAmount: wire.max_amount,
-  unit: wire.unit,
-}));
+export interface Threshold {
+  readonly docType: ThresholdDocType;
+  readonly role: string;
+  readonly territory: { readonly id: string; readonly name: string; readonly level: string } | null;
+  /** Null: no ceiling. */
+  readonly maxAmount: string | null;
+  readonly unit: "inr" | "pct";
+}
 
-export type Threshold = z.output<typeof thresholdSchema>;
-
-/** GET and PUT /approvals/thresholds both answer with every row. */
+/**
+ * GET and PUT /approvals/thresholds both answer with every row. A row for a document the
+ * screen doesn't know yet is left out rather than failing the page: the backend added refund
+ * limits (`complaint`) after this screen was built, and that broke it.
+ */
 export const thresholdsResponseSchema = z
-  .object({ data: z.array(thresholdSchema) })
-  .transform(({ data }) => data);
+  .object({ data: z.array(thresholdWireSchema) })
+  .transform(({ data }) =>
+    data.flatMap((wire): Threshold[] => {
+      const docType = THRESHOLD_DOC_TYPES.find((known) => known === wire.doc_type);
+      return docType === undefined
+        ? []
+        : [
+            {
+              docType,
+              role: wire.role,
+              territory: wire.territory,
+              maxAmount: wire.max_amount,
+              unit: wire.unit,
+            },
+          ];
+    }),
+  );
 
 /** PUT /approvals/thresholds — one role's limit, company-wide (`territory_id: null`) or for a territory. */
 export interface ThresholdPutRequest {
-  readonly doc_type: ApprovalDocType;
+  readonly doc_type: ThresholdDocType;
   readonly role: LimitRole;
   readonly territory_id: string | null;
   /** Null for no ceiling. */

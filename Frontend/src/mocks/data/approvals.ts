@@ -35,8 +35,8 @@ export interface MockApprovalStep {
 }
 
 /**
- * APPR-002 · The backend's stand-in limits (migrations 013 and 017): an order's value
- * including GST per manager, and a quotation's discount per role. One territory override
+ * APPR-002 · The backend's stand-in limits (migrations 013, 017 and 026): an order's value
+ * including GST per manager, a quotation's discount per role, and a complaint's refund. One territory override
  * shows how a district can differ from the company-wide row.
  */
 export function seedThresholds(overrideTerritory: ThresholdWire["territory"]): ThresholdWire[] {
@@ -66,6 +66,10 @@ export function seedThresholds(overrideTerritory: ThresholdWire["territory"]): T
     discount("state_manager", "15.00"),
     discount("regional_manager", "20.00"),
     discount("admin_sales", null),
+    // REFUND_LIMITS in migration 026 (FS-015b): rupees, the order's three managers.
+    { ...order("district_manager", "25000.00"), doc_type: "complaint" },
+    { ...order("state_manager", "100000.00"), doc_type: "complaint" },
+    { ...order("regional_manager", null), doc_type: "complaint" },
   ];
 }
 

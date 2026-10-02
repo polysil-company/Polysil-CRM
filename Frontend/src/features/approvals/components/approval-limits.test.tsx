@@ -25,7 +25,7 @@ describe("[APPR-002] ApprovalLimits", () => {
     writeMockRole("state_manager");
   });
 
-  it("shows both ladders, read-only to a manager", async () => {
+  it("shows the three ladders (orders, discounts, refunds), read-only to a manager", async () => {
     signInAs("state_manager");
     renderWithProviders(<ApprovalLimits />);
 
@@ -34,6 +34,8 @@ describe("[APPR-002] ApprovalLimits", () => {
     expect(within(orders).getByText("No limit")).toBeInTheDocument();
     const discounts = screen.getByRole("list", { name: "Discount on a quotation, company-wide" });
     expect(within(discounts).getByText("Field officer")).toBeInTheDocument();
+    const refunds = screen.getByRole("list", { name: "Refund on a complaint, company-wide" });
+    expect(within(refunds).getByText("Up to ₹25,000")).toBeInTheDocument();
     expect(screen.getByText(/Only an administrator changes these/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Change the/ })).not.toBeInTheDocument();
   });
