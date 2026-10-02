@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { approvalThresholdsQueryOptions } from "@/features/approvals/api/approvals.queries";
-import type { ApprovalDocType, Threshold } from "@/features/approvals/api/approvals.schemas";
+import type { Threshold, ThresholdDocType } from "@/features/approvals/api/approvals.schemas";
 import { limitRoleLabel } from "@/features/approvals/lib/approval-labels";
 import {
   formatLimit,
@@ -26,7 +26,7 @@ import { useCan } from "@/features/session/hooks/use-session";
 import { ApprovalLimitDialog, type LimitTarget } from "./approval-limit-dialog";
 
 const LADDERS: readonly {
-  readonly docType: ApprovalDocType;
+  readonly docType: ThresholdDocType;
   readonly title: string;
   readonly explain: string;
   readonly unit: Threshold["unit"];
@@ -45,10 +45,18 @@ const LADDERS: readonly {
       "A field officer sends a quotation with a discount up to their own limit. Above it, the lowest manager whose limit covers the discount approves it first.",
     unit: "pct",
   },
+  {
+    docType: "complaint",
+    title: "Refund on a complaint",
+    explain:
+      "When a complaint is settled with a refund, the lowest manager whose limit covers the amount approves it, then Accounts pays it.",
+    unit: "inr",
+  },
 ];
 
 /**
- * APPR-002 · The approval limits: an order's value and a quotation's discount, per role —
+ * APPR-002 · The approval limits: an order's value, a quotation's discount and a complaint's
+ * refund, per role —
  * company-wide, and a territory's own where one is set. Anyone signed in reads them; those
  * who may edit masters change one level at a time.
  */
@@ -110,7 +118,7 @@ export function ApprovalLimits(): React.JSX.Element {
 
 interface LadderCardProps {
   rows: readonly Threshold[];
-  docType: ApprovalDocType;
+  docType: ThresholdDocType;
   title: string;
   explain: string;
   unit: Threshold["unit"];

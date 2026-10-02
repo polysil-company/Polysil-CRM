@@ -2,11 +2,11 @@ import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
 import {
-  APPROVAL_DOC_TYPES,
   DISCOUNT_LIMIT_ROLES,
   ORDER_LIMIT_ROLES,
+  THRESHOLD_DOC_TYPES,
   type QueuePageWire,
-  type ThresholdWire,
+  type ThresholdDocType,
 } from "@/features/approvals/api/approvals.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
@@ -60,16 +60,18 @@ function toRow(step: MockApprovalStep): QueuePageWire["data"][number] {
 }
 
 const thresholdPutSchema = z.object({
-  doc_type: z.enum(APPROVAL_DOC_TYPES).default("sales_order"),
+  doc_type: z.enum(THRESHOLD_DOC_TYPES).default("sales_order"),
   role: z.enum(DISCOUNT_LIMIT_ROLES),
   territory_id: z.string().min(1).nullish(),
   max_amount: z.union([z.number(), z.string().regex(/^\d+(\.\d+)?$/)]).nullish(),
 });
 
 /** Each role's level in its ladder: a higher level's ceiling stays above a lower one's. */
-const LIMIT_LEVELS: Readonly<Record<ThresholdWire["doc_type"], readonly string[]>> = {
+const LIMIT_LEVELS: Readonly<Record<ThresholdDocType, readonly string[]>> = {
   sales_order: ORDER_LIMIT_ROLES,
   quotation: DISCOUNT_LIMIT_ROLES,
+  // A refund climbs the order's three managers (FS-015b).
+  complaint: ORDER_LIMIT_ROLES,
 };
 
 const decisionSchema = z.object({
@@ -134,9 +136,9 @@ export const approvalHandlers = [
         max_amount: "a discount limit is at most 100",
       });
     }
-    if (docType === "sales_order" && amount !== null && amount <= 0) {
+    if (docType !== "quotation" && amount !== null && amount <= 0) {
       return errorResponse(422, "validation_error", "Some fields need correcting.", {
-        max_amount: "an order limit is above 0",
+        max_amount: "a limit in rupees is above 0",
       });
     }
     if (docType === "quotation" && amount === null && role !== "admin_sales") {

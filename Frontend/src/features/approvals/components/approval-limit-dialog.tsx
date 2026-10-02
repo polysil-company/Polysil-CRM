@@ -26,7 +26,7 @@ import { usePutApprovalThreshold } from "@/features/approvals/api/approvals.muta
 import { approvalKeys } from "@/features/approvals/api/approvals.queries";
 import {
   limitFormSchema,
-  type ApprovalDocType,
+  type ThresholdDocType,
   type LimitForm,
   type LimitRole,
   type Threshold,
@@ -38,6 +38,7 @@ import {
   formatLimit,
   ladderFor,
   limitRefusal,
+  limitUnit,
   mayBeUnlimited,
   outOfBounds,
   type LimitRefusal,
@@ -51,12 +52,33 @@ const log = createLogger({
   dataId: "APPR-002",
 });
 
+/** What the dialog calls each kind of limit: "State Manager's refund limit". */
+const LIMIT_NAMES: Readonly<Record<ThresholdDocType, string>> = {
+  sales_order: "order limit",
+  quotation: "discount limit",
+  complaint: "refund limit",
+};
+
+/** What a limit at this level means, in one sentence. */
+function limitMeaning(target: LimitTarget): string {
+  switch (target.docType) {
+    case "sales_order":
+      return "Orders up to this value, including GST, stop at this level.";
+    case "complaint":
+      return "Refunds up to this amount are approved at this level, then go to Accounts.";
+    case "quotation":
+      return target.role === "field_officer"
+        ? "Discounts up to this need no approval."
+        : "Discounts up to this are approved at this level.";
+  }
+}
+
 /** Long enough to see the success check before the dialog closes. */
 const CLOSE_AFTER_SUCCESS_MS = 600;
 
 /** The limit being changed: a document's ladder, one role, company-wide or a territory's. */
 export interface LimitTarget {
-  readonly docType: ApprovalDocType;
+  readonly docType: ThresholdDocType;
   readonly role: LimitRole;
   readonly territory: Threshold["territory"];
 }
@@ -109,14 +131,14 @@ function LimitFormBody({
     };
   }, []);
 
-  const unit: Threshold["unit"] = target.docType === "sales_order" ? "inr" : "pct";
+  const unit = limitUnit(target.docType);
   const territoryId = target.territory?.id ?? null;
   const ladder = ladderFor(rows, target.docType, territoryId);
   const current = ladder.find((step) => step.role === target.role)?.row ?? null;
   const bounds = boundsFor(ladder, target.role);
   const unlimitedAllowed = mayBeUnlimited(target.docType, target.role);
   const who = limitRoleLabel(target.role);
-  const what = target.docType === "sales_order" ? "order limit" : "discount limit";
+  const what = LIMIT_NAMES[target.docType];
   const where = target.territory === null ? "company-wide" : `in ${target.territory.name}`;
 
   const form = useForm<LimitForm>({
@@ -191,12 +213,7 @@ function LimitFormBody({
           {current === null
             ? "Not set yet"
             : `Now ${formatLimit(current.maxAmount, unit).toLowerCase()}`}
-          , {where}.{" "}
-          {target.docType === "sales_order"
-            ? "Orders up to this value, including GST, stop at this level."
-            : target.role === "field_officer"
-              ? "Discounts up to this need no approval."
-              : "Discounts up to this are approved at this level."}
+          , {where}. {limitMeaning(target)}
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
@@ -232,7 +249,7 @@ function LimitFormBody({
               />
               <Label htmlFor="limit-none" className="font-normal">
                 No limit: the top of the ladder approves any{" "}
-                {target.docType === "sales_order" ? "value" : "discount"}
+                {target.docType === "quotation" ? "discount" : "amount"}
               </Label>
             </div>
           ) : null}
