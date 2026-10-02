@@ -191,9 +191,14 @@ def create_app() -> FastAPI:
     app.include_router(messages.directory, prefix=API_PREFIX)
     app.include_router(subsidy_applications.router, prefix=API_PREFIX)
     app.include_router(subsidy_applications.lookups, prefix=API_PREFIX)
-    # The farmer's link: /public, not /api/v1. No session, two definer functions
-    # on app_anon, and a file route the local storage adapter alone uses (FS-005 4).
-    app.include_router(public.router)
+    # The farmer's link and the website form: no session, definer functions on
+    # app_anon (FS-005 4, FS-003a). Served under /api/v1, because a deployment's
+    # proxy sends only /api/v1 to the API and the rest to the frontend: at the root
+    # alone the customer's link was unreachable (demo walk D-2). The root mount
+    # stays for links already sent and for the local storage adapter's file route,
+    # out of the schema so the docs show one path.
+    app.include_router(public.router, prefix=API_PREFIX)
+    app.include_router(public.router, include_in_schema=False)
 
     return app
 

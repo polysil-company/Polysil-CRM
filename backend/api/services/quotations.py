@@ -1236,7 +1236,7 @@ def _public(doc: dict[str, Any], token: str) -> sch.PublicQuotation:
         totals=sch.Totals(**{k: _s(Decimal(str(t[k]))) for k in
                              ("gross", "discount", "taxable", "cgst", "sgst", "igst", "total")}),
         line_count=int(doc["line_count"]), pdf_ready=doc.get("pdf_state") == "ready",
-        pdf_url=f"/public/q/{token}/pdf")
+        pdf_url=f"/api/v1/public/q/{token}/pdf")
 
 
 async def public_view(db: AsyncSession, token: str) -> sch.PublicQuotation:

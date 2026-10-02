@@ -117,7 +117,7 @@ Upload refusals:
 | `409 status_changed` | the application is cancelled |
 | `503 storage_unavailable` | retry later |
 
-**Staging has no file storage yet**, so uploads and links answer `503 storage_unavailable` there. Show "Files cannot be stored right now" and keep the form usable.
+Staging has file storage since 1 Oct. `503 storage_unavailable` can still happen if storage is unreachable: show "Files cannot be stored right now" and keep the form usable.
 
 ## The PIMS sheet
 

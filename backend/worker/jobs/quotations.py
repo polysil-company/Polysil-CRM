@@ -51,11 +51,38 @@ _env = Environment(loader=FileSystemLoader(str(TEMPLATES)),
 # ── rendering ────────────────────────────────────────────────────────────────
 
 def _money(v: Any) -> str:
-    return f"{Decimal(str(v)):.2f}"
+    """Two decimals in Indian grouping: 12,34,567.89 (demo walk D-5)."""
+    d = Decimal(str(v)).quantize(Decimal("0.01"))
+    whole, frac = f"{abs(d):.2f}".split(".")
+    if len(whole) > 3:
+        head, groups = whole[:-3], [whole[-3:]]
+        while len(head) > 2:
+            groups.insert(0, head[-2:])
+            head = head[:-2]
+        whole = ",".join(([head] if head else []) + groups)
+    return f"{'-' if d < 0 else ''}{whole}.{frac}"
 
 
-def _pct(v: Any) -> str:
-    return f"{Decimal(str(v)):.3f}"
+def _rupees(v: Any) -> str:
+    return "\u20b9" + _money(v)
+
+
+def _plain(v: Any) -> str:
+    """A quantity or a percentage without trailing zeros: 600, 2.5, 18.25."""
+    d = Decimal(str(v))
+    text = format(d.normalize(), "f")
+    return text if d != 0 else "0"
+
+
+def discount_tiers(lines: list[dict[str, Any]]) -> list[int]:
+    """The discount tiers any line uses: a tier nobody uses is three columns of
+    zeros on the page (demo walk D-5)."""
+    keys = {1: "discount_pct", 2: "discount2_pct", 3: "discount3_pct"}
+    return [t for t, k in keys.items() if any(Decimal(str(ln.get(k) or 0)) != 0 for ln in lines)]
+
+
+def discount_columns(tiers: list[int]) -> int:
+    return sum(2 if t == 3 else 3 for t in tiers)
 
 
 def _date(v: Any) -> str:
@@ -72,7 +99,7 @@ def _date(v: Any) -> str:
     return dt.date.fromisoformat(s).strftime("%d %b %Y")
 
 
-_env.filters.update(money=_money, pct=_pct, date=_date)
+_env.filters.update(money=_money, rupees=_rupees, pct=_plain, qty=_plain, date=_date)
 
 
 def render_html(doc: dict[str, Any]) -> str:
@@ -80,8 +107,10 @@ def render_html(doc: dict[str, Any]) -> str:
     the template does no arithmetic (FS-005 5.3)."""
     q = doc["quotation"]
     lines = doc["lines"]
+    tiers = discount_tiers(lines)
     return _env.get_template("quotation.html").render(
-        q=q, lines=lines, is_provisional=bool(q.get("is_provisional")),
+        q=q, lines=lines, tiers=tiers, discount_cols=discount_columns(tiers),
+        is_provisional=bool(q.get("is_provisional")),
         intra_state=bool(q.get("intra_state")), rendered_on=today_ist().strftime("%d %b %Y"))
 
 

@@ -596,9 +596,13 @@ async def test_the_public_link_shows_no_party_data_and_records_the_view_on_the_p
     sent = await _send(client, h, q["id"])
     token = sent["share_url"].rsplit("/", 1)[1]
 
-    pub = await client.get(f"/public/q/{token}")
+    # under /api/v1, where a deployment's proxy sends it (demo walk D-2)
+    pub = await client.get(f"{V1}/public/q/{token}")
     assert pub.status_code == 200, pub.text
     body = pub.json()["data"]
+    assert body["pdf_url"] == f"{V1}/public/q/{token}/pdf", "a path the proxy forwards"
+    root = await client.get(f"/public/q/{token}")
+    assert root.status_code == 200, "links already sent still open"
     assert body["quote_no"] == sent["quote_no"] and body["totals"]["total"] == "1667.50"
     assert body["expired"] is False and body["superseded"] is False and body["pdf_ready"] is False
     assert "Rameshbhai" not in pub.text and q["party"]["mobile"] not in pub.text
@@ -609,18 +613,20 @@ async def test_the_public_link_shows_no_party_data_and_records_the_view_on_the_p
     before = (await client.get(f"{V1}/quotations/{q['id']}", headers=h)).json()["data"]
     assert before["viewed_at"] is None
 
-    pending = await client.get(f"/public/q/{token}/pdf", follow_redirects=False)
+    pending = await client.get(body["pdf_url"], follow_redirects=False)
     assert pending.status_code == 409 and pending.json()["error"]["code"] == "pdf_pending"
     assert await _render(tmp_path) == "ready"
-    opened = await client.get(f"/public/q/{token}/pdf", follow_redirects=False)
+    opened = await client.get(body["pdf_url"], follow_redirects=False)
     assert opened.status_code == 302 and "/public/files/" in opened.headers["location"]
     got = (await client.get(f"{V1}/quotations/{q['id']}", headers=h)).json()["data"]
     assert got["status"] == "viewed" and got["viewed_at"] and got["open_count"] == 1
-    await client.get(f"/public/q/{token}/pdf", follow_redirects=False)
+    await client.get(body["pdf_url"], follow_redirects=False)
     got = (await client.get(f"{V1}/quotations/{q['id']}", headers=h)).json()["data"]
     assert got["open_count"] == 2 and got["status"] == "viewed", "later opens only count"
 
-    assert (await client.get("/public/q/" + "x" * 43)).status_code == 404
+    missing = await client.get(f"{V1}/public/q/" + "x" * 43)
+    # the app's own 404 envelope: a missing route would answer {"detail": ...}
+    assert missing.status_code == 404 and "error" in missing.json(), missing.text
 
 
 class _StorageDown:
