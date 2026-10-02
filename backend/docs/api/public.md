@@ -25,7 +25,7 @@ Conventions for every endpoint in this file:
 
 ---
 
-## `GET /public/lead-form`
+## `GET /api/v1/public/lead-form`
 
 **Lead Form**
 
@@ -51,7 +51,7 @@ irrigation systems and the inquiry types. Districts and talukas come from
 
 ---
 
-## `POST /public/leads`
+## `POST /api/v1/public/leads`
 
 **Public Lead**
 
@@ -89,7 +89,7 @@ or used-up code: offer to send a new one.
 
 ---
 
-## `POST /public/leads/verify`
+## `POST /api/v1/public/leads/verify`
 
 **Lead Verify**
 
@@ -116,7 +116,7 @@ same whether or not the number is known to Polysil. Offer "send again" after
 
 ---
 
-## `GET /public/q/{token}`
+## `GET /api/v1/public/q/{token}`
 
 **Public Quotation**
 
@@ -143,7 +143,7 @@ message is sent, and that must not count as a view.
 
 ---
 
-## `GET /public/q/{token}/pdf`
+## `GET /api/v1/public/q/{token}/pdf`
 
 **Public Quotation Pdf**
 
@@ -170,7 +170,7 @@ worker has not finished.
 
 ---
 
-## `GET /public/territories`
+## `GET /api/v1/public/territories`
 
 **Public Territories**
 

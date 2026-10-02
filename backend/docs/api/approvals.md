@@ -615,6 +615,7 @@ One approval chain.
 | `raised_by` | UserRef \| null | yes |  |
 | `raised_at` | string | yes | The submit time, or when a quotation's approval was asked. |
 | `discount_pct` | string \| null |  | A quotation row: the effective discount asked for, in percent. Null on an order. |
+| `request_remark` | string \| null |  | Why the approval was asked, as the person asking wrote it. Show it beside the figures. Null when none was given. |
 
 **`QueuePage`**
 

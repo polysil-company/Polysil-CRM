@@ -165,11 +165,16 @@ async def test_staff_manage_partners_and_a_dealer_edits_only_its_contact_details
     sub = (await _post(client, h, "/partners", {
         "parent_id": admin.dealer_id, "partner_type": "sub_dealer", "code": f"SUB-{tag}",
         "name": "Patel Agro", "territory_id": admin.territory_id, "mobile": "98765 43210",
+        "contact_name": f"Kishor Bhatt {tag}",
         "gstin": "24aaaaa0000a1z5", "credit_limit": "25000.00", "payment_terms_days": 15,
         "is_gst_registered": True}))["data"]
     assert sub["price_tier"] == "sub_dealer" and sub["mobile"] == "919876543210"
     assert sub["gstin"] == "24AAAAA0000A1Z5" and sub["credit_limit"] == "25000.00"
     assert sub["parent"]["id"] == admin.dealer_id and sub["users"] == 0
+    # a person's name finds their firm, in the lead picker and the list (re-walk R-8)
+    for path in ("/lookups/partners", "/partners"):
+        found = await client.get(f"{V1}{path}", params={"q": f"kishor bhatt {tag}"}, headers=h)
+        assert [p["id"] for p in found.json()["data"]] == [sub["id"]], (path, found.text)
     bad = await client.post(f"{V1}/partners", json={
         "parent_id": admin.dealer_id, "partner_type": "sub_dealer", "code": f"SUB2-{tag}",
         "name": "Bad GST", "territory_id": admin.territory_id, "gstin": "nope"},

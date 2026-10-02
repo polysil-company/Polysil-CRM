@@ -396,6 +396,9 @@ class QueueDocument(BaseModel):
     discount_pct: str | None = Field(
         default=None, description="A quotation row: the effective discount asked for, in "
                                   "percent. Null on an order.")
+    request_remark: str | None = Field(
+        default=None, description="Why the approval was asked, as the person asking wrote "
+                                  "it. Show it beside the figures. Null when none was given.")
 
 
 class QueueRow(BaseModel):

@@ -218,7 +218,7 @@ async def patch_territory(item_id: ItemId, body: TerritoryPatch, db: DbSession,
               dependencies=[Depends(require("partners", "view"))])
 async def list_partners(
     db: DbSession, caller: CallerDep,
-    q: Annotated[str | None, Query(description="Name or code substring.")] = None,
+    q: Annotated[str | None, Query(description="Name, code or contact person substring.")] = None,
     partner_type: Annotated[str | None, Query(
         description="distributor, dealer or sub_dealer.")] = None,
     parent_id: Annotated[str | None, Query(pattern=UUID_RE,

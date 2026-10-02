@@ -89,6 +89,8 @@ async def test_a_deep_discount_is_sent_only_after_a_manager_approves_it(
     row = next(x for x in inbox if x["document"]["id"] == q["id"])
     assert (row["doc_type"], row["document"]["number"], row["document"]["discount_pct"]) == \
         ("quotation", None, "12.00")
+    # the approver reads the asker's reason beside the figures (demo re-walk R-7)
+    assert row["document"]["request_remark"] == "Season order"
     r = await client.post(f"{V1}/approvals/steps/{row['step_id']}/decision",
                           json={"decision": "approve", "remark": "Season rate"},
                           headers={**hs, **_key()})

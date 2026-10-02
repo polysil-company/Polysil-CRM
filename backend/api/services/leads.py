@@ -1640,7 +1640,8 @@ async def list_partners(db: AsyncSession, *, q: str | None = None,
                         limit: int = 50) -> list[PartnerPick]:
     """The partner picker for assignment (FS-003 4). channel_partner's own policies
     scope it: a dealer sees its subtree, a manager the partners in its territories,
-    an admin all. q matches the name or the code."""
+    an admin all. q matches the name, the code or the contact person, since staff
+    know a dealer by its owner as often as by its firm."""
     limit = max(1, min(limit, _MAX_LIMIT))
     like = _contains(q) if q else None
     rows = (await db.execute(text("""
@@ -1650,7 +1651,8 @@ async def list_partners(db: AsyncSession, *, q: str | None = None,
           LEFT JOIN territory t ON t.id = cp.territory_id
          WHERE cp.is_active AND cp.deleted_at IS NULL
            AND (CAST(:like AS text) IS NULL
-                OR cp.name ILIKE CAST(:like AS text) OR cp.code ILIKE CAST(:like AS text))
+                OR cp.name ILIKE CAST(:like AS text) OR cp.code ILIKE CAST(:like AS text)
+                OR cp.contact_name ILIKE CAST(:like AS text))
          ORDER BY cp.name LIMIT :lim"""), {"like": like, "lim": limit})).all()
     return [PartnerPick(
         id=str(r.id), code=r.code, name=r.name, partner_type=r.ptype,
