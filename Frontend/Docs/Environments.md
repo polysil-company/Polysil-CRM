@@ -46,9 +46,10 @@ fails `next build` with a clear message, so a misconfigured deploy never ships.
 
 The backend team runs a shared development API with real data at
 `https://polysil-api.pranayx.tech` — interactive docs at `/docs`, the contract at `/openapi.json`,
-and `/health`. It serves sign-in, leads, lookups, people, offices, territories, channel partners,
-subsidy and products. Quotations, orders, dispatch, dashboard figures, notifications and messages
-are not there yet.
+and `/health`. The backend keeps it on the latest `integration` (BE-012), so it serves every
+module the frontend calls: sign-in, leads, lookups, quotations, approvals, orders and dispatch,
+the dashboard, notifications and messages. Check `/openapi.json` when an endpoint seems missing:
+a backend change reaches it only after it merges into `integration`.
 
 To build against it, put these in `.env.local` and restart `npm run dev`:
 
@@ -58,16 +59,12 @@ NEXT_PUBLIC_API_MOCKING=partial
 ```
 
 - **`partial` mocking** answers only the endpoints the backend lacks — `unbuiltHandlers` in
-  [`src/mocks/handlers/index.ts`](../src/mocks/handlers/index.ts): today the dashboard figures,
-  notifications and messages. Everything else goes to the dev API: sign-in, the session, leads
-  (list, detail, New lead) and the lookups behind the lead form. When a module's screens are
-  connected, take it out of that list.
-- **What leads cannot show yet.** The dev API records no crops, acreage, follow-up dates, win
-  probability or weekly activity, so those columns and fields read "—", and it lists leads newest
-  first whatever sort arrow is chosen. Both are requests to the backend (Frontend-Scope §10). The
-  mock backend implements the sort, so the intended behaviour can still be previewed.
-- **Partial mode's one seam.** Messages are mocked but leads are real: sharing a real lead in a
-  message works, and the mock names it "Lead" because it cannot see the real one.
+  [`src/mocks/handlers/index.ts`](../src/mocks/handlers/index.ts). Today that list is empty:
+  every screen is connected, so `partial` sends every request to the dev API, like `disabled`,
+  while keeping the mock tools in the account menu. A module built before its endpoints exist
+  goes on that list until its screens are connected.
+- **What leads cannot show yet.** The dev API records no follow-up date on a lead: follow-ups are
+  tasks (BE-002), so that column reads "—" until the tasks module is built.
 - **Sign in with a real account.** The accounts and their roles are listed in the backend's
   `docs/handover/dev-api-access.md`. The password comes from the backend team and never goes in a
   file. Roles see different data by design: a field officer's short list is not a bug.

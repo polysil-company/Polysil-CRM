@@ -27,13 +27,20 @@ export function describeResourceType(type: string): string {
  * The screens a record can open today. Spelled as template types (not `Route`) so typed
  * routes can check each one where it is passed to a link.
  */
-export type ResourceHref = `/leads/${string}`;
+export type ResourceHref = `/leads/${string}` | `/quotations/${string}` | `/sales-orders/${string}`;
 
 /** Where a record opens, or null while its module has no screen yet. */
 export function resourceHref(resource: Pick<ResourceRef, "type" | "id">): ResourceHref | null {
-  if (resource.type === "lead") {
-    return `/leads/${encodeURIComponent(resource.id)}`;
+  const id = encodeURIComponent(resource.id);
+  switch (resource.type) {
+    case "lead":
+      return `/leads/${id}`;
+    case "quotation":
+      return `/quotations/${id}`;
+    case "sales_order":
+      return `/sales-orders/${id}`;
+    default:
+      // TODO(TASK-001): link tasks and complaints (CMPL-001) once their screens land.
+      return null;
   }
-  // TODO(QUOT-001): link quotations, sales orders, approvals, tasks and complaints as their screens land.
-  return null;
 }

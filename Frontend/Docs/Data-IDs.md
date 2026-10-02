@@ -174,12 +174,12 @@ The registry file is the source of truth; this snapshot helps reading.
 | DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |
 | ADMN-001 | Users, roles and approval thresholds | shared | planned |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |
-| NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | mocked |
-| NOTIF-002 | Mark notifications as read — one or all | shared | mocked |
-| MSG-001 | Conversation list with unread counts | shared | mocked |
-| MSG-002 | Messages in a conversation | shared | mocked |
-| MSG-003 | Send a message, optionally linking a CRM record | shared | mocked |
-| MSG-004 | Start a conversation — staff directory search | shared | mocked |
-| MSG-005 | Mark a conversation as read | shared | mocked |
+| NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | in-progress |
+| NOTIF-002 | Mark notifications as read — one or all | shared | in-progress |
+| MSG-001 | Conversation list with unread counts | shared | in-progress |
+| MSG-002 | Messages in a conversation | shared | in-progress |
+| MSG-003 | Send a message, optionally linking a CRM record | shared | in-progress |
+| MSG-004 | Start a conversation — staff directory search | shared | in-progress |
+| MSG-005 | Mark a conversation as read | shared | in-progress |
 | REPO-001 | Changelog system — one entry per change, generated CHANGELOG.md | frontend | in-progress |
 | REPO-002 | Quality gates — lint rules, git hooks, CI pipeline | frontend | in-progress |

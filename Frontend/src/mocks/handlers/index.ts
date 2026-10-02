@@ -1,3 +1,5 @@
+import type { HttpHandler } from "msw";
+
 import { approvalHandlers } from "./approvals";
 import { authHandlers } from "./auth";
 import { dashboardHandlers } from "./dashboard";
@@ -10,22 +12,18 @@ import { quotationHandlers } from "./quotations";
 
 /**
  * What the backend does not serve yet, so it stays mocked even against a real API
- * (NEXT_PUBLIC_API_MOCKING=partial). Remove a module from this list the moment its
- * screens are connected — everything not listed goes to the real backend.
+ * (NEXT_PUBLIC_API_MOCKING=partial). A module built before its endpoints exist goes here;
+ * remove it the moment its screens are connected. Empty since notifications and messages
+ * were connected: every screen talks to the real backend in partial mode.
  */
-export const unbuiltHandlers = [
-  // TODO(NOTIF-001): served since backend #31 (BE-009); the screens are not connected yet.
-  ...notificationHandlers,
-  // TODO(MSG-001): served since backend #31 (BE-010); the screens are not connected yet.
-  ...messageHandlers,
-];
+export const unbuiltHandlers: readonly HttpHandler[] = [];
 
 /**
  * Every mock endpoint: the full mock backend (NEXT_PUBLIC_API_MOCKING=enabled) and the
- * unit tests. A new API integration adds its handlers here first. Leads, lookups,
- * quotations, orders, approvals and the dashboard are served by the backend, so in partial mode they go to the real API.
+ * unit tests. A new API integration adds its handlers here first. Everything here is served
+ * by the backend, so in partial mode it goes to the real API.
  */
-export const handlers = [
+export const handlers: readonly HttpHandler[] = [
   ...authHandlers,
   ...approvalHandlers,
   ...leadHandlers,
@@ -33,5 +31,7 @@ export const handlers = [
   ...quotationHandlers,
   ...orderHandlers,
   ...dashboardHandlers,
+  ...notificationHandlers,
+  ...messageHandlers,
   ...unbuiltHandlers,
 ];
