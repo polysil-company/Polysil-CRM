@@ -260,6 +260,9 @@ def upgrade() -> None:
     op.execute(counts_after())
     op.execute(minutes_after())
     op.execute(task_link_after())
+    # a re-created function is PUBLIC-executable by default; 012 and 013 revoked
+    # it schema-wide, so the two guards re-created here need it again (CI, PR 50)
+    op.execute("REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC")
 
 
 def downgrade() -> None:
@@ -276,3 +279,4 @@ def downgrade() -> None:
     op.execute(_replace(_task_link_before(), "CREATE FUNCTION", "CREATE OR REPLACE FUNCTION"))
     for sig in reversed(SIGNATURES):
         op.execute(f"DROP FUNCTION IF EXISTS {sig}")
+    op.execute("REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC")
