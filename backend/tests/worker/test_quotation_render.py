@@ -148,7 +148,7 @@ def test_the_pdf_is_a_pdf_and_carries_the_figures() -> None:
     data = render_pdf(render_html(_doc()))
     assert data[:5] == b"%PDF-"
     text = _pdf_text(data)
-    for figure in ("1857.42", "185.74", "1588.10", "1667.50", "QT/GJ/2026-27/00001"):
+    for figure in ("1,857.42", "185.74", "1,588.10", "1,667.50", "QT/GJ/2026-27/00001"):
         assert figure in text, figure
 
 

@@ -108,5 +108,5 @@ def test_the_pdf_is_a_pdf_and_carries_the_order_number() -> None:
     data = render_pdf(job.render_html(_doc()))
     assert data[:5] == b"%PDF-"
     text = "\n".join(p.extract_text() or "" for p in pypdf.PdfReader(io.BytesIO(data)).pages)
-    for figure in ("SO/GJ/2026-27/00007", "1667.50"):
+    for figure in ("SO/GJ/2026-27/00007", "1,667.50"):
         assert figure in text, figure
