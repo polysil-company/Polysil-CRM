@@ -7,12 +7,13 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-25 changes, newest first. Each title opens its entry.
+26 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
 | 2026-10-02 | [Backend pick-ups: lead sorting, territory levels, names in assignments, awaiting approval, a quotation's order](changelog/entries/2026-10-02--api-integration--LEAD-001--backend-pick-ups-lead-sorting-territory-levels-names-in.md) | `api-integration` | `LEAD-001` `LEAD-002` `LEAD-005` `LEAD-008` `QUOT-001` `SO-003` |
 | 2026-10-02 | [Notifications and messages on the backend](changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md) | `api-integration` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-004` |
+| 2026-10-02 | [A live test plan for the hosted app, by role and functionality](changelog/entries/2026-10-02--docs--OBS-002--a-live-test-plan-for-the-hosted-app-by-role-and.md) | `docs` | `OBS-002` |
 | 2026-10-02 | [Approval limits read the backend's refund limits instead of failing](changelog/entries/2026-10-02--fix--APPR-002--approval-limits-read-the-backend-s-refund-limits-instead-of.md) | `fix` | `APPR-002` |
 | 2026-10-02 | [Say what each lead stage means, and give long pages their bottom margin](changelog/entries/2026-10-02--fix--LEAD-007--say-what-each-lead-stage-means-and-give-long-pages-their.md) | `fix` | `LEAD-007` `LEAD-001` `SO-002` `DS-001` |
 | 2026-10-02 | [Demo walk fixes: the dashboard on the backend's contract, the customer's PDF link, crops and land, clearer lead history](changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md) | `fix` | `RPT-001` `QUOT-012` `LEAD-002` `LEAD-003` `LEAD-005` `APPR-001` `AUTH-005` |
@@ -235,6 +236,43 @@ The bell and staff messages were built on a contract the frontend proposed (15 S
   - `[NOTIF-001]` the bell opens a quotation.
   - `[MSG-002]` send a message; a colleague who has left.
 - **By hand, with axe:** the bell, a thread and a closed conversation on a desktop (light) and a phone (dark). axe found the bell's contrast issue, fixed here; after the fix, nothing.
+
+### A live test plan for the hosted app, by role and functionality
+
+`docs` · `OBS-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--docs--OBS-002--a-live-test-plan-for-the-hosted-app-by-role-and.md)
+
+#### Before
+
+The automated tests run against the mock backend. Checks against the real backend were done by hand, one feature at a time, and nothing listed what to check on the hosted `integration` app. The approval-limits failure on the dev API (fixed in #46) was found by chance.
+
+#### Now
+
+`Docs/Live-Test-Plan.md`: a plan to test the hosted app against the dev API, by a person or by an agent driving a browser.
+
+- **Setup.** What's needed, the rules for a shared database (`TEST` names, no WhatsApp to real customers, approval limits restored), the roles, two screen sizes, what each result means, and the evidence to capture for a failure (screenshot, the REF code, the failing request with its `x-request-id`, console errors).
+- **Cases, sections A–Q.** About 100, each with an ID, the Data ID, the role, the steps and the expected result. They cover sign-in, navigation per role, the dashboard, leads, quotations, the customer link, approvals, approval limits, sales orders, dispatch, notifications and messages.
+- **Section R.** What isn't built yet, to list rather than test.
+- **Section S.** The whole demo story, from a new lead to dispatch, across roles.
+- **Two output formats:**
+  - a plain-words client walkthrough per functionality (works, works with a problem, doesn't work, not built yet, how to try it);
+  - a concise issue report for the developers, with the evidence each failure needs.
+
+`Docs/Tested-Features.md` links to it.
+
+#### Discussion
+
+- **The plan is self-contained,** so another agent can run it without this conversation's context.
+- **Credentials never go into the repository.** The plan says where they come from and forbids writing them anywhere.
+- **The two outputs are kept separate.** The client document has no technical terms; the issue report has all of them.
+
+#### Files changed
+
+- `Docs/Live-Test-Plan.md`: new.
+- `Docs/Tested-Features.md`: a link to it.
+
+#### Tests
+
+Documentation only. Checked that every route, label and rule it names matches the app and `Docs/Tested-Features.md` on `integration`.
 
 ### Approval limits read the backend's refund limits instead of failing
 
