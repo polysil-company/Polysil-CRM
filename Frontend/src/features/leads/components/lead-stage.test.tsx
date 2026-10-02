@@ -49,6 +49,23 @@ describe("[LEAD-007] LeadStageMenu", () => {
     resetMockDb();
   });
 
+  it("says what the current stage and each move mean, for someone new", async () => {
+    signInAs("employee");
+    const user = showLead(leadAt("new").id);
+
+    const menu = await openStageMenu(user);
+
+    expect(
+      within(menu).getByText("Just came in. Nobody has spoken to the farmer yet."),
+    ).toBeVisible();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Mark as contacted" }),
+    ).toHaveAccessibleDescription("Someone has spoken to the farmer about what they need.");
+    expect(
+      within(menu).getByRole("menuitem", { name: "Mark as lost…" }),
+    ).toHaveAccessibleDescription("Asks for the reason. The lead can be reopened later.");
+  });
+
   it("marks a new lead as contacted straight from the menu", async () => {
     signInAs("employee");
     const lead = leadAt("new");

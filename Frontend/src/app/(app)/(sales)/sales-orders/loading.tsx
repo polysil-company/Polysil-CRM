@@ -5,7 +5,11 @@ import { OrdersToolbarSkeleton } from "@/features/orders/components/orders-toolb
 
 export default function SalesOrdersLoading(): React.JSX.Element {
   return (
-    <section aria-label="Loading sales orders" className="flex min-h-0 flex-1 flex-col gap-4">
+    <section
+      aria-label="Loading sales orders"
+      data-page-fill
+      className="flex min-h-0 flex-1 flex-col gap-4"
+    >
       <OrdersToolbarSkeleton />
       <OrdersTableSkeleton />
     </section>

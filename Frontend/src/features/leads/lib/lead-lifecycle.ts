@@ -4,7 +4,7 @@ import { LEAD_STAGES, type LeadStage } from "@/features/leads/api/leads.schemas"
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
 
-import { LEAD_STAGE_LABELS } from "./lead-labels";
+import { LEAD_STAGE_DESCRIPTIONS, LEAD_STAGE_LABELS } from "./lead-labels";
 
 /**
  * LEAD-007 · What the stage menu offers for a lead.
@@ -75,6 +75,20 @@ export function stageActionLabel(action: StageAction): string {
       return "Mark as lost…";
     case "reopen":
       return "Reopen lead…";
+  }
+}
+
+/** What each action does, in one line under it, for someone new to the pipeline. */
+export function stageActionDescription(action: StageAction): string {
+  switch (action.kind) {
+    case "move":
+      return LEAD_STAGE_DESCRIPTIONS[action.to];
+    case "won":
+      return "The farmer accepted a quotation. Closes the lead.";
+    case "lost":
+      return "Asks for the reason. The lead can be reopened later.";
+    case "reopen":
+      return "Back to the stage it was lost from.";
   }
 }
 

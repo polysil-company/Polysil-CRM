@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "@/test/render";
 
-import { SingleFilterPill } from "./filter-pill";
+import { FilterPill, SingleFilterPill } from "./filter-pill";
 
 const TYPES = [
   { value: "commercial", label: "Commercial" },
@@ -55,5 +55,32 @@ describe("[LEAD-001] SingleFilterPill", () => {
     await user.click(screen.getByRole("button", { name: "Source" }));
 
     expect(await screen.findByText("Loading sources…")).toBeInTheDocument();
+  });
+});
+
+describe("[LEAD-001] FilterPill with descriptions", () => {
+  it("names each option by its label and describes it by the line under it", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <FilterPill
+        label="Stage"
+        options={[
+          { value: "new", label: "New", description: "Just came in." },
+          {
+            value: "merged",
+            label: "Merged",
+            description: "A duplicate, folded into another lead.",
+          },
+        ]}
+        selected={[]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Stage" }));
+    const merged = await screen.findByRole("checkbox", { name: "Merged" });
+
+    expect(merged).toHaveAccessibleDescription("A duplicate, folded into another lead.");
+    expect(screen.getByText("Just came in.")).toBeVisible();
   });
 });

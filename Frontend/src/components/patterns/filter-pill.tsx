@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -16,11 +17,43 @@ export interface FilterOption<TValue extends string> {
   readonly label: string;
   /** Matching records, when the API provides counts. */
   readonly count?: number | undefined;
+  /** One line under the label saying what the option means, for people new to the terms. */
+  readonly description?: string | undefined;
 }
 
-/** One option row; at least 44px tall on touch screens. */
+/** One option row; at least 44px tall on touch screens. Rows with a description align to the top. */
 const optionRowClasses =
-  "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-accent pointer-coarse:min-h-control-lg";
+  "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-accent pointer-coarse:min-h-control-lg has-data-[slot=option-description]:items-start";
+
+function hasDescriptions<TValue extends string>(options: readonly FilterOption<TValue>[]): boolean {
+  return options.some((option) => option.description !== undefined);
+}
+
+/** Ids that tie an option's control to its label and description. */
+interface OptionIds {
+  readonly label: string;
+  readonly description: string;
+}
+
+function optionIds(prefix: string, index: number): OptionIds {
+  return {
+    label: `${prefix}-${String(index)}-label`,
+    description: `${prefix}-${String(index)}-description`,
+  };
+}
+
+/**
+ * With a description, the control is named by the label alone and described by the line under
+ * it, so a screen reader says "Merged, checkbox" and then what merged means.
+ */
+function optionAria<TValue extends string>(
+  option: FilterOption<TValue>,
+  ids: OptionIds,
+): { "aria-labelledby"?: string; "aria-describedby"?: string } {
+  return option.description === undefined
+    ? {}
+    : { "aria-labelledby": ids.label, "aria-describedby": ids.description };
+}
 
 interface FilterPillBaseProps<TValue extends string> {
   label: string;
@@ -57,6 +90,7 @@ export function FilterPill<TValue extends string>({
         ? firstSelected.label
         : `${selected.length} selected`;
 
+  const idPrefix = useId();
   const toggle = (value: TValue, checked: boolean): void => {
     onChange(checked ? [...selected, value] : selected.filter((item) => item !== value));
   };
@@ -67,6 +101,7 @@ export function FilterPill<TValue extends string>({
       icon={icon}
       summary={summary}
       className={className}
+      wide={hasDescriptions(options)}
       onClear={() => {
         onChange([]);
       }}
@@ -75,17 +110,22 @@ export function FilterPill<TValue extends string>({
         <FilterPillMessage message={emptyMessage} />
       ) : (
         <div role="group" aria-label={`Filter by ${label.toLowerCase()}`} className="flex flex-col">
-          {options.map((option) => (
-            <label key={option.value} className={optionRowClasses}>
-              <Checkbox
-                checked={selected.includes(option.value)}
-                onCheckedChange={(checked) => {
-                  toggle(option.value, checked);
-                }}
-              />
-              <OptionText option={option} />
-            </label>
-          ))}
+          {options.map((option, index) => {
+            const ids = optionIds(idPrefix, index);
+            return (
+              <label key={option.value} className={optionRowClasses}>
+                <Checkbox
+                  className={cn(option.description !== undefined && "mt-0.5")}
+                  checked={selected.includes(option.value)}
+                  onCheckedChange={(checked) => {
+                    toggle(option.value, checked);
+                  }}
+                  {...optionAria(option, ids)}
+                />
+                <OptionText option={option} ids={ids} />
+              </label>
+            );
+          })}
         </div>
       )}
     </FilterPillFrame>
@@ -110,6 +150,7 @@ export function SingleFilterPill<TValue extends string>({
   emptyMessage,
   className,
 }: SingleFilterPillProps<TValue>): React.JSX.Element {
+  const idPrefix = useId();
   const selectedOption = options.find((option) => option.value === selected);
   // A value the options no longer offer still reads as set, so the pill never hides a filter.
   const summary = selected === null ? undefined : (selectedOption?.label ?? selected);
@@ -120,6 +161,7 @@ export function SingleFilterPill<TValue extends string>({
       icon={icon}
       summary={summary}
       className={className}
+      wide={hasDescriptions(options)}
       onClear={() => {
         onChange(null);
       }}
@@ -135,12 +177,19 @@ export function SingleFilterPill<TValue extends string>({
           }}
           className="gap-0"
         >
-          {options.map((option) => (
-            <label key={option.value} className={optionRowClasses}>
-              <RadioGroupItem value={option.value} />
-              <OptionText option={option} />
-            </label>
-          ))}
+          {options.map((option, index) => {
+            const ids = optionIds(idPrefix, index);
+            return (
+              <label key={option.value} className={optionRowClasses}>
+                <RadioGroupItem
+                  value={option.value}
+                  className={cn(option.description !== undefined && "mt-0.5")}
+                  {...optionAria(option, ids)}
+                />
+                <OptionText option={option} ids={ids} />
+              </label>
+            );
+          })}
         </RadioGroup>
       )}
     </FilterPillFrame>
@@ -149,12 +198,29 @@ export function SingleFilterPill<TValue extends string>({
 
 function OptionText<TValue extends string>({
   option,
+  ids,
 }: {
   option: FilterOption<TValue>;
+  ids: OptionIds;
 }): React.JSX.Element {
   return (
     <>
-      <span className="flex-1 truncate">{option.label}</span>
+      {option.description === undefined ? (
+        <span className="flex-1 truncate">{option.label}</span>
+      ) : (
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span id={ids.label} className="truncate">
+            {option.label}
+          </span>
+          <span
+            id={ids.description}
+            data-slot="option-description"
+            className="text-xs text-pretty text-muted-foreground"
+          >
+            {option.description}
+          </span>
+        </span>
+      )}
       {option.count === undefined ? null : (
         <span className="text-xs text-subtle-foreground tabular-nums">
           {formatNumber(option.count)}
@@ -174,6 +240,7 @@ function FilterPillFrame({
   icon,
   summary,
   className,
+  wide,
   onClear,
   children,
 }: {
@@ -181,6 +248,8 @@ function FilterPillFrame({
   icon: IconGlyph | undefined;
   summary: string | undefined;
   className: string | undefined;
+  /** Options carry descriptions: a wider popover that scrolls when the screen is short. */
+  wide: boolean;
   onClear: () => void;
   children: React.ReactNode;
 }): React.JSX.Element {
@@ -206,7 +275,13 @@ function FilterPillFrame({
           </>
         ) : null}
       </PopoverTrigger>
-      <PopoverContent className="w-60 gap-0 p-1">
+      <PopoverContent
+        aria-label={`${label} filter`}
+        className={cn(
+          "gap-0 p-1",
+          wide ? "max-h-(--available-height) w-80 overflow-y-auto" : "w-60",
+        )}
+      >
         {children}
         {active ? (
           <>

@@ -9,6 +9,7 @@ import { server } from "@/mocks/node";
 import { renderWithProviders } from "@/test/render";
 
 import { LeadsTable } from "./leads-table";
+import { LeadsToolbar } from "./leads-toolbar";
 import { NewLeadDialog } from "./new-lead-dialog";
 
 function emptyPage(total: number | null = 0): Response {
@@ -67,6 +68,19 @@ describe("[LEAD-001] LeadsTable", () => {
       expect(sent.at(-1)?.searchParams.get("sort")).toBe("estimated_value");
     });
     expect(customer).toHaveAttribute("aria-sort", "none");
+  });
+
+  it("explains each stage in the Stage filter, merged included", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LeadsToolbar />);
+    await user.click(screen.getByRole("button", { name: "Stage" }));
+
+    expect(await screen.findByRole("checkbox", { name: "Merged" })).toHaveAccessibleDescription(
+      /A duplicate, folded into another lead/,
+    );
+    expect(screen.getByRole("checkbox", { name: "Dormant" })).toHaveAccessibleDescription(
+      /Set by the system/,
+    );
   });
 
   it("names each source from the admin-edited list", async () => {

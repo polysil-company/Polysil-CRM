@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
-import { useState } from "react";
+import { useId, useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
@@ -18,8 +18,9 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { useTransitionLead } from "@/features/leads/api/leads.mutations";
 import type { Lead } from "@/features/leads/api/leads.schemas";
-import { LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
+import { LEAD_STAGE_DESCRIPTIONS, LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
 import {
+  stageActionDescription,
   stageActionLabel,
   stageChangeError,
   stageMenuFor,
@@ -111,20 +112,21 @@ export function LeadStageMenu({ lead }: LeadStageMenuProps): React.JSX.Element |
           Update stage
           <Icon icon={ArrowDown01Icon} />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuContent align="end" className="w-72">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Now {LEAD_STAGE_LABELS[lead.stage]}</DropdownMenuLabel>
+            <DropdownMenuLabel className="flex flex-col gap-0.5">
+              <span>Now {LEAD_STAGE_LABELS[lead.stage]}</span>
+              <span className="text-xs font-normal tracking-normal text-muted-foreground normal-case">
+                {LEAD_STAGE_DESCRIPTIONS[lead.stage]}
+              </span>
+            </DropdownMenuLabel>
             {menu.actions.map((action) => (
-              <DropdownMenuItem
+              <StageMenuItem
                 key={action.kind === "move" ? action.to : action.kind}
-                variant={action.kind === "lost" ? "destructive" : "default"}
+                action={action}
                 disabled={move.isBusy}
-                onClick={() => {
-                  choose(action);
-                }}
-              >
-                {stageActionLabel(action)}
-              </DropdownMenuItem>
+                onChoose={choose}
+              />
             ))}
           </DropdownMenuGroup>
           {menu.hint === null ? null : (
@@ -146,5 +148,36 @@ export function LeadStageMenu({ lead }: LeadStageMenuProps): React.JSX.Element |
         }}
       />
     </>
+  );
+}
+
+/** One move, named by its label and described by the line under it (what the stage means). */
+function StageMenuItem({
+  action,
+  disabled,
+  onChoose,
+}: {
+  action: StageAction;
+  disabled: boolean;
+  onChoose: (action: StageAction) => void;
+}): React.JSX.Element {
+  const id = useId();
+  const label = stageActionLabel(action);
+  return (
+    <DropdownMenuItem
+      variant={action.kind === "lost" ? "destructive" : "default"}
+      disabled={disabled}
+      aria-label={label}
+      aria-describedby={`${id}-description`}
+      className="flex-col items-start gap-0.5"
+      onClick={() => {
+        onChoose(action);
+      }}
+    >
+      <span>{label}</span>
+      <span id={`${id}-description`} className="text-xs text-muted-foreground">
+        {stageActionDescription(action)}
+      </span>
+    </DropdownMenuItem>
   );
 }
