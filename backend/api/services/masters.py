@@ -510,7 +510,7 @@ async def _p_counts(db: AsyncSession, ids: list[str]) -> dict[str, tuple[int, in
     return {str(r.partner_id): (int(r.users), int(r.users_inactive)) for r in rows}
 
 
-def _partner(r: Any, counts: tuple[int, int], staff: bool) -> Partner:
+def _partner(r: Any, counts: tuple[int, int], terms: bool) -> Partner:
     return Partner(
         id=str(r.id), code=r.code, name=r.name, partner_type=r.partner_type,
         price_tier=r.price_tier,
@@ -520,9 +520,9 @@ def _partner(r: Any, counts: tuple[int, int], staff: bool) -> Partner:
                                level=r.territory_level) if r.territory_id else None,
         contact_name=r.contact_name, mobile=r.mobile, email=r.email, address=r.address,
         gstin=r.gstin, pan=r.pan, is_gst_registered=bool(r.is_gst_registered),
-        credit_limit=_dec(r.credit_limit) if staff else None,
+        credit_limit=_dec(r.credit_limit) if terms else None,
         payment_terms_days=int(r.payment_terms_days)
-        if staff and r.payment_terms_days is not None else None,
+        if terms and r.payment_terms_days is not None else None,
         is_active=bool(r.is_active), users=counts[0], created_at=r.created_at.isoformat())
 
 
@@ -534,8 +534,11 @@ async def _p_rows(db: AsyncSession, caller: Caller, ids: list[str]
                              {"ids": ids})).all()
     by_id = {str(r.id): r for r in rows}
     counts = await _p_counts(db, [i for i in ids if i in by_id])
-    staff = not _is_partner_caller(caller)
-    return [(_partner(by_id[i], counts.get(i, (0, 0)), staff), counts.get(i, (0, 0))[1])
+    # Credit terms are for those who set them: staff with partners.edit. A field
+    # officer sees the dealers serving his area, not their credit (FS-020 rule 6).
+    terms = not _is_partner_caller(caller) and bool((await db.execute(
+        text("SELECT app_has_permission('partners', 'edit')"))).scalar_one())
+    return [(_partner(by_id[i], counts.get(i, (0, 0)), terms), counts.get(i, (0, 0))[1])
             for i in ids if i in by_id]
 
 

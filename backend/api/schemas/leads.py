@@ -238,6 +238,20 @@ class PartnerPick(BaseModel):
     territory: TerritoryParent | None = None
 
 
+class LeadArea(BaseModel):
+    """A row of GET /leads/areas: an area holding some of your leads, for the
+    lead list's area filter (FS-020)."""
+
+    id: str
+    name: str
+    level: str = Field(description="state, district or taluka: the level you asked for.")
+    code: str | None = None
+    parent: TerritoryParent | None = None
+    lead_count: int = Field(description="Your leads in this area or under it, every stage "
+                                        "but merged. The list's other filters do not "
+                                        "change it.")
+
+
 class TerritoryPick(BaseModel):
     """A row of GET /lookups/territories, for the territory picker on the new-lead form."""
 

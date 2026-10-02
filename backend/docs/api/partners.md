@@ -288,8 +288,8 @@ many, and each is reactivated through `PATCH /users/{id}`.
 | `gstin` | string \| null | yes |  |
 | `pan` | string \| null | yes |  |
 | `is_gst_registered` | boolean | yes |  |
-| `credit_limit` | string \| null | yes | Rupees, a decimal string. Stored, not enforced (H12). Staff readers only. |
-| `payment_terms_days` | integer \| null | yes | Staff readers only. |
+| `credit_limit` | string \| null | yes | Rupees, a decimal string. Stored, not enforced (H12). Null unless the reader may edit partners. |
+| `payment_terms_days` | integer \| null | yes | Null unless the reader may edit partners. |
 | `is_active` | boolean | yes |  |
 | `users` | integer | yes | Active partner users anchored here. |
 | `created_at` | string | yes |  |
@@ -362,8 +362,8 @@ many, and each is reactivated through `PATCH /users/{id}`.
 | `gstin` | string \| null | yes |  |
 | `pan` | string \| null | yes |  |
 | `is_gst_registered` | boolean | yes |  |
-| `credit_limit` | string \| null | yes | Rupees, a decimal string. Stored, not enforced (H12). Staff readers only. |
-| `payment_terms_days` | integer \| null | yes | Staff readers only. |
+| `credit_limit` | string \| null | yes | Rupees, a decimal string. Stored, not enforced (H12). Null unless the reader may edit partners. |
+| `payment_terms_days` | integer \| null | yes | Null unless the reader may edit partners. |
 | `is_active` | boolean | yes |  |
 | `users` | integer | yes | Active partner users anchored here. |
 | `created_at` | string | yes |  |

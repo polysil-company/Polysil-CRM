@@ -12,7 +12,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Complaints | 20 | [`complaints.md`](complaints.md) |
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
-| Leads | 17 | [`leads.md`](leads.md) |
+| Leads | 18 | [`leads.md`](leads.md) |
 | Lookups | 23 | [`lookups.md`](lookups.md) |
 | Messages | 6 | [`messages.md`](messages.md) |
 | Notifications | 2 | [`notifications.md`](notifications.md) |

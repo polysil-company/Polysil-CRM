@@ -61,6 +61,13 @@ def _statements() -> dict[str, str]:
             match = _HEAD.search(stmt)
             if match and match.group(1) in out:
                 out[match.group(1)] = stmt
+    # 028 re-pastes the partners guard, which now reaches up and down (FS-020)
+    m28 = _load("028_dealer_area_access")
+    if m28 is not None:
+        stmt = m28.counts_after().replace("CREATE OR REPLACE FUNCTION", "CREATE FUNCTION", 1)
+        match = _HEAD.search(stmt)
+        assert match and match.group(1) in out, stmt[:80]
+        out[match.group(1)] = stmt
     return out
 
 

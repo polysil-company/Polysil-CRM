@@ -92,7 +92,13 @@ def _scope_clause(spec: ScopeSpec, caller: Caller,
         subtree = sa.select(org_closure.c.descendant_id).where(
             org_closure.c.ancestor_id == caller.org_unit_id)
         if spec.org_subtree_via:
-            return col.in_(sa.select(org_unit.c.territory_id).where(org_unit.c.id.in_(subtree)))
+            # at, under or above the offices' territories (FS-020), as the policy
+            offices = sa.select(org_unit.c.territory_id).where(org_unit.c.id.in_(subtree))
+            return sa.or_(
+                col.in_(sa.select(territory_closure.c.descendant_id).where(
+                    territory_closure.c.ancestor_id.in_(offices))),
+                col.in_(sa.select(territory_closure.c.ancestor_id).where(
+                    territory_closure.c.descendant_id.in_(offices))))
         return col.in_(subtree)
     if scope == "territory":
         return col.in_(
