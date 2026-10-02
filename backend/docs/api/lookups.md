@@ -584,7 +584,7 @@ partners in its territories, an admin all of them.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `q` | query | string \| null |  | Name or code substring. |
+| `q` | query | string \| null |  | Name, code or contact person substring. |
 | `limit` | query | integer |  |  |
 
 **Responses**

@@ -72,6 +72,7 @@ partner_t = sa.table(
     sa.column("partner_type"),
     sa.column("code"),
     sa.column("name"),
+    sa.column("contact_name"),
     sa.column("territory_id", _UUID),
     sa.column("is_active"),
     sa.column("deleted_at", _TS),
@@ -553,7 +554,8 @@ async def list_partners(db: AsyncSession, caller: Caller, *, q: str | None = Non
     if q:
         like = _contains(q)
         where.append(sa.or_(partner_t.c.name.ilike(like),
-                            sa.cast(partner_t.c.code, sa.Text).ilike(like)))
+                            sa.cast(partner_t.c.code, sa.Text).ilike(like),
+                            partner_t.c.contact_name.ilike(like)))
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)
         where.append(sa.or_(partner_t.c.created_at < c_ts,

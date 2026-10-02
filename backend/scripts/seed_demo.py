@@ -248,21 +248,24 @@ def main() -> None:
         # seeded before the table was created.
         distributor = uuid.uuid5(uuid.NAMESPACE_DNS, "polysil.demo.distributor")
         partner = uuid.uuid5(uuid.NAMESPACE_DNS, "polysil.demo.dealer")
-        for pid, parent, ptype, code, name in (
-            (distributor, None, "distributor", "DEMO-DIST", "Rajkot Agro Distributors"),
-            (partner, distributor, "dealer", "DEMO-DLR", "Shah Irrigation, Rajkot"),
+        for pid, parent, ptype, code, name, contact in (
+            (distributor, None, "distributor", "DEMO-DIST", "Rajkot Agro Distributors", None),
+            (partner, distributor, "dealer", "DEMO-DLR", "Shah Irrigation, Rajkot",
+             "Bhavesh Shah"),
         ):
             cur.execute(
                 """
                 INSERT INTO channel_partner (id, parent_id, partner_type, code, name,
-                                             territory_id, price_tier)
-                VALUES (%s, %s, %s::partner_type, %s, %s, %s, %s::channel_tier)
+                                             territory_id, price_tier, contact_name)
+                VALUES (%s, %s, %s::partner_type, %s, %s, %s, %s::channel_tier, %s)
                 ON CONFLICT (id) DO UPDATE
                    SET parent_id = EXCLUDED.parent_id, name = EXCLUDED.name,
+                       contact_name = COALESCE(channel_partner.contact_name,
+                                               EXCLUDED.contact_name),
                        is_active = true, deleted_at = NULL
                 """,
                 (str(pid), str(parent) if parent else None, ptype, code, name,
-                 territories["Rajkot"], ptype),
+                 territories["Rajkot"], ptype, contact),
             )
         cur.execute(
             """

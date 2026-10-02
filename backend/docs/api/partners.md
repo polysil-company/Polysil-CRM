@@ -37,7 +37,7 @@ means nothing in your scope; 403 means you may not view partners at all.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `q` | query | string \| null |  | Name or code substring. |
+| `q` | query | string \| null |  | Name, code or contact person substring. |
 | `partner_type` | query | string \| null |  | distributor, dealer or sub_dealer. |
 | `parent_id` | query | string \| null |  | Children of this partner. |
 | `is_active` | query | boolean \| null |  |  |

@@ -507,7 +507,7 @@ async def territories(
 async def partners(
     db: DbSession,
     _: Claims,
-    q: Annotated[str | None, Query(description="Name or code substring.")] = None,
+    q: Annotated[str | None, Query(description="Name, code or contact person substring.")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> Envelope[list[PartnerPick]]:
     """The partner picker for assigning a lead to a channel partner. You see only
