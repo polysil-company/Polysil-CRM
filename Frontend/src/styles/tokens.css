@@ -263,7 +263,8 @@
   --overlay: oklch(0 0 0 / 55%);
 
   --muted-foreground: oklch(0.68 0.005 270);
-  --subtle-foreground: oklch(0.6 0.006 270);
+  /* 0.63, not 0.6: 0.6 measured 4.27:1 on --popover, under the 4.5:1 that small text needs. */
+  --subtle-foreground: oklch(0.63 0.006 270);
 
   --muted: oklch(1 0 0 / 5%);
   --accent: oklch(1 0 0 / 7%);

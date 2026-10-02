@@ -19,6 +19,24 @@ export const LEAD_STAGE_LABELS: Readonly<Record<LeadStage, string>> = {
   dormant: "Dormant",
 };
 
+/**
+ * LEAD-001, LEAD-007 · What each stage means, in one line, for someone new to the pipeline.
+ * Shown under the stage in the Stage filter and in the Update stage menu. The rules behind
+ * them are the backend's (backend/docs/api/leads.md and the stage machine in leads.py).
+ */
+export const LEAD_STAGE_DESCRIPTIONS: Readonly<Record<LeadStage, string>> = {
+  new: "Just came in. Nobody has spoken to the farmer yet.",
+  contacted: "Someone has spoken to the farmer about what they need.",
+  qualified: "A real need, with land and budget confirmed. Ready for a quotation.",
+  quoted: "A quotation has been sent. Moves here when one is sent.",
+  negotiation: "The farmer is discussing a quotation's price or design.",
+  won: "The farmer accepted a quotation. The lead is closed.",
+  lost: "The farmer won't buy now; the reason is recorded. It can be reopened.",
+  merged:
+    "A duplicate, folded into another lead that carries its history. Hidden from the list unless chosen here.",
+  dormant: "Set by the system after a long time with no activity. It can't be moved by hand.",
+};
+
 /** The label always travels with the colour, so colour is never the only signal. */
 export const LEAD_STAGE_BADGE: Readonly<Record<LeadStage, BadgeVariant>> = {
   new: "info",

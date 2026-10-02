@@ -9,7 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LEAD_INQUIRY_TYPES, LEAD_STAGES } from "@/features/leads/api/leads.schemas";
 import { useLeadListParams } from "@/features/leads/hooks/use-lead-list-params";
-import { LEAD_INQUIRY_TYPE_LABELS, LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
+import {
+  LEAD_INQUIRY_TYPE_LABELS,
+  LEAD_STAGE_DESCRIPTIONS,
+  LEAD_STAGE_LABELS,
+} from "@/features/leads/lib/lead-labels";
 import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import { useCan } from "@/features/session/hooks/use-session";
 
@@ -18,6 +22,7 @@ import { NewLeadDialog } from "./new-lead-dialog";
 const STAGE_OPTIONS = LEAD_STAGES.map((stage) => ({
   value: stage,
   label: LEAD_STAGE_LABELS[stage],
+  description: LEAD_STAGE_DESCRIPTIONS[stage],
 }));
 const TYPE_OPTIONS = LEAD_INQUIRY_TYPES.map((type) => ({
   value: type,
