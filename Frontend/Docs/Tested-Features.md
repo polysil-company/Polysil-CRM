@@ -15,6 +15,8 @@ Each story says who can do what, then the cases that were checked, then how:
 | 👀 | **Walked through** — clicked through in a real browser against the mock backend, at 360px and on desktop, light and dark, with screenshots. |
 | 🔌 | **Real backend** — checked by hand against the backend's dev API. **Only the stories marked 🔌 have been.** Everything else still needs this before staging ([Plan.md §9.1](Plan.md)). |
 
+**Testing on the real backend:** [Live-Test-Plan.md](Live-Test-Plan.md) is the plan, case by case and role by role, for checking the hosted app against the dev API. It also produces a client walkthrough and an issue report.
+
 **Where it is:** `integration` means merged. `PR #n` means built and passing locally but still in review. A story in an open PR is not on `integration` yet.
 
 ## At a glance
