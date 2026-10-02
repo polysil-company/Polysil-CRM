@@ -7,12 +7,13 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-26 changes, newest first. Each title opens its entry.
+27 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
 | 2026-10-02 | [Backend pick-ups: lead sorting, territory levels, names in assignments, awaiting approval, a quotation's order](changelog/entries/2026-10-02--api-integration--LEAD-001--backend-pick-ups-lead-sorting-territory-levels-names-in.md) | `api-integration` | `LEAD-001` `LEAD-002` `LEAD-005` `LEAD-008` `QUOT-001` `SO-003` |
 | 2026-10-02 | [Notifications and messages on the backend](changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md) | `api-integration` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-004` |
+| 2026-10-02 | [A demo guide: what's ready, and every flow click by click](changelog/entries/2026-10-02--docs--APP-001--a-demo-guide-what-s-ready-and-every-flow-click-by-click.md) | `docs` | `APP-001` |
 | 2026-10-02 | [A live test plan for the hosted app, by role and functionality](changelog/entries/2026-10-02--docs--OBS-002--a-live-test-plan-for-the-hosted-app-by-role-and.md) | `docs` | `OBS-002` |
 | 2026-10-02 | [Approval limits read the backend's refund limits instead of failing](changelog/entries/2026-10-02--fix--APPR-002--approval-limits-read-the-backend-s-refund-limits-instead-of.md) | `fix` | `APPR-002` |
 | 2026-10-02 | [Say what each lead stage means, and give long pages their bottom margin](changelog/entries/2026-10-02--fix--LEAD-007--say-what-each-lead-stage-means-and-give-long-pages-their.md) | `fix` | `LEAD-007` `LEAD-001` `SO-002` `DS-001` |
@@ -236,6 +237,42 @@ The bell and staff messages were built on a contract the frontend proposed (15 S
   - `[NOTIF-001]` the bell opens a quotation.
   - `[MSG-002]` send a message; a colleague who has left.
 - **By hand, with axe:** the bell, a thread and a closed conversation on a desktop (light) and a phone (dark). axe found the bell's contrast issue, fixed here; after the fix, nothing.
+
+### A demo guide: what's ready, and every flow click by click
+
+`docs` · `APP-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--docs--APP-001--a-demo-guide-what-s-ready-and-every-flow-click-by-click.md)
+
+#### Before
+
+What's ready was spread across `Tested-Features.md` (written for developers), the changelog and pull requests. Nothing walked a presenter through the app click by click for a client demo.
+
+#### Now
+
+`Docs/Demo-Guide.md`, in plain words, for the team preparing a demo:
+
+1. **What's ready, at a glance:** short pointers per main feature, for everything merged into `integration` up to #47.
+2. **What each feature does:** signing in, the dashboard, leads, quotations, approvals and approval limits, sales orders and dispatch, notifications, messages.
+3. **Demo flows, click by click, with the exact button names on screen:**
+   - what to prepare the day before: logins, two windows, a safe mobile number;
+   - a suggested 20-minute order;
+   - 14 flows, from signing in to dispatch, including the discount and order approvals shown live in two windows.
+4. **Not built yet:** answers for the client's questions.
+
+`Docs/Tested-Features.md` links to it.
+
+#### Discussion
+
+- **Labels come from the code.** Button and field names were checked against the components, so the steps match the screen.
+- **No WhatsApp to real customers.** The guide says to send WhatsApp only to the presenter's own number.
+
+#### Files changed
+
+- `Docs/Demo-Guide.md`: new.
+- `Docs/Tested-Features.md`: a link to it.
+
+#### Tests
+
+Documentation only.
 
 ### A live test plan for the hosted app, by role and functionality
 
