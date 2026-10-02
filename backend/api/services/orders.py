@@ -793,7 +793,15 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
     else:
         p = (await db.execute(text(
             "SELECT name, mobile, address, gstin::text AS gstin FROM channel_partner "
-            "WHERE id = CAST(:p AS uuid)"), {"p": partner})).one()
+            "WHERE id = CAST(:p AS uuid)"), {"p": partner})).one_or_none()
+        if p is None:
+            # The dealer is the buyer of record, so its details go on the order. A
+            # caller who prices with the dealer only through a document (FS-020
+            # rule 2) cannot read them: a manager or the dealer places this one.
+            raise ValidationFailed(
+                "A consolidated order is placed by the dealer or a manager who can see "
+                "the dealer.", code="partner_not_readable",
+                fields={"partner_id": "outside your area"})
         party = {"pn": p.name, "pm": p.mobile, "pa": p.address, "pg": p.gstin}
         owner = caller.user_id if not _is_portal(caller) else (await db.execute(text(
             "SELECT lead_auto_owner(CAST(:t AS uuid))"), {"t": str(first.territory_id)})

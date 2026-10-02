@@ -353,6 +353,30 @@ def f_permissions() -> None:
               "HQ nodes have no sales descendants,\n"
               "so their reach comes from scope,\n"
               "never from closure descent.", w=300, colour=YELLOW)
+    e += note("sc6", 0, 1140,
+              "DEALERS BY AREA  (FS-020, ADR-043, 2 Oct)\n\n"
+              "A partner has no office column, so staff reach it\n"
+              "through their offices' territories:\n"
+              "  READ   at, under or ABOVE those territories\n"
+              "         (a taluka officer sees the district dealer\n"
+              "          and the state distributor)\n"
+              "  WRITE  at or under only\n"
+              "         (a district office cannot edit a state distributor)\n\n"
+              "Safety net: a dealer on a lead, quotation or order you\n"
+              "can see prices and writes onto a quotation or order,\n"
+              "via partner_on_visible_document(). Tier and name only.\n"
+              "Credit terms only with partners.edit.",
+              w=560, colour=GREEN)
+    e += note("sc7", 620, 1140,
+              "TRAP: two functions PASTE the partners guard:\n"
+              "  minutes_visible()  channel_partner_user_counts()\n"
+              "Change the partners ScopeSpec and both must be\n"
+              "re-pasted in the same migration (028 did).\n"
+              "test_migration_028 fails on a stale copy.\n\n"
+              "Before 2 Oct the rule was an exact territory match:\n"
+              "a field officer saw no dealer at all, and could not\n"
+              "quote a dealer lead (ISS-109, found in the demo).",
+              w=460, colour=RED)
     write("03-permissions", e)
 
 

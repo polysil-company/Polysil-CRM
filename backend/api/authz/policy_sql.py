@@ -32,8 +32,16 @@ def perm_call(module: str, action: str) -> str:
     return f"(SELECT app_has_permission('{module}', '{action}'))"
 
 
-def branch_predicate(spec: ScopeSpec, scope: str) -> str:
-    """The row test for one scope branch, without the scope guard."""
+OFFICE_TERRITORIES = ("SELECT ou.territory_id FROM org_unit ou "
+                      "WHERE ou.id IN (SELECT descendant_id FROM org_closure "
+                      f"WHERE ancestor_id = {ORG})")
+
+
+def branch_predicate(spec: ScopeSpec, scope: str, *, write: bool = False) -> str:
+    """The row test for one scope branch, without the scope guard. `write` narrows
+    the one branch whose read and write reach differ: org_subtree_via reads the
+    rows at, under or above the caller's office territories and writes only at or
+    under them (FS-020)."""
     col = spec.branch_column(scope)
     if scope == "global":
         return "true"
@@ -41,9 +49,13 @@ def branch_predicate(spec: ScopeSpec, scope: str) -> str:
     if scope == "own":
         return f"{col} = {USER}"
     if scope == "org_subtree" and spec.org_subtree_via:
-        return (f"{col} IN (SELECT ou.territory_id FROM org_unit ou "
-                f"WHERE ou.id IN (SELECT descendant_id FROM org_closure "
-                f"WHERE ancestor_id = {ORG}))")
+        under = (f"{col} IN (SELECT tc.descendant_id FROM territory_closure tc "
+                 f"WHERE tc.ancestor_id IN ({OFFICE_TERRITORIES}))")
+        if write:
+            return under
+        above = (f"{col} IN (SELECT tc.ancestor_id FROM territory_closure tc "
+                 f"WHERE tc.descendant_id IN ({OFFICE_TERRITORIES}))")
+        return f"({under}\n    OR {above})"
     if scope == "org_subtree":
         return f"{col} IN (SELECT descendant_id FROM org_closure WHERE ancestor_id = {ORG})"
     if scope == "territory":
@@ -56,23 +68,23 @@ def branch_predicate(spec: ScopeSpec, scope: str) -> str:
     raise ValueError(scope)
 
 
-def _branches(spec: ScopeSpec) -> list[tuple[str, str]]:
+def _branches(spec: ScopeSpec, *, write: bool = False) -> list[tuple[str, str]]:
     """(scope, guarded predicate) for every branch the spec declares, plus global."""
     out = []
     for scope in (*spec.declared_scopes(), "global"):
         guard = f"{scope_call(spec.module)} = '{scope}'"
-        pred = branch_predicate(spec, scope)
+        pred = branch_predicate(spec, scope, write=write)
         out.append((scope, guard if pred == "true" else f"{guard}\n  AND {pred}"))
     return out
 
 
-def _or_branches(spec: ScopeSpec, *, for_write: bool = False) -> str:
+def _or_branches(spec: ScopeSpec, *, for_write: bool = False, write: bool = False) -> str:
     """For writes on a table whose subtree branch is keyed on its own id, the new
     row has no closure entry yet, so the branch also accepts the row's same-table
     parent being in the subtree. A dealer creates a sub-dealer under itself; a
     row cannot be attached under a parent the caller does not reach."""
     parts = []
-    for scope, p in _branches(spec):
+    for scope, p in _branches(spec, write=write or for_write):
         if (for_write and scope == "partner_subtree" and spec.partner_subtree == "id"
                 and spec.self_parent()):
             parent_pred = branch_predicate(spec, scope).replace(
@@ -104,6 +116,10 @@ def _parents(spec: ScopeSpec) -> str:
     for col, parent in spec.parents.items():
         if parent == spec.table:
             clauses.append(f"({col} IS NULL OR authz_visible('{parent}', {col}))")
+        elif col in spec.parent_fallback:
+            clauses.append(
+                f"({col} IS NULL OR EXISTS (SELECT 1 FROM {parent} p WHERE p.id = {col})"
+                f" OR {spec.parent_fallback[col]}({col}))")
         else:
             clauses.append(
                 f"({col} IS NULL OR EXISTS (SELECT 1 FROM {parent} p WHERE p.id = {col}))")
@@ -156,7 +172,9 @@ def policies_for(spec: ScopeSpec) -> list[str]:
         out.append(f"CREATE POLICY {t}_res_deleted ON {t} AS RESTRICTIVE FOR SELECT USING (\n"
                    f"  {deleted_gate}\n)")
 
-    scope_or = _or_branches(spec)
+    # Writes reach less than reads on org_subtree_via (FS-020); for every other
+    # spec the two are the same text, so their policies do not change.
+    write_scope_or = _or_branches(spec, write=True)
     write_or = _or_branches(spec, for_write=True)
     parents = _parents(spec)
     check = write_or if not parents else f"({write_or})\n  AND {parents}"
@@ -167,11 +185,11 @@ def policies_for(spec: ScopeSpec) -> list[str]:
     out.append(f"CREATE POLICY {t}_ins ON {t} FOR INSERT WITH CHECK (\n  {check}\n)")
     out.append(f"CREATE POLICY {t}_ins_perm ON {t} AS RESTRICTIVE FOR INSERT WITH CHECK (\n"
                f"  {perm_call(m, 'create')}\n)")
-    out.append(f"CREATE POLICY {t}_upd ON {t} FOR UPDATE USING (\n  {scope_or}\n) "
+    out.append(f"CREATE POLICY {t}_upd ON {t} FOR UPDATE USING (\n  {write_scope_or}\n) "
                f"WITH CHECK (\n  {upd_check}\n)")
     out.append(f"CREATE POLICY {t}_upd_perm ON {t} AS RESTRICTIVE FOR UPDATE USING (\n"
                f"  {perm_call(m, 'edit')}\n)")
-    out.append(f"CREATE POLICY {t}_del ON {t} FOR DELETE USING (\n  {scope_or}\n)")
+    out.append(f"CREATE POLICY {t}_del ON {t} FOR DELETE USING (\n  {write_scope_or}\n)")
     out.append(f"CREATE POLICY {t}_del_perm ON {t} AS RESTRICTIVE FOR DELETE USING (\n"
                f"  {perm_call(m, 'delete')}\n)")
     return out
@@ -240,7 +258,10 @@ def parent_guard_ddl(spec: ScopeSpec) -> list[str]:
     t = spec.table
     checks = "\n".join(
         f"            IF NEW.{col} IS DISTINCT FROM OLD.{col} AND NEW.{col} IS NOT NULL\n"
-        f"               AND NOT authz_visible('{parent}', NEW.{col}) THEN\n"
+        f"               AND NOT authz_visible('{parent}', NEW.{col})"
+        + (f" AND NOT {spec.parent_fallback[col]}(NEW.{col})"
+           if col in spec.parent_fallback else "")
+        + " THEN\n"
         f"                RAISE EXCEPTION '{col} % is not in your scope', NEW.{col}\n"
         f"                    USING ERRCODE = '42501';\n"
         f"            END IF;"

@@ -118,33 +118,37 @@ async def resolve_scope(db: AsyncSession, *, partner_id: str | None,
     """
     caller_partner = (await db.execute(text("SELECT app_current_partner()"))).scalar_one_or_none()
 
+    tier: str
     if caller_partner is not None:
         if partner_id is not None and str(partner_id) != str(caller_partner):
             raise ValidationFailed(
                 fields={"partner_id": "A partner prices for itself; the tier comes from the "
                                       "signed-in account."})
         target = str(caller_partner)
+        tier = (await db.execute(text(
+            "SELECT price_tier::text FROM channel_partner WHERE id = CAST(:p AS uuid)"),
+            {"p": target})).scalar_one()
     elif partner_id is not None:
-        seen = (await db.execute(text("SELECT id FROM channel_partner WHERE id = CAST(:p AS uuid)"),
-                                 {"p": partner_id})).scalar_one_or_none()
-        if seen is None:
+        found = (await db.execute(text(
+            "SELECT price_tier::text FROM channel_partner WHERE id = CAST(:p AS uuid)"),
+            {"p": partner_id})).scalar_one_or_none()
+        if found is None:
+            # FS-020 rule 1: the dealer on a lead, quotation or order the caller can
+            # see prices that document, though the dealer is outside their area.
+            # Only the tier comes back, never the dealer's row.
+            found = (await db.execute(text("SELECT document_partner_tier(CAST(:p AS uuid))"),
+                                      {"p": partner_id})).scalar_one_or_none()
+        if found is None:
             # A partner outside the caller's scope is invisible to the policy, so
             # this is both "does not exist" and "not yours" - one answer on
             # purpose, as everywhere else in this system.
             raise ValidationFailed(fields={"partner_id": "No such partner in your scope."})
-        target = str(seen)
-    else:
-        target = ""
-
-    if target:
-        tier: str = (await db.execute(text(
-            "SELECT price_tier::text FROM channel_partner WHERE id = CAST(:p AS uuid)"),
-            {"p": target})).scalar_one()
+        target, tier = str(partner_id), str(found)
     else:
         # No partner means a farmer, which is a tier migration 004 created and no
         # `channel_partner` row can hold. Without this the base list would be doing
         # two jobs: the fallback for every tier, and the retail price (GAP-091).
-        tier = Tier.FARMER.value
+        target, tier = "", Tier.FARMER.value
 
     state = (await db.execute(text(
         "SELECT t.id::text FROM territory t "

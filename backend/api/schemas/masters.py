@@ -141,8 +141,10 @@ class Partner(BaseModel):
     pan: str | None
     is_gst_registered: bool
     credit_limit: str | None = Field(description="Rupees, a decimal string. Stored, not "
-                                                 "enforced (H12). Staff readers only.")
-    payment_terms_days: int | None = Field(description="Staff readers only.")
+                                                 "enforced (H12). Null unless the reader "
+                                                 "may edit partners.")
+    payment_terms_days: int | None = Field(
+        description="Null unless the reader may edit partners.")
     is_active: bool
     users: int = Field(description="Active partner users anchored here.")
     created_at: str

@@ -104,7 +104,7 @@ day it is the slowest thing on the screen.
 | `priority` | query | string \| null |  | hot, warm or cold. |
 | `owner_user_id` | query | string \| null |  | Leads owned by this user. |
 | `owner` | query | string \| null |  | `none` for the unassigned list a manager works from. |
-| `territory_id` | query | string \| null |  | Leads in this territory or anywhere under it: a state selects its districts and talukas. |
+| `territory_id` | query | string \| null |  | Leads in these territories or anywhere under them, up to 20 ids comma-separated: a state selects its districts and talukas. |
 | `owner_org_unit_id` | query | string \| null |  | Leads owned by this office or any office under it (the hierarchy filter). |
 | `assigned_partner_id` | query | string \| null |  | Leads assigned to this partner or any partner under it: a distributor selects its dealers' leads too. |
 | `source` | query | string \| null |  | A source code. |
@@ -181,6 +181,34 @@ the stored `201` and creates nothing; the same key with a different body is
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `409` | `ErrorResponse` | The key was used for a different body. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/leads/areas`
+
+**Lead Areas**
+
+The areas your leads are in, at one level, with a count each: the options for
+the lead list's area filter. Start at the highest level with more than one
+option (a one-state company starts at districts), then pass the picked area as
+`parent_id` for the level below. An area holding none of your leads is not
+listed. Send the picks to `GET /leads?territory_id=` as a comma list.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `level` | query | string | yes | state, district or taluka. |
+| `parent_id` | query | string \| null |  | Only areas under this territory. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_LeadArea__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
 
 ---
@@ -273,7 +301,7 @@ column and its list always agree. Every stage is present, 0 when empty.
 | `priority` | query | string \| null |  | hot, warm or cold. |
 | `owner_user_id` | query | string \| null |  |  |
 | `owner` | query | string \| null |  | `none` for unassigned leads. |
-| `territory_id` | query | string \| null |  | This territory and everything under it. |
+| `territory_id` | query | string \| null |  | These territories and everything under them, up to 20 ids comma-separated. |
 | `owner_org_unit_id` | query | string \| null |  | This office and every office under it. |
 | `assigned_partner_id` | query | string \| null |  | This partner and every partner under it. |
 | `source` | query | string \| null |  | A source code. |
@@ -700,6 +728,12 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `data` | TimelineEvent | yes |  |
 
+**`Envelope_list_LeadArea__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | LeadArea[] | yes |  |
+
 **`ErrorBody`**
 
 | Field | Type | Required | Notes |
@@ -746,6 +780,17 @@ with the current stage in `fields.stage`.
 | `created_at` | string | yes |  |
 | `created_by` | UserRef \| null | yes |  |
 | `duplicates` | DuplicateRef[] |  | Pending duplicate links whose other lead you can also see. |
+
+**`LeadArea`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes | state, district or taluka: the level you asked for. |
+| `code` | string \| null |  |  |
+| `parent` | TerritoryParent \| null |  |  |
+| `lead_count` | integer | yes | Your leads in this area or under it, every stage but merged. The list's other filters do not change it. |
 
 **`LeadAssign`**
 
@@ -894,6 +939,14 @@ with the current stage in `fields.stage`.
 | `id` | string | yes |  |
 | `code` | string | yes |  |
 | `name` | string | yes |  |
+
+**`TerritoryParent`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes |  |
 
 **`TerritoryRef`**
 

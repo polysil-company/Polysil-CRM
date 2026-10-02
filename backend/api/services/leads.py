@@ -42,6 +42,7 @@ from api.schemas.leads import (
     DuplicatePair,
     DuplicateRef,
     Lead,
+    LeadArea,
     LeadAssign,
     LeadCreate,
     LeadMerge,
@@ -1296,7 +1297,9 @@ async def _lead_filters(db: AsyncSession, caller: Caller, *, stage: str | None =
     # talukas, an office the offices under it, a distributor its dealers. The
     # closures hold every node as its own descendant.
     if territory_id:
-        where.append(lead_t.c.territory_id.in_(_under("territory_closure", territory_id)))
+        # several areas at once, each with everything under it (FS-020)
+        where.append(lead_t.c.territory_id.in_(
+            _under("territory_closure", *_id_list(territory_id, "territory_id"))))
     if owner_org_unit_id:
         where.append(lead_t.c.owner_org_unit_id.in_(_under("org_closure", owner_org_unit_id)))
     if assigned_partner_id:
@@ -1532,11 +1535,75 @@ async def follow_ups(db: AsyncSession, caller: Caller, where: list[Any],
     return int(row[0]), int(row[1])
 
 
-def _under(closure: str, ancestor: str) -> Any:
-    """The ids at and below `ancestor` in one of the three trees. The closures are
-    readable by any authenticated caller; scope is applied by the list itself."""
+def _under(closure: str, *ancestors: str) -> Any:
+    """The ids at and below any of `ancestors` in one of the three trees. The
+    closures are readable by any authenticated caller; scope is applied by the list
+    itself."""
     t = sa.table(closure, sa.column("ancestor_id", _UUID), sa.column("descendant_id", _UUID))
-    return sa.select(t.c.descendant_id).where(t.c.ancestor_id == ancestor).scalar_subquery()
+    return sa.select(t.c.descendant_id).where(t.c.ancestor_id.in_(ancestors)).scalar_subquery()
+
+
+MAX_AREA_IDS = 20
+
+
+def _id_list(raw: str, field: str) -> list[str]:
+    """A comma list of ids: blanks dropped, repeats folded, at most 20, each a uuid
+    in its plain form. uuid.UUID() also takes braces, `urn:uuid:` and bare hex, and
+    the database refuses those, so only the canonical spelling passes (code review
+    F-2: a braced id was a 500)."""
+    ids = list(dict.fromkeys(x.strip().lower() for x in raw.split(",") if x.strip()))
+    if not ids:
+        raise ValidationFailed(fields={field: "at least one id"})
+    if len(ids) > MAX_AREA_IDS:
+        raise ValidationFailed(fields={field: f"at most {MAX_AREA_IDS} ids"})
+    for x in ids:
+        try:
+            canonical = str(uuid.UUID(x)) == x
+        except ValueError:
+            canonical = False
+        if not canonical:
+            raise ValidationFailed(fields={field: f"not an id: {x[:40]}"})
+    return ids
+
+
+_AREA_LEVELS = ("state", "district", "taluka")
+
+
+async def lead_areas(db: AsyncSession, caller: Caller, *, level: str,
+                     parent_id: str | None = None) -> list[LeadArea]:
+    """The areas at one level that hold the caller's leads, with counts (FS-020).
+    The leads are the list's own default set, through the same filters, so a count
+    and the list filtered to that area agree. A lead at a district counts toward
+    its district and state, not toward any taluka."""
+    if level not in _AREA_LEVELS:
+        raise ValidationFailed(fields={"level": "state, district or taluka"})
+    tc = sa.table("territory_closure", sa.column("ancestor_id", _UUID),
+                  sa.column("descendant_id", _UUID))
+    area = sa.table("territory", sa.column("id", _UUID), sa.column("name"),
+                    sa.column("level"), sa.column("code"), sa.column("parent_id", _UUID)
+                    ).alias("area")
+    up = sa.table("territory", sa.column("id", _UUID), sa.column("name"),
+                  sa.column("level")).alias("up")
+    where = await _lead_filters(db, caller)
+    where.append(sa.cast(area.c.level, sa.Text) == level)
+    if parent_id:
+        where.append(area.c.id.in_(_under("territory_closure", parent_id)))
+    rows = (await db.execute(
+        sa.select(area.c.id, area.c.name, sa.cast(area.c.level, sa.Text).label("level"),
+                  sa.cast(area.c.code, sa.Text).label("code"), up.c.id.label("pid"),
+                  up.c.name.label("pname"), sa.cast(up.c.level, sa.Text).label("plevel"),
+                  sa.func.count().label("n"))
+        .select_from(lead_t.join(tc, tc.c.descendant_id == lead_t.c.territory_id)
+                     .join(area, area.c.id == tc.c.ancestor_id)
+                     .outerjoin(up, up.c.id == area.c.parent_id))
+        .where(sa.and_(*where))
+        .group_by(area.c.id, area.c.name, area.c.level, area.c.code,
+                  up.c.id, up.c.name, up.c.level)
+        .order_by(area.c.name, area.c.id))).all()
+    return [LeadArea(
+        id=str(r.id), name=r.name, level=r.level, code=r.code,
+        parent=TerritoryParent(id=str(r.pid), name=r.pname, level=r.plevel)
+        if r.pid else None, lead_count=int(r.n)) for r in rows]
 
 
 def _search_clause(q: str) -> Any:

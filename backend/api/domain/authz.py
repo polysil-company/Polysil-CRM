@@ -33,7 +33,14 @@ class ScopeSpec:
 
     `org_subtree_via` is the partners case (GAP-036): the table has no org-unit
     column, so a manager's org reach is resolved through the territories their org
-    units cover. `parents` are the foreign keys a row attaches to; each gets a
+    units cover. A read reaches the rows at, under or above those territories: the
+    dealers that serve the caller's area, a district dealer for a taluka office and
+    a state distributor for everyone in the state. A write reaches only at or under
+    them, so a district office cannot edit a state distributor (FS-020).
+    `parent_fallback` maps a parent column to a boolean function that admits a
+    parent the caller cannot read directly: a dealer on a lead or quotation the
+    caller can see (FS-020 rule 1). The INSERT check and the parent guard both use
+    it. `parents` are the foreign keys a row attaches to; each gets a
     `WITH CHECK (EXISTS ...)` in the policy and a stage-4 lookup in the service
     (FS-002 5.2 fact 5, both halves). `self_column` with `self_ref` exempts the
     caller's own row from the view-permission gate: `app_user.id` against the
@@ -53,13 +60,14 @@ class ScopeSpec:
     parents: Mapping[str, str] = field(default_factory=dict)
     self_column: str | None = None
     self_ref: str | None = None  # "user" or "partner"; required with self_column
+    parent_fallback: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         names = [self.module, self.table, *self.parents.values()]
         columns = [c for c in (self.own, self.org_subtree, self.org_subtree_via,
                                self.territory, self.partner_subtree, self.soft_delete,
                                self.self_column, *self.parents) if c is not None]
-        for n in names + columns:
+        for n in names + columns + list(self.parent_fallback.values()):
             if not _IDENT.match(n):
                 raise DeclarationError(f"{self.module}: {n!r} is not a safe identifier")
         if self.org_subtree and self.org_subtree_via:
@@ -71,6 +79,11 @@ class ScopeSpec:
             raise DeclarationError(f"{self.module}: self_column and self_ref go together")
         if self.self_ref not in (None, "user", "partner"):
             raise DeclarationError(f"{self.module}: self_ref must be 'user' or 'partner'")
+        stray = [c for c in self.parent_fallback if c not in self.parents
+                 or self.parents[c] == self.table]
+        if stray:
+            raise DeclarationError(
+                f"{self.module}: parent_fallback needs a cross-table parent: {stray}")
 
     def branch_column(self, scope: str) -> str | None:
         """The column a scope reads, or None when the scope has no branch here.

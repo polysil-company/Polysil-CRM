@@ -23,6 +23,7 @@ from api.schemas.leads import (
     DismissResult,
     DuplicatePage,
     Lead,
+    LeadArea,
     LeadAssign,
     LeadCreate,
     LeadMerge,
@@ -117,9 +118,9 @@ async def list_leads(
     owner: Annotated[str | None, Query(
         description="`none` for the unassigned list a manager works from.")] = None,
     territory_id: Annotated[str | None, Query(
-        pattern=UUID_RE,
-        description="Leads in this territory or anywhere under it: a state selects its "
-                    "districts and talukas.")] = None,
+        max_length=800,
+        description="Leads in these territories or anywhere under them, up to 20 ids "
+                    "comma-separated: a state selects its districts and talukas.")] = None,
     owner_org_unit_id: Annotated[str | None, Query(
         pattern=UUID_RE,
         description="Leads owned by this office or any office under it (the hierarchy "
@@ -185,7 +186,8 @@ async def lead_stats(
     owner_user_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
     owner: Annotated[str | None, Query(description="`none` for unassigned leads.")] = None,
     territory_id: Annotated[str | None, Query(
-        pattern=UUID_RE, description="This territory and everything under it.")] = None,
+        max_length=800, description="These territories and everything under them, up to "
+                                    "20 ids comma-separated.")] = None,
     owner_org_unit_id: Annotated[str | None, Query(
         pattern=UUID_RE, description="This office and every office under it.")] = None,
     assigned_partner_id: Annotated[str | None, Query(
@@ -207,6 +209,22 @@ async def lead_stats(
 
 
 # Declared before the /{lead_id} routes so the literal path wins the match.
+@router.get("/areas", response_model=Envelope[list[LeadArea]], responses=_ERRORS,
+            dependencies=[Depends(require("leads", "view"))])
+async def lead_areas(
+    db: DbSession, caller: CallerDep,
+    level: Annotated[str, Query(description="state, district or taluka.")],
+    parent_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="Only areas under this territory.")] = None,
+) -> Envelope[list[LeadArea]]:
+    """The areas your leads are in, at one level, with a count each: the options for
+    the lead list's area filter. Start at the highest level with more than one
+    option (a one-state company starts at districts), then pass the picked area as
+    `parent_id` for the level below. An area holding none of your leads is not
+    listed. Send the picks to `GET /leads?territory_id=` as a comma list."""
+    return Envelope(data=await service.lead_areas(db, caller, level=level, parent_id=parent_id))
+
+
 @router.get("/assignees", response_model=Envelope[list[Assignee]], responses=_ERRORS,
             dependencies=[Depends(require("leads", "edit"))])
 async def list_assignees(db: DbSession, caller: CallerDep) -> Envelope[list[Assignee]]:
