@@ -99,17 +99,20 @@ export type DecisionResult = z.output<typeof decisionResultSchema>;
 
 export const DECISION_REMARK_MAX_LENGTH = 1000;
 
-/** The decision dialog: a remark, required to reject (and on an Accounts step). */
+/**
+ * The decision dialog: a remark, required to reject and on an Accounts step. `missingRemark`
+ * is what to say when a required remark is left empty; null when it is optional.
+ */
 export function decisionFormSchema(
-  remarkRequired: boolean,
+  missingRemark: string | null,
 ): z.ZodType<{ remark: string }, { remark: string }> {
   return z.object({
     remark: z
       .string()
       .trim()
       .max(DECISION_REMARK_MAX_LENGTH, { message: "Keep the remark under 1,000 characters" })
-      .refine((value) => !remarkRequired || value.length > 0, {
-        message: "Say why — the person who asked reads it",
+      .refine((value) => missingRemark === null || value.length > 0, {
+        message: missingRemark ?? "",
       }),
   });
 }

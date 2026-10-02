@@ -106,7 +106,7 @@ export function LeadNoteComposer({ leadId }: LeadNoteComposerProps): React.JSX.E
         ref={textareaRef}
         value={draft}
         rows={2}
-        placeholder="Add a note — a call, a visit, what the farmer asked for…"
+        placeholder="Add a note: a call, a visit, what the farmer asked for…"
         aria-invalid={tooLong || error !== null ? true : undefined}
         aria-describedby={describedBy}
         className="max-h-60 min-h-16 resize-none"
@@ -125,7 +125,7 @@ export function LeadNoteComposer({ leadId }: LeadNoteComposerProps): React.JSX.E
       />
       {error === null ? null : (
         <p id={errorId} role="alert" className="text-xs text-danger">
-          {error} Your note is still here — try again.
+          {error} Your note is still here. Try again.
         </p>
       )}
       <div className="flex items-center justify-between gap-3">

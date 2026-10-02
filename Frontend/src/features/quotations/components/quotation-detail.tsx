@@ -115,7 +115,7 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {quotation.lines.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No items yet — this draft is empty.</p>
+            <p className="text-sm text-muted-foreground">No items yet. This draft is empty.</p>
           ) : (
             <>
               <LineCards lines={quotation.lines} intraState={quotation.intraState} />
@@ -190,8 +190,8 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
                   {quotation.placeOfSupply.territory.name} · {quotation.placeOfSupply.state}
                   <span className="block text-xs text-muted-foreground">
                     {quotation.intraState
-                      ? "Within the state — CGST and SGST"
-                      : "Across states — IGST"}
+                      ? "Within the state: CGST and SGST"
+                      : "Across states: IGST"}
                   </span>
                 </DetailItem>
                 <DetailItem label="Seller">

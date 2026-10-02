@@ -8,10 +8,11 @@ import {
   createDataTableColumnHelper,
   createSelectionColumn,
 } from "@/components/patterns/data-table";
+import { TagList, toneForLabel } from "@/components/patterns/tag";
 import type { Lead } from "@/features/leads/api/leads.schemas";
 import { LEAD_COLUMN_META } from "@/features/leads/lib/lead-table-layout";
 import { LookupName } from "@/features/lookups/components/lookup-name";
-import { EMPTY_VALUE, formatInrCompact } from "@/lib/format";
+import { EMPTY_VALUE, formatInr } from "@/lib/format";
 
 import { LeadStageBadge } from "./lead-stage-badge";
 
@@ -36,9 +37,8 @@ function LeadNameCell({ lead }: { lead: Lead }): React.JSX.Element {
 }
 
 /**
- * A column the backend does not supply yet. The column stays so the table keeps its shape
- * once the data arrives. TODO(LEAD-001): crops, win probability, weekly activity and the
- * next follow-up are requested from the backend (Docs/Frontend-Scope.md §10).
+ * A column the backend does not supply on the list. TODO(TASK-001): a lead's next follow-up
+ * is a task (BE-002); it shows here once the tasks module is connected.
  */
 function NotRecorded(): React.JSX.Element {
   return <span className="text-sm text-subtle-foreground">{EMPTY_VALUE}</span>;
@@ -77,23 +77,25 @@ export const leadColumns = columnHelper.columns([
     ),
     meta: LEAD_COLUMN_META.source,
   }),
-  columnHelper.display({
-    id: "crops",
+  columnHelper.accessor("crops", {
     header: "Crops",
-    cell: () => <NotRecorded />,
+    enableSorting: false,
+    cell: ({ getValue }) => {
+      const crops = getValue();
+      return crops.length === 0 ? (
+        <NotRecorded />
+      ) : (
+        <TagList
+          max={2}
+          items={crops.map((crop) => ({
+            id: crop.code,
+            label: crop.name,
+            tone: toneForLabel(crop.name),
+          }))}
+        />
+      );
+    },
     meta: LEAD_COLUMN_META.crops,
-  }),
-  columnHelper.display({
-    id: "winProbability",
-    header: "Probability",
-    cell: () => <NotRecorded />,
-    meta: LEAD_COLUMN_META.winProbability,
-  }),
-  columnHelper.display({
-    id: "engagement",
-    header: "Activity",
-    cell: () => <NotRecorded />,
-    meta: LEAD_COLUMN_META.engagement,
   }),
   columnHelper.accessor((lead) => lead.owner?.name ?? null, {
     id: "owner",
@@ -118,7 +120,8 @@ export const leadColumns = columnHelper.columns([
   columnHelper.accessor("estimatedValue", {
     header: "Value",
     enableSorting: BACKEND_SORTS_LEADS,
-    cell: ({ getValue }) => <span className="font-medium">{formatInrCompact(getValue())}</span>,
+    // Whole rupees in every row, so a column never mixes "₹69,910" with "₹2.41 L".
+    cell: ({ getValue }) => <span className="font-medium">{formatInr(getValue())}</span>,
     meta: LEAD_COLUMN_META.estimatedValue,
   }),
 ]);

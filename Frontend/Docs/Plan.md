@@ -273,7 +273,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 ## 9. Integration status — frontend ↔ backend
 
-> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **29 September 2026**: quotations (#21, #28), approvals (#26) and the staging review fixes (#29) merged into `integration`; sales orders and dispatch (SO-001…004, DISP-002) built on `feature/SO-001-sales-orders`. The backend now serves the dashboard, notifications and messages (BE-008…010, #30 and #31) — connecting them is next after orders.
+> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **2 October 2026**: sales orders (#34) and approval limits (#35) merged into `integration`. The demo walk's fixes connect the dashboard to the backend's real shape (RPT-001), fix the customer link's PDF path, and pick up crops and land (BE-003) and the end of win probability (BE-004). Notifications and messages are served by the backend (BE-009, BE-010) and connect next.
 
 **How the two sides meet.** The browser calls `/api/v1` on the app's own origin; `next.config.ts` forwards it to `API_PROXY_TARGET`. Every call goes through `apiRequest` (`src/lib/api/client.ts`): Zod-validated responses, `x-request-id` / `x-data-id`, `Idempotency-Key` on mutations, one refresh-and-retry on a 401. The backend's contract is `backend/docs/api/*.md` (generated) and the dev API's `/openapi.json`. `NEXT_PUBLIC_API_MOCKING=partial` sends everything to the dev API except the modules listed in `unbuiltHandlers` (`src/mocks/handlers/index.ts`).
 
@@ -308,6 +308,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Order page — lines with sent, short and open; the approval chain; notices; history; PDF | SO-002 | `GET /orders/{id}`, `GET /orders/{id}/timeline`, `GET /orders/{id}/pdf` |
 | Place an order from an accepted quotation; a draft's delivery, terms and remarks; delete a never-submitted draft | SO-003 | `POST /orders`, `PATCH /orders/{id}`, `DELETE /orders/{id}` |
 | Submit for approval (again, after a return); cancel with a reason | SO-004 | `POST /orders/{id}/submit`, `POST /orders/{id}/cancel` |
+| Dashboard — key figures, pipeline by stage, lead sources, the next follow-ups, in the backend's shape (decimal strings) | RPT-001 | `GET /dashboard/overview` |
 | Record a dispatch, void one, close the rest short | DISP-002 | `POST /orders/{id}/dispatches`, `POST /dispatches/{id}/void`, `POST /orders/{id}/close-short` |
 | Approval limits — order value and discount per role, company-wide and per territory; administrators change one level at a time | APPR-002 | `GET /approvals/thresholds`, `PUT /approvals/thresholds` |
 
@@ -329,11 +330,10 @@ LEAD-005…008, QUOT-001…012, APPR-001…002, SO-001…004, DISP-002 and MSTR-
 
 | Area | Data IDs | Mock endpoints | Backend |
 |---|---|---|---|
-| Dashboard figures | RPT-001 | `GET /dashboard/overview` | Served since #30 (BE-008), in the mock's shape, snake_case: `backend/docs/api/dashboard.md` |
 | Notifications | NOTIF-001, NOTIF-002 | `GET /notifications`, `POST /notifications/read` | Served since #31 (BE-009): `backend/docs/api/notifications.md` |
 | Staff messages | MSG-001…005 | `/conversations*`, `/staff-directory` | Served since #31 (BE-010), with `up_to` on mark-read: `backend/docs/api/messages.md` |
 
-The backend also finished sorting on `GET /leads` (BE-001), crops and land on a lead (BE-003), the territory levels a lead may sit in (BE-005), and names on assignment and quotation events (BE-006, BE-017); win probability and weekly activity are dropped (BE-004). The frontend picks these up in the pull request after sales orders.
+Picked up from the backend's finished asks: crops and land on a lead (BE-003: the new-lead form, the lead page and the list), win probability and weekly activity removed (BE-004), and quotation numbers with links in a lead's history (BE-017). Still to pick up: sorting on `GET /leads` (BE-001), the territory levels filter (BE-005) and names on assignment events (BE-006). Order events in a lead's history need the order's id and number from the backend (BE-020).
 
 ### 9.3 Served by the backend, not yet built on the frontend
 

@@ -325,7 +325,7 @@ function SendForm({ quotation, onClose }: FormProps): React.JSX.Element {
           <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
             <li>It gets its number and is valid for 45 days.</li>
             <li>A qualified lead moves to Quoted.</li>
-            <li>A sent quotation isn&apos;t edited again — it is revised.</li>
+            <li>A sent quotation isn&apos;t edited again: it is revised.</li>
             {quotation.isProvisional ? (
               <li className="text-warning">
                 Some rates are stand-ins: the PDF carries an Indicative pricing banner.

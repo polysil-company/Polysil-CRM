@@ -9,7 +9,7 @@ import { z } from "zod";
  */
 
 /** The editable lists the lead screens read, by their path under /lookups. */
-export const LOOKUP_LISTS = ["lead-sources", "mis-systems", "lost-reasons"] as const;
+export const LOOKUP_LISTS = ["lead-sources", "mis-systems", "lost-reasons", "crops"] as const;
 export type LookupList = (typeof LOOKUP_LISTS)[number];
 
 const lookupItemWireSchema = z.object({

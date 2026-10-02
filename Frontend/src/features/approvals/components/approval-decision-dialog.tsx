@@ -30,7 +30,7 @@ import {
   DOC_TYPE_LABELS,
   decisionRefusal,
   documentTitle,
-  remarkRequired,
+  missingRemarkMessage,
 } from "@/features/approvals/lib/approval-labels";
 import { formatRate } from "@/features/quotations/lib/quotation-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
@@ -96,9 +96,11 @@ function DecisionForm({
   const decide = useDecideApproval();
   const idempotency = useIdempotencyKey();
   const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
-  const required = remarkRequired(decision, row.role);
+  const missingRemark = missingRemarkMessage(decision, row.role);
+  const required = missingRemark !== null;
+  const paymentCheck = decision === "approve" && row.role === "account_manager";
   const form = useForm<DecisionForm>({
-    resolver: zodResolver(decisionFormSchema(required)),
+    resolver: zodResolver(decisionFormSchema(missingRemark)),
     defaultValues: { remark: "" },
     mode: "onTouched",
   });
@@ -182,7 +184,7 @@ function DecisionForm({
         </p>
         <Field data-invalid={errors.remark ? true : undefined}>
           <FieldLabel htmlFor="decision-remark">
-            {approve ? "Remark" : "Reason"}
+            {paymentCheck ? "Payment check" : approve ? "Remark" : "Reason"}
             {required ? null : (
               <span className="font-normal text-muted-foreground">(optional)</span>
             )}
@@ -198,7 +200,11 @@ function DecisionForm({
           />
           {errors.remark ? null : (
             <FieldDescription id="decision-remark-description">
-              {approve ? "Kept with the approval." : "The person who asked reads it."}
+              {paymentCheck
+                ? "What was received or agreed. Kept as Accounts' record."
+                : approve
+                  ? "Kept with the approval."
+                  : "The person who asked reads it."}
             </FieldDescription>
           )}
           <FieldError id="decision-remark-error">{errors.remark?.message}</FieldError>

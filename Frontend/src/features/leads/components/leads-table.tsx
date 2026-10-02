@@ -131,7 +131,7 @@ export function LeadsTable(): React.JSX.Element {
           <EmptyState
             icon={UserAdd01Icon}
             title="No leads yet"
-            description="Leads you can work on appear here as they are captured — from WhatsApp, the website, QR codes and field visits."
+            description="Leads you can work on appear here as they are captured: from WhatsApp, the website, QR codes and field visits."
             className={LEADS_EMPTY_FRAME_CLASSES}
           />
         )

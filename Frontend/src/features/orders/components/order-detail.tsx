@@ -127,7 +127,7 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {order.lines.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No items yet — this draft is empty.</p>
+            <p className="text-sm text-muted-foreground">No items yet. This draft is empty.</p>
           ) : (
             <>
               <LineCards lines={order.lines} intraState={order.intraState} shipping={shipping} />
@@ -229,7 +229,7 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
                 <DetailItem label="Place of supply">
                   {order.placeOfSupply.name}
                   <span className="block text-xs text-muted-foreground">
-                    {order.intraState ? "Within the state — CGST and SGST" : "Across states — IGST"}
+                    {order.intraState ? "Within the state: CGST and SGST" : "Across states: IGST"}
                   </span>
                 </DetailItem>
                 <DetailItem label="Seller">

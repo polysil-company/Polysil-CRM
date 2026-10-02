@@ -14,18 +14,16 @@ import { quotationHandlers } from "./quotations";
  * screens are connected — everything not listed goes to the real backend.
  */
 export const unbuiltHandlers = [
-  // TODO(RPT-001): no dashboard figures endpoint yet.
-  ...dashboardHandlers,
-  // TODO(NOTIF-001): no notification endpoints yet.
+  // TODO(NOTIF-001): served since backend #31 (BE-009); the screens are not connected yet.
   ...notificationHandlers,
-  // TODO(MSG-001): no messaging endpoints yet.
+  // TODO(MSG-001): served since backend #31 (BE-010); the screens are not connected yet.
   ...messageHandlers,
 ];
 
 /**
  * Every mock endpoint: the full mock backend (NEXT_PUBLIC_API_MOCKING=enabled) and the
  * unit tests. A new API integration adds its handlers here first. Leads, lookups,
- * quotations, orders and approvals are served by the backend, so in partial mode they go to the real API.
+ * quotations, orders, approvals and the dashboard are served by the backend, so in partial mode they go to the real API.
  */
 export const handlers = [
   ...authHandlers,
@@ -34,5 +32,6 @@ export const handlers = [
   ...lookupHandlers,
   ...quotationHandlers,
   ...orderHandlers,
+  ...dashboardHandlers,
   ...unbuiltHandlers,
 ];

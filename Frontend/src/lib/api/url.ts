@@ -13,9 +13,20 @@ function isApiPath(path: string): path is ApiPath {
   return path.startsWith("/") && !path.startsWith("//");
 }
 
-/** A path an API response hands back (`/public/q/…/pdf`), or null when it is not one. */
+/** The prefix the backend mounts its API under; some answers carry it in their paths. */
+const BACKEND_API_PREFIX = "/api/v1";
+
+/**
+ * A path an API response hands back, relative to the API (`/public/q/…/pdf`), or null when
+ * it is not one. The backend may send it with its own mount prefix (`/api/v1/public/q/…/pdf`),
+ * which is stripped so `buildApiUrl` does not add the base twice.
+ */
 export function asApiPath(path: string): ApiPath | null {
-  return isApiPath(path) ? path : null;
+  const relative =
+    path === BACKEND_API_PREFIX || path.startsWith(`${BACKEND_API_PREFIX}/`)
+      ? path.slice(BACKEND_API_PREFIX.length) || "/"
+      : path;
+  return isApiPath(relative) ? relative : null;
 }
 
 /**

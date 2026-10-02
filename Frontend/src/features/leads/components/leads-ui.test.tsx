@@ -169,4 +169,54 @@ describe("[LEAD-002] NewLeadDialog", () => {
     expect(within(dialog).getByText("Choose the inquiry type.")).toBeInTheDocument();
     expect(within(dialog).getByText("Choose the irrigation system.")).toBeInTheDocument();
   });
+
+  it("does not mark a dropdown wrong just because it was opened", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NewLeadDialog />, { searchParams: "?newLead=true" });
+
+    const dialog = await screen.findByRole("dialog", { name: "New lead" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Inquiry type" }));
+    await screen.findByRole("option", { name: "Commercial" });
+    await user.keyboard("{Escape}");
+    await user.click(within(dialog).getByRole("combobox", { name: "Irrigation system" }));
+    await user.keyboard("{Escape}");
+
+    expect(within(dialog).queryByText("Choose the inquiry type.")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Choose the irrigation system.")).not.toBeInTheDocument();
+  });
+
+  it("sends the crops and land with the lead", async () => {
+    let sent: unknown = null;
+    server.use(
+      // Records the body, then falls through to the mock backend's own handler.
+      http.post(buildApiUrl("/leads"), async ({ request }) => {
+        sent = await request.clone().json();
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<NewLeadDialog />, { searchParams: "?newLead=true" });
+
+    const dialog = await screen.findByRole("dialog", { name: "New lead" });
+    await user.type(within(dialog).getByLabelText("Farmer name"), "Ramesh Patel");
+    await user.type(within(dialog).getByLabelText("Mobile number"), "9812345678");
+    await user.type(within(dialog).getByRole("combobox", { name: "Territory" }), "gond");
+    await user.click(await screen.findByRole("option", { name: /Gondal/ }));
+    await user.click(within(dialog).getByRole("combobox", { name: "Inquiry type" }));
+    await user.click(await screen.findByRole("option", { name: "Commercial" }));
+    await user.click(within(dialog).getByRole("combobox", { name: "Irrigation system" }));
+    await user.click(await screen.findByRole("option", { name: "Drip" }));
+    await user.click(within(dialog).getByRole("combobox", { name: /Crops/ }));
+    await user.click(await screen.findByRole("option", { name: "Cotton" }));
+    await user.click(await screen.findByRole("option", { name: "Groundnut" }));
+    await user.keyboard("{Escape}");
+    expect(within(dialog).getByRole("combobox", { name: /Crops/ })).toHaveTextContent(
+      "Cotton, Groundnut",
+    );
+    await user.type(within(dialog).getByLabelText(/Land/), "4.5");
+    await user.click(within(dialog).getByRole("button", { name: "Create lead" }));
+
+    await waitFor(() => {
+      expect(sent).toMatchObject({ crops: ["cotton", "groundnut"], land_acres: "4.5" });
+    });
+  });
 });

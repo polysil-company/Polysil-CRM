@@ -95,7 +95,7 @@ describe("[LEAD-008] LeadAssignDialog", () => {
     const dialog = await screen.findByRole("dialog", { name: "Assign lead" });
 
     expect(
-      await within(dialog).findByText(/only a manager can change the owner/),
+      await within(dialog).findByText(/Only a manager can change the owner/),
     ).toBeInTheDocument();
     expect(within(dialog).queryByRole("combobox", { name: "Owner" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("combobox", { name: "Channel partner" })).toBeInTheDocument();

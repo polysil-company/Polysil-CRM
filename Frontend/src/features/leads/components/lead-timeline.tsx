@@ -3,11 +3,13 @@
 import {
   Activity01Icon,
   ArrowRight02Icon,
+  CheckmarkBadge01Icon,
   Clock01Icon,
   Copy01Icon,
   Delete02Icon,
   Edit02Icon,
   GitMergeIcon,
+  Invoice03Icon,
   Note01Icon,
   PlusSignCircleIcon,
   RotateLeft01Icon,
@@ -30,11 +32,13 @@ import {
   joinFields,
   toTimelineEntry,
   type ChangeKind,
+  type TimelineDocument,
   type TimelineEntry,
 } from "@/features/leads/lib/timeline-entries";
 import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import { LookupName } from "@/features/lookups/components/lookup-name";
 import { findLookupNameById } from "@/features/lookups/lib/lookup-labels";
+import { stepRoleLabel } from "@/features/orders/lib/order-labels";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -183,9 +187,45 @@ function appearanceOf(entry: TimelineEntry): { icon: IconGlyph; tone: Tone } {
       return { icon: Copy01Icon, tone: "warning" };
     case "deleted":
       return { icon: Delete02Icon, tone: "danger" };
+    case "approval":
+      return {
+        icon: CheckmarkBadge01Icon,
+        tone:
+          entry.decision === "approve"
+            ? "success"
+            : entry.decision === "reject"
+              ? "danger"
+              : "neutral",
+      };
+    case "document":
+      return { icon: Invoice03Icon, tone: "neutral" };
     case "other":
       return { icon: Activity01Icon, tone: "neutral" };
   }
+}
+
+/** "approved the District Manager step" — the step by its desk, as approvals name it. */
+function approvalSentence(decision: "approve" | "reject" | null, role: string | null): string {
+  const step = role === null ? "an approval step" : `the ${stepRoleLabel(role)} step`;
+  if (decision === "approve") {
+    return `approved ${step}`;
+  }
+  return decision === "reject" ? `returned it at ${step}` : `decided ${step}`;
+}
+
+function DocumentLink({ document }: { document: TimelineDocument }): React.JSX.Element {
+  return (
+    <Link
+      href={
+        document.kind === "quotation"
+          ? `/quotations/${document.id}`
+          : `/sales-orders/${document.id}`
+      }
+      className="font-mono text-primary-text underline-offset-4 hover:underline"
+    >
+      {document.title}
+    </Link>
+  );
 }
 
 function stageName(stage: LeadStage | null): string {
@@ -272,6 +312,26 @@ function EntrySentence({ entry }: { entry: TimelineEntry }): React.JSX.Element {
       return <>dismissed a possible duplicate</>;
     case "deleted":
       return <>deleted the lead</>;
+    case "approval":
+      return <>{approvalSentence(entry.decision, entry.role)}</>;
+    case "document":
+      return (
+        <>
+          · {entry.label}
+          {entry.document === null ? null : (
+            <>
+              {" "}
+              <DocumentLink document={entry.document} />
+            </>
+          )}
+          {entry.dispatchNo === null ? null : (
+            <>
+              {" "}
+              <span className="font-mono">{entry.dispatchNo}</span>
+            </>
+          )}
+        </>
+      );
     case "other":
       return <>· {entry.label}</>;
   }

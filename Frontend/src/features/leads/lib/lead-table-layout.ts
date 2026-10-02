@@ -15,11 +15,9 @@ export const LEAD_COLUMN_META = {
   stage: { width: "sm" },
   source: { width: "sm", hideBelow: "lg" },
   crops: { width: "fill", hideBelow: "xl" },
-  winProbability: { width: "md", hideBelow: "md" },
-  engagement: { width: "md", hideBelow: "xl" },
   owner: { width: "fill", hideBelow: "lg" },
   followUpAt: { width: "sm", hideBelow: "sm" },
-  estimatedValue: { width: "sm", align: "end" },
+  estimatedValue: { width: "md", align: "end" },
 } as const satisfies Record<string, DataTableColumnMeta>;
 
 const COLUMN_ORDER = [
@@ -28,8 +26,6 @@ const COLUMN_ORDER = [
   "stage",
   "source",
   "crops",
-  "winProbability",
-  "engagement",
   "owner",
   "followUpAt",
   "estimatedValue",

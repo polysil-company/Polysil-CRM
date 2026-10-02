@@ -99,6 +99,26 @@ function villageIn(random: Random, taluka: MockTerritory): string | null {
   return villages.length > 0 && random.chance(0.85) ? random.pick(villages) : null;
 }
 
+const CROP_ROWS = mockLookupRows("crops");
+
+/**
+ * BE-003 · A lead's crops and land, from its position rather than the random sequence, so
+ * every other seeded figure stays as it was. Every fifth lead has none recorded.
+ */
+function cropsAndLandFor(index: number): Pick<LeadWire, "crops" | "land_acres"> {
+  if (index % 5 === 4) {
+    return { crops: [], land_acres: null };
+  }
+  const count = 1 + (index % 3);
+  const crops = Array.from(
+    { length: count },
+    (_, offset) => CROP_ROWS[(index + offset * 5) % CROP_ROWS.length],
+  )
+    .filter((row) => row !== undefined)
+    .map((row) => ({ code: row.code, name: row.name, is_active: true }));
+  return { crops, land_acres: (1.5 + (index % 12) * 0.75).toFixed(2) };
+}
+
 /**
  * Deterministic mock leads in the backend's wire format, checked against the contract
  * (leadWireSchema). Dates are relative to `now`, so the demo always looks current. Every
@@ -168,6 +188,7 @@ export function generateLeads(
       score: scored ? `${String(score)}.00` : null,
       priority: scored ? priorityFor(score) : null,
       estimated_value: estimateValue(random, type, random.int(1, 25)),
+      ...cropsAndLandFor(index),
       lost_reason:
         stage === "lost" ? { id: reason.id, code: reason.code, name: reason.name } : null,
       lost_note: stage === "lost" && random.chance(0.5) ? random.pick(LOST_NOTES) : null,

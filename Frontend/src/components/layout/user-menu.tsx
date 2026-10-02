@@ -207,7 +207,7 @@ function MockControls({ canPreviewRoles }: { canPreviewRoles: boolean }): React.
 const FOLLOW_SERVER = "server";
 
 const LOG_LEVEL_LABELS: Readonly<Record<LogLevel, string>> = {
-  debug: "Debug — everything",
+  debug: "Debug: everything",
   info: "Info",
   warn: "Warnings and errors",
   error: "Errors only",

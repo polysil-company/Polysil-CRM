@@ -272,7 +272,7 @@ function OwnerField({
       <FieldLabel htmlFor="assign-owner">Owner</FieldLabel>
       {cannotAssign ? (
         <p id="assign-owner" className="text-sm text-muted-foreground">
-          {value.name} — only a manager can change the owner.
+          {value.name}. Only a manager can change the owner.
         </p>
       ) : (
         <ChoicePicker

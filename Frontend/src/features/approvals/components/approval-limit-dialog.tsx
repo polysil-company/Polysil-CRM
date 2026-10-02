@@ -231,7 +231,7 @@ function LimitFormBody({
                 }}
               />
               <Label htmlFor="limit-none" className="font-normal">
-                No limit — the top of the ladder approves any{" "}
+                No limit: the top of the ladder approves any{" "}
                 {target.docType === "sales_order" ? "value" : "discount"}
               </Label>
             </div>

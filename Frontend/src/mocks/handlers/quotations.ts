@@ -1243,7 +1243,8 @@ export const quotationHandlers = [
         totals: quotation.totals,
         line_count: quotation.lines.length,
         pdf_ready: quotation.pdf_state === "ready",
-        pdf_url: `/public/q/${String(params.token)}/pdf`,
+        // As the backend sends it since its PR 40: with its own mount prefix.
+        pdf_url: `/api/v1/public/q/${String(params.token)}/pdf`,
       },
     };
     return HttpResponse.json(body);

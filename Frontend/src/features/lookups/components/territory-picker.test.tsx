@@ -38,7 +38,7 @@ describe("[MSTR-002] TerritoryPicker", () => {
     await user.click(screen.getByRole("combobox", { name: "Territory" }));
 
     expect(await screen.findByRole("option", { name: /Ahmedabad/ })).toBeInTheDocument();
-    expect(screen.getByText("Districts — type to find a taluka or village.")).toBeInTheDocument();
+    expect(screen.getByText("Districts. Type to find a taluka or village.")).toBeInTheDocument();
   });
 
   it("searches as you type and keeps the chosen place in the field", async () => {

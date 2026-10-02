@@ -167,7 +167,7 @@ export function orderRefusal(error: unknown): OrderRefusal {
       return {
         title: "Prices changed since the draft was saved",
         message:
-          "A price list or tax rate was published meanwhile. The order shows the new figures — check them and submit again.",
+          "A price list or tax rate was published meanwhile. The order shows the new figures: check them and submit again.",
         stale: true,
       };
     case "lead_not_open":

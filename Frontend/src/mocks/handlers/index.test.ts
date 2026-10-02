@@ -7,8 +7,8 @@ function paths(list: typeof handlers): string[] {
 }
 
 describe("[APP-004] mock handler sets", () => {
-  it("leaves sign-in, leads and lookups to the real API in partial mode", () => {
-    for (const fragment of ["/auth/", "/leads", "/lookups/"]) {
+  it("leaves sign-in, leads, lookups and the dashboard to the real API in partial mode", () => {
+    for (const fragment of ["/auth/", "/leads", "/lookups/", "/dashboard/"]) {
       expect(
         paths(unbuiltHandlers).some((path) => path.includes(fragment)),
         fragment,
@@ -21,7 +21,7 @@ describe("[APP-004] mock handler sets", () => {
   });
 
   it("still mocks the modules the backend does not serve yet", () => {
-    for (const endpoint of ["/dashboard/overview", "/notifications", "/conversations"]) {
+    for (const endpoint of ["/notifications", "/conversations"]) {
       expect(
         paths(unbuiltHandlers).some((path) => path.endsWith(endpoint)),
         endpoint,

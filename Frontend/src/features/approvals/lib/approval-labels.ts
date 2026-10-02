@@ -23,13 +23,17 @@ export function documentTitle(docType: ApprovalDocType, number: string | null): 
 /**
  * The backend asks for a remark to reject, and on every Accounts decision: Accounts checks
  * payment outside the system, and the remark is the record (role `account_manager`,
- * backend migration 013, BE-018).
+ * backend migration 013, BE-018). This says what a required remark is for when it is left
+ * empty, and is null when the remark is optional.
  */
-export function remarkRequired(decision: "approve" | "reject", role: string): boolean {
-  return decision === "reject" || role === "account_manager";
+export function missingRemarkMessage(decision: "approve" | "reject", role: string): string | null {
+  if (decision === "reject") {
+    return "Say why. The person who asked reads it.";
+  }
+  return role === "account_manager" ? "Note the payment check: what was received or agreed." : null;
 }
 
-/** "State Manager's step" — whose step a row is, for a manager covering a lower one. */
+/** "State Manager's step": whose step a row is, for a manager covering a lower one. */
 export function stepOwnerLabel(role: string): string {
   return `${roleLabel(role)}'s step`;
 }
@@ -100,9 +104,9 @@ export function decisionRefusal(error: unknown): DecisionRefusal {
       if (fields.remark !== undefined) {
         return {
           title: "Add a remark",
-          message: "Say why — the person who asked reads it.",
+          message: "A return needs its reason, and an Accounts decision its payment check.",
           stale: false,
-          remark: "Say why — the person who asked reads it",
+          remark: "Add a remark",
         };
       }
       const view = toUserFacingError(error);

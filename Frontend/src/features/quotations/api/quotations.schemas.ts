@@ -694,7 +694,10 @@ export const publicQuotationResponseSchema = z
       totals: totalsSchema,
       line_count: z.number().int().nonnegative(),
       pdf_ready: z.boolean(),
-      /** Relative to the API: `/public/q/{token}/pdf`, which records the view and redirects. */
+      /**
+       * `/api/v1/public/q/{token}/pdf` (older backends: `/public/q/{token}/pdf`), which records
+       * the view and redirects. Used as given, never built (`asApiPath`).
+       */
       pdf_url: z.string().startsWith("/"),
     }),
   })

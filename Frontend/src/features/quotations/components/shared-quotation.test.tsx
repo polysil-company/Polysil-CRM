@@ -75,7 +75,7 @@ describe("[QUOT-012] getPublicQuotation", () => {
     server.events.removeAllListeners();
     expect(authorization).toBeNull();
     expect(quotation).toMatchObject({ quoteNo: shared.quoteNo, pdfReady: true });
-    expect(quotation.pdfPath).toBe(`/public/q/${shared.token}/pdf`);
+    expect(quotation.pdfPath).toBe(`/api/v1/public/q/${shared.token}/pdf`);
     expect(Object.keys(quotation)).not.toContain("party");
   });
 

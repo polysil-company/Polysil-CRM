@@ -152,7 +152,7 @@ function LeadQuotationRow({ quotation }: { quotation: QuotationSummary }): React
       <div className="flex shrink-0 flex-col items-end gap-1">
         <QuotationStatusBadge status={quotation.status} />
         <span className="text-sm font-medium tabular-nums">
-          {formatInr(quotation.totals.total)}
+          {formatInr(quotation.totals.total, { paise: true })}
         </span>
       </div>
     </li>

@@ -209,7 +209,7 @@ test.describe("[APPR-001] Approvals", () => {
       .click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Reject" }).click();
-    await expect(dialog.getByText("Say why — the person who asked reads it")).toBeVisible();
+    await expect(dialog.getByText("Say why. The person who asked reads it.")).toBeVisible();
   });
 
   test("has no automatically detectable accessibility violations", async ({ page }) => {

@@ -139,7 +139,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-006 | Add a note to a lead (`POST /leads/{leadId}/notes`) | shared | in-progress |
 | LEAD-007 | Move a lead's stage — contact, qualify, mark lost, reopen (`POST /leads/{leadId}/transition`, `POST /leads/{leadId}/reopen`) | shared | in-progress |
 | LEAD-008 | Assign a lead — owner and channel partner (`POST /leads/{leadId}/assign`, `GET /leads/assignees`, `GET /lookups/partners`) | shared | in-progress |
-| RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | mocked |
+| RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
 | RPT-002 | Reports | shared | planned |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |

@@ -123,6 +123,49 @@ describe("[LEAD-005] LeadTimeline", () => {
     expect(await screen.findByText("No activity yet")).toBeInTheDocument();
   });
 
+  it("says who approved which step, and links quotations by their number", async () => {
+    const at = "2026-09-29T10:00:00Z";
+    const actor = { id: "usr-2", full_name: "Ravi Joshi" };
+    server.use(
+      http.get(buildApiUrl("/leads/:leadId/timeline"), () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: "e1",
+              kind: "approval.decided",
+              occurred_at: at,
+              actor,
+              payload: { seq: 1, role: "district_manager", decision: "approve" },
+            },
+            {
+              id: "e2",
+              kind: "quotation.sent",
+              occurred_at: at,
+              actor,
+              payload: { quotation_id: "q-9", quote_no: "QT/GJ/2026-27/00009", version: 2 },
+            },
+            {
+              id: "e3",
+              kind: "dispatch.recorded",
+              occurred_at: at,
+              actor,
+              payload: { dispatch_no: "D/SO/GJ/2026-27/00041/1" },
+            },
+          ],
+          meta: { limit: 20, next_cursor: null },
+        }),
+      ),
+    );
+    renderWithProviders(<LeadTimeline leadId="lead-x" />);
+
+    expect(await screen.findByText(/approved the District Manager step/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "QT/GJ/2026-27/00009 · v2" })).toHaveAttribute(
+      "href",
+      "/quotations/q-9",
+    );
+    expect(screen.getByText("D/SO/GJ/2026-27/00041/1")).toBeInTheDocument();
+  });
+
   it("shows an error with a retry when the history cannot load", async () => {
     server.use(
       http.get(buildApiUrl("/leads/:leadId/timeline"), () =>
@@ -274,5 +317,37 @@ describe("[LEAD-006] LeadDetail activity", () => {
       await screen.findByRole("list", { name: "Lead activity, newest first" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "Add a note" })).not.toBeInTheDocument();
+  });
+});
+
+describe("[LEAD-003] LeadDetail details", () => {
+  afterEach(() => {
+    resetMockDb();
+  });
+
+  it("shows the lead's crops and land, and no win probability or engagement cards", async () => {
+    signInAs("employee");
+    const lead = mockLead(
+      (item) =>
+        item.stage === "qualified" && (item.crops ?? []).length > 0 && item.land_acres != null,
+    );
+    renderWithProviders(<LeadDetail leadId={lead.id} />);
+
+    const firstCrop = lead.crops?.[0]?.name ?? "";
+    expect(await screen.findByText(firstCrop)).toBeInTheDocument();
+    expect(screen.getByText(/acres$/)).toBeInTheDocument();
+    expect(screen.queryByText("Win probability")).not.toBeInTheDocument();
+    expect(screen.queryByText("Engagement")).not.toBeInTheDocument();
+  });
+
+  it("drops the hot, warm or cold tag once a lead is won", async () => {
+    signInAs("employee");
+    const lead = mockLead((item) => item.stage === "won" && item.priority !== null);
+    renderWithProviders(<LeadDetail leadId={lead.id} />);
+
+    expect(
+      await screen.findByRole("heading", { level: 2, name: lead.farmer_name }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^(Hot|Warm|Cold)$/)).not.toBeInTheDocument();
   });
 });

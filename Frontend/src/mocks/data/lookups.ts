@@ -32,12 +32,30 @@ const SEEDS: Readonly<Record<LookupList, readonly (readonly [code: string, name:
     ["financing_not_approved", "Financing not approved"],
     ["out_of_area", "Out of area"],
   ],
+  // A few of the 78 the backend seeds (migration 021), with their real codes.
+  crops: [
+    ["banana", "Banana"],
+    ["castor", "Castor"],
+    ["chillies", "Chillies"],
+    ["cotton", "Cotton"],
+    ["cumin", "Cumin"],
+    ["groundnut", "Groundnut"],
+    ["mango", "Mango"],
+    ["onion", "Onion"],
+    ["papaya", "Papaya"],
+    ["pomegranate", "Pomegranate"],
+    ["potato", "Potato"],
+    ["sugarcane", "Sugarcane"],
+    ["tomato", "Tomato"],
+    ["wheat", "Wheat"],
+  ],
 };
 
 const LIST_OFFSET: Readonly<Record<LookupList, number>> = {
   "lead-sources": 100,
   "mis-systems": 200,
   "lost-reasons": 300,
+  crops: 400,
 };
 
 /** Every row of one list, as GET /lookups/{list} returns it. */
