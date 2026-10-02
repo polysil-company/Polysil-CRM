@@ -64,7 +64,7 @@ in the same shape. Never renumber or reuse a number.
 
 **Sales orders** — added as the order screens are built (SO-001…, DISP-002).
 
-- [ ] **BE-019** · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders` · SO-003 · low
+- [x] **BE-019** · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders` · SO-003 · low
 - [ ] **BE-020** · Name the order on its events in the lead's timeline · SO-002, LEAD-005 · normal
 
 ---
@@ -364,7 +364,7 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-019 · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 29 Sep 2026 · SO-003
 - **What:** accept `quotation_id` on `GET /orders` (orders whose `quotations` include it), or add
   `quotation_ids` to `OrderSummary`.
@@ -374,8 +374,11 @@ in the same shape. Never renumber or reuse a number.
   (up to ten) to find the match. One filtered call would do.
 - **Done when:** `GET /orders?quotation_id=…` returns the order(s) carrying that quotation, in the
   caller's scope.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #36 (commit c284913)
+- **Backend notes:** `quotation_id` on `GET /orders` lists the orders this quotation is or was on.
+  A cancelled order released it, so add `status` to find the live one
+  (`backend/docs/api/orders.md`). Ticked by the frontend after reading the contract; the
+  frontend uses it since the backend pick-ups pull request (`place-order.tsx`).
 
 ### BE-020 · Name the order on its events in the lead's timeline
 

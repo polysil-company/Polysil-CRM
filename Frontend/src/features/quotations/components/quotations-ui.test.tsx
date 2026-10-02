@@ -44,6 +44,22 @@ describe("[QUOT-001] QuotationsTable", () => {
     expect(within(table).getAllByText("Accepted").length).toBeGreaterThan(0);
   });
 
+  it("marks a draft whose discount waits for a manager as awaiting approval", async () => {
+    const waiting = mockQuotation(
+      (quotation) => quotation.status === "draft" && quotation.approval?.status === "pending",
+    );
+    renderWithProviders(<QuotationsTable />, { searchParams: "?status=draft" });
+
+    const table = await screen.findByRole("table", { name: "Quotations" });
+    const row = within(table)
+      .getAllByRole("row")
+      .find((candidate) => within(candidate).queryByText(waiting.party.name) !== null);
+    expect(row).toBeDefined();
+    expect(within(row ?? table).getByText("Awaiting approval")).toBeInTheDocument();
+    // Drafts nobody has asked about still read "Draft".
+    expect(within(table).getAllByText("Draft").length).toBeGreaterThan(0);
+  });
+
   it("says when nothing matches the filters", async () => {
     server.use(
       http.get(buildApiUrl("/quotations"), () =>

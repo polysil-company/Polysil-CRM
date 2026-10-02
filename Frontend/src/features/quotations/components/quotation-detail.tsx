@@ -82,7 +82,10 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
             <h2 className="truncate font-mono text-xl font-semibold text-foreground">
               {quotationTitle(quotation)}
             </h2>
-            <QuotationStatusBadge status={quotation.status} />
+            <QuotationStatusBadge
+              status={quotation.status}
+              awaitingApproval={quotation.approval?.status === "pending"}
+            />
             <Badge variant="outline">{SALES_TYPE_LABELS[quotation.salesType]}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">

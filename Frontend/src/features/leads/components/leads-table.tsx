@@ -25,8 +25,8 @@ import { formatInrCompact, sumRupees } from "@/lib/format";
 import { leadColumns } from "./leads-columns";
 
 /**
- * Columns that can carry a sort. "createdAt" (the default order, newest first) has no column.
- * TODO(LEAD-001): the arrows are hidden until the backend sorts (BE-001; `leads-columns.tsx`).
+ * Columns that can carry a sort; the backend sorts `GET /leads` since BE-001. "createdAt" (the
+ * default order, newest first) has no column.
  */
 const SORTABLE_COLUMNS: readonly LeadSortField[] = ["customerName", "estimatedValue"];
 

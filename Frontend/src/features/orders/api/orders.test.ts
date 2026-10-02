@@ -1,10 +1,13 @@
+import { http } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { decideApprovalStep, listPendingApprovals } from "@/features/approvals/api/approvals.api";
 import { isApiError } from "@/lib/api/errors";
+import { buildApiUrl } from "@/lib/api/url";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import { writeMockRole } from "@/lib/dev/mock-settings";
 import { mockDb, resetMockDb } from "@/mocks/db";
+import { server } from "@/mocks/node";
 
 import {
   cancelOrder,
@@ -19,7 +22,7 @@ import {
   submitOrder,
   voidDispatch,
 } from "./orders.api";
-import type { Order, OrderListParams } from "./orders.schemas";
+import { ORDER_STATUSES, type Order, type OrderListParams } from "./orders.schemas";
 
 let keys = 0;
 function key(): string {
@@ -48,6 +51,7 @@ const ALL: OrderListParams = {
   orderType: null,
   mine: false,
   leadId: null,
+  quotationId: null,
 };
 
 function seeded(status: Order["status"]): string {
@@ -104,6 +108,29 @@ describe("[SO-001] listOrders", () => {
 
     const industrial = await listOrders({ ...ALL, orderType: "industrial" });
     expect(industrial.items.every((order) => order.orderType === "industrial")).toBe(true);
+  });
+
+  it("finds the live order carrying a quotation with one filtered call (BE-019)", async () => {
+    const ordered = mockDb.orders.find(
+      (order) => order.status !== "cancelled" && order.quotations.length > 0,
+    );
+    const quotationId = ordered?.quotations[0]?.id ?? "";
+    let sent: URL | undefined;
+    server.use(
+      // Notes the request, then falls through to the mock backend's own handler.
+      http.get(buildApiUrl("/orders"), ({ request }) => {
+        sent = new URL(request.url);
+      }),
+    );
+
+    const page = await listOrders({ ...ALL, quotationId });
+
+    expect(sent?.searchParams.get("quotation_id")).toBe(quotationId);
+    expect(page.items.map((order) => order.id)).toContain(ordered?.id);
+    // "Is or was on": a cancelled order still lists it, so the live one is asked by status.
+    const live = ORDER_STATUSES.filter((status) => status !== "cancelled");
+    const free = await listOrders({ ...ALL, status: live, quotationId: freeAcceptedQuotation() });
+    expect(free.items).toEqual([]);
   });
 
   it("shows how much has shipped", async () => {

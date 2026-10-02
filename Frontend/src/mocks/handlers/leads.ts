@@ -66,18 +66,29 @@ function matchesSearch(lead: LeadWire, q: string): boolean {
 }
 
 /**
- * TODO(LEAD-001): the real backend does not sort yet — it always lists newest first. The mock
- * honours the `sort` and `order` we asked for, so the UI can be previewed as intended.
+ * The order `GET /leads` lists in, as the backend sorts (BE-001): names ignore case, a lead
+ * without a value comes last in both orders, and ties break by id so pages never repeat a row.
  */
-function compareLeads(a: LeadWire, b: LeadWire, sort: string): number {
-  switch (sort) {
-    case "farmer_name":
-      return a.farmer_name.localeCompare(b.farmer_name, "en-IN");
-    case "estimated_value":
-      return Number(a.estimated_value ?? -1) - Number(b.estimated_value ?? -1);
-    default:
-      return Date.parse(a.created_at) - Date.parse(b.created_at) || a.id.localeCompare(b.id);
-  }
+function sortLeads(leads: readonly LeadWire[], sort: string, direction: 1 | -1): LeadWire[] {
+  const byKey = (a: LeadWire, b: LeadWire): number => {
+    switch (sort) {
+      case "farmer_name":
+        return a.farmer_name.toLowerCase().localeCompare(b.farmer_name.toLowerCase(), "en-IN");
+      case "estimated_value":
+        return Number(a.estimated_value) - Number(b.estimated_value);
+      default:
+        return Date.parse(a.created_at) - Date.parse(b.created_at);
+    }
+  };
+  return [...leads].sort((a, b) => {
+    if (
+      sort === "estimated_value" &&
+      (a.estimated_value === null) !== (b.estimated_value === null)
+    ) {
+      return a.estimated_value === null ? 1 : -1;
+    }
+    return (byKey(a, b) || a.id.localeCompare(b.id)) * direction;
+  });
 }
 
 /** The list omits duplicate links; only the detail endpoint carries them. */
@@ -140,6 +151,11 @@ function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
   if (territory === undefined) {
     return errorResponse(422, "validation_error", "Some fields need correcting.", {
       territory_id: "no such territory",
+    });
+  }
+  if (territory.level === "state") {
+    return errorResponse(422, "validation_error", "Some fields need correcting.", {
+      territory_id: "a lead sits in a district, taluka or village, not a state",
     });
   }
   const office = mockOfficeFor(territory);
@@ -333,7 +349,7 @@ export const leadHandlers = [
 
     const matches = scenario === "empty" ? [] : filterLeads(url.searchParams);
 
-    const sorted = [...matches].sort((a, b) => compareLeads(a, b, sort) * direction);
+    const sorted = sortLeads(matches, sort, direction);
     const page = sorted.slice(offset, offset + limit);
     const hasMore = offset + limit < sorted.length;
     const counted = url.searchParams.get("include_total") === "true";
@@ -647,10 +663,16 @@ export const leadHandlers = [
       });
     }
 
+    // Each id travels with its name, as the backend writes them (BE-006).
     const payload: Record<string, unknown> = {};
     if (body.owner_user_id !== undefined) {
+      if (lead.owner !== null && lead.owner.id !== owner?.id) {
+        payload.previous_owner_user_id = lead.owner.id;
+        payload.previous_owner_name = lead.owner.full_name;
+      }
       lead.owner = owner === null ? null : { id: owner.id, full_name: owner.full_name };
       payload.owner_user_id = body.owner_user_id;
+      payload.owner_name = owner?.full_name ?? null;
     }
     if (body.assigned_partner_id !== undefined) {
       const partner =
@@ -667,6 +689,7 @@ export const leadHandlers = [
           ? null
           : { id: partner.id, name: partner.name, partner_type: partner.partner_type };
       payload.assigned_partner_id = body.assigned_partner_id;
+      payload.partner_name = partner?.name ?? null;
     }
 
     recordLeadEvent(lead, "lead.assigned", payload);

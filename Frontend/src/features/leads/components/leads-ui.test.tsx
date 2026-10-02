@@ -25,15 +25,48 @@ describe("[LEAD-001] LeadsTable", () => {
     expect(screen.getByText(/^1–25 of \d+$/)).toBeInTheDocument();
   });
 
-  it("offers no sort arrows until the backend sorts (BE-001)", async () => {
-    renderWithProviders(<LeadsTable />);
+  it("sorts by customer and value on the server, and starts again from the first page (BE-001)", async () => {
+    const user = userEvent.setup();
+    const sent: URL[] = [];
+    // Notes each request and returns nothing, so the mock backend still answers it.
+    server.use(
+      http.get(buildApiUrl("/leads"), ({ request }) => {
+        sent.push(new URL(request.url));
+      }),
+    );
+    const onUrlChange = vi.fn<(queryString: string) => void>();
+    renderWithProviders(<LeadsTable />, { onUrlChange });
 
     const table = await screen.findByRole("table", { name: "Leads" });
-    for (const name of ["Customer", "Value"]) {
-      const header = within(table).getByRole("columnheader", { name });
-      expect(within(header).queryByRole("button")).not.toBeInTheDocument();
-      expect(header).not.toHaveAttribute("aria-sort");
-    }
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    await waitFor(() => {
+      expect(screen.getByText(/^26–50 of \d+$/)).toBeInTheDocument();
+    });
+
+    const customer = within(table).getByRole("columnheader", { name: /Customer/ });
+    expect(customer).toHaveAttribute("aria-sort", "none");
+    await user.click(within(customer).getByRole("button", { name: /Customer/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/^1–25 of \d+$/)).toBeInTheDocument();
+    });
+    expect(customer).toHaveAttribute("aria-sort", "ascending");
+    const last = sent.at(-1);
+    expect(last?.searchParams.get("sort")).toBe("farmer_name");
+    expect(last?.searchParams.get("order")).toBe("asc");
+    // A cursor belongs to one order: the backend refuses it with another sort.
+    expect(last?.searchParams.has("cursor")).toBe(false);
+    expect(onUrlChange).toHaveBeenLastCalledWith(expect.not.stringContaining("cursors="));
+
+    const names = screen.getAllByRole("rowheader").map((cell) => cell.textContent.toLowerCase());
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, "en-IN")));
+
+    const value = within(table).getByRole("columnheader", { name: /Value/ });
+    await user.click(within(value).getByRole("button", { name: /Value/ }));
+    await waitFor(() => {
+      expect(sent.at(-1)?.searchParams.get("sort")).toBe("estimated_value");
+    });
+    expect(customer).toHaveAttribute("aria-sort", "none");
   });
 
   it("names each source from the admin-edited list", async () => {
@@ -183,6 +216,26 @@ describe("[LEAD-002] NewLeadDialog", () => {
 
     expect(within(dialog).queryByText("Choose the inquiry type.")).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Choose the irrigation system.")).not.toBeInTheDocument();
+  });
+
+  it("offers a district, taluka or village for the lead, never the state (BE-005)", async () => {
+    const searches: URL[] = [];
+    server.use(
+      // Notes the search, then falls through to the mock backend's own handler.
+      http.get(buildApiUrl("/lookups/territories"), ({ request }) => {
+        searches.push(new URL(request.url));
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<NewLeadDialog />, { searchParams: "?newLead=true" });
+
+    const dialog = await screen.findByRole("dialog", { name: "New lead" });
+    await user.type(within(dialog).getByRole("combobox", { name: "Territory" }), "guj");
+
+    // The state is the only place named "Guj…": a lead may not sit in it.
+    expect(await screen.findByText("No place matches “guj”.")).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Gujarat/ })).not.toBeInTheDocument();
+    expect(searches.at(-1)?.searchParams.get("levels")).toBe("district,taluka,village");
   });
 
   it("sends the crops and land with the lead", async () => {

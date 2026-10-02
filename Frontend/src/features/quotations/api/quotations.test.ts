@@ -2,11 +2,12 @@ import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApiUrl } from "@/lib/api/url";
+import { toQuotationSummary } from "@/mocks/data/quotations";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 
 import { getQuotation, getQuotationPdf, listQuotations } from "./quotations.api";
-import type { QuotationListParams } from "./quotations.schemas";
+import type { QuotationListParams, QuotationSummaryWire } from "./quotations.schemas";
 
 const FIRST_PAGE: QuotationListParams = {
   cursor: null,
@@ -26,6 +27,14 @@ function mockQuotation(
     throw new Error("No matching quotation in the mock database");
   }
   return quotation;
+}
+
+/** A list row as a backend from before `awaiting_approval` sent it. */
+function rowWithoutFlag(id: string): Omit<QuotationSummaryWire, "awaiting_approval"> {
+  const { awaiting_approval: _flag, ...row } = toQuotationSummary(
+    mockQuotation((item) => item.id === id),
+  );
+  return row;
 }
 
 describe("[QUOT-001] listQuotations", () => {
@@ -55,6 +64,29 @@ describe("[QUOT-001] listQuotations", () => {
 
     await listQuotations({ ...FIRST_PAGE, currentOnly: false });
     expect(sent?.searchParams.get("current_only")).toBe("false");
+  });
+
+  it("reads which drafts wait for a manager, and treats a row without the flag as not waiting", async () => {
+    const page = await listQuotations({ ...FIRST_PAGE, status: ["draft"], pageSize: 100 });
+    const waiting = mockDb.quotations.filter(
+      (quotation) => quotation.approval?.status === "pending",
+    );
+    expect(waiting.length).toBeGreaterThan(0);
+    for (const quotation of page.items) {
+      expect(quotation.awaitingApproval).toBe(waiting.some((item) => item.id === quotation.id));
+    }
+
+    const row = page.items[0];
+    server.use(
+      http.get(buildApiUrl("/quotations"), () =>
+        HttpResponse.json({
+          data: page.items.length === 0 ? [] : [rowWithoutFlag(row?.id ?? "")],
+          meta: { limit: 25, next_cursor: null, total: 1 },
+        }),
+      ),
+    );
+    const older = await listQuotations(FIRST_PAGE);
+    expect(older.items[0]?.awaitingApproval).toBe(false);
   });
 
   it("shows every version of a lead's quotations when asked", async () => {

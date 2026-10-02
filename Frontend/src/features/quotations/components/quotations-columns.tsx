@@ -82,7 +82,12 @@ export const quotationColumns = columnHelper.columns([
   columnHelper.accessor("status", {
     header: "Status",
     enableSorting: false,
-    cell: ({ getValue }) => <QuotationStatusBadge status={getValue()} />,
+    cell: ({ row }) => (
+      <QuotationStatusBadge
+        status={row.original.status}
+        awaitingApproval={row.original.awaitingApproval}
+      />
+    ),
     meta: QUOTATION_COLUMN_META.status,
   }),
   columnHelper.accessor("salesType", {

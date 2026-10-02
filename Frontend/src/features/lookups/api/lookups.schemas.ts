@@ -75,10 +75,12 @@ export interface TerritoryChoice {
 
 /**
  * GET /lookups/territories filters. With no search the picker lists districts to start
- * from; a search matches names at every level.
+ * from; a search matches names at the `levels` the form allows, or at every level when null.
+ * The backend refuses `level` and `levels` together, so a search sends one or the other.
  */
 export interface TerritorySearchParams {
   readonly q: string;
   readonly level: string | null;
+  readonly levels: readonly string[] | null;
   readonly limit: number;
 }

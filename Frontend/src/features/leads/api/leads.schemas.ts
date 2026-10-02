@@ -374,8 +374,9 @@ export type LeadStats = z.output<typeof leadStatsSchema>;
 export type LeadStatsWire = z.input<typeof leadStatsSchema>;
 
 /**
- * Sort columns. TODO(LEAD-001): the backend lists newest first and does not sort yet — the
- * `sort` and `order` parameters are our request to the backend (Docs/Frontend-Scope.md §10).
+ * Sort columns (BE-001, backend/docs/api/leads.md). The cursor carries its sort: a cursor sent
+ * with a different `sort` or `order` is `422` on `cursor`, so changing the sort starts again
+ * from the first page.
  */
 export const LEAD_SORT_FIELDS = ["createdAt", "customerName", "estimatedValue"] as const;
 export type LeadSortField = (typeof LEAD_SORT_FIELDS)[number];
@@ -416,6 +417,9 @@ const AMOUNT_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
 const ACRES_PATTERN = /^\d{1,5}(\.\d{1,2})?$/;
 /** The backend takes at most this many crops on a lead. */
 export const MAX_LEAD_CROPS = 10;
+
+/** A lead sits in a district, a taluka or a village; a state is refused (BE-005). */
+export const LEAD_TERRITORY_LEVELS = ["district", "taluka", "village"] as const;
 
 /** POST /leads request body (`LeadCreate`) — what the backend receives. */
 export const createLeadRequestSchema = z.object({

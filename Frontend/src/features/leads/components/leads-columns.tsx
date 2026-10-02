@@ -44,20 +44,12 @@ function NotRecorded(): React.JSX.Element {
   return <span className="text-sm text-subtle-foreground">{EMPTY_VALUE}</span>;
 }
 
-/**
- * Whether the backend sorts `GET /leads`. It does not yet (BE-001), and an arrow that changes
- * nothing tells the user the list is sorted when it is not — so no column offers one.
- * TODO(LEAD-001): set to true once BE-001 is done; the sort already travels in the URL and the
- * request.
- */
-const BACKEND_SORTS_LEADS = false;
-
 /** Columns in display order. Widths and breakpoints come from LEAD_COLUMN_META (shared with the skeleton). */
 export const leadColumns = columnHelper.columns([
   createSelectionColumn(columnHelper, (lead) => lead.customerName),
   columnHelper.accessor("customerName", {
     header: "Customer",
-    enableSorting: BACKEND_SORTS_LEADS,
+    enableSorting: true,
     cell: ({ row }) => <LeadNameCell lead={row.original} />,
     meta: LEAD_COLUMN_META.customerName,
   }),
@@ -119,7 +111,7 @@ export const leadColumns = columnHelper.columns([
   }),
   columnHelper.accessor("estimatedValue", {
     header: "Value",
-    enableSorting: BACKEND_SORTS_LEADS,
+    enableSorting: true,
     // Whole rupees in every row, so a column never mixes "₹69,910" with "₹2.41 L".
     cell: ({ getValue }) => <span className="font-medium">{formatInr(getValue())}</span>,
     meta: LEAD_COLUMN_META.estimatedValue,

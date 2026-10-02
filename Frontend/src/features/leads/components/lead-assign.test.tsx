@@ -51,6 +51,7 @@ describe("[LEAD-008] LeadAssignDialog", () => {
     signInAs("state_manager");
     const lead = leadAt("contacted");
     const newOwner = MOCK_STAFF.find((person) => person.id !== lead.owner?.id);
+    const previousOwner = lead.owner?.full_name ?? null;
     const user = showLead(lead.id);
 
     await user.click(await screen.findByRole("button", { name: "Assign" }));
@@ -81,8 +82,15 @@ describe("[LEAD-008] LeadAssignDialog", () => {
     });
     expect(await screen.findByText("Khodiyar Irrigation · Dealer")).toBeInTheDocument();
     expect(lead.owner?.id).toBe(newOwner?.id);
+    // The history names both people and the partner (BE-006).
+    const handover =
+      previousOwner === null
+        ? `assigned the lead to ${newOwner?.full_name ?? ""}`
+        : `handed the lead from ${previousOwner} to ${newOwner?.full_name ?? ""}`;
     expect(
-      await screen.findByText(/changed the owner and the channel partner/),
+      await screen.findByText(`${handover} and made Khodiyar Irrigation the channel partner`, {
+        exact: false,
+      }),
     ).toBeInTheDocument();
   });
 

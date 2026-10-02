@@ -50,6 +50,7 @@ export async function listOrders(
       order_type: params.orderType,
       owner: params.mine ? "me" : undefined,
       lead_id: params.leadId,
+      quotation_id: params.quotationId,
     },
     schema: orderPageSchema,
     signal,

@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import type { TimelineEvent } from "@/features/leads/api/leads.schemas";
 
-import { joinFields, labelForUnknownKind, toTimelineEntry } from "./timeline-entries";
+import {
+  assignmentSentence,
+  joinFields,
+  labelForUnknownKind,
+  toTimelineEntry,
+  type AssignmentChange,
+} from "./timeline-entries";
 
 const LEAD_ID = "lead-1";
 
@@ -75,15 +81,57 @@ describe("[LEAD-005] toTimelineEntry", () => {
   it("tells a set owner from a cleared one, and leaves an untouched partner alone", () => {
     expect(toTimelineEntry(event("lead.assigned", { owner_user_id: "usr-2" }), LEAD_ID)).toEqual({
       type: "assigned",
-      owner: "set",
-      partner: "unchanged",
+      owner: { kind: "set", name: null },
+      partner: { kind: "unchanged", name: null },
+      previousOwnerName: null,
     });
     expect(
       toTimelineEntry(
         event("lead.assigned", { owner_user_id: null, assigned_partner_id: "p-1" }),
         LEAD_ID,
       ),
-    ).toEqual({ type: "assigned", owner: "cleared", partner: "set" });
+    ).toEqual({
+      type: "assigned",
+      owner: { kind: "cleared", name: null },
+      partner: { kind: "set", name: null },
+      previousOwnerName: null,
+    });
+  });
+
+  it("reads the names written beside the ids (BE-006)", () => {
+    expect(
+      toTimelineEntry(
+        event("lead.assigned", {
+          owner_user_id: "usr-2",
+          owner_name: "Ravi Joshi",
+          previous_owner_user_id: "usr-1",
+          previous_owner_name: "Asha Mehta",
+          assigned_partner_id: "p-1",
+          partner_name: "Shree Agro",
+        }),
+        LEAD_ID,
+      ),
+    ).toEqual({
+      type: "assigned",
+      owner: { kind: "set", name: "Ravi Joshi" },
+      partner: { kind: "set", name: "Shree Agro" },
+      previousOwnerName: "Asha Mehta",
+    });
+    // A cleared id has a null name; an empty name is no name.
+    expect(
+      toTimelineEntry(
+        event("lead.assigned", {
+          owner_user_id: null,
+          owner_name: null,
+          assigned_partner_id: "p-1",
+          partner_name: " ",
+        }),
+        LEAD_ID,
+      ),
+    ).toMatchObject({
+      owner: { kind: "cleared", name: null },
+      partner: { kind: "set", name: null },
+    });
   });
 
   it("names the edited fields in words", () => {
@@ -203,5 +251,68 @@ describe("[LEAD-005] joinFields", () => {
     expect(joinFields(["farmer name", "mobile", "village"])).toBe(
       "farmer name, mobile and village",
     );
+  });
+});
+
+describe("[LEAD-008] assignmentSentence", () => {
+  const set = (name: string | null): AssignmentChange => ({ kind: "set", name });
+  const cleared: AssignmentChange = { kind: "cleared", name: null };
+  const unchanged: AssignmentChange = { kind: "unchanged", name: null };
+
+  it("names the new owner and partner", () => {
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: set("Ravi Joshi"),
+        partner: set("Shree Agro"),
+        previousOwnerName: null,
+      }),
+    ).toBe("assigned the lead to Ravi Joshi and made Shree Agro the channel partner");
+  });
+
+  it("names both owners on a handover, and who was unassigned", () => {
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: set("Ravi Joshi"),
+        partner: unchanged,
+        previousOwnerName: "Asha Mehta",
+      }),
+    ).toBe("handed the lead from Asha Mehta to Ravi Joshi");
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: cleared,
+        partner: cleared,
+        previousOwnerName: "Asha Mehta",
+      }),
+    ).toBe("unassigned Asha Mehta and removed the channel partner");
+  });
+
+  it("still reads for events without names", () => {
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: set(null),
+        partner: set(null),
+        previousOwnerName: null,
+      }),
+    ).toBe("changed the owner and the channel partner");
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: cleared,
+        partner: unchanged,
+        previousOwnerName: null,
+      }),
+    ).toBe("unassigned the owner");
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: unchanged,
+        partner: unchanged,
+        previousOwnerName: null,
+      }),
+    ).toBe("updated the assignment");
   });
 });

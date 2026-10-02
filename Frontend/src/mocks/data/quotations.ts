@@ -354,6 +354,7 @@ export function toQuotationSummary(quotation: QuotationWire): QuotationSummaryWi
     pdf_state: quotation.pdf_state,
     superseded_by: quotation.superseded_by,
     created_at: quotation.created_at,
+    awaiting_approval: quotation.status === "draft" && quotation.approval?.status === "pending",
   };
 }
 
