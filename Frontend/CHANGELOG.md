@@ -7,7 +7,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-23 changes, newest first. Each title opens its entry.
+24 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
@@ -15,6 +15,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-10-02 | [Notifications and messages on the backend](changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md) | `api-integration` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-004` |
 | 2026-10-02 | [Say what each lead stage means, and give long pages their bottom margin](changelog/entries/2026-10-02--fix--LEAD-007--say-what-each-lead-stage-means-and-give-long-pages-their.md) | `fix` | `LEAD-007` `LEAD-001` `SO-002` `DS-001` |
 | 2026-10-02 | [Demo walk fixes: the dashboard on the backend's contract, the customer's PDF link, crops and land, clearer lead history](changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md) | `fix` | `RPT-001` `QUOT-012` `LEAD-002` `LEAD-003` `LEAD-005` `APPR-001` `AUTH-005` |
+| 2026-10-02 | [Fix the three npm audit findings, and take the safe dependency updates](changelog/entries/2026-10-02--security--APP-001--fix-the-three-npm-audit-findings-and-take-the-safe.md) | `security` | `APP-001` |
 | 2026-09-30 | [Approval limits: an order's value and a quotation's discount per role, changed by an administrator](changelog/entries/2026-09-30--feature--APPR-002--approval-limits.md) | `feature` | `APPR-002` |
 | 2026-09-30 | [Sales orders and dispatch: place an order from a quotation, follow its approval, record what left](changelog/entries/2026-09-30--feature--SO-001--sales-orders-and-dispatch.md) | `feature` | `SO-001` `SO-002` `SO-003` `SO-004` `DISP-002` `APPR-001` |
 | 2026-09-28 | [A tested-features log with screenshots, and an index at the top of the changelog](changelog/entries/2026-09-28--docs--REPO-001--a-tested-features-log-with-screenshots-and-an-index-at-the.md) | `docs` | `REPO-001` |
@@ -391,6 +392,63 @@ The backend's walk of staging on 1 October, along the demo's path, found these (
 - `src/mocks/handlers/index.test.ts` — the dashboard goes to the real API in partial mode
 - `e2e/smoke.spec.ts` — the whole suite, desktop and phone, with axe: 35 passed
 - By hand (`npm run dev`): the dashboard on a desktop and a phone in dark mode; a new lead with three crops and 4.5 acres, a dropdown opened and closed without an error; a won lead with its crops and land and no "Warm". axe found nothing.
+
+### Fix the three npm audit findings, and take the safe dependency updates
+
+`security` · `APP-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--security--APP-001--fix-the-three-npm-audit-findings-and-take-the-safe.md)
+
+#### Before
+
+`npm install` reported 3 vulnerabilities:
+
+- **Critical: `next` 16.3.5.** Remote code execution in `next/og` `ImageResponse` (GHSA-vcvr-r3jv-pc5j). The app does not use `next/og`, so it was not reachable, but it shipped in the production dependency.
+- **High: `brace-expansion`.** CPU and stack denial of service on crafted brace patterns (GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p). It comes in through ESLint and its plugins: development only.
+- **Moderate: `fast-uri`.** Inconsistent host normalisation (GHSA-hrr3-gc8f-f4qj). It comes in through Ajv: development only.
+
+Dependabot's pull requests #13–#17 were open and failing:
+
+- **#13 (minor and patch group).** `@hugeicons/core-free-icons` 4.3.4 is a broken release: its index imports a file it does not ship, so every test that renders an icon failed.
+- **#14 (jsdom 30).** It needs Node ≥ 24.15, and we pin 24.13.1, so `npm ci` stopped.
+- **#15 (ESLint 10), #16 and #17 (`@vitest/browser` 5).** Major versions that need their peers moved with them. The Vitest 5 packages, for example, need `vitest` 5 itself.
+
+#### Now
+
+`npm audit` reports **0 vulnerabilities**.
+
+- **`next` and `eslint-config-next`: 16.3.5 → 16.3.8.** A patch release with the fix.
+- **`npm audit fix`:** `brace-expansion` and `fast-uri` move to fixed versions inside the lockfile; no direct dependency changes.
+- **#13's safe updates, all patch or minor:**
+  - `@tanstack/react-query`, `-devtools` and `eslint-plugin-query` 5.103.1;
+  - `motion` 13.4.0;
+  - `@commitlint/*` 21.2.3;
+  - `knip` 6.37.0;
+  - `prettier` 3.9.8;
+  - `tsx` 4.23.15.
+- **Left out:** `@hugeicons/core-free-icons` stays on 4.3.3, the release #13 wanted to replace with the broken 4.3.4.
+
+#### Discussion
+
+- **#13 is superseded by this pull request.** Close it, or let Dependabot close it once this merges.
+- **#14–#17 are major upgrades.** Each needs its own change, not a bump:
+  - jsdom 30 waits for a Node upgrade (`.nvmrc` to 24.15 or later, in CI and on every machine);
+  - ESLint 10 waits for `eslint-config-next` and the React, a11y and import plugins to support it;
+  - Vitest 5 means `vitest`, `@vitest/browser`, `@vitest/browser-playwright` and the Storybook Vitest addon together.
+
+  Closing them loses nothing: Dependabot opens them again for the next release.
+
+- **No code changed.** Prettier 3.9.8 formats every file the same way.
+
+#### Files changed
+
+- `package.json`: the versions above.
+- `package-lock.json`: regenerated by npm.
+
+#### Tests
+
+- `npm audit`: 0 vulnerabilities.
+- `npm run verify`: typecheck, lint, every unit test, changelog check.
+- `npm run build`: the production build on Next.js 16.3.8.
+- `npm run knip` and `prettier --check .`: clean.
 
 ## 30 September 2026
 
