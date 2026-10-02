@@ -107,6 +107,8 @@ const quotationSummaryWireSchema = z.object({
   pdf_state: z.enum(PDF_STATES).nullable(),
   superseded_by: versionRef.nullable(),
   created_at: isoDateTime,
+  /** A discount request on this draft waits for a manager; absent before the backend's #30. */
+  awaiting_approval: z.boolean().optional(),
 });
 
 export type QuotationSummaryWire = z.input<typeof quotationSummaryWireSchema>;
@@ -133,6 +135,7 @@ export const quotationSummarySchema = quotationSummaryWireSchema.transform((wire
   pdfState: wire.pdf_state,
   supersededBy: wire.superseded_by,
   createdAt: wire.created_at,
+  awaitingApproval: wire.awaiting_approval ?? false,
 }));
 
 export type QuotationSummary = z.output<typeof quotationSummarySchema>;

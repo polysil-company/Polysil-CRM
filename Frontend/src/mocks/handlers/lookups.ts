@@ -12,9 +12,11 @@ import { MOCK_PARTNERS } from "@/mocks/data/reference";
 import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 
 import { applyScenario } from "./scenario";
+import { errorResponse } from "./shared";
 
 const DEFAULT_TERRITORY_LIMIT = 50;
 const MAX_TERRITORY_LIMIT = 100;
+const TERRITORY_LEVELS: readonly string[] = ["state", "district", "taluka", "village"];
 const DEFAULT_PARTNER_LIMIT = 50;
 
 /**
@@ -74,7 +76,10 @@ export const lookupHandlers = [
     return HttpResponse.json(body);
   }),
 
-  /** Name contains `q` (any case), optionally one `level` and one `parent_id`, ordered by name. */
+  /**
+   * Name contains `q` (any case), optionally one `level` or several `levels` (never both) and
+   * one `parent_id`, ordered by name.
+   */
   http.get(buildApiUrl("/lookups/territories"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
@@ -82,6 +87,20 @@ export const lookupHandlers = [
     const url = new URL(request.url);
     const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
     const level = url.searchParams.get("level");
+    const levels =
+      url.searchParams
+        .get("levels")
+        ?.split(",")
+        .map((part) => part.trim()) ?? null;
+    if (
+      levels !== null &&
+      (level !== null || levels.some((part) => !TERRITORY_LEVELS.includes(part)))
+    ) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        levels:
+          level === null ? "unknown territory level" : "send either level or levels, not both",
+      });
+    }
     const parentId = url.searchParams.get("parent_id");
     const limit = Math.min(
       MAX_TERRITORY_LIMIT,
@@ -91,6 +110,7 @@ export const lookupHandlers = [
     const matches = MOCK_TERRITORIES.filter(
       (territory) =>
         (level === null || territory.level === level) &&
+        (levels === null || levels.includes(territory.level)) &&
         (parentId === null || territory.parent?.id === parentId) &&
         (q === "" || territory.name.toLowerCase().includes(q)),
     )

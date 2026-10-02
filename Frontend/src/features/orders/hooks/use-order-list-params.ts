@@ -74,6 +74,7 @@ export function useOrderListParams(): OrderListParamsControls {
     orderType: values.type,
     mine: values.mine,
     leadId: null,
+    quotationId: null,
   };
 
   const activeFilterCount = [

@@ -66,6 +66,30 @@ export function mockTimelineFor(lead: LeadWire): TimelineEventWire[] {
     });
   }
 
+  // Whoever captured it handed it to its owner and partner; names travel with the ids (BE-006).
+  // Only what the capture did not already settle is written: no one assigns a lead to themselves.
+  const handedTo = lead.owner !== null && lead.owner.id !== creator?.id ? lead.owner : null;
+  if (handedTo !== null || lead.assigned_partner !== null) {
+    events.push({
+      id: eventId(lead, 2),
+      kind: "lead.assigned",
+      occurred_at: iso(createdAt + 2 * MINUTE),
+      actor: creator,
+      payload: {
+        actor_name: creator?.full_name ?? "",
+        ...(handedTo === null
+          ? {}
+          : { owner_user_id: handedTo.id, owner_name: handedTo.full_name }),
+        ...(lead.assigned_partner === null
+          ? {}
+          : {
+              assigned_partner_id: lead.assigned_partner.id,
+              partner_name: lead.assigned_partner.name,
+            }),
+      },
+    });
+  }
+
   // Walk the stage path up to the lead's stage; a won, lost or merged lead walked part of it.
   const reached = STAGE_PATH.indexOf(lead.stage);
   const walked = reached >= 0 ? reached : lead.stage === "won" ? STAGE_PATH.length - 1 : 1;

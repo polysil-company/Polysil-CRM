@@ -29,9 +29,9 @@ import { leadTimelineQueryOptions } from "@/features/leads/api/leads.queries";
 import type { LeadStage, TimelineEvent } from "@/features/leads/api/leads.schemas";
 import { LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
 import {
+  assignmentSentence,
   joinFields,
   toTimelineEntry,
-  type ChangeKind,
   type TimelineDocument,
   type TimelineEntry,
 } from "@/features/leads/lib/timeline-entries";
@@ -232,18 +232,6 @@ function stageName(stage: LeadStage | null): string {
   return stage === null ? "another stage" : LEAD_STAGE_LABELS[stage];
 }
 
-function assignmentSentence(owner: ChangeKind, partner: ChangeKind): string {
-  if (owner === "set" && partner === "set") {
-    return "changed the owner and the channel partner";
-  }
-  const parts: string[] = [];
-  if (owner === "set") parts.push("changed the owner");
-  if (owner === "cleared") parts.push("unassigned the owner");
-  if (partner === "set") parts.push("changed the channel partner");
-  if (partner === "cleared") parts.push("removed the channel partner");
-  return parts.length === 0 ? "updated the assignment" : parts.join(" and ");
-}
-
 /** What the actor did, as the rest of a sentence that starts with their name. */
 function EntrySentence({ entry }: { entry: TimelineEntry }): React.JSX.Element {
   switch (entry.type) {
@@ -272,7 +260,7 @@ function EntrySentence({ entry }: { entry: TimelineEntry }): React.JSX.Element {
     case "reopened":
       return <>reopened the lead{entry.to === null ? null : <> at {stageName(entry.to)}</>}</>;
     case "assigned":
-      return <>{assignmentSentence(entry.owner, entry.partner)}</>;
+      return <>{assignmentSentence(entry)}</>;
     case "updated":
       return entry.fields.length === 0 ? (
         <>edited the lead</>

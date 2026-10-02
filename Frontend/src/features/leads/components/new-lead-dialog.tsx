@@ -37,6 +37,7 @@ import { useCreateLead } from "@/features/leads/api/leads.mutations";
 import {
   createLeadFormSchema,
   LEAD_INQUIRY_TYPES,
+  LEAD_TERRITORY_LEVELS,
   MAX_LEAD_CROPS,
   type CreateLeadFormValues,
   type CreateLeadRequest,
@@ -284,6 +285,7 @@ export function NewLeadDialog(): React.JSX.Element {
                       <TerritoryPicker
                         {...aria}
                         value={field.value ?? null}
+                        levels={LEAD_TERRITORY_LEVELS}
                         onValueChange={(territory) => {
                           field.onChange(territory);
                         }}

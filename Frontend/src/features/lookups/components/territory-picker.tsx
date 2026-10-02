@@ -25,18 +25,16 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 /** Search once typing pauses for this long. */
 const SEARCH_DEBOUNCE_MS = 250;
 
-/**
- * Opening the picker lists districts to start from; typing searches every level.
- * TODO(LEAD-002): the backend docs say a lead sits in a taluka or district, but the search
- * also returns villages and the state — which levels to offer is asked (Frontend-Scope §10).
- */
-const START_PARAMS: TerritorySearchParams = { q: "", level: "district", limit: 50 };
+/** Opening the picker lists districts to start from; typing searches the allowed levels. */
+const START_PARAMS: TerritorySearchParams = { q: "", level: "district", levels: null, limit: 50 };
 const SEARCH_LIMIT = 20;
 
 export interface TerritoryPickerProps {
   id: string;
   value: TerritoryChoice | null;
   onValueChange: (territory: TerritoryChoice | null) => void;
+  /** The levels a search offers, e.g. a lead's district, taluka or village; null for every level. */
+  levels?: readonly string[] | null;
   onBlur?: () => void;
   disabled?: boolean;
   placeholder?: string;
@@ -54,6 +52,7 @@ export function TerritoryPicker({
   value,
   onValueChange,
   onBlur,
+  levels = null,
   disabled = false,
   placeholder = "Search a district, taluka or village",
   ...aria
@@ -61,7 +60,7 @@ export function TerritoryPicker({
   const [search, setSearch] = useState("");
   const term = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
   const params: TerritorySearchParams =
-    term === "" ? START_PARAMS : { q: term, level: null, limit: SEARCH_LIMIT };
+    term === "" ? START_PARAMS : { q: term, level: null, levels, limit: SEARCH_LIMIT };
   const query = useQuery(territorySearchQueryOptions(params));
 
   const results: readonly TerritoryChoice[] = query.data ?? [];

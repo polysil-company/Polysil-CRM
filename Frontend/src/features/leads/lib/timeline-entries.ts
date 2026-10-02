@@ -26,7 +26,13 @@ export type TimelineEntry =
       readonly lostNote: string | null;
     }
   | { readonly type: "reopened"; readonly to: LeadStage | null; readonly note: string | null }
-  | { readonly type: "assigned"; readonly owner: ChangeKind; readonly partner: ChangeKind }
+  | {
+      readonly type: "assigned";
+      readonly owner: AssignmentChange;
+      readonly partner: AssignmentChange;
+      /** On a handover, who held the lead before; null when not named. */
+      readonly previousOwnerName: string | null;
+    }
   | { readonly type: "updated"; readonly fields: readonly string[] }
   | { readonly type: "merged"; readonly role: "survivor" | "loser"; readonly otherLeadId: string }
   | { readonly type: "duplicate-flagged"; readonly count: number }
@@ -58,6 +64,16 @@ export interface TimelineDocument {
 
 /** How an assignment event touched a field: given a value, cleared, or left alone. */
 export type ChangeKind = "set" | "cleared" | "unchanged";
+
+/**
+ * One side of an assignment: what happened, and the name the backend wrote beside the id
+ * (BE-006). The name is null on events from before BE-006, and for someone the backend could
+ * not name, so the sentence falls back to "changed the owner".
+ */
+export interface AssignmentChange {
+  readonly kind: ChangeKind;
+  readonly name: string | null;
+}
 
 const text = z.string().trim().min(1);
 const optionalText = text.nullish().catch(null);
@@ -140,11 +156,19 @@ export function labelForUnknownKind(kind: string): string {
   return OTHER_KIND_LABELS[kind] ?? humanizeCode(kind.replace(/\./g, " "));
 }
 
-function changeOf(payload: Readonly<Record<string, unknown>>, key: string): ChangeKind {
+function changeOf(
+  payload: Readonly<Record<string, unknown>>,
+  key: string,
+  nameKey: string,
+): AssignmentChange {
   if (!(key in payload)) {
-    return "unchanged";
+    return { kind: "unchanged", name: null };
   }
-  return typeof payload[key] === "string" && payload[key] !== "" ? "set" : "cleared";
+  const set = typeof payload[key] === "string" && payload[key] !== "";
+  return {
+    kind: set ? "set" : "cleared",
+    name: set ? (optionalText.parse(payload[nameKey]) ?? null) : null,
+  };
 }
 
 /** Turns one event into the entry the timeline renders. `leadId` is the lead on screen. */
@@ -179,8 +203,9 @@ export function toTimelineEntry(event: TimelineEvent, leadId: string): TimelineE
     case "lead.assigned":
       return {
         type: "assigned",
-        owner: changeOf(payload, "owner_user_id"),
-        partner: changeOf(payload, "assigned_partner_id"),
+        owner: changeOf(payload, "owner_user_id", "owner_name"),
+        partner: changeOf(payload, "assigned_partner_id", "partner_name"),
+        previousOwnerName: optionalText.parse(payload.previous_owner_name) ?? null,
       };
 
     case "lead.updated": {
@@ -238,4 +263,50 @@ export function joinFields(fields: readonly string[]): string {
     return fields[0] ?? "";
   }
   return `${fields.slice(0, -1).join(", ")} and ${fields.at(-1) ?? ""}`;
+}
+
+/**
+ * LEAD-008 · An assignment, as the rest of a sentence that starts with the actor's name:
+ * "assigned the lead to Ravi Joshi and made Shree Agro the channel partner". Events without
+ * names (before BE-006) still read: "changed the owner".
+ */
+export function assignmentSentence({
+  owner,
+  partner,
+  previousOwnerName,
+}: Extract<TimelineEntry, { type: "assigned" }>): string {
+  if (
+    owner.kind === "set" &&
+    partner.kind === "set" &&
+    owner.name === null &&
+    partner.name === null
+  ) {
+    return "changed the owner and the channel partner";
+  }
+  const parts: string[] = [];
+  if (owner.kind === "set") {
+    parts.push(
+      owner.name === null
+        ? "changed the owner"
+        : previousOwnerName === null
+          ? `assigned the lead to ${owner.name}`
+          : `handed the lead from ${previousOwnerName} to ${owner.name}`,
+    );
+  }
+  if (owner.kind === "cleared") {
+    parts.push(
+      previousOwnerName === null ? "unassigned the owner" : `unassigned ${previousOwnerName}`,
+    );
+  }
+  if (partner.kind === "set") {
+    parts.push(
+      partner.name === null
+        ? "changed the channel partner"
+        : `made ${partner.name} the channel partner`,
+    );
+  }
+  if (partner.kind === "cleared") {
+    parts.push("removed the channel partner");
+  }
+  return parts.length === 0 ? "updated the assignment" : parts.join(" and ");
 }

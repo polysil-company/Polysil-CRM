@@ -150,7 +150,10 @@ function LeadQuotationRow({ quotation }: { quotation: QuotationSummary }): React
         </span>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <QuotationStatusBadge status={quotation.status} />
+        <QuotationStatusBadge
+          status={quotation.status}
+          awaitingApproval={quotation.awaitingApproval}
+        />
         <span className="text-sm font-medium tabular-nums">
           {formatInr(quotation.totals.total, { paise: true })}
         </span>

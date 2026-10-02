@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PackageIcon } from "@hugeicons/core-free-icons";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -29,11 +29,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateOrder } from "@/features/orders/api/orders.mutations";
+import { orderListQueryOptions } from "@/features/orders/api/orders.queries";
 import {
-  orderDetailQueryOptions,
-  orderListQueryOptions,
-} from "@/features/orders/api/orders.queries";
-import {
+  ORDER_STATUSES,
   ORDERABLE_TYPES,
   PAYMENT_TERMS,
   orderHeaderFormSchema,
@@ -62,19 +60,20 @@ const placeOrderFormSchema = orderHeaderFormSchema.extend({
 });
 type PlaceOrderForm = z.infer<typeof placeOrderFormSchema>;
 
-/** How many of the lead's live orders are read to find the one carrying this quotation. */
-const MAX_ORDERS_CHECKED = 10;
+/** Every status but cancelled: a cancelled order released its quotations. */
+const LIVE_STATUSES = ORDER_STATUSES.filter((status) => status !== "cancelled");
 
-/** A lead's orders: enough to find the one that already carries a quotation. */
-function leadOrdersParams(leadId: string): OrderListParams {
+/** The live order that carries this quotation, if any (BE-019). */
+function quotationOrderParams(quotationId: string): OrderListParams {
   return {
     cursor: null,
-    pageSize: 100,
+    pageSize: 25,
     q: "",
-    status: [],
+    status: LIVE_STATUSES,
     orderType: null,
     mine: false,
-    leadId,
+    leadId: null,
+    quotationId,
   };
 }
 
@@ -86,29 +85,18 @@ function leadOrdersParams(leadId: string): OrderListParams {
 export function PlaceOrder({ quotation }: { quotation: Quotation }): React.JSX.Element | null {
   const canCreate = useCan("sales_orders", "create");
   const orderable = canCreate && quotation.status === "accepted" && quotation.supersededBy === null;
-  const leadId = quotation.lead?.id ?? null;
   const orders = useQuery({
-    ...orderListQueryOptions(leadOrdersParams(leadId ?? "")),
-    enabled: orderable && leadId !== null,
-  });
-  // The list row has no quotation ids, so each live order of the lead is read to find it.
-  // TODO(SO-003): one `GET /orders?quotation_id=` call once the backend has it (BE-019).
-  const live = (orders.data?.items ?? [])
-    .filter((order) => order.status !== "cancelled")
-    .slice(0, MAX_ORDERS_CHECKED);
-  const details = useQueries({
-    queries: live.map((order) => ({ ...orderDetailQueryOptions(order.id), enabled: orderable })),
+    ...orderListQueryOptions(quotationOrderParams(quotation.id)),
+    enabled: orderable,
   });
   const [open, setOpen] = useState(false);
 
   if (!orderable) {
     return null;
   }
-  const existing = details
-    .map((detail) => detail.data)
-    .find((order) => order?.quotations.some((item) => item.id === quotation.id) === true);
-  const checking =
-    leadId !== null && (orders.isPending || details.some((detail) => detail.isPending));
+  // Each accepted quotation goes on one live order, so the first row is the one.
+  const existing = orders.data?.items[0];
+  const checking = orders.isPending;
   if (existing !== undefined) {
     return (
       <Link

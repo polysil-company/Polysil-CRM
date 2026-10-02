@@ -34,7 +34,12 @@ export function searchTerritories(
     logger: log,
     fn: "searchTerritories",
     path: "/lookups/territories",
-    query: { q: params.q, level: params.level, limit: params.limit },
+    query: {
+      q: params.q,
+      level: params.level,
+      levels: params.levels === null ? null : params.levels.join(","),
+      limit: params.limit,
+    },
     schema: territoryListResponseSchema,
     signal,
   });

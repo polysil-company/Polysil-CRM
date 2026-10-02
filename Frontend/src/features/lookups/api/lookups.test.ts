@@ -43,7 +43,12 @@ describe("[MSTR-002] listLookup", () => {
 
 describe("[MSTR-002] searchTerritories", () => {
   it("lists districts to start from", async () => {
-    const districts = await searchTerritories({ q: "", level: "district", limit: 50 });
+    const districts = await searchTerritories({
+      q: "",
+      level: "district",
+      levels: null,
+      limit: 50,
+    });
 
     expect(districts).toHaveLength(33);
     expect(districts.every((territory) => territory.level === "district")).toBe(true);
@@ -51,7 +56,7 @@ describe("[MSTR-002] searchTerritories", () => {
   });
 
   it("finds a place by part of its name at any level, with the place above it", async () => {
-    const results = await searchTerritories({ q: "gond", level: null, limit: 20 });
+    const results = await searchTerritories({ q: "gond", level: null, levels: null, limit: 20 });
 
     expect(results).toContainEqual(
       expect.objectContaining({
@@ -62,6 +67,34 @@ describe("[MSTR-002] searchTerritories", () => {
     );
   });
 
+  it("searches only the levels asked for, as the New lead form does (BE-005)", async () => {
+    const levels = ["district", "taluka", "village"];
+    const everywhere = await searchTerritories({
+      q: "gujarat",
+      level: null,
+      levels: null,
+      limit: 20,
+    });
+    const forALead = await searchTerritories({ q: "gujarat", level: null, levels, limit: 20 });
+
+    expect(everywhere).toContainEqual(expect.objectContaining({ level: "state" }));
+    expect(forALead.some((territory) => territory.level === "state")).toBe(false);
+  });
+
+  it("sends the levels comma-separated, and never with a single level", async () => {
+    let sent: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/lookups/territories"), ({ request }) => {
+        sent = new URL(request.url);
+      }),
+    );
+
+    await searchTerritories({ q: "gon", level: null, levels: ["district", "taluka"], limit: 20 });
+
+    expect(sent?.searchParams.get("levels")).toBe("district,taluka");
+    expect(sent?.searchParams.has("level")).toBe(false);
+  });
+
   it("fails with the Data ID on the error", async () => {
     server.use(
       http.get(buildApiUrl("/lookups/territories"), () =>
@@ -69,7 +102,9 @@ describe("[MSTR-002] searchTerritories", () => {
       ),
     );
 
-    await expect(searchTerritories({ q: "x", level: null, limit: 20 })).rejects.toMatchObject({
+    await expect(
+      searchTerritories({ q: "x", level: null, levels: null, limit: 20 }),
+    ).rejects.toMatchObject({
       status: 500,
       dataId: "MSTR-002",
     });

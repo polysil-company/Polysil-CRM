@@ -409,6 +409,7 @@ export const orderHandlers = [
     const orderType = url.searchParams.get("order_type");
     const owner = url.searchParams.get("owner");
     const leadId = url.searchParams.get("lead_id");
+    const quotationId = url.searchParams.get("quotation_id");
     const q = url.searchParams.get("q") ?? "";
     const matches =
       scenario === "empty"
@@ -419,6 +420,8 @@ export const orderHandlers = [
               (orderType === null || order.order_type === orderType) &&
               (owner === null || order.owner?.id === (owner === "me" ? MOCK_CREATOR?.id : owner)) &&
               (leadId === null || order.lead?.id === leadId) &&
+              (quotationId === null ||
+                order.quotations.some((quotation) => quotation.id === quotationId)) &&
               matchesSearch(order, q),
           );
     const counted = url.searchParams.get("include_total") === "true";

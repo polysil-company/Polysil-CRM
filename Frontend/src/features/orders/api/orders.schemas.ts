@@ -126,6 +126,8 @@ export interface OrderListParams {
   /** Only the user's own orders (`owner=me`). */
   readonly mine: boolean;
   readonly leadId: string | null;
+  /** Orders this quotation is or was on (BE-019); a cancelled order released it. */
+  readonly quotationId: string | null;
 }
 
 // ── the document (SO-002) ─────────────────────────────────────────────────────────
