@@ -22,7 +22,7 @@ export interface FilterOption<TValue extends string> {
 }
 
 /** One option row; at least 44px tall on touch screens. Rows with a description align to the top. */
-const optionRowClasses =
+export const filterOptionRowClasses =
   "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-accent pointer-coarse:min-h-control-lg has-data-[slot=option-description]:items-start";
 
 function hasDescriptions<TValue extends string>(options: readonly FilterOption<TValue>[]): boolean {
@@ -113,7 +113,7 @@ export function FilterPill<TValue extends string>({
           {options.map((option, index) => {
             const ids = optionIds(idPrefix, index);
             return (
-              <label key={option.value} className={optionRowClasses}>
+              <label key={option.value} className={filterOptionRowClasses}>
                 <Checkbox
                   className={cn(option.description !== undefined && "mt-0.5")}
                   checked={selected.includes(option.value)}
@@ -180,7 +180,7 @@ export function SingleFilterPill<TValue extends string>({
           {options.map((option, index) => {
             const ids = optionIds(idPrefix, index);
             return (
-              <label key={option.value} className={optionRowClasses}>
+              <label key={option.value} className={filterOptionRowClasses}>
                 <RadioGroupItem
                   value={option.value}
                   className={cn(option.description !== undefined && "mt-0.5")}
@@ -234,8 +234,11 @@ function FilterPillMessage({ message }: { message: string | undefined }): React.
   return <p className="px-2 py-1.5 text-sm text-muted-foreground">{message ?? "No options."}</p>;
 }
 
-/** The pill trigger, its popover and the "Clear" action — shared by both kinds of pill. */
-function FilterPillFrame({
+/**
+ * The pill trigger, its popover and the "Clear" action — shared by every kind of pill, including
+ * feature pills with their own popover body (the leads area picker).
+ */
+export function FilterPillFrame({
   label,
   icon,
   summary,

@@ -191,6 +191,12 @@ function ApprovalRow({
             <RelativeDate value={document.raisedAt} /> · waiting since{" "}
             <RelativeDate value={row.waitingSince} />
           </p>
+          {document.requestRemark === null ? null : (
+            <blockquote className="mt-1 border-l-2 border-border-strong pl-3 text-sm text-pretty text-foreground">
+              <span className="sr-only">Their reason: </span>
+              {document.requestRemark}
+            </blockquote>
+          )}
         </div>
         <div className="flex shrink-0 flex-row items-baseline gap-3 sm:flex-col sm:items-end sm:gap-1">
           <span className="text-lg font-semibold text-foreground tabular-nums">

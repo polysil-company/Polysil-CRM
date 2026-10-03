@@ -5,10 +5,11 @@ import {
   getLeadStats,
   getLeadTimeline,
   listAssignees,
+  listLeadAreas,
   listLeads,
   searchPartners,
 } from "./leads.api";
-import type { LeadListParams } from "./leads.schemas";
+import type { LeadAreasParams, LeadListParams } from "./leads.schemas";
 
 /**
  * Query keys for leads. Invalidate by prefix:
@@ -25,7 +26,18 @@ export const leadKeys = {
   stats: () => [...leadKeys.all, "stats"] as const,
   assignees: () => [...leadKeys.all, "assignees"] as const,
   partners: (q: string) => [...leadKeys.all, "partners", q] as const,
+  areas: (params: LeadAreasParams) => [...leadKeys.all, "areas", params] as const,
 };
+
+/** The area filter's options change as leads come in; a few minutes is fresh enough. */
+export function leadAreasQueryOptions(params: LeadAreasParams) {
+  return queryOptions({
+    queryKey: leadKeys.areas(params),
+    queryFn: ({ signal }) => listLeadAreas(params, signal),
+    staleTime: 5 * 60_000,
+    meta: { dataId: "LEAD-001" },
+  });
+}
 
 /** Keeps the previous page on screen while the next one loads — no skeleton flash on paging. */
 export function leadListQueryOptions(params: LeadListParams) {

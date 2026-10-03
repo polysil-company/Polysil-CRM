@@ -273,7 +273,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 ## 9. Integration status — frontend ↔ backend
 
-> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **2 October 2026**: sales orders (#34) and approval limits (#35) merged into `integration`. The demo walk's fixes connect the dashboard to the backend's real shape (RPT-001), fix the customer link's PDF path, and pick up crops and land (BE-003) and the end of win probability (BE-004). The backend pick-ups follow: lead list sorting (BE-001), the territory levels a lead may sit in (BE-005), names on assignment events (BE-006), "Awaiting approval" in quotation lists, and one call to find a quotation's order (BE-019). Then notifications and messages connect to the backend (BE-009, BE-010): nothing on screen is mocked against a live backend any more, and `partial` mocking mocks nothing.
+> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **3 October 2026**: sales orders (#34) and approval limits (#35) merged into `integration`. The demo walk's fixes connect the dashboard to the backend's real shape (RPT-001), fix the customer link's PDF path, and pick up crops and land (BE-003) and the end of win probability (BE-004). The backend pick-ups follow: lead list sorting (BE-001), the territory levels a lead may sit in (BE-005), names on assignment events (BE-006), "Awaiting approval" in quotation lists, and one call to find a quotation's order (BE-019). Then notifications and messages connect to the backend (BE-009, BE-010): nothing on screen is mocked against a live backend any more, and `partial` mocking mocks nothing. Backend #49 and #50 are picked up: the Area filter on the lead list, the salesperson's reason in the approvals inbox, and finding a dealer by its contact person.
 
 **How the two sides meet.** The browser calls `/api/v1` on the app's own origin; `next.config.ts` forwards it to `API_PROXY_TARGET`. Every call goes through `apiRequest` (`src/lib/api/client.ts`): Zod-validated responses, `x-request-id` / `x-data-id`, `Idempotency-Key` on mutations, one refresh-and-retry on a 401. The backend's contract is `backend/docs/api/*.md` (generated) and the dev API's `/openapi.json`. `NEXT_PUBLIC_API_MOCKING=partial` sends everything to the dev API except the modules listed in `unbuiltHandlers` (`src/mocks/handlers/index.ts`).
 
@@ -282,7 +282,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Area | Data IDs | Endpoints |
 |---|---|---|
 | Sign-in, session, refresh, sign-out | AUTH-001…006 | `/auth/login`, `/auth/otp/*`, `/auth/refresh`, `/auth/logout`, `/auth/me` |
-| Lead list — cursor paging in the URL, stage / source / type filters, search, sorting by customer or value (BE-001) | LEAD-001 | `GET /leads` |
+| Lead list — cursor paging in the URL, stage / source / type / area filters, search, sorting by customer or value (BE-001); the Area pill drills from districts to talukas, with lead counts | LEAD-001 | `GET /leads?territory_id=`, `GET /leads/areas` |
 | New lead — territory picker (district, taluka or village: BE-005), crops and land, admin lookups, safe retries, field errors | LEAD-002 | `POST /leads`, `GET /lookups/territories?levels=` |
 | Lead page — the real record and possible duplicates | LEAD-003 | `GET /leads/{id}` |
 | Lead count — sidebar badge and Sales tab, exact | LEAD-004 | `GET /leads/stats` |
@@ -303,7 +303,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | A quotation's history | QUOT-010 | `GET /quotations/{id}/timeline` |
 | Delete a draft | QUOT-011 | `DELETE /quotations/{id}` |
 | The customer's quotation page `/q/{token}` (no sign-in) | QUOT-012 | `GET /public/q/{token}`, `GET /public/q/{token}/pdf` |
-| Approvals inbox — quotation discounts and sales orders, approve or reject with a reason, sidebar count | APPR-001 | `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` |
+| Approvals inbox — quotation discounts and sales orders, the salesperson's reason for asking, approve or reject with a reason, sidebar count | APPR-001 | `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` |
 | Sales orders list — status, whom it waits on, how much has shipped; filters and "only mine" in the URL | SO-001 | `GET /orders` |
 | Order page — lines with sent, short and open; the approval chain; notices; history; PDF | SO-002 | `GET /orders/{id}`, `GET /orders/{id}/timeline`, `GET /orders/{id}/pdf` |
 | Place an order from an accepted quotation, or open the live order that carries it (BE-019); a draft's delivery, terms and remarks; delete a never-submitted draft | SO-003 | `POST /orders`, `GET /orders?quotation_id=`, `PATCH /orders/{id}`, `DELETE /orders/{id}` |
@@ -332,7 +332,7 @@ LEAD-005…008, QUOT-001…012, APPR-001…002, SO-001…004, DISP-002, NOTIF-00
 
 Nothing. Notifications and messages were the last (BE-009, BE-010); `unbuiltHandlers` in `src/mocks/handlers/index.ts` is empty, so `partial` mocking sends every request to the real API. A module built before its endpoints exist goes back on that list until it is connected.
 
-Picked up from the backend's finished asks: crops and land on a lead (BE-003: the new-lead form, the lead page and the list), win probability and weekly activity removed (BE-004), quotation numbers with links in a lead's history (BE-017), sorting on `GET /leads` (BE-001), the territory levels filter (BE-005), names on assignment events (BE-006), `awaiting_approval` on quotation list rows, and the `quotation_id` filter on `GET /orders` (BE-019). Nothing the backend marked done is left to pick up. Order events in a lead's history need the order's id and number from the backend (BE-020).
+Picked up from the backend's finished asks: crops and land on a lead (BE-003: the new-lead form, the lead page and the list), win probability and weekly activity removed (BE-004), quotation numbers with links in a lead's history (BE-017), sorting on `GET /leads` (BE-001), the territory levels filter (BE-005), names on assignment events (BE-006), `awaiting_approval` on quotation list rows, and the `quotation_id` filter on `GET /orders` (BE-019); from #49, `request_remark` on approval rows and partner search by contact person; from #50, `GET /leads/areas` and the `territory_id` list filter. Nothing the backend marked done is left to pick up. Order events in a lead's history need the order's id and number from the backend (BE-020).
 
 ### 9.3 Served by the backend, not yet built on the frontend
 

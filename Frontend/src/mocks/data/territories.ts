@@ -95,3 +95,14 @@ export function toTerritoryRef(territory: MockTerritory): {
 } {
   return { id: territory.id, name: territory.name, level: territory.level };
 }
+
+/** The territory and every territory above it, nearest first: village → taluka → district → state. */
+export function mockTerritoryLineage(id: string): MockTerritory[] {
+  const lineage: MockTerritory[] = [];
+  let current = findMockTerritory(id);
+  while (current !== undefined) {
+    lineage.push(current);
+    current = current.parent ? findMockTerritory(current.parent.id) : undefined;
+  }
+  return lineage;
+}

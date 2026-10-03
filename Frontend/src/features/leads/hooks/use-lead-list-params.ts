@@ -14,6 +14,7 @@ import {
   LEAD_PAGE_SIZES,
   LEAD_SORT_FIELDS,
   LEAD_STAGES,
+  MAX_LEAD_AREAS,
   SORT_ORDERS,
   type LeadInquiryType,
   type LeadListParams,
@@ -36,6 +37,13 @@ const parseAsLookupCode = createParser({
   serialize: (value: string) => value,
 });
 
+/** A territory id from GET /leads/areas: a UUID or similar, never a comma. */
+const AREA_ID_PATTERN = /^[\w-]{1,64}$/;
+const parseAsAreaId = createParser({
+  parse: (value: string) => (AREA_ID_PATTERN.test(value) ? value : null),
+  serialize: (value: string) => value,
+});
+
 /**
  * URL ⇄ state parsers. Filters, sort and page live in the URL, so a filtered page can be
  * bookmarked or sent to a colleague. Defaults are left out of the URL.
@@ -53,6 +61,7 @@ export const leadListSearchParams = {
   stage: parseAsArrayOf(parseAsStringLiteral(LEAD_STAGES)).withDefault([]),
   source: parseAsLookupCode,
   type: parseAsStringLiteral(LEAD_INQUIRY_TYPES),
+  area: parseAsArrayOf(parseAsAreaId).withDefault([]),
 };
 
 export interface LeadFilterPatch {
@@ -60,6 +69,7 @@ export interface LeadFilterPatch {
   readonly stage?: readonly LeadStage[];
   readonly source?: string | null;
   readonly type?: LeadInquiryType | null;
+  readonly areas?: readonly string[];
 }
 
 export interface LeadListParamsControls {
@@ -100,6 +110,8 @@ export function useLeadListParams(): LeadListParamsControls {
     stage: values.stage,
     source: values.source,
     type: values.type,
+    // A hand-edited URL may repeat an area or carry more than the backend takes.
+    areas: [...new Set(values.area)].slice(0, MAX_LEAD_AREAS),
   };
 
   const activeFilterCount = [
@@ -107,6 +119,7 @@ export function useLeadListParams(): LeadListParamsControls {
     params.stage.length > 0,
     params.source !== null,
     params.type !== null,
+    params.areas.length > 0,
   ].filter(Boolean).length;
 
   return {
@@ -120,6 +133,7 @@ export function useLeadListParams(): LeadListParamsControls {
         ...(patch.stage === undefined ? {} : { stage: [...patch.stage] }),
         ...(patch.source === undefined ? {} : { source: patch.source }),
         ...(patch.type === undefined ? {} : { type: patch.type }),
+        ...(patch.areas === undefined ? {} : { area: [...patch.areas] }),
       });
     },
     setSort: (sort, order) => {
@@ -138,7 +152,7 @@ export function useLeadListParams(): LeadListParamsControls {
       void setValues({ pageSize: normalizePageSize(pageSize), cursors: null });
     },
     resetFilters: () => {
-      void setValues({ q: null, stage: null, source: null, type: null, cursors: null });
+      void setValues({ q: null, stage: null, source: null, type: null, area: null, cursors: null });
     },
   };
 }

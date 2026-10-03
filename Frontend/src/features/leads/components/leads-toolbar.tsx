@@ -17,6 +17,7 @@ import {
 import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import { useCan } from "@/features/session/hooks/use-session";
 
+import { LeadAreaFilter } from "./lead-area-filter";
 import { NewLeadDialog } from "./new-lead-dialog";
 
 const STAGE_OPTIONS = LEAD_STAGES.map((stage) => ({
@@ -84,6 +85,12 @@ export function LeadsToolbar(): React.JSX.Element {
               setFilters({ source });
             }}
           />
+          <LeadAreaFilter
+            selected={params.areas}
+            onChange={(areas) => {
+              setFilters({ areas });
+            }}
+          />
           <SingleFilterPill
             label="Type"
             options={TYPE_OPTIONS}
@@ -104,7 +111,7 @@ export function LeadsToolbar(): React.JSX.Element {
   );
 }
 
-/** Mirrors LeadsToolbar: search field, three filter pills, primary button. */
+/** Mirrors LeadsToolbar: search field, four filter pills, primary button. */
 export function LeadsToolbarSkeleton(): React.JSX.Element {
   return (
     <div
@@ -116,6 +123,7 @@ export function LeadsToolbarSkeleton(): React.JSX.Element {
         <div className="flex flex-wrap items-center gap-2">
           <Skeleton className="h-control-sm w-20 rounded-full" />
           <Skeleton className="h-control-sm w-20 rounded-full" />
+          <Skeleton className="h-control-sm w-16 rounded-full" />
           <Skeleton className="h-control-sm w-16 rounded-full" />
         </div>
       </div>

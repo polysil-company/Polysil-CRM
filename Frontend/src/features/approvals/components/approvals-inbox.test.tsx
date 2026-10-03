@@ -80,6 +80,24 @@ describe("[APPR-001] ApprovalsInbox", () => {
     });
   });
 
+  it("shows why the salesperson asked, on the row and again in the decision dialog", async () => {
+    signInAs("state_manager");
+    const user = show();
+    const reason = "Repeat customer; matching a competitor's offer.";
+
+    const asked = (await rows()).find((row) => within(row).queryByText(reason) !== null);
+    if (asked === undefined) {
+      throw new Error("No request carries a reason");
+    }
+    // Requests raised without one show nothing extra.
+    expect((await rows()).some((row) => within(row).queryByText(reason) === null)).toBe(true);
+
+    await user.click(within(asked).getByRole("button", { name: /^Approve/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/'s reason:|Their reason:/)).toBeInTheDocument();
+    expect(within(dialog).getByText(reason)).toBeInTheDocument();
+  });
+
   it("approves without a remark", async () => {
     signInAs("state_manager");
     const user = show();

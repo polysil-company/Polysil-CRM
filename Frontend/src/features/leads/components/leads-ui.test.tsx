@@ -83,6 +83,82 @@ describe("[LEAD-001] LeadsTable", () => {
     );
   });
 
+  it("filters by area, drilling from districts to talukas, and keeps it in the URL", async () => {
+    const user = userEvent.setup();
+    const sent: URL[] = [];
+    server.use(
+      http.get(buildApiUrl("/leads"), ({ request }) => {
+        sent.push(new URL(request.url));
+      }),
+    );
+    const onUrlChange = vi.fn<(queryString: string) => void>();
+    renderWithProviders(
+      <>
+        <LeadsToolbar />
+        <LeadsTable />
+      </>,
+      { onUrlChange },
+    );
+    await screen.findByRole("table", { name: "Leads" });
+
+    await user.click(screen.getByRole("button", { name: "Area" }));
+    // One state: the picker starts at its districts, since the state alone filters nothing.
+    const districts = await screen.findByRole("list", { name: "Areas in Gujarat" });
+    // Rajkot's leads are filed down to taluka and village.
+    const districtName = "Rajkot";
+    const district = within(districts).getByRole("checkbox", { name: /^Rajkot/ });
+    const drill = within(districts).getByRole("button", { name: "Show talukas in Rajkot" });
+
+    await user.click(district);
+    await waitFor(() => {
+      expect(onUrlChange).toHaveBeenLastCalledWith(expect.stringContaining("area="));
+    });
+    await waitFor(() => {
+      expect(sent.at(-1)?.searchParams.get("territory_id")).toMatch(/\S/);
+    });
+    expect(
+      screen.getByRole("button", { name: new RegExp(`^Area.*${districtName}`) }),
+    ).toBeVisible();
+
+    await user.click(drill);
+    expect(await screen.findByRole("list", { name: `Areas in ${districtName}` })).toBeVisible();
+    expect(screen.getByText(`Talukas in ${districtName}`)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "All districts" }));
+    expect(await screen.findByRole("list", { name: "Areas in Gujarat" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Clear area" }));
+    await waitFor(() => {
+      expect(sent.at(-1)?.searchParams.has("territory_id")).toBe(false);
+    });
+  });
+
+  it("says to choose the district itself when none of its leads is filed under a taluka", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LeadsToolbar />);
+    await user.click(screen.getByRole("button", { name: "Area" }));
+
+    await user.click(await screen.findByRole("button", { name: "Show talukas in Ahmedabad" }));
+
+    expect(
+      await screen.findByText(/No lead in Ahmedabad is filed under a taluka yet/),
+    ).toBeInTheDocument();
+  });
+
+  it("says when the areas couldn't be loaded, and offers to try again", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(buildApiUrl("/leads/areas"), () =>
+        HttpResponse.json({ error: { code: "server_error", message: "boom" } }, { status: 500 }),
+      ),
+    );
+    renderWithProviders(<LeadsToolbar />);
+
+    await user.click(screen.getByRole("button", { name: "Area" }));
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
   it("names each source from the admin-edited list", async () => {
     renderWithProviders(<LeadsTable />, { searchParams: "?source=agri_fair" });
 

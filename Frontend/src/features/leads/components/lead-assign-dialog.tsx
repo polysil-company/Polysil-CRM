@@ -363,7 +363,7 @@ function PartnerField({
         value={value}
         onChange={onChange}
         onSearch={setSearch}
-        placeholder="Search a dealer or distributor"
+        placeholder="Dealer name, code or contact person"
         invalid={error !== null}
         describedBy={error === null ? "assign-partner-description" : "assign-partner-error"}
         emptyText={term === "" ? "No partners in your area." : `No partner matches “${term}”.`}

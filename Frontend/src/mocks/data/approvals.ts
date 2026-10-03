@@ -25,6 +25,8 @@ export interface MockApprovalStep {
   readonly total: string;
   readonly isProvisional: boolean;
   readonly discountPct: string | null;
+  /** Why the approval was asked, as the asker wrote it; null when none given. */
+  readonly requestRemark: string | null;
   readonly raisedBy: { readonly id: string; readonly full_name: string } | null;
   readonly raisedAt: string;
   decision: "approve" | "reject" | null;
@@ -202,6 +204,7 @@ export function orderQueueStep(order: OrderWire, stalled = false): MockApprovalS
     total: order.totals.total,
     isProvisional: order.is_provisional,
     discountPct: null,
+    requestRemark: null,
     raisedBy:
       order.owner === null ? null : { id: order.owner.id, full_name: order.owner.full_name },
     raisedAt: previous?.decided_at ?? order.submitted_at ?? order.created_at,
@@ -271,6 +274,7 @@ export function seedApprovals(
       total: quotation.totals.total,
       isProvisional: quotation.is_provisional,
       discountPct: quotation.discount?.effective_pct ?? null,
+      requestRemark: quotation.approval.request_remark ?? null,
       raisedBy: quotation.owner,
       raisedAt,
       decision: null,
