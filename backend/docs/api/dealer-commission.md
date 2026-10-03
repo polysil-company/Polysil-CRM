@@ -424,7 +424,7 @@ the stored calculation, and the rate in force on the full-FP date.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `application` | AppRef | yes |  |
-| `partner` | api__schemas__commission__Ref | yes |  |
+| `partner` | CommissionRef | yes |  |
 | `status` | `calculated` \| `approved` \| `returned` \| `paid` \| `cancelled` | yes |  |
 | `cost_excl_gst` | string | yes |  |
 | `a_plus_b` | string \| null | yes |  |
@@ -439,9 +439,9 @@ the stored calculation, and the rate in force on the full-FP date.
 | `tod_amount` | string | yes |  |
 | `total` | string | yes |  |
 | `remark` | string \| null | yes |  |
-| `recorded_by` | api__schemas__commission__Ref | yes |  |
+| `recorded_by` | CommissionRef | yes |  |
 | `recorded_at` | string | yes |  |
-| `decided_by` | api__schemas__commission__Ref \| null | yes |  |
+| `decided_by` | CommissionRef \| null | yes |  |
 | `decided_at` | string \| null | yes |  |
 | `decision_remark` | string \| null | yes |  |
 | `paid_on` | string \| null | yes |  |
@@ -463,6 +463,13 @@ the stored calculation, and the rate in force on the full-FP date.
 |---|---|---|---|
 | `data` | Commission[] | yes |  |
 | `meta` | PageMeta | yes |  |
+
+**`CommissionRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string \| null | yes |  |
 
 **`Decision`**
 
@@ -528,7 +535,7 @@ the stored calculation, and the rate in force on the full-FP date.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `partner` | api__schemas__commission__Ref | yes |  |
+| `partner` | CommissionRef | yes |  |
 | `cost_excl_gst` | string | yes | calculation.total.blocks.cost_excl_gst: includes installation, insurance, inspection, education, sump. |
 | `a_plus_b` | string \| null | yes | Material only (head and field units). |
 | `installation` | string | yes |  |
@@ -544,7 +551,7 @@ the stored calculation, and the rate in force on the full-FP date.
 | `scheme` | string | yes |  |
 | `system_type` | string \| null | yes |  |
 | `partner_type` | string \| null | yes |  |
-| `partner` | api__schemas__commission__Ref \| null | yes |  |
+| `partner` | CommissionRef \| null | yes |  |
 | `commission_pct` | string | yes |  |
 | `tod_pct` | string | yes |  |
 | `effective_from` | string | yes |  |
@@ -560,10 +567,3 @@ the stored calculation, and the rate in force on the full-FP date.
 | `commission_pct` | number \| string | yes |  |
 | `tod_pct` | number \| string | yes |  |
 | `effective_from` | date | yes |  |
-
-**`api__schemas__commission__Ref`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `name` | string \| null | yes |  |

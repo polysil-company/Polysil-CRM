@@ -90,7 +90,7 @@ draft has no number until it is submitted.
 
 **Request body**
 
-**`api__schemas__orders__OrderCreate`**
+**`OrderCreate`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -756,7 +756,7 @@ and only the outcome to a dealer.
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
-| `totals` | api__schemas__quotations__Totals | yes |  |
+| `totals` | Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
 | `last_rejection` | LastRejection \| null | yes | Set while a rejected order is back in draft. |
 | `dispatches` | Dispatch[] | yes |  |
@@ -792,6 +792,23 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `complaint_no` | string \| null | yes |  |
+
+**`OrderCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial or industrial. The other five are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
+| `quotation_ids` | string[] |  | Accepted quotations that agree on partner, place of supply, seller, price date, office and territory. Their lines are imported. |
+| `lead_id` | string \| null |  | A direct order's lead, qualified or later. Leave out when ordering from quotations: the lead comes from them. |
+| `partner_id` | string \| null |  | OMIT for your own partner (a dealer) or none (staff). Null is a direct sale, refused from a dealer. |
+| `party` | OrderParty \| null |  | Required for a direct order; from the quotations otherwise. |
+| `delivery_address` | string \| null |  |  |
+| `place_of_supply_territory_id` | string \| null |  | Where the goods go. Required for a direct order. |
+| `seller_gstin_id` | string \| null |  | The selling registration. Omit for the default one. |
+| `price_effective_date` | date \| null |  | A direct order's price date, today in India by default. |
+| `payment_terms` | `full_payment` \| `credit` |  | Recorded, not enforced. There is no credit check. Default `full_payment`. |
+| `remarks` | string \| null |  |  |
+| `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 
 **`OrderLeadRef`**
 
@@ -913,7 +930,7 @@ and only the outcome to a dealer.
 | `party_name` | string | yes |  |
 | `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
 | `owner` | UserRef \| null | yes |  |
-| `totals` | api__schemas__quotations__Totals | yes |  |
+| `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes |  |
 | `dispatched_pct` | integer | yes | Share of the ordered quantity sent, 0 to 100. |
 | `approval_waiting_on` | string \| null | yes | The role of the next undecided step. |
@@ -1035,6 +1052,18 @@ and only the outcome to a dealer.
 | `data` | TimelineEvent[] | yes |  |
 | `meta` | PageMeta | yes |  |
 
+**`Totals`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `gross` | string | yes |  |
+| `discount` | string | yes |  |
+| `taxable` | string | yes |  |
+| `cgst` | string | yes |  |
+| `sgst` | string | yes |  |
+| `igst` | string | yes |  |
+| `total` | string | yes |  |
+
 **`UserRef`**
 
 | Field | Type | Required | Notes |
@@ -1049,32 +1078,3 @@ and only the outcome to a dealer.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 | `partner_type` | string | yes | distributor, dealer or sub_dealer. |
-
-**`api__schemas__orders__OrderCreate`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial or industrial. The other five are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
-| `quotation_ids` | string[] |  | Accepted quotations that agree on partner, place of supply, seller, price date, office and territory. Their lines are imported. |
-| `lead_id` | string \| null |  | A direct order's lead, qualified or later. Leave out when ordering from quotations: the lead comes from them. |
-| `partner_id` | string \| null |  | OMIT for your own partner (a dealer) or none (staff). Null is a direct sale, refused from a dealer. |
-| `party` | OrderParty \| null |  | Required for a direct order; from the quotations otherwise. |
-| `delivery_address` | string \| null |  |  |
-| `place_of_supply_territory_id` | string \| null |  | Where the goods go. Required for a direct order. |
-| `seller_gstin_id` | string \| null |  | The selling registration. Omit for the default one. |
-| `price_effective_date` | date \| null |  | A direct order's price date, today in India by default. |
-| `payment_terms` | `full_payment` \| `credit` |  | Recorded, not enforced. There is no credit check. Default `full_payment`. |
-| `remarks` | string \| null |  |  |
-| `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
-
-**`api__schemas__quotations__Totals`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `gross` | string | yes |  |
-| `discount` | string | yes |  |
-| `taxable` | string | yes |  |
-| `cgst` | string | yes |  |
-| `sgst` | string | yes |  |
-| `igst` | string | yes |  |
-| `total` | string | yes |  |

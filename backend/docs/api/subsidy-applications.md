@@ -455,12 +455,12 @@ Build "Record stage" from this; the stages are data, not code.
 | `village` | string \| null | yes |  |
 | `survey_no` | string \| null | yes |  |
 | `territory` | TerritoryRef | yes |  |
-| `partner` | api__schemas__complaints__Ref \| null | yes |  |
+| `partner` | Ref \| null | yes |  |
 | `total_area` | string | yes |  |
 | `group_total_area` | string \| null | yes |  |
 | `figures` | Figures | yes |  |
 | `owner` | UserRef \| null | yes |  |
-| `owner_org_unit` | api__schemas__complaints__Ref | yes |  |
+| `owner_org_unit` | Ref | yes |  |
 | `documents` | DocumentCount | yes |  |
 | `ageing` | Ageing | yes |  |
 | `full_fp_received_on` | string \| null | yes |  |
@@ -683,6 +683,13 @@ Build "Record stage" from this; the stages are data, not code.
 | `qty` | number \| string | yes | Quantity, at most three decimals. |
 | `product_id` | string \| null |  | The catalogue row this line is, when the designer picked it from the product list. Optional, and additive: the rate and description still come from this request, because a subsidy quotation is costed at the scheme's figures rather than at ours. What it buys is the two checks the catalogue makes possible - a head-unit item cannot appear in a crop block, and an item marked not subsidy-eligible cannot appear at all. |
 
+**`Ref`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+
 **`StageDef`**
 
 | Field | Type | Required | Notes |
@@ -730,10 +737,3 @@ Build "Record stage" from this; the stages are data, not code.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
-
-**`api__schemas__complaints__Ref`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `name` | string | yes |  |

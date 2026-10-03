@@ -213,7 +213,7 @@ order.
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
-| `totals` | api__schemas__quotations__Totals | yes |  |
+| `totals` | Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
 | `last_rejection` | LastRejection \| null | yes | Set while a rejected order is back in draft. |
 | `dispatches` | Dispatch[] | yes |  |
@@ -359,6 +359,18 @@ order.
 | `name` | string | yes |  |
 | `level` | string | yes | state, district, taluka or village. |
 
+**`Totals`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `gross` | string | yes |  |
+| `discount` | string | yes |  |
+| `taxable` | string | yes |  |
+| `cgst` | string | yes |  |
+| `sgst` | string | yes |  |
+| `igst` | string | yes |  |
+| `total` | string | yes |  |
+
 **`UserRef`**
 
 | Field | Type | Required | Notes |
@@ -373,15 +385,3 @@ order.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 | `partner_type` | string | yes | distributor, dealer or sub_dealer. |
-
-**`api__schemas__quotations__Totals`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `gross` | string | yes |  |
-| `discount` | string | yes |  |
-| `taxable` | string | yes |  |
-| `cgst` | string | yes |  |
-| `sgst` | string | yes |  |
-| `igst` | string | yes |  |
-| `total` | string | yes |  |

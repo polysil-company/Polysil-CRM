@@ -23,11 +23,11 @@ from api.schemas.marketing import (
     Decision,
     DispatchIn,
     MarketingOrder,
+    MarketingOrderCreate,
     MarketingOrderPage,
     Material,
     MaterialCreate,
     MaterialPatch,
-    OrderCreate,
 )
 from api.services import exports
 from api.services import marketing as service
@@ -85,7 +85,7 @@ async def patch_material(material_id: Id, body: MaterialPatch, db: DbSession, ca
 
 @router.post("", status_code=201, response_model=Envelope[MarketingOrder], responses=_ERRORS,
              dependencies=[Depends(require("marketing_material", "create"))])
-async def create_order(body: OrderCreate, db: DbSession, caller: CallerDep, claims: Claims,
+async def create_order(body: MarketingOrderCreate, db: DbSession, caller: CallerDep, claims: Claims,
                        idem: IdemKey) -> Response:
     """Order marketing material. A partner user orders for itself; staff for a dealer
     or, with no `partner_id`, for their office's own use (then the company pays all).

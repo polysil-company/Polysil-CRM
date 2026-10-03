@@ -65,7 +65,7 @@ async def preview(db: AsyncSession, app_id: str) -> sch.Preview:
     d = raw if isinstance(raw, dict) else json.loads(raw)
     name = (await db.execute(text("SELECT name FROM channel_partner WHERE id = CAST(:p AS uuid)"),
                              {"p": d["partner_id"]})).scalar_one_or_none()
-    return sch.Preview(partner=sch.Ref(id=d["partner_id"], name=name),
+    return sch.Preview(partner=sch.CommissionRef(id=d["partner_id"], name=name),
                        cost_excl_gst=_m(d["cost_excl_gst"]) or "0.00", a_plus_b=_m(d.get("a_plus_b")),
                        installation=_m(d["installation"]) or "0.00",
                        commission_pct=_p(d["commission_pct"]) if d.get("commission_pct") is not None else None,
@@ -87,15 +87,15 @@ def _out(r: Any) -> sch.Commission:
     return sch.Commission(
         id=str(r.id), application=sch.AppRef(id=str(r.application_id), application_no=r.application_no,
                                               reg_no=r.reg_no),
-        partner=sch.Ref(id=str(r.partner_id), name=r.partner_name), status=r.status,
+        partner=sch.CommissionRef(id=str(r.partner_id), name=r.partner_name), status=r.status,
         cost_excl_gst=_m(r.cost_excl_gst) or "0.00", a_plus_b=_m(r.a_plus_b),
         gi_fitting=_m(r.gi_fitting) or "0.00", pvc_hdpe_fitting=_m(r.pvc_hdpe_fitting) or "0.00",
         installation=_m(r.installation) or "0.00", commission_base=_m(r.commission_base) or "0.00",
         commission_pct=_p(r.commission_pct), commission_amount=_m(r.commission_amount) or "0.00",
         tod_base=_m(r.tod_base) or "0.00", tod_pct=_p(r.tod_pct), tod_amount=_m(r.tod_amount) or "0.00",
         total=_m(r.total) or "0.00", remark=r.remark,
-        recorded_by=sch.Ref(id=str(r.recorded_by), name=r.recorder_name), recorded_at=r.recorded_at.isoformat(),
-        decided_by=sch.Ref(id=str(r.decided_by), name=r.decider_name) if r.decided_by else None,
+        recorded_by=sch.CommissionRef(id=str(r.recorded_by), name=r.recorder_name), recorded_at=r.recorded_at.isoformat(),
+        decided_by=sch.CommissionRef(id=str(r.decided_by), name=r.decider_name) if r.decided_by else None,
         decided_at=r.decided_at.isoformat() if r.decided_at else None, decision_remark=r.decision_remark,
         paid_on=r.paid_on.isoformat() if r.paid_on else None, payment_reference=r.payment_reference)
 
@@ -173,7 +173,7 @@ async def list_rates(db: AsyncSession, scheme: str) -> list[sch.Rate]:
         "JOIN subsidy_scheme s ON s.id = r.scheme_id LEFT JOIN channel_partner p ON p.id = r.partner_id "
         "WHERE s.code = :s ORDER BY r.effective_from DESC, r.created_at DESC"), {"s": scheme})).all()
     return [sch.Rate(id=str(r.id), scheme=r.scheme_code, system_type=r.system_type, partner_type=r.partner_type,
-                     partner=sch.Ref(id=str(r.partner_id), name=r.partner_name) if r.partner_id else None,
+                     partner=sch.CommissionRef(id=str(r.partner_id), name=r.partner_name) if r.partner_id else None,
                      commission_pct=_p(r.commission_pct), tod_pct=_p(r.tod_pct),
                      effective_from=r.effective_from.isoformat()) for r in rows]
 

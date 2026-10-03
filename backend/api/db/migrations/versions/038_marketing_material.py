@@ -146,7 +146,8 @@ TABLES = [
       f"SELECT id, {p}, 50, true, DATE '2026-04-01' FROM marketing_material WHERE code = '{c}'" for c, _, _, p in CATALOGUE],
 ]
 
-RLS_TABLES = ("marketing_material", "marketing_material_price", "marketing_order", "marketing_order_line")
+RLS_TABLES = ("marketing_material", "marketing_material_price", "marketing_order", "marketing_order_line",
+              "marketing_order_counter")
 
 GRANTS: dict[str, str] = {
     "marketing_material": "SELECT, INSERT, UPDATE",

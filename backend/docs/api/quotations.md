@@ -725,7 +725,7 @@ Every version of the number, oldest first. Any version's id works.
 | `price_list` | PriceListRef \| null | yes | Null when the lines drew from more than one list. |
 | `price_list_ids` | string[] | yes |  |
 | `lines` | QuotationLine[] | yes |  |
-| `totals` | api__schemas__quotations__Totals | yes |  |
+| `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
 | `warnings` | string[] | yes | Each is `code: sentence`. |
 | `terms` | string \| null | yes |  |
@@ -843,7 +843,7 @@ Every version of the number, oldest first. Any version's id works.
 | `party_mobile` | string | yes |  |
 | `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
 | `owner` | UserRef \| null | yes |  |
-| `totals` | api__schemas__quotations__Totals | yes |  |
+| `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes |  |
 | `valid_until` | string \| null | yes |  |
 | `sent_at` | string \| null | yes |  |
@@ -902,6 +902,18 @@ Every version of the number, oldest first. Any version's id works.
 | `data` | TimelineEvent[] | yes |  |
 | `meta` | PageMeta | yes |  |
 
+**`Totals`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `gross` | string | yes |  |
+| `discount` | string | yes |  |
+| `taxable` | string | yes |  |
+| `cgst` | string | yes |  |
+| `sgst` | string | yes |  |
+| `igst` | string | yes |  |
+| `total` | string | yes |  |
+
 **`TransitionRequest`**
 
 | Field | Type | Required | Notes |
@@ -938,15 +950,3 @@ Every version of the number, oldest first. Any version's id works.
 |---|---|---|---|
 | `lines` | QuotationLineIn[] | yes | The whole basket, in order. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
-
-**`api__schemas__quotations__Totals`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `gross` | string | yes |  |
-| `discount` | string | yes |  |
-| `taxable` | string | yes |  |
-| `cgst` | string | yes |  |
-| `sgst` | string | yes |  |
-| `igst` | string | yes |  |
-| `total` | string | yes |  |

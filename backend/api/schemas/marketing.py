@@ -51,20 +51,20 @@ class Material(BaseModel):
     is_provisional: bool = Field(description="A stand-in price: show it as indicative.")
 
 
-class LineIn(BaseModel):
+class MarketingLineIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     material_id: str = Field(pattern=UUID_RE)
     qty: int = Field(ge=1, le=100000)
 
 
-class OrderCreate(BaseModel):
+class MarketingOrderCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     partner_id: str | None = Field(default=None, pattern=UUID_RE,
                                    description="Staff: the dealer it is for, or null for an "
                                                "office's own use. Ignored for a partner user.")
-    lines: list[LineIn] = Field(min_length=1, max_length=50)
+    lines: list[MarketingLineIn] = Field(min_length=1, max_length=50)
     remark: str | None = Field(default=None, max_length=1000)
 
 
@@ -81,7 +81,7 @@ class DispatchIn(BaseModel):
     reference: str = Field(min_length=1, max_length=200)
 
 
-class Ref(BaseModel):
+class MarketingRef(BaseModel):
     id: str
     name: str | None
 
@@ -92,7 +92,7 @@ class MaterialRef(BaseModel):
     name: str
 
 
-class Line(BaseModel):
+class MarketingLine(BaseModel):
     id: str
     material: MaterialRef
     unit: str
@@ -104,7 +104,7 @@ class Line(BaseModel):
     dealer_share: str
 
 
-class Totals(BaseModel):
+class MarketingTotals(BaseModel):
     value: str
     company_share: str
     dealer_share: str
@@ -112,7 +112,7 @@ class Totals(BaseModel):
 
 class DecisionOut(BaseModel):
     status: Literal["approved", "rejected"]
-    by: Ref | None = Field(description="Null for a partner user (question 15.14).")
+    by: MarketingRef | None = Field(description="Null for a partner user (question 15.14).")
     at: str
     remark: str | None
 
@@ -120,10 +120,10 @@ class DecisionOut(BaseModel):
 class DispatchOut(BaseModel):
     dispatched_on: str
     reference: str
-    by: Ref | None
+    by: MarketingRef | None
 
 
-class Can(BaseModel):
+class MarketingCan(BaseModel):
     approve: bool
     reject: bool
     cancel: bool
@@ -134,17 +134,17 @@ class MarketingOrder(BaseModel):
     id: str
     order_no: str
     status: Literal["submitted", "approved", "rejected", "cancelled", "dispatched"]
-    partner: Ref | None
-    requested_by: Ref
-    office: Ref
-    lines: list[Line]
-    totals: Totals
+    partner: MarketingRef | None
+    requested_by: MarketingRef
+    office: MarketingRef
+    lines: list[MarketingLine]
+    totals: MarketingTotals
     remark: str | None
     is_provisional: bool
     decision: DecisionOut | None
     dispatch: DispatchOut | None
     cancel_remark: str | None
-    can: Can = Field(description="Which buttons this caller may use now.")
+    can: MarketingCan = Field(description="Which buttons this caller may use now.")
     created_at: str
 
 
@@ -152,10 +152,10 @@ class MarketingOrderSummary(BaseModel):
     id: str
     order_no: str
     status: Literal["submitted", "approved", "rejected", "cancelled", "dispatched"]
-    partner: Ref | None
-    requested_by: Ref
-    office: Ref
-    totals: Totals
+    partner: MarketingRef | None
+    requested_by: MarketingRef
+    office: MarketingRef
+    totals: MarketingTotals
     is_provisional: bool
     created_at: str
 

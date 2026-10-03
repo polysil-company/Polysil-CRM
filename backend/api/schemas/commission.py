@@ -37,7 +37,7 @@ class Payment(BaseModel):
     payment_reference: str = Field(min_length=1, max_length=200)
 
 
-class Ref(BaseModel):
+class CommissionRef(BaseModel):
     id: str
     name: str | None
 
@@ -49,7 +49,7 @@ class AppRef(BaseModel):
 
 
 class Preview(BaseModel):
-    partner: Ref
+    partner: CommissionRef
     cost_excl_gst: str = Field(description="calculation.total.blocks.cost_excl_gst: includes "
                                            "installation, insurance, inspection, education, sump.")
     a_plus_b: str | None = Field(description="Material only (head and field units).")
@@ -62,7 +62,7 @@ class Preview(BaseModel):
 class Commission(BaseModel):
     id: str
     application: AppRef
-    partner: Ref
+    partner: CommissionRef
     status: Literal["calculated", "approved", "returned", "paid", "cancelled"]
     cost_excl_gst: str
     a_plus_b: str | None
@@ -77,9 +77,9 @@ class Commission(BaseModel):
     tod_amount: str
     total: str
     remark: str | None
-    recorded_by: Ref
+    recorded_by: CommissionRef
     recorded_at: str
-    decided_by: Ref | None
+    decided_by: CommissionRef | None
     decided_at: str | None
     decision_remark: str | None
     paid_on: str | None
@@ -108,7 +108,7 @@ class Rate(BaseModel):
     scheme: str
     system_type: str | None
     partner_type: str | None
-    partner: Ref | None
+    partner: CommissionRef | None
     commission_pct: str
     tod_pct: str
     effective_from: str

@@ -176,12 +176,12 @@ District Manager over the office; there is no draft.
 
 **Request body**
 
-**`api__schemas__marketing__OrderCreate`**
+**`MarketingOrderCreate`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `partner_id` | string \| null |  | Staff: the dealer it is for, or null for an office's own use. Ignored for a partner user. |
-| `lines` | api__schemas__marketing__LineIn[] | yes |  |
+| `lines` | MarketingLineIn[] | yes |  |
 | `remark` | string \| null |  |  |
 
 **Responses**
@@ -400,7 +400,7 @@ Reject with a remark (required).
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `status` | `approved` \| `rejected` | yes |  |
-| `by` | api__schemas__marketing__Ref \| null | yes | Null for a partner user (question 15.14). |
+| `by` | MarketingRef \| null | yes | Null for a partner user (question 15.14). |
 | `at` | string | yes |  |
 | `remark` | string \| null | yes |  |
 
@@ -417,7 +417,7 @@ Reject with a remark (required).
 |---|---|---|---|
 | `dispatched_on` | string | yes |  |
 | `reference` | string | yes |  |
-| `by` | api__schemas__marketing__Ref \| null | yes |  |
+| `by` | MarketingRef \| null | yes |  |
 
 **`Envelope_MarketingOrder_`**
 
@@ -451,6 +451,36 @@ Reject with a remark (required).
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
+**`MarketingCan`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `approve` | boolean | yes |  |
+| `reject` | boolean | yes |  |
+| `cancel` | boolean | yes |  |
+| `dispatch` | boolean | yes |  |
+
+**`MarketingLine`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `material` | MaterialRef | yes |  |
+| `unit` | string | yes |  |
+| `qty` | integer | yes |  |
+| `price` | string | yes |  |
+| `value` | string | yes |  |
+| `company_share_pct` | string | yes |  |
+| `company_share` | string | yes |  |
+| `dealer_share` | string | yes |  |
+
+**`MarketingLineIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `material_id` | string | yes |  |
+| `qty` | integer | yes |  |
+
 **`MarketingOrder`**
 
 | Field | Type | Required | Notes |
@@ -458,18 +488,26 @@ Reject with a remark (required).
 | `id` | string | yes |  |
 | `order_no` | string | yes |  |
 | `status` | `submitted` \| `approved` \| `rejected` \| `cancelled` \| `dispatched` | yes |  |
-| `partner` | api__schemas__marketing__Ref \| null | yes |  |
-| `requested_by` | api__schemas__marketing__Ref | yes |  |
-| `office` | api__schemas__marketing__Ref | yes |  |
-| `lines` | api__schemas__marketing__Line[] | yes |  |
-| `totals` | api__schemas__marketing__Totals | yes |  |
+| `partner` | MarketingRef \| null | yes |  |
+| `requested_by` | MarketingRef | yes |  |
+| `office` | MarketingRef | yes |  |
+| `lines` | MarketingLine[] | yes |  |
+| `totals` | MarketingTotals | yes |  |
 | `remark` | string \| null | yes |  |
 | `is_provisional` | boolean | yes |  |
 | `decision` | DecisionOut \| null | yes |  |
 | `dispatch` | DispatchOut \| null | yes |  |
 | `cancel_remark` | string \| null | yes |  |
-| `can` | api__schemas__marketing__Can | yes | Which buttons this caller may use now. |
+| `can` | MarketingCan | yes | Which buttons this caller may use now. |
 | `created_at` | string | yes |  |
+
+**`MarketingOrderCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `partner_id` | string \| null |  | Staff: the dealer it is for, or null for an office's own use. Ignored for a partner user. |
+| `lines` | MarketingLineIn[] | yes |  |
+| `remark` | string \| null |  |  |
 
 **`MarketingOrderPage`**
 
@@ -485,12 +523,27 @@ Reject with a remark (required).
 | `id` | string | yes |  |
 | `order_no` | string | yes |  |
 | `status` | `submitted` \| `approved` \| `rejected` \| `cancelled` \| `dispatched` | yes |  |
-| `partner` | api__schemas__marketing__Ref \| null | yes |  |
-| `requested_by` | api__schemas__marketing__Ref | yes |  |
-| `office` | api__schemas__marketing__Ref | yes |  |
-| `totals` | api__schemas__marketing__Totals | yes |  |
+| `partner` | MarketingRef \| null | yes |  |
+| `requested_by` | MarketingRef | yes |  |
+| `office` | MarketingRef | yes |  |
+| `totals` | MarketingTotals | yes |  |
 | `is_provisional` | boolean | yes |  |
 | `created_at` | string | yes |  |
+
+**`MarketingRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string \| null | yes |  |
+
+**`MarketingTotals`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `value` | string | yes |  |
+| `company_share` | string | yes |  |
+| `dealer_share` | string | yes |  |
 
 **`Material`**
 
@@ -545,56 +598,3 @@ Reject with a remark (required).
 | `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
-
-**`api__schemas__marketing__Can`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `approve` | boolean | yes |  |
-| `reject` | boolean | yes |  |
-| `cancel` | boolean | yes |  |
-| `dispatch` | boolean | yes |  |
-
-**`api__schemas__marketing__Line`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `material` | MaterialRef | yes |  |
-| `unit` | string | yes |  |
-| `qty` | integer | yes |  |
-| `price` | string | yes |  |
-| `value` | string | yes |  |
-| `company_share_pct` | string | yes |  |
-| `company_share` | string | yes |  |
-| `dealer_share` | string | yes |  |
-
-**`api__schemas__marketing__LineIn`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `material_id` | string | yes |  |
-| `qty` | integer | yes |  |
-
-**`api__schemas__marketing__OrderCreate`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `partner_id` | string \| null |  | Staff: the dealer it is for, or null for an office's own use. Ignored for a partner user. |
-| `lines` | api__schemas__marketing__LineIn[] | yes |  |
-| `remark` | string \| null |  |  |
-
-**`api__schemas__marketing__Ref`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `name` | string \| null | yes |  |
-
-**`api__schemas__marketing__Totals`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `value` | string | yes |  |
-| `company_share` | string | yes |  |
-| `dealer_share` | string | yes |  |

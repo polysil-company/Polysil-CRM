@@ -155,16 +155,16 @@ SELECT o.*, o.order_no::text AS no_text, p.name AS partner_name, ru.full_name AS
   LEFT JOIN app_user xu ON xu.id = o.dispatched_by"""
 
 
-def _totals(r: Any) -> sch.Totals:
-    return sch.Totals(value=_m(r.value), company_share=_m(r.company_share), dealer_share=_m(r.dealer_share))
+def _totals(r: Any) -> sch.MarketingTotals:
+    return sch.MarketingTotals(value=_m(r.value), company_share=_m(r.company_share), dealer_share=_m(r.dealer_share))
 
 
 def _summary(r: Any) -> sch.MarketingOrderSummary:
     return sch.MarketingOrderSummary(
         id=str(r.id), order_no=r.no_text, status=r.status,
-        partner=sch.Ref(id=str(r.partner_id), name=r.partner_name) if r.partner_id else None,
-        requested_by=sch.Ref(id=str(r.requested_by), name=r.requester_name),
-        office=sch.Ref(id=str(r.owner_org_unit_id), name=r.office_name), totals=_totals(r),
+        partner=sch.MarketingRef(id=str(r.partner_id), name=r.partner_name) if r.partner_id else None,
+        requested_by=sch.MarketingRef(id=str(r.requested_by), name=r.requester_name),
+        office=sch.MarketingRef(id=str(r.owner_org_unit_id), name=r.office_name), totals=_totals(r),
         is_provisional=r.is_provisional, created_at=r.created_at.isoformat())
 
 
@@ -181,24 +181,24 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Mark
     if r.decided_at is not None and r.status in ("approved", "rejected", "dispatched", "cancelled"):
         decision = sch.DecisionOut(
             status="rejected" if r.status == "rejected" else "approved",
-            by=None if portal else sch.Ref(id=str(r.decided_by), name=r.decider_name),
+            by=None if portal else sch.MarketingRef(id=str(r.decided_by), name=r.decider_name),
             at=r.decided_at.isoformat(), remark=r.decision_remark)
     dispatch = (sch.DispatchOut(dispatched_on=r.dispatched_on.isoformat(), reference=r.dispatch_reference,
-                                by=None if portal else sch.Ref(id=str(r.dispatched_by), name=r.dispatcher_name))
+                                by=None if portal else sch.MarketingRef(id=str(r.dispatched_by), name=r.dispatcher_name))
                 if r.dispatched_on else None)
     s = _summary(r)
     return sch.MarketingOrder(
         **s.model_dump(exclude={"partner", "requested_by", "office", "totals"}),
         partner=s.partner, requested_by=s.requested_by, office=s.office, totals=s.totals,
-        lines=[sch.Line(id=str(x.id), material=sch.MaterialRef(id=str(x.material_id), code=x.code, name=x.name),
+        lines=[sch.MarketingLine(id=str(x.id), material=sch.MaterialRef(id=str(x.material_id), code=x.code, name=x.name),
                         unit=x.unit, qty=x.qty, price=_m(x.price), value=_m(x.value),
                         company_share_pct=_pct(x.company_share_pct), company_share=_m(x.company_share),
                         dealer_share=_m(x.dealer_share)) for x in lines],
         remark=r.remark, decision=decision, dispatch=dispatch, cancel_remark=r.cancel_remark,
-        can=sch.Can(**can))
+        can=sch.MarketingCan(**can))
 
 
-async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate) -> sch.MarketingOrder:
+async def create_order(db: AsyncSession, caller: Caller, body: sch.MarketingOrderCreate) -> sch.MarketingOrder:
     partner_id = caller.partner_id or body.partner_id
     territory = None
     if partner_id:
