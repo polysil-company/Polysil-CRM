@@ -11,7 +11,7 @@ import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
 import { generateQuotations } from "./data/quotations";
-import { generateTasks, type MockTask } from "./data/tasks";
+import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
 
 export interface MockDb {
   /** Newest first, in the backend's wire format. */
@@ -61,6 +61,10 @@ export interface MockDb {
   tasks: MockTask[];
   /** Task writes: Idempotency-Key → the request and the task it made or changed. */
   taskWrites: Map<string, { body: string; taskId: string }>;
+  /** Meeting minutes, newest first (TASK-007). */
+  minutes: MockMinutes[];
+  /** POST /minutes replays: Idempotency-Key → the request and the minutes it made. */
+  minutesWrites: Map<string, { body: string; minutesId: string }>;
   /** How many events the mock has written, for their ids. */
   writtenEvents: number;
 }
@@ -75,6 +79,7 @@ function createMockDb(): MockDb {
   );
   const orders = generateOrders(leads, quotations, thresholds);
   const approvalSteps = seedApprovals(quotations, orders, thresholds);
+  const { tasks, minutes } = seedMinutes(generateTasks(leads));
   return {
     leads,
     quotations,
@@ -104,8 +109,10 @@ function createMockDb(): MockDb {
     noteCreations: new Map(),
     stageChanges: new Map(),
     lostFrom: new Map(),
-    tasks: generateTasks(leads),
+    tasks,
     taskWrites: new Map(),
+    minutes,
+    minutesWrites: new Map(),
     writtenEvents: 1,
   };
 }

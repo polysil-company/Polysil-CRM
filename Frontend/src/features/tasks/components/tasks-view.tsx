@@ -15,18 +15,21 @@ import { taskAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
 import { useHasTeam, useTaskParams, type TaskView } from "@/features/tasks/hooks/use-task-params";
 import { formatCalendarDay, shiftCalendarDay, todayInIndia } from "@/lib/format";
 
+import { AllTasks } from "./all-tasks";
 import { NewTaskDialog } from "./new-task-dialog";
 import { PlannerDay, PlannerDaySkeleton } from "./planner-day";
-import { TaskActionDialog, type PendingTaskAction } from "./task-action-dialog";
+import type { PendingTaskAction } from "./task-action-dialog";
+import { TaskDialogs } from "./task-dialogs";
 import { TeamDay } from "./team-day";
 
 /**
  * TASK-001 · The Tasks page. "My day" is today's tasks with the overdue ones on top; a
  * manager also has "Team": one row per person below them, each opening that person's day.
- * The day moves back and forward, or jumps to a date; all of it is in the URL.
+ * "All tasks" lists everything the user can see, filtered, with an Excel download. The day
+ * moves back and forward, or jumps to a date; all of it is in the URL.
  */
 export function TasksView(): React.JSX.Element {
-  const { params, setParams } = useTaskParams();
+  const { params, setParams, setFilters, resetFilters } = useTaskParams();
   const [today] = useState(todayInIndia);
   const [pending, setPending] = useState<PendingTaskAction | null>(null);
   const session = useSession();
@@ -36,37 +39,39 @@ export function TasksView(): React.JSX.Element {
   const meId = session.data?.user.id ?? null;
 
   const date = params.date ?? today;
-  const view: TaskView = hasTeam ? params.view : "day";
+  // Team is for managers; anyone else asking for it gets their own day.
+  const view: TaskView = params.view === "team" && !hasTeam ? "day" : params.view;
   const personId = view === "day" && params.userId !== meId ? params.userId : null;
 
   return (
     <section aria-label="Tasks" className="flex flex-col gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          {hasTeam ? (
-            <ToggleGroup
-              aria-label="Whose tasks"
-              value={[personId === null ? view : "team"]}
-              onValueChange={(next) => {
-                const [choice] = next;
-                if (choice === "day" || choice === "team") {
-                  setParams({ view: choice, userId: null });
-                }
-              }}
-            >
-              <ToggleGroupItem value="day">My day</ToggleGroupItem>
-              <ToggleGroupItem value="team">Team</ToggleGroupItem>
-            </ToggleGroup>
-          ) : null}
-          <DayNavigator
-            date={date}
-            today={today}
-            onChange={(next) => {
-              setParams({ date: next === today ? null : next });
+          <ToggleGroup
+            aria-label="Which tasks"
+            value={[personId === null ? view : "team"]}
+            onValueChange={(next) => {
+              const [choice] = next;
+              if (choice === "day" || choice === "team" || choice === "all") {
+                setParams({ view: choice, userId: null });
+              }
             }}
-          />
+          >
+            <ToggleGroupItem value="day">My day</ToggleGroupItem>
+            {hasTeam ? <ToggleGroupItem value="team">Team</ToggleGroupItem> : null}
+            <ToggleGroupItem value="all">All tasks</ToggleGroupItem>
+          </ToggleGroup>
+          {view === "all" ? null : (
+            <DayNavigator
+              date={date}
+              today={today}
+              onChange={(next) => {
+                setParams({ date: next === today ? null : next });
+              }}
+            />
+          )}
         </div>
-        {canCreate && view === "day" ? (
+        {canCreate && view !== "team" ? (
           <NewTaskDialog
             subject={null}
             defaultDate={date}
@@ -87,6 +92,16 @@ export function TasksView(): React.JSX.Element {
 
       {session.isPending ? (
         <PlannerDaySkeleton />
+      ) : view === "all" ? (
+        <AllTasks
+          filters={params.filters}
+          onFiltersChange={setFilters}
+          onReset={resetFilters}
+          hasTeam={hasTeam}
+          meId={meId}
+          canEdit={canEdit}
+          onAction={setPending}
+        />
       ) : view === "team" ? (
         <TeamDay
           date={date}
@@ -106,8 +121,9 @@ export function TasksView(): React.JSX.Element {
         />
       )}
 
-      <TaskActionDialog
+      <TaskDialogs
         pending={pending}
+        meId={meId}
         onClose={() => {
           setPending(null);
         }}

@@ -48,6 +48,14 @@ const isoDay = new Intl.DateTimeFormat("en-CA", {
 
 const relative = new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" });
 
+/** 24-hour "HH:MM", the value an `<input type="time">` holds. */
+const clock24 = new Intl.DateTimeFormat("en-GB", {
+  timeZone: APP_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 const weekdayDayMonth = new Intl.DateTimeFormat("en-IN", {
   timeZone: APP_TIME_ZONE,
   weekday: "long",
@@ -100,6 +108,18 @@ export function formatTime(value: DateInput): string {
  */
 export function todayInIndia(now: Date = new Date()): string {
   return isoDay.format(now);
+}
+
+/** The calendar day in India of an instant, "YYYY-MM-DD" — for an `<input type="date">`. */
+export function calendarDayOf(value: DateInput): string {
+  const date = toDate(value);
+  return date ? isoDay.format(date) : "";
+}
+
+/** The time of day in India of an instant, 24-hour "HH:MM" — for an `<input type="time">`. */
+export function timeOfDayOf(value: DateInput): string {
+  const date = toDate(value);
+  return date ? clock24.format(date) : "";
 }
 
 /** A calendar day ("YYYY-MM-DD") moved by a number of days: 2026-10-31 + 1 → 2026-11-01. */

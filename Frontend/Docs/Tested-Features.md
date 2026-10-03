@@ -35,7 +35,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | `integration` |
 | [Approvals](#approvals) | 5 | 🧪 🌐 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 7 | 🧪 🌐 👀 | PR #34 |
-| [Tasks and the day planner](#tasks-and-the-day-planner) | 5 | 🧪 👀 | PR #54 |
+| [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #PRNUM |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 🌐 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -156,7 +156,9 @@ On the backend's contract (`backend/docs/api/tasks.md`) since PR #54 ([changelog
   - a done task can be reopened by whoever it is for or whoever gave it. After 7 days the backend says to add a new task;
   - a task someone moved on meanwhile closes the dialog and refreshes. 🧪 👀
 
-Not in this pull request (next): meeting minutes with action items (TASK-007), editing and reassigning a task (TASK-006), and the full task list with filters and Excel export (TASK-008).
+- **TASK-006 · Edit or reassign** an open task from its menu (PR #PRNUM, [screen](screenshots/tasks/edit-task-desktop-light.jpg)): what to do, the day and time, notes, and who does it (a manager's team; an officer's field says only a manager can give it to someone else). Only what changed is sent, with `expected_status: open`, so a task done meanwhile is refused and the list refreshes. "Given to Ravi Joshi" confirms a reassignment. 🧪 👀
+- **TASK-007 · Meeting minutes** on a lead's page (PR #PRNUM; screens: [the minutes](screenshots/tasks/lead-minutes-desktop-light.jpg), [recording them](screenshots/tasks/record-minutes-desktop-light.jpg)): newest first, with when, who was there, what was discussed, and each action item as its task stands now ("1 of 2 done", overdue in red). **Record minutes** from the card, or from a planned meeting's menu, which then marks that meeting done. Who was there is one per line; each action item (what, due day, for whom, kind) becomes a task, marked "From meeting minutes". One save: an item the backend refuses (say, someone the user can't assign) keeps everything unsaved and points at that item. 🧪 👀
+- **TASK-008 · All tasks** (PR #PRNUM; screens: [desktop](screenshots/tasks/all-tasks-desktop-light.jpg), [phone, dark](screenshots/tasks/all-tasks-phone-dark.jpg)): everything the user can see, earliest due first, with a count; filters for status, kind, person (managers) and overdue only, all in the URL; **Download Excel** saves the same tasks as a file named by the backend (`tasks-2026-10-04.xlsx`), every page. More than 5,000 rows: "Too many tasks to download — narrow the filters". States: skeleton, "No tasks match these filters" with Reset, a later page failing. 🧪 👀
 
 ---
 
@@ -190,6 +192,5 @@ The backend serves these, and the frontend has no screen for them — in the ord
 1. A direct order typed in line by line, and a consolidated order from several leads of one dealer (SO-005).
 2. Editing and deleting a lead, the duplicates queue and merging.
 3. Lead QR codes and the public enquiry form.
-4. Meeting minutes, editing and reassigning a task, and the full task list with export (TASK-006…008). My day, Team and a lead's tasks are in PR #54.
-5. Complaints, from entry to the quality check (on `integration` since #25).
-6. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.
+4. Complaints, from entry to the quality check (on `integration` since #25).
+5. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.

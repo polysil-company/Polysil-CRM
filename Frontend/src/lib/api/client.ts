@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 import type { DataId } from "@/lib/data-ids";
 import { clientEnv } from "@/lib/env/client";
@@ -90,6 +90,8 @@ interface RequestContext {
   readonly signal: AbortSignal | undefined;
   readonly timeoutMs: number;
   readonly startedAt: number;
+  /** A JSON body, or a file to download (`apiDownload`). Error bodies are JSON either way. */
+  readonly readAs: "json" | "file";
 }
 
 interface RawResponse {
@@ -111,8 +113,66 @@ interface RawResponse {
  *  - throws only `ApiError`, except cancellations, which re-throw the
  *    original AbortError so TanStack Query treats them as cancelled
  */
-export async function apiRequest<TSchema extends z.ZodType>(
+export function apiRequest<TSchema extends z.ZodType>(
   request: ApiRequest<TSchema>,
+): Promise<z.output<TSchema>> {
+  return execute(request, "json");
+}
+
+/** A file the backend sent: its bytes, and the name it suggested. */
+export interface DownloadedFile {
+  readonly blob: Blob;
+  /** From `Content-Disposition`; null when the backend gave none. */
+  readonly filename: string | null;
+}
+
+/**
+ * Checked by shape, not `instanceof`: the Blob `fetch` makes can come from another realm
+ * than the global one (Node's fetch under jsdom, an iframe), which fails `instanceof Blob`.
+ */
+function isBlob(value: unknown): value is Blob {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "arrayBuffer" in value &&
+    "size" in value &&
+    "type" in value
+  );
+}
+
+const downloadedFileSchema = z.object({
+  blob: z.custom<Blob>(isBlob),
+  filename: z.string().nullable(),
+});
+
+/** How long a download may take: an export of thousands of rows takes a few seconds. */
+export const DOWNLOAD_TIMEOUT_MS = 60_000;
+
+export type ApiDownloadRequest = Omit<
+  ApiRequest<z.ZodType>,
+  "schema" | "body" | "method" | "idempotencyKey" | "sensitive"
+>;
+
+/**
+ * A GET that returns a file — an Excel export, say — through the same pipe as
+ * `apiRequest`: the access token (a plain link can't carry it), one refresh and retry
+ * after a 401, `x-request-id` and `x-data-id`, logging, and the backend's error envelope
+ * as an `ApiError`. The file is not parsed; save it with `saveFile`.
+ */
+export function apiDownload(request: ApiDownloadRequest): Promise<DownloadedFile> {
+  return execute(
+    {
+      ...request,
+      timeoutMs: request.timeoutMs ?? DOWNLOAD_TIMEOUT_MS,
+      schema: downloadedFileSchema,
+    },
+    "file",
+  );
+}
+
+async function execute<TSchema extends z.ZodType>(
+  request: ApiRequest<TSchema>,
+  readAs: "json" | "file",
 ): Promise<z.output<TSchema>> {
   const method = request.method ?? "GET";
   const auth = request.auth ?? "required";
@@ -133,6 +193,7 @@ export async function apiRequest<TSchema extends z.ZodType>(
     signal: request.signal,
     timeoutMs: request.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     startedAt: performance.now(),
+    readAs,
   };
 
   context.logger.debug(context.fn, `→ ${context.label}`, {
@@ -208,7 +269,14 @@ async function send(context: RequestContext, token: string | null): Promise<RawR
       // The refresh cookie is same-origin and scoped to /api/v1/auth.
       credentials: "same-origin",
     });
-    return { status: response.status, ok: response.ok, payload: await readBody(response) };
+    return {
+      status: response.status,
+      ok: response.ok,
+      payload:
+        context.readAs === "file" && response.ok
+          ? await readFile(response)
+          : await readBody(response),
+    };
   } catch (error) {
     const durationMs = elapsedMs(context.startedAt);
 
@@ -311,7 +379,7 @@ function parseResponse<TSchema extends z.ZodType>(
 
 function buildHeaders(context: RequestContext, token: string | null): Headers {
   const headers = new Headers({
-    accept: "application/json",
+    accept: context.readAs === "file" ? "*/*" : "application/json",
     "x-request-id": context.requestId,
     "x-data-id": context.dataId,
     "x-client": `polysil-web@${clientEnv.release}`,
@@ -326,6 +394,16 @@ function buildHeaders(context: RequestContext, token: string | null): Headers {
     headers.set("idempotency-key", context.idempotencyKey);
   }
   return headers;
+}
+
+/** A file response: its bytes and the name in `Content-Disposition`, if any. */
+async function readFile(response: Response): Promise<DownloadedFile> {
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const filename = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1] ?? null;
+  return {
+    blob: await response.blob(),
+    filename: filename === null ? null : decodeURIComponent(filename),
+  };
 }
 
 async function readBody(response: Response): Promise<unknown> {

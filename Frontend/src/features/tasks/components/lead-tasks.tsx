@@ -12,11 +12,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan, useSession } from "@/features/session/hooks/use-session";
 import { taskListQueryOptions } from "@/features/tasks/api/tasks.queries";
-import type { Task } from "@/features/tasks/api/tasks.schemas";
+import { leadTaskParams, type Task } from "@/features/tasks/api/tasks.schemas";
 import { toUserFacingError } from "@/lib/api/error-messages";
 
 import { NewTaskDialog } from "./new-task-dialog";
-import { TaskActionDialog, type PendingTaskAction } from "./task-action-dialog";
+import type { PendingTaskAction } from "./task-action-dialog";
+import { TaskDialogs } from "./task-dialogs";
 import { TaskRow } from "./task-row";
 
 export interface LeadTasksProps {
@@ -33,7 +34,7 @@ export interface LeadTasksProps {
  * kind (Survey & Design, Follow-up…).
  */
 export function LeadTasks({ leadId, leadName, merged }: LeadTasksProps): React.JSX.Element {
-  const query = useInfiniteQuery(taskListQueryOptions({ leadId }));
+  const query = useInfiniteQuery(taskListQueryOptions(leadTaskParams(leadId)));
   const session = useSession();
   const canCreate = useCan("tasks", "create");
   const canEdit = useCan("tasks", "edit");
@@ -120,8 +121,9 @@ export function LeadTasks({ leadId, leadName, merged }: LeadTasksProps): React.J
           }}
         </QueryView>
       </CardContent>
-      <TaskActionDialog
+      <TaskDialogs
         pending={pending}
+        meId={meId}
         onClose={() => {
           setPending(null);
         }}

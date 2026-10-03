@@ -40,7 +40,14 @@ const CLOSE_AFTER_SUCCESS_MS = 600;
 
 export type TaskActionKind = "complete" | "cancel";
 
+/** What was chosen on a task's row: a dialog to open. See `TaskDialogs`. */
 export interface PendingTaskAction {
+  readonly task: Task;
+  readonly kind: TaskActionKind | "edit" | "minutes";
+}
+
+/** Done or cancel: the two this dialog handles. */
+interface PendingDoneOrCancel {
   readonly task: Task;
   readonly kind: TaskActionKind;
 }
@@ -63,7 +70,7 @@ function actionFormSchema(kind: TaskActionKind): z.ZodType<ActionForm, ActionFor
 
 export interface TaskActionDialogProps {
   /** The task and what to do with it; null when closed. */
-  pending: PendingTaskAction | null;
+  pending: PendingDoneOrCancel | null;
   onClose: () => void;
 }
 
@@ -93,7 +100,7 @@ function ActionForm({
   task,
   kind,
   onClose,
-}: PendingTaskAction & { onClose: () => void }): React.JSX.Element {
+}: PendingDoneOrCancel & { onClose: () => void }): React.JSX.Element {
   const complete = useCompleteTask();
   const cancel = useCancelTask();
   const idempotency = useIdempotencyKey();

@@ -13,6 +13,7 @@ import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 import { renderWithProviders } from "@/test/render";
 
+import { LeadMinutes } from "./lead-minutes";
 import { LeadTasks } from "./lead-tasks";
 import { TasksView } from "./tasks-view";
 
@@ -126,8 +127,11 @@ describe("[TASK-001] My day", () => {
 
     const givenRow = screen.getByRole("listitem", { name: /: Check the stock report$/ });
     expect(within(givenRow).getByText("Given by Asha Patel")).toBeInTheDocument();
-    // Only whoever gave it may cancel it, so there is nothing in its menu to offer.
-    expect(within(givenRow).queryByRole("button", { name: /^More for/ })).toBeNull();
+    // Only whoever gave it may cancel it: the menu offers editing, not cancelling.
+    await user.click(within(givenRow).getByRole("button", { name: /^More for/ }));
+    expect(await screen.findByRole("menuitem", { name: "Edit or reassign" })).toBeVisible();
+    expect(screen.queryByRole("menuitem", { name: "Cancel task" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
 
     const ownRow = screen.getByRole("listitem", { name: /: Plan the week$/ });
     await user.click(within(ownRow).getByRole("button", { name: /^More for/ }));
@@ -285,5 +289,148 @@ describe("[TASK-003] LeadTasks", () => {
 
     await screen.findByRole("region", { name: "To do" });
     expect(screen.queryByRole("button", { name: "Add task" })).not.toBeInTheDocument();
+  });
+});
+
+describe("[TASK-006] Edit or reassign", () => {
+  afterEach(reset);
+
+  it("renames a task and gives it to someone in the team", async () => {
+    signInAs("district_manager");
+    const { user } = showTasks();
+    const open = (await dueToday()).find(
+      (row) => within(row).queryByRole("button", { name: /^Mark done/ }) !== null,
+    );
+    if (open === undefined) throw new Error("Nothing open today");
+
+    await user.click(within(open).getByRole("button", { name: /^More for/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit or reassign" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit task" });
+    const title = within(dialog).getByLabelText("What to do");
+    await user.clear(title);
+    await user.type(title, "Call him after lunch");
+    await user.click(within(dialog).getByRole("combobox", { name: "For" }));
+    await user.click(await screen.findByRole("option", { name: MOCK_TEAM[1]?.full_name ?? "" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText(`Given to ${MOCK_TEAM[1]?.full_name ?? ""}`, {
+        selector: "[data-title]",
+      }),
+    ).toBeVisible();
+    expect(
+      mockDb.tasks.find((task) => task.title === "Call him after lunch")?.assigned_to?.id,
+    ).toBe(MOCK_TEAM[1]?.id);
+  });
+});
+
+describe("[TASK-007] Meeting minutes", () => {
+  afterEach(reset);
+
+  it("shows a lead's minutes with how many action items are done", async () => {
+    signInAs("admin");
+    const seeded = mockDb.minutes[0];
+    const lead = mockDb.leads.find((item) => item.id === seeded?.lead?.id);
+    if (lead === undefined) throw new Error("No lead with minutes");
+    renderWithProviders(
+      <LeadMinutes leadId={lead.id} leadName={lead.farmer_name} merged={false} />,
+    );
+
+    const list = await screen.findByRole("list", { name: "Meeting minutes, newest first" });
+    expect(within(list).getByText("1 of 2 done")).toBeInTheDocument();
+    expect(within(list).getByText(/Walked the plot/)).toBeInTheDocument();
+  });
+
+  it("records minutes with an action item, which then shows as open", async () => {
+    signInAs("admin");
+    const user = userEvent.setup();
+    const lead = mockDb.leads.find(
+      (item) => item.stage !== "merged" && !mockDb.minutes.some((m) => m.lead?.id === item.id),
+    );
+    if (lead === undefined) throw new Error("No lead without minutes");
+    renderWithProviders(
+      <>
+        <LeadMinutes leadId={lead.id} leadName={lead.farmer_name} merged={false} />
+        <Toaster />
+      </>,
+    );
+    expect(await screen.findByText("No minutes yet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Record minutes" }));
+    const dialog = await screen.findByRole("dialog", { name: "Record minutes" });
+    await user.click(within(dialog).getByRole("button", { name: "Save minutes" }));
+    expect(await within(dialog).findByText("Write what was discussed and agreed.")).toBeVisible();
+    expect(within(dialog).getByText("Enter the time, like 15:00.")).toBeVisible();
+
+    await user.type(within(dialog).getByLabelText("At"), "15:00");
+    await user.type(within(dialog).getByLabelText(/^Who was there/), "Ramesh{Enter}Kiran");
+    await user.type(within(dialog).getByLabelText("What was discussed"), "Agreed on drip.");
+    await user.click(within(dialog).getByRole("button", { name: "Add an action item" }));
+    await user.type(within(dialog).getByLabelText("What to do"), "Send the revised quotation");
+    await user.click(within(dialog).getByRole("button", { name: "Save minutes" }));
+
+    expect(await screen.findByText("Minutes recorded", { selector: "[data-title]" })).toBeVisible();
+    const list = await screen.findByRole("list", { name: "Meeting minutes, newest first" });
+    expect(await within(list).findByText("0 of 1 done")).toBeInTheDocument();
+    expect(within(list).getByText("With Ramesh, Kiran")).toBeInTheDocument();
+  });
+});
+
+describe("[TASK-008] All tasks", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    reset();
+  });
+
+  it("filters in the URL and downloads the same tasks as Excel", async () => {
+    signInAs("district_manager");
+    const createObjectURL = vi.fn<(blob: Blob) => string>(() => "blob:tasks");
+    const revokeObjectURL = vi.fn<(url: string) => void>();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    let exported: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/tasks/export"), ({ request }) => {
+        exported = new URL(request.url);
+      }),
+    );
+    const { user, onUrlChange } = showTasks("?view=all");
+
+    const list = await screen.findByRole("list", { name: "Tasks, earliest due first" });
+    expect(within(list).getAllByRole("listitem").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("checkbox", { name: "Overdue only" }));
+    await waitFor(() => {
+      expect(onUrlChange).toHaveBeenLastCalledWith(expect.stringContaining("overdue=true"));
+    });
+    await waitFor(() => {
+      const rows = within(screen.getByRole("list", { name: "Tasks, earliest due first" }));
+      expect(rows.getAllByText("Overdue").length).toBe(rows.getAllByRole("listitem").length);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Download Excel" }));
+
+    await waitFor(() => {
+      expect(click).toHaveBeenCalled();
+    });
+    expect(exported?.searchParams.get("overdue")).toBe("true");
+    expect(createObjectURL).toHaveBeenCalled();
+  });
+
+  it("says when no task matches, and resets the filters", async () => {
+    signInAs("employee");
+    server.use(
+      http.get(buildApiUrl("/tasks"), () =>
+        HttpResponse.json({ data: [], meta: { limit: 25, next_cursor: null, total: 0 } }),
+      ),
+    );
+    const { user, onUrlChange } = showTasks("?view=all&type=visit");
+
+    expect(await screen.findByText("No tasks match these filters")).toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: "Reset filters" })[0] ?? document.body);
+    await waitFor(() => {
+      expect(onUrlChange).toHaveBeenLastCalledWith(expect.not.stringContaining("type="));
+    });
   });
 });

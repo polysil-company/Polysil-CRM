@@ -36,6 +36,7 @@ import { formatTerritory } from "@/features/lookups/lib/lookup-labels";
 import { toShareParam } from "@/features/messages/lib/share-attachment";
 import { LeadQuotations } from "@/features/quotations/components/lead-quotations";
 import { useCan, useSession } from "@/features/session/hooks/use-session";
+import { LeadMinutes } from "@/features/tasks/components/lead-minutes";
 import { LeadTasks } from "@/features/tasks/components/lead-tasks";
 import { isApiError } from "@/lib/api/errors";
 import {
@@ -320,13 +321,20 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
         {/* QUOT-001 · The lead's quotations, for whoever may see quotations. */}
         {canSeeQuotations ? <LeadQuotations leadId={lead.id} leadStage={lead.stage} /> : null}
 
-        {/* TASK-003 · Calls, visits and meetings about this lead, for staff with tasks. */}
+        {/* TASK-003, TASK-007 · Calls, visits and meetings about this lead, and their minutes. */}
         {canSeeTasks ? (
-          <LeadTasks
-            leadId={lead.id}
-            leadName={lead.customerName}
-            merged={lead.stage === "merged"}
-          />
+          <>
+            <LeadTasks
+              leadId={lead.id}
+              leadName={lead.customerName}
+              merged={lead.stage === "merged"}
+            />
+            <LeadMinutes
+              leadId={lead.id}
+              leadName={lead.customerName}
+              merged={lead.stage === "merged"}
+            />
+          </>
         ) : null}
 
         {/* LEAD-005, LEAD-006 · Notes and the lead's history. A merged lead is read-only. */}

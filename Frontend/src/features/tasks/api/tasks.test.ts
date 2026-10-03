@@ -13,14 +13,18 @@ import { server } from "@/mocks/node";
 import {
   cancelTask,
   completeTask,
+  createMinutes,
   createTask,
+  exportTasks,
   getPlannerDay,
   getTeamDay,
+  listLeadMinutes,
   listTaskAssignees,
   listTasks,
+  patchTask,
   reopenTask,
 } from "./tasks.api";
-import { taskFormSchema, type TaskFormValues } from "./tasks.schemas";
+import { leadTaskParams, taskFormSchema, type TaskFormValues } from "./tasks.schemas";
 
 const TODAY = todayInIndia();
 
@@ -112,7 +116,7 @@ describe("[TASK-003] listTasks", () => {
   it("lists a lead's tasks, earliest due first, with the total", async () => {
     const leadId = mockDb.tasks.find((task) => task.lead !== null)?.lead?.id ?? "";
 
-    const page = await listTasks({ leadId, cursor: null });
+    const page = await listTasks({ ...leadTaskParams(leadId), cursor: null });
 
     expect(page.items.length).toBeGreaterThan(0);
     expect(page.items.every((task) => task.lead?.id === leadId)).toBe(true);
@@ -130,7 +134,7 @@ describe("[TASK-003] listTasks", () => {
       }),
     );
 
-    const page = await listTasks({ leadId: "x", cursor: null });
+    const page = await listTasks({ ...leadTaskParams("x"), cursor: null });
 
     expect(page.items[0]?.lead).toEqual({
       id: "l-1",
@@ -211,7 +215,7 @@ describe("[TASK-004] createTask", () => {
     });
     const day = await getPlannerDay({ date: TODAY, userId: null });
     expect(day.due.map((item) => item.id)).toContain(task.id);
-    const onLead = await listTasks({ leadId: lead?.id ?? "", cursor: null });
+    const onLead = await listTasks({ ...leadTaskParams(lead?.id ?? ""), cursor: null });
     expect(onLead.items.map((item) => item.id)).toContain(task.id);
   });
 
@@ -296,5 +300,187 @@ describe("[TASK-005] complete, cancel and reopen", () => {
     await expect(
       cancelTask({ taskId: given.id, body: { reason: "Not needed." }, idempotencyKey: "x-2" }),
     ).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("[TASK-003] listTasks filters", () => {
+  afterEach(reset);
+
+  it("filters by person, kind, status and overdue", async () => {
+    const mine = await listTasks({
+      leadId: null,
+      assignedTo: "me",
+      status: ["open"],
+      type: null,
+      overdue: false,
+      cursor: null,
+    });
+    expect(mine.items.length).toBeGreaterThan(0);
+    expect(mine.items.every((task) => task.assignedTo?.id === MOCK_TASK_ME.id)).toBe(true);
+    expect(mine.items.every((task) => task.status === "open")).toBe(true);
+
+    const overdueCalls = await listTasks({
+      leadId: null,
+      assignedTo: null,
+      status: [],
+      type: "visit",
+      overdue: true,
+      cursor: null,
+    });
+    expect(overdueCalls.items.every((task) => task.type === "visit" && task.overdue)).toBe(true);
+  });
+});
+
+describe("[TASK-006] patchTask", () => {
+  afterEach(reset);
+
+  it("changes only what was sent, and reassigns to someone below the manager", async () => {
+    const taskId = anOpenTaskOf(MOCK_TASK_ME.id);
+    const before = mockDb.tasks.find((task) => task.id === taskId);
+    const person = MOCK_TEAM[2];
+
+    const saved = await patchTask({
+      taskId,
+      body: { title: "Call him after lunch", assigned_to: person?.id, expected_status: "open" },
+      idempotencyKey: "p-1",
+    });
+
+    expect(saved).toMatchObject({
+      title: "Call him after lunch",
+      assignedTo: { id: person?.id },
+      dueAt: new Date(before?.due_at ?? "").toISOString(),
+    });
+  });
+
+  it("refuses a change to a task that is no longer open", async () => {
+    const taskId = anOpenTaskOf(MOCK_TASK_ME.id);
+    await completeTask({ taskId, body: { outcome: "Done." }, idempotencyKey: "p-2" });
+
+    await expect(
+      patchTask({
+        taskId,
+        body: { title: "Late", expected_status: "open" },
+        idempotencyKey: "p-3",
+      }),
+    ).rejects.toMatchObject({ status: 409, code: "status_changed" });
+  });
+});
+
+describe("[TASK-007] meeting minutes", () => {
+  afterEach(reset);
+
+  it("lists a lead's seeded minutes with each action item as it stands", async () => {
+    const seeded = mockDb.minutes[0];
+    if (seeded?.lead === null || seeded === undefined) throw new Error("No seeded minutes");
+
+    const [minutes] = await listLeadMinutes(seeded.lead.id);
+
+    expect(minutes?.notes).toMatch(/Walked the plot/);
+    expect(minutes?.actionItems.map((task) => task.status)).toEqual(["done", "open"]);
+  });
+
+  it("records minutes: action items become tasks, and the meeting is marked done", async () => {
+    const meeting = mockDb.tasks.find(
+      (task) => task.task_type === "meeting" && task.status === "open" && task.lead !== null,
+    );
+    if (meeting?.lead === null || meeting === undefined) throw new Error("No open meeting");
+
+    const minutes = await createMinutes({
+      body: {
+        lead_id: meeting.lead.id,
+        task_id: meeting.id,
+        held_at: "2026-10-04T11:00:00+05:30",
+        attendees: ["Ramesh Patel", "  ", "Kiran"],
+        notes: "Agreed on 3 acres of drip.",
+        action_items: [
+          { title: "Send the revised quotation", due_at: "2026-10-06", assigned_to: null },
+          {
+            title: "Collect the 7/12",
+            due_at: "2026-10-08",
+            assigned_to: MOCK_TEAM[0]?.id,
+            task_type: "visit",
+          },
+        ],
+      },
+      idempotencyKey: "m-1",
+    });
+
+    expect(minutes.attendees).toEqual(["Ramesh Patel", "Kiran"]);
+    expect(minutes.actionItems).toHaveLength(2);
+    expect(minutes.actionItems[1]).toMatchObject({
+      type: "visit",
+      assignedTo: { id: MOCK_TEAM[0]?.id },
+      minutesId: minutes.id,
+    });
+    expect(mockDb.tasks.find((task) => task.id === meeting.id)?.status).toBe("done");
+  });
+
+  it("refuses the whole save when one action item is for someone the user can't assign", async () => {
+    writeMockRole("employee");
+    const lead = mockDb.leads.find((item) => item.stage !== "merged");
+    const before = mockDb.tasks.length;
+
+    const error: unknown = await createMinutes({
+      body: {
+        lead_id: lead?.id,
+        held_at: "2026-10-04T11:00:00+05:30",
+        attendees: [],
+        notes: "Spoke about the subsidy.",
+        action_items: [
+          { title: "Call back", due_at: "2026-10-06" },
+          { title: "Visit", due_at: "2026-10-07", assigned_to: MOCK_TEAM[0]?.id },
+        ],
+      },
+      idempotencyKey: "m-2",
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({
+      status: 422,
+      details: { fields: { "action_items.1.assigned_to": expect.any(String) } },
+    });
+    expect(mockDb.tasks).toHaveLength(before);
+  });
+});
+
+describe("[TASK-008] exportTasks", () => {
+  afterEach(reset);
+
+  it("downloads the list with the same filters, named by the backend", async () => {
+    let sent: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/tasks/export"), ({ request }) => {
+        sent = new URL(request.url);
+      }),
+    );
+
+    const file = await exportTasks({
+      leadId: null,
+      assignedTo: "me",
+      status: ["open", "done"],
+      type: "call",
+      overdue: true,
+    });
+
+    expect(file.filename).toBe(`tasks-${TODAY}.xlsx`);
+    expect(sent?.searchParams.getAll("status")).toEqual(["open", "done"]);
+    expect(sent?.searchParams.get("assigned_to")).toBe("me");
+    expect(sent?.searchParams.get("task_type")).toBe("call");
+    expect(sent?.searchParams.get("overdue")).toBe("true");
+    expect(sent?.searchParams.has("cursor")).toBe(false);
+  });
+
+  it("explains an export that is too large", async () => {
+    server.use(
+      http.get(buildApiUrl("/tasks/export"), () =>
+        HttpResponse.json(
+          { error: { code: "export_too_large", message: "More than 5000 rows." } },
+          { status: 422 },
+        ),
+      ),
+    );
+
+    await expect(exportTasks(leadTaskParams("lead-1"))).rejects.toMatchObject({
+      code: "export_too_large",
+    });
   });
 });

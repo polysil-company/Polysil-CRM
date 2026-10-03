@@ -131,8 +131,22 @@ export type TaskPageWire = { data: TaskWire[]; meta: PageMetaWire };
 /** Tasks a page of GET /tasks asks for. */
 export const TASK_PAGE_SIZE = 25;
 
+/** GET /tasks filters (and GET /tasks/export, which takes the same). */
 export interface TaskListParams {
-  readonly leadId: string;
+  /** One lead's tasks; null for every task in the user's scope. */
+  readonly leadId: string | null;
+  /** `me`, someone's id, or null for everyone the user can see. */
+  readonly assignedTo: string | null;
+  /** None means every status. */
+  readonly status: readonly TaskStatus[];
+  readonly type: TaskType | null;
+  /** Only open tasks past their due time. */
+  readonly overdue: boolean;
+}
+
+/** A lead's tasks, whatever their status. */
+export function leadTaskParams(leadId: string): TaskListParams {
+  return { leadId, assignedTo: null, status: [], type: null, overdue: false };
 }
 
 /** GET /planner — one person's day: due that day, by time, and open tasks overdue before it. */
@@ -219,6 +233,91 @@ export const cancelTaskRequestSchema = z.object({
 });
 
 export type CancelTaskRequest = z.infer<typeof cancelTaskRequestSchema>;
+
+/** PATCH /tasks/{id} — an open task's title, due time or notes, or a reassignment. */
+export const patchTaskRequestSchema = z.object({
+  title: z.string().min(1).max(TASK_TITLE_MAX).optional(),
+  due_at: z.string().min(1).optional(),
+  notes: z.string().max(TASK_TEXT_MAX).nullable().optional(),
+  assigned_to: z.string().min(1).optional(),
+  /** Refused with 409 `status_changed` when the task is no longer this. */
+  expected_status: z.enum(TASK_STATUSES).optional(),
+});
+
+export type PatchTaskRequest = z.infer<typeof patchTaskRequestSchema>;
+
+// ---------------------------------------------------------------------------------------------
+// Meeting minutes (TASK-007)
+
+/** The backend's limits on minutes (backend/api/domain/tasks.py). */
+export const ATTENDEES_MAX = 50;
+export const ATTENDEE_MAX = 120;
+export const ACTION_ITEMS_MAX = 50;
+
+/** An action item becomes a task of one of these kinds; never a meeting. */
+export const ACTION_ITEM_TYPES = ["call", "visit", "followup", "other"] as const;
+export type ActionItemType = (typeof ACTION_ITEM_TYPES)[number];
+
+const minutesWireSchema = z.object({
+  id,
+  lead: leadLinkSchema.nullable(),
+  partner: partnerLinkSchema.nullable(),
+  /** The meeting these minutes record. */
+  task_id: z.string().nullable(),
+  held_at: isoDateTime,
+  attendees: z.array(z.string()),
+  notes: z.string(),
+  created_by: userRefSchema.nullable(),
+  created_at: isoDateTime,
+  /** Each action item's task, as it stands now. */
+  action_items: z.array(taskSchema),
+});
+
+export type MinutesWire = z.input<typeof minutesWireSchema>;
+
+const minutesSchema = minutesWireSchema.transform((wire) => ({
+  id: wire.id,
+  taskId: wire.task_id,
+  heldAt: wire.held_at,
+  attendees: wire.attendees.map((name) => name.trim()).filter((name) => name !== ""),
+  notes: wire.notes.trim(),
+  createdBy: wire.created_by,
+  createdAt: wire.created_at,
+  actionItems: wire.action_items,
+}));
+
+export type Minutes = z.output<typeof minutesSchema>;
+
+/** GET /minutes?lead_id= — newest first. */
+export const minutesListSchema = z
+  .object({ data: z.array(minutesSchema) })
+  .transform(({ data }) => data);
+
+export const minutesResponseSchema = z
+  .object({ data: minutesSchema })
+  .transform(({ data }) => data);
+
+/** POST /minutes — the minutes and a task per action item, in one save. */
+export const createMinutesRequestSchema = z.object({
+  lead_id: z.string().nullish(),
+  partner_id: z.string().nullish(),
+  task_id: z.string().nullish(),
+  held_at: z.string().min(1),
+  attendees: z.array(z.string().max(ATTENDEE_MAX)).max(ATTENDEES_MAX),
+  notes: z.string().min(1).max(TASK_TEXT_MAX),
+  action_items: z
+    .array(
+      z.object({
+        title: z.string().min(1).max(TASK_TITLE_MAX),
+        due_at: z.string().min(1),
+        assigned_to: z.string().nullish(),
+        task_type: z.enum(ACTION_ITEM_TYPES).optional(),
+      }),
+    )
+    .max(ACTION_ITEMS_MAX),
+});
+
+export type CreateMinutesRequest = z.infer<typeof createMinutesRequestSchema>;
 
 // ---------------------------------------------------------------------------------------------
 // Forms

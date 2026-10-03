@@ -1,6 +1,12 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import { getPlannerDay, getTeamDay, listTaskAssignees, listTasks } from "./tasks.api";
+import {
+  getPlannerDay,
+  getTeamDay,
+  listLeadMinutes,
+  listTaskAssignees,
+  listTasks,
+} from "./tasks.api";
 import type { PlannerParams, TaskListParams } from "./tasks.schemas";
 
 /**
@@ -13,6 +19,7 @@ export const taskKeys = {
   team: (date: string) => [...taskKeys.all, "team", date] as const,
   list: (params: TaskListParams) => [...taskKeys.all, "list", params] as const,
   assignees: () => [...taskKeys.all, "assignees"] as const,
+  minutes: (leadId: string) => [...taskKeys.all, "minutes", leadId] as const,
 };
 
 const FIRST_PAGE: string | null = null;
@@ -37,7 +44,7 @@ export function teamDayQueryOptions(date: string) {
   });
 }
 
-/** TASK-003 · A lead's tasks and meetings. */
+/** TASK-003 · Tasks in the user's scope, filtered: a lead's, or the full list. */
 export function taskListQueryOptions(params: TaskListParams) {
   return infiniteQueryOptions({
     queryKey: taskKeys.list(params),
@@ -55,5 +62,14 @@ export function taskAssigneesQueryOptions() {
     queryFn: ({ signal }) => listTaskAssignees(signal),
     staleTime: 5 * 60_000,
     meta: { dataId: "TASK-004" },
+  });
+}
+
+/** TASK-007 · A lead's meeting minutes, newest first. */
+export function leadMinutesQueryOptions(leadId: string) {
+  return queryOptions({
+    queryKey: taskKeys.minutes(leadId),
+    queryFn: ({ signal }) => listLeadMinutes(leadId, signal),
+    meta: { dataId: "TASK-007" },
   });
 }

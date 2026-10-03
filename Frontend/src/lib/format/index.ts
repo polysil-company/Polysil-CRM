@@ -1,5 +1,6 @@
 export { formatInr, formatInrCompact, sumRupees, toRupeeNumber } from "./currency";
 export {
+  calendarDayOf,
   formatCalendarDay,
   formatDate,
   formatDateTime,
@@ -9,6 +10,7 @@ export {
   isPast,
   isSameDay,
   shiftCalendarDay,
+  timeOfDayOf,
   toDate,
   todayInIndia,
   type DateInput,

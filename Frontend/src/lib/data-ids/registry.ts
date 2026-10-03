@@ -433,7 +433,7 @@ export const DATA_IDS = {
   },
   "TASK-003": {
     domain: "TASK",
-    title: "List tasks — a lead's tasks and meetings",
+    title: "List tasks — a lead's tasks, and every task with filters",
     owner: "shared",
     status: "in-progress",
     endpoints: ["GET /tasks", "GET /tasks/{id}"],
@@ -456,21 +456,21 @@ export const DATA_IDS = {
     domain: "TASK",
     title: "Edit or reassign an open task",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
     endpoints: ["PATCH /tasks/{id}"],
   },
   "TASK-007": {
     domain: "TASK",
     title: "Meeting minutes with action items",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
     endpoints: ["POST /minutes", "GET /minutes", "GET /minutes/{id}"],
   },
   "TASK-008": {
     domain: "TASK",
     title: "Export the task list to Excel",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
     endpoints: ["GET /tasks/export"],
   },
   "CHNL-001": {
