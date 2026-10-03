@@ -174,6 +174,44 @@ territory cannot be numbered yet.
 
 ---
 
+## `GET /api/v1/complaints/export`
+
+**Export Complaints**
+
+Download the complaint list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `status` | query | `draft` \| `submitted` \| `under_qc` \| `qc_approved` \| `qc_rejected` \| `cancelled` \| `remedy_pending` \| `closed`[] \| null |  | Repeatable. |
+| `complaint_type_id` | query | string \| null |  |  |
+| `severity` | query | `low` \| `medium` \| `high` \| null |  |  |
+| `partner_id` | query | string \| null |  |  |
+| `lead_id` | query | string \| null |  |  |
+| `sales_order_id` | query | string \| null |  |  |
+| `owner` | query | string \| null |  | `none`: no owner yet. |
+| `breached` | query | boolean |  |  |
+| `awaiting` | query | string \| null |  | `me`: waiting for my check or my QC verdict, oldest first; one page. |
+| `q` | query | string \| null |  | Number, contact name or mobile. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not yours to do. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `GET /api/v1/complaints/stats`
 
 **Complaint Stats**

@@ -7,7 +7,7 @@ purpose. Money comes back as decimal strings; the screen never computes a total.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.idempotency import payload_digest, run_idempotent
+from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE, TimelinePage
 from api.schemas.quotations import (
@@ -31,6 +32,7 @@ from api.schemas.quotations import (
     SendRequest,
     TransitionRequest,
 )
+from api.services import exports
 from api.services import quotations as service
 from api.storage import get_storage
 
@@ -125,6 +127,24 @@ async def list_quotations(
         db, caller, lead_id=lead_id, status=status_, sales_type=sales_type, owner=owner,
         partner_id=partner_id, q=q, created_from=created_from, created_to=created_to,
         current_only=current_only, limit=limit, cursor=cursor, include_total=include_total)
+
+
+@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+            dependencies=[Depends(require("quotations", "view"))])
+async def export_quotations(
+    db: DbSession, caller: CallerDep,
+    filters: Annotated[dict[str, Any], Depends(filters_of(list_quotations))],
+) -> Response:
+    """Download the quotation list as an Excel file, with the same filters as the list.
+
+    The file holds exactly the rows the list would show for these filters, across
+    every page, and nothing outside your scope. Call it with `fetch` and the bearer
+    token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+    narrow the filters. An empty list gives a file with the header row only.
+    """
+    return await export(list_quotations, stem="quotations", title="Quotations",
+                        columns=exports.QUOTATIONS,
+                        user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 
 @router.get("/{quotation_id}", response_model=Envelope[Quotation], responses=_ERRORS,

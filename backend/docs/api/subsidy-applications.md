@@ -94,6 +94,37 @@ the category's subsidy and farmer share, and moves the lead to won. `422` on
 
 ---
 
+## `GET /api/v1/subsidy-applications/export`
+
+**Export Applications**
+
+Download the subsidy application list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `status` | query | `open` \| `full_fp_received` \| `cancelled` \| null |  |  |
+| `stage` | query | string \| null |  | A stage code. |
+| `q` | query | string \| null |  | Application number, registration number or farmer's name. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
+| `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
 ## `GET /api/v1/subsidy-applications/{app_id}`
 
 **Get Application**

@@ -105,6 +105,37 @@ down under itself. `price_tier` is set to the type. The code must be unique.
 
 ---
 
+## `GET /api/v1/partners/export`
+
+**Export Partners**
+
+Download the partner list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `q` | query | string \| null |  | Name, code or contact person substring. |
+| `partner_type` | query | string \| null |  | distributor, dealer or sub_dealer. |
+| `parent_id` | query | string \| null |  | Children of this partner. |
+| `is_active` | query | boolean \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/partners/{item_id}`
 
 **Get Partner**

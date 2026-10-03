@@ -450,6 +450,8 @@ One approval chain.
 | `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
 | `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
+| `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
+| `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |
@@ -457,6 +459,17 @@ One approval chain.
 | `closed_at` | string \| null | yes |  |
 | `close_remark` | string \| null | yes |  |
 | `created_at` | string | yes |  |
+
+**`OrderBenefit`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `kind` | `discount` \| `entitlement_used` \| `reward_redemption` | yes |  |
+| `scheme` | SchemeRef \| null | yes | Null for reward points (FS-032). |
+| `amount` | string | yes |  |
+| `status` | `applied` \| `reversed` | yes |  |
+| `applied_at` | string | yes |  |
 
 **`OrderComplaintRef`**
 
@@ -770,6 +783,14 @@ One approval chain.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `order` | RemedyOrder \| null | yes |  |
+
+**`SchemeRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
 
 **`SellerRef`**
 

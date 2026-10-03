@@ -21,6 +21,7 @@ from api.schemas.complaints import Complaint
 from api.schemas.leads import UUID_RE, OrgUnitRef, PageMeta, PartnerRef, TerritoryRef, UserRef
 from api.schemas.products import MAX_LINES, _places
 from api.schemas.quotations import Quotation, QuotationLineIn, Totals
+from api.schemas.schemes import OrderBenefit
 
 OrderType = Literal["commercial", "industrial", "export", "sample", "marketing_material",
                     "subsidised", "replacement"]
@@ -344,6 +345,14 @@ class Order(BaseModel):
         default=None, description="Whether the buyer was sent the WhatsApp confirmation on "
                                   "approval: queued, no_mobile (tell the officer to call), "
                                   "or disabled. Null before approval.")
+    benefits: list[OrderBenefit] = Field(
+        default_factory=list,
+        description="Scheme benefits on the order (FS-031): applied at submit, reversed if "
+                    "it returns to draft or is cancelled. They reduce `payable`, never the "
+                    "invoice.")
+    payable: str | None = Field(
+        default=None, description="What the buyer owes: the total minus the applied "
+                                  "benefits. Payments count against this.")
     submitted_at: str | None
     approved_at: str | None
     cancelled_at: str | None

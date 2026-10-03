@@ -113,6 +113,39 @@ counts) is `409`.
 
 ---
 
+## `GET /api/v1/users/export`
+
+**Export Users**
+
+Download the user list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `q` | query | string \| null |  | Name, email or mobile substring. |
+| `user_type` | query | string \| null |  | staff or partner_user. |
+| `role` | query | string \| null |  | A role code. |
+| `org_unit_id` | query | string \| null |  | Staff anchored on this office. |
+| `partner_id` | query | string \| null |  | Users anchored on this partner. |
+| `is_active` | query | boolean \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions, or a temporary password must be changed first (`password_change_required`). |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `DELETE /api/v1/users/{user_id}`
 
 **Delete User**

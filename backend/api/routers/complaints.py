@@ -17,6 +17,7 @@ from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.domain import complaints as domain
 from api.idempotency import payload_digest, run_idempotent
+from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.complaints import (
     Assignee,
@@ -40,6 +41,7 @@ from api.schemas.complaints import (
 )
 from api.schemas.leads import UUID_RE, TimelinePage
 from api.services import complaints as service
+from api.services import exports
 from api.storage import get_storage
 from api.upload_limit import BodyTooLarge
 
@@ -123,6 +125,27 @@ async def complaint_stats(db: DbSession) -> Envelope[Stats]:
     """Counts by status, breached and no-target counts, and whether files can be
     stored now (`storage_available`; hide the upload button when false)."""
     return Envelope(data=await service.stats(db, get_storage(get_settings())))
+
+
+@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+            dependencies=[Depends(require("complaints", "view"))])
+async def export_complaints(
+    db: DbSession, caller: CallerDep,
+    filters: Annotated[dict[str, Any], Depends(filters_of(list_complaints))],
+) -> Response:
+    """Download the complaint list as an Excel file, with the same filters as the list.
+
+    The file holds exactly the rows the list would show for these filters, across
+    every page, and nothing outside your scope. Call it with `fetch` and the bearer
+    token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+    narrow the filters. An empty list gives a file with the header row only.
+    """
+    if filters.get("awaiting"):
+        # the queue is one page with no cursor: draining it would stop at 100 (FS-030 rule 10)
+        raise exports.FilterNotExportableError(
+            "The approval queue cannot be exported. Remove the awaiting filter.")
+    return await export(list_complaints, stem="complaints", title="Complaints", columns=exports.COMPLAINTS,
+                        user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 
 @router.get("/{complaint_id}", response_model=Envelope[Complaint], responses=_ERRORS,

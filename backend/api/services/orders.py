@@ -138,6 +138,10 @@ def map_db_error(exc: DBAPIError) -> Exception:
     as a 500 (PR #10 review)."""
     code = _sqlstate(exc) or ""
     msg = _pg_text(exc)
+    if code in ("40P01", "40001"):
+        # a deadlock or serialization abort: nothing was written, the same request can be retried
+        return ConflictError("Someone else changed this at the same moment. Try again.",
+                             code="try_again")
     if code == "42501":
         if "self_approval" in msg:
             return ForbiddenError("You cannot decide on your own request.", code="self_approval")
@@ -490,7 +494,11 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         c = (await db.execute(text("SELECT * FROM order_complaint(CAST(:o AS uuid))"),
                               {"o": order_id})).one_or_none()
         complaint = sch.OrderComplaintRef(id=str(c.id), complaint_no=c.complaint_no) if c else None
+    from api.services import schemes as scheme_service  # schemes imports this module
+    totals = _totals(r)
+    benefits, payable = await scheme_service.order_benefits(db, order_id, Decimal(totals.total))
     return sch.Order(
+        benefits=benefits, payable=payable,
         id=str(r.id), order_no=r.order_no, complaint=complaint, status=r.status_text,
         order_type=r.type_text,
         party=sch.OrderParty(name=r.party_name, mobile=r.party_mobile, address=r.party_address,
@@ -508,7 +516,7 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
                                      level=r.pos_level),
         intra_state=r.intra_state, price_effective_date=r.price_effective_date.isoformat(),
         tax_date=_iso(r.tax_date), is_provisional=r.is_provisional, lines=lines,
-        totals=_totals(r), approval=approval, last_rejection=last_rejection,
+        totals=totals, approval=approval, last_rejection=last_rejection,
         dispatches=await _dispatches(db, order_id, portal), warnings=_warnings(r, lines),
         pdf_state=("pending" if r.pdf_state == "rendering" else r.pdf_state or "none"),
         pdf_error=None if portal else r.pdf_error,

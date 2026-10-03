@@ -27,6 +27,7 @@ from api.storage import get_storage
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
 from worker.jobs.quotations import quotation_expire, quotation_render_due, renderer_available
+from worker.jobs.schemes import scheme_nightly
 from worker.schedules import CRON_JOBS
 
 log = structlog.get_logger()
@@ -79,7 +80,8 @@ async def on_shutdown(ctx: dict[str, Any]) -> None:
 class WorkerSettings:
     redis_settings = _redis_settings()
     functions: ClassVar[list] = [outbox_drain, purge_expired_sessions,
-                                 quotation_render_due, quotation_expire, order_render_due]
+                                 quotation_render_due, quotation_expire, order_render_due,
+                                 scheme_nightly]
     cron_jobs: ClassVar[list] = CRON_JOBS
     on_startup = on_startup
     on_shutdown = on_shutdown

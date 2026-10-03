@@ -121,6 +121,43 @@ draft has no number until it is submitted.
 
 ---
 
+## `GET /api/v1/orders/export`
+
+**Export Orders**
+
+Download the order list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `status` | query | string \| null |  | One status, or several separated by commas: submitted,approved,partially_dispatched. |
+| `order_type` | query | string \| null |  | One order type. |
+| `partner_id` | query | string \| null |  | Orders placed through this partner. |
+| `lead_id` | query | string \| null |  | Orders on this lead. |
+| `quotation_id` | query | string \| null |  | Orders this quotation is or was on. A cancelled order released it; add `status` to find the live one. |
+| `owner` | query | string \| null |  | `me`, or a user id. |
+| `q` | query | string \| null |  | Order number, party name or mobile. |
+| `from` | query | string \| null |  | ISO date, IST. |
+| `to` | query | string \| null |  | ISO date, inclusive. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions, or not your step. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `GET /api/v1/orders/stats`
 
 **Order Stats**
@@ -466,6 +503,33 @@ once the order is cancelled.
 
 ---
 
+## `GET /api/v1/orders/{order_id}/schemes`
+
+**Order Schemes**
+
+The schemes panel on a draft order (FS-031): the discounts and credits submit
+would apply now, the points or credit it would earn on delivery, and the
+payable. Nothing is stored by reading it; submit stores the same figures.
+`409 order_not_draft` once submitted: read `benefits` on the order instead.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `order_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_OrderSchemePreview_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions, or not your step. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `POST /api/v1/orders/{order_id}/submit`
 
 **Submit Order**
@@ -620,6 +684,12 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `data` | Dispatch | yes |  |
 
+**`Envelope_OrderSchemePreview_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | OrderSchemePreview | yes |  |
+
 **`Envelope_Order_`**
 
 | Field | Type | Required | Notes |
@@ -695,6 +765,8 @@ and only the outcome to a dealer.
 | `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
 | `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
+| `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
+| `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |
@@ -702,6 +774,17 @@ and only the outcome to a dealer.
 | `closed_at` | string \| null | yes |  |
 | `close_remark` | string \| null | yes |  |
 | `created_at` | string | yes |  |
+
+**`OrderBenefit`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `kind` | `discount` \| `entitlement_used` \| `reward_redemption` | yes |  |
+| `scheme` | SchemeRef \| null | yes | Null for reward points (FS-032). |
+| `amount` | string | yes |  |
+| `status` | `applied` \| `reversed` | yes |  |
+| `applied_at` | string | yes |  |
 
 **`OrderComplaintRef`**
 
@@ -809,6 +892,16 @@ and only the outcome to a dealer.
 | `remarks` | string \| null |  |  |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
+**`OrderSchemePreview`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `discounts` | PreviewDiscount[] | yes |  |
+| `entitlements` | PreviewEntitlement[] | yes |  |
+| `on_delivery` | PreviewOnDelivery[] | yes | Earned when the order is delivered, worked on the full quantity; the real figure uses what is dispatched. |
+| `total_benefit` | string | yes |  |
+| `payable` | string | yes | The order total minus the benefits. |
+
 **`OrderSeller`**
 
 | Field | Type | Required | Notes |
@@ -868,6 +961,31 @@ and only the outcome to a dealer.
 | `expires_at` | string | yes |  |
 | `filename` | string | yes |  |
 
+**`PreviewDiscount`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `scheme` | SchemeRef | yes |  |
+| `basis` | string | yes | The counted lines' taxable value. |
+| `amount` | string | yes |  |
+
+**`PreviewEntitlement`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `entitlement_id` | string | yes |  |
+| `scheme` | SchemeRef | yes |  |
+| `amount` | string | yes |  |
+
+**`PreviewOnDelivery`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `scheme` | SchemeRef | yes |  |
+| `kind` | `points` \| `next_order_credit` | yes |  |
+| `points` | integer \| null | yes | Points earned when the order is delivered. |
+| `basis` | string | yes |  |
+
 **`QuotationLineIn`**
 
 | Field | Type | Required | Notes |
@@ -894,6 +1012,14 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `remark` | string | yes | Why. Kept on the order and its timeline. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
+
+**`SchemeRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
 
 **`SubmitRequest`**
 

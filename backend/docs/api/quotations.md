@@ -119,6 +119,43 @@ that blocks them.
 
 ---
 
+## `GET /api/v1/quotations/export`
+
+**Export Quotations**
+
+Download the quotation list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | query | string \| null |  | Quotations on this lead, and on any lead merged into it. |
+| `status` | query | string \| null |  | One status, or several separated by commas: sent,viewed,negotiation. |
+| `sales_type` | query | string \| null |  |  |
+| `owner` | query | string \| null |  | `me`, or a user id. |
+| `partner_id` | query | string \| null |  |  |
+| `q` | query | string \| null |  | Number, party name or mobile. |
+| `from` | query | string \| null |  | ISO date. |
+| `to` | query | string \| null |  | ISO date, inclusive. |
+| `current_only` | query | boolean |  | Hide superseded versions. On by default; switch it off to see every version of every number. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `DELETE /api/v1/quotations/{quotation_id}`
 
 **Delete Quotation**
