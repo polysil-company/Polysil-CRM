@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require, require_any
 from api.idempotency import payload_digest, run_idempotent
+from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE, TimelinePage
 from api.schemas.orders import (
@@ -39,8 +40,11 @@ from api.schemas.orders import (
     ThresholdPut,
 )
 from api.schemas.quotations import PdfLink
+from api.schemas.schemes import OrderSchemePreview
 from api.services import approvals as approval_service
+from api.services import exports
 from api.services import orders as service
+from api.services import schemes as scheme_service
 from api.storage import get_storage
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -164,6 +168,23 @@ async def order_stats(
         lead_id=lead_id, owner=owner, created_from=created_from, created_to=created_to)
 
 
+@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+            dependencies=[Depends(require("sales_orders", "view"))])
+async def export_orders(
+    db: DbSession, caller: CallerDep,
+    filters: Annotated[dict[str, Any], Depends(filters_of(list_orders))],
+) -> Response:
+    """Download the order list as an Excel file, with the same filters as the list.
+
+    The file holds exactly the rows the list would show for these filters, across
+    every page, and nothing outside your scope. Call it with `fetch` and the bearer
+    token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+    narrow the filters. An empty list gives a file with the header row only.
+    """
+    return await export(list_orders, stem="orders", title="Orders", columns=exports.ORDERS,
+                        user_id=caller.user_id, filters=filters, db=db, caller=caller)
+
+
 @router.get("/{order_id}", response_model=Envelope[Order], responses=_ERRORS,
             dependencies=[Depends(require("sales_orders", "view"))])
 async def get_order(order_id: Id, db: DbSession, caller: CallerDep) -> dict[str, Any]:
@@ -172,6 +193,16 @@ async def get_order(order_id: Id, db: DbSession, caller: CallerDep) -> dict[str,
     partner or owner you cannot see is null. A dealer sees no approver names and no
     remarks."""
     return _order(await service.get_order(db, caller, order_id))
+
+
+@router.get("/{order_id}/schemes", response_model=Envelope[OrderSchemePreview],
+            responses=_ERRORS, dependencies=[Depends(require("sales_orders", "view"))])
+async def order_schemes(order_id: Id, db: DbSession) -> Envelope[OrderSchemePreview]:
+    """The schemes panel on a draft order (FS-031): the discounts and credits submit
+    would apply now, the points or credit it would earn on delivery, and the
+    payable. Nothing is stored by reading it; submit stores the same figures.
+    `409 order_not_draft` once submitted: read `benefits` on the order instead."""
+    return Envelope(data=await scheme_service.order_preview(db, order_id))
 
 
 @router.get("/{order_id}/pdf", response_model=Envelope[PdfLink],

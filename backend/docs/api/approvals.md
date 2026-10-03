@@ -222,20 +222,6 @@ One approval chain.
 | `uploaded_by` | UserRef \| null | yes |  |
 | `uploaded_at` | string | yes |  |
 
-**`Can`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `edit` | boolean | yes |  |
-| `submit` | boolean | yes |  |
-| `check` | boolean | yes |  |
-| `qc` | boolean | yes |  |
-| `cancel` | boolean | yes |  |
-| `delete` | boolean | yes |  |
-| `upload` | boolean | yes |  |
-| `remedy` | boolean | yes | Choose a remedy (FS-015b). |
-| `withdraw` | boolean | yes | Withdraw the pending remedy. |
-
 **`Cancellation`**
 
 | Field | Type | Required | Notes |
@@ -267,7 +253,7 @@ One approval chain.
 | `description` | string | yes |  |
 | `contact_name` | string | yes |  |
 | `contact_mobile` | string | yes |  |
-| `territory` | Ref | yes |  |
+| `territory` | api__schemas__complaints__Ref | yes |  |
 | `partner` | PartnerLink \| null | yes |  |
 | `lead` | LeadLink \| null | yes |  |
 | `sales_order` | OrderLink \| null | yes |  |
@@ -277,7 +263,7 @@ One approval chain.
 | `pims_no` | string \| null | yes |  |
 | `sample_courier_date` | string \| null | yes |  |
 | `sample_courier_detail` | string \| null | yes |  |
-| `lines` | Line-Output[] | yes |  |
+| `lines` | api__schemas__complaints__Line[] | yes |  |
 | `attachments` | Attachment[] | yes |  |
 | `check` | Check \| null | yes | The manager's decision since the latest submit. |
 | `quality` | Quality \| null | yes |  |
@@ -285,11 +271,11 @@ One approval chain.
 | `sla` | Sla \| null | yes | Null before the first submit. |
 | `submit_count` | integer | yes |  |
 | `owner` | UserRef \| null | yes |  |
-| `owner_org_unit` | Ref | yes |  |
+| `owner_org_unit` | api__schemas__complaints__Ref | yes |  |
 | `raised_by` | UserRef \| null | yes |  |
 | `remedy` | Remedy \| null |  | The live or the last remedy. |
 | `closed_at` | string \| null |  |  |
-| `can` | Can | yes |  |
+| `can` | api__schemas__complaints__Can | yes |  |
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
 | `submitted_at` | string \| null | yes |  |
@@ -403,18 +389,6 @@ One approval chain.
 | `inquiry_no` | string | yes |  |
 | `stage` | `new` \| `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` \| `merged` \| `dormant` | yes |  |
 
-**`Line-Output`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `product` | ProductRef | yes |  |
-| `uom` | string \| null | yes |  |
-| `supplied_qty` | string | yes |  |
-| `defective_qty` | string | yes |  |
-| `failure_frequency` | string \| null | yes |  |
-| `remark` | string \| null | yes |  |
-
 **`Order`**
 
 | Field | Type | Required | Notes |
@@ -441,7 +415,7 @@ One approval chain.
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
-| `totals` | Totals | yes |  |
+| `totals` | api__schemas__quotations__Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
 | `last_rejection` | LastRejection \| null | yes | Set while a rejected order is back in draft. |
 | `dispatches` | Dispatch[] | yes |  |
@@ -450,6 +424,8 @@ One approval chain.
 | `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
 | `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
+| `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
+| `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |
@@ -457,6 +433,17 @@ One approval chain.
 | `closed_at` | string \| null | yes |  |
 | `close_remark` | string \| null | yes |  |
 | `created_at` | string | yes |  |
+
+**`OrderBenefit`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `kind` | `discount` \| `entitlement_used` \| `reward_redemption` | yes |  |
+| `scheme` | SchemeRef \| null | yes | Null for reward points (FS-032). |
+| `amount` | string | yes |  |
+| `status` | `applied` \| `reversed` | yes |  |
+| `applied_at` | string | yes |  |
 
 **`OrderComplaintRef`**
 
@@ -660,7 +647,7 @@ One approval chain.
 | `price_list` | PriceListRef \| null | yes | Null when the lines drew from more than one list. |
 | `price_list_ids` | string[] | yes |  |
 | `lines` | QuotationLine[] | yes |  |
-| `totals` | Totals | yes |  |
+| `totals` | api__schemas__quotations__Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
 | `warnings` | string[] | yes | Each is `code: sentence`. |
 | `terms` | string \| null | yes |  |
@@ -726,20 +713,13 @@ One approval chain.
 | `quote_no` | string \| null | yes |  |
 | `version` | integer | yes |  |
 
-**`Ref`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `name` | string | yes |  |
-
 **`Refund`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `amount` | string | yes |  |
 | `payee_name` | string \| null | yes | Null for a dealer. |
-| `paid_through` | Ref \| null | yes | Null for a dealer. |
+| `paid_through` | api__schemas__complaints__Ref \| null | yes | Null for a dealer. |
 | `approval` | Approval \| null | yes | This refund's own request. Null for a dealer. |
 | `payment_reference` | string \| null | yes | The Account Manager's remark once paid. Null for a dealer. |
 
@@ -770,6 +750,14 @@ One approval chain.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `order` | RemedyOrder \| null | yes |  |
+
+**`SchemeRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
 
 **`SellerRef`**
 
@@ -820,18 +808,6 @@ One approval chain.
 | `territory_id` | string \| null |  | Null for the company-wide row. |
 | `max_amount` | number \| string \| null |  | Null for no ceiling. An order's is rupees including GST, above 0; a quotation's is a discount in percent, 0 to 100 (0: no discount without approval). |
 
-**`Totals`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `gross` | string | yes |  |
-| `discount` | string | yes |  |
-| `taxable` | string | yes |  |
-| `cgst` | string | yes |  |
-| `sgst` | string | yes |  |
-| `igst` | string | yes |  |
-| `total` | string | yes |  |
-
 **`TypeRef`**
 
 | Field | Type | Required | Notes |
@@ -854,6 +830,39 @@ One approval chain.
 | `id` | string | yes |  |
 | `version` | integer | yes |  |
 
+**`api__schemas__complaints__Can`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `edit` | boolean | yes |  |
+| `submit` | boolean | yes |  |
+| `check` | boolean | yes |  |
+| `qc` | boolean | yes |  |
+| `cancel` | boolean | yes |  |
+| `delete` | boolean | yes |  |
+| `upload` | boolean | yes |  |
+| `remedy` | boolean | yes | Choose a remedy (FS-015b). |
+| `withdraw` | boolean | yes | Withdraw the pending remedy. |
+
+**`api__schemas__complaints__Line`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `product` | ProductRef | yes |  |
+| `uom` | string \| null | yes |  |
+| `supplied_qty` | string | yes |  |
+| `defective_qty` | string | yes |  |
+| `failure_frequency` | string \| null | yes |  |
+| `remark` | string \| null | yes |  |
+
+**`api__schemas__complaints__Ref`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+
 **`api__schemas__leads__PartnerRef`**
 
 | Field | Type | Required | Notes |
@@ -861,3 +870,15 @@ One approval chain.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 | `partner_type` | string | yes | distributor, dealer or sub_dealer. |
+
+**`api__schemas__quotations__Totals`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `gross` | string | yes |  |
+| `discount` | string | yes |  |
+| `taxable` | string | yes |  |
+| `cgst` | string | yes |  |
+| `sgst` | string | yes |  |
+| `igst` | string | yes |  |
+| `total` | string | yes |  |

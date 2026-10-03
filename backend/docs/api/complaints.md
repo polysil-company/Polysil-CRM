@@ -158,7 +158,7 @@ territory cannot be numbered yet.
 | `sample_courier_detail` | string \| null |  |  |
 | `complaint_type_id` | string | yes |  |
 | `severity` | `low` \| `medium` \| `high` |  | Default `medium`. |
-| `lines` | LineIn[] | yes |  |
+| `lines` | api__schemas__complaints__LineIn[] | yes |  |
 
 **Responses**
 
@@ -170,6 +170,44 @@ territory cannot be numbered yet.
 | `403` | `ErrorResponse` | Not yours to do. |
 | `404` | `ErrorResponse` | Not in your scope. |
 | `409` | `ErrorResponse` | `status_changed`: someone acted first, reload. `complaint_not_draft`: it was submitted. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
+## `GET /api/v1/complaints/export`
+
+**Export Complaints**
+
+Download the complaint list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `status` | query | `draft` \| `submitted` \| `under_qc` \| `qc_approved` \| `qc_rejected` \| `cancelled` \| `remedy_pending` \| `closed`[] \| null |  | Repeatable. |
+| `complaint_type_id` | query | string \| null |  |  |
+| `severity` | query | `low` \| `medium` \| `high` \| null |  |  |
+| `partner_id` | query | string \| null |  |  |
+| `lead_id` | query | string \| null |  |  |
+| `sales_order_id` | query | string \| null |  |  |
+| `owner` | query | string \| null |  | `none`: no owner yet. |
+| `breached` | query | boolean |  |  |
+| `awaiting` | query | string \| null |  | `me`: waiting for my check or my QC verdict, oldest first; one page. |
+| `q` | query | string \| null |  | Number, contact name or mobile. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not yours to do. |
+| `404` | `ErrorResponse` | Not in your scope. |
 | `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
 
 ---
@@ -499,7 +537,7 @@ Replace a draft's products, 1 to 20, each once.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `lines` | LineIn[] | yes |  |
+| `lines` | api__schemas__complaints__LineIn[] | yes |  |
 
 **Responses**
 
@@ -744,20 +782,6 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `url` | string | yes | Valid ten minutes. Use it as an image source or a download; never fetch it with the bearer token. |
 | `expires_at` | string | yes |  |
 
-**`Can`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `edit` | boolean | yes |  |
-| `submit` | boolean | yes |  |
-| `check` | boolean | yes |  |
-| `qc` | boolean | yes |  |
-| `cancel` | boolean | yes |  |
-| `delete` | boolean | yes |  |
-| `upload` | boolean | yes |  |
-| `remedy` | boolean | yes | Choose a remedy (FS-015b). |
-| `withdraw` | boolean | yes | Withdraw the pending remedy. |
-
 **`CancelIn`**
 
 | Field | Type | Required | Notes |
@@ -805,7 +829,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `description` | string | yes |  |
 | `contact_name` | string | yes |  |
 | `contact_mobile` | string | yes |  |
-| `territory` | Ref | yes |  |
+| `territory` | api__schemas__complaints__Ref | yes |  |
 | `partner` | PartnerLink \| null | yes |  |
 | `lead` | LeadLink \| null | yes |  |
 | `sales_order` | OrderLink \| null | yes |  |
@@ -815,7 +839,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `pims_no` | string \| null | yes |  |
 | `sample_courier_date` | string \| null | yes |  |
 | `sample_courier_detail` | string \| null | yes |  |
-| `lines` | Line-Output[] | yes |  |
+| `lines` | api__schemas__complaints__Line[] | yes |  |
 | `attachments` | Attachment[] | yes |  |
 | `check` | Check \| null | yes | The manager's decision since the latest submit. |
 | `quality` | Quality \| null | yes |  |
@@ -823,11 +847,11 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `sla` | Sla \| null | yes | Null before the first submit. |
 | `submit_count` | integer | yes |  |
 | `owner` | UserRef \| null | yes |  |
-| `owner_org_unit` | Ref | yes |  |
+| `owner_org_unit` | api__schemas__complaints__Ref | yes |  |
 | `raised_by` | UserRef \| null | yes |  |
 | `remedy` | Remedy \| null |  | The live or the last remedy. |
 | `closed_at` | string \| null |  |  |
-| `can` | Can | yes |  |
+| `can` | api__schemas__complaints__Can | yes |  |
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
 | `submitted_at` | string \| null | yes |  |
@@ -851,7 +875,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `sample_courier_detail` | string \| null |  |  |
 | `complaint_type_id` | string | yes |  |
 | `severity` | `low` \| `medium` \| `high` |  | Default `medium`. |
-| `lines` | LineIn[] | yes |  |
+| `lines` | api__schemas__complaints__LineIn[] | yes |  |
 
 **`ComplaintPage`**
 
@@ -949,28 +973,6 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `inquiry_no` | string \| null |  |  |
 | `farmer_name` | string \| null |  |  |
 
-**`Line-Output`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `product` | ProductRef | yes |  |
-| `uom` | string \| null | yes |  |
-| `supplied_qty` | string | yes |  |
-| `defective_qty` | string | yes |  |
-| `failure_frequency` | string \| null | yes |  |
-| `remark` | string \| null | yes |  |
-
-**`LineIn`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `product_id` | string | yes |  |
-| `supplied_qty` | number \| string | yes | More than zero. |
-| `defective_qty` | number \| string | yes | Zero or more, not more than supplied. |
-| `failure_frequency` | string \| null |  |  |
-| `remark` | string \| null |  |  |
-
 **`OrderLink`**
 
 | Field | Type | Required | Notes |
@@ -1028,20 +1030,13 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `at` | string | yes |  |
 | `internal_note` | string \| null |  | Staff only; absent for a dealer. |
 
-**`Ref`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `name` | string | yes |  |
-
 **`Refund`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `amount` | string | yes |  |
 | `payee_name` | string \| null | yes | Null for a dealer. |
-| `paid_through` | Ref \| null | yes | Null for a dealer. |
+| `paid_through` | api__schemas__complaints__Ref \| null | yes | Null for a dealer. |
 | `approval` | Approval \| null | yes | This refund's own request. Null for a dealer. |
 | `payment_reference` | string \| null | yes | The Account Manager's remark once paid. Null for a dealer. |
 
@@ -1180,8 +1175,51 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `full_name` | string | yes |  |
 | `org_unit_id` | string \| null | yes |  |
 
+**`api__schemas__complaints__Can`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `edit` | boolean | yes |  |
+| `submit` | boolean | yes |  |
+| `check` | boolean | yes |  |
+| `qc` | boolean | yes |  |
+| `cancel` | boolean | yes |  |
+| `delete` | boolean | yes |  |
+| `upload` | boolean | yes |  |
+| `remedy` | boolean | yes | Choose a remedy (FS-015b). |
+| `withdraw` | boolean | yes | Withdraw the pending remedy. |
+
+**`api__schemas__complaints__Line`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `product` | ProductRef | yes |  |
+| `uom` | string \| null | yes |  |
+| `supplied_qty` | string | yes |  |
+| `defective_qty` | string | yes |  |
+| `failure_frequency` | string \| null | yes |  |
+| `remark` | string \| null | yes |  |
+
+**`api__schemas__complaints__LineIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `product_id` | string | yes |  |
+| `supplied_qty` | number \| string | yes | More than zero. |
+| `defective_qty` | number \| string | yes | Zero or more, not more than supplied. |
+| `failure_frequency` | string \| null |  |  |
+| `remark` | string \| null |  |  |
+
 **`api__schemas__complaints__LinesReplace`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `lines` | LineIn[] | yes |  |
+| `lines` | api__schemas__complaints__LineIn[] | yes |  |
+
+**`api__schemas__complaints__Ref`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |

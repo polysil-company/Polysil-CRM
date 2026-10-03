@@ -94,6 +94,37 @@ the category's subsidy and farmer share, and moves the lead to won. `422` on
 
 ---
 
+## `GET /api/v1/subsidy-applications/export`
+
+**Export Applications**
+
+Download the subsidy application list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `status` | query | `open` \| `full_fp_received` \| `cancelled` \| null |  |  |
+| `stage` | query | string \| null |  | A stage code. |
+| `q` | query | string \| null |  | Application number, registration number or farmer's name. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
+| `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
 ## `GET /api/v1/subsidy-applications/{app_id}`
 
 **Get Application**
@@ -424,12 +455,12 @@ Build "Record stage" from this; the stages are data, not code.
 | `village` | string \| null | yes |  |
 | `survey_no` | string \| null | yes |  |
 | `territory` | TerritoryRef | yes |  |
-| `partner` | Ref \| null | yes |  |
+| `partner` | api__schemas__complaints__Ref \| null | yes |  |
 | `total_area` | string | yes |  |
 | `group_total_area` | string \| null | yes |  |
 | `figures` | Figures | yes |  |
 | `owner` | UserRef \| null | yes |  |
-| `owner_org_unit` | Ref | yes |  |
+| `owner_org_unit` | api__schemas__complaints__Ref | yes |  |
 | `documents` | DocumentCount | yes |  |
 | `ageing` | Ageing | yes |  |
 | `full_fp_received_on` | string \| null | yes |  |
@@ -652,13 +683,6 @@ Build "Record stage" from this; the stages are data, not code.
 | `qty` | number \| string | yes | Quantity, at most three decimals. |
 | `product_id` | string \| null |  | The catalogue row this line is, when the designer picked it from the product list. Optional, and additive: the rate and description still come from this request, because a subsidy quotation is costed at the scheme's figures rather than at ours. What it buys is the two checks the catalogue makes possible - a head-unit item cannot appear in a crop block, and an item marked not subsidy-eligible cannot appear at all. |
 
-**`Ref`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `name` | string | yes |  |
-
 **`StageDef`**
 
 | Field | Type | Required | Notes |
@@ -706,3 +730,10 @@ Build "Record stage" from this; the stages are data, not code.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
+
+**`api__schemas__complaints__Ref`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |

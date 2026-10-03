@@ -15,6 +15,7 @@ from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.domain import complaints as upload_rules
 from api.idempotency import payload_digest, run_idempotent
+from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE
 from api.schemas.subsidy_applications import (
@@ -30,6 +31,7 @@ from api.schemas.subsidy_applications import (
     StageDef,
     StageRecord,
 )
+from api.services import exports
 from api.services import subsidy_applications as service
 from api.storage import get_storage
 from api.upload_limit import BodyTooLarge
@@ -115,6 +117,24 @@ async def list_applications(
     """The worklist, newest first, in your scope."""
     return await service.list_applications(db, status=status, stage=stage, q=q, cursor=cursor,
                                            limit=limit)
+
+
+@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+            dependencies=[Depends(require("subsidy", "view"))])
+async def export_applications(
+    db: DbSession, caller: CallerDep,
+    filters: Annotated[dict[str, Any], Depends(filters_of(list_applications))],
+) -> Response:
+    """Download the subsidy application list as an Excel file, with the same filters as the list.
+
+    The file holds exactly the rows the list would show for these filters, across
+    every page, and nothing outside your scope. Call it with `fetch` and the bearer
+    token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+    narrow the filters. An empty list gives a file with the header row only.
+    """
+    return await export(list_applications, stem="subsidy-applications",
+                        title="Subsidy applications", columns=exports.SUBSIDY_APPLICATIONS,
+                        user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 
 @router.get("/{app_id}", response_model=Envelope[Application], responses=_ERRORS,

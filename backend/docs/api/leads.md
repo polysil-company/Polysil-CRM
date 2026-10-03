@@ -285,6 +285,47 @@ pair leaves the queue and both timelines record the dismissal.
 
 ---
 
+## `GET /api/v1/leads/export`
+
+**Export Leads**
+
+Download the lead list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `stage` | query | string \| null |  | Comma-separated stages. Defaults to every stage except `merged`; `?stage=merged` lists the merge losers for an audit. |
+| `priority` | query | string \| null |  | hot, warm or cold. |
+| `owner_user_id` | query | string \| null |  | Leads owned by this user. |
+| `owner` | query | string \| null |  | `none` for the unassigned list a manager works from. |
+| `territory_id` | query | string \| null |  | Leads in these territories or anywhere under them, up to 20 ids comma-separated: a state selects its districts and talukas. |
+| `owner_org_unit_id` | query | string \| null |  | Leads owned by this office or any office under it (the hierarchy filter). |
+| `assigned_partner_id` | query | string \| null |  | Leads assigned to this partner or any partner under it: a distributor selects its dealers' leads too. |
+| `source` | query | string \| null |  | A source code. |
+| `inquiry_type` | query | string \| null |  |  |
+| `created_from` | query | string \| null |  | ISO date, inclusive. |
+| `created_to` | query | string \| null |  | ISO date, inclusive. |
+| `q` | query | string \| null |  | Name, mobile or inquiry number. |
+| `sort` | query | `created_at` \| `farmer_name` \| `estimated_value` |  | The column to sort by. `farmer_name` ignores case; leads with no `estimated_value` come last in both orders. |
+| `order` | query | `asc` \| `desc` |  | asc or desc. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/leads/stats`
 
 **Lead Stats**

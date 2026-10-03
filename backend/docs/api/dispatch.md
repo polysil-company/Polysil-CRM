@@ -213,7 +213,7 @@ order.
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
-| `totals` | Totals | yes |  |
+| `totals` | api__schemas__quotations__Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
 | `last_rejection` | LastRejection \| null | yes | Set while a rejected order is back in draft. |
 | `dispatches` | Dispatch[] | yes |  |
@@ -222,6 +222,8 @@ order.
 | `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
 | `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
+| `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
+| `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |
@@ -229,6 +231,17 @@ order.
 | `closed_at` | string \| null | yes |  |
 | `close_remark` | string \| null | yes |  |
 | `created_at` | string | yes |  |
+
+**`OrderBenefit`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `kind` | `discount` \| `entitlement_used` \| `reward_redemption` | yes |  |
+| `scheme` | SchemeRef \| null | yes | Null for reward points (FS-032). |
+| `amount` | string | yes |  |
+| `status` | `applied` \| `reversed` | yes |  |
+| `applied_at` | string | yes |  |
 
 **`OrderComplaintRef`**
 
@@ -330,6 +343,14 @@ order.
 | `remark` | string | yes | Why. Kept on the order and its timeline. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
+**`SchemeRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+
 **`TerritoryRef`**
 
 | Field | Type | Required | Notes |
@@ -337,18 +358,6 @@ order.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 | `level` | string | yes | state, district, taluka or village. |
-
-**`Totals`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `gross` | string | yes |  |
-| `discount` | string | yes |  |
-| `taxable` | string | yes |  |
-| `cgst` | string | yes |  |
-| `sgst` | string | yes |  |
-| `igst` | string | yes |  |
-| `total` | string | yes |  |
 
 **`UserRef`**
 
@@ -364,3 +373,15 @@ order.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 | `partner_type` | string | yes | distributor, dealer or sub_dealer. |
+
+**`api__schemas__quotations__Totals`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `gross` | string | yes |  |
+| `discount` | string | yes |  |
+| `taxable` | string | yes |  |
+| `cgst` | string | yes |  |
+| `sgst` | string | yes |  |
+| `igst` | string | yes |  |
+| `total` | string | yes |  |

@@ -58,6 +58,10 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
     code = "S" + tag[:3].upper()
     hsn = "9" + "".join(random.choice("0123456789") for _ in range(7))
     s = sessions()
+    # 4,096 codes, and a failed teardown leaves its state behind: skip a code in use
+    while (await s.execute(text("SELECT 1 FROM territory WHERE level = 'state' AND code = :c"),
+                           {"c": code})).first():
+        code = "S" + uuid.uuid4().hex[:3].upper()
     state = str((await s.execute(text(
         "INSERT INTO territory (level, name, code) VALUES ('state', :n, :c) RETURNING id"),
         {"n": f"ord_state_{tag}", "c": code})).scalar_one())

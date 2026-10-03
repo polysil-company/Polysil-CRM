@@ -276,6 +276,43 @@ The assignee picker: you first, then the active staff below you.
 
 ---
 
+## `GET /api/v1/tasks/export`
+
+**Export Tasks**
+
+Download the task list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `assigned_to` | query | string \| null |  | `me` or a user id. |
+| `status` | query | string[] \| null |  | Repeatable: open, done, cancelled. |
+| `task_type` | query | string \| null |  |  |
+| `lead_id` | query | string \| null |  |  |
+| `partner_id` | query | string \| null |  |  |
+| `sales_order_id` | query | string \| null |  |  |
+| `due_from` | query | date \| null |  | IST date, inclusive. |
+| `due_to` | query | date \| null |  | IST date, inclusive. |
+| `overdue` | query | boolean |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `GET /api/v1/tasks/{task_id}`
 
 **Get Task**

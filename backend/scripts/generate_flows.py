@@ -1768,10 +1768,132 @@ def f_subsidy_applications() -> None:
     write("17-subsidy-applications", e)
 
 
+# ── session B, 3 Oct: canvases 40 to 49 ──────────────────────────────────────
+
+def _columns(name: str, head: str, sub: str, status: str, steps: list, side: list,
+             notes: list) -> None:
+    """Main steps down the left, side steps down the middle, notes on the right."""
+    e, n = [], {}
+    e += title(head, sub=sub, status=status, status_colour=GREEN)
+    for col, items, dashed in ((0, steps, False), (620, side, True)):
+        prev = None
+        for i, (eid, lbl, colour) in enumerate(items):
+            els = node(eid, col, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+            n[eid] = els[0]
+            e += els
+            if prev:
+                e += edge(f"e_{eid}", n[prev], n[eid], dashed=dashed)
+            prev = eid
+    y = 0
+    for eid, text_, colour in notes:
+        e += note(eid, 1240, y, text_, w=420, colour=colour)
+        y += 260
+    write(name, e)
+
+
+def f_exports() -> None:
+    _columns(
+        "40-list-exports", "List exports: any list to Excel, through the list's own code",
+        "Eight lists, one /export each, the same filters, the same scope.",
+        "BUILT. FS-030: GET /<list>/export, no migration.",
+        [("s1", "GET /leads/export?stage=new&territory_id=...\nfilters_of(list_leads): the list's own parameters", BLUE),
+         ("s2", "the list endpoint itself, page by page\nthe caller's db and caller: service predicate + RLS", GREEN),
+         ("s3", "more than 5,000 rows: 422 export_too_large\nnever a cut file", YELLOW),
+         ("s4", "workbook(): typed cells, IST, frozen header\nbuilt in a thread", VIOLET),
+         ("s5", "200 attachment leads-YYYY-MM-DD.xlsx\none structlog line: names of filters, never values", GREEN)],
+        [("d1", "complaints awaiting=me: refused\nthe queue has no cursor", YELLOW),
+         ("d2", "credit terms stay blank without partners.edit\nthe same masking code as the screen", GREEN)],
+        [("n1", "A TEXT CELL STARTING = IS A FORMULA\n\nopenpyxl stores it as one through cell() and\nappend() alike. The writer forces data_type 's'.\nThe PIMS sheet had the same hole (ISS-200).", RED),
+         ("n2", "/export IS DECLARED BEFORE /{id}\n\nStarlette matches {id} first; declared after,\nthe export answers 422 forever.", RED),
+         ("n3", "Not yet: CSV, PDF, the client's layouts,\nlarge background exports (GAP-300 to GAP-303).", YELLOW)])
+
+
+def f_schemes() -> None:
+    _columns(
+        "41-schemes", "Schemes: one order-status trigger writes every benefit",
+        "Type 1 at submit; types 2 and 3 at delivery; type 4 nightly. A benefit lowers the payable, never the invoice.",
+        "BUILT. FS-031: /schemes, /scheme-entitlements, GET /orders/{id}/schemes, migration 033.",
+        [("s1", "admin: POST /schemes\ntype, condition, benefit, targets, dates", BLUE),
+         ("s2", "draft order: GET /orders/{id}/schemes\nthe trigger's own functions, read-only", VIOLET),
+         ("s3", "draft -> submitted: type 1 discounts, then credits\n(FOR UPDATE, earliest expiry, skip if larger)", GREEN),
+         ("s4", "-> dispatched / closed_short: points and next-order credits\non dispatched quantities, latest dispatch day IST", GREEN),
+         ("s5", "-> draft / cancelled: benefits reversed, credits released\nvoid out of dispatched: unused credits and points reversed", YELLOW)],
+        [("d1", "nightly 00:20 IST: expire credits\nthen credit ended months and quarters", VIOLET),
+         ("d2", "GET /orders/{id}: benefits + payable\npayments count against payable", GREEN),
+         ("d3", "a dealer sees only schemes aimed at it\nnever their partner targets", GREY)],
+        [("n1", "THE TRIGGER IS NAMED zz ON PURPOSE\n\nSame-event triggers fire alphabetically; the\nclose-short trigger writes qty_short first.", RED),
+         ("n2", "UNIQUE ONLY AMONG ROWS NOT REVERSED\n\nA void reverses; the re-dispatch earns again.\nA plain unique index would refuse it for good.", RED),
+         ("n3", "Every rule is a stand-in: product lines only, credit not\ninvoice, auto-use, dispatch date (GAP-304 to GAP-313).", YELLOW)])
+
+
+def f_rewards() -> None:
+    _columns(
+        "42-rewards", "Reward points: earned by triggers, spent under one lock",
+        "Dealers and staff earn; dealers spend on an order or a gift.",
+        "BUILT. FS-032: /reward-rules, /reward-settings, /gifts, /rewards/*, migration 036.",
+        [("s1", "order delivered: rule points for the partner\nand for a staff owner (before the no-partner return)", GREEN),
+         ("s2", "lead won (any of three writers): lead_won points\nfor the staff owner, once per rule", GREEN),
+         ("s3", "reward_spend(): advisory lock per holder\nbalance check, redemption + redeemed row", VIOLET),
+         ("s4", "order redemption applied at submit\nafter scheme benefits; the rest released", BLUE),
+         ("s5", "nightly: expire what is left of each due lot\noldest first", YELLOW)],
+        [("d1", "gift: requested -> fulfilled / rejected / withdrawn\nreject and withdraw give the points back", BLUE),
+         ("d2", "void: rule and scheme points reversed\nmay take a balance below zero", YELLOW)],
+        [("n1", "A FIELD OFFICER READS NO DEALER'S POINTS\n\nrewards V:own: the ledger policy needs a partner\ncaller or a scope other than own (review B3).", RED),
+         ("n2", "rewards.create IS HELD BY EVERY DEALER\n\nIt is how they redeem (GAP-043). Rules and gifts\nneed rewards.edit.", RED),
+         ("n3", "Stand-ins: no rule until the admin adds one, Rs 1 a\npoint, 10% (GAP-316 to GAP-320, GAP-336).", YELLOW)])
+
+
+def f_commission() -> None:
+    _columns(
+        "43-dealer-commission", "Dealer commission and TOD: subsidy stage 18",
+        "After full FP: the co-ordinator records, Accounts approves and pays.",
+        "BUILT. FS-033: /subsidy-applications/{id}/commission, /dealer-commissions, /commission-rates, migration 037.",
+        [("s1", "full FP received, a dealer on the application\nGET .../commission/preview", BLUE),
+         ("s2", "POST .../commission {gi, pvc, installation?}\nbase = cost excl GST - GI - PVC - installation", GREEN),
+         ("s3", "Accounts: approve (not a recorder)\nor return with a remark", VIOLET),
+         ("s4", "pay {date, reference}\ncompany-wide payments scope only", GREEN)],
+        [("d1", "rate: one partner 4 + type 2 + system 1\nlatest start on or before the full-FP date", YELLOW),
+         ("d2", "record again while calculated or returned\nclears the old decision", GREY)],
+        [("n1", "A STATE MANAGER HOLDS payments.edit\n\nat org scope. Paying needs the global scope.", RED),
+         ("n2", "Dealers do not see commissions (GAP-330).\nThe base and rates are our reading (GAP-321, GAP-323).", YELLOW)])
+
+
+def f_marketing() -> None:
+    _columns(
+        "44-marketing-material", "Marketing material: order, approve over the office, dispatch",
+        "17 items, company and dealer shares copied onto the order.",
+        "BUILT. FS-034: /marketing-materials, /marketing-orders, migration 038.",
+        [("s1", "catalogue: price and share, effective-dated\nnever edited; is_provisional stand-ins", BLUE),
+         ("s2", "POST /marketing-orders: routed to the office\n(the lead rule); MM/<state>/<FY>/<n>", GREEN),
+         ("s3", "District Manager over the office approves\nor rejects with a remark; never their own", VIOLET),
+         ("s4", "marketing team: dispatched {date, reference}", GREEN)],
+        [("d1", "marketing_order_refusal(): one rule for\nthe definer, can and awaiting=me", YELLOW),
+         ("d2", "office use: no partner, 100% company", GREY)],
+        [("n1", "create IS FOR ORDERING ONLY\n\nEvery ordering role holds it, dealers included.\nThe catalogue needs edit (review blocker).", RED),
+         ("n2", "Not yet: images, budgets, billing the dealer's share,\nthe approver's bell (GAP-325 to GAP-335).", YELLOW)])
+
+
+def f_subsidy_follow_ups() -> None:
+    _columns(
+        "45-subsidy-follow-ups", "Subsidy ageing, reports and masters revisions",
+        "The client's six ageing figures, the stage and supply reports, and GGRC revisions from a date.",
+        "BUILT. FS-009a: /subsidy-reports/*, /subsidy-masters/*, migration 039.",
+        [("s1", "GET /subsidy-reports/ageing\nsix figures from the latest stage values", BLUE),
+         ("s2", "GET /subsidy-reports/stages and /supply\neach with /export", BLUE),
+         ("s3", "POST /subsidy-masters/{kind}/revisions\nfrom today or later; rows close and start", GREEN),
+         ("s4", "POST /subsidy-masters/{matrix kind}/matrices\na new matrix; old cells never change", GREEN)],
+        [("d1", "open interval: counted to today, running", YELLOW),
+         ("d2", "engine cache cleared after a revision", GREY)],
+        [("n1", "ROUTES UNDER /subsidy-reports\n\n/subsidy-applications/{app_id} would match /ageing first.", RED),
+         ("n2", "Not yet: printed GGRC quotations and consent letters\n(GAP-331, GAP-333).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
     f_approval(); f_subsidy(); f_outbox(); f_money(); f_pricing()
     f_quotation(); f_order(); f_auth(); f_admin(); f_tasks(); f_complaints(); f_bell_and_messages()
     f_subsidy_applications()
+    f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
+    f_subsidy_follow_ups()
     print(f"\nwrote to {OUT}")

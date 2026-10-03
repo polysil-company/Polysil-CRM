@@ -297,7 +297,7 @@ The children of one territory, name and id only, at most 200.
 | `valid_until` | string \| null | yes |  |
 | `expired` | boolean | yes |  |
 | `superseded` | boolean | yes |  |
-| `totals` | Totals | yes |  |
+| `totals` | api__schemas__quotations__Totals | yes |  |
 | `line_count` | integer | yes |  |
 | `pdf_ready` | boolean | yes |  |
 | `pdf_url` | string | yes |  |
@@ -331,18 +331,6 @@ The children of one territory, name and id only, at most 200.
 | `name` | string | yes |  |
 | `level` | string | yes | district, taluka or village. |
 
-**`Totals`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `gross` | string | yes |  |
-| `discount` | string | yes |  |
-| `taxable` | string | yes |  |
-| `cgst` | string | yes |  |
-| `sgst` | string | yes |  |
-| `igst` | string | yes |  |
-| `total` | string | yes |  |
-
 **`ValidationError`**
 
 | Field | Type | Required | Notes |
@@ -367,3 +355,15 @@ The children of one territory, name and id only, at most 200.
 | `channel` | string |  | Default `whatsapp`. |
 | `expires_in` | integer | yes | Seconds the code is valid. |
 | `resend_after` | integer | yes | Seconds before offering to send another. |
+
+**`api__schemas__quotations__Totals`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `gross` | string | yes |  |
+| `discount` | string | yes |  |
+| `taxable` | string | yes |  |
+| `cgst` | string | yes |  |
+| `sgst` | string | yes |  |
+| `igst` | string | yes |  |
+| `total` | string | yes |  |

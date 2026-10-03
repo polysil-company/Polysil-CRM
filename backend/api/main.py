@@ -27,10 +27,12 @@ from api.errors import (
 )
 from api.routers import (
     auth,
+    commission,
     complaints,
     dashboard,
     lead_qr,
     leads,
+    marketing,
     masters,
     messages,
     notifications,
@@ -39,8 +41,11 @@ from api.routers import (
     products,
     public,
     quotations,
+    rewards,
+    schemes,
     subsidy,
     subsidy_applications,
+    subsidy_follow_ups,
     tasks,
     users,
 )
@@ -191,6 +196,20 @@ def create_app() -> FastAPI:
     app.include_router(messages.directory, prefix=API_PREFIX)
     app.include_router(subsidy_applications.router, prefix=API_PREFIX)
     app.include_router(subsidy_applications.lookups, prefix=API_PREFIX)
+    app.include_router(schemes.router, prefix=API_PREFIX)
+    app.include_router(schemes.entitlements, prefix=API_PREFIX)
+    app.include_router(rewards.rules, prefix=API_PREFIX)
+    app.include_router(rewards.settings_router, prefix=API_PREFIX)
+    app.include_router(rewards.gifts, prefix=API_PREFIX)
+    app.include_router(rewards.router, prefix=API_PREFIX)
+    app.include_router(rewards.order_points, prefix=API_PREFIX)
+    app.include_router(commission.on_application, prefix=API_PREFIX)
+    app.include_router(commission.router, prefix=API_PREFIX)
+    app.include_router(commission.rates, prefix=API_PREFIX)
+    app.include_router(marketing.materials, prefix=API_PREFIX)
+    app.include_router(marketing.router, prefix=API_PREFIX)
+    app.include_router(subsidy_follow_ups.reports, prefix=API_PREFIX)
+    app.include_router(subsidy_follow_ups.masters, prefix=API_PREFIX)
     # The farmer's link and the website form: no session, definer functions on
     # app_anon (FS-005 4, FS-003a). Served under /api/v1, because a deployment's
     # proxy sends only /api/v1 to the API and the rest to the frontend: at the root

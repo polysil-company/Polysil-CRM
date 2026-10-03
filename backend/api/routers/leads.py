@@ -9,13 +9,14 @@ document the frontend track builds against. They say what the endpoint is *for*.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.idempotency import payload_digest, run_idempotent
+from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import (
     UUID_RE,
@@ -43,6 +44,7 @@ from api.schemas.leads import (
     TimelineEvent,
     TimelinePage,
 )
+from api.services import exports
 from api.services import leads as service
 
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -246,6 +248,23 @@ async def duplicate_queue(
     scope, newest first. From here, dismiss a pair or merge one lead into the other.
     """
     return await service.duplicates(db, caller, limit=limit, cursor=cursor)
+
+
+@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+            dependencies=[Depends(require("leads", "view"))])
+async def export_leads(
+    db: DbSession, caller: CallerDep,
+    filters: Annotated[dict[str, Any], Depends(filters_of(list_leads))],
+) -> Response:
+    """Download the lead list as an Excel file, with the same filters as the list.
+
+    The file holds exactly the rows the list would show for these filters, across
+    every page, and nothing outside your scope. Call it with `fetch` and the bearer
+    token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+    narrow the filters. An empty list gives a file with the header row only.
+    """
+    return await export(list_leads, stem="leads", title="Leads", columns=exports.LEADS,
+                        user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 
 @router.get(

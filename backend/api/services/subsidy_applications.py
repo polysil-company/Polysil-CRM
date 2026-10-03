@@ -593,6 +593,12 @@ def pims_workbook(rows: list[tuple[Any, ...]]) -> bytes:
     ws.append(list(PIMS_COLUMNS))
     for r in rows:
         ws.append(list(r))   # openpyxl writes Decimal as a number: no float on the way (rule 4)
+    # append() reads a string starting with "=" as a formula; a farmer's name must
+    # stay text (FS-030 rule 9, ISS-200)
+    for row in ws.iter_rows(min_row=2):
+        for cell in row:
+            if isinstance(cell.value, str):
+                cell.data_type = "s"
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()

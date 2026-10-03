@@ -13,6 +13,7 @@ from arq import cron
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
 from worker.jobs.quotations import quotation_expire, quotation_render_due
+from worker.jobs.schemes import scheme_nightly
 
 CRON_JOBS: list = [
     # Every ten seconds. An OTP that arrives a minute after it was asked for is a
@@ -33,4 +34,6 @@ CRON_JOBS: list = [
     # renders do not start in the same second.
     cron(order_render_due, second={2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57},
          run_at_startup=True),
+    # FS-031: 00:20 IST is 18:50 UTC. Expire credits, then credit ended periods.
+    cron(scheme_nightly, hour=18, minute=50),
 ]
