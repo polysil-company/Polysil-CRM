@@ -7,6 +7,7 @@ import {
   ORDER_TYPES,
   ORDERABLE_TYPES,
   PAYMENT_TERMS,
+  type DispatchPageWire,
   type DispatchWire,
   type OrderPageWire,
   type OrderStatus,
@@ -17,6 +18,7 @@ import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
 import type { Role } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
+import { calendarDayOf } from "@/lib/format";
 import { orderQueueStep, type MockApprovalStep } from "@/mocks/data/approvals";
 import {
   applyDispatch,
@@ -386,6 +388,55 @@ function onLiveOrder(quotationId: string): boolean {
 // ── handlers ────────────────────────────────────────────────────────────────────
 
 export const orderHandlers = [
+  /**
+   * DISP-001 · GET /dispatches — every dispatch on the orders the user can see, newest first,
+   * voided ones included (marked), filtered by order, partner and the day it was sent.
+   */
+  http.get(buildApiUrl("/dispatches"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const url = new URL(request.url);
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(1, Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT) || DEFAULT_LIMIT),
+    );
+    const cursorParam = url.searchParams.get("cursor");
+    const offset = cursorParam === null ? 0 : decodeCursor(cursorParam);
+    if (offset === null) {
+      return validation({ cursor: "malformed cursor" });
+    }
+    const orderId = url.searchParams.get("order_id");
+    const partnerId = url.searchParams.get("partner_id");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const matches =
+      scenario === "empty"
+        ? []
+        : mockDb.orders
+            .filter(
+              (order) =>
+                (orderId === null || order.id === orderId) &&
+                (partnerId === null || order.partner?.id === partnerId),
+            )
+            .flatMap((order) => order.dispatches)
+            .filter((dispatch) => {
+              const day = calendarDayOf(dispatch.dispatched_at);
+              return (from === null || day >= from) && (to === null || day <= to);
+            })
+            .sort(
+              (a, b) => b.dispatched_at.localeCompare(a.dispatched_at) || b.id.localeCompare(a.id),
+            );
+    const body: DispatchPageWire = {
+      data: matches.slice(offset, offset + limit),
+      meta: {
+        limit,
+        next_cursor: offset + limit < matches.length ? encodeCursor(offset + limit) : null,
+      },
+    };
+    return HttpResponse.json(body);
+  }),
+
   http.get(buildApiUrl("/orders"), async ({ request }) => {
     const { scenario, failure } = await applyScenario();
     if (failure) return failure;

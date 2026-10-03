@@ -200,9 +200,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "dispatch",
         label: "Dispatch queue",
+        description: "Approved orders waiting to ship, and what has left.",
         icon: DeliveryTruck01Icon,
         module: "dispatch",
+        audience: "staff",
         dataId: "DISP-001",
+        href: "/dispatch",
       },
     ],
   },

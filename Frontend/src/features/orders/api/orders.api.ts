@@ -8,6 +8,8 @@ import { apiRequest } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
+  DISPATCH_PAGE_SIZE,
+  dispatchPageSchema,
   dispatchResponseSchema,
   noContentSchema,
   orderPageSchema,
@@ -21,6 +23,8 @@ import {
   type OrderPage,
   type PatchOrderRequest,
   type RemarkRequest,
+  type DispatchListParams,
+  type DispatchPage,
 } from "./orders.schemas";
 
 const log = createLogger({ file: "features/orders/api/orders.api.ts", dataId: "SO-001" });
@@ -248,4 +252,33 @@ export function closeOrderShort(
     idempotencyKey,
     schema: orderResponseSchema,
   });
+}
+
+/** DISP-001 · GET /dispatches — every dispatch on the orders the user can see, newest first. */
+export async function listDispatches(
+  params: DispatchListParams & { cursor: string | null },
+  signal?: AbortSignal,
+): Promise<DispatchPage> {
+  const page = await apiRequest({
+    dataId: "DISP-001",
+    logger: log,
+    fn: "listDispatches",
+    path: "/dispatches",
+    query: {
+      from: params.from ?? undefined,
+      to: params.to ?? undefined,
+      cursor: params.cursor,
+      limit: DISPATCH_PAGE_SIZE,
+    },
+    schema: dispatchPageSchema,
+    signal,
+  });
+  if (page.skipped > 0) {
+    log.warn(
+      "listDispatches",
+      `left out ${String(page.skipped)} dispatch(es) that did not match the contract`,
+      { dataId: "DISP-001", context: { skipped: page.skipped, kept: page.items.length } },
+    );
+  }
+  return page;
 }

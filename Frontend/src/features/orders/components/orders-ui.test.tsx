@@ -14,6 +14,7 @@ import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 import { renderWithProviders } from "@/test/render";
 
+import { DispatchQueue } from "./dispatch-queue";
 import { OrderDetail } from "./order-detail";
 import { OrdersTable } from "./orders-table";
 import { OrdersToolbar } from "./orders-toolbar";
@@ -203,5 +204,78 @@ describe("[SO-003] Place an order from an accepted quotation", () => {
       "href",
       `/sales-orders/${ordered?.id ?? ""}`,
     );
+  });
+});
+
+describe("[DISP-001] Dispatch queue", () => {
+  afterEach(reset);
+
+  it("lists approved orders still to ship, each opening its order ready to record", async () => {
+    signInAs("dispatch_manager");
+    renderWithProviders(<DispatchQueue />);
+
+    const list = await screen.findByRole("list", { name: "Orders to ship" });
+    const rows = within(list).getAllByRole("listitem");
+    const waiting = mockDb.orders.filter(
+      (order) => order.status === "approved" || order.status === "partially_dispatched",
+    );
+    expect(rows).toHaveLength(waiting.length);
+    expect(screen.getByText(`${String(waiting.length)} orders still to ship.`)).toBeInTheDocument();
+    const [first] = rows;
+    const record = await within(first ?? list).findByRole("link", {
+      name: /^Record a dispatch on /,
+    });
+    expect(record.getAttribute("href")).toMatch(/^\/sales-orders\/.+\?record=dispatch$/);
+    expect(within(first ?? list).getByText(/% sent$/)).toBeInTheDocument();
+  });
+
+  it("offers no recording to someone who can only look", async () => {
+    signInAs("state_manager");
+    renderWithProviders(<DispatchQueue />);
+
+    await screen.findByRole("list", { name: "Orders to ship" });
+    expect(screen.queryByRole("link", { name: /^Record a dispatch/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the dispatch log, and keeps the tab and days in the URL", async () => {
+    signInAs("dispatch_manager");
+    const user = userEvent.setup();
+    const onUrlChange = vi.fn<(queryString: string) => void>();
+    renderWithProviders(<DispatchQueue />, { onUrlChange });
+    await screen.findByRole("list", { name: "Orders to ship" });
+
+    await user.click(screen.getByRole("button", { name: "Dispatched" }));
+    const log = await screen.findByRole("list", { name: "Dispatches, newest first" });
+    expect(within(log).getAllByRole("listitem").length).toBeGreaterThan(0);
+    expect(onUrlChange).toHaveBeenLastCalledWith(expect.stringContaining("tab=dispatched"));
+
+    await user.type(screen.getByLabelText("From"), "2001-01-01");
+    await user.type(screen.getByLabelText("to"), "2001-01-02");
+    expect(await screen.findByText("Nothing sent on these days")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Any day" }));
+    expect(await screen.findByRole("list", { name: "Dispatches, newest first" })).toBeVisible();
+  });
+});
+
+describe("[DISP-002] Record a dispatch from the queue's link", () => {
+  afterEach(reset);
+
+  it("opens the form at once when the order is reached with ?record=dispatch", async () => {
+    signInAs("dispatch_manager");
+    renderWithProviders(<OrderDetail orderId={seeded("approved")} />, {
+      searchParams: "?record=dispatch",
+    });
+
+    expect(await screen.findByRole("dialog", { name: "Record a dispatch" })).toBeVisible();
+  });
+
+  it("ignores the link for someone who may not record", async () => {
+    signInAs("state_manager");
+    renderWithProviders(<OrderDetail orderId={seeded("approved")} />, {
+      searchParams: "?record=dispatch",
+    });
+
+    await screen.findByRole("heading", { level: 2 });
+    expect(screen.queryByRole("dialog", { name: "Record a dispatch" })).not.toBeInTheDocument();
   });
 });

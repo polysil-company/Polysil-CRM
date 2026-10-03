@@ -549,6 +549,8 @@ export const DATA_IDS = {
     title: "Accounts work queue",
     owner: "shared",
     status: "planned",
+    notes:
+      "Waits on BE-022: GET /orders cannot filter on approval_waiting_on, and there is no payments API. Accounts' steps are in the Approvals inbox meanwhile.",
   },
   "DISP-002": {
     domain: "DISP",
@@ -565,9 +567,12 @@ export const DATA_IDS = {
   },
   "DISP-001": {
     domain: "DISP",
-    title: "Dispatch work queue",
+    title: "Dispatch work queue — orders to ship, and the dispatch log",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
+    endpoints: ["GET /orders?status=approved,partially_dispatched", "GET /dispatches"],
+    notes:
+      "Record a dispatch opens the order with ?record=dispatch, which opens the DISP-002 form at once.",
   },
   "ADMN-001": {
     domain: "ADMN",
