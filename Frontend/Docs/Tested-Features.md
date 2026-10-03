@@ -35,7 +35,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | `integration` |
 | [Approvals](#approvals) | 5 | 🧪 🌐 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 7 | 🧪 🌐 👀 | PR #34 |
-| [Tasks and the day planner](#tasks-and-the-day-planner) | 5 | 🧪 👀 | PR #PRNUM |
+| [Tasks and the day planner](#tasks-and-the-day-planner) | 5 | 🧪 👀 | PR #54 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 🌐 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -141,7 +141,7 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-30--feature--S
 
 ## Tasks and the day planner
 
-On the backend's contract (`backend/docs/api/tasks.md`) since PR #PRNUM ([changelog](../changelog/entries/2026-10-04--feature--TASK-001--tasks-my-day-team-day-and-a-lead-s-tasks.md)). Walked through in the mock, as an admin with a team and as an officer, on a desktop in light mode and on a phone in dark mode; axe found nothing on My day, Team, a person's day, Mark done or New task. Not yet checked on the dev API. Screens: [My day](screenshots/tasks/my-day-desktop-light.jpg), [phone, dark](screenshots/tasks/my-day-phone-dark.jpg), [Team](screenshots/tasks/team-day-desktop-light.jpg), [a person's day](screenshots/tasks/person-day-desktop-light.jpg), [Mark done](screenshots/tasks/mark-done-desktop-light.jpg), [New task](screenshots/tasks/new-task-desktop-light.jpg), [New task, phone](screenshots/tasks/new-task-phone-dark.jpg), [on a lead](screenshots/tasks/lead-tasks-desktop-light.jpg).
+On the backend's contract (`backend/docs/api/tasks.md`) since PR #54 ([changelog](../changelog/entries/2026-10-04--feature--TASK-001--tasks-my-day-team-day-and-a-lead-s-tasks.md)). Walked through in the mock, as an admin with a team and as an officer, on a desktop in light mode and on a phone in dark mode; axe found nothing on My day, Team, a person's day, Mark done or New task. Not yet checked on the dev API. Screens: [My day](screenshots/tasks/my-day-desktop-light.jpg), [phone, dark](screenshots/tasks/my-day-phone-dark.jpg), [Team](screenshots/tasks/team-day-desktop-light.jpg), [a person's day](screenshots/tasks/person-day-desktop-light.jpg), [Mark done](screenshots/tasks/mark-done-desktop-light.jpg), [New task](screenshots/tasks/new-task-desktop-light.jpg), [New task, phone](screenshots/tasks/new-task-phone-dark.jpg), [on a lead](screenshots/tasks/lead-tasks-desktop-light.jpg).
 
 - **TASK-001 · My day** (staff with `tasks`; dealers have none): what is overdue from earlier on top (up to 90 days back), then what is due that day by time. Each task shows its kind, time, meeting type, the lead (linked) or dealer it is about, who gave it, and its notes. Done tasks show what happened; cancelled ones show why. The server says what is overdue; the screen never works it out. Previous day, next day, any date, and back to today. A future day has nothing overdue. The day is in the URL (`?date=`). States: skeleton, "A clear day", an error with retry. 🧪 👀
 - **TASK-002 · Team** (managers and admins: anyone with a team): one row per person below them, with due that day, done that day and overdue now. People with nothing to do are listed too. A row opens that person's day (`?user=`, sent as a link), with "Back to team"; a new task from there is for them. Officers see no Team. 🧪 👀
@@ -190,6 +190,6 @@ The backend serves these, and the frontend has no screen for them — in the ord
 1. A direct order typed in line by line, and a consolidated order from several leads of one dealer (SO-005).
 2. Editing and deleting a lead, the duplicates queue and merging.
 3. Lead QR codes and the public enquiry form.
-4. Meeting minutes, editing and reassigning a task, and the full task list with export (TASK-006…008). My day, Team and a lead's tasks are in PR #PRNUM.
+4. Meeting minutes, editing and reassigning a task, and the full task list with export (TASK-006…008). My day, Team and a lead's tasks are in PR #54.
 5. Complaints, from entry to the quality check (on `integration` since #25).
 6. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.
