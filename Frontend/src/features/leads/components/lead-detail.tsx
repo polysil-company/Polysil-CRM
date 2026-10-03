@@ -36,6 +36,7 @@ import { formatTerritory } from "@/features/lookups/lib/lookup-labels";
 import { toShareParam } from "@/features/messages/lib/share-attachment";
 import { LeadQuotations } from "@/features/quotations/components/lead-quotations";
 import { useCan, useSession } from "@/features/session/hooks/use-session";
+import { LeadTasks } from "@/features/tasks/components/lead-tasks";
 import { isApiError } from "@/lib/api/errors";
 import {
   EMPTY_VALUE,
@@ -158,6 +159,7 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
   const { data: session } = useSession();
   const canEdit = useCan("leads", "edit");
   const canSeeQuotations = useCan("quotations");
+  const canSeeTasks = useCan("tasks") && session?.userType === "staff";
   const whatsappNumber = lead.phone.replace(/\D/g, "");
   const lost = lead.stage === "lost";
 
@@ -317,6 +319,15 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
 
         {/* QUOT-001 · The lead's quotations, for whoever may see quotations. */}
         {canSeeQuotations ? <LeadQuotations leadId={lead.id} leadStage={lead.stage} /> : null}
+
+        {/* TASK-003 · Calls, visits and meetings about this lead, for staff with tasks. */}
+        {canSeeTasks ? (
+          <LeadTasks
+            leadId={lead.id}
+            leadName={lead.customerName}
+            merged={lead.stage === "merged"}
+          />
+        ) : null}
 
         {/* LEAD-005, LEAD-006 · Notes and the lead's history. A merged lead is read-only. */}
         <Card>

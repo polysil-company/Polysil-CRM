@@ -17,6 +17,8 @@ import {
   sumRupees,
   toRupeeNumber,
   todayInIndia,
+  shiftCalendarDay,
+  formatCalendarDay,
 } from "@/lib/format";
 
 const NOW = new Date("2026-09-14T10:00:00+05:30");
@@ -115,6 +117,12 @@ describe("[DS-001] date formatting (India Standard Time)", () => {
   it("gives today's date in India, already tomorrow there late in the UTC evening", () => {
     expect(todayInIndia(NOW)).toBe("2026-09-14");
     expect(todayInIndia(new Date("2026-09-14T19:00:00Z"))).toBe("2026-09-15");
+  });
+
+  it("moves a calendar day across months and years, and names it", () => {
+    expect(shiftCalendarDay("2026-10-31", 1)).toBe("2026-11-01");
+    expect(shiftCalendarDay("2027-01-01", -1)).toBe("2026-12-31");
+    expect(formatCalendarDay("2026-10-03")).toBe("Saturday, 3 October");
   });
 
   it("handles missing and invalid dates without throwing", () => {

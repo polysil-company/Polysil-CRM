@@ -8,8 +8,14 @@ import { z } from "zod";
  * carries a code (`source: "agri_fair"`) and the name comes from here.
  */
 
-/** The editable lists the lead screens read, by their path under /lookups. */
-export const LOOKUP_LISTS = ["lead-sources", "mis-systems", "lost-reasons", "crops"] as const;
+/** The editable lists the screens read, by their path under /lookups. */
+export const LOOKUP_LISTS = [
+  "lead-sources",
+  "mis-systems",
+  "lost-reasons",
+  "crops",
+  "meeting-types",
+] as const;
 export type LookupList = (typeof LOOKUP_LISTS)[number];
 
 const lookupItemWireSchema = z.object({

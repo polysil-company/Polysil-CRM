@@ -161,7 +161,14 @@ The registry file is the source of truth; this snapshot helps reading.
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
 | CMPL-001 | Complaints list and QA review | shared | planned |
-| TASK-001 | Tasks and daily planner | shared | planned |
+| TASK-001 | My day — one person's tasks due that day and overdue (`GET /planner`) | shared | in-progress |
+| TASK-002 | Team day — due, done and overdue per person below a manager (`GET /planner/team`) | shared | in-progress |
+| TASK-003 | List tasks — a lead's tasks and meetings (`GET /tasks`, `GET /tasks/{id}`) | shared | in-progress |
+| TASK-004 | Create a task — call, visit, meeting, follow-up (`POST /tasks`, `GET /tasks/assignees`, `GET /lookups/meeting-types`) | shared | in-progress |
+| TASK-005 | Complete, cancel or reopen a task (`POST /tasks/{id}/complete`, `/cancel`, `/reopen`) | shared | in-progress |
+| TASK-006 | Edit or reassign an open task (`PATCH /tasks/{id}`) | shared | planned |
+| TASK-007 | Meeting minutes with action items (`POST /minutes`, `GET /minutes`, `GET /minutes/{id}`) | shared | planned |
+| TASK-008 | Export the task list to Excel (`GET /tasks/export`) | shared | planned |
 | CHNL-001 | Channel partners list and detail | shared | planned |
 | MKT-001 | Marketing offers — set by Admin, visible to channel partners only | shared | planned |
 | SCHM-001 | Schemes — set by Admin, visible to everyone | shared | planned |

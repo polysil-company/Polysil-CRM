@@ -35,6 +35,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | `integration` |
 | [Approvals](#approvals) | 5 | 🧪 🌐 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 7 | 🧪 🌐 👀 | PR #34 |
+| [Tasks and the day planner](#tasks-and-the-day-planner) | 5 | 🧪 👀 | PR #PRNUM |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 🌐 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -138,6 +139,27 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-30--feature--S
 - **DISP-002 · Record a dispatch** (Dispatch, `dispatch.create`): each open item's quantity (or "Everything open"), when it left, challan, invoice, transporter, vehicle. Refused on the field: nothing entered, more than is open, decimals on a whole-unit item, a time in the future. An invoice dated before its challan, or an invoice number already used, is recorded with a warning. The order moves to Partly dispatched or Dispatched. 🧪 👀
 - **DISP-002 · Void a dispatch** with a reason — it stays on record, struck through, and its quantities are open again — and **close the rest short** with a reason. Managers see neither. When someone else moved the order first, the dialog closes, a toast says what happened, and the page shows the latest. 🧪 👀
 
+## Tasks and the day planner
+
+On the backend's contract (`backend/docs/api/tasks.md`) since PR #PRNUM ([changelog](../changelog/entries/2026-10-04--feature--TASK-001--tasks-my-day-team-day-and-a-lead-s-tasks.md)). Walked through in the mock, as an admin with a team and as an officer, on a desktop in light mode and on a phone in dark mode; axe found nothing on My day, Team, a person's day, Mark done or New task. Not yet checked on the dev API. Screens: [My day](screenshots/tasks/my-day-desktop-light.jpg), [phone, dark](screenshots/tasks/my-day-phone-dark.jpg), [Team](screenshots/tasks/team-day-desktop-light.jpg), [a person's day](screenshots/tasks/person-day-desktop-light.jpg), [Mark done](screenshots/tasks/mark-done-desktop-light.jpg), [New task](screenshots/tasks/new-task-desktop-light.jpg), [New task, phone](screenshots/tasks/new-task-phone-dark.jpg), [on a lead](screenshots/tasks/lead-tasks-desktop-light.jpg).
+
+- **TASK-001 · My day** (staff with `tasks`; dealers have none): what is overdue from earlier on top (up to 90 days back), then what is due that day by time. Each task shows its kind, time, meeting type, the lead (linked) or dealer it is about, who gave it, and its notes. Done tasks show what happened; cancelled ones show why. The server says what is overdue; the screen never works it out. Previous day, next day, any date, and back to today. A future day has nothing overdue. The day is in the URL (`?date=`). States: skeleton, "A clear day", an error with retry. 🧪 👀
+- **TASK-002 · Team** (managers and admins: anyone with a team): one row per person below them, with due that day, done that day and overdue now. People with nothing to do are listed too. A row opens that person's day (`?user=`, sent as a link), with "Back to team"; a new task from there is for them. Officers see no Team. 🧪 👀
+- **TASK-003 · A lead's tasks and meetings** on its page: what is still to do, by due date, then what was done or cancelled, each saying who it is for. A merged lead takes no new tasks. 🧪 👀
+- **TASK-004 · New task:**
+  - what to do, the kind (call, visit, meeting, follow-up, other), the day, an optional time (otherwise due at 18:00), who it is for (yourself, or someone below you), and notes;
+  - from a lead it is about that lead, and a meeting names its kind (Survey & Design, Follow-up…);
+  - field errors from the server land on their fields; a retry reuses its key, so no second task is made. 🧪 👀
+- **TASK-005 · Done, cancel, reopen:**
+  - Done asks what happened, and for a meeting whether the gift was shown;
+  - cancelling asks why. A task someone else gave you can't be cancelled by you, only by them, so the option isn't offered;
+  - a done task can be reopened by whoever it is for or whoever gave it. After 7 days the backend says to add a new task;
+  - a task someone moved on meanwhile closes the dialog and refreshes. 🧪 👀
+
+Not in this pull request (next): meeting minutes with action items (TASK-007), editing and reassigning a task (TASK-006), and the full task list with filters and Excel export (TASK-008).
+
+---
+
 ## Dashboard, notifications, messages
 
 The dashboard reads the backend's real shape since the demo-walk fixes ([changelog](../changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md)). The bell and messages follow the backend's contracts (BE-009, BE-010) since PR #43 ([changelog](../changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md)). None of the three has been checked on the dev API by hand yet. Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
@@ -168,6 +190,6 @@ The backend serves these, and the frontend has no screen for them — in the ord
 1. A direct order typed in line by line, and a consolidated order from several leads of one dealer (SO-005).
 2. Editing and deleting a lead, the duplicates queue and merging.
 3. Lead QR codes and the public enquiry form.
-4. Tasks, the planner, meetings and minutes (on `integration` since #25).
+4. Meeting minutes, editing and reassigning a task, and the full task list with export (TASK-006…008). My day, Team and a lead's tasks are in PR #PRNUM.
 5. Complaints, from entry to the quality check (on `integration` since #25).
 6. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.

@@ -150,9 +150,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "tasks",
         label: "Tasks",
+        description: "Your calls, visits and meetings for the day, and your team's.",
         icon: Task01Icon,
         module: "tasks",
+        audience: "staff",
         dataId: "TASK-001",
+        href: "/tasks",
       },
     ],
   },
