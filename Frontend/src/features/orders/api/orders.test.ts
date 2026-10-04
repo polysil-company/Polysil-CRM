@@ -17,6 +17,7 @@ import {
   deleteOrder,
   getOrder,
   getOrderTimeline,
+  listDispatches,
   listOrders,
   patchOrder,
   submitOrder,
@@ -444,5 +445,47 @@ describe("[DISP-002] dispatches", () => {
         }),
       ),
     ).resolves.toEqual({ status: 403, code: "forbidden" });
+  });
+});
+
+describe("[DISP-001] listDispatches", () => {
+  afterEach(reset);
+
+  it("lists every dispatch, newest first, with its order's number and party", async () => {
+    as("dispatch_manager");
+    const page = await listDispatches({ from: null, to: null, cursor: null });
+
+    expect(page.items.length).toBeGreaterThan(0);
+    const times = page.items.map((dispatch) => dispatch.dispatchedAt);
+    expect(times).toEqual([...times].sort().reverse());
+    const [first] = page.items;
+    const order = mockDb.orders.find((item) => item.id === first?.order.id);
+    expect(first?.order).toEqual({
+      id: order?.id,
+      orderNo: order?.order_no,
+      partyName: order?.party.name,
+    });
+  });
+
+  it("asks for the days it was given, and none when not", async () => {
+    const sent: URL[] = [];
+    server.use(
+      http.get(buildApiUrl("/dispatches"), ({ request }) => {
+        sent.push(new URL(request.url));
+      }),
+    );
+
+    await listDispatches({ from: "2026-10-01", to: "2026-10-03", cursor: null });
+    await listDispatches({ from: null, to: null, cursor: null });
+
+    expect(sent[0]?.searchParams.get("from")).toBe("2026-10-01");
+    expect(sent[0]?.searchParams.get("to")).toBe("2026-10-03");
+    expect(sent[1]?.searchParams.has("from")).toBe(false);
+  });
+
+  it("has nothing between days with no dispatch", async () => {
+    const page = await listDispatches({ from: "2001-01-01", to: "2001-01-02", cursor: null });
+
+    expect(page.items).toEqual([]);
   });
 });

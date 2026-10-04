@@ -71,6 +71,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-021** · Read one conversation: `GET /conversations/{id}` · MSG-002, MSG-004 · low
 
+**Operations queues** — added as the Dispatch and Accounts screens are built (DISP-001, ACCT-001).
+
+- [ ] **BE-022** · An Accounts queue: orders waiting on the payment check, and what Accounts records · ACCT-001 · normal
+
 ---
 
 ## Details
@@ -413,5 +417,28 @@ in the same shape. Never renumber or reuse a number.
   cannot say whom it writes to.
 - **Done when:** the thread can name the colleague of any conversation the caller is in, written
   in or not.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-022 · An Accounts queue: orders waiting on the payment check, and what Accounts records
+
+- **Status:** ⬜ Open
+- **Asked:** 4 Oct 2026 · ACCT-001
+- **What:** two things, in this order:
+  1. A filter on `GET /orders` (and `/orders/stats`, `/orders/export`) for **whose approval is
+     next**: `waiting_on=account_manager` (any role code), matching the row's
+     `approval_waiting_on`. Paged and counted like the other filters.
+  2. Is there anything Accounts records **besides** the approval remark, such as a payment
+     received, its mode and reference, or an advance against the order? RBAC.md §6 lists a
+     `payments` module (Accounts `V:global CEA`), but no endpoint serves it. If payments are
+     planned, the contract for them; if not, say so and the queue stays the approval step alone.
+- **Why:** the plan gives Accounts its own working screen. Today Accounts' steps arrive in
+  the Approvals inbox (APPR-001), which works. But a queue of "orders at the payment check",
+  showing what each is waiting for, can't be built: `GET /orders` can't filter on
+  `approval_waiting_on`, and filtering on the screen would break paging and the count. The
+  sidebar's "Accounts queue" stays "Soon" until then.
+- **Done when:** `GET /orders?waiting_on=account_manager` returns only the orders whose next
+  step is Accounts, with `include_total`. And there is a decision on payments: either a
+  contract, or "none planned".
 - **Done in:** —
 - **Backend notes:** —

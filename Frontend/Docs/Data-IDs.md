@@ -177,7 +177,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
 | SUBS-001 | Subsidy forms and case status | shared | planned |
 | ACCT-001 | Accounts work queue | shared | planned |
-| DISP-001 | Dispatch work queue | shared | planned |
+| DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |
 | DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |
 | ADMN-001 | Users, roles and approval thresholds | shared | planned |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |

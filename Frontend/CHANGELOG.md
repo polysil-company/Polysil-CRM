@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-30 changes, newest first. Each title opens its entry.
+31 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-04 | [Dispatch queue: orders to ship and the dispatch log](changelog/entries/2026-10-04--feature--DISP-001--dispatch-queue-orders-to-ship-and-the-dispatch-log.md) | `feature` | `DISP-001` `DISP-002` `ACCT-001` |
 | 2026-10-04 | [Tasks: my day, team day and a lead's tasks](changelog/entries/2026-10-04--feature--TASK-001--tasks-my-day-team-day-and-a-lead-s-tasks.md) | `feature` | `TASK-001` `TASK-002` `TASK-003` `TASK-004` `TASK-005` |
 | 2026-10-04 | [Tasks: meeting minutes, edit and reassign, all tasks with an Excel export](changelog/entries/2026-10-04--feature--TASK-007--tasks-meeting-minutes-edit-and-reassign-all-tasks-with-an.md) | `feature` | `TASK-007` `TASK-006` `TASK-008` `TASK-003` `OBS-002` |
 | 2026-10-03 | [Area filter on leads, the asker's reason in approvals, dealer search by contact person](changelog/entries/2026-10-03--feature--LEAD-001--area-filter-on-leads-the-asker-s-reason-in-approvals-dealer.md) | `feature` | `LEAD-001` `APPR-001` `LEAD-008` |
@@ -43,6 +44,90 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
 
 ## 4 October 2026
+
+### Dispatch queue: orders to ship and the dispatch log
+
+`feature` · `DISP-001` `DISP-002` `ACCT-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-04--feature--DISP-001--dispatch-queue-orders-to-ship-and-the-dispatch-log.md)
+
+#### Before
+
+"Dispatch queue" and "Accounts queue" were "Soon" items in the sidebar. Dispatch could record a dispatch only by finding an approved order in the Sales orders list and opening it. Nothing showed what had left across all orders, though the backend serves `GET /dispatches`.
+
+#### Now
+
+**Dispatch queue** (`/dispatch`), for anyone with the `dispatch` module.
+
+**To ship** lists every approved order still waiting to leave:
+
+- each order's number and status, the party, the order type, the total, and when it was submitted;
+- how much has gone, as a bar with "46% sent";
+- a count at the top: "2 orders still to ship".
+
+**Record a dispatch** opens the order with the record form already open, using `?record=dispatch`:
+
+- Someone who may only look sees no button.
+- The link does nothing for them, or on an order that can't ship.
+
+**Dispatched** is the log of what left, newest first:
+
+- each dispatch's number, the order (linked) and party, and the item count;
+- the challan, invoice, transporter and vehicle, and who recorded it;
+- voided dispatches are marked, with their reason.
+
+It can be limited to the days between two dates, or show any day. The tab and the days are kept in the URL.
+
+States covered: skeletons, "Nothing waiting to ship", "Nothing sent on these days", errors, and a later page failing. Checked on a phone and a desktop, in light and dark.
+
+**Accounts queue.** This is not built yet; it waits on the backend (BE-022, below). Accounts' approval steps are already in their Approvals inbox.
+
+#### Discussion
+
+**Why the Accounts queue isn't built.** The plan's Accounts queue is "orders waiting on the payment check". `GET /orders` can't filter on `approval_waiting_on`, and filtering on the screen would break paging and the count. No endpoint serves the `payments` module that RBAC.md lists either. Accounts loses nothing meanwhile: their steps arrive in the Approvals inbox with the payment-check remark. So the screen waits, and BE-022 asks the backend for two things:
+
+- a `waiting_on` filter on `GET /orders`;
+- a decision on payments.
+
+**Why recording stays on the order page.** The queue doesn't copy the record form. The form needs the order's open quantities, and it already handles every rule and refusal there. The `?record=dispatch` link takes Dispatch straight to it, one click from the queue.
+
+**Refreshing the queue.** Its query keys sit under the order lists' key. Recording a dispatch, voiding one, or approving an order already invalidates that key, so the queue refreshes with no extra wiring.
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`: a dispatch keeps its order's number and party; `dispatchPageSchema`, `DispatchListParams`, `DISPATCH_PAGE_SIZE`.
+- `src/features/orders/api/orders.api.ts`: `listDispatches`.
+- `src/features/orders/api/orders.queries.ts`: `ordersToShipQueryOptions` and `dispatchListQueryOptions`, under `orderKeys.lists()`.
+- `src/features/orders/components/dispatch-queue.tsx`: new, the queue.
+- `src/features/orders/components/order-actions.tsx`: `?record=dispatch` opens the record form.
+- `src/app/(app)/dispatch/page.tsx`, `loading.tsx`: the route.
+- `src/components/layout/navigation.ts`: Dispatch queue is a link, for staff, with its description.
+- `src/mocks/handlers/orders.ts`: `GET /dispatches`, filtered by order, partner and day.
+- `src/features/orders/api/orders.test.ts`, `src/features/orders/components/orders-ui.test.tsx`: the tests.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: DISP-001 in progress; ACCT-001 waits on BE-022.
+- `../docs/Backend-Tasks.md`: BE-022.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/dispatch/`: the records.
+
+#### Tests
+
+**`src/features/orders/api/orders.test.ts`, `[DISP-001] listDispatches`:**
+
+- newest first, with each dispatch's order number and party;
+- the days are sent only when given;
+- nothing comes back for days with no dispatch.
+
+**`src/features/orders/components/orders-ui.test.tsx`:**
+
+- `[DISP-001] Dispatch queue`:
+  - the orders to ship, with their count and how much has gone;
+  - the record link and its URL;
+  - no recording for a manager;
+  - the log, with the tab and days in the URL, "Nothing sent on these days", and "Any day".
+- `[DISP-002]`: `?record=dispatch` opens the form for Dispatch, and does nothing for a manager.
+
+**By hand, in Chromium on the mock backend, as Dispatch:**
+
+- To ship and the log, on a desktop in light and on a phone in dark;
+- Record a dispatch from the queue lands on the order with the form open;
+- axe found nothing on either tab.
 
 ### Tasks: my day, team day and a lead's tasks
 

@@ -9,6 +9,7 @@ import {
   PackageRemoveIcon,
   SentIcon,
 } from "@hugeicons/core-free-icons";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 
@@ -37,10 +38,15 @@ const log = createLogger({
  * SO-002 … SO-004, DISP-002 · The order's actions, by its status and the user's permissions.
  * A draft is edited and submitted; an approved order opens its PDF, and Dispatch records what
  * leaves or closes the rest short. Cancelling and deleting sit in the "more" menu.
+ * `?record=dispatch` opens "Record a dispatch" at once — the Dispatch queue links here so.
  */
 export function OrderActions({ order }: { order: Order }): React.JSX.Element {
   const actions = useOrderActions(order);
-  const [dialog, setDialog] = useState<OrderDialog | null>(null);
+  const [chosen, setDialog] = useState<OrderDialog | null>(null);
+  const [record, setRecord] = useQueryState("record", parseAsStringLiteral(["dispatch"]));
+  // A link's request counts only where the user may record one, on an order that can ship.
+  const dialog: OrderDialog | null =
+    chosen ?? (record === "dispatch" && actions.recordDispatch ? { kind: "dispatch" } : null);
   const hasMore = actions.closeShort || actions.cancel || actions.delete;
   const open = (next: OrderDialog): void => {
     setDialog(next);
@@ -137,6 +143,7 @@ export function OrderActions({ order }: { order: Order }): React.JSX.Element {
         dialog={dialog}
         onClose={() => {
           setDialog(null);
+          if (record !== null) void setRecord(null);
         }}
       />
     </div>

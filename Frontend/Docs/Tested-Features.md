@@ -34,7 +34,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — send, approve, answer, revise, delete](#quotations--send-approve-answer-revise-delete) | 7 | 🧪 👀 | `integration` |
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 🌐 👀 | `integration` |
 | [Approvals](#approvals) | 5 | 🧪 🌐 👀 | `integration`; limits in PR #35 |
-| [Sales orders and dispatch](#sales-orders-and-dispatch) | 7 | 🧪 🌐 👀 | PR #34 |
+| [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 🌐 👀 | PR #34; the Dispatch queue in PR #56 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 🌐 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
@@ -138,6 +138,8 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-30--feature--S
 - **SO-004 · Submit for approval,** or "Submit again" after a return: the order gets its number and waits on its managers by value, then Accounts, then Dispatch. Cancel with a reason — the owner while it is a draft or waiting, a holder of delete once approved, nobody once something has shipped. 🧪 👀
 - **DISP-002 · Record a dispatch** (Dispatch, `dispatch.create`): each open item's quantity (or "Everything open"), when it left, challan, invoice, transporter, vehicle. Refused on the field: nothing entered, more than is open, decimals on a whole-unit item, a time in the future. An invoice dated before its challan, or an invoice number already used, is recorded with a warning. The order moves to Partly dispatched or Dispatched. 🧪 👀
 - **DISP-002 · Void a dispatch** with a reason — it stays on record, struck through, and its quantities are open again — and **close the rest short** with a reason. Managers see neither. When someone else moved the order first, the dialog closes, a toast says what happened, and the page shows the latest. 🧪 👀
+- **DISP-001 · The Dispatch queue** (Dispatch, or anyone with `dispatch`; PR #56; screens: [to ship](screenshots/dispatch/to-ship-desktop-light.jpg), [to ship, phone dark](screenshots/dispatch/to-ship-phone-dark.jpg), [record from the queue](screenshots/dispatch/record-from-queue-desktop-light.jpg)): **To ship** lists every approved order still waiting to leave, partly sent ones with how much has gone ("46% sent"), with the count. **Record a dispatch** opens the order with the form already open (`?record=dispatch`); someone who may only look sees no button, and the link does nothing for them. States: skeleton, "Nothing waiting to ship", an error, a later page failing. 🧪 👀
+- **DISP-001 · The dispatch log** (PR #56; screens: [desktop](screenshots/dispatch/dispatched-desktop-light.jpg), [phone, dark](screenshots/dispatch/dispatched-phone-dark.jpg)): **Dispatched** lists what left, newest first — dispatch number, the order (linked) and party, items, challan, invoice, transporter and vehicle, who recorded it — voided ones marked with their reason. Between two days (in the URL), or any day; "Nothing sent on these days" otherwise. The **Accounts queue** waits on the backend (BE-022); Accounts' steps are in their Approvals inbox meanwhile. 🧪 👀
 
 ## Tasks and the day planner
 

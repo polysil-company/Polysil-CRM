@@ -1,7 +1,11 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 
-import { getOrder, getOrderTimeline, listOrders } from "./orders.api";
-import type { OrderListParams } from "./orders.schemas";
+import { getOrder, getOrderTimeline, listDispatches, listOrders } from "./orders.api";
+import {
+  DEFAULT_ORDER_PAGE_SIZE,
+  type DispatchListParams,
+  type OrderListParams,
+} from "./orders.schemas";
 
 /** How often an order is re-read while its PDF renders (a few seconds). */
 export const ORDER_PDF_POLL_MS = 3000;
@@ -21,7 +25,46 @@ export const orderKeys = {
   detail: (orderId: string) => [...orderKeys.details(), orderId] as const,
   timelines: () => [...orderKeys.all, "timeline"] as const,
   timeline: (orderId: string) => [...orderKeys.timelines(), orderId] as const,
+  // Under lists(), so recording or voiding a dispatch refreshes the queue as well.
+  toShip: () => [...orderKeys.lists(), "to-ship"] as const,
+  dispatches: (params: DispatchListParams) => [...orderKeys.lists(), "dispatches", params] as const,
 };
+
+const FIRST_PAGE: string | null = null;
+
+/** Orders waiting to ship: approved, or partly sent. */
+const TO_SHIP: OrderListParams = {
+  cursor: null,
+  pageSize: DEFAULT_ORDER_PAGE_SIZE,
+  q: "",
+  status: ["approved", "partially_dispatched"],
+  orderType: null,
+  mine: false,
+  leadId: null,
+  quotationId: null,
+};
+
+/** DISP-001 · The orders waiting to ship, a page at a time. */
+export function ordersToShipQueryOptions() {
+  return infiniteQueryOptions({
+    queryKey: orderKeys.toShip(),
+    queryFn: ({ pageParam, signal }) => listOrders({ ...TO_SHIP, cursor: pageParam }, signal),
+    initialPageParam: FIRST_PAGE,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    meta: { dataId: "DISP-001" },
+  });
+}
+
+/** DISP-001 · The dispatch log, newest first, a page at a time. */
+export function dispatchListQueryOptions(params: DispatchListParams) {
+  return infiniteQueryOptions({
+    queryKey: orderKeys.dispatches(params),
+    queryFn: ({ pageParam, signal }) => listDispatches({ ...params, cursor: pageParam }, signal),
+    initialPageParam: FIRST_PAGE,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    meta: { dataId: "DISP-001" },
+  });
+}
 
 /** SO-001 · Keeps the previous page on screen while the next one loads. */
 export function orderListQueryOptions(params: OrderListParams) {

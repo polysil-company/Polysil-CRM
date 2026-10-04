@@ -255,6 +255,12 @@ export type DispatchWire = z.input<typeof dispatchWireSchema>;
 const dispatchSchema = dispatchWireSchema.transform((wire) => ({
   id: wire.id,
   orderId: wire.order.id,
+  /** The order it shipped against, as the dispatch log names it. */
+  order: {
+    id: wire.order.id,
+    orderNo: wire.order.order_no,
+    partyName: wire.order.party_name.trim() || "Unnamed party",
+  },
   dispatchNo: wire.dispatch_no,
   dcNo: wire.dc_no,
   dcDate: wire.dc_date,
@@ -275,6 +281,21 @@ const dispatchSchema = dispatchWireSchema.transform((wire) => ({
 }));
 
 export type Dispatch = z.output<typeof dispatchSchema>;
+
+/** DISP-001 · GET /dispatches — the dispatch log, newest first, one row at a time. */
+export const dispatchPageSchema = cursorPageSchema(dispatchSchema);
+export type DispatchPage = CursorPage<Dispatch>;
+export type DispatchPageWire = { data: DispatchWire[]; meta: PageMetaWire };
+
+/** Dispatches a page of the log asks for. */
+export const DISPATCH_PAGE_SIZE = 25;
+
+export interface DispatchListParams {
+  /** An Indian calendar day, `YYYY-MM-DD`; null for no lower bound. */
+  readonly from: string | null;
+  /** Inclusive; null for no upper bound. */
+  readonly to: string | null;
+}
 
 export const orderWireSchema = z.object({
   doc_type: z.literal("sales_order").optional(),
