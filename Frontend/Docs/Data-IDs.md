@@ -160,7 +160,15 @@ The registry file is the source of truth; this snapshot helps reading.
 | SO-005 | A direct order typed in line by line, and a draft's lines (`POST /orders`, `PUT /orders/{orderId}/lines`, `POST /pricing/quote-lines`) | shared | planned |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
-| CMPL-001 | Complaints list and QA review | shared | planned |
+| CMPL-001 | Complaints list — filters, waiting on me, counts (`GET /complaints`, `GET /complaints/stats`) | shared | in-progress |
+| CMPL-002 | Complaint detail and history (`GET /complaints/{id}`, `GET /complaints/{id}/timeline`) | shared | in-progress |
+| CMPL-003 | Raise a complaint — draft, edit, products, submit, cancel, delete (`POST /complaints`, `PATCH /complaints/{id}`, `PUT /complaints/{id}/lines`, `POST /complaints/{id}/submit`, `POST /complaints/{id}/cancel`, `DELETE /complaints/{id}`) | shared | in-progress |
+| CMPL-004 | Manager's check — approve or return, severity and owner (`POST /complaints/{id}/check`, `GET /complaints/{id}/assignees`) | shared | in-progress |
+| CMPL-005 | QC verdict (`POST /complaints/{id}/qc`) | shared | in-progress |
+| CMPL-006 | Complaint attachments — photos and documents (`POST /complaints/{id}/attachments`, `GET /complaints/{id}/attachments/{attachmentId}`, `DELETE /complaints/{id}/attachments/{attachmentId}`) | shared | planned |
+| CMPL-007 | Complaint remedy — refund, replacement or none; withdraw (`POST /complaints/{id}/remedy`, `POST /complaints/{id}/remedy/withdraw`) | shared | planned |
+| CMPL-008 | Complaint targets (SLA policies) and complaint types (`GET /complaint-sla-policies`, `POST /complaint-sla-policies`, `GET /lookups/complaint-types`, `POST /lookups/complaint-types`) | shared | planned |
+| CMPL-009 | Export complaints to Excel (`GET /complaints/export`) | shared | planned |
 | TASK-001 | My day — one person's tasks due that day and overdue (`GET /planner`) | shared | in-progress |
 | TASK-002 | Team day — due, done and overdue per person below a manager (`GET /planner/team`) | shared | in-progress |
 | TASK-003 | List tasks — a lead's tasks, and every task with filters (`GET /tasks`, `GET /tasks/{id}`) | shared | in-progress |

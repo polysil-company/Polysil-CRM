@@ -15,6 +15,7 @@ export const LOOKUP_LISTS = [
   "lost-reasons",
   "crops",
   "meeting-types",
+  "complaint-types",
 ] as const;
 export type LookupList = (typeof LOOKUP_LISTS)[number];
 

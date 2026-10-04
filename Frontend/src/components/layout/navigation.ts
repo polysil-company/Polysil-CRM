@@ -143,9 +143,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "complaints",
         label: "Complaints",
+        description: "From the farmer's report to the manager's check, QC and the remedy.",
         icon: CustomerSupportIcon,
         module: "complaints",
         dataId: "CMPL-001",
+        href: "/complaints",
       },
       {
         id: "tasks",

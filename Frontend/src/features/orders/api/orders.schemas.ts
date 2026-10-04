@@ -225,6 +225,13 @@ const approvalStepSchema = z
 
 export type OrderApprovalStep = z.output<typeof approvalStepSchema>;
 
+/** A document's approval request: an order's, or a complaint refund's (CMPL-007). */
+export const approvalBlockSchema = z.object({
+  request_id: z.string().min(1),
+  status: z.enum(["pending", "approved", "rejected", "cancelled"]),
+  steps: z.array(approvalStepSchema),
+});
+
 const dispatchWireSchema = z.object({
   id: z.string().min(1),
   order: z.object({
@@ -338,13 +345,7 @@ export const orderWireSchema = z.object({
   is_provisional: z.boolean(),
   lines: z.array(orderLineSchema),
   totals: totalsSchema,
-  approval: z
-    .object({
-      request_id: z.string().min(1),
-      status: z.enum(["pending", "approved", "rejected", "cancelled"]),
-      steps: z.array(approvalStepSchema),
-    })
-    .nullable(),
+  approval: approvalBlockSchema.nullable(),
   last_rejection: z.object({ remark: z.string(), role: z.string(), at: isoDateTime }).nullable(),
   dispatches: z.array(dispatchSchema),
   /** "code: sentence", as on a quotation. */
