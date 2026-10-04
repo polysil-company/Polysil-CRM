@@ -1,11 +1,13 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 import {
+  getAttachmentLink,
   getComplaint,
   getComplaintStats,
   getComplaintTimeline,
   listComplaintAssignees,
   listComplaints,
+  listSlaPolicies,
 } from "./complaints.api";
 import type { ComplaintListParams } from "./complaints.schemas";
 
@@ -21,6 +23,9 @@ export const complaintKeys = {
   detail: (complaintId: string) => [...complaintKeys.all, "detail", complaintId] as const,
   timeline: (complaintId: string) => [...complaintKeys.all, "timeline", complaintId] as const,
   assignees: (complaintId: string) => [...complaintKeys.all, "assignees", complaintId] as const,
+  attachment: (complaintId: string, attachmentId: string) =>
+    [...complaintKeys.all, "attachment", complaintId, attachmentId] as const,
+  slaPolicies: () => [...complaintKeys.all, "sla-policies"] as const,
 };
 
 const FIRST_PAGE: string | null = null;
@@ -72,5 +77,28 @@ export function complaintAssigneesQueryOptions(complaintId: string) {
     queryKey: complaintKeys.assignees(complaintId),
     queryFn: ({ signal }) => listComplaintAssignees(complaintId, signal),
     meta: { dataId: "CMPL-004" },
+  });
+}
+
+/**
+ * CMPL-006 · A file's ten-minute link. Re-read after nine minutes, so a thumbnail left open
+ * never points at an expired link.
+ */
+export function attachmentLinkQueryOptions(complaintId: string, attachmentId: string) {
+  return queryOptions({
+    queryKey: complaintKeys.attachment(complaintId, attachmentId),
+    queryFn: ({ signal }) => getAttachmentLink(complaintId, attachmentId, signal),
+    staleTime: 9 * 60_000,
+    refetchInterval: 9 * 60_000,
+    meta: { dataId: "CMPL-006" },
+  });
+}
+
+/** CMPL-008 · The response and resolution targets. */
+export function slaPoliciesQueryOptions() {
+  return queryOptions({
+    queryKey: complaintKeys.slaPolicies(),
+    queryFn: ({ signal }) => listSlaPolicies(signal),
+    meta: { dataId: "CMPL-008" },
   });
 }

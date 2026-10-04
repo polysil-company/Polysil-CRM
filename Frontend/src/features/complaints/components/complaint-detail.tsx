@@ -28,16 +28,12 @@ import {
 } from "@/features/complaints/lib/complaint-labels";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
-import {
-  formatDate,
-  formatDateTime,
-  formatIndianPhone,
-  formatInr,
-  formatNumber,
-} from "@/lib/format";
+import { formatDate, formatDateTime, formatIndianPhone, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { AttachmentsCard } from "./attachments-card";
 import { ComplaintActions } from "./complaint-actions";
+import { RemedyCard } from "./remedy-card";
 
 const DOT: Readonly<Record<string, string>> = {
   neutral: "bg-subtle-foreground",
@@ -49,8 +45,8 @@ const DOT: Readonly<Record<string, string>> = {
 
 /**
  * CMPL-002 · One complaint: what happened and to what, who to contact, the products, the
- * targets with their due times, the manager's check, the QC verdict, the remedy, and the
- * history. A returned draft says what to fix. Buttons follow the complaint's `can`.
+ * files, the targets with their due times, the manager's check, the QC verdict, the remedy,
+ * and the history. A returned draft says what to fix. Buttons follow the complaint's `can`.
  */
 export function ComplaintDetail({ complaintId }: { complaintId: string }): React.JSX.Element {
   const query = useQuery(complaintDetailQueryOptions(complaintId));
@@ -308,6 +304,8 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
             </CardContent>
           </Card>
 
+          <AttachmentsCard complaint={complaint} />
+
           <Card>
             <CardHeader>
               <div className="flex flex-col gap-0.5">
@@ -322,6 +320,7 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
+          <RemedyCard complaint={complaint} />
           <TargetsCard complaint={complaint} />
           {complaint.check === null || returned ? null : (
             <DecisionCard
@@ -360,7 +359,6 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
               ].filter((part): part is string => part !== null)}
             />
           )}
-          {complaint.remedy === null ? null : <RemedySummary complaint={complaint} />}
         </div>
       </div>
     </div>
@@ -481,43 +479,6 @@ function DecisionCard({
           {by === null ? "" : `${by} · `}
           <RelativeDate value={at} />
         </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-const REMEDY_LABELS = { refund: "Refund", replacement: "Replacement", none: "No action" } as const;
-const REMEDY_STATUS = {
-  pending: "Under way",
-  completed: "Done",
-  rejected: "Rejected",
-  withdrawn: "Withdrawn",
-  cancelled: "Cancelled",
-} as const;
-
-/** CMPL-007 · The remedy as it stands. Choosing and withdrawing one come with the remedy screens. */
-function RemedySummary({ complaint }: { complaint: Complaint }): React.JSX.Element | null {
-  const { remedy } = complaint;
-  if (remedy === null) return null;
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle level={3}>Remedy</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 text-sm">
-        <p className="font-medium text-foreground">
-          {REMEDY_LABELS[remedy.kind]} · {REMEDY_STATUS[remedy.status]}
-        </p>
-        {remedy.refund === null ? null : <p>{formatInr(remedy.refund.amount, { paise: true })}</p>}
-        {remedy.replacementOrder === null ? null : (
-          <Link
-            href={`/sales-orders/${remedy.replacementOrder.id}`}
-            className="font-medium underline-offset-2 hover:underline"
-          >
-            {remedy.replacementOrder.orderNo ?? "The replacement order"}
-          </Link>
-        )}
-        {remedy.remark === null ? null : <p className="text-muted-foreground">{remedy.remark}</p>}
       </CardContent>
     </Card>
   );

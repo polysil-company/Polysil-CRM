@@ -1,17 +1,26 @@
 import { z } from "zod";
 
 import { timelinePageSchema, type TimelinePage } from "@/features/leads/api/leads.schemas";
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import type { DataId } from "@/lib/data-ids";
 import { createLogger } from "@/lib/logger";
 
 import {
   COMPLAINT_PAGE_SIZE,
+  attachmentLinkSchema,
+  slaPoliciesSchema,
+  uploadResponseSchema,
   complaintAssigneesSchema,
   complaintPageSchema,
   complaintResponseSchema,
   complaintStatsSchema,
+  type AttachmentKind,
+  type AttachmentLink,
   type CancelComplaintRequest,
+  type CreateSlaPolicyRequest,
+  type RemedyRequest,
+  type SlaPolicy,
+  type WithdrawRemedyRequest,
   type CheckRequest,
   type Complaint,
   type ComplaintAssignee,
@@ -39,6 +48,22 @@ function complaintPath(complaintId: string, rest = ""): `/${string}` {
 }
 
 /** CMPL-001 · GET /complaints — newest first; `awaiting=me` is the user's queue, oldest first. */
+/** The filters GET /complaints and GET /complaints/export share. */
+function complaintFilterQuery(
+  params: ComplaintListParams,
+): Record<string, string | boolean | string[] | undefined> {
+  return {
+    status: params.status.length === 0 ? undefined : [...params.status],
+    severity: params.severity ?? undefined,
+    complaint_type_id: params.typeId ?? undefined,
+    q: params.q === "" ? undefined : params.q,
+    breached: params.breached ? true : undefined,
+    owner: params.noOwner ? "none" : undefined,
+    lead_id: params.leadId ?? undefined,
+    sales_order_id: params.orderId ?? undefined,
+  };
+}
+
 export async function listComplaints(
   params: ComplaintListParams & { cursor: string | null },
   signal?: AbortSignal,
@@ -49,15 +74,8 @@ export async function listComplaints(
     fn: "listComplaints",
     path: "/complaints",
     query: {
-      status: params.status.length === 0 ? undefined : [...params.status],
-      severity: params.severity ?? undefined,
-      complaint_type_id: params.typeId ?? undefined,
-      q: params.q === "" ? undefined : params.q,
-      breached: params.breached ? true : undefined,
-      owner: params.noOwner ? "none" : undefined,
+      ...complaintFilterQuery(params),
       awaiting: params.awaitingMe ? "me" : undefined,
-      lead_id: params.leadId ?? undefined,
-      sales_order_id: params.orderId ?? undefined,
       cursor: params.cursor,
       limit: COMPLAINT_PAGE_SIZE,
       include_total: params.cursor === null,
@@ -217,4 +235,132 @@ export function listComplaintAssignees(
 /** CMPL-005 · POST /complaints/{id}/qc — approved or rejected, with the sample's dates. */
 export function qcComplaint(complaintId: string, input: WriteInput<QcRequest>): Promise<Complaint> {
   return write("CMPL-005", "qcComplaint", "POST", complaintPath(complaintId, "/qc"), input);
+}
+
+/** CMPL-007 · POST /complaints/{id}/remedy — a refund, a replacement, or no action. */
+export function chooseRemedy(
+  complaintId: string,
+  input: WriteInput<RemedyRequest>,
+): Promise<Complaint> {
+  return write("CMPL-007", "chooseRemedy", "POST", complaintPath(complaintId, "/remedy"), input);
+}
+
+/** CMPL-007 · POST /complaints/{id}/remedy/withdraw — while it is still open. */
+export function withdrawRemedy(
+  complaintId: string,
+  input: WriteInput<WithdrawRemedyRequest>,
+): Promise<Complaint> {
+  return write(
+    "CMPL-007",
+    "withdrawRemedy",
+    "POST",
+    complaintPath(complaintId, "/remedy/withdraw"),
+    input,
+  );
+}
+
+/**
+ * CMPL-006 · POST /complaints/{id}/attachments — one file, multipart. Up to 10 MB; JPEG, PNG,
+ * WebP, HEIC or PDF judged by content; up to 10. The same file again answers with the first.
+ */
+export async function uploadAttachment({
+  complaintId,
+  file,
+  kind,
+  idempotencyKey,
+}: {
+  complaintId: string;
+  /** A picked `File`, or any named Blob. */
+  file: Blob & { readonly name: string };
+  kind: AttachmentKind;
+  idempotencyKey: string;
+}): Promise<void> {
+  const body = new FormData();
+  body.append("file", file, file.name);
+  body.append("kind", kind);
+  await apiRequest({
+    dataId: "CMPL-006",
+    logger: log,
+    fn: "uploadAttachment",
+    method: "POST",
+    path: complaintPath(complaintId, "/attachments"),
+    body,
+    idempotencyKey,
+    // Uploads over a field connection take longer than a JSON call.
+    timeoutMs: 90_000,
+    schema: uploadResponseSchema,
+  });
+}
+
+/** CMPL-006 · GET /complaints/{id}/attachments/{id} — a ten-minute link to the file. */
+export function getAttachmentLink(
+  complaintId: string,
+  attachmentId: string,
+  signal?: AbortSignal,
+): Promise<AttachmentLink> {
+  return apiRequest({
+    dataId: "CMPL-006",
+    logger: log,
+    fn: "getAttachmentLink",
+    path: complaintPath(complaintId, `/attachments/${encodeURIComponent(attachmentId)}`),
+    schema: attachmentLinkSchema,
+    signal,
+  });
+}
+
+/** CMPL-006 · DELETE /complaints/{id}/attachments/{id} */
+export function deleteAttachment(
+  complaintId: string,
+  attachmentId: string,
+  idempotencyKey: string,
+): Promise<void> {
+  return apiRequest({
+    dataId: "CMPL-006",
+    logger: log,
+    fn: "deleteAttachment",
+    method: "DELETE",
+    path: complaintPath(complaintId, `/attachments/${encodeURIComponent(attachmentId)}`),
+    idempotencyKey,
+    schema: noContentSchema,
+  });
+}
+
+/** CMPL-009 · GET /complaints/export — the list as an Excel file, with the same filters. */
+export function exportComplaints(params: ComplaintListParams): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "CMPL-009",
+    logger: log,
+    fn: "exportComplaints",
+    path: "/complaints/export",
+    query: complaintFilterQuery(params),
+  });
+}
+
+/** CMPL-008 · GET /complaint-sla-policies — the response and resolution targets. */
+export function listSlaPolicies(signal?: AbortSignal): Promise<SlaPolicy[]> {
+  return apiRequest({
+    dataId: "CMPL-008",
+    logger: log,
+    fn: "listSlaPolicies",
+    path: "/complaint-sla-policies",
+    schema: slaPoliciesSchema,
+    signal,
+  });
+}
+
+/** CMPL-008 · POST /complaint-sla-policies — a new target from a day. */
+export function createSlaPolicy({
+  body,
+  idempotencyKey,
+}: WriteInput<CreateSlaPolicyRequest>): Promise<SlaPolicy[]> {
+  return apiRequest({
+    dataId: "CMPL-008",
+    logger: log,
+    fn: "createSlaPolicy",
+    method: "POST",
+    path: "/complaint-sla-policies",
+    body,
+    idempotencyKey,
+    schema: slaPoliciesSchema,
+  });
 }

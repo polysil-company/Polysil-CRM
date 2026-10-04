@@ -16,6 +16,7 @@ import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb } from "@/mocks/db";
 
+import { decideComplaintRefundStep } from "./complaints";
 import { decideOrderStep, findOrder } from "./orders";
 import { findQuotation, recordQuotationEvent, refreshGate } from "./quotations";
 import { applyScenario } from "./scenario";
@@ -294,7 +295,9 @@ export const approvalHandlers = [
       step.decidedAt = decidedAt;
       mockDb.approvalDecisions.set(key, { body: serialized, stepId: step.stepId });
 
-      if (step.docType === "quotation") {
+      if (step.docType === "complaint") {
+        decideComplaintRefundStep(step.docId, step.stepId, parsed.data.decision, remark, role);
+      } else if (step.docType === "quotation") {
         const quotation = findQuotation(step.docId);
         if (quotation?.approval !== null && quotation?.approval !== undefined) {
           quotation.approval = {
@@ -330,6 +333,12 @@ export const approvalHandlers = [
       }
     }
 
+    if (step.docType === "complaint") {
+      const complaint = mockDb.complaints.find((item) => item.id === step.docId);
+      return complaint === undefined
+        ? errorResponse(404, "not_found", "The complaint is gone.")
+        : HttpResponse.json({ data: { ...complaint, doc_type: "complaint" } });
+    }
     if (step.docType === "quotation") {
       const quotation = findQuotation(step.docId);
       return quotation === undefined

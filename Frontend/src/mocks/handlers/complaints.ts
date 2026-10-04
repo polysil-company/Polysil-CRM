@@ -13,16 +13,27 @@ import {
   type ComplaintStatsWire,
   type ComplaintWire,
   type CreateComplaintRequest,
+  COMPLAINT_ATTACHMENT_MAX_BYTES,
+  COMPLAINT_ATTACHMENT_TYPES,
+  COMPLAINT_ATTACHMENTS_MAX,
+  ATTACHMENT_KINDS,
+  createSlaPolicyRequestSchema,
+  remedyRequestSchema,
+  withdrawRemedyRequestSchema,
+  type SlaPolicyWire,
   type PatchComplaintRequest,
 } from "@/features/complaints/api/complaints.schemas";
 import type { TimelineEventWire, TimelinePageWire } from "@/features/leads/api/leads.schemas";
 import { summarizeSchemaIssues } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
+import type { Role } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { todayInIndia } from "@/lib/format";
+import { refundManagersFor, type MockApprovalStep } from "@/mocks/data/approvals";
 import { slaFor, type MockComplaint } from "@/mocks/data/complaints";
 import { mockLookupRows } from "@/mocks/data/lookups";
+import { chainSteps } from "@/mocks/data/orders";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_PRODUCTS } from "@/mocks/data/quotations";
 import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
@@ -67,9 +78,14 @@ function canFor(complaint: MockComplaint, who: Caller): ComplaintWire["can"] {
     cancel: (draft || complaint.status === "submitted") && who.create,
     check: complaint.status === "submitted" && MANAGER_ROLES.has(who.role),
     qc: complaint.status === "under_qc" && QC_ROLES.has(who.role),
-    upload: false,
-    remedy: false,
-    withdraw: false,
+    upload:
+      ((draft || complaint.status === "submitted") && who.create) ||
+      (complaint.status === "under_qc" && QC_ROLES.has(who.role)),
+    remedy: complaint.status === "qc_approved" && QC_ROLES.has(who.role),
+    withdraw:
+      complaint.status === "remedy_pending" &&
+      complaint.remedy?.status === "pending" &&
+      QC_ROLES.has(who.role),
   };
 }
 
@@ -146,7 +162,7 @@ function seedEvents(complaint: MockComplaint): TimelineEventWire[] {
   }
   if (complaint.check !== null) {
     push(
-      complaint.check.decision === "approve" ? "complaint.checked" : "complaint.returned",
+      complaint.check.decision === "approve" ? "complaint.approved" : "complaint.returned",
       complaint.check.at,
       complaint.check.by,
       { remark: complaint.check.remark },
@@ -305,6 +321,137 @@ function moved(): Response {
 
 function complaintPath(rest = ""): string {
   return buildApiUrl(`/complaints/:complaintId${rest}`);
+}
+
+/** The uploaded file as a link; a stand-in where the runtime can't make one (jsdom). */
+function objectUrlOf(file: Blob): string {
+  try {
+    return URL.createObjectURL(file);
+  } catch {
+    return "/icon.svg";
+  }
+}
+
+type MockRemedy = NonNullable<MockComplaint["remedy"]>;
+type MockApproval = NonNullable<NonNullable<MockRemedy["refund"]>["approval"]>;
+
+let remedySerial = 0;
+
+/** The seeded QC officer, as in mocks/data/complaints. */
+const MOCK_QC = MOCK_STAFF[4];
+
+/** The refund's next undecided step, as a row of the approvals inbox. */
+function refundQueueStep(complaint: MockComplaint): MockApprovalStep | null {
+  const approval = complaint.remedy?.refund?.approval;
+  const next = approval?.steps.find((step) => (step.decision ?? null) === null);
+  if (approval == null || next === undefined) return null;
+  const previous = approval.steps.filter((step) => step.seq < next.seq).at(-1);
+  return {
+    stepId: next.id,
+    requestId: approval.request_id,
+    seq: next.seq,
+    role: next.role,
+    stalled: false,
+    docType: "complaint",
+    docId: complaint.id,
+    number: complaint.complaint_no,
+    partyName: complaint.contact_name,
+    total: complaint.remedy?.refund?.amount ?? "0.00",
+    isProvisional: false,
+    discountPct: null,
+    requestRemark: complaint.remedy?.remark ?? null,
+    // Every mock role signs in as one user, so the seeded QC officer stands in as the asker;
+    // otherwise the manager deciding it would be refused as deciding their own request.
+    raisedBy: MOCK_QC === undefined ? null : { id: MOCK_QC.id, full_name: MOCK_QC.full_name },
+    raisedAt: previous?.decided_at ?? complaint.remedy?.chosen_at ?? complaint.updated_at,
+    decision: null,
+    remark: null,
+    decidedAt: null,
+    closed: null,
+  };
+}
+
+function closeRefundRows(complaint: MockComplaint): void {
+  const requestId = complaint.remedy?.refund?.approval?.request_id;
+  for (const step of mockDb.approvalSteps) {
+    if (step.requestId === requestId && step.decision === null) step.closed = "deleted";
+  }
+}
+
+/**
+ * APPR-001, CMPL-007 · A decision on a refund's step from the approvals inbox: the managers in
+ * turn, then Accounts, whose remark is the payment reference; the last approval closes the
+ * complaint. A rejection sends it back to QC to choose again.
+ */
+export function decideComplaintRefundStep(
+  complaintId: string,
+  stepId: string,
+  decision: "approve" | "reject",
+  remark: string | null,
+  role: Role,
+): ComplaintWire | null {
+  const complaint = mockDb.complaints.find((item) => item.id === complaintId);
+  const refund = complaint?.remedy?.refund;
+  if (
+    complaint === undefined ||
+    complaint.remedy == null ||
+    refund == null ||
+    refund.approval == null
+  ) {
+    return null;
+  }
+  const me = mockMeFor(role).data;
+  const now = new Date().toISOString();
+  const steps = refund.approval.steps.map((step) =>
+    step.id === stepId
+      ? {
+          ...step,
+          decision,
+          by: { id: me.id, full_name: me.full_name },
+          remark,
+          decided_at: now,
+          decided_role: null,
+        }
+      : step,
+  );
+  const decided = steps.find((step) => step.id === stepId);
+  const last = steps.every((step) => step.decision === "approve");
+  const approval: MockApproval = {
+    ...refund.approval,
+    steps,
+    status: decision === "reject" ? "rejected" : last ? "approved" : "pending",
+  };
+  const remedy: MockRemedy = {
+    ...complaint.remedy,
+    status: decision === "reject" ? "rejected" : last ? "completed" : "pending",
+    completed_at: last && decision === "approve" ? now : null,
+    refund: {
+      ...refund,
+      approval,
+      payment_reference:
+        last && decision === "approve" && decided?.role === "account_manager" ? remark : null,
+    },
+  };
+  const next: MockComplaint = {
+    ...complaint,
+    remedy,
+    status: decision === "reject" ? "qc_approved" : last ? "closed" : "remedy_pending",
+    closed_at: last && decision === "approve" ? now : null,
+    updated_at: now,
+  };
+  save(next);
+  // The backend writes an event at the end of the chain only: paid, or not approved.
+  if (decision === "reject") {
+    record(next, "complaint.refund_rejected", { amount: refund.amount });
+  } else if (last) {
+    record(next, "complaint.refund_paid", { amount: refund.amount });
+    record(next, "complaint.closed", {});
+  }
+  if (decision === "approve" && !last) {
+    const step = refundQueueStep(next);
+    if (step !== null) mockDb.approvalSteps.push(step);
+  }
+  return toWire(next);
 }
 
 export const complaintHandlers = [
@@ -473,6 +620,30 @@ export const complaintHandlers = [
     // Its history starts from the seed rule: "complaint.created" at created_at.
     mockDb.complaintEvents.set(complaint.id, seedEvents(complaint));
     return HttpResponse.json({ data: toWire(complaint) }, { status: 201 });
+  }),
+
+  /** CMPL-009 · The list as a file, with the same filters. Before /complaints/:id. */
+  http.get(buildApiUrl("/complaints/export"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const lines = [
+      "Number\tStatus\tSeverity\tContact\tType",
+      ...mockDb.complaints.map((item) =>
+        [
+          item.complaint_no ?? "Draft",
+          item.status,
+          item.severity,
+          item.contact_name,
+          item.complaint_type.name,
+        ].join("\t"),
+      ),
+    ];
+    return new HttpResponse(lines.join("\n"), {
+      headers: {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "content-disposition": `attachment; filename="complaints-${todayInIndia()}.xlsx"`,
+      },
+    });
   }),
 
   http.get(complaintPath(), async ({ params }) => {
@@ -662,7 +833,7 @@ export const complaintHandlers = [
     };
     save(next);
     remember(key, serialized, next);
-    record(next, approve ? "complaint.checked" : "complaint.returned", { remark: body.remark });
+    record(next, approve ? "complaint.approved" : "complaint.returned", { remark: body.remark });
     return HttpResponse.json({ data: toWire(next) });
   }),
 
@@ -757,5 +928,310 @@ export const complaintHandlers = [
     remember(key, serialized, next);
     record(next, "complaint.cancelled", { reason: parsed.data.reason });
     return HttpResponse.json({ data: toWire(next) });
+  }),
+
+  /** CMPL-007 · QC chooses: a refund (managers by amount, then Accounts), a replacement, or none. */
+  http.post(complaintPath("/remedy"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const raw: unknown = await request.json();
+    const serialized = JSON.stringify({ id: params.complaintId, raw });
+    const key = replay(request, serialized);
+    if (key instanceof Response) return key;
+    const complaint = findComplaint(params.complaintId);
+    if (complaint instanceof Response) return complaint;
+    const parsed = remedyRequestSchema.safeParse(raw);
+    if (!parsed.success) return invalid(fieldsOf(parsed.error));
+    const who = caller();
+    if (!QC_ROLES.has(who.role))
+      return errorResponse(403, "forbidden", "Only QC chooses the remedy.");
+    if (complaint.status !== "qc_approved") return moved();
+    const body = parsed.data;
+    if (body.kind === "refund") {
+      const amount = Number(body.amount ?? "");
+      if (!(amount > 0) || !/^\d+(\.\d{1,2})?$/.test(body.amount ?? "")) {
+        return invalid({ amount: "above 0, two decimals at most" });
+      }
+      if (!body.payee_name?.trim()) return invalid({ payee_name: "who is paid" });
+    } else if (
+      body.amount != null ||
+      body.payee_name != null ||
+      body.paid_through_partner_id != null
+    ) {
+      return invalid({ amount: "a refund only" });
+    }
+    if (
+      body.kind === "replacement" &&
+      complaint.lines.every((line) => Number(line.defective_qty) === 0)
+    ) {
+      return errorResponse(422, "nothing_defective", "Nothing is marked defective.", {
+        lines: "nothing defective",
+      });
+    }
+    const now = new Date().toISOString();
+    remedySerial += 1;
+    const base = {
+      id: mockUuid(MOCK_ID_SPACE.complaint, 0x7000 + remedySerial),
+      kind: body.kind,
+      remark: body.remark.trim(),
+      chosen_by: who.user,
+      chosen_at: now,
+    };
+    let remedy: MockRemedy;
+    let status: MockComplaint["status"] = "remedy_pending";
+    if (body.kind === "refund") {
+      const roles = [
+        ...refundManagersFor(body.amount ?? "0", mockDb.thresholds),
+        "account_manager",
+      ];
+      const partner = MOCK_PARTNERS.find((item) => item.id === body.paid_through_partner_id);
+      remedy = {
+        ...base,
+        status: "pending",
+        refund: {
+          amount: Number(body.amount).toFixed(2),
+          payee_name: body.payee_name?.trim() ?? null,
+          paid_through: partner === undefined ? null : { id: partner.id, name: partner.name },
+          approval: {
+            request_id: mockUuid(MOCK_ID_SPACE.approval, 0x70000 + remedySerial),
+            status: "pending",
+            steps: chainSteps(roles, 0x71000 + remedySerial * 10),
+          },
+          payment_reference: null,
+        },
+        replacement: null,
+        completed_at: null,
+      };
+    } else if (body.kind === "replacement") {
+      const order =
+        mockDb.orders.find((item) => item.id === complaint.sales_order?.id) ?? mockDb.orders[0];
+      remedy = {
+        ...base,
+        status: "pending",
+        refund: null,
+        // The mock names the order it would raise; the backend creates a free replacement order.
+        replacement: {
+          order:
+            order === undefined
+              ? null
+              : { id: order.id, order_no: order.order_no, status: "submitted" },
+        },
+        completed_at: null,
+      };
+    } else {
+      remedy = { ...base, status: "completed", refund: null, replacement: null, completed_at: now };
+      status = "closed";
+    }
+    const next: MockComplaint = {
+      ...complaint,
+      remedy,
+      status,
+      closed_at: status === "closed" ? now : null,
+      updated_at: now,
+    };
+    save(next);
+    remember(key, serialized, next);
+    if (body.kind === "refund") {
+      record(next, "complaint.refund_requested", { amount: next.remedy?.refund?.amount });
+    } else if (body.kind === "replacement") {
+      record(next, "complaint.replacement_ordered", {
+        order_no: next.remedy?.replacement?.order?.order_no ?? null,
+      });
+    } else {
+      record(next, "complaint.remedy_chosen", { kind: "none", remark: body.remark });
+      record(next, "complaint.closed", {});
+    }
+    const step = refundQueueStep(next);
+    if (step !== null) mockDb.approvalSteps.push(step);
+    return HttpResponse.json({ data: toWire(next) });
+  }),
+
+  /** CMPL-007 · Withdraw while open: a refund's approval is closed; back to QC to choose again. */
+  http.post(complaintPath("/remedy/withdraw"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const raw: unknown = await request.json();
+    const serialized = JSON.stringify({ id: params.complaintId, raw });
+    const key = replay(request, serialized);
+    if (key instanceof Response) return key;
+    const complaint = findComplaint(params.complaintId);
+    if (complaint instanceof Response) return complaint;
+    const parsed = withdrawRemedyRequestSchema.safeParse(raw);
+    if (!parsed.success) return invalid(fieldsOf(parsed.error));
+    if (!QC_ROLES.has(caller().role))
+      return errorResponse(403, "forbidden", "Only QC withdraws the remedy.");
+    if (complaint.status !== "remedy_pending" || complaint.remedy?.status !== "pending")
+      return moved();
+    closeRefundRows(complaint);
+    const now = new Date().toISOString();
+    const next: MockComplaint = {
+      ...complaint,
+      status: "qc_approved",
+      remedy: { ...complaint.remedy, status: "withdrawn" },
+      updated_at: now,
+    };
+    save(next);
+    remember(key, serialized, next);
+    record(next, "complaint.remedy_withdrawn", { remark: parsed.data.remark });
+    return HttpResponse.json({ data: toWire(next) });
+  }),
+
+  /** CMPL-006 · One file, multipart: 10 MB, JPEG/PNG/WebP/HEIC/PDF, up to 10. */
+  http.post(complaintPath("/attachments"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const complaint = findComplaint(params.complaintId);
+    if (complaint instanceof Response) return complaint;
+    if (!canFor(complaint, caller()).upload) {
+      return errorResponse(403, "forbidden", "You may not add files to this complaint.");
+    }
+    const form = await request.formData();
+    const file = form.get("file");
+    const kind = form.get("kind");
+    // A shape check, not `instanceof File`: the parsed part may come from another realm.
+    if (file === null || typeof file === "string") return invalid({ file: "a file is needed" });
+    if (typeof kind !== "string" || !ATTACHMENT_KINDS.some((item) => item === kind)) {
+      return invalid({ kind: "photo, document or challan" });
+    }
+    if (file.size > COMPLAINT_ATTACHMENT_MAX_BYTES) {
+      return errorResponse(422, "attachment_too_large", "Up to 10 MB.", { file: "over 10 MB" });
+    }
+    if (!COMPLAINT_ATTACHMENT_TYPES.some((type) => type === file.type)) {
+      return errorResponse(422, "attachment_type", "JPEG, PNG, WebP, HEIC or PDF only.", {
+        file: "not an accepted type",
+      });
+    }
+    const same = complaint.attachments.find(
+      (item) => item.filename === file.name && item.size_bytes === file.size,
+    );
+    if (same !== undefined) return HttpResponse.json({ data: same });
+    if (complaint.attachments.length >= COMPLAINT_ATTACHMENTS_MAX) {
+      return errorResponse(422, "too_many_attachments", "Up to 10 files.");
+    }
+    const attachment: MockComplaint["attachments"][number] = {
+      id: mockUuid(MOCK_ID_SPACE.complaint, 0x9000 + mockDb.complaintFiles.size + 1),
+      kind: ATTACHMENT_KINDS.find((item) => item === kind) ?? "photo",
+      filename: file.name,
+      content_type: file.type,
+      size_bytes: file.size,
+      preview: file.type !== "image/heic" && file.type !== "image/heif",
+      uploaded_by: caller().user,
+      uploaded_at: new Date().toISOString(),
+    };
+    mockDb.complaintFiles.set(attachment.id, file);
+    const next: MockComplaint = {
+      ...complaint,
+      attachments: [...complaint.attachments, attachment],
+    };
+    save(next);
+    record(next, "complaint.attachment_added", { filename: file.name });
+    return HttpResponse.json({ data: attachment }, { status: 201 });
+  }),
+
+  http.get(complaintPath("/attachments/:attachmentId"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const complaint = findComplaint(params.complaintId);
+    if (complaint instanceof Response) return complaint;
+    const attachment = complaint.attachments.find((item) => item.id === params.attachmentId);
+    if (attachment === undefined) return errorResponse(404, "not_found", "No such file.");
+    const file = mockDb.complaintFiles.get(attachment.id);
+    // A seeded file has no bytes in the mock; a picture stands in for it.
+    const url = file === undefined ? "/icon.svg" : objectUrlOf(file);
+    return HttpResponse.json({
+      data: { url, expires_at: new Date(Date.now() + 10 * 60_000).toISOString() },
+    });
+  }),
+
+  http.delete(complaintPath("/attachments/:attachmentId"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const complaint = findComplaint(params.complaintId);
+    if (complaint instanceof Response) return complaint;
+    if (!canFor(complaint, caller()).upload) {
+      return errorResponse(409, "complaint_closed_for_upload", "The complaint is closed.");
+    }
+    const attachment = complaint.attachments.find((item) => item.id === params.attachmentId);
+    if (attachment === undefined) return errorResponse(404, "not_found", "No such file.");
+    // In a draft, whoever added it or an editor; after submit, only whoever added it.
+    if (complaint.status !== "draft" && attachment.uploaded_by?.id !== caller().user.id) {
+      return errorResponse(403, "forbidden", "Only whoever added this file can remove it.");
+    }
+    record(complaint, "complaint.attachment_removed", { filename: attachment.filename });
+    save({
+      ...complaint,
+      attachments: complaint.attachments.filter((item) => item.id !== params.attachmentId),
+    });
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  /** CMPL-008 · The response and resolution targets, in working hours. */
+  http.get(buildApiUrl("/complaint-sla-policies"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    return HttpResponse.json({ data: mockDb.slaPolicies });
+  }),
+
+  /** CMPL-008 · A new target from a day (masters edit): the one in force ends that day. */
+  http.post(buildApiUrl("/complaint-sla-policies"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!can(mockPermissionsFor(readMockRole()), "masters", "edit")) {
+      return errorResponse(403, "forbidden", "Only the administrator sets targets.");
+    }
+    const parsed = createSlaPolicyRequestSchema.safeParse(await request.json());
+    if (!parsed.success) return invalid(fieldsOf(parsed.error));
+    const body = parsed.data;
+    if (body.effective_from < todayInIndia()) {
+      return errorResponse(422, "target_in_the_past", "A target cannot start in the past.", {
+        effective_from: "today or later",
+      });
+    }
+    if (body.resolution_hours < body.response_hours) {
+      return invalid({ resolution_hours: "not less than the response target" });
+    }
+    const typeId = body.complaint_type_id ?? null;
+    if (
+      mockDb.slaPolicies.some(
+        (row) =>
+          row.severity === body.severity &&
+          row.complaint_type_id === typeId &&
+          row.effective_from === body.effective_from,
+      )
+    ) {
+      return errorResponse(409, "target_exists", "A target already starts that day.");
+    }
+    const policy: SlaPolicyWire = {
+      id: mockUuid(MOCK_ID_SPACE.complaint, 0xa000 + mockDb.slaPolicies.length + 1),
+      severity: body.severity,
+      complaint_type_id: typeId,
+      response_hours: body.response_hours,
+      resolution_hours: body.resolution_hours,
+      business_hours_only: body.business_hours_only ?? true,
+      effective_from: body.effective_from,
+      // Up to the next one already scheduled, if any.
+      effective_to:
+        mockDb.slaPolicies
+          .filter(
+            (row) =>
+              row.severity === body.severity &&
+              row.complaint_type_id === typeId &&
+              row.effective_from > body.effective_from,
+          )
+          .map((row) => row.effective_from)
+          .sort()[0] ?? null,
+    };
+    mockDb.slaPolicies = [
+      ...mockDb.slaPolicies.map((row) =>
+        row.severity === body.severity &&
+        row.complaint_type_id === typeId &&
+        row.effective_from < body.effective_from &&
+        (row.effective_to === null || row.effective_to > body.effective_from)
+          ? { ...row, effective_to: body.effective_from }
+          : row,
+      ),
+      policy,
+    ];
+    return HttpResponse.json({ data: mockDb.slaPolicies }, { status: 201 });
   }),
 ];

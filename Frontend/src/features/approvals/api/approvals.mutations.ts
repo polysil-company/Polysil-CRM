@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 
+import { complaintKeys } from "@/features/complaints/api/complaints.queries";
 import { orderKeys } from "@/features/orders/api/orders.queries";
 import { quotationKeys } from "@/features/quotations/api/quotations.queries";
 
@@ -36,7 +37,9 @@ export function useDecideApproval(): UseMutationResult<DecisionResult, Error, De
       void queryClient.invalidateQueries({ queryKey: approvalKeys.all });
     },
     onSuccess: (result) => {
-      if (result.docType === "quotation") {
+      if (result.docType === "complaint") {
+        void queryClient.invalidateQueries({ queryKey: complaintKeys.all });
+      } else if (result.docType === "quotation") {
         void queryClient.invalidateQueries({ queryKey: quotationKeys.detail(result.id) });
         void queryClient.invalidateQueries({ queryKey: quotationKeys.timelines() });
       } else {

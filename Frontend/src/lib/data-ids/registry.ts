@@ -456,7 +456,7 @@ export const DATA_IDS = {
     domain: "CMPL",
     title: "Complaint attachments — photos and documents",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
     endpoints: [
       "POST /complaints/{id}/attachments",
       "GET /complaints/{id}/attachments/{attachmentId}",
@@ -467,14 +467,14 @@ export const DATA_IDS = {
     domain: "CMPL",
     title: "Complaint remedy — refund, replacement or none; withdraw",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
     endpoints: ["POST /complaints/{id}/remedy", "POST /complaints/{id}/remedy/withdraw"],
   },
   "CMPL-008": {
     domain: "CMPL",
     title: "Complaint targets (SLA policies) and complaint types",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
     endpoints: [
       "GET /complaint-sla-policies",
       "POST /complaint-sla-policies",
@@ -486,7 +486,7 @@ export const DATA_IDS = {
     domain: "CMPL",
     title: "Export complaints to Excel",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
     endpoints: ["GET /complaints/export"],
   },
   "TASK-001": {

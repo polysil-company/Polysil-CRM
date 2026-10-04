@@ -1,4 +1,5 @@
 import type {
+  SlaPolicyWire,
   ComplaintSeverity,
   ComplaintStatus,
   ComplaintWire,
@@ -231,4 +232,18 @@ export function generateComplaints(
       submitted_at: submitted === null ? null : new Date(submitted).toISOString(),
     };
   });
+}
+
+/** The backend's stand-in targets (migration 019, GAP-147), from 1 April 2026. */
+export function seedSlaPolicies(): SlaPolicyWire[] {
+  return (["high", "medium", "low"] as const).map((severity, index) => ({
+    id: mockUuid(MOCK_ID_SPACE.complaint, 0xa000 - index - 1),
+    severity,
+    complaint_type_id: null,
+    response_hours: MOCK_SLA_HOURS[severity][0],
+    resolution_hours: MOCK_SLA_HOURS[severity][1],
+    business_hours_only: true,
+    effective_from: "2026-04-01",
+    effective_to: null,
+  }));
 }

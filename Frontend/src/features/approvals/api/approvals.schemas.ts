@@ -8,13 +8,13 @@ import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/
  * sales orders and quotation discounts (FS-013) side by side.
  */
 
-export const APPROVAL_DOC_TYPES = ["sales_order", "quotation"] as const;
+/** Orders, quotation discounts, and complaint refunds (CMPL-007). */
+export const APPROVAL_DOC_TYPES = ["sales_order", "quotation", "complaint"] as const;
 export type ApprovalDocType = (typeof APPROVAL_DOC_TYPES)[number];
 
 /**
  * The documents with approval limits: an order's value, a quotation's discount, and a
  * complaint's refund (FS-015b, rupees, the order's three managers, then Accounts).
- * TODO(CMPL-001): refund steps join the inbox (`APPROVAL_DOC_TYPES`) with the complaint screens.
  */
 export const THRESHOLD_DOC_TYPES = ["sales_order", "quotation", "complaint"] as const;
 export type ThresholdDocType = (typeof THRESHOLD_DOC_TYPES)[number];
@@ -97,7 +97,7 @@ export interface DecisionRequest {
 }
 
 /**
- * The decision answers with the document it decided — an order or a quotation. The inbox
+ * The decision answers with the document it decided — an order, a quotation or a complaint. The inbox
  * needs only which one, to refresh it; `doc_type` is on both.
  */
 export const decisionResultSchema = z
