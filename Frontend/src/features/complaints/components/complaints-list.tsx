@@ -1,11 +1,11 @@
 "use client";
 
-import { Add01Icon, CustomerSupportIcon, Download04Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, CustomerSupportIcon } from "@hugeicons/core-free-icons";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import type * as React from "react";
-import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { FilterPill, SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
@@ -40,10 +40,7 @@ import {
 } from "@/features/complaints/lib/complaint-labels";
 import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import { useCan } from "@/features/session/hooks/use-session";
-import { useAsyncAction } from "@/hooks/use-async-action";
 import { toUserFacingError } from "@/lib/api/error-messages";
-import { isApiError } from "@/lib/api/errors";
-import { saveFile } from "@/lib/api/save-file";
 import { formatCount } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
@@ -180,39 +177,14 @@ export function ComplaintsList(): React.JSX.Element {
 
 /** CMPL-009 · The list as an Excel file, with the filters on screen. */
 function ExportComplaintsButton({ params }: { params: ComplaintListParams }): React.JSX.Element {
-  const download = useAsyncAction({
-    action: () => exportComplaints(params),
-    logger: log,
-    fn: "handleExportComplaints",
-    dataId: "CMPL-009",
-    onSuccess: (file) => {
-      saveFile(file, "complaints.xlsx");
-    },
-    onError: (error) => {
-      if (isApiError(error) && error.code === "export_too_large") {
-        toast.error("Too many complaints to download", {
-          description: "More than 5,000 match. Narrow the filters and try again.",
-        });
-        return;
-      }
-      const view = toUserFacingError(error);
-      toast.error(view.title, { description: view.description });
-    },
-  });
   return (
-    <Button
-      variant="outline"
-      state={download.state}
-      loadingLabel="Preparing…"
-      successLabel="Downloaded"
-      errorLabel="Not downloaded"
-      onClick={() => {
-        void download.run();
-      }}
-    >
-      <Icon icon={Download04Icon} />
-      Download Excel
-    </Button>
+    <DownloadExcelButton
+      download={() => exportComplaints(params)}
+      fallbackName="complaints.xlsx"
+      what="complaints"
+      logger={log}
+      dataId="CMPL-009"
+    />
   );
 }
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { QuotationLineRequest } from "@/features/quotations/api/quotations.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 import { EMPTY_VALUE } from "@/lib/format";
 
@@ -445,8 +446,41 @@ export interface CreateOrderFromQuotations {
   readonly remarks: string | null;
 }
 
-/** PATCH /orders/{id} — a draft's header, as far as this screen edits it. */
+/** The buyer printed on an order: the farmer, or the dealer on a consolidated order. */
+export interface OrderPartyRequest {
+  readonly name: string;
+  readonly mobile: string | null;
+  readonly address: string | null;
+  readonly gstin: string | null;
+}
+
+/**
+ * SO-005 · POST /orders typed in line by line: the party, where the goods go (or the lead's
+ * place), and the lines as the pricing preview priced them. `partner_id` is left out for a
+ * direct sale by staff; it names the lead's dealer when there is one.
+ */
+export interface CreateDirectOrder {
+  readonly order_type: (typeof ORDERABLE_TYPES)[number];
+  readonly lead_id?: string;
+  readonly partner_id?: string;
+  readonly party: OrderPartyRequest;
+  readonly place_of_supply_territory_id: string;
+  readonly delivery_address: string | null;
+  readonly payment_terms: PaymentTerms;
+  readonly remarks: string | null;
+  readonly lines: readonly QuotationLineRequest[];
+}
+
+/** SO-005 · PUT /orders/{id}/lines — every line of a draft, priced as new. */
+export interface ReplaceOrderLinesRequest {
+  readonly lines: readonly QuotationLineRequest[];
+  readonly expected_status: "draft";
+}
+
+/** PATCH /orders/{id} — a draft's header, as far as the screens edit it. */
 export interface PatchOrderRequest {
+  readonly order_type?: (typeof ORDERABLE_TYPES)[number];
+  readonly party?: OrderPartyRequest;
   readonly delivery_address?: string | null;
   readonly payment_terms?: PaymentTerms;
   readonly remarks?: string | null;

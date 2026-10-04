@@ -3,7 +3,7 @@ import {
   timelinePageSchema,
   type TimelinePage,
 } from "@/features/leads/api/leads.schemas";
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -73,6 +73,23 @@ export async function listQuotations(
   }
 
   return page;
+}
+
+/** QUOT-013 · GET /quotations/export — the list as an Excel file, with the list's filters. */
+export function exportQuotations(params: QuotationListParams): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "QUOT-013",
+    logger: log,
+    fn: "exportQuotations",
+    path: "/quotations/export",
+    query: {
+      q: params.q,
+      status: params.status.join(","),
+      sales_type: params.salesType,
+      lead_id: params.leadId,
+      current_only: params.currentOnly ? undefined : false,
+    },
+  });
 }
 
 /** QUOT-002 · GET /quotations/{quotationId} — the document. 404 outside the caller's scope. */

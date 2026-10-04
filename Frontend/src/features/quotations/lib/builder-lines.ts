@@ -167,7 +167,10 @@ function trimZeros(value: string): string {
 }
 
 export interface SaveErrors {
-  /** Header fields by name: salesType, partyName, partyMobile, partyAddress, partyGstin, terms. */
+  /**
+   * Header fields by name: salesType, partyName, partyMobile, partyAddress, partyGstin, terms;
+   * on an order also orderType, place, deliveryAddress and remarks.
+   */
   readonly header: Readonly<Record<string, string>>;
   /** Row errors by row key. */
   readonly lines: Readonly<Record<string, string>>;
@@ -180,6 +183,12 @@ const HEADER_FIELDS: Readonly<Record<string, string>> = {
   "party.address": "partyAddress",
   "party.gstin": "partyGstin",
   terms: "terms",
+  // An order's header (SO-005).
+  party: "partyName",
+  order_type: "orderType",
+  place_of_supply_territory_id: "place",
+  delivery_address: "deliveryAddress",
+  remarks: "remarks",
 };
 
 const LINE_FIELD_PATTERN = /^lines\[(\d+)\]\.(\w+)$/;
@@ -224,4 +233,21 @@ export function routeSaveErrors(
     }
   }
   return { header, lines };
+}
+
+/** The backend's `fields` on any refusal, not only a 422 (a 409 rate_changed carries them too). */
+export function readAnyFields(error: { details: unknown }): Record<string, string> {
+  const details = error.details;
+  if (typeof details !== "object" || details === null || !("fields" in details)) {
+    return {};
+  }
+  const { fields } = details;
+  if (typeof fields !== "object" || fields === null) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(fields).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
 }

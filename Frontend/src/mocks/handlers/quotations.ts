@@ -40,7 +40,7 @@ import { mockDb } from "@/mocks/db";
 
 import { MOCK_CREATOR, newMockEvent, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
-import { decodeCursor, encodeCursor, errorResponse } from "./shared";
+import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
 
 /**
  * QUOT-001 … QUOT-003 · The backend's quotation reads (backend/docs/api/quotations.md): the
@@ -97,7 +97,7 @@ const QUOTABLE_STAGES = ["qualified", "quoted", "negotiation", "won"];
 /** The mock's one stand-in rate, so the indicative-pricing banner can be previewed. */
 const PROVISIONAL_PRODUCT_INDEX = 1;
 
-const lineInSchema = z.object({
+export const lineInSchema = z.object({
   product_id: z.string().min(1),
   qty: z.coerce.number(),
   discount_pct: z.coerce.number().default(0),
@@ -107,7 +107,7 @@ const lineInSchema = z.object({
   gst_rate_id: z.string().nullish(),
 });
 
-type LineIn = z.infer<typeof lineInSchema>;
+export type LineIn = z.infer<typeof lineInSchema>;
 
 const partySchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -121,7 +121,7 @@ const partySchema = z.object({
  * an unknown product, a quantity of zero or with more decimals than the unit takes, a
  * discount outside 0–100.
  */
-function priceLines(
+export function priceLines(
   lines: readonly LineIn[],
 ): { ok: true; lines: QuotationLineWire[] } | { ok: false; fields: Record<string, string> } {
   const fields: Record<string, string> = {};
@@ -164,7 +164,7 @@ function priceLines(
 }
 
 /** 409 rate_changed when a line was priced against a list row that is no longer in force. */
-function rateChanges(lines: readonly LineIn[]): Record<string, string> {
+export function rateChanges(lines: readonly LineIn[]): Record<string, string> {
   const fields: Record<string, string> = {};
   for (const [index, line] of lines.entries()) {
     const product = MOCK_PRODUCTS.find((item) => item.id === line.product_id);
@@ -1277,6 +1277,23 @@ export const quotationHandlers = [
       status: 302,
       headers: { Location: `https://files.polysil.example/quotations/${filename}` },
     });
+  }),
+
+  /** QUOT-013 · The list as a file. Before /quotations/:quotationId. */
+  http.get(buildApiUrl("/quotations/export"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    return mockWorkbook(
+      "quotations",
+      ["Number", "Version", "Status", "Party", "Total"],
+      mockDb.quotations.map((quotation) => [
+        quotation.quote_no ?? "Draft",
+        String(quotation.version),
+        quotation.status,
+        quotation.party.name,
+        quotation.totals.total,
+      ]),
+    );
   }),
 
   http.get(buildApiUrl("/quotations/:quotationId"), async ({ params }) => {

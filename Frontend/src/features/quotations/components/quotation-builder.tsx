@@ -1,11 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Add01Icon, AlertCircleIcon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertCircleIcon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
 import { toast } from "sonner";
@@ -14,62 +14,55 @@ import { ErrorReference } from "@/components/patterns/error-state";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import type { Lead } from "@/features/leads/api/leads.schemas";
 import { useCreateQuotation, useUpdateDraft } from "@/features/quotations/api/quotations.mutations";
-import {
-  quotationKeys,
-  quotePreviewQueryOptions,
-} from "@/features/quotations/api/quotations.queries";
+import { quotationKeys } from "@/features/quotations/api/quotations.queries";
 import {
   PRICED_SALES_TYPES,
   quotationHeaderFormSchema,
   type PartyRequest,
   type Quotation,
   type QuotationHeaderForm,
-  type QuotePreview,
-  type QuoteLinesRequest,
 } from "@/features/quotations/api/quotations.schemas";
+import { emptyLine, usePricedLines } from "@/features/quotations/hooks/use-priced-lines";
 import {
   draftLinesFrom,
-  isPriceable,
-  lineIssue,
   linesToSave,
-  pricedByKey,
-  previewRequestFor,
+  readAnyFields,
   routeSaveErrors,
-  type DraftLine,
   type PricingContext,
 } from "@/features/quotations/lib/builder-lines";
 import {
   SALES_TYPE_LABELS,
   formatRate,
-  parseWarnings,
   quotationTitle,
 } from "@/features/quotations/lib/quotation-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toUserFacingError } from "@/lib/api/error-messages";
-import { isApiError, readFieldErrors } from "@/lib/api/errors";
+import { isApiError } from "@/lib/api/errors";
 import { createRequestId } from "@/lib/api/request-id";
-import { formatInr, normalizeIndianMobile } from "@/lib/format";
+import { normalizeIndianMobile } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 
-import { QuotationLineRow } from "./quotation-line-row";
+import {
+  PricedItemsCard,
+  PricedSummary,
+  pricingStatus,
+  saveBlocker,
+  TextField,
+} from "./builder-parts";
 
 const log = createLogger({
   file: "features/quotations/components/quotation-builder.tsx",
   dataId: "QUOT-004",
 });
-
-/** Price once typing pauses for this long. */
-const PREVIEW_DEBOUNCE_MS = 400;
 
 /** What the builder starts from: a lead for a new draft, or a draft to edit. */
 export type BuilderSource =
@@ -85,13 +78,6 @@ const HEADER_FIELD_NAMES: readonly (keyof QuotationHeaderForm)[] = [
   "partyGstin",
   "terms",
 ];
-
-/** A preview request that never goes out: the query is off while there is nothing to price. */
-const NOTHING_TO_PRICE: QuoteLinesRequest = { place_of_supply_territory_id: "", lines: [] };
-
-function emptyLine(): DraftLine {
-  return { key: createRequestId(), product: null, qty: "", discounts: ["", "", ""] };
-}
 
 function contextFor(source: BuilderSource): PricingContext {
   return source.mode === "create"
@@ -139,12 +125,6 @@ function partyFrom(values: QuotationHeaderForm): PartyRequest {
   };
 }
 
-/** The last preview that belongs to a plan, so rows keep their figures while the next loads. */
-interface PricedSnapshot {
-  readonly keys: readonly string[];
-  readonly preview: QuotePreview;
-}
-
 /**
  * QUOT-004, QUOT-005 · Build a draft quotation: who it is for, its items, and — as the lines
  * change — every figure priced by the backend (`POST /pricing/quote-lines`), which the screen
@@ -156,12 +136,11 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
   const router = useRouter();
   const queryClient = useQueryClient();
   const [context] = useState(() => contextFor(source));
-  const [lines, setLines] = useState<DraftLine[]>(() =>
+  const priced = usePricedLines(context, () =>
     source.mode === "edit" && source.quotation.lines.length > 0
       ? draftLinesFrom(source.quotation.lines, createRequestId)
       : [emptyLine()],
   );
-  const [lineErrors, setLineErrors] = useState<Readonly<Record<string, string>>>({});
   const [formError, setFormError] = useState<{
     title: string;
     description: string;
@@ -178,60 +157,13 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
   const create = useCreateQuotation();
   const update = useUpdateDraft();
 
-  // ── pricing ──────────────────────────────────────────────────────────────
-  const plan = useMemo(() => previewRequestFor(lines, context), [lines, context]);
-  const debouncedPlan = useDebouncedValue(plan, PREVIEW_DEBOUNCE_MS);
-  const preview = useQuery({
-    ...quotePreviewQueryOptions(debouncedPlan.request ?? NOTHING_TO_PRICE),
-    enabled: debouncedPlan.request !== null,
-  });
-
-  const [snapshot, setSnapshot] = useState<PricedSnapshot | null>(null);
-  if (
-    preview.data !== undefined &&
-    !preview.isPlaceholderData &&
-    snapshot?.preview !== preview.data
-  ) {
-    setSnapshot({ keys: debouncedPlan.keys, preview: preview.data });
-  }
-  const upToDate =
-    plan.request === null ||
-    (debouncedPlan === plan &&
-      preview.data !== undefined &&
-      !preview.isPlaceholderData &&
-      !preview.isFetching);
-  const pricing = plan.request !== null && !upToDate && !preview.isError;
-  const priced = pricedByKey(snapshot?.preview, snapshot?.keys ?? []);
-  const totals = plan.request === null ? null : (snapshot?.preview.totals ?? null);
-  const previewErrors =
-    preview.isError && debouncedPlan === plan
-      ? routeSaveErrors(readFieldErrors(preview.error) ?? {}, debouncedPlan.keys).lines
-      : {};
-  const previewFailed =
-    preview.isError && debouncedPlan === plan && Object.keys(previewErrors).length === 0;
-
-  const rowsWithIssues = lines.filter((line) => lineIssue(line) !== null).length;
-  const rowsReady = lines.filter(isPriceable).length;
-
-  // ── lines ────────────────────────────────────────────────────────────────
-  const changeLine = (next: DraftLine): void => {
-    setLines((current) => current.map((line) => (line.key === next.key ? next : line)));
-    setLineErrors(({ [next.key]: _cleared, ...rest }) => rest);
-  };
-  const removeLine = (key: string): void => {
-    setLines((current) =>
-      current.length === 1 ? [emptyLine()] : current.filter((line) => line.key !== key),
-    );
-  };
-  const addLine = (): void => {
-    setLines((current) => [...current, emptyLine()]);
-  };
-
   // ── saving ───────────────────────────────────────────────────────────────
   const save = useAsyncAction({
     action: async (values: QuotationHeaderForm) => {
       const saved =
-        plan.request !== null && snapshot !== null ? linesToSave(plan, snapshot.preview) : [];
+        priced.plan.request !== null && priced.snapshot !== null
+          ? linesToSave(priced.plan, priced.snapshot.preview)
+          : [];
       const party = partyFrom(values);
       const terms = values.terms.trim() === "" ? null : values.terms.trim();
       if (source.mode === "create") {
@@ -280,8 +212,8 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
 
   function handleSaveError(error: unknown): void {
     const fields = isApiError(error) && error.details !== undefined ? readAnyFields(error) : {};
-    const routed = routeSaveErrors(fields, plan.keys);
-    setLineErrors(routed.lines);
+    const routed = routeSaveErrors(fields, priced.plan.keys);
+    priced.setLineErrors(routed.lines);
     for (const [field, message] of Object.entries(routed.header)) {
       const name = HEADER_FIELD_NAMES.find((candidate) => candidate === field);
       if (name !== undefined) {
@@ -345,20 +277,9 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
     }
   }
 
-  const canSave =
-    rowsWithIssues === 0 &&
-    upToDate &&
-    !save.isBusy &&
-    !previewFailed &&
-    Object.keys(previewErrors).length === 0;
-  const saveHint =
-    rowsWithIssues > 0
-      ? `Finish ${rowsWithIssues === 1 ? "one item" : `${String(rowsWithIssues)} items`} first.`
-      : pricing
-        ? "Pricing…"
-        : previewFailed || Object.keys(previewErrors).length > 0
-          ? "Fix the pricing first."
-          : null;
+  const blocker = saveBlocker(priced);
+  const canSave = blocker === null && priced.upToDate && !save.isBusy;
+  const saveHint = blocker;
 
   const title =
     source.mode === "create" ? "New quotation" : `Edit ${quotationTitle(source.quotation)}`;
@@ -419,39 +340,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-0.5">
-                <CardTitle level={3}>Items</CardTitle>
-                <CardDescription>
-                  Each discount is a percentage of what is left after the one before.
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <ol aria-label="Items" className="flex flex-col gap-3">
-                {lines.map((line, index) => (
-                  <QuotationLineRow
-                    key={line.key}
-                    line={line}
-                    index={index}
-                    priced={priced.get(line.key)}
-                    pricing={pricing}
-                    error={lineErrors[line.key] ?? previewErrors[line.key]}
-                    canRemove={lines.length > 1 || line.product !== null || line.qty !== ""}
-                    onChange={changeLine}
-                    onRemove={() => {
-                      removeLine(line.key);
-                    }}
-                  />
-                ))}
-              </ol>
-              <Button type="button" variant="outline" className="self-start" onClick={addLine}>
-                <Icon icon={Add01Icon} />
-                Add item
-              </Button>
-            </CardContent>
-          </Card>
+          <PricedItemsCard priced={priced} />
 
           <Card>
             <CardHeader>
@@ -561,39 +450,11 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
           <CardHeader>
             <div className="flex flex-col gap-0.5">
               <CardTitle level={3}>Summary</CardTitle>
-              <CardDescription aria-live="polite">
-                {rowsReady === 0
-                  ? "Add an item to see prices."
-                  : pricing
-                    ? "Pricing…"
-                    : "Priced by the price list in force."}
-              </CardDescription>
+              <CardDescription aria-live="polite">{pricingStatus(priced)}</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <BuilderTotals
-              totals={totals}
-              intraState={snapshot?.preview.intraState ?? true}
-              stale={pricing}
-            />
-            {previewFailed ? (
-              <div
-                role="alert"
-                className="flex flex-col gap-2 rounded-md bg-danger-soft p-3 text-sm"
-              >
-                <p className="font-medium text-danger">{toUserFacingError(preview.error).title}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="self-start"
-                  onClick={() => void preview.refetch()}
-                >
-                  Price again
-                </Button>
-              </div>
-            ) : null}
-            <BuilderWarnings warnings={snapshot?.preview.warnings ?? []} />
+            <PricedSummary priced={priced} />
             {source.mode === "edit" && source.quotation.discount !== null ? (
               <p className="text-xs text-muted-foreground">
                 At the last save the discount was{" "}
@@ -639,142 +500,5 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
         </Card>
       </div>
     </form>
-  );
-}
-
-/** The backend's `fields` on any refusal, not only a 422 (a 409 rate_changed carries them too). */
-function readAnyFields(error: { details: unknown }): Record<string, string> {
-  const details = error.details;
-  if (typeof details !== "object" || details === null || !("fields" in details)) {
-    return {};
-  }
-  const { fields } = details;
-  if (typeof fields !== "object" || fields === null) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(fields).filter(
-      (entry): entry is [string, string] => typeof entry[1] === "string",
-    ),
-  );
-}
-
-interface FieldAria {
-  id: string;
-  "aria-invalid": true | undefined;
-  "aria-describedby": string | undefined;
-}
-
-function TextField({
-  id,
-  label,
-  optional = false,
-  error,
-  description,
-  className,
-  children,
-}: {
-  id: string;
-  label: string;
-  optional?: boolean;
-  error: string | undefined;
-  description?: string;
-  className?: string;
-  children: (aria: FieldAria) => React.ReactNode;
-}): React.JSX.Element {
-  const errorId = `${id}-error`;
-  const descriptionId = `${id}-description`;
-  return (
-    <Field data-invalid={error ? true : undefined} className={className}>
-      <FieldLabel htmlFor={id}>
-        {label}
-        {optional ? <span className="font-normal text-muted-foreground">(optional)</span> : null}
-      </FieldLabel>
-      {children({
-        id,
-        "aria-invalid": error ? true : undefined,
-        "aria-describedby": error ? errorId : description ? descriptionId : undefined,
-      })}
-      {description && !error ? (
-        <FieldDescription id={descriptionId}>{description}</FieldDescription>
-      ) : null}
-      <FieldError id={errorId}>{error}</FieldError>
-    </Field>
-  );
-}
-
-function BuilderTotals({
-  totals,
-  intraState,
-  stale,
-}: {
-  totals: QuotePreview["totals"] | null;
-  intraState: boolean;
-  stale: boolean;
-}): React.JSX.Element {
-  const rows: { label: string; value: string | null; strong?: boolean }[] = [
-    { label: "Gross", value: totals?.gross ?? null },
-    { label: "Discount", value: totals?.discount ?? null },
-    { label: "Taxable value", value: totals?.taxable ?? null },
-    ...(intraState
-      ? [
-          { label: "CGST", value: totals?.cgst ?? null },
-          { label: "SGST", value: totals?.sgst ?? null },
-        ]
-      : [{ label: "IGST", value: totals?.igst ?? null }]),
-    { label: "Total", value: totals?.total ?? null, strong: true },
-  ];
-  return (
-    <dl
-      aria-label="Totals"
-      className={cn(
-        "grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm transition-opacity duration-fast",
-        stale && "opacity-60",
-      )}
-    >
-      {rows.map((row) => (
-        <div
-          key={row.label}
-          className={cn(
-            "col-span-2 grid grid-cols-subgrid",
-            row.strong && "border-t border-border pt-2",
-          )}
-        >
-          <dt className={row.strong ? "font-semibold text-foreground" : "text-muted-foreground"}>
-            {row.label}
-          </dt>
-          <dd
-            className={cn(
-              "text-right tabular-nums",
-              row.strong ? "text-base font-semibold" : "text-foreground",
-            )}
-          >
-            {row.value === null
-              ? "—"
-              : `${row.label === "Discount" && Number(row.value) !== 0 ? "−" : ""}${formatInr(row.value, { paise: true })}`}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function BuilderWarnings({ warnings }: { warnings: readonly string[] }): React.JSX.Element | null {
-  const parsed = parseWarnings(warnings);
-  if (parsed.length === 0) {
-    return null;
-  }
-  return (
-    <ul aria-label="Pricing notes" className="flex flex-col gap-1.5">
-      {parsed.map((warning, index) => (
-        <li
-          key={`${warning.code}-${String(index)}`}
-          className="rounded-md bg-warning-soft px-3 py-2 text-xs text-foreground"
-        >
-          {warning.code === "provisional_pricing" ? "Indicative pricing: " : null}
-          {warning.message}
-        </li>
-      ))}
-    </ul>
   );
 }

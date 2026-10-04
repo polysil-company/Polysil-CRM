@@ -25,22 +25,27 @@ import {
   chainFor,
   chainSteps,
   milli,
+  mockDirectOrder,
   mockOrderFromQuotations,
   nextMockId,
+  orderLinesFrom,
   orderNumber,
   qtyText,
   statusFromLines,
   toOrderSummary,
+  withOrderLines,
 } from "@/mocks/data/orders";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { mockMeFor } from "@/mocks/data/sessions";
+import { findMockTerritory } from "@/mocks/data/territories";
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
 import { MOCK_CREATOR, newMockEvent } from "./lead-events";
+import { lineInSchema, priceLines, rateChanges } from "./quotations";
 import { applyScenario } from "./scenario";
-import { decodeCursor, encodeCursor, errorResponse } from "./shared";
+import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
 
 /**
  * SO-001 … SO-004, DISP-002 · The backend's sales orders (backend/docs/api/orders.md,
@@ -332,16 +337,41 @@ export function decideOrderStep(
 const remarkText = z.string().trim().max(REMARK_MAX_LENGTH);
 const expectedStatus = z.enum(ORDER_STATUSES).nullish();
 
+const orderPartySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  mobile: z.string().trim().nullish(),
+  address: z.string().trim().max(500).nullish(),
+  gstin: z
+    .string()
+    .trim()
+    .regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/)
+    .nullish(),
+});
+
 const createSchema = z.object({
   order_type: z.enum(ORDER_TYPES).default("commercial"),
   quotation_ids: z.array(z.string().min(1)).default([]),
+  lead_id: z.string().min(1).nullish(),
+  partner_id: z.string().min(1).nullish(),
+  party: orderPartySchema.nullish(),
+  place_of_supply_territory_id: z.string().min(1).nullish(),
   delivery_address: z.string().trim().max(500).nullish(),
   payment_terms: z.enum(PAYMENT_TERMS).default("full_payment"),
   remarks: z.string().trim().max(2000).nullish(),
-  lines: z.array(z.unknown()).optional(),
+  lines: z.array(lineInSchema).max(200).default([]),
 });
 
+const linesSchema = z.object({
+  lines: z.array(lineInSchema).max(200),
+  expected_status: expectedStatus,
+});
+
+/** The lead stages an order may be placed on (backend domain LEAD_STAGES_ORDERABLE). */
+const ORDERABLE_STAGES: readonly string[] = ["qualified", "quoted", "negotiation", "won"];
+
 const patchSchema = z.object({
+  order_type: z.enum(ORDER_TYPES).nullish(),
+  party: orderPartySchema.nullish(),
   delivery_address: z.string().trim().max(500).nullish(),
   payment_terms: z.enum(PAYMENT_TERMS).nullish(),
   remarks: z.string().trim().max(2000).nullish(),
@@ -386,6 +416,77 @@ function onLiveOrder(quotationId: string): boolean {
 }
 
 // ── handlers ────────────────────────────────────────────────────────────────────
+
+/**
+ * SO-005 · POST /orders typed in line by line: the party, the place of supply (or the lead's),
+ * and lines priced as the preview priced them; a lead must be qualified or later.
+ */
+function createDirect(
+  body: z.infer<typeof createSchema>,
+  replay: { key: string; serialized: string },
+): Response {
+  if (body.party == null) {
+    return validation({ party: "required" });
+  }
+  const lead =
+    body.lead_id == null ? undefined : mockDb.leads.find((item) => item.id === body.lead_id);
+  if (body.lead_id != null && lead === undefined) {
+    return errorResponse(422, "lead_not_visible", "You cannot see that lead.", {
+      lead_id: body.lead_id,
+    });
+  }
+  if (lead !== undefined && !ORDERABLE_STAGES.includes(lead.stage)) {
+    return errorResponse(422, "lead_not_open", `The lead is ${lead.stage}.`, {
+      lead_stage: lead.stage,
+    });
+  }
+  const placeId = body.place_of_supply_territory_id ?? lead?.territory.id ?? null;
+  const place = placeId === null ? undefined : findMockTerritory(placeId);
+  if (place === undefined) {
+    return validation({ place_of_supply_territory_id: "required" });
+  }
+  if (body.lines.length === 0) {
+    return validation({ lines: "at least one line" });
+  }
+  const changed = rateChanges(body.lines);
+  if (Object.keys(changed).length > 0) {
+    return errorResponse(409, "rate_changed", "Prices or tax changed since the preview.", changed);
+  }
+  const priced = priceLines(body.lines);
+  if (!priced.ok) {
+    return validation(priced.fields);
+  }
+  const me = mockMeFor(readMockRole()).data;
+  const partner = lead?.assigned_partner;
+  const order = mockDirectOrder({
+    id: mockUuid(MOCK_ID_SPACE.order, 1000 + mockDb.orderWrites.size),
+    lead,
+    party: {
+      name: body.party.name,
+      mobile: body.party.mobile ?? null,
+      address: body.party.address ?? null,
+      gstin: body.party.gstin ?? null,
+    },
+    partner:
+      body.partner_id != null && partner != null && partner.id === body.partner_id
+        ? { id: partner.id, name: partner.name, partner_type: partner.partner_type }
+        : null,
+    placeOfSupply: { id: place.id, name: place.name, level: place.level },
+    owner: { id: me.id, full_name: me.full_name },
+    ownerOrgUnit: lead?.owner_org_unit ??
+      me.org_unit ?? { id: "ou-head-office", name: "Head Office" },
+    lines: priced.lines,
+    orderType: body.order_type,
+    deliveryAddress: body.delivery_address ?? null,
+    paymentTerms: body.payment_terms,
+    remarks: body.remarks ?? null,
+    createdAt: new Date().toISOString(),
+  });
+  mockDb.orders.unshift(order);
+  mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+  recordOrderEvent(order, "order.created", {});
+  return HttpResponse.json({ data: order }, { status: 201 });
+}
 
 export const orderHandlers = [
   /**
@@ -489,6 +590,22 @@ export const orderHandlers = [
     return HttpResponse.json(body);
   }),
 
+  /** SO-006 · The list as a file. Before /orders/:orderId. */
+  http.get(buildApiUrl("/orders/export"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    return mockWorkbook(
+      "orders",
+      ["Number", "Status", "Party", "Total"],
+      mockDb.orders.map((order) => [
+        order.order_no ?? "Draft",
+        order.status,
+        order.party.name,
+        order.totals.total,
+      ]),
+    );
+  }),
+
   http.get(buildApiUrl("/orders/:orderId"), async ({ params }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
@@ -582,8 +699,7 @@ export const orderHandlers = [
       );
     }
     if (body.quotation_ids.length === 0) {
-      // TODO(SO-005): a direct order, typed in line by line.
-      return validation({ quotation_ids: "at least one accepted quotation" });
+      return createDirect(body, replay);
     }
     const quotations = body.quotation_ids.map((id) =>
       mockDb.quotations.find((item) => item.id === id),
@@ -661,12 +777,73 @@ export const orderHandlers = [
       return errorResponse(409, "order_not_draft", "Only a draft can be changed.");
     }
     const body = parsed.data;
+    if (body.order_type != null) {
+      if (!orderableType(body.order_type)) {
+        return errorResponse(422, "order_type_unsupported", "Only commercial and industrial.", {
+          order_type: body.order_type,
+        });
+      }
+      order.order_type = body.order_type;
+    }
+    if (body.party != null) {
+      if (order.quotations.length > 0) {
+        return errorResponse(422, "fixed_by_quotation", "The quotations fix the party.", {
+          party: "fixed by the quotations",
+        });
+      }
+      order.party = {
+        name: body.party.name,
+        mobile: body.party.mobile ?? null,
+        address: body.party.address ?? null,
+        gstin: body.party.gstin ?? null,
+      };
+    }
     if (body.delivery_address !== undefined) order.delivery_address = body.delivery_address || null;
     if (body.payment_terms !== undefined && body.payment_terms !== null)
       order.payment_terms = body.payment_terms;
     if (body.remarks !== undefined) order.remarks = body.remarks || null;
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.updated", {});
+    return HttpResponse.json({ data: order });
+  }),
+
+  /** SO-005 · Replace a draft's lines, priced as new. */
+  http.put(buildApiUrl("/orders/:orderId/lines"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    if (!allowed(readMockRole(), "sales_orders", "edit")) {
+      return errorResponse(403, "forbidden", "You cannot change orders.");
+    }
+    const parsed = linesSchema.safeParse(raw);
+    if (!parsed.success) {
+      return validation({ lines: "every line with a product and a quantity" });
+    }
+    const target = orderAt(String(params.orderId), parsed.data.expected_status);
+    if (!target.ok) return target.response;
+    const { order } = target;
+    if (order.status !== "draft") {
+      return errorResponse(409, "order_not_draft", "Only a draft can be changed.");
+    }
+    const changed = rateChanges(parsed.data.lines);
+    if (Object.keys(changed).length > 0) {
+      return errorResponse(
+        409,
+        "rate_changed",
+        "Prices or tax changed since the preview.",
+        changed,
+      );
+    }
+    const priced = priceLines(parsed.data.lines);
+    if (!priced.ok) {
+      return validation(priced.fields);
+    }
+    Object.assign(order, withOrderLines(orderLinesFrom(priced.lines)));
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.lines_replaced", { lines: priced.lines.length });
     return HttpResponse.json({ data: order });
   }),
 

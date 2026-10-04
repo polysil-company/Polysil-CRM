@@ -237,6 +237,94 @@ export function mockOrderFromQuotations(input: MockOrderInput): OrderWire {
   };
 }
 
+export interface MockDirectOrderInput {
+  readonly id: string;
+  readonly lead: LeadWire | undefined;
+  readonly party: OrderWire["party"];
+  readonly partner: OrderWire["partner"];
+  readonly placeOfSupply: OrderWire["place_of_supply"];
+  readonly owner: OrderWire["owner"];
+  readonly ownerOrgUnit: OrderWire["owner_org_unit"];
+  readonly lines: readonly QuotationWire["lines"][number][];
+  readonly orderType: OrderWire["order_type"];
+  readonly deliveryAddress: string | null;
+  readonly paymentTerms: OrderWire["payment_terms"];
+  readonly remarks: string | null;
+  readonly createdAt: string;
+}
+
+/** SO-005 · A draft typed in line by line: the party and place of supply as given. */
+export function mockDirectOrder(input: MockDirectOrderInput): OrderWire {
+  const lines = orderLinesFrom(input.lines);
+  return {
+    doc_type: "sales_order",
+    id: input.id,
+    order_no: null,
+    status: "draft",
+    order_type: input.orderType,
+    party: input.party,
+    partner: input.partner,
+    lead:
+      input.lead === undefined ? null : { id: input.lead.id, inquiry_no: input.lead.inquiry_no },
+    quotations: [],
+    owner: input.owner,
+    owner_org_unit: input.ownerOrgUnit,
+    territory: input.lead?.territory ?? input.placeOfSupply,
+    delivery_address: input.deliveryAddress,
+    payment_terms: input.paymentTerms,
+    seller: {
+      gstin: MOCK_SELLER.gstin,
+      legal_name: MOCK_SELLER.legal_name,
+      address: MOCK_SELLER.address,
+      state_code: MOCK_SELLER.state,
+    },
+    place_of_supply: input.placeOfSupply,
+    intra_state: true,
+    price_effective_date: input.createdAt.slice(0, 10),
+    tax_date: input.createdAt.slice(0, 10),
+    ...withOrderLines(lines),
+    approval: null,
+    last_rejection: null,
+    dispatches: [],
+    warnings: [],
+    remarks: input.remarks,
+    pdf_state: "none",
+    pdf_error: null,
+    confirmation: null,
+    submitted_at: null,
+    approved_at: null,
+    cancelled_at: null,
+    cancel_remark: null,
+    closed_at: null,
+    close_remark: null,
+    created_at: input.createdAt,
+  };
+}
+
+/** SO-005 · A draft's lines replaced: renumbered, with the totals again. */
+export function withOrderLines(
+  lines: readonly OrderLineWire[],
+): Pick<OrderWire, "lines" | "totals" | "is_provisional"> {
+  return {
+    is_provisional: lines.some((line) => line.provisional_fields.length > 0),
+    lines: [...lines],
+    totals: {
+      gross: sumMoney(lines, "gross"),
+      discount: sumMoney(lines, "discount"),
+      taxable: sumMoney(lines, "taxable"),
+      cgst: sumMoney(lines, "cgst"),
+      sgst: sumMoney(lines, "sgst"),
+      igst: sumMoney(lines, "igst"),
+      total: sumMoney(lines, "total"),
+    },
+  };
+}
+
+/** Priced quotation lines as order lines, numbered from 1. */
+export function orderLinesFrom(lines: readonly QuotationWire["lines"][number][]): OrderLineWire[] {
+  return lines.map((line, index) => orderLineFrom({ ...line, line_no: index + 1 }));
+}
+
 type MoneyField = "gross" | "discount" | "taxable" | "cgst" | "sgst" | "igst" | "total";
 
 function sumMoney(lines: readonly OrderLineWire[], field: MoneyField): string {
