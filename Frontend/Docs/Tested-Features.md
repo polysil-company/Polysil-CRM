@@ -36,7 +36,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Approvals](#approvals) | 5 | 🧪 🌐 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 🌐 👀 | PR #34; the Dispatch queue in PR #56 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
-| [Complaints](#complaints) | 6 | 🧪 👀 | PR #PRNUM |
+| [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 🌐 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -167,7 +167,7 @@ On the backend's contract (`backend/docs/api/tasks.md`) since PR #54 ([changelog
 
 ## Complaints
 
-On the backend's contract (`backend/docs/api/complaints.md`, handover `complaints-contract.md`) since PR #PRNUM ([changelog](../changelog/entries/2026-10-04--feature--CMPL-001--complaints-raise-check-and-qc.md)). Walked through in the mock: raised as Admin with mistakes then correctly, submitted, checked, given a QC verdict; a District Manager's queue on a phone in dark mode. axe found nothing on the list, the form, the complaint, or the check and QC dialogs. Not yet checked on the dev API. Screens: [list](screenshots/complaints/list-desktop-light.jpg), [form mistakes](screenshots/complaints/new-errors-desktop-light.jpg), [a draft](screenshots/complaints/draft-desktop-light.jpg), [submitted](screenshots/complaints/submitted-desktop-light.jpg), [check](screenshots/complaints/check-dialog-desktop-light.jpg), [QC](screenshots/complaints/qc-dialog-desktop-light.jpg), [QC approved](screenshots/complaints/qc-approved-desktop-light.jpg), [waiting on me, phone dark](screenshots/complaints/waiting-on-me-phone-dark.jpg), [a complaint on a phone](screenshots/complaints/detail-phone-dark.jpg).
+On the backend's contract (`backend/docs/api/complaints.md`, handover `complaints-contract.md`) since PR #57 ([changelog](../changelog/entries/2026-10-04--feature--CMPL-001--complaints-raise-check-and-qc.md)). Walked through in the mock: raised as Admin with mistakes then correctly, submitted, checked, given a QC verdict; a District Manager's queue on a phone in dark mode. axe found nothing on the list, the form, the complaint, or the check and QC dialogs. Not yet checked on the dev API. Screens: [list](screenshots/complaints/list-desktop-light.jpg), [form mistakes](screenshots/complaints/new-errors-desktop-light.jpg), [a draft](screenshots/complaints/draft-desktop-light.jpg), [submitted](screenshots/complaints/submitted-desktop-light.jpg), [check](screenshots/complaints/check-dialog-desktop-light.jpg), [QC](screenshots/complaints/qc-dialog-desktop-light.jpg), [QC approved](screenshots/complaints/qc-approved-desktop-light.jpg), [waiting on me, phone dark](screenshots/complaints/waiting-on-me-phone-dark.jpg), [a complaint on a phone](screenshots/complaints/detail-phone-dark.jpg).
 
 - **CMPL-001 · The complaints list** (anyone with `complaints`): newest first, with the number (or "Draft complaint"), status, severity, a red "Late" when a target was missed, the contact, type, dealer and owner (or "No owner yet"), and how long ago. Counts above: waiting for a check, with QC, late. Search by number, contact or mobile; filter by status (each explained), severity, type, late only, no owner — all in the URL. States: skeleton, "No complaints yet", nothing matching with Reset, an error, a later page failing. 🧪 👀
 - **CMPL-001 · Waiting on me** (managers and QC): what waits for their check or verdict, oldest first. Someone who can only look (Accounts) sees neither the queue nor "New complaint". 🧪 👀
@@ -188,7 +188,7 @@ The dashboard reads the backend's real shape since the demo-walk fixes ([changel
 - **NOTIF-001, NOTIF-002 · The notification bell** in the top bar (any signed-in user).
   - The badge counts the unread, checking every 30 seconds with one notification's worth of data.
   - Opening it lists the latest 20, each with its own icon for the backend's 14 kinds; an unknown kind gets the plain bell.
-  - A notification opens its lead, quotation, sales order or complaint (PR #PRNUM). Tasks have no page of their own yet, so theirs only mark read.
+  - A notification opens its lead, quotation, sales order or complaint (PR #57). Tasks have no page of their own yet, so theirs only mark read.
   - Mark one or all read: the badge drops at once, is put back if the call fails, then takes the backend's count.
   - States: skeleton, "You're all caught up", an error with retry.
   - Screens: [desktop](screenshots/messages-notifications/notifications-bell-desktop-light.jpg), [phone, dark](screenshots/messages-notifications/notifications-bell-phone-dark.jpg). 🧪 🌐 👀
@@ -210,5 +210,5 @@ The backend serves these, and the frontend has no screen for them — in the ord
 1. A direct order typed in line by line, and a consolidated order from several leads of one dealer (SO-005).
 2. Editing and deleting a lead, the duplicates queue and merging.
 3. Lead QR codes and the public enquiry form.
-4. Complaints, the rest: photos and documents, the remedy, the targets and types, export, and a lead's and an order's complaints. The flow from raising to QC is in PR #PRNUM.
+4. Complaints, the rest: photos and documents, the remedy, the targets and types, export, and a lead's and an order's complaints. The flow from raising to QC is in PR #57.
 5. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.
