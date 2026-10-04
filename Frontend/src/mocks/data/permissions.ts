@@ -54,8 +54,13 @@ function manager(scope: Scope): MockModulePermission[] {
   return [
     // One entry per module, as GET /auth/me returns: the manager's replace the officer's.
     ...fieldStaff(scope).filter(
-      (entry) => entry.module !== "quotations" && entry.module !== "sales_orders",
+      (entry) =>
+        entry.module !== "quotations" &&
+        entry.module !== "sales_orders" &&
+        entry.module !== "complaints",
     ),
+    // Managers check complaints before QC (RBAC.md §6.1: complaints CEA).
+    grant("complaints", ["view", "create", "edit", "approve"], scope),
     // Managers approve orders and quotation discounts (RBAC.md §6.1).
     grant("quotations", ["view", "create", "edit", "approve"], scope),
     grant("sales_orders", ["view", "create", "edit", "approve"], scope),
@@ -88,6 +93,8 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
     case "account_manager":
       return [
         grant("accounts", ["view", "edit", "approve"], "global"),
+        // Accounts sees complaints (refunds are paid through them) but decides none.
+        grant("complaints", ["view"], "global"),
         // Accounts decides the payment step of every order (RBAC.md §6.2).
         grant("sales_orders", ["view", "approve"], "global"),
         SCHEMES_VIEW,

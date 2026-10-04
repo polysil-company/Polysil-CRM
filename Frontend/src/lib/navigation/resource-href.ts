@@ -27,7 +27,11 @@ export function describeResourceType(type: string): string {
  * The screens a record can open today. Spelled as template types (not `Route`) so typed
  * routes can check each one where it is passed to a link.
  */
-export type ResourceHref = `/leads/${string}` | `/quotations/${string}` | `/sales-orders/${string}`;
+export type ResourceHref =
+  | `/leads/${string}`
+  | `/quotations/${string}`
+  | `/sales-orders/${string}`
+  | `/complaints/${string}`;
 
 /** Where a record opens, or null while its module has no screen yet. */
 export function resourceHref(resource: Pick<ResourceRef, "type" | "id">): ResourceHref | null {
@@ -39,9 +43,11 @@ export function resourceHref(resource: Pick<ResourceRef, "type" | "id">): Resour
       return `/quotations/${id}`;
     case "sales_order":
       return `/sales-orders/${id}`;
+    case "complaint":
+      return `/complaints/${id}`;
     default:
       // TODO(TASK-003): link a task once it has its own page; My day shows one day only, so
-      // it may not hold the task. Complaints (CMPL-001) once their screens land.
+      // it may not hold the task.
       return null;
   }
 }

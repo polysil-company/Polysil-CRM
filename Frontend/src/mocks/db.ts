@@ -6,6 +6,7 @@ import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
+import { generateComplaints, type MockComplaint } from "./data/complaints";
 import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
@@ -65,6 +66,12 @@ export interface MockDb {
   minutes: MockMinutes[];
   /** POST /minutes replays: Idempotency-Key → the request and the minutes it made. */
   minutesWrites: Map<string, { body: string; minutesId: string }>;
+  /** Complaints, newest first (CMPL-001…). */
+  complaints: MockComplaint[];
+  /** Complaint writes: Idempotency-Key → the request and the complaint it made or changed. */
+  complaintWrites: Map<string, { body: string; complaintId: string }>;
+  /** Each complaint's history, newest first. */
+  complaintEvents: Map<string, TimelineEventWire[]>;
   /** How many events the mock has written, for their ids. */
   writtenEvents: number;
 }
@@ -113,6 +120,9 @@ function createMockDb(): MockDb {
     taskWrites: new Map(),
     minutes,
     minutesWrites: new Map(),
+    complaints: generateComplaints(leads, orders),
+    complaintWrites: new Map(),
+    complaintEvents: new Map(),
     writtenEvents: 1,
   };
 }
