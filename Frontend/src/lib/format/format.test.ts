@@ -19,6 +19,8 @@ import {
   todayInIndia,
   shiftCalendarDay,
   formatCalendarDay,
+  calendarDayOf,
+  timeOfDayOf,
 } from "@/lib/format";
 
 const NOW = new Date("2026-09-14T10:00:00+05:30");
@@ -123,6 +125,14 @@ describe("[DS-001] date formatting (India Standard Time)", () => {
     expect(shiftCalendarDay("2026-10-31", 1)).toBe("2026-11-01");
     expect(shiftCalendarDay("2027-01-01", -1)).toBe("2026-12-31");
     expect(formatCalendarDay("2026-10-03")).toBe("Saturday, 3 October");
+  });
+
+  it("reads an instant's day and time in India, for date and time inputs", () => {
+    // 19:00 UTC is half past midnight the next day in India.
+    expect(calendarDayOf("2026-10-03T19:00:00Z")).toBe("2026-10-04");
+    expect(timeOfDayOf("2026-10-03T19:00:00Z")).toBe("00:30");
+    expect(timeOfDayOf("2026-10-03T12:30:00Z")).toBe("18:00");
+    expect(calendarDayOf(null)).toBe("");
   });
 
   it("handles missing and invalid dates without throwing", () => {

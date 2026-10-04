@@ -5,7 +5,10 @@ import {
   TASK_STATUSES,
   cancelTaskRequestSchema,
   completeTaskRequestSchema,
+  createMinutesRequestSchema,
   createTaskRequestSchema,
+  patchTaskRequestSchema,
+  type MinutesWire,
   type PlannerDayWire,
   type TaskPageWire,
   type TaskStatus,
@@ -20,7 +23,7 @@ import { mockLookupRows } from "@/mocks/data/lookups";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, MOCK_PARTNERS, mockUuid } from "@/mocks/data/reference";
 import { mockMeFor } from "@/mocks/data/sessions";
-import { MOCK_TEAM, type MockTask, type MockUser } from "@/mocks/data/tasks";
+import { MOCK_TEAM, type MockMinutes, type MockTask, type MockUser } from "@/mocks/data/tasks";
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
@@ -31,6 +34,8 @@ const OVERDUE_LOOKBACK_DAYS = 90;
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+/** The backend refuses a bigger export: narrow the filters. */
+const EXPORT_MAX_ROWS = 5000;
 
 /** The signed-in user, as GET /auth/me names them. */
 function currentUser(): MockUser {
@@ -77,6 +82,18 @@ function fieldsOf(error: Parameters<typeof summarizeSchemaIssues>[0]): Record<st
   );
 }
 
+/** Minutes as the backend serves them: each action item's task as it stands now. */
+function minutesWire(minutes: MockMinutes): MinutesWire {
+  const { action_item_ids: ids, ...rest } = minutes;
+  return {
+    ...rest,
+    action_items: ids.flatMap((taskId) => {
+      const task = mockDb.tasks.find((item) => item.id === taskId);
+      return task === undefined ? [] : [toWire(task)];
+    }),
+  };
+}
+
 function noTasksModule(): Response {
   return errorResponse(403, "forbidden", "Tasks are not in your permissions.");
 }
@@ -121,6 +138,29 @@ function idempotencyKeyOf(request: Request): string | Response {
   return (
     request.headers.get("idempotency-key") ??
     errorResponse(400, "idempotency_key_required", "Idempotency-Key missing.")
+  );
+}
+
+/** The filters GET /tasks and GET /tasks/export share: the export holds exactly the list. */
+function filterTasks(params: URLSearchParams, scope: string | null): MockTask[] {
+  const me = currentUser();
+  const leadId = params.get("lead_id");
+  const assignedTo = params.get("assigned_to");
+  const type = params.get("task_type");
+  const overdueOnly = params.get("overdue") === "true";
+  const statuses = params
+    .getAll("status")
+    .flatMap((value) => value.split(","))
+    .filter((value): value is TaskStatus => TASK_STATUSES.some((status) => status === value));
+  const now = Date.now();
+  return visibleTasks(me, scope).filter(
+    (task) =>
+      (leadId === null || task.lead?.id === leadId) &&
+      (assignedTo === null ||
+        task.assigned_to?.id === (assignedTo === "me" ? me.id : assignedTo)) &&
+      (type === null || task.task_type === type) &&
+      (!overdueOnly || (task.status === "open" && Date.parse(task.due_at) < now)) &&
+      (statuses.length === 0 || statuses.includes(task.status)),
   );
 }
 
@@ -248,21 +288,7 @@ export const taskHandlers = [
         cursor: "malformed cursor",
       });
     }
-    const leadId = url.searchParams.get("lead_id");
-    const statuses = url.searchParams
-      .getAll("status")
-      .flatMap((value) => value.split(","))
-      .filter((value): value is TaskStatus => TASK_STATUSES.some((status) => status === value));
-
-    const me = currentUser();
-    const matches =
-      scenario === "empty"
-        ? []
-        : visibleTasks(me, scope).filter(
-            (task) =>
-              (leadId === null || task.lead?.id === leadId) &&
-              (statuses.length === 0 || statuses.includes(task.status)),
-          );
+    const matches = scenario === "empty" ? [] : filterTasks(url.searchParams, scope);
     const page = matches.slice(offset, offset + limit);
     const counted = url.searchParams.get("include_total") === "true";
     const body: TaskPageWire = {
@@ -398,6 +424,267 @@ export const taskHandlers = [
     );
     mockDb.taskWrites.set(key, { body: serialized, taskId: task.id });
     return HttpResponse.json({ data: toWire(task) }, { status: 201 });
+  }),
+
+  /** TASK-008 · The list as a file, with the same filters. Before /tasks/:taskId. */
+  http.get(buildApiUrl("/tasks/export"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const scope = taskScope();
+    if (scope === null) return noTasksModule();
+    const rows = filterTasks(new URL(request.url).searchParams, scope);
+    if (rows.length > EXPORT_MAX_ROWS) {
+      return errorResponse(422, "export_too_large", "More than 5000 rows: narrow the filters.");
+    }
+    // A stand-in for the workbook: one line per task, with the real file's headers.
+    const lines = [
+      "Title\tKind\tStatus\tDue\tFor",
+      ...rows.map((task) =>
+        [
+          task.title,
+          task.task_type,
+          task.status,
+          task.due_at,
+          task.assigned_to?.full_name ?? "",
+        ].join("\t"),
+      ),
+    ];
+    return new HttpResponse(lines.join("\n"), {
+      headers: {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "content-disposition": `attachment; filename="tasks-${todayInIndia()}.xlsx"`,
+      },
+    });
+  }),
+
+  /** TASK-006 · An open task's title, due time or notes, or who does it. */
+  http.patch(buildApiUrl("/tasks/:taskId"), async ({ request, params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const key = idempotencyKeyOf(request);
+    if (key instanceof Response) return key;
+    const raw: unknown = await request.json();
+    const serialized = JSON.stringify({ task: params.taskId, raw });
+    const replayed = replay(key, serialized);
+    if (replayed !== null) return replayed;
+    const task = findTask(params.taskId);
+    if (task instanceof Response) return task;
+
+    const parsed = patchTaskRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      return errorResponse(
+        422,
+        "validation_error",
+        "Some fields need correcting.",
+        fieldsOf(parsed.error),
+      );
+    }
+    const body = parsed.data;
+    if (body.expected_status !== undefined && body.expected_status !== task.status) {
+      return errorResponse(409, "status_changed", `The task is now ${task.status}.`);
+    }
+    if (task.status !== "open") return notOpen(task, "open");
+    let assignee = task.assigned_to;
+    if (body.assigned_to !== undefined && body.assigned_to !== task.assigned_to?.id) {
+      const scope = taskScope();
+      const next = [currentUser(), ...teamOf(scope)].find(
+        (person) => person.id === body.assigned_to,
+      );
+      if (next === undefined) {
+        return errorResponse(422, "not_assignable", "That person is not yours to assign to.", {
+          assigned_to: "not assignable by you",
+        });
+      }
+      assignee = next;
+    }
+    const due =
+      body.due_at === undefined
+        ? task.due_at
+        : new Date(
+            DATE_PATTERN.test(body.due_at) ? `${body.due_at}T18:00:00+05:30` : body.due_at,
+          ).toISOString();
+    return saveTask(key, serialized, {
+      ...task,
+      title: body.title?.trim() ?? task.title,
+      notes: body.notes === undefined ? task.notes : body.notes?.trim() || null,
+      due_at: due,
+      assigned_to: assignee,
+      updated_at: new Date().toISOString(),
+    });
+  }),
+
+  /** TASK-007 · A lead's minutes, newest first. Exactly one of lead_id and partner_id. */
+  http.get(buildApiUrl("/minutes"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+    if (taskScope() === null) return noTasksModule();
+    const url = new URL(request.url);
+    const leadId = url.searchParams.get("lead_id");
+    const partnerId = url.searchParams.get("partner_id");
+    if ((leadId === null) === (partnerId === null)) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        lead_id: "give lead_id or partner_id",
+      });
+    }
+    const rows =
+      scenario === "empty"
+        ? []
+        : mockDb.minutes
+            .filter((minutes) =>
+              leadId === null ? minutes.partner?.id === partnerId : minutes.lead?.id === leadId,
+            )
+            .sort((a, b) => b.held_at.localeCompare(a.held_at));
+    return HttpResponse.json({ data: rows.map(minutesWire) });
+  }),
+
+  /**
+   * TASK-007 · The minutes and a task per action item, in one save; one bad item refuses the
+   * whole save with `fields.action_items.i…`. The meeting it records is completed if open.
+   */
+  http.post(buildApiUrl("/minutes"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const scope = taskScope();
+    if (scope === null) return noTasksModule();
+    const key = idempotencyKeyOf(request);
+    if (key instanceof Response) return key;
+    const raw: unknown = await request.json();
+    const serialized = JSON.stringify(raw);
+    const earlier = mockDb.minutesWrites.get(key);
+    if (earlier !== undefined) {
+      const minutes = mockDb.minutes.find((item) => item.id === earlier.minutesId);
+      if (earlier.body !== serialized) {
+        return errorResponse(
+          409,
+          "idempotency_key_reused",
+          "This Idempotency-Key was already used for a different request.",
+        );
+      }
+      if (minutes !== undefined)
+        return HttpResponse.json({ data: minutesWire(minutes) }, { status: 201 });
+    }
+
+    const parsed = createMinutesRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      return errorResponse(
+        422,
+        "validation_error",
+        "Some fields need correcting.",
+        fieldsOf(parsed.error),
+      );
+    }
+    const body = parsed.data;
+    const lead = mockDb.leads.find((item) => item.id === body.lead_id);
+    if (lead === undefined) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        lead_id: "give lead_id or partner_id",
+      });
+    }
+    if (lead.stage === "merged") {
+      return errorResponse(422, "lead_merged", "That lead was merged into another.", {
+        lead_id: "merged",
+      });
+    }
+    const me = currentUser();
+    const people = [me, ...teamOf(scope)];
+    const fields: Record<string, string> = {};
+    body.action_items.forEach((item, index) => {
+      if (item.assigned_to && !people.some((person) => person.id === item.assigned_to)) {
+        fields[`action_items.${String(index)}.assigned_to`] = "not assignable by you";
+      }
+      const due = DATE_PATTERN.test(item.due_at) ? `${item.due_at}T18:00:00+05:30` : item.due_at;
+      if (Number.isNaN(Date.parse(due))) {
+        fields[`action_items.${String(index)}.due_at`] = "give a date and time with a timezone";
+      }
+    });
+    if (Object.keys(fields).length > 0) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+    }
+    const meeting = body.task_id
+      ? mockDb.tasks.find((task) => task.id === body.task_id)
+      : undefined;
+    if (body.task_id && meeting === undefined) {
+      return errorResponse(404, "not_found", "No such task.");
+    }
+    if (meeting !== undefined) {
+      if (meeting.lead?.id !== lead.id) {
+        return errorResponse(422, "task_link_mismatch", "That task is on something else.", {
+          task_id: "on another lead",
+        });
+      }
+      if (meeting.task_type !== "meeting") {
+        return errorResponse(422, "task_not_a_meeting", "That task is not a meeting.", {
+          task_id: "not a meeting",
+        });
+      }
+      if (meeting.status === "cancelled") {
+        return errorResponse(409, "task_not_open", "That task was cancelled.");
+      }
+    }
+
+    const now = new Date().toISOString();
+    const minutesId = mockUuid(MOCK_ID_SPACE.task, 0x8000 + mockDb.minutes.length + 1);
+    const leadLink = {
+      id: lead.id,
+      hidden: false,
+      inquiry_no: lead.inquiry_no,
+      farmer_name: lead.farmer_name,
+    };
+    const actionTasks: MockTask[] = body.action_items.map((item, index) => {
+      const assignee = people.find((person) => person.id === item.assigned_to) ?? me;
+      const due = DATE_PATTERN.test(item.due_at) ? `${item.due_at}T18:00:00+05:30` : item.due_at;
+      return {
+        id: mockUuid(MOCK_ID_SPACE.task, 0x9000 + mockDb.tasks.length + index),
+        title: item.title.trim(),
+        task_type: item.task_type ?? "followup",
+        status: "open",
+        due_at: new Date(due).toISOString(),
+        assigned_to: assignee,
+        assigned_by: me,
+        lead: leadLink,
+        partner: null,
+        sales_order: null,
+        meeting_type: null,
+        minutes_id: minutesId,
+        notes: null,
+        outcome: null,
+        gift_shown: null,
+        cancel_reason: null,
+        completed_at: null,
+        completed_by: null,
+        created_at: now,
+        updated_at: now,
+      };
+    });
+    mockDb.tasks = [...mockDb.tasks, ...actionTasks]
+      .map((task) =>
+        meeting !== undefined && task.id === meeting.id && task.status === "open"
+          ? {
+              ...task,
+              status: "done" as const,
+              outcome: "Minutes recorded",
+              completed_at: now,
+              completed_by: me,
+              updated_at: now,
+            }
+          : task,
+      )
+      .sort((a, b) => a.due_at.localeCompare(b.due_at) || a.id.localeCompare(b.id));
+    const minutes: MockMinutes = {
+      id: minutesId,
+      lead: leadLink,
+      partner: null,
+      task_id: body.task_id ?? null,
+      held_at: new Date(body.held_at).toISOString(),
+      attendees: body.attendees.map((name) => name.trim()).filter((name) => name !== ""),
+      notes: body.notes.trim(),
+      created_by: me,
+      created_at: now,
+      action_item_ids: actionTasks.map((task) => task.id),
+    };
+    mockDb.minutes = [minutes, ...mockDb.minutes];
+    mockDb.minutesWrites.set(key, { body: serialized, minutesId });
+    return HttpResponse.json({ data: minutesWire(minutes) }, { status: 201 });
   }),
 
   http.get(buildApiUrl("/tasks/:taskId"), async ({ params }) => {

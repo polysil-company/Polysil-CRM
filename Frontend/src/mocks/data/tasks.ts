@@ -1,5 +1,5 @@
 import type { LeadWire } from "@/features/leads/api/leads.schemas";
-import type { TaskType, TaskWire } from "@/features/tasks/api/tasks.schemas";
+import type { MinutesWire, TaskType, TaskWire } from "@/features/tasks/api/tasks.schemas";
 import { todayInIndia } from "@/lib/format";
 
 import { mockLookupRows } from "./lookups";
@@ -8,6 +8,11 @@ import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "./reference"
 
 /** A task as the mock keeps it: `overdue` is worked out when it is served, as on the backend. */
 export type MockTask = Omit<TaskWire, "overdue">;
+
+/** Minutes as the mock keeps them: action items by id, served as their tasks are now. */
+export type MockMinutes = Omit<MinutesWire, "action_items"> & {
+  readonly action_item_ids: readonly string[];
+};
 
 export interface MockUser {
   readonly id: string;
@@ -32,6 +37,11 @@ const OUTCOMES = [
   "Collected the 7/12 extract and Aadhaar copy.",
   "No answer; left a WhatsApp message.",
 ] as const;
+
+/** A farmer's outcome for a task about a lead; a plain one for office work. */
+function outcomeFor(aboutLead: boolean, farmerOutcome: string): string {
+  return aboutLead ? farmerOutcome : "Done on time.";
+}
 
 const CANCEL_REASONS = [
   "The farmer went with another company.",
@@ -154,7 +164,7 @@ export function generateTasks(leads: readonly LeadWire[], now: number = Date.now
         random.chance(0.5) && lead !== null && (type === "visit" || type === "meeting")
           ? "Carry the Polysil drip brochure and the subsidy checklist."
           : null,
-      outcome: status === "done" ? random.pick(OUTCOMES) : null,
+      outcome: status === "done" ? outcomeFor(lead !== null, random.pick(OUTCOMES)) : null,
       gift_shown: status === "done" && type === "meeting" ? random.chance(0.5) : null,
       cancel_reason: status === "cancelled" ? random.pick(CANCEL_REASONS) : null,
       completed_at: completedAt,
@@ -196,4 +206,78 @@ export function generateTasks(leads: readonly LeadWire[], now: number = Date.now
   }
 
   return tasks.sort((a, b) => a.due_at.localeCompare(b.due_at) || a.id.localeCompare(b.id));
+}
+
+/**
+ * One seeded set of minutes, so a lead's page shows what recorded minutes look like: the
+ * first done meeting on a lead, with two action items — one done, one still open.
+ */
+export function seedMinutes(
+  tasks: readonly MockTask[],
+  now: number = Date.now(),
+): { tasks: MockTask[]; minutes: MockMinutes[] } {
+  const meeting = tasks.find(
+    (task) => task.task_type === "meeting" && task.status === "done" && task.lead !== null,
+  );
+  if (meeting === undefined || meeting.lead === null || meeting.assigned_to === null) {
+    return { tasks: [...tasks], minutes: [] };
+  }
+  const minutesId = mockUuid(MOCK_ID_SPACE.task, 0x8000);
+  const owner = meeting.assigned_to;
+  const base = {
+    assigned_to: owner,
+    assigned_by: owner,
+    lead: meeting.lead,
+    partner: null,
+    sales_order: null,
+    meeting_type: null,
+    minutes_id: minutesId,
+    notes: null,
+    gift_shown: null,
+    cancel_reason: null,
+    created_at: meeting.due_at,
+  } as const;
+  const sendQuote: MockTask = {
+    ...base,
+    id: mockUuid(MOCK_ID_SPACE.task, 0x8001),
+    title: "Send the revised quotation with the 16 mm lateral",
+    task_type: "followup",
+    status: "done",
+    due_at: new Date(Date.parse(meeting.due_at) + DAY_MS).toISOString(),
+    outcome: "Sent on WhatsApp.",
+    completed_at: new Date(Date.parse(meeting.due_at) + DAY_MS).toISOString(),
+    completed_by: owner,
+    updated_at: new Date(Date.parse(meeting.due_at) + DAY_MS).toISOString(),
+  };
+  const subsidy: MockTask = {
+    ...base,
+    id: mockUuid(MOCK_ID_SPACE.task, 0x8002),
+    title: "Collect the subsidy papers: 7/12 extract and bank passbook",
+    task_type: "visit",
+    status: "open",
+    due_at: dueAt(now, 2, "11:00"),
+    outcome: null,
+    completed_at: null,
+    completed_by: null,
+    updated_at: meeting.due_at,
+  };
+  const minutes: MockMinutes = {
+    id: minutesId,
+    lead: meeting.lead,
+    partner: null,
+    task_id: meeting.id,
+    held_at: meeting.due_at,
+    attendees: [meeting.lead.farmer_name ?? "The farmer", "His son", owner.full_name],
+    notes:
+      "Walked the plot with the family. They want drip on 3 acres of cotton now and the rest after the monsoon. Price is fine if the subsidy comes through.",
+    created_by: owner,
+    created_at: meeting.due_at,
+    action_item_ids: [sendQuote.id, subsidy.id],
+  };
+  return {
+    tasks: [...tasks, sendQuote, subsidy].sort(
+      (a, b) => a.due_at.localeCompare(b.due_at) || a.id.localeCompare(b.id),
+    ),
+    minutes: [minutes],
+  };
 }

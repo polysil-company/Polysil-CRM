@@ -1,8 +1,10 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
   TASK_PAGE_SIZE,
+  minutesListSchema,
+  minutesResponseSchema,
   plannerDaySchema,
   taskAssigneesSchema,
   taskPageSchema,
@@ -10,7 +12,10 @@ import {
   teamPageSchema,
   type CancelTaskRequest,
   type CompleteTaskRequest,
+  type CreateMinutesRequest,
   type CreateTaskRequest,
+  type Minutes,
+  type PatchTaskRequest,
   type PlannerDay,
   type PlannerParams,
   type Task,
@@ -56,7 +61,20 @@ export async function getTeamDay(
   return page;
 }
 
-/** TASK-003 · GET /tasks?lead_id= — a lead's tasks and meetings, earliest due first. */
+/** The filters GET /tasks and GET /tasks/export share, as query parameters. */
+function taskFilterQuery(
+  params: TaskListParams,
+): Record<string, string | boolean | string[] | undefined> {
+  return {
+    lead_id: params.leadId ?? undefined,
+    assigned_to: params.assignedTo ?? undefined,
+    status: params.status.length === 0 ? undefined : [...params.status],
+    task_type: params.type ?? undefined,
+    overdue: params.overdue ? true : undefined,
+  };
+}
+
+/** TASK-003 · GET /tasks — tasks in the user's scope, earliest due first, filtered. */
 export async function listTasks(
   params: TaskListParams & { cursor: string | null },
   signal?: AbortSignal,
@@ -67,7 +85,7 @@ export async function listTasks(
     fn: "listTasks",
     path: "/tasks",
     query: {
-      lead_id: params.leadId,
+      ...taskFilterQuery(params),
       cursor: params.cursor,
       limit: TASK_PAGE_SIZE,
       include_total: params.cursor === null,
@@ -77,6 +95,20 @@ export async function listTasks(
   });
   logSkipped("listTasks", "TASK-003", page.skipped, page.items.length);
   return page;
+}
+
+/**
+ * TASK-008 · GET /tasks/export — the list as an Excel file, with the same filters: every
+ * page, nothing outside the user's scope. More than 5,000 rows is `422 export_too_large`.
+ */
+export function exportTasks(params: TaskListParams): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "TASK-008",
+    logger: log,
+    fn: "exportTasks",
+    path: "/tasks/export",
+    query: taskFilterQuery(params),
+  });
 }
 
 /** TASK-004 · GET /tasks/assignees — the user first, then the active staff below them. */
@@ -171,6 +203,64 @@ export function reopenTask({
     path: `/tasks/${encodeURIComponent(taskId)}/reopen`,
     idempotencyKey,
     schema: taskResponseSchema,
+  });
+}
+
+/** TASK-006 · PATCH /tasks/{id} — an open task's title, due time or notes, or who does it. */
+export function patchTask({
+  taskId,
+  body,
+  idempotencyKey,
+}: {
+  taskId: string;
+  body: PatchTaskRequest;
+  idempotencyKey: string;
+}): Promise<Task> {
+  return apiRequest({
+    dataId: "TASK-006",
+    logger: log,
+    fn: "patchTask",
+    method: "PATCH",
+    path: `/tasks/${encodeURIComponent(taskId)}`,
+    body,
+    idempotencyKey,
+    schema: taskResponseSchema,
+  });
+}
+
+/** TASK-007 · GET /minutes?lead_id= — a lead's meeting minutes, newest first. */
+export function listLeadMinutes(leadId: string, signal?: AbortSignal): Promise<Minutes[]> {
+  return apiRequest({
+    dataId: "TASK-007",
+    logger: log,
+    fn: "listLeadMinutes",
+    path: "/minutes",
+    query: { lead_id: leadId },
+    schema: minutesListSchema,
+    signal,
+  });
+}
+
+/**
+ * TASK-007 · POST /minutes — the minutes and a task per action item, in one save. One bad
+ * action item refuses the whole save, with `fields.action_items[i]…`.
+ */
+export function createMinutes({
+  body,
+  idempotencyKey,
+}: {
+  body: CreateMinutesRequest;
+  idempotencyKey: string;
+}): Promise<Minutes> {
+  return apiRequest({
+    dataId: "TASK-007",
+    logger: log,
+    fn: "createMinutes",
+    method: "POST",
+    path: "/minutes",
+    body,
+    idempotencyKey,
+    schema: minutesResponseSchema,
   });
 }
 

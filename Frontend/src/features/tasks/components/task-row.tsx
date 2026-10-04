@@ -49,8 +49,9 @@ export interface TaskRowProps {
 
 /**
  * TASK-001 · One task: what it is, when, what it is about, and who gave it; done tasks say
- * what happened, cancelled ones why. Open tasks are marked done in place; the menu cancels
- * (unless someone else gave it to you: only they can) or reopens a done one.
+ * what happened, cancelled ones why. Open tasks are marked done in place. The menu edits or
+ * reassigns an open task, records minutes for a meeting on a lead, cancels (unless someone
+ * else gave it to you: only they can) or reopens a done one.
  */
 export function TaskRow({
   task,
@@ -66,6 +67,13 @@ export function TaskRow({
   const givenByOther =
     task.assignedBy !== null && task.assignedBy.id !== task.assignedTo?.id ? task.assignedBy : null;
   const canCancel = canEdit && open && !(task.assignedTo?.id === meId && givenByOther !== null);
+  const canChange = canEdit && open;
+  const canRecordMinutes =
+    canEdit &&
+    task.type === "meeting" &&
+    task.status !== "cancelled" &&
+    task.lead !== null &&
+    !task.lead.hidden;
   const canReopen =
     canEdit &&
     task.status === "done" &&
@@ -133,7 +141,12 @@ export function TaskRow({
           <p className="text-xs text-muted-foreground">For {task.assignedTo.name}</p>
         ) : null}
         {givenByOther === null ? null : (
-          <p className="text-xs text-muted-foreground">Given by {givenByOther.name}</p>
+          <p className="text-xs text-muted-foreground">
+            Given by {givenByOther.id === meId ? "you" : givenByOther.name}
+          </p>
+        )}
+        {task.minutesId === null ? null : (
+          <p className="text-xs text-muted-foreground">From meeting minutes</p>
         )}
         {task.notes === null || !open ? null : (
           <p className="line-clamp-2 text-sm text-pretty text-muted-foreground">{task.notes}</p>
@@ -169,14 +182,14 @@ export function TaskRow({
               Done
             </Button>
           ) : null}
-          {canCancel || canReopen ? (
+          {canCancel || canReopen || canChange || canRecordMinutes ? (
             <TaskMenu
               task={task}
+              canEdit={canChange}
+              canRecordMinutes={canRecordMinutes}
               canCancel={canCancel}
               canReopen={canReopen}
-              onCancel={() => {
-                onAction({ task, kind: "cancel" });
-              }}
+              onAction={onAction}
             />
           ) : (
             // Keeps Done in line with the rows that have a menu.
@@ -215,14 +228,18 @@ function TaskSubject({ task, label }: { task: Task; label: string }): React.JSX.
 
 function TaskMenu({
   task,
+  canEdit,
+  canRecordMinutes,
   canCancel,
   canReopen,
-  onCancel,
+  onAction,
 }: {
   task: Task;
+  canEdit: boolean;
+  canRecordMinutes: boolean;
   canCancel: boolean;
   canReopen: boolean;
-  onCancel: () => void;
+  onAction: (action: PendingTaskAction) => void;
 }): React.JSX.Element {
   const reopen = useReopenTask();
   const idempotency = useIdempotencyKey();
@@ -260,6 +277,24 @@ function TaskMenu({
         <Icon icon={MoreHorizontalIcon} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {canEdit ? (
+          <DropdownMenuItem
+            onClick={() => {
+              onAction({ task, kind: "edit" });
+            }}
+          >
+            Edit or reassign
+          </DropdownMenuItem>
+        ) : null}
+        {canRecordMinutes ? (
+          <DropdownMenuItem
+            onClick={() => {
+              onAction({ task, kind: "minutes" });
+            }}
+          >
+            Record minutes
+          </DropdownMenuItem>
+        ) : null}
         {canReopen ? (
           <DropdownMenuItem
             onClick={() => {
@@ -270,7 +305,12 @@ function TaskMenu({
           </DropdownMenuItem>
         ) : null}
         {canCancel ? (
-          <DropdownMenuItem variant="destructive" onClick={onCancel}>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => {
+              onAction({ task, kind: "cancel" });
+            }}
+          >
             Cancel task
           </DropdownMenuItem>
         ) : null}

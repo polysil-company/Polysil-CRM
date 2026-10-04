@@ -4,12 +4,22 @@ import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/r
 
 import { leadKeys } from "@/features/leads/api/leads.queries";
 
-import { cancelTask, completeTask, createTask, reopenTask } from "./tasks.api";
+import {
+  cancelTask,
+  completeTask,
+  createMinutes,
+  createTask,
+  patchTask,
+  reopenTask,
+} from "./tasks.api";
 import { taskKeys } from "./tasks.queries";
 import type {
   CancelTaskRequest,
   CompleteTaskRequest,
+  CreateMinutesRequest,
   CreateTaskRequest,
+  Minutes,
+  PatchTaskRequest,
   Task,
 } from "./tasks.schemas";
 
@@ -81,5 +91,41 @@ export function useReopenTask(): UseMutationResult<
     mutationFn: reopenTask,
     meta: { dataId: "TASK-005" },
     onSuccess: refresh,
+  });
+}
+
+/** TASK-006 · Change an open task, or give it to someone else. */
+export function usePatchTask(): UseMutationResult<
+  Task,
+  Error,
+  { taskId: string; body: PatchTaskRequest; idempotencyKey: string }
+> {
+  const refresh = useRefreshAfter();
+  return useMutation({
+    mutationKey: [...taskKeys.all, "patch"],
+    mutationFn: patchTask,
+    meta: { dataId: "TASK-006" },
+    onSuccess: refresh,
+  });
+}
+
+/**
+ * TASK-007 · Record a meeting's minutes. Its action items become tasks, and the meeting it
+ * records is marked done: every task view and the lead's history refresh.
+ */
+export function useCreateMinutes(): UseMutationResult<
+  Minutes,
+  Error,
+  { leadId: string; body: CreateMinutesRequest; idempotencyKey: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...taskKeys.all, "minutes", "create"],
+    mutationFn: ({ body, idempotencyKey }) => createMinutes({ body, idempotencyKey }),
+    meta: { dataId: "TASK-007" },
+    onSuccess: (_minutes, { leadId }) => {
+      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.timeline(leadId) });
+    },
   });
 }
