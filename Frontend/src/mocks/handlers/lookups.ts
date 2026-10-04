@@ -14,6 +14,11 @@ import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { applyScenario } from "./scenario";
 import { errorResponse } from "./shared";
 
+/** A partner's code: its place in the seed, as `CP-001`. */
+function partnerCode(index: number): string {
+  return `CP-${String(index + 1).padStart(3, "0")}`;
+}
+
 const DEFAULT_TERRITORY_LIMIT = 50;
 const MAX_TERRITORY_LIMIT = 100;
 const TERRITORY_LEVELS: readonly string[] = ["state", "district", "taluka", "village"];
@@ -37,7 +42,7 @@ export const lookupHandlers = [
 
   /**
    * LEAD-008 · GET /lookups/partners — every mock partner (the mock does not scope them), by
-   * name or code containing `q`, ordered by name.
+   * name, code or contact person containing `q` (backend #49), ordered by name.
    */
   http.get(buildApiUrl("/lookups/partners"), async ({ request }) => {
     const { scenario, failure } = await applyScenario();
@@ -53,23 +58,24 @@ export const lookupHandlers = [
       data:
         scenario === "empty"
           ? []
-          : MOCK_PARTNERS.map((partner, index) => ({
-              id: partner.id,
-              code: `CP-${String(index + 1).padStart(3, "0")}`,
-              name: partner.name,
-              partner_type: partner.partner_type,
-              territory:
-                MOCK_TERRITORIES.filter(
-                  (territory) =>
-                    territory.level === "district" && territory.name === partner.district,
-                ).map(({ id, name, level }) => ({ id, name, level }))[0] ?? null,
-            }))
-              .filter(
-                (partner) =>
-                  q === "" ||
-                  partner.name.toLowerCase().includes(q) ||
-                  partner.code.toLowerCase().includes(q),
-              )
+          : MOCK_PARTNERS.filter(
+              (partner, index) =>
+                q === "" ||
+                partner.name.toLowerCase().includes(q) ||
+                partner.contact_person.toLowerCase().includes(q) ||
+                partnerCode(index).toLowerCase().includes(q),
+            )
+              .map((partner) => ({
+                id: partner.id,
+                code: partnerCode(MOCK_PARTNERS.indexOf(partner)),
+                name: partner.name,
+                partner_type: partner.partner_type,
+                territory:
+                  MOCK_TERRITORIES.filter(
+                    (territory) =>
+                      territory.level === "district" && territory.name === partner.district,
+                  ).map(({ id, name, level }) => ({ id, name, level }))[0] ?? null,
+              }))
               .sort((a, b) => a.name.localeCompare(b.name, "en-IN"))
               .slice(0, limit),
     };

@@ -938,6 +938,7 @@ export const quotationHandlers = [
         total: quotation.totals.total,
         isProvisional: quotation.is_provisional,
         discountPct: quotation.discount?.effective_pct ?? null,
+        requestRemark: parsed.data.remark ?? null,
         raisedBy: MOCK_CREATOR ?? null,
         raisedAt: new Date().toISOString(),
         decision: null,

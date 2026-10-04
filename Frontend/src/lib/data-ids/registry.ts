@@ -171,9 +171,9 @@ export const DATA_IDS = {
     title: "List leads with filters, sorting and pagination",
     owner: "shared",
     status: "in-progress",
-    endpoints: ["GET /leads"],
+    endpoints: ["GET /leads", "GET /leads/areas"],
     notes:
-      "Connected to the dev API: cursor paging with include_total; sorting by customer or value since BE-001 (a sort change starts from the first page).",
+      "Connected to the dev API: cursor paging with include_total; sorting by customer or value since BE-001 (a sort change starts from the first page); the Area filter (state, district, taluka; at most 20) since backend #50.",
   },
   "LEAD-002": {
     domain: "LEAD",
@@ -399,7 +399,7 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /approvals/pending", "POST /approvals/steps/{stepId}/decision"],
     notes:
-      "Quotation discounts and sales orders side by side. An order's chain is its managers by value, then Accounts, then Dispatch.",
+      "Quotation discounts and sales orders side by side, with the asker's reason (request_remark, backend #49). An order's chain is its managers by value, then Accounts, then Dispatch.",
   },
   "APPR-002": {
     domain: "APPR",

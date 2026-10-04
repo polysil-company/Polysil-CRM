@@ -6,8 +6,11 @@ import {
   createLeadRequestSchema,
   reopenLeadRequestSchema,
   transitionLeadRequestSchema,
+  LEAD_AREA_LEVELS,
   LEAD_STAGES,
   type CreateLeadRequest,
+  type LeadAreaLevel,
+  type LeadAreaWire,
   type LeadPageWire,
   type LeadResponseWire,
   type LeadStage,
@@ -22,7 +25,13 @@ import { readMockRole } from "@/lib/dev/mock-settings";
 import { mockLookupRows } from "@/mocks/data/lookups";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
-import { findMockTerritory, mockOfficeFor, toTerritoryRef } from "@/mocks/data/territories";
+import {
+  findMockTerritory,
+  MOCK_TERRITORIES,
+  mockOfficeFor,
+  mockTerritoryLineage,
+  toTerritoryRef,
+} from "@/mocks/data/territories";
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
@@ -49,6 +58,10 @@ const MAX_LIMIT = 100;
 
 function isStage(value: string): value is LeadStage {
   return LEAD_STAGES.some((stage) => stage === value);
+}
+
+function isLeadAreaLevel(value: string): value is LeadAreaLevel {
+  return LEAD_AREA_LEVELS.some((level) => level === value);
 }
 
 /** q matches the name (contains), the mobile's digits (contains) and the inquiry number (exact). */
@@ -108,6 +121,12 @@ function filterLeads(params: URLSearchParams): LeadWire[] {
   const source = params.get("source");
   const inquiryType = params.get("inquiry_type");
   const q = params.get("q") ?? "";
+  const areas = new Set(
+    (params.get("territory_id") ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id !== ""),
+  );
 
   return mockDb.leads.filter((lead) => {
     if (stages.length > 0 ? !stages.includes(lead.stage) : lead.stage === "merged") {
@@ -117,8 +136,39 @@ function filterLeads(params: URLSearchParams): LeadWire[] {
     if (inquiryType !== null && inquiryType !== "" && lead.inquiry_type !== inquiryType) {
       return false;
     }
+    if (areas.size > 0 && !inAnyArea(lead, areas)) return false;
     return matchesSearch(lead, q);
   });
+}
+
+/** A lead sits in an area when its own territory, or any territory above it, is one of them. */
+function inAnyArea(lead: LeadWire, areas: ReadonlySet<string>): boolean {
+  return mockTerritoryLineage(lead.territory.id).some((territory) => areas.has(territory.id));
+}
+
+/**
+ * GET /leads/areas — the areas at one level (under a parent, if given) that hold at least one
+ * lead the caller can see, with how many. Merged leads don't count, as on the list.
+ */
+function leadAreasOf(level: LeadAreaLevel, parentId: string | null): LeadAreaWire[] {
+  const counts = new Map<string, number>();
+  for (const lead of mockDb.leads) {
+    if (lead.stage === "merged") continue;
+    const area = mockTerritoryLineage(lead.territory.id).find((item) => item.level === level);
+    if (area === undefined) continue;
+    if (parentId !== null && area.parent?.id !== parentId) continue;
+    counts.set(area.id, (counts.get(area.id) ?? 0) + 1);
+  }
+  return MOCK_TERRITORIES.filter((territory) => counts.has(territory.id))
+    .map((territory) => ({
+      id: territory.id,
+      name: territory.name,
+      level,
+      code: territory.code,
+      parent: territory.parent,
+      lead_count: counts.get(territory.id) ?? 0,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Every stage and priority is present, 0 when empty — as the backend promises. */
@@ -378,6 +428,23 @@ export const leadHandlers = [
 
     const matches = scenario === "empty" ? [] : filterLeads(new URL(request.url).searchParams);
     return HttpResponse.json(statsOf(matches));
+  }),
+
+  // Before /leads/:leadId, as on the backend, so "areas" is never read as a lead ID.
+  http.get(buildApiUrl("/leads/areas"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const url = new URL(request.url);
+    const level = url.searchParams.get("level") ?? "";
+    if (!isLeadAreaLevel(level)) {
+      return errorResponse(422, "validation_error", "Choose a level: state, district or taluka.", {
+        level: "must be state, district or taluka",
+      });
+    }
+    const parentId = url.searchParams.get("parent_id");
+    const data = scenario === "empty" ? [] : leadAreasOf(level, parentId === "" ? null : parentId);
+    return HttpResponse.json({ data });
   }),
 
   // Before /leads/:leadId, as on the backend, so "assignees" is never read as a lead ID.

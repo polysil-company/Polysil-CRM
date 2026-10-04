@@ -173,6 +173,17 @@ function DecisionForm({
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
+        {row.document.requestRemark === null ? null : (
+          <blockquote className="mb-4 border-l-2 border-border-strong pl-3 text-sm text-pretty text-foreground">
+            <span className="font-medium">
+              {row.document.raisedBy === null
+                ? "Their reason"
+                : `${row.document.raisedBy.name}'s reason`}
+              :
+            </span>{" "}
+            {row.document.requestRemark}
+          </blockquote>
+        )}
         <p className="mb-4 text-sm text-muted-foreground">
           {row.docType === "quotation"
             ? approve

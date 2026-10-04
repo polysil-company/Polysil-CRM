@@ -54,6 +54,7 @@ function toRow(step: MockApprovalStep): QueuePageWire["data"][number] {
       raised_by: step.raisedBy,
       raised_at: step.raisedAt,
       discount_pct: step.discountPct,
+      request_remark: step.requestRemark,
     },
     waiting_since: step.raisedAt,
   };

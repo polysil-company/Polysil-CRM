@@ -167,22 +167,68 @@ export const MOCK_STAFF: readonly { readonly id: string; readonly full_name: str
   "Nirav Shah",
 ].map((fullName, index) => ({ id: mockUuid(MOCK_ID_SPACE.staff, index + 1), full_name: fullName }));
 
-/** Channel partners, by the district they work in. Invented businesses. */
+/** Channel partners, by the district they work in, with whom to ask for. Invented businesses and people. */
 export const MOCK_PARTNERS: readonly {
   readonly id: string;
   readonly name: string;
   readonly partner_type: string;
   readonly district: string;
+  readonly contact_person: string;
 }[] = [
-  { name: "Saurashtra Agro Distributors", partner_type: "distributor", district: "Rajkot" },
-  { name: "Sorath Agri Distributors", partner_type: "distributor", district: "Junagadh" },
-  { name: "Shree Ganesh Agro Agency", partner_type: "dealer", district: "Rajkot" },
-  { name: "Khodiyar Irrigation", partner_type: "dealer", district: "Rajkot" },
-  { name: "Patel Agro Traders", partner_type: "dealer", district: "Junagadh" },
-  { name: "Ambika Krishi Kendra", partner_type: "dealer", district: "Amreli" },
-  { name: "Virpur Agro Point", partner_type: "sub_dealer", district: "Rajkot" },
-  { name: "Balagam Krishi Seva", partner_type: "sub_dealer", district: "Junagadh" },
-  { name: "Babra Farm Supplies", partner_type: "sub_dealer", district: "Amreli" },
+  {
+    name: "Saurashtra Agro Distributors",
+    partner_type: "distributor",
+    district: "Rajkot",
+    contact_person: "Mahesh Kotecha",
+  },
+  {
+    name: "Sorath Agri Distributors",
+    partner_type: "distributor",
+    district: "Junagadh",
+    contact_person: "Jignesh Vaghela",
+  },
+  {
+    name: "Shree Ganesh Agro Agency",
+    partner_type: "dealer",
+    district: "Rajkot",
+    contact_person: "Ganesh Bhalodia",
+  },
+  {
+    name: "Khodiyar Irrigation",
+    partner_type: "dealer",
+    district: "Rajkot",
+    contact_person: "Kishor Sakhiya",
+  },
+  {
+    name: "Patel Agro Traders",
+    partner_type: "dealer",
+    district: "Junagadh",
+    contact_person: "Haresh Patel",
+  },
+  {
+    name: "Ambika Krishi Kendra",
+    partner_type: "dealer",
+    district: "Amreli",
+    contact_person: "Dilip Savaliya",
+  },
+  {
+    name: "Virpur Agro Point",
+    partner_type: "sub_dealer",
+    district: "Rajkot",
+    contact_person: "Rasik Dhaduk",
+  },
+  {
+    name: "Balagam Krishi Seva",
+    partner_type: "sub_dealer",
+    district: "Junagadh",
+    contact_person: "Bhavesh Ladani",
+  },
+  {
+    name: "Babra Farm Supplies",
+    partner_type: "sub_dealer",
+    district: "Amreli",
+    contact_person: "Paresh Kakadiya",
+  },
 ].map((partner, index) => ({ ...partner, id: mockUuid(MOCK_ID_SPACE.partner, index + 1) }));
 
 /** Short notes a salesperson leaves on a lost lead. */

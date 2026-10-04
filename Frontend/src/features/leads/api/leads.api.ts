@@ -3,6 +3,7 @@ import { createLogger } from "@/lib/logger";
 
 import {
   LEAD_SORT_WIRE_FIELDS,
+  leadAreasResponseSchema,
   leadPageSchema,
   leadResponseSchema,
   leadStatsSchema,
@@ -19,6 +20,8 @@ import {
   type ReopenLeadRequest,
   type TransitionLeadRequest,
   type Lead,
+  type LeadArea,
+  type LeadAreasParams,
   type LeadListParams,
   type LeadPage,
   type LeadStats,
@@ -48,6 +51,7 @@ export async function listLeads(params: LeadListParams, signal?: AbortSignal): P
       inquiry_type: params.type,
       sort: LEAD_SORT_WIRE_FIELDS[params.sort],
       order: params.order,
+      territory_id: params.areas.join(","),
     },
     schema: leadPageSchema,
     signal,
@@ -267,5 +271,18 @@ export function assignLead({ leadId, body, idempotencyKey }: AssignLeadInput): P
     body,
     idempotencyKey,
     schema: leadResponseSchema,
+  });
+}
+
+/** LEAD-001 · GET /leads/areas — the area filter's options at one level, with lead counts. */
+export function listLeadAreas(params: LeadAreasParams, signal?: AbortSignal): Promise<LeadArea[]> {
+  return apiRequest({
+    dataId: "LEAD-001",
+    logger: log,
+    fn: "listLeadAreas",
+    path: "/leads/areas",
+    query: { level: params.level, parent_id: params.parentId },
+    schema: leadAreasResponseSchema,
+    signal,
   });
 }

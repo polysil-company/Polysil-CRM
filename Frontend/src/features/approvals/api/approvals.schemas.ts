@@ -41,6 +41,8 @@ const queueRowWireSchema = z.object({
     raised_at: isoDateTime,
     /** A quotation row: the effective discount asked for, in percent. Null on an order. */
     discount_pct: decimal.nullish(),
+    /** Why the approval was asked, as the asker wrote it (backend #49). Null when none given. */
+    request_remark: z.string().nullish(),
   }),
   waiting_since: isoDateTime,
 });
@@ -65,6 +67,7 @@ const queueRowSchema = queueRowWireSchema.transform((wire) => ({
         : { id: wire.document.raised_by.id, name: wire.document.raised_by.full_name.trim() },
     raisedAt: wire.document.raised_at,
     discountPct: wire.document.discount_pct ?? null,
+    requestRemark: wire.document.request_remark?.trim() || null,
   },
   waitingSince: wire.waiting_since,
 }));

@@ -407,6 +407,49 @@ export interface LeadListParams {
   /** A lead-source code from GET /lookups/lead-sources. The backend takes one. */
   readonly source: string | null;
   readonly type: LeadInquiryType | null;
+  /** Territory ids from GET /leads/areas: leads in any of them or under them. At most 20. */
+  readonly areas: readonly string[];
+}
+
+// ── the area filter (LEAD-001, backend #50) ──────────────────────────────────────
+
+/** The levels the area filter drills through, top first. */
+export const LEAD_AREA_LEVELS = ["state", "district", "taluka"] as const;
+export type LeadAreaLevel = (typeof LEAD_AREA_LEVELS)[number];
+
+/** `GET /leads?territory_id=` takes at most this many areas. */
+export const MAX_LEAD_AREAS = 20;
+
+const leadAreaWireSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  level: z.enum(LEAD_AREA_LEVELS),
+  code: z.string().nullish(),
+  parent: z.object({ id: z.string().min(1), name: z.string(), level: z.string() }).nullish(),
+  /** The user's leads in this area or under it, every stage but merged. */
+  lead_count: z.number().int().nonnegative(),
+});
+
+export type LeadAreaWire = z.input<typeof leadAreaWireSchema>;
+
+/** GET /leads/areas — the areas the user's leads are in, at one level, with a count each. */
+export const leadAreasResponseSchema = z
+  .object({ data: z.array(leadAreaWireSchema) })
+  .transform(({ data }) =>
+    data.map((area) => ({
+      id: area.id,
+      name: area.name,
+      level: area.level,
+      leadCount: area.lead_count,
+    })),
+  );
+
+export type LeadArea = z.output<typeof leadAreasResponseSchema>[number];
+
+export interface LeadAreasParams {
+  readonly level: LeadAreaLevel;
+  /** Only areas under this territory; null at the top. */
+  readonly parentId: string | null;
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

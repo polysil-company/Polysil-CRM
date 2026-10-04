@@ -20,6 +20,7 @@ import {
   getLeadStats,
   getLeadTimeline,
   listAssignees,
+  listLeadAreas,
   listLeads,
   reopenLead,
   searchPartners,
@@ -44,6 +45,7 @@ const FIRST_PAGE: LeadListParams = {
   stage: [],
   source: null,
   type: null,
+  areas: [],
 };
 
 function territoryNamed(name: string): (typeof MOCK_TERRITORIES)[number] {
@@ -195,6 +197,36 @@ describe("[LEAD-001] listLeads", () => {
     expect(byMobile.items.map((lead) => lead.id)).toContain(target.id);
   });
 
+  it("filters by area: a district takes in every taluka and village under it", async () => {
+    const [state] = await listLeadAreas({ level: "state", parentId: null });
+    const districts = await listLeadAreas({ level: "district", parentId: state?.id ?? null });
+    const district = districts[0];
+    if (district === undefined) throw new Error("The mock leads sit in no district");
+
+    const result = await listLeads({ ...FIRST_PAGE, areas: [district.id], pageSize: 100 });
+
+    // The area's count and the filtered list agree, as on the backend.
+    expect(result.total).toBe(district.leadCount);
+    const talukas = await listLeadAreas({ level: "taluka", parentId: district.id });
+    const inTalukas = talukas.reduce((sum, taluka) => sum + taluka.leadCount, 0);
+    expect(inTalukas).toBeLessThanOrEqual(district.leadCount);
+  });
+
+  it("sends several areas as one comma-separated territory_id, and none when unset", async () => {
+    const sent: URL[] = [];
+    server.use(
+      http.get(buildApiUrl("/leads"), ({ request }) => {
+        sent.push(new URL(request.url));
+      }),
+    );
+
+    await listLeads({ ...FIRST_PAGE, areas: ["district-a", "taluka-b"] });
+    await listLeads(FIRST_PAGE);
+
+    expect(sent[0]?.searchParams.get("territory_id")).toBe("district-a,taluka-b");
+    expect(sent[1]?.searchParams.has("territory_id")).toBe(false);
+  });
+
   it("reads a capped total as a lower bound", async () => {
     server.use(
       http.get(buildApiUrl("/leads"), () =>
@@ -220,6 +252,50 @@ describe("[LEAD-001] listLeads", () => {
       status: 422,
       details: { fields: { cursor: expect.any(String) } },
     });
+  });
+});
+
+describe("[LEAD-001] listLeadAreas", () => {
+  it("lists the areas at one level that hold leads, with how many", async () => {
+    const states = await listLeadAreas({ level: "state", parentId: null });
+    expect(states).toEqual([
+      { id: expect.any(String), name: "Gujarat", level: "state", leadCount: expect.any(Number) },
+    ]);
+    const stats = await getLeadStats();
+    expect(states[0]?.leadCount).toBe(stats.total);
+
+    const districts = await listLeadAreas({ level: "district", parentId: states[0]?.id ?? null });
+    expect(districts.length).toBeGreaterThan(1);
+    expect(districts.every((district) => district.level === "district")).toBe(true);
+    expect(districts.every((district) => district.leadCount > 0)).toBe(true);
+  });
+
+  it("asks for the level and the parent it was given", async () => {
+    const sent: URL[] = [];
+    server.use(
+      http.get(buildApiUrl("/leads/areas"), ({ request }) => {
+        sent.push(new URL(request.url));
+      }),
+    );
+
+    await listLeadAreas({ level: "taluka", parentId: "district-a" });
+
+    expect(sent[0]?.searchParams.get("level")).toBe("taluka");
+    expect(sent[0]?.searchParams.get("parent_id")).toBe("district-a");
+  });
+
+  it("reports an area list that breaks the contract", async () => {
+    server.use(
+      http.get(buildApiUrl("/leads/areas"), () =>
+        HttpResponse.json({ data: [{ id: "x", name: "X", level: "village", lead_count: 1 }] }),
+      ),
+    );
+
+    const error: unknown = await listLeadAreas({ level: "state", parentId: null }).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toMatchObject({ kind: "contract" });
   });
 });
 
@@ -804,6 +880,12 @@ describe("[LEAD-008] assignment", () => {
         territoryName: "Rajkot",
       }),
     ]);
+  });
+
+  it("finds a partner by the person to ask for there (backend #49)", async () => {
+    const partners = await searchPartners("kishor");
+
+    expect(partners.map((partner) => partner.name)).toEqual(["Khodiyar Irrigation"]);
   });
 
   it("sets the owner and the partner, and records the assignment", async () => {
