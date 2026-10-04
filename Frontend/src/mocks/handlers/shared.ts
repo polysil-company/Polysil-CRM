@@ -1,5 +1,7 @@
 import { HttpResponse } from "msw";
 
+import { todayInIndia } from "@/lib/format";
+
 /** The backend's error envelope: `{ error: { code, message, fields? } }`. */
 export function errorResponse(
   status: number,
@@ -29,4 +31,22 @@ export function decodeCursor(cursor: string): number | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A stand-in for an export's workbook: one tab-separated line per row under the real file's
+ * headers, named as the backend names it (`orders-2026-10-04.xlsx`).
+ */
+export function mockWorkbook(
+  name: string,
+  headers: readonly string[],
+  rows: readonly (readonly string[])[],
+): Response {
+  const lines = [headers.join("\t"), ...rows.map((row) => row.join("\t"))];
+  return new HttpResponse(lines.join("\n"), {
+    headers: {
+      "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "content-disposition": `attachment; filename="${name}-${todayInIndia()}.xlsx"`,
+    },
+  });
 }

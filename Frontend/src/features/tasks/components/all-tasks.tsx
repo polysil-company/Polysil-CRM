@@ -1,16 +1,15 @@
 "use client";
 
-import { Download04Icon, Task01Icon } from "@hugeicons/core-free-icons";
+import { Task01Icon } from "@hugeicons/core-free-icons";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type * as React from "react";
-import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { FilterPill, SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Icon } from "@/components/ui/icon";
 import { Label } from "@/components/ui/label";
 import { exportTasks } from "@/features/tasks/api/tasks.api";
 import {
@@ -20,10 +19,7 @@ import {
 import { TASK_STATUSES, TASK_TYPES, type TaskListParams } from "@/features/tasks/api/tasks.schemas";
 import { taskListParamsOf, type TaskFilters } from "@/features/tasks/hooks/use-task-params";
 import { TASK_TYPE_LABELS } from "@/features/tasks/lib/task-labels";
-import { useAsyncAction } from "@/hooks/use-async-action";
 import { toUserFacingError } from "@/lib/api/error-messages";
-import { isApiError } from "@/lib/api/errors";
-import { saveFile } from "@/lib/api/save-file";
 import { formatCount } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
@@ -80,26 +76,6 @@ export function AllTasks({
       .map((person) => ({ value: person.id, label: person.name })),
   ];
 
-  const download = useAsyncAction({
-    action: () => exportTasks(params),
-    logger: log,
-    fn: "handleExportTasks",
-    dataId: "TASK-008",
-    onSuccess: (file) => {
-      saveFile(file, "tasks.xlsx");
-    },
-    onError: (error) => {
-      if (isApiError(error) && error.code === "export_too_large") {
-        toast.error("Too many tasks to download", {
-          description: "More than 5,000 match. Narrow the filters and try again.",
-        });
-        return;
-      }
-      const view = toUserFacingError(error);
-      toast.error(view.title, { description: view.description });
-    },
-  });
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -149,19 +125,13 @@ export function AllTasks({
             </Button>
           ) : null}
         </div>
-        <Button
-          variant="outline"
-          state={download.state}
-          loadingLabel="Preparing…"
-          successLabel="Downloaded"
-          errorLabel="Not downloaded"
-          onClick={() => {
-            void download.run();
-          }}
-        >
-          <Icon icon={Download04Icon} />
-          Download Excel
-        </Button>
+        <DownloadExcelButton
+          download={() => exportTasks(params)}
+          fallbackName="tasks.xlsx"
+          what="tasks"
+          logger={log}
+          dataId="TASK-008"
+        />
       </div>
 
       <p aria-live="polite" className="text-sm text-muted-foreground">

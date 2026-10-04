@@ -13,6 +13,7 @@ import {
   createOrder,
   deleteOrder,
   patchOrder,
+  replaceOrderLines,
   submitOrder,
   voidDispatch,
   type WriteInput,
@@ -20,12 +21,14 @@ import {
 import { orderKeys } from "./orders.queries";
 import type {
   CreateDispatchRequest,
+  CreateDirectOrder,
   CreateOrderFromQuotations,
   Dispatch,
   ExpectedStatusRequest,
   Order,
   PatchOrderRequest,
   RemarkRequest,
+  ReplaceOrderLinesRequest,
 } from "./orders.schemas";
 
 /** An action on one order (or one of its dispatches), with its body and retry-safe key. */
@@ -55,11 +58,11 @@ function useApplyOrder(): (order: Order) => void {
   };
 }
 
-/** SO-003 · A draft from accepted quotations. */
+/** SO-003, SO-005 · A draft from accepted quotations, or typed in line by line. */
 export function useCreateOrder(): UseMutationResult<
   Order,
   Error,
-  WriteInput<CreateOrderFromQuotations>
+  WriteInput<CreateOrderFromQuotations | CreateDirectOrder>
 > {
   const apply = useApplyOrder();
   return useMutation({
@@ -81,6 +84,31 @@ export function usePatchOrder(): UseMutationResult<
     mutationKey: [...orderKeys.all, "patch"],
     mutationFn: ({ id, input }) => patchOrder(id, input),
     meta: { dataId: "SO-003" },
+    onSuccess: apply,
+  });
+}
+
+/**
+ * SO-003, SO-005 · Save a draft from the builder: the header when it changed, then every line.
+ * The lines go last, so the order that comes back carries both.
+ */
+export function useSaveOrderDraft(): UseMutationResult<
+  Order,
+  Error,
+  {
+    orderId: string;
+    header: WriteInput<PatchOrderRequest> | null;
+    lines: WriteInput<ReplaceOrderLinesRequest>;
+  }
+> {
+  const apply = useApplyOrder();
+  return useMutation({
+    mutationKey: [...orderKeys.all, "save-draft"],
+    mutationFn: async ({ orderId, header, lines }) => {
+      if (header !== null) await patchOrder(orderId, header);
+      return replaceOrderLines(orderId, lines);
+    },
+    meta: { dataId: "SO-005" },
     onSuccess: apply,
   });
 }

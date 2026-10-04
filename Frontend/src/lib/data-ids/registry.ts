@@ -234,6 +234,14 @@ export const DATA_IDS = {
     notes:
       "Only what changed is sent. Owners come from GET /leads/assignees, which is empty for roles that may not set one; a closed lead cannot be reassigned.",
   },
+  "LEAD-009": {
+    domain: "LEAD",
+    title: "Export the lead list to Excel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads/export"],
+    notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
+  },
   "RPT-001": {
     domain: "RPT",
     title: "Dashboard overview — KPIs, pipeline, follow-ups",
@@ -344,6 +352,14 @@ export const DATA_IDS = {
     notes:
       "No sign-in. Shows the number, seller, validity and total only; the PDF opens from the button, never on load, so a link preview is not a view.",
   },
+  "QUOT-013": {
+    domain: "QUOT",
+    title: "Export the quotation list to Excel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /quotations/export"],
+    notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
+  },
   "SO-001": {
     domain: "SO",
     title: "Sales orders list",
@@ -387,10 +403,18 @@ export const DATA_IDS = {
     domain: "SO",
     title: "A direct order typed in line by line, and a draft's lines",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
     endpoints: ["POST /orders", "PUT /orders/{orderId}/lines", "POST /pricing/quote-lines"],
     notes:
       "Party, place of supply and lines as on a quotation, priced by the backend; a lead is optional.",
+  },
+  "SO-006": {
+    domain: "SO",
+    title: "Export the order list to Excel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /orders/export"],
+    notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
   },
   "APPR-001": {
     domain: "APPR",

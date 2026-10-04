@@ -5,6 +5,7 @@ import {
   ArrowLeft01Icon,
   Call02Icon,
   Share08Icon,
+  PackageIcon,
   WhatsappIcon,
 } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -57,6 +58,13 @@ import { LeadTimeline, LeadTimelineSkeleton } from "./lead-timeline";
 
 /** Stages the backend closes to reassignment (`TERMINAL` in backend/api/domain/leads.py). */
 const CLOSED_STAGES: ReadonlySet<LeadStage> = new Set(["won", "lost", "merged"]);
+/** The stages an order may be placed on, as the backend allows (SO-005). */
+const ORDERABLE_STAGES: ReadonlySet<LeadStage> = new Set([
+  "qualified",
+  "quoted",
+  "negotiation",
+  "won",
+]);
 
 /** Detail rows that always render — the skeleton draws the same number. */
 const DETAIL_ROW_COUNT = 15;
@@ -161,6 +169,7 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
   const { data: session } = useSession();
   const canEdit = useCan("leads", "edit");
   const canSeeQuotations = useCan("quotations");
+  const canOrder = useCan("sales_orders", "create");
   const canSeeTasks = useCan("tasks") && session?.userType === "staff";
   const whatsappNumber = lead.phone.replace(/\D/g, "");
   const lost = lead.stage === "lost";
@@ -217,6 +226,16 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
             >
               <Icon icon={Share08Icon} />
               Share with a colleague
+            </Link>
+          ) : null}
+          {/* SO-005 · An order typed in without a quotation, once the lead is qualified. */}
+          {canOrder && ORDERABLE_STAGES.has(lead.stage) ? (
+            <Link
+              href={`/sales-orders/new?lead=${lead.id}`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <Icon icon={PackageIcon} />
+              New order
             </Link>
           ) : null}
           {/* LEAD-007 · The main action on a lead, for whoever may edit it. */}

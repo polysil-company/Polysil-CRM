@@ -4,7 +4,7 @@ import {
   type TimelinePage,
 } from "@/features/leads/api/leads.schemas";
 import { pdfLinkResponseSchema, type PdfLink } from "@/features/quotations/api/quotations.schemas";
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -15,6 +15,7 @@ import {
   orderPageSchema,
   orderResponseSchema,
   type CreateDispatchRequest,
+  type CreateDirectOrder,
   type CreateOrderFromQuotations,
   type Dispatch,
   type ExpectedStatusRequest,
@@ -23,6 +24,7 @@ import {
   type OrderPage,
   type PatchOrderRequest,
   type RemarkRequest,
+  type ReplaceOrderLinesRequest,
   type DispatchListParams,
   type DispatchPage,
 } from "./orders.schemas";
@@ -119,13 +121,16 @@ export async function getOrderTimeline(
   return page;
 }
 
-/** SO-003 · POST /orders from accepted quotations; 201 with a draft that has no number. */
+/**
+ * SO-003, SO-005 · POST /orders — from accepted quotations, or typed in line by line; 201 with
+ * a draft that has no number.
+ */
 export function createOrder({
   body,
   idempotencyKey,
-}: WriteInput<CreateOrderFromQuotations>): Promise<Order> {
+}: WriteInput<CreateOrderFromQuotations | CreateDirectOrder>): Promise<Order> {
   return apiRequest({
-    dataId: "SO-003",
+    dataId: "quotation_ids" in body ? "SO-003" : "SO-005",
     logger: log,
     fn: "createOrder",
     method: "POST",
@@ -150,6 +155,41 @@ export function patchOrder(
     body,
     idempotencyKey,
     schema: orderResponseSchema,
+  });
+}
+
+/** SO-005 · PUT /orders/{id}/lines — replace a draft's lines, priced as new. */
+export function replaceOrderLines(
+  orderId: string,
+  { body, idempotencyKey }: WriteInput<ReplaceOrderLinesRequest>,
+): Promise<Order> {
+  return apiRequest({
+    dataId: "SO-005",
+    logger: log,
+    fn: "replaceOrderLines",
+    method: "PUT",
+    path: `/orders/${encodeURIComponent(orderId)}/lines`,
+    body,
+    idempotencyKey,
+    schema: orderResponseSchema,
+  });
+}
+
+/** SO-006 · GET /orders/export — the list as an Excel file, with the list's filters. */
+export function exportOrders(params: OrderListParams): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "SO-006",
+    logger: log,
+    fn: "exportOrders",
+    path: "/orders/export",
+    query: {
+      q: params.q,
+      status: params.status.join(","),
+      order_type: params.orderType,
+      owner: params.mine ? "me" : undefined,
+      lead_id: params.leadId,
+      quotation_id: params.quotationId,
+    },
   });
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  PackageIcon,
   Cancel01Icon,
   Delete02Icon,
   DeliveryTruck01Icon,
@@ -9,12 +10,14 @@ import {
   PackageRemoveIcon,
   SentIcon,
 } from "@hugeicons/core-free-icons";
+import Link from "next/link";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 
 import { PdfLinkButton } from "@/components/patterns/pdf-link-button";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +64,15 @@ export function OrderActions({ order }: { order: Order }): React.JSX.Element {
           logger={log}
           dataId="SO-002"
         />
+      ) : null}
+      {actions.editHeader ? (
+        <Link
+          href={`/sales-orders/${order.id}/edit`}
+          className={buttonVariants({ variant: "outline" })}
+        >
+          <Icon icon={PackageIcon} />
+          Edit items
+        </Link>
       ) : null}
       {actions.editHeader ? (
         <Button

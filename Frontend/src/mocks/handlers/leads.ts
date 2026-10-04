@@ -37,7 +37,7 @@ import { mockDb } from "@/mocks/db";
 
 import { MOCK_CREATOR, leadEventsOf, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
-import { decodeCursor, encodeCursor, errorResponse } from "./shared";
+import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
 
 /**
  * LEAD-001 … LEAD-004 · The backend's lead endpoints (backend/docs/api/leads.md), as far as
@@ -454,6 +454,23 @@ export const leadHandlers = [
 
     const body: AssigneeListWire = { data: mockAssignees() };
     return HttpResponse.json(body);
+  }),
+
+  /** LEAD-009 · The list as a file. Before /leads/:leadId. */
+  http.get(buildApiUrl("/leads/export"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    return mockWorkbook(
+      "leads",
+      ["Inquiry", "Farmer", "Mobile", "Stage", "Territory"],
+      mockDb.leads.map((lead) => [
+        lead.inquiry_no,
+        lead.farmer_name,
+        lead.mobile,
+        lead.stage,
+        lead.territory.name,
+      ]),
+    );
   }),
 
   http.get(buildApiUrl("/leads/:leadId"), async ({ params }) => {

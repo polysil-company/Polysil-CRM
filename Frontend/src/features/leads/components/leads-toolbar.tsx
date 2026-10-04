@@ -3,10 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { FilterPill, SingleFilterPill } from "@/components/patterns/filter-pill";
 import { SearchField } from "@/components/patterns/search-field";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportLeads } from "@/features/leads/api/leads.api";
 import { LEAD_INQUIRY_TYPES, LEAD_STAGES } from "@/features/leads/api/leads.schemas";
 import { useLeadListParams } from "@/features/leads/hooks/use-lead-list-params";
 import {
@@ -16,9 +18,15 @@ import {
 } from "@/features/leads/lib/lead-labels";
 import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import { useCan } from "@/features/session/hooks/use-session";
+import { createLogger } from "@/lib/logger";
 
 import { LeadAreaFilter } from "./lead-area-filter";
 import { NewLeadDialog } from "./new-lead-dialog";
+
+const log = createLogger({
+  file: "features/leads/components/leads-toolbar.tsx",
+  dataId: "LEAD-001",
+});
 
 const STAGE_OPTIONS = LEAD_STAGES.map((stage) => ({
   value: stage,
@@ -106,7 +114,16 @@ export function LeadsToolbar(): React.JSX.Element {
           ) : null}
         </div>
       </div>
-      {canCreate ? <NewLeadDialog /> : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <DownloadExcelButton
+          download={() => exportLeads(params)}
+          fallbackName="leads.xlsx"
+          what="leads"
+          logger={log}
+          dataId="LEAD-009"
+        />
+        {canCreate ? <NewLeadDialog /> : null}
+      </div>
     </div>
   );
 }

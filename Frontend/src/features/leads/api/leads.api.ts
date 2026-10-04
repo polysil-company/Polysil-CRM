@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -70,6 +70,25 @@ export async function listLeads(params: LeadListParams, signal?: AbortSignal): P
   }
 
   return page;
+}
+
+/** LEAD-009 · GET /leads/export — the list as an Excel file, with the list's filters and sort. */
+export function exportLeads(params: LeadListParams): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "LEAD-009",
+    logger: log,
+    fn: "exportLeads",
+    path: "/leads/export",
+    query: {
+      q: params.q,
+      stage: params.stage.join(","),
+      source: params.source,
+      inquiry_type: params.type,
+      sort: LEAD_SORT_WIRE_FIELDS[params.sort],
+      order: params.order,
+      territory_id: params.areas.join(","),
+    },
+  });
 }
 
 /** LEAD-003 · GET /leads/{leadId} */

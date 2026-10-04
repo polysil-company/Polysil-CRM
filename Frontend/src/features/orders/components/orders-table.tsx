@@ -89,7 +89,7 @@ export function OrdersTable(): React.JSX.Element {
           <EmptyState
             icon={PackageIcon}
             title="No sales orders yet"
-            description="An order is placed from an accepted quotation, on its page. Orders you can see appear here, newest first."
+            description="Place one from an accepted quotation, or with New order. Orders you can see appear here, newest first."
             className={ORDERS_EMPTY_FRAME_CLASSES}
           />
         )
