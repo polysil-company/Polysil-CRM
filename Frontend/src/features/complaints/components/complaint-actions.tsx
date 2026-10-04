@@ -5,7 +5,7 @@ import { Cancel01Icon, Delete02Icon, Edit02Icon, SentIcon } from "@hugeicons/cor
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -54,14 +54,14 @@ import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { todayInIndia } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
+import { COMPLAINT_TEXT_MAX, Refusal, useCloseLater } from "./complaint-dialog-parts";
+
 const log = createLogger({
   file: "features/complaints/components/complaint-actions.tsx",
   dataId: "CMPL-003",
 });
 
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
-const TEXT_MAX = 2000;
+const TEXT_MAX = COMPLAINT_TEXT_MAX;
 
 type DialogKind = "check" | "qc" | "cancel" | "delete";
 
@@ -188,36 +188,6 @@ export function ComplaintActions({
           {dialog === "delete" ? <DeleteForm complaint={complaint} onClose={close} /> : null}
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-/** Closes a moment after success, and never after the dialog has gone. */
-function useCloseLater(onClose: () => void): () => void {
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
-  return () => {
-    timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
-  };
-}
-
-function Refusal({
-  refusal,
-}: {
-  refusal: { title: string; message: string } | null;
-}): React.JSX.Element | null {
-  if (refusal === null) return null;
-  return (
-    <div
-      role="alert"
-      className="mt-4 flex flex-col gap-1 rounded-md border border-border bg-danger-soft p-3 text-sm"
-    >
-      <p className="font-medium text-danger">{refusal.title}</p>
-      <p className="text-foreground">{refusal.message}</p>
     </div>
   );
 }

@@ -31,10 +31,12 @@ const MARKER_CLASSES: Readonly<Record<StepState, string>> = {
   stopped: "bg-muted text-subtle-foreground",
 };
 
+type ApprovalBlock = NonNullable<Order["approval"]>;
+
 /** Each step's place in the chain, read from the decisions and the request's status. */
-function stepStates(order: Order): StepState[] {
-  const steps = order.approval?.steps ?? [];
-  const open = order.approval?.status === "pending";
+function stepStates(approval: ApprovalBlock): StepState[] {
+  const steps = approval.steps;
+  const open = approval.status === "pending";
   const current = open ? steps.findIndex((step) => step.decision === null) : -1;
   return steps.map((step, index) => {
     if (step.decision === "approve") return "approved";
@@ -55,7 +57,6 @@ export function OrderApproval({ order }: { order: Order }): React.JSX.Element | 
   if (approval === null || approval.steps.length === 0) {
     return null;
   }
-  const states = stepStates(order);
   const waiting = order.status === "submitted";
 
   return (
@@ -69,16 +70,37 @@ export function OrderApproval({ order }: { order: Order }): React.JSX.Element | 
         ) : null}
       </CardHeader>
       <CardContent>
-        <ol
-          aria-label="Approval steps, in order"
-          className="flex flex-col gap-3 md:grid md:auto-cols-fr md:grid-flow-col md:gap-4"
-        >
-          {approval.steps.map((step, index) => (
-            <Step key={step.id} step={step} state={states[index] ?? "later"} />
-          ))}
-        </ol>
+        <ApprovalChain approval={approval} />
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * APPR-001 · The steps of one approval request, in order — an order's, or a complaint
+ * refund's (CMPL-007), which share one contract.
+ */
+export function ApprovalChain({
+  approval,
+  compact = false,
+}: {
+  approval: ApprovalBlock;
+  /** One column at every width, for a narrow card. */
+  compact?: boolean;
+}): React.JSX.Element {
+  const states = stepStates(approval);
+  return (
+    <ol
+      aria-label="Approval steps, in order"
+      className={cn(
+        "flex flex-col gap-3",
+        !compact && "md:grid md:auto-cols-fr md:grid-flow-col md:gap-4",
+      )}
+    >
+      {approval.steps.map((step, index) => (
+        <Step key={step.id} step={step} state={states[index] ?? "later"} />
+      ))}
+    </ol>
   );
 }
 

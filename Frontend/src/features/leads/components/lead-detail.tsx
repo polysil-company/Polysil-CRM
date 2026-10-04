@@ -21,6 +21,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RelatedComplaints } from "@/features/complaints/components/related-complaints";
 import { leadDetailQueryOptions } from "@/features/leads/api/leads.queries";
 import type { Lead, LeadStage } from "@/features/leads/api/leads.schemas";
 import {
@@ -320,6 +321,9 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
 
         {/* QUOT-001 · The lead's quotations, for whoever may see quotations. */}
         {canSeeQuotations ? <LeadQuotations leadId={lead.id} leadStage={lead.stage} /> : null}
+
+        {/* CMPL-001 · Complaints about this lead, and raising one. */}
+        <RelatedComplaints about={{ leadId: lead.id }} readOnly={lead.stage === "merged"} />
 
         {/* TASK-003, TASK-007 · Calls, visits and meetings about this lead, and their minutes. */}
         {canSeeTasks ? (

@@ -1,4 +1,5 @@
 import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
+import type { SlaPolicyWire } from "@/features/complaints/api/complaints.schemas";
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
@@ -6,7 +7,7 @@ import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
-import { generateComplaints, type MockComplaint } from "./data/complaints";
+import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
 import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
@@ -72,6 +73,10 @@ export interface MockDb {
   complaintWrites: Map<string, { body: string; complaintId: string }>;
   /** Each complaint's history, newest first. */
   complaintEvents: Map<string, TimelineEventWire[]>;
+  /** Uploaded files, by attachment id, served back as object URLs. */
+  complaintFiles: Map<string, File>;
+  /** The response and resolution targets (CMPL-008). */
+  slaPolicies: SlaPolicyWire[];
   /** How many events the mock has written, for their ids. */
   writtenEvents: number;
 }
@@ -123,6 +128,8 @@ function createMockDb(): MockDb {
     complaints: generateComplaints(leads, orders),
     complaintWrites: new Map(),
     complaintEvents: new Map(),
+    complaintFiles: new Map(),
+    slaPolicies: seedSlaPolicies(),
     writtenEvents: 1,
   };
 }

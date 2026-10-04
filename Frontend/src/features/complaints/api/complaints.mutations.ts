@@ -2,8 +2,16 @@
 
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 
+import { approvalKeys } from "@/features/approvals/api/approvals.queries";
+import { orderKeys } from "@/features/orders/api/orders.queries";
+
 import {
   cancelComplaint,
+  chooseRemedy,
+  createSlaPolicy,
+  deleteAttachment,
+  uploadAttachment,
+  withdrawRemedy,
   checkComplaint,
   createComplaint,
   deleteComplaint,
@@ -16,6 +24,10 @@ import {
 import { complaintKeys } from "./complaints.queries";
 import type {
   CancelComplaintRequest,
+  CreateSlaPolicyRequest,
+  RemedyRequest,
+  SlaPolicy,
+  WithdrawRemedyRequest,
   CheckRequest,
   Complaint,
   CreateComplaintRequest,
@@ -151,5 +163,94 @@ export function useQcComplaint(): UseMutationResult<Complaint, Error, Keyed<QcRe
     mutationFn: ({ complaintId, ...input }) => qcComplaint(complaintId, input),
     meta: { dataId: "CMPL-005" },
     onSuccess: settle,
+  });
+}
+
+/** CMPL-007 · Choose a remedy: a refund goes into the Approvals inbox. */
+export function useChooseRemedy(): UseMutationResult<Complaint, Error, Keyed<RemedyRequest>> {
+  const settle = useSettle();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...complaintKeys.all, "remedy"],
+    mutationFn: ({ complaintId, ...input }) => chooseRemedy(complaintId, input),
+    meta: { dataId: "CMPL-007" },
+    onSuccess: (complaint) => {
+      settle(complaint);
+      void queryClient.invalidateQueries({ queryKey: approvalKeys.all });
+      void queryClient.invalidateQueries({ queryKey: orderKeys.all });
+    },
+  });
+}
+
+/** CMPL-007 · Withdraw the remedy while it is still open. */
+export function useWithdrawRemedy(): UseMutationResult<
+  Complaint,
+  Error,
+  Keyed<WithdrawRemedyRequest>
+> {
+  const settle = useSettle();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...complaintKeys.all, "withdraw"],
+    mutationFn: ({ complaintId, ...input }) => withdrawRemedy(complaintId, input),
+    meta: { dataId: "CMPL-007" },
+    onSuccess: (complaint) => {
+      settle(complaint);
+      void queryClient.invalidateQueries({ queryKey: approvalKeys.all });
+      void queryClient.invalidateQueries({ queryKey: orderKeys.all });
+    },
+  });
+}
+
+/** CMPL-006 · Add a file, then re-read the complaint for its list of files. */
+export function useUploadAttachment(): UseMutationResult<
+  void,
+  Error,
+  Parameters<typeof uploadAttachment>[0]
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...complaintKeys.all, "upload"],
+    mutationFn: uploadAttachment,
+    meta: { dataId: "CMPL-006" },
+    onSuccess: (_result, { complaintId }) => {
+      void queryClient.invalidateQueries({ queryKey: complaintKeys.detail(complaintId) });
+      void queryClient.invalidateQueries({ queryKey: complaintKeys.timeline(complaintId) });
+    },
+  });
+}
+
+/** CMPL-006 · Remove a file. */
+export function useDeleteAttachment(): UseMutationResult<
+  void,
+  Error,
+  { complaintId: string; attachmentId: string; idempotencyKey: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...complaintKeys.all, "delete-attachment"],
+    mutationFn: ({ complaintId, attachmentId, idempotencyKey }) =>
+      deleteAttachment(complaintId, attachmentId, idempotencyKey),
+    meta: { dataId: "CMPL-006" },
+    onSuccess: (_result, { complaintId }) => {
+      void queryClient.invalidateQueries({ queryKey: complaintKeys.detail(complaintId) });
+    },
+  });
+}
+
+/** CMPL-008 · Set a new target from a day; the answer is every target. */
+export function useCreateSlaPolicy(): UseMutationResult<
+  SlaPolicy[],
+  Error,
+  WriteInput<CreateSlaPolicyRequest>
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...complaintKeys.slaPolicies(), "create"],
+    mutationFn: createSlaPolicy,
+    meta: { dataId: "CMPL-008" },
+    onSuccess: (policies) => {
+      queryClient.setQueryData(complaintKeys.slaPolicies(), policies);
+    },
   });
 }

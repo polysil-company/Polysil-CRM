@@ -10,6 +10,7 @@ import { isApiError } from "@/lib/api/errors";
 export const DOC_TYPE_LABELS: Readonly<Record<ApprovalDocType, string>> = {
   quotation: "Quotation discount",
   sales_order: "Sales order",
+  complaint: "Complaint refund",
 };
 
 /** "Draft quotation" for a quotation that has no number yet, else its number. */
@@ -17,7 +18,7 @@ export function documentTitle(docType: ApprovalDocType, number: string | null): 
   if (number !== null) {
     return number;
   }
-  return docType === "quotation" ? "Draft quotation" : "Sales order";
+  return docType === "quotation" ? "Draft quotation" : DOC_TYPE_LABELS[docType];
 }
 
 /**
@@ -26,11 +27,19 @@ export function documentTitle(docType: ApprovalDocType, number: string | null): 
  * backend migration 013, BE-018). This says what a required remark is for when it is left
  * empty, and is null when the remark is optional.
  */
-export function missingRemarkMessage(decision: "approve" | "reject", role: string): string | null {
+export function missingRemarkMessage(
+  decision: "approve" | "reject",
+  role: string,
+  docType: ApprovalDocType = "sales_order",
+): string | null {
   if (decision === "reject") {
     return "Say why. The person who asked reads it.";
   }
-  return role === "account_manager" ? "Note the payment check: what was received or agreed." : null;
+  if (role !== "account_manager") return null;
+  // A refund's last step is the payout: its remark is the payment reference (CMPL-007).
+  return docType === "complaint"
+    ? "Enter the payment reference: the UTR or cheque number."
+    : "Note the payment check: what was received or agreed.";
 }
 
 /** "State Manager's step": whose step a row is, for a manager covering a lower one. */

@@ -202,7 +202,12 @@ async function execute<TSchema extends z.ZodType>(
       method,
       url: context.url,
       query: request.query,
-      body: context.sensitive && request.body !== undefined ? REDACTED : request.body,
+      body:
+        context.sensitive && request.body !== undefined
+          ? REDACTED
+          : request.body instanceof FormData
+            ? describeFormData(request.body)
+            : request.body,
     },
   });
 
@@ -263,7 +268,12 @@ async function send(context: RequestContext, token: string | null): Promise<RawR
     const response = await fetch(context.url, {
       method: context.method,
       headers: buildHeaders(context, token),
-      ...(context.body === undefined ? {} : { body: JSON.stringify(context.body) }),
+      ...(context.body === undefined
+        ? {}
+        : {
+            // A file upload goes as multipart; the browser sets its content type and boundary.
+            body: context.body instanceof FormData ? context.body : JSON.stringify(context.body),
+          }),
       signal: timeout.signal,
       cache: "no-store",
       // The refresh cookie is same-origin and scoped to /api/v1/auth.
@@ -384,7 +394,7 @@ function buildHeaders(context: RequestContext, token: string | null): Headers {
     "x-data-id": context.dataId,
     "x-client": `polysil-web@${clientEnv.release}`,
   });
-  if (context.body !== undefined) {
+  if (context.body !== undefined && !(context.body instanceof FormData)) {
     headers.set("content-type", "application/json");
   }
   if (token !== null) {
@@ -394,6 +404,16 @@ function buildHeaders(context: RequestContext, token: string | null): Headers {
     headers.set("idempotency-key", context.idempotencyKey);
   }
   return headers;
+}
+
+/** A multipart body as the logs show it: field names, and files by name and size, never bytes. */
+function describeFormData(body: FormData): Record<string, string> {
+  const fields: Record<string, string> = {};
+  body.forEach((value, key) => {
+    fields[key] =
+      typeof value === "string" ? value : `file ${value.name} (${String(value.size)} bytes)`;
+  });
+  return fields;
 }
 
 /** A file response: its bytes and the name in `Content-Disposition`, if any. */

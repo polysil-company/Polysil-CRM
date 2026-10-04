@@ -505,4 +505,86 @@ export type QcRequest = z.infer<typeof qcRequestSchema>;
 export const cancelComplaintRequestSchema = z.object({ reason: z.string().min(1) });
 export type CancelComplaintRequest = z.infer<typeof cancelComplaintRequestSchema>;
 
-// TODO(CMPL-006, CMPL-007): the remedy, withdraw and attachment-link requests come with C2.
+/** POST /complaints/{id}/remedy — amount, payee and dealer belong to a refund only. */
+export const remedyRequestSchema = z.object({
+  kind: z.enum(REMEDY_KINDS),
+  amount: decimal.nullish(),
+  payee_name: z.string().nullish(),
+  paid_through_partner_id: z.string().nullish(),
+  remark: z.string().min(1),
+});
+export type RemedyRequest = z.infer<typeof remedyRequestSchema>;
+export type RemedyKind = (typeof REMEDY_KINDS)[number];
+
+/** POST /complaints/{id}/remedy/withdraw */
+export const withdrawRemedyRequestSchema = z.object({ remark: z.string().min(1) });
+export type WithdrawRemedyRequest = z.infer<typeof withdrawRemedyRequestSchema>;
+
+// ── attachments (CMPL-006) ────────────────────────────────────────────────────────
+
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+export type ComplaintAttachment = Complaint["attachments"][number];
+export const COMPLAINT_ATTACHMENTS_MAX = 10;
+export const COMPLAINT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+/** What the backend takes, judged by the file's content: JPEG, PNG, WebP, HEIC or PDF. */
+export const COMPLAINT_ATTACHMENT_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "application/pdf",
+] as const;
+
+/** GET /complaints/{id}/attachments/{attachmentId} — a link valid for ten minutes. */
+export const attachmentLinkSchema = z
+  .object({ data: z.object({ url: z.string().min(1), expires_at: isoDateTime }) })
+  .transform(({ data }) => ({ url: data.url, expiresAt: data.expires_at }));
+export type AttachmentLink = z.output<typeof attachmentLinkSchema>;
+
+/**
+ * POST /complaints/{id}/attachments answers `Envelope_Any_`: no shape is promised, so the
+ * screen reads only that it worked and re-reads the complaint for its files.
+ */
+export const uploadResponseSchema = z.object({ data: z.unknown() });
+
+// ── targets (CMPL-008) ────────────────────────────────────────────────────────────
+
+const slaPolicyWireSchema = z.object({
+  id,
+  severity: z.enum(COMPLAINT_SEVERITIES),
+  complaint_type_id: z.string().nullable(),
+  response_hours: z.number().int().positive(),
+  resolution_hours: z.number().int().positive(),
+  business_hours_only: z.boolean(),
+  effective_from: isoDate,
+  effective_to: isoDate.nullable(),
+});
+export type SlaPolicyWire = z.input<typeof slaPolicyWireSchema>;
+
+export const slaPoliciesSchema = z
+  .object({ data: z.array(slaPolicyWireSchema) })
+  .transform(({ data }) =>
+    data.map((policy) => ({
+      id: policy.id,
+      severity: policy.severity,
+      typeId: policy.complaint_type_id,
+      responseHours: policy.response_hours,
+      resolutionHours: policy.resolution_hours,
+      businessHoursOnly: policy.business_hours_only,
+      effectiveFrom: policy.effective_from,
+      effectiveTo: policy.effective_to,
+    })),
+  );
+export type SlaPolicy = z.output<typeof slaPoliciesSchema>[number];
+
+/** POST /complaint-sla-policies — a new target from a day; admin only. */
+export const createSlaPolicyRequestSchema = z.object({
+  severity: z.enum(COMPLAINT_SEVERITIES),
+  complaint_type_id: z.string().nullish(),
+  response_hours: z.number().int().positive(),
+  resolution_hours: z.number().int().positive(),
+  business_hours_only: z.boolean().optional(),
+  effective_from: isoDate,
+});
+export type CreateSlaPolicyRequest = z.infer<typeof createSlaPolicyRequestSchema>;

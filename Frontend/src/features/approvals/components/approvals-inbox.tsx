@@ -1,6 +1,11 @@
 "use client";
 
-import { CheckmarkBadge01Icon, Invoice03Icon, PackageIcon } from "@hugeicons/core-free-icons";
+import {
+  CheckmarkBadge01Icon,
+  CustomerSupportIcon,
+  Invoice03Icon,
+  PackageIcon,
+} from "@hugeicons/core-free-icons";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { parseAsBoolean, useQueryState } from "nuqs";
@@ -174,7 +179,15 @@ function ApprovalRow({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={row.docType === "quotation" ? "primary" : "info"}>
+            <Badge
+              variant={
+                row.docType === "quotation"
+                  ? "primary"
+                  : row.docType === "complaint"
+                    ? "warning"
+                    : "info"
+              }
+            >
               {DOC_TYPE_LABELS[row.docType]}
             </Badge>
             <span className="font-mono text-sm font-semibold text-foreground">{title}</span>
@@ -221,6 +234,14 @@ function ApprovalRow({
           >
             <Icon icon={Invoice03Icon} />
             Open the quotation
+          </Link>
+        ) : row.docType === "complaint" ? (
+          <Link
+            href={`/complaints/${document.id}`}
+            className={buttonVariants({ variant: "ghost", size: "sm", className: "self-start" })}
+          >
+            <Icon icon={CustomerSupportIcon} />
+            Open the complaint
           </Link>
         ) : (
           <Link

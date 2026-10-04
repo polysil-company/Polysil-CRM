@@ -18,7 +18,7 @@ export interface MockApprovalStep {
   readonly role: string;
   /** Nobody of the step's own role covers it, so a higher manager may decide it. */
   readonly stalled: boolean;
-  readonly docType: "sales_order" | "quotation";
+  readonly docType: "sales_order" | "quotation" | "complaint";
   readonly docId: string;
   readonly number: string | null;
   readonly partyName: string;
@@ -109,6 +109,23 @@ export function orderManagersFor(
     managers.push(role);
     const limit = limitOf(thresholds, "sales_order", role, territoryId);
     if (limit === null || (limit !== undefined && amount <= limit)) {
+      break;
+    }
+  }
+  return managers;
+}
+
+/**
+ * CMPL-007 · A refund's managers: they stack, each up to their limit, until one covers the
+ * amount — a 50,000 refund needs District, then State. Accounts pays it after them.
+ */
+export function refundManagersFor(amount: string, thresholds: readonly ThresholdWire[]): string[] {
+  const value = Number(amount);
+  const managers: string[] = [];
+  for (const role of ORDER_MANAGERS) {
+    managers.push(role);
+    const limit = limitOf(thresholds, "complaint", role, null);
+    if (limit === null || (limit !== undefined && value <= limit)) {
       break;
     }
   }

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RelatedComplaints } from "@/features/complaints/components/related-complaints";
 import { partnerTypeLabel } from "@/features/leads/lib/lead-labels";
 import { orderDetailQueryOptions } from "@/features/orders/api/orders.queries";
 import type { Order, OrderLine } from "@/features/orders/api/orders.schemas";
@@ -139,6 +140,8 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
       </Card>
 
       {shipping ? <OrderDispatches order={order} /> : null}
+
+      {order.status === "draft" ? null : <RelatedComplaints about={{ orderId: order.id }} />}
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4">

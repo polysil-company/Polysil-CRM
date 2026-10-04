@@ -5,6 +5,7 @@ import type {
 } from "@/features/complaints/api/complaints.schemas";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError, readFieldErrors } from "@/lib/api/errors";
+import { formatInr } from "@/lib/format";
 
 export const COMPLAINT_STATUS_LABELS: Readonly<Record<ComplaintStatus, string>> = {
   draft: "Draft",
@@ -63,7 +64,7 @@ const FIELD_NAMES: Readonly<Record<string, string>> = {
 export interface ComplaintRefusal {
   readonly title: string;
   readonly message: string;
-  /** Someone acted first: close and show the latest. */
+  /** Someone acted first, or the complaint moved on: close and show the latest. */
   readonly stale: boolean;
   readonly fields: Readonly<Record<string, string>> | null;
 }
@@ -71,7 +72,9 @@ export interface ComplaintRefusal {
 /**
  * The backend's complaint refusals in plain words: `status_changed` and `complaint_not_draft`
  * (someone acted first), `missing_for_submit`, `nothing_defective`, `no_checker`,
- * `territory_without_state_code`, and a 403 (not this user's step).
+ * `territory_without_state_code`, the file refusals (`attachment_too_large`, `attachment_type`,
+ * `too_many_attachments`, `storage_unavailable`, `complaint_closed_for_upload`), and a 403
+ * (not this user's step).
  */
 export function complaintRefusal(error: unknown): ComplaintRefusal {
   const fields = readFieldErrors(error);
@@ -115,6 +118,41 @@ export function complaintRefusal(error: unknown): ComplaintRefusal {
           stale: false,
           fields: { territory_id: "its state has no code yet" },
         };
+      case "attachment_too_large":
+        return {
+          title: "That file is too large",
+          message: "Files can be up to 10 MB. Send a smaller photo or a shorter PDF.",
+          stale: false,
+          fields,
+        };
+      case "attachment_type":
+        return {
+          title: "That kind of file isn't taken",
+          message: "Send a JPEG, PNG, WebP or HEIC photo, or a PDF.",
+          stale: false,
+          fields,
+        };
+      case "too_many_attachments":
+        return {
+          title: "This complaint has 10 files",
+          message: "Remove one before adding another.",
+          stale: false,
+          fields: null,
+        };
+      case "storage_unavailable":
+        return {
+          title: "Files can't be stored right now",
+          message: "Nothing was saved. Try again in a few minutes.",
+          stale: false,
+          fields: null,
+        };
+      case "complaint_closed_for_upload":
+        return {
+          title: "Files can no longer be added",
+          message: "The complaint has moved past the stage that takes files.",
+          stale: true,
+          fields: null,
+        };
       default:
         break;
     }
@@ -142,6 +180,13 @@ function textOf(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
+/** A rupee amount from an event's payload, which may carry it as a string or a number. */
+function amountOf(value: unknown): string | null {
+  if (typeof value === "number") return formatInr(String(value), { paise: true });
+  const text = textOf(value);
+  return text === null ? null : formatInr(text, { paise: true });
+}
+
 /** Turns one history event into its line. A kind the screen doesn't know keeps a readable label. */
 export function complaintHistoryEntry(
   kind: string,
@@ -156,7 +201,7 @@ export function complaintHistoryEntry(
       return { title: "Draft edited", detail: null, tone: "neutral" };
     case "complaint.submitted":
       return { title: "Submitted", detail: textOf(payload.complaint_no), tone: "info" };
-    case "complaint.checked":
+    case "complaint.approved":
       return { title: "Approved by the manager, sent to QC", detail: remark, tone: "success" };
     case "complaint.returned":
       return { title: "Returned to fix", detail: remark, tone: "warning" };
@@ -168,8 +213,26 @@ export function complaintHistoryEntry(
       return { title: "Cancelled", detail: textOf(payload.reason), tone: "danger" };
     case "complaint.attachment_added":
       return { title: "File added", detail: textOf(payload.filename), tone: "neutral" };
+    case "complaint.attachment_removed":
+      return { title: "File removed", detail: textOf(payload.filename), tone: "neutral" };
     case "complaint.remedy_chosen":
-      return { title: "Remedy chosen", detail: remark, tone: "info" };
+      return {
+        title: payload.kind === "none" ? "No remedy due" : "Remedy chosen",
+        detail: remark,
+        tone: "info",
+      };
+    case "complaint.refund_requested":
+      return { title: "Refund sent for approval", detail: amountOf(payload.amount), tone: "info" };
+    case "complaint.refund_paid":
+      return { title: "Refund paid", detail: amountOf(payload.amount), tone: "success" };
+    case "complaint.refund_rejected":
+      return { title: "Refund not approved", detail: amountOf(payload.amount), tone: "danger" };
+    case "complaint.replacement_ordered":
+      return { title: "Replacement order raised", detail: textOf(payload.order_no), tone: "info" };
+    case "complaint.replacement_cancelled":
+      return { title: "Replacement order cancelled", detail: remark, tone: "warning" };
+    case "complaint.remedy_withdrawn":
+      return { title: "Remedy withdrawn", detail: remark, tone: "warning" };
     case "complaint.closed":
       return { title: "Closed", detail: remark, tone: "success" };
     default: {

@@ -96,9 +96,10 @@ function DecisionForm({
   const decide = useDecideApproval();
   const idempotency = useIdempotencyKey();
   const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
-  const missingRemark = missingRemarkMessage(decision, row.role);
+  const missingRemark = missingRemarkMessage(decision, row.role, row.docType);
   const required = missingRemark !== null;
   const paymentCheck = decision === "approve" && row.role === "account_manager";
+  const refund = row.docType === "complaint";
   const form = useForm<DecisionForm>({
     resolver: zodResolver(decisionFormSchema(missingRemark)),
     defaultValues: { remark: "" },
@@ -189,13 +190,25 @@ function DecisionForm({
             ? approve
               ? "The officer can then send the quotation with this discount."
               : "The quotation stays a draft; the officer sees your reason and can change the discount."
-            : approve
-              ? "If yours is the last step, the order is approved."
-              : "The order returns to draft, with your reason."}
+            : refund
+              ? approve
+                ? paymentCheck
+                  ? "Approving records the refund as paid, and closes the complaint."
+                  : "The refund goes to the next manager, then to Accounts to pay."
+                : "The refund is refused; QC can choose another remedy."
+              : approve
+                ? "If yours is the last step, the order is approved."
+                : "The order returns to draft, with your reason."}
         </p>
         <Field data-invalid={errors.remark ? true : undefined}>
           <FieldLabel htmlFor="decision-remark">
-            {paymentCheck ? "Payment check" : approve ? "Remark" : "Reason"}
+            {paymentCheck
+              ? refund
+                ? "Payment reference"
+                : "Payment check"
+              : approve
+                ? "Remark"
+                : "Reason"}
             {required ? null : (
               <span className="font-normal text-muted-foreground">(optional)</span>
             )}
@@ -212,7 +225,9 @@ function DecisionForm({
           {errors.remark ? null : (
             <FieldDescription id="decision-remark-description">
               {paymentCheck
-                ? "What was received or agreed. Kept as Accounts' record."
+                ? refund
+                  ? "The UTR or cheque number of the payout. Shown on the complaint."
+                  : "What was received or agreed. Kept as Accounts' record."
                 : approve
                   ? "Kept with the approval."
                   : "The person who asked reads it."}
