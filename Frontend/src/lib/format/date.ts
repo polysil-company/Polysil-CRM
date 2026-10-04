@@ -48,6 +48,13 @@ const isoDay = new Intl.DateTimeFormat("en-CA", {
 
 const relative = new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" });
 
+const weekdayDayMonth = new Intl.DateTimeFormat("en-IN", {
+  timeZone: APP_TIME_ZONE,
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
+
 export type DateInput = string | Date | null | undefined;
 
 /** Returns a valid Date or null. Never throws. */
@@ -93,6 +100,19 @@ export function formatTime(value: DateInput): string {
  */
 export function todayInIndia(now: Date = new Date()): string {
   return isoDay.format(now);
+}
+
+/** A calendar day ("YYYY-MM-DD") moved by a number of days: 2026-10-31 + 1 → 2026-11-01. */
+export function shiftCalendarDay(day: string, days: number): string {
+  const noon = Date.parse(`${day}T12:00:00Z`);
+  return new Date(noon + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** A calendar day ("YYYY-MM-DD") as a heading: "Friday, 3 October". */
+export function formatCalendarDay(day: string): string {
+  // Midday in India keeps the day the same whatever the browser's own time zone.
+  const date = toDate(`${day}T12:00:00+05:30`);
+  return date ? weekdayDayMonth.format(date) : EMPTY_VALUE;
 }
 
 /** True when both fall on the same calendar day in India. */

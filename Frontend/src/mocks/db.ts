@@ -11,6 +11,7 @@ import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
 import { generateQuotations } from "./data/quotations";
+import { generateTasks, type MockTask } from "./data/tasks";
 
 export interface MockDb {
   /** Newest first, in the backend's wire format. */
@@ -56,6 +57,10 @@ export interface MockDb {
   stageChanges: Map<string, { body: string; leadId: string }>;
   /** The stage each lead was lost from, for reopening (the backend's `lost_from`). */
   lostFrom: Map<string, LeadStage>;
+  /** Tasks, earliest due first (TASK-001…005). */
+  tasks: MockTask[];
+  /** Task writes: Idempotency-Key → the request and the task it made or changed. */
+  taskWrites: Map<string, { body: string; taskId: string }>;
   /** How many events the mock has written, for their ids. */
   writtenEvents: number;
 }
@@ -99,6 +104,8 @@ function createMockDb(): MockDb {
     noteCreations: new Map(),
     stageChanges: new Map(),
     lostFrom: new Map(),
+    tasks: generateTasks(leads),
+    taskWrites: new Map(),
     writtenEvents: 1,
   };
 }

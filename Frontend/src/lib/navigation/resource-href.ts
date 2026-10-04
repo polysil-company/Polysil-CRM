@@ -40,7 +40,8 @@ export function resourceHref(resource: Pick<ResourceRef, "type" | "id">): Resour
     case "sales_order":
       return `/sales-orders/${id}`;
     default:
-      // TODO(TASK-001): link tasks and complaints (CMPL-001) once their screens land.
+      // TODO(TASK-003): link a task once it has its own page; My day shows one day only, so
+      // it may not hold the task. Complaints (CMPL-001) once their screens land.
       return null;
   }
 }

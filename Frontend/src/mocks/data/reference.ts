@@ -27,6 +27,7 @@ export const MOCK_ID_SPACE = {
   order: 0x0de7,
   orderLine: 0x0de1,
   dispatch: 0xd15,
+  task: 0x7a5,
 } as const;
 
 export const MOCK_STATE = { name: "Gujarat", code: "GJ" } as const;

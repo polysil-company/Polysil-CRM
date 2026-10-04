@@ -24,6 +24,14 @@ const SEEDS: Readonly<Record<LookupList, readonly (readonly [code: string, name:
     ["automation", "Automation"],
     ["other", "Other"],
   ],
+  // backend/api/db/migrations/versions/018_tasks_planner.py
+  "meeting-types": [
+    ["by_call", "By call"],
+    ["survey_design", "Survey & Design"],
+    ["cd_understanding", "C & D understanding"],
+    ["won_or_wait", "Won or wait"],
+    ["follow_up", "Follow-up"],
+  ],
   "lost-reasons": [
     ["price", "Price"],
     ["competitor", "Competitor"],
@@ -56,6 +64,7 @@ const LIST_OFFSET: Readonly<Record<LookupList, number>> = {
   "mis-systems": 200,
   "lost-reasons": 300,
   crops: 400,
+  "meeting-types": 500,
 };
 
 /** Every row of one list, as GET /lookups/{list} returns it. */
