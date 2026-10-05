@@ -116,7 +116,7 @@ def main() -> None:
     pw = hasher.hash(DEMO_PASSWORD)
 
     with psycopg.connect(
-        host="127.0.0.1", port=6432, user=e["DB_USER"],
+        host="127.0.0.1", port=int(e.get("PGBOUNCER_PORT", "6432")), user=e["DB_USER"],
         password=e["DB_PASSWORD"], dbname=e["DB_NAME"],
     ) as conn:
         cur = conn.cursor()

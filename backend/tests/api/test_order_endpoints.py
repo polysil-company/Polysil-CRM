@@ -152,6 +152,8 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
             # FS-013: a quotation's discount approval
             f"DELETE FROM approval_step WHERE request_id IN (SELECT id FROM approval_request WHERE entity_id IN {quotations})",
             f"DELETE FROM approval_request WHERE entity_id IN {quotations}",
+            # FS-023: a dispatch line moves stock; the movement points at it
+            f"DELETE FROM stock_movement WHERE dispatch_line_id IN (SELECT dl.id FROM dispatch_line dl JOIN dispatch d ON d.id = dl.dispatch_id WHERE d.sales_order_id IN {orders})",
             f"DELETE FROM dispatch WHERE sales_order_id IN {orders}",
             f"DELETE FROM activity_event WHERE entity_id IN {orders}",
             "DELETE FROM sales_order WHERE territory_id = CAST(:d AS uuid)",
@@ -180,7 +182,8 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
             "DELETE FROM gst_rate WHERE hsn_code = :h",
             "DELETE FROM product WHERE id = CAST(:p AS uuid)",
             "DELETE FROM seller_gstin WHERE id = CAST(:sg AS uuid)",
-            "DELETE FROM org_unit WHERE id = CAST(:o AS uuid)",
+            # every office in the district: a test may add a sibling (test_reports)
+            "DELETE FROM org_unit WHERE id = CAST(:o AS uuid) OR territory_id = CAST(:d AS uuid)",
             "DELETE FROM territory WHERE id = CAST(:d AS uuid)",
             "DELETE FROM territory WHERE id = CAST(:s AS uuid)",
         ):

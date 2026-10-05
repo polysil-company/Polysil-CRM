@@ -21,18 +21,23 @@ any endpoint change, so it is always current rather than a snapshot.
 | Orders | 16 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 7 | [`partners.md`](partners.md) |
+| Payments | 7 | [`payments.md`](payments.md) |
 | Pricing | 8 | [`pricing.md`](pricing.md) |
 | Products | 8 | [`products.md`](products.md) |
 | Public | 6 | [`public.md`](public.md) |
 | Quotations | 14 | [`quotations.md`](quotations.md) |
+| Reports | 8 | [`reports.md`](reports.md) |
 | Rewards | 19 | [`rewards.md`](rewards.md) |
 | Schemes | 6 | [`schemes.md`](schemes.md) |
+| Stock | 7 | [`stock.md`](stock.md) |
 | Subsidy | 4 | [`subsidy.md`](subsidy.md) |
 | Subsidy Applications | 14 | [`subsidy-applications.md`](subsidy-applications.md) |
 | Subsidy Masters | 4 | [`subsidy-masters.md`](subsidy-masters.md) |
 | Subsidy Reports | 6 | [`subsidy-reports.md`](subsidy-reports.md) |
+| Targets | 3 | [`targets.md`](targets.md) |
 | Tasks | 14 | [`tasks.md`](tasks.md) |
 | Territories | 4 | [`territories.md`](territories.md) |
+| Tracking | 16 | [`tracking.md`](tracking.md) |
 | Users | 10 | [`users.md`](users.md) |
 
 ---

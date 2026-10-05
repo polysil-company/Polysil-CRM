@@ -333,6 +333,7 @@ One approval chain.
 | `dispatched_by` | UserRef \| null | yes |  |
 | `voided_at` | string \| null | yes | Set when voided; its quantities are open again. |
 | `void_remark` | string \| null | yes |  |
+| `warehouse` | WarehouseRef \| null |  | Where the goods left (FS-023). |
 | `lines` | DispatchLineOut[] | yes |  |
 | `warnings` | string[] |  | invoice_before_dc, duplicate_invoice_no. Recorded anyway. |
 
@@ -378,6 +379,16 @@ One approval chain.
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
+**`InstalmentOut`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `seq` | integer | yes |  |
+| `due_on` | string | yes |  |
+| `amount` | string | yes |  |
+| `note` | string \| null | yes |  |
+| `covered` | boolean | yes | Received has reached this instalment, taken in due order. |
+
 **`LastRejection`**
 
 | Field | Type | Required | Notes |
@@ -408,12 +419,19 @@ One approval chain.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `product` | ProductRef | yes |  |
+| `product` | api__schemas__complaints__ProductRef | yes |  |
 | `uom` | string \| null | yes |  |
 | `supplied_qty` | string | yes |  |
 | `defective_qty` | string | yes |  |
 | `failure_frequency` | string \| null | yes |  |
 | `remark` | string \| null | yes |  |
+
+**`LineStock`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `available` | string | yes | At the order's warehouse, now. |
+| `short` | boolean | yes | True when available is below what this line still needs. |
 
 **`Order`**
 
@@ -452,6 +470,8 @@ One approval chain.
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
 | `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
+| `warehouse` | WarehouseRef \| null |  | "Order to" (FS-023); null means the default. Always null for a dealer. |
+| `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |
@@ -496,6 +516,7 @@ One approval chain.
 | `hsn_code` | string | yes |  |
 | `uom` | string | yes |  |
 | `uom_decimals` | integer | yes | How many decimals the unit takes; 0 for pieces. |
+| `stock` | LineStock \| null |  | Availability at the order's warehouse while the line is open (FS-023). A warning, never a block. Null without stock.view or once shipped. |
 | `qty` | string | yes |  |
 | `rate` | string | yes |  |
 | `gross` | string | yes |  |
@@ -538,6 +559,19 @@ One approval chain.
 | `mobile` | string \| null |  | Any Indian form. |
 | `address` | string \| null |  |  |
 | `gstin` | string \| null |  |  |
+
+**`OrderPayments`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `payable` | string | yes | The order total; 0 when cancelled. Less scheme benefits once schemes land. |
+| `received` | string | yes |  |
+| `balance` | string | yes |  |
+| `status` | `not_applicable` \| `unpaid` \| `part_paid` \| `paid` \| `overpaid` | yes |  |
+| `overdue` | boolean | yes |  |
+| `overdue_amount` | string | yes |  |
+| `schedule` | InstalmentOut[] | yes |  |
+| `receipts` | ReceiptOut[] | yes |  |
 
 **`OrderSeller`**
 
@@ -596,13 +630,6 @@ One approval chain.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 
-**`ProductRef`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `description` | string \| null | yes |  |
-
 **`Quality`**
 
 | Field | Type | Required | Notes |
@@ -628,6 +655,7 @@ One approval chain.
 | `raised_by` | UserRef \| null | yes |  |
 | `raised_at` | string | yes | The submit time, or when a quotation's approval was asked. |
 | `discount_pct` | string \| null |  | A quotation row: the effective discount asked for, in percent. Null on an order. |
+| `payment_status` | string \| null |  | An order row: not_applicable, unpaid, part_paid, paid or overpaid (FS-022), for the Accounts step. Null otherwise. |
 | `request_remark` | string \| null |  | Why the approval was asked, as the person asking wrote it. Show it beside the figures. Null when none was given. |
 
 **`QueuePage`**
@@ -738,6 +766,17 @@ One approval chain.
 | `id` | string | yes |  |
 | `quote_no` | string \| null | yes |  |
 | `version` | integer | yes |  |
+
+**`ReceiptOut`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `payment_id` | string | yes |  |
+| `received_on` | string | yes |  |
+| `mode` | `neft` \| `upi` \| `cheque` \| `cash` \| `adjustment` | yes |  |
+| `ref_no` | string \| null | yes |  |
+| `amount` | string | yes | What this receipt put on this order. |
+| `is_short_payment` | boolean | yes |  |
 
 **`Ref`**
 
@@ -874,6 +913,21 @@ One approval chain.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `version` | integer | yes |  |
+
+**`WarehouseRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+
+**`api__schemas__complaints__ProductRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `description` | string \| null | yes |  |
 
 **`api__schemas__leads__PartnerRef`**
 

@@ -53,7 +53,10 @@ from api.schemas.leads import (
     UserRef,
 )
 from api.schemas.quotations import PdfLink, QuotationLineIn, Totals
+from api.schemas.stock import WarehouseRef
 from api.services import approval_view, people, pricing
+from api.services import payments as payments_service
+from api.services import stock as stock_service
 from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor, _route
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
@@ -386,8 +389,10 @@ async def _approval(db: AsyncSession, order_id: str, portal: bool,
 async def _dispatches(db: AsyncSession, order_id: str, portal: bool = False
                       ) -> list[sch.Dispatch]:
     rows = (await db.execute(text(
-        "SELECT d.*, u.full_name, o.order_no::text AS order_no, o.party_name FROM dispatch d "
+        "SELECT d.*, u.full_name, o.order_no::text AS order_no, o.party_name, "
+        "w.code::text AS w_code, w.name AS w_name FROM dispatch d "
         "JOIN sales_order o ON o.id = d.sales_order_id "
+        "LEFT JOIN warehouse w ON w.id = d.warehouse_id "
         "LEFT JOIN app_user u ON u.id = d.dispatched_by "
         "WHERE d.sales_order_id = CAST(:o AS uuid) ORDER BY d.created_at, d.dispatch_no"),
         {"o": order_id})).all()
@@ -426,6 +431,10 @@ def _dispatch_out(r: Any, lines: list[sch.DispatchLineOut], portal: bool = False
         dispatched_by=(None if portal
                        else (names or people.Names()).user(r.dispatched_by, r.full_name)),
         voided_at=_iso(r.voided_at), void_remark=None if portal else r.void_remark,
+        # a dealer sees no warehouse (FS-023 B-1); a staff reader without stock.view
+        # gets null from the join, which warehouse RLS hides
+        warehouse=(None if portal or getattr(r, "w_code", None) is None
+                   else WarehouseRef(id=str(r.warehouse_id), code=r.w_code, name=r.w_name)),
         lines=lines)
 
 
@@ -468,7 +477,23 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
     if r is None:
         raise NotFoundError("No such order.")
     portal = _is_portal(caller)
-    lines = [_line_out(x) for x in (await db.execute(text(_LINE_SELECT), {"o": order_id})).all()]
+    line_rows = (await db.execute(text(_LINE_SELECT), {"o": order_id})).all()
+    lines = [_line_out(x) for x in line_rows]
+    warehouse = None
+    if not portal and r.status_text not in ("dispatched", "closed_short", "cancelled"):
+        open_lines = [(str(x.id), str(x.product_id), Decimal(x.qty) - Decimal(x.sent))
+                      for x in line_rows if Decimal(x.qty) - Decimal(x.sent) > 0]
+        wid = None if r.warehouse_id is None else str(r.warehouse_id)
+        stock = await stock_service.order_lines(db, wid, open_lines,
+                                                committed=r.status_text != "draft")
+        for ln in lines:
+            ln.stock = stock.get(ln.id)
+    if not portal and r.warehouse_id is not None:
+        w = (await db.execute(text(
+            "SELECT code::text AS code, name FROM warehouse WHERE id = CAST(:w AS uuid)"),
+            {"w": str(r.warehouse_id)})).one_or_none()
+        warehouse = (None if w is None
+                     else WarehouseRef(id=str(r.warehouse_id), code=w.code, name=w.name))
     quotations = [sch.QuotationRef(id=str(q.id), quote_no=q.quote_no, version=q.version)
                   for q in (await db.execute(text(
                       "SELECT q.id, q.quote_no::text AS quote_no, q.version "
@@ -530,6 +555,8 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         cancel_remark=(r.cancel_remark if not portal or str(r.updated_by) == caller.user_id
                        else None),
         closed_at=_iso(r.closed_at), close_remark=None if portal else r.close_remark,
+        warehouse=warehouse,
+        payments=await payments_service.position(db, order_id),
         created_at=r.created_at.isoformat())
 
 
@@ -846,6 +873,7 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
     if _is_portal(caller) and body.partner_given and body.partner_id is None:
         raise ValidationFailed("A dealer's order is its own.", code="partner_required",
                                fields={"partner_id": "required"})
+    await stock_service.check_order_warehouse(db, caller, body.warehouse_id)
     warnings: list[str] = []
     sources: list[str | None] | None = None
     snaps: list[Any] | None = None
@@ -897,17 +925,19 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
                 party_address, party_gstin, delivery_address, owner_user_id, owner_org_unit_id,
                 territory_id, seller_gstin_id, place_of_supply_territory_id,
                 place_of_supply_state_id, intra_state, price_effective_date, payment_terms,
-                remarks, created_by, updated_by)
+                remarks, created_by, updated_by, warehouse_id)
             VALUES (CAST(:ty AS order_type), CAST(:lead AS uuid), CAST(:p AS uuid), :pn, :pm,
                 :pa, :pg, :da, CAST(:ou AS uuid), CAST(:oou AS uuid), CAST(:terr AS uuid),
                 CAST(:sg AS uuid), CAST(:pos AS uuid), CAST(:ps AS uuid), :intra, :day,
-                CAST(:pt AS order_payment_terms), :rem, CAST(:me AS uuid), CAST(:me AS uuid))
+                CAST(:pt AS order_payment_terms), :rem, CAST(:me AS uuid), CAST(:me AS uuid),
+                CAST(:wh AS uuid))
             RETURNING id"""),
             {"ty": body.order_type, "lead": lead_id, "p": ctx.partner_id if partner else None,
              **party, "da": body.delivery_address, "ou": owner, "oou": office,
              "terr": territory, "sg": ctx.seller_gstin_id, "pos": pos,
              "ps": ctx.place_of_supply_state_id, "intra": ctx.intra_state, "day": ctx.as_of,
-             "pt": body.payment_terms, "rem": body.remarks, "me": caller.user_id})).scalar_one())
+             "pt": body.payment_terms, "rem": body.remarks, "me": caller.user_id,
+             "wh": body.warehouse_id})).scalar_one())
     except DBAPIError as exc:
         raise map_db_error(exc) from exc
     await _write_lines(db, order_id, ctx, snaps, sources)
@@ -951,6 +981,7 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
     if _is_portal(caller) and body.partner_given and body.partner_id is None:
         raise ValidationFailed("A dealer's order is its own.", code="partner_required",
                                fields={"partner_id": "required"})
+    await stock_service.check_order_warehouse(db, caller, body.warehouse_id)
     stored = await _stored(db, order_id)
     ctx = await _price(db, partner_id=partner, pos=pos, seller=seller, as_of=day,
                        specs=_specs(stored), existing=True)
@@ -965,10 +996,13 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
         sets["pt"] = body.payment_terms
     if "remarks" in body.model_fields_set:
         sets["rem"] = body.remarks
+    if "warehouse_id" in body.model_fields_set:
+        sets["wh"] = body.warehouse_id
     columns = {"order_type": "order_type = CAST(:order_type AS order_type)",
                "pn": "party_name = :pn", "pm": "party_mobile = :pm", "pa": "party_address = :pa",
                "pg": "party_gstin = :pg", "da": "delivery_address = :da",
-               "pt": "payment_terms = CAST(:pt AS order_payment_terms)", "rem": "remarks = :rem"}
+               "pt": "payment_terms = CAST(:pt AS order_payment_terms)", "rem": "remarks = :rem",
+               "wh": "warehouse_id = CAST(:wh AS uuid)"}
     assignments = [columns[k] for k in sets] + [
         "partner_id = CAST(:p AS uuid)", "place_of_supply_territory_id = CAST(:pos AS uuid)",
         "updated_by = CAST(:me AS uuid)"]
@@ -1075,6 +1109,7 @@ async def record_dispatch(db: AsyncSession, caller: Caller, order_id: str,
         "dc_no": body.dc_no, "dc_date": _iso(body.dc_date), "invoice_no": body.invoice_no,
         "invoice_date": _iso(body.invoice_date), "dispatched_at": sent_at.isoformat(),
         "transporter": body.transporter, "vehicle_no": body.vehicle_no,
+        "warehouse_id": body.warehouse_id,
         "lines": [{"order_line_id": ln.order_line_id, "qty": str(ln.qty)} for ln in body.lines],
     }
     dispatch_id = await _call(db, "SELECT dispatch_record(CAST(:o AS uuid), CAST(:p AS jsonb))",
@@ -1129,8 +1164,10 @@ async def list_dispatches(db: AsyncSession, caller: Caller, *, order_id: str | N
     if cursor:
         before_at, before_id = _decode_cursor(cursor)
     rows = (await db.execute(text(
-        "SELECT d.*, u.full_name, o.order_no::text AS order_no, o.party_name "
+        "SELECT d.*, u.full_name, o.order_no::text AS order_no, o.party_name, "
+        "w.code::text AS w_code, w.name AS w_name "
         "FROM dispatch d JOIN sales_order o ON o.id = d.sales_order_id "
+        "LEFT JOIN warehouse w ON w.id = d.warehouse_id "
         "LEFT JOIN app_user u ON u.id = d.dispatched_by "
         "WHERE (CAST(:o AS uuid) IS NULL OR d.sales_order_id = CAST(:o AS uuid)) "
         "AND (CAST(:p AS uuid) IS NULL OR o.partner_id = CAST(:p AS uuid)) "
