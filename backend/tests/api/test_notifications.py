@@ -206,3 +206,73 @@ async def test_a_discount_request_reaches_its_approver_and_the_answer_comes_back
     assert r.status_code == 200, r.text
     kinds = [n["kind"] for n in _about(await _bell(client, fo), q["id"])]
     assert "discount_returned" in kinds, kinds
+
+
+# ── ISS-108: a decided step clears its bell, and says what was decided ──────
+
+def _unread(page: dict, resource_id: str) -> list[dict]:
+    return [n for n in _about(page, resource_id) if n["read_at"] is None]
+
+
+async def test_an_approve_clears_the_deciders_bell_and_the_next_step_stays_unread(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    fo = await endpoints._as(client, shop, "field_officer")
+    order = await endpoints._submit(client, fo, (await endpoints._create(client, fo, endpoints._direct(shop)))["id"])
+    dm = await endpoints._as(client, shop, "district_manager")
+    assert len(_unread(await _bell(client, dm), order["id"])) == 1
+    assert (await endpoints._decide(client, dm, order["approval"]["steps"][0]["id"])).status_code == 200
+    (done,) = _about(await _bell(client, dm), order["id"])
+    assert done["read_at"] is not None, "the decided step no longer waits"
+    accounts = await endpoints._as(client, shop, "account_manager")
+    (waiting,) = _about(await _bell(client, accounts), order["id"])
+    assert waiting["read_at"] is None, "settling ran before the next step was told"
+
+
+async def test_a_rejected_order_clears_the_bell_and_reads_not_approved(client: httpx.AsyncClient, shop: Shop) -> None:
+    fo = await endpoints._as(client, shop, "field_officer")
+    order = await endpoints._submit(client, fo, (await endpoints._create(client, fo, endpoints._direct(shop)))["id"])
+    dm = await endpoints._as(client, shop, "district_manager")
+    r = await endpoints._decide(client, dm, order["approval"]["steps"][0]["id"], "reject", "Rate too low")
+    assert r.status_code == 200, r.text
+    assert _unread(await _bell(client, dm), order["id"]) == []
+    (back,) = _about(await _bell(client, fo), order["id"])
+    assert back["kind"] == "order_returned", "the kind code is unchanged for the frontend"
+    assert back["title"].endswith(" was not approved"), back["title"]
+
+
+async def test_a_cancelled_order_clears_its_approvers_bell(client: httpx.AsyncClient, shop: Shop) -> None:
+    fo = await endpoints._as(client, shop, "field_officer")
+    order = await endpoints._submit(client, fo, (await endpoints._create(client, fo, endpoints._direct(shop)))["id"])
+    dm = await endpoints._as(client, shop, "district_manager")
+    assert len(_unread(await _bell(client, dm), order["id"])) == 1
+    r = await client.post(f"{V1}/orders/{order['id']}/cancel", json={"remark": "Wrong lead"}, headers={**fo, **_key()})
+    assert r.status_code == 200, r.text
+    assert _unread(await _bell(client, dm), order["id"]) == [], "nobody is waited on after a cancel"
+
+
+async def test_a_discount_names_its_percent_and_an_edit_clears_the_request(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    from tests.api import test_quotation_approval as qa
+    fo = await endpoints._as(client, shop, "field_officer")
+    dm = await endpoints._as(client, shop, "district_manager")
+    q = await qa._draft(client, shop, fo, "8")
+    assert (await qa._ask(client, fo, q["id"])).status_code == 200
+    (waiting,) = _about(await _bell(client, dm), q["id"])
+    assert waiting["title"].startswith("Discount of 8% on "), waiting["title"]
+    lines = [{"product_id": shop.product, "qty": "25", "discount_pct": "8"}]
+    r = await client.put(f"{V1}/quotations/{q['id']}/lines", json={"lines": lines}, headers={**fo, **_key()})
+    assert r.status_code == 200 and r.json()["data"]["approval"]["status"] == "cancelled", r.text
+    assert _unread(await _bell(client, dm), q["id"]) == [], "an edit cancelled the request"
+
+
+async def test_a_rejected_discount_reads_not_approved_with_its_percent(client: httpx.AsyncClient, shop: Shop) -> None:
+    from tests.api import test_quotation_approval as qa
+    fo = await endpoints._as(client, shop, "field_officer")
+    q = await qa._draft(client, shop, fo, "12.5")
+    step = (await qa._ask(client, fo, q["id"])).json()["data"]["approval"]["steps"][0]
+    decider = await endpoints._as(client, shop, step["role"])
+    r = await endpoints._decide(client, decider, step["id"], "reject", "Too deep")
+    assert r.status_code == 200, r.text
+    assert _unread(await _bell(client, decider), q["id"]) == []
+    (back,) = [n for n in _about(await _bell(client, fo), q["id"]) if n["kind"] == "discount_returned"]
+    assert back["title"].startswith("Discount of 12.5% on ") and back["title"].endswith(" was not approved"), back["title"]

@@ -80,11 +80,16 @@ class ElevenZaProvider:
             values, button = template_values(msg.template_key, msg.payload)
         except UnknownTemplateError as exc:
             return ProviderResult(Outcome.PERMANENT, None, f"unknown template: {exc}")
+        name = provider_template(msg.template_key, self._settings, msg.payload)
+        if name is None:
+            # an unset template name is a dead letter here, never a send with a null
+            # name whose outcome depends on how the provider words its refusal (GAP-110)
+            return ProviderResult(Outcome.PERMANENT, None, "template not configured")
         token = self._token()
         body: dict[str, Any] = {
             "authToken": token,
             "sendto": sendto,
-            "templateName": provider_template(msg.template_key, self._settings, msg.payload),
+            "templateName": name,
             "language": self._settings.whatsapp_template_language,
             "data": values,
             "tags": msg.reference,

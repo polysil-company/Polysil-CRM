@@ -33,9 +33,9 @@ from api.domain.complaints import MAX_UPLOAD_BYTES
 
 # the file itself may be up to 10 MB; the multipart framing around it is not
 BODY_LIMIT = MAX_UPLOAD_BYTES + 64 * 1024
-# complaint attachments (FS-015) and subsidy documents (FS-009)
+# complaint attachments (FS-015), subsidy documents (FS-009) and visit photos (FS-021)
 _PATH = re.compile(
-    r"^/api/v1/(complaints/[^/]+/attachments|subsidy-applications/[^/]+/documents)/?$")
+    r"^/api/v1/(complaints/[^/]+/attachments|subsidy-applications/[^/]+/documents|visits/[^/]+/photos)/?$")
 _BODY = {"error": {"code": "attachment_too_large", "message": "Up to 10 MB."}}
 
 

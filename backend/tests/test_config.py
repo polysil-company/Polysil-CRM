@@ -43,6 +43,12 @@ def test_direct_connection_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
         _settings(monkeypatch, DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:5432/appdb")
 
 
+def test_second_pgbouncer_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """pgbouncer-b on 6433 serves a parallel worktree's database copy."""
+    s = _settings(monkeypatch, DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:6433/appdb_b")
+    assert s.environment == "local"
+
+
 def test_direct_connection_escape_hatch(monkeypatch: pytest.MonkeyPatch) -> None:
     """Throwaway test databases need it; nothing else may use it."""
     monkeypatch.setenv("POLYSIL_ALLOW_DIRECT_DB", "1")

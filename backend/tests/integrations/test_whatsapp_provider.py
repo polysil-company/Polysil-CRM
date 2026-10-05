@@ -20,6 +20,7 @@ from api.config import Settings
 from api.integrations.messages import (
     TEMPLATE_AUTH_OTP,
     TEMPLATE_LEAD_ACK,
+    TEMPLATE_QUOTATION_SHARE,
     TEMPLATES,
     render,
     template_values,
@@ -514,3 +515,17 @@ async def test_the_check_reads_the_live_shape_in_our_language() -> None:
     async with httpx.AsyncClient(transport=httpx.MockTransport(_live_listing(docs))) as c:
         problems = await check_templates(ElevenZaProvider(settings, c), settings)
     assert problems == ["auth.otp: template 'polysil_auth_otp' is not on the account"], problems
+
+
+async def test_an_unset_template_name_is_a_dead_letter_and_sends_nothing() -> None:
+    """PR 11 review: with the quotation share template unset (GAP-110), the send went
+    out with a null name and its outcome depended on the provider's wording."""
+    share = OutboundMessage(channel="whatsapp", recipient="919876543210",
+                            template_key=TEMPLATE_QUOTATION_SHARE,
+                            payload={"party_name": "Ram", "quote_no": "QT/GJ/2026-27/00001",
+                                     "link": "https://example.test/q/abc"},
+                            reference="row-3")
+    result, seen = await _send(lambda r: _json(200, {"IsSuccess": True}), share,
+                               whatsapp_template_quotation_share=None)
+    assert result.outcome is Outcome.PERMANENT and result.error == "template not configured"
+    assert seen == [], "no request reaches the provider"

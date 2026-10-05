@@ -89,6 +89,35 @@ services:
       timeout: 3s
       retries: 10
 
+  # ── A second PgBouncer for a parallel worktree, routing only appdb_b ──
+  # Two sessions migrate separate copies of the database, so neither alembic
+  # chain sees the other's revisions. Same transaction mode as above; only the
+  # database and the port differ. Bring the stack up from the main checkout:
+  # `pgbouncer` above takes DB_NAME from the .env of whoever runs compose.
+  pgbouncer-b:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${DB_HOST:-db-tunnel}
+      DB_PORT: 5432
+      LISTEN_PORT: 6433
+      LISTEN_ADDR: 0.0.0.0
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: appdb_b
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 25
+      AUTH_TYPE: scram-sha-256
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits,options
+    ports:
+      - "127.0.0.1:6433:6433"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 6433 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped

@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.authz.modules import SPECS
 from api.authz.policy_sql import guard_sql
+from tests.db import test_migration_013 as m13
+from tests.db import test_migration_018 as m18
 from tests.db.migration_grants import _load
 
 pytestmark = [pytest.mark.db]
@@ -67,17 +69,23 @@ async def test_no_body_or_policy_keeps_the_exact_territory_partner_rule(db: Asyn
 
 async def test_a_dealer_on_no_visible_document_gets_no_tier(db: AsyncSession) -> None:
     """As a staff caller who sees no documents, the definer says nothing about a
-    dealer that IS on documents: no tier and no yes, so it cannot be used to probe."""
-    dealer = (await db.execute(text(
-        "SELECT l.assigned_partner_id FROM lead l "
-        "JOIN channel_partner cp ON cp.id = l.assigned_partner_id "
-        "WHERE cp.deleted_at IS NULL LIMIT 1"))).scalar_one_or_none()
-    if dealer is None:
-        pytest.skip("no dealer on this database")
-    await db.execute(text("SELECT set_config('app.current_user_id', :u, true)"),
-                     {"u": str(uuid.uuid4())})
-    await db.execute(text("SET LOCAL ROLE app_role"))
-    row = (await db.execute(text(
-        "SELECT partner_on_visible_document(CAST(:p AS uuid)) AS seen, "
-        "document_partner_tier(CAST(:p AS uuid)) AS tier"), {"p": str(dealer)})).one()
+    dealer that IS on documents: no tier and no yes, so it cannot be used to probe.
+    Built here, so it runs on an empty database too (PR 11 review: it skipped on CI)."""
+    w = await m18._world(db)
+    await db.execute(text(
+        "INSERT INTO lead (inquiry_no, inquiry_type, mis_system_id, lead_source_id, farmer_name, "
+        "mobile, territory_id, owner_user_id, owner_org_unit_id, assigned_partner_id, created_by) "
+        "VALUES (:no, 'commercial', (SELECT id FROM mis_system WHERE code = 'drip'), "
+        "(SELECT id FROM lead_source WHERE code = 'employee'), 'Farmer', :mob, CAST(:t AS uuid), "
+        "CAST(:o AS uuid), CAST(:ou AS uuid), CAST(:p AS uuid), CAST(:o AS uuid))"),
+        {"no": f"M28-{uuid.uuid4().hex[:10]}", "mob": "+9196" + f"{uuid.uuid4().int % 10**8:08d}",
+         "t": w.district, "o": w.officer, "ou": w.a, "p": w.partner})
+    probe = ("SELECT partner_on_visible_document(CAST(:p AS uuid)) AS seen, "
+             "document_partner_tier(CAST(:p AS uuid)) AS tier")
+    await m13._as(db, w.officer)                 # the positive control: the lead's own officer
+    assert (await db.execute(text(probe), {"p": w.partner})).one().seen is True
+    await m13._as_owner(db)
+    await m13._as(db, w.officer_b)               # a real officer in the other office
+    row = (await db.execute(text(probe), {"p": w.partner})).one()
+    await m13._as_owner(db)
     assert row.seen is False and row.tier is None

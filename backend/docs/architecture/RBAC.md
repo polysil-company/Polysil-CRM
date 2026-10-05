@@ -527,6 +527,8 @@ Kept as the regression list. Each is a named test in `tests/rbac/`.
 
 ### 5.5 Reports — materialized views do not inherit RLS
 
+> **Live form, 4 Oct (ADR-047, FS-024).** Reports today are live aggregates, not materialized views. Their three rules: the module's scope predicate on every ScopeSpec table the query reads, with RLS beneath (six hand-policy tables are RLS-only, ISS-111); a figure without its module is null, never 0; and a cross-office leakage test per report and per export. The materialized-view form below applies when one is introduced.
+
 Reading a materialized view returns stored rows; it does **not** re-run the source query under the reader's policies. Without this every report is a company-wide aggregate readable by anyone who can reach it.
 
 ```sql
@@ -568,7 +570,7 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | sales_orders | V:own CE | V:org CEA | V:org CEAD | V:org A | V:global CEAD | V:global CEAD |
 | dispatch | V:own | V:org | V:org | V:org | V:global CE | V:global CE |
 | complaints | V:own CE | V:org CEA | V:org CEAD | V:org A | V:global CEAD | V:global CEAD |
-| payments | | V:org | V:org E | V:org | V:global CEAD | V:global CEAD |
+| payments | | V:org | V:org | V:org | V:global CEAD | V:global CEAD |
 | subsidy | V:own CE | V:org CE | V:org CE | V:org | V:global CEAD | V:global CEAD |
 | schemes | V:global | V:global | V:global | V:global | V:global CEAD | V:global CEAD |
 | products | V:global | V:global | V:global | V:global | V:global CEAD | V:global CEAD |
@@ -581,6 +583,9 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | chat | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
 | users | | V:org | V:org | V:org | V:global CEAD | V:global CEAD |
 | masters | | | | | V:global CEAD | V:global CEAD |
+| tracking | V:own CE | V:org CE | V:org CE | V:org CE | V:global CE | V:global CE |
+| stock | V:global | V:global | V:global | V:global | V:global CE | V:global CE |
+| targets | V:own | V:org C | V:org C | V:org C | V:global C | V:global C |
 
 *V = view · C = create · E = edit · A = approve · D = delete*
 
@@ -601,6 +606,7 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | users | V:global | V:global | | V:global | V:global | V:global |
 | tasks | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
 | chat | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
+| stock | V:global | V:global C | V:global | V:global | V:global | V:global |
 
 State Co-ordinators own subsidy stage entry (ADR-030), scoped by `user_territory`.
 
@@ -628,7 +634,6 @@ Scope is `partner_subtree` throughout, served by the partner permissive branch (
 | schemes | V *(applicable only)* | V | V |
 | marketing_material | V C | V C | V C |
 | rewards | V + redeem | V + redeem | V + redeem |
-| stock | V | V | V |
 | reports | V *(own subtree)* | V | V |
 
 > **Pricing visibility across tiers is a hard rule, not a UI choice.** A sub-dealer must never resolve dealer pricing, and a dealer must never see distributor pricing. Enforced by a restrictive policy on `price_list` keyed to the user's own `partner_type`.
@@ -639,13 +644,15 @@ Scope is `partner_subtree` throughout, served by the partner permissive branch (
 
 `view` on everything at `global`. No create, edit, approve or delete anywhere.
 
+**Except:** `tracking`, `stock`. Staff locations are not board information (FS-021, GAP-195); company stock is an operational figure the board reads in reports (FS-023).
+
 ---
 
 ## 7. Generated tests
 
 `tests/db/test_matrix_005.py` enumerates the cells from this file, through `api/domain/authz.py:parse_matrix()`, the same parser that seeds `role_permission`. Never hand-edited; a cell changed here changes the seed and the assertions together.
 
-**16 roles × 20 modules × 5 actions = 1,600 assertions** (ISS-031: an earlier count of 18 modules and 1,440 missed `campaigns` and `stock`), and the negatives matter more than the positives:
+**16 roles × 22 modules × 5 actions = 1,760 assertions** (ISS-031: an earlier count of 18 modules and 1,440 missed `campaigns` and `stock`; FS-021 added `tracking`, FS-025 `targets`), and the negatives matter more than the positives:
 
 | Class | Assertion |
 |---|---|

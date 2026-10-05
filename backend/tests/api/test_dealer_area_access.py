@@ -274,13 +274,17 @@ async def test_a_dealer_from_outside_the_area_prices_through_the_lead(
 async def test_a_dealer_caller_still_prices_only_as_itself(
         client: httpx.AsyncClient, shop: Shop, area: Area,  # noqa: F811
         sessions: Callable[[], AsyncSession]) -> None:
-    from tests.api.test_complaints import _dealer
-    h, _ = await _dealer(client, shop, sessions)
-    r = await client.post(f"{V1}/pricing/quote-lines", headers=h, json={
-        "place_of_supply_territory_id": shop.district, "partner_id": area.far_dealer, "as_of": AS_OF,
-        "seller_gstin_id": shop.seller,
-        "lines": [{"product_id": shop.product, "qty": "1"}]})
-    assert r.status_code == 422 and "partner_id" in r.json()["error"]["fields"], r.text
+    from tests.api.test_complaints import _dealer, _forget
+    h, mobile = await _dealer(client, shop, sessions)
+    try:
+        r = await client.post(f"{V1}/pricing/quote-lines", headers=h, json={
+            "place_of_supply_territory_id": shop.district, "partner_id": area.far_dealer, "as_of": AS_OF,
+            "seller_gstin_id": shop.seller,
+            "lines": [{"product_id": shop.product, "qty": "1"}]})
+        assert r.status_code == 422 and "partner_id" in r.json()["error"]["fields"], r.text
+    finally:
+        # the sign-in code row would otherwise wait in the outbox for a live worker (PR 11 review)
+        await _forget(sessions, mobile)
 
 
 # ── the area filter ──────────────────────────────────────────────────────────
