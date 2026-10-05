@@ -43,11 +43,10 @@ may not see is null.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | Successful Response |
+| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
-| `501` | `ErrorResponse` | `export_not_ready`: Excel is not available yet. |
 
 ---
 
@@ -66,18 +65,17 @@ breaches, and refunds paid.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | xlsx answers 501 until exports land. |
+| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 | `group_by` | query | `type` \| `status` \| `severity` |  |  |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | Successful Response |
+| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
-| `501` | `ErrorResponse` | `export_not_ready`: Excel is not available yet. |
 
 ---
 
@@ -95,17 +93,16 @@ the all-time received and balance.
 | `from` | query | date \| null |  | IST date, inclusive. Default: 30 days before `to`. |
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
-| `format` | query | `json` \| `xlsx` |  | xlsx answers 501 until exports land. |
+| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | Successful Response |
+| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
-| `501` | `ErrorResponse` | `export_not_ready`: Excel is not available yet. |
 
 ---
 
@@ -120,17 +117,16 @@ Open tasks per person, as of now: due today and overdue by age. Staff only.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | xlsx answers 501 until exports land. |
+| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | Successful Response |
+| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
-| `501` | `ErrorResponse` | `export_not_ready`: Excel is not available yet. |
 
 ---
 
@@ -149,18 +145,17 @@ each stage, won, lost and are open, and the conversion rate.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | xlsx answers 501 until exports land. |
+| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 | `group_by` | query | `source` \| `owner` \| `territory` |  |  |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | Successful Response |
+| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
-| `501` | `ErrorResponse` | `export_not_ready`: Excel is not available yet. |
 
 ---
 
@@ -179,18 +174,17 @@ stage they dropped off at.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | xlsx answers 501 until exports land. |
+| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 | `group_by` | query | `reason` \| `owner` |  |  |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | Successful Response |
+| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
-| `501` | `ErrorResponse` | `export_not_ready`: Excel is not available yet. |
 
 ---
 
@@ -209,17 +203,16 @@ and overdue. A figure you may not see is null. Staff only.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | xlsx answers 501 until exports land. |
+| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | Successful Response |
+| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
-| `501` | `ErrorResponse` | `export_not_ready`: Excel is not available yet. |
 
 ---
 
@@ -236,18 +229,17 @@ Per district or taluka: leads, won, conversion, orders and value. Staff only.
 | `from` | query | date \| null |  | IST date, inclusive. Default: 30 days before `to`. |
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
-| `format` | query | `json` \| `xlsx` |  | xlsx answers 501 until exports land. |
+| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 | `level` | query | `district` \| `taluka` |  |  |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | Successful Response |
+| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
-| `501` | `ErrorResponse` | `export_not_ready`: Excel is not available yet. |
 
 ---
 
