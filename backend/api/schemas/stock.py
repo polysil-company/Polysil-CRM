@@ -73,7 +73,7 @@ class MovementsOut(BaseModel):
     movements: list[MovementOut]
 
 
-class ProductRef(BaseModel):
+class StockProductRef(BaseModel):
     id: str
     code: str | None
     name: str
@@ -81,7 +81,7 @@ class ProductRef(BaseModel):
 
 class StockRow(BaseModel):
     warehouse: WarehouseRef
-    product: ProductRef
+    product: StockProductRef
     on_hand: str
     committed: str = Field(description="What submitted, approved and partly dispatched orders for this warehouse still owe.")
     available: str = Field(description="On hand less committed. Negative is short.")
@@ -107,7 +107,7 @@ class Availability(BaseModel):
 class LedgerMovement(BaseModel):
     id: str
     warehouse: WarehouseRef
-    product: ProductRef
+    product: StockProductRef
     qty: str
     kind: Literal["receipt", "adjustment", "dispatch", "dispatch_void"]
     reference: str | None

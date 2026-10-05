@@ -312,7 +312,7 @@ the default before deactivating this one.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `warehouse` | WarehouseRef | yes |  |
-| `product` | api__schemas__stock__ProductRef | yes |  |
+| `product` | StockProductRef | yes |  |
 | `qty` | string | yes |  |
 | `kind` | `receipt` \| `adjustment` \| `dispatch` \| `dispatch_void` | yes |  |
 | `reference` | string \| null | yes |  |
@@ -377,12 +377,20 @@ the default before deactivating this one.
 | `data` | StockRow[] | yes |  |
 | `meta` | PageMeta | yes |  |
 
+**`StockProductRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string \| null | yes |  |
+| `name` | string | yes |  |
+
 **`StockRow`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `warehouse` | WarehouseRef | yes |  |
-| `product` | api__schemas__stock__ProductRef | yes |  |
+| `product` | StockProductRef | yes |  |
 | `on_hand` | string | yes |  |
 | `committed` | string | yes | What submitted, approved and partly dispatched orders for this warehouse still owe. |
 | `available` | string | yes | On hand less committed. Negative is short. |
@@ -432,12 +440,4 @@ the default before deactivating this one.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `code` | string | yes |  |
-| `name` | string | yes |  |
-
-**`api__schemas__stock__ProductRef`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `code` | string \| null | yes |  |
 | `name` | string | yes |  |

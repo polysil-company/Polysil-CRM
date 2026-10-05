@@ -992,7 +992,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `product` | api__schemas__complaints__ProductRef | yes |  |
+| `product` | ProductRef | yes |  |
 | `uom` | string \| null | yes |  |
 | `supplied_qty` | string | yes |  |
 | `defective_qty` | string | yes |  |
@@ -1034,6 +1034,13 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `hidden` | boolean |  | True when you can no longer see it: show 'not visible'. The other fields are then null. Default `False`. |
 | `name` | string \| null |  |  |
 | `partner_type` | string \| null |  | dealer or distributor. |
+
+**`ProductRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `description` | string \| null | yes |  |
 
 **`QcIn`**
 
@@ -1216,10 +1223,3 @@ The complaint's events, newest first. A dealer never sees who decided.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `lines` | LineIn[] | yes |  |
-
-**`api__schemas__complaints__ProductRef`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `description` | string \| null | yes |  |

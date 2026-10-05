@@ -419,7 +419,7 @@ One approval chain.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `product` | api__schemas__complaints__ProductRef | yes |  |
+| `product` | ProductRef | yes |  |
 | `uom` | string \| null | yes |  |
 | `supplied_qty` | string | yes |  |
 | `defective_qty` | string | yes |  |
@@ -629,6 +629,13 @@ One approval chain.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
+
+**`ProductRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `description` | string \| null | yes |  |
 
 **`Quality`**
 
@@ -921,13 +928,6 @@ One approval chain.
 | `id` | string | yes |  |
 | `code` | string | yes |  |
 | `name` | string | yes |  |
-
-**`api__schemas__complaints__ProductRef`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `description` | string \| null | yes |  |
 
 **`api__schemas__leads__PartnerRef`**
 

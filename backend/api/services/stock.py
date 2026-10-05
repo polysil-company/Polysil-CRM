@@ -200,7 +200,7 @@ async def movements(db: AsyncSession, *, warehouse_id: str | None, product_id: s
     next_cursor = _encode_cursor(page[-1].created_at, str(page[-1].id)) if len(rows) > limit else None
     return sch.MovementPage(data=[sch.LedgerMovement(
         id=str(r.id), warehouse=sch.WarehouseRef(id=str(r.warehouse_id), code=str(r.w_code), name=r.w_name),
-        product=sch.ProductRef(id=str(r.product_id), code=None if r.item_code is None else str(r.item_code),
+        product=sch.StockProductRef(id=str(r.product_id), code=None if r.item_code is None else str(r.item_code),
                                name=str(r.description)),
         qty=_qty(r.qty), kind=r.kind_text, reference=r.reference, note=r.note, dispatch_no=r.dispatch_no,
         order=r.order_no, created_by=None if r.created_by is None else UserRef(id=str(r.created_by), full_name=r.full_name or ""),
@@ -239,7 +239,7 @@ async def stock_list(db: AsyncSession, *, warehouse_id: str | None, product_id: 
     next_cursor = str(params["off"] + limit) if len(rows) > limit else None
     return sch.StockPage(data=[sch.StockRow(
         warehouse=sch.WarehouseRef(id=str(r.warehouse_id), code=str(r.w_code), name=r.w_name),
-        product=sch.ProductRef(id=str(r.product_id), code=None if r.item_code is None else str(r.item_code),
+        product=sch.StockProductRef(id=str(r.product_id), code=None if r.item_code is None else str(r.item_code),
                                name=str(r.description)),
         on_hand=_qty(Decimal(r.on_hand)), committed=_qty(Decimal(r.committed)),
         available=_qty(Decimal(r.on_hand) - Decimal(r.committed)), uom=str(r.uom)) for r in page],
