@@ -29,7 +29,13 @@ TRANSITIONS: dict[str, frozenset[str]] = {
     # and the flowchart's straight line would otherwise force a fake stage (FS-005 3)
     "quoted": frozenset({"negotiation", "won", "lost"}),
     "negotiation": frozenset({"won", "lost"}),
+    # the worker parks a lead here; a person closes it as lost, or reopens it (FS-035)
+    "dormant": frozenset({"lost"}),
 }
+
+# Stages a lead leaves through POST /leads/{id}/reopen: lost returns to the stage it
+# was lost from, dormant to the stage it was swept from (FS-035 rule 10).
+REOPENABLE: frozenset[str] = frozenset({"lost", "dormant"})
 
 # won, lost and merged accept no transition and no edit; a lost lead is reopened.
 TERMINAL: frozenset[str] = frozenset({"won", "lost", "merged"})

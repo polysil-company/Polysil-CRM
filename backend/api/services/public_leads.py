@@ -11,6 +11,7 @@ The staff half manages the printed codes under the caller's leads scope.
 
 from __future__ import annotations
 
+import json
 import secrets
 from datetime import datetime
 from typing import Any
@@ -257,6 +258,74 @@ async def create_qr(db: AsyncSession, caller: Caller, body: sch.QrCodeCreate) ->
     raise RuntimeError("no free QR code after five tries")
 
 
-async def list_qr(db: AsyncSession) -> sch.QrCodeList:
-    rows = (await db.execute(text(_QR_SELECT + " ORDER BY q.created_at DESC LIMIT 500"))).all()
+async def list_qr(db: AsyncSession, active: bool | None = None) -> sch.QrCodeList:
+    rows = (await db.execute(text(
+        _QR_SELECT + " WHERE (CAST(:a AS boolean) IS NULL OR q.is_active = CAST(:a AS boolean))"
+        " ORDER BY q.created_at DESC LIMIT 500"), {"a": active})).all()
     return sch.QrCodeList(data=[_qr_out(r) for r in rows])
+
+
+async def patch_qr(db: AsyncSession, caller: Caller, qr_id: str,
+                   body: sch.QrCodePatch) -> sch.QrCode:
+    """Change a code's label, campaign, partner or territory, or switch it off
+    (FS-035). The checks are create's; the row is locked under the UPDATE policy,
+    so a code outside the caller's scope is a 404."""
+    if caller.org_unit_id is None:
+        raise ValidationFailed("Only staff edit QR codes.", fields={"body": "staff only"})
+    fields = body.model_fields_set
+    if not fields:
+        raise ValidationFailed(fields={"body": "nothing to change"})
+    for f in ("label", "is_active"):
+        if f in fields and getattr(body, f) is None:
+            raise ValidationFailed(fields={f: "cannot be cleared"})
+    row = (await db.execute(text(
+        "SELECT label, campaign, partner_id, territory_id, is_active FROM lead_qr_code "
+        "WHERE id = CAST(:i AS uuid) FOR UPDATE"), {"i": qr_id})).one_or_none()
+    if row is None:
+        raise NotFoundError("No such QR code.")
+    old: dict[str, Any] = {
+        "label": row.label, "campaign": row.campaign,
+        "partner_id": str(row.partner_id) if row.partner_id else None,
+        "territory_id": str(row.territory_id) if row.territory_id else None,
+        "is_active": row.is_active}
+    new = {**old, **{f: getattr(body, f) for f in fields}}
+    changed = {f: new[f] for f in fields if new[f] != old[f]}
+    if not changed:
+        return await _qr_one(db, qr_id)
+    if "partner_id" in changed and new["partner_id"] is not None:
+        # create's check (FS-003a code review F-2): read under the caller's policies
+        seen = (await db.execute(text(
+            "SELECT 1 FROM channel_partner WHERE id = CAST(:p AS uuid) AND is_active "
+            "AND deleted_at IS NULL"), {"p": new["partner_id"]})).one_or_none()
+        if seen is None:
+            raise ValidationFailed(fields={"partner_id": "not found"})
+    if "territory_id" in changed and new["territory_id"] is not None:
+        await lead_service.check_lead_territory(db, str(new["territory_id"]))
+    if caller.scopes.get("leads") == "territory":
+        # the policy's WITH CHECK, asked first so the answer is a 422 (FS-035 rule 15)
+        mine = new["territory_id"] is not None and bool((await db.execute(text(
+            "SELECT 1 FROM territory_closure tc JOIN user_territory ut "
+            "ON ut.territory_id = tc.ancestor_id "
+            "WHERE ut.user_id = CAST(:u AS uuid) AND tc.descendant_id = CAST(:t AS uuid)"),
+            {"u": caller.user_id, "t": new["territory_id"]})).first())
+        if not mine:
+            raise ValidationFailed(fields={"territory_id": "choose a territory in your area"})
+    await db.execute(text(
+        "UPDATE lead_qr_code SET label = :l, campaign = :c, partner_id = CAST(:p AS uuid), "
+        "territory_id = CAST(:t AS uuid), is_active = :a, updated_by = CAST(:me AS uuid) "
+        "WHERE id = CAST(:i AS uuid)"),
+        {"l": new["label"], "c": new["campaign"], "p": new["partner_id"],
+         "t": new["territory_id"], "a": new["is_active"], "me": caller.user_id, "i": qr_id})
+    # CLAUDE.md 4.1 rule 7, in the same transaction
+    await db.execute(text(
+        "INSERT INTO activity_event (entity_type, entity_id, kind, actor_id, payload) "
+        "VALUES ('lead_qr_code', CAST(:i AS uuid), 'lead_qr_code.updated', CAST(:me AS uuid), "
+        "CAST(:p AS jsonb))"),
+        {"i": qr_id, "me": caller.user_id, "p": json.dumps({"changed": changed})})
+    return await _qr_one(db, qr_id)
+
+
+async def _qr_one(db: AsyncSession, qr_id: str) -> sch.QrCode:
+    row = (await db.execute(text(_QR_SELECT + " WHERE q.id = CAST(:i AS uuid)"),
+                            {"i": qr_id})).one()
+    return _qr_out(row)

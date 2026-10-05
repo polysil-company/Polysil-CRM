@@ -450,8 +450,8 @@ def f_lead() -> None:
               "An unknown or closed QR code: a plain website lead.",
               w=460, colour=YELLOW)
     e += note("nGrey1", 300, y + 20,
-              "Not here: inbound WhatsApp as a source (11za webhook settings),\n"
-              "editing or switching off a QR code, dealership enquiries (GAP-135).",
+              "Not here: inbound WhatsApp as a source (GAP-337, question 3a.1),\n"
+              "dealership enquiries (GAP-135). Editing a QR code: canvas 46.",
               w=560, colour=GREY)
     write("04-lead-capture", e)
 
@@ -1888,6 +1888,23 @@ def f_subsidy_follow_ups() -> None:
          ("n2", "Not yet: printed GGRC quotations and consent letters\n(GAP-331, GAP-333).", YELLOW)])
 
 
+def f_lead_small_gaps() -> None:
+    _columns(
+        "46-lead-small-gaps", "Lead small gaps: QR edit, dormant leads, the office on assign",
+        "Three pieces FS-003 and FS-003a left open.",
+        "BUILT. FS-035: PATCH /lead-qr-codes/{id}, the nightly sweep, migration 040.",
+        [("s1", "nightly 00:30 IST: lead_dormant_sweep(now, 2000)\nthe System principal only", VIOLET),
+         ("s2", "open stage, no person's event for 60 days,\nno open task, no waiting quotation", BLUE),
+         ("s3", "FOR UPDATE SKIP LOCKED, stage re-checked\nplain UPDATE: stage = dormant, from-stage kept", GREEN),
+         ("s4", "POST /leads/{id}/reopen: back to the from-stage\nor transition to lost: lost_from = the from-stage", GREEN)],
+        [("d1", "assign: the office follows the owner\nlead_owner_unit(), else routed by territory", BLUE),
+         ("d2", "outside the assigner's scope: office kept", YELLOW),
+         ("d3", "PATCH /lead-qr-codes/{id}: label, campaign,\ndealer, territory, switch off; the code never changes", GREY)],
+        [("n1", "THE CLEAR TRIGGER GUARDS THE CHECK\n\nA merge moves a dormant loser to merged. Without\ntrg_lead_dormant_clear the CHECK fails with a 500.", RED),
+         ("n2", "DO NOT RUN THE SWEEP ON THE DEV DB\n\nIt parks every idle demo lead. The tests run it\n61 days ahead inside a rolled-back transaction.", RED),
+         ("n3", "Ours: 60 days, what keeps a lead open, only Reopen\nwakes it, nobody told (GAP-339 to GAP-342).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -1895,5 +1912,5 @@ if __name__ == "__main__":
     f_quotation(); f_order(); f_auth(); f_admin(); f_tasks(); f_complaints(); f_bell_and_messages()
     f_subsidy_applications()
     f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
-    f_subsidy_follow_ups()
+    f_subsidy_follow_ups(); f_lead_small_gaps()
     print(f"\nwrote to {OUT}")

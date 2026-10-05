@@ -35,7 +35,7 @@ _MODULE_NAMES = ("005_authorization", "006_leads", "007_administration",
                  "021_lead_extras", "022_timeline_actor_names", "023_notifications",
                  "024_messages", "025_subsidy_applications", "026_complaint_remedies",
                  "033_schemes", "036_rewards", "037_dealer_commission", "038_marketing_material",
-                 "039_subsidy_follow_ups")
+                 "039_subsidy_follow_ups", "040_lead_small_gaps")
 
 _NAME = re.compile(r"CREATE POLICY (\w+)")
 
