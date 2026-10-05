@@ -241,14 +241,10 @@ async def test_the_sweep_parks_idle_open_leads_and_never_a_won_or_lost_one(
         ledger_after = (await s.execute(text(
             "SELECT count(*) FROM reward_ledger WHERE lead_id = ANY(CAST(:i AS uuid[]))"), {"i": ids})).scalar_one()
         assert ledger_after == ledger_before, "the rewards trigger fired and wrote nothing"
-        # session A's 034 trigger stamps won_at and lost_at on stage changes
-        cols = set((await s.execute(text(
-            "SELECT column_name FROM information_schema.columns WHERE table_name = 'lead' "
-            "AND column_name IN ('won_at', 'lost_at')"))).scalars().all())
-        if cols == {"won_at", "lost_at"}:
-            dates = (await s.execute(text(
-                "SELECT won_at, lost_at FROM lead WHERE id = CAST(:i AS uuid)"), {"i": idle["id"]})).one()
-            assert dates == (None, None), "a dormant lead carries no won or lost date"
+        # 034's lead_stage_dates fires on the sweep's plain UPDATE too
+        dates = (await s.execute(text(
+            "SELECT won_at, lost_at FROM lead WHERE id = CAST(:i AS uuid)"), {"i": idle["id"]})).one()
+        assert tuple(dates) == (None, None), "a dormant lead carries no won or lost date"
         assert await _sweep(s) == 0, "a second run changes nothing"
     finally:
         await s.rollback()

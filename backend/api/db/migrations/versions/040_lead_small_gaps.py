@@ -26,7 +26,7 @@ Also the PR 11 review of 033 to 039 (findings 1, 4 and the index):
   for a partial unique index (CLAUDE.md 4.1 rule 9).
 
 Revision ID: 040_lead_small_gaps
-Revises: 039_subsidy_follow_ups
+Revises: 035_targets
 """
 
 # ruff: noqa: E501  (embedded SQL)
@@ -40,7 +40,7 @@ from types import ModuleType
 from alembic import op
 
 revision: str = "040_lead_small_gaps"
-down_revision: str | None = "039_subsidy_follow_ups"
+down_revision: str | None = "035_targets"
 branch_labels = None
 depends_on = None
 
