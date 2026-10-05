@@ -95,6 +95,23 @@ class QrCodeCreate(BaseModel):
         default=None, pattern=UUID_RE, description="Preselected in the form's picker.")]
 
 
+class QrCodePatch(BaseModel):
+    """Any subset. A field sent null is cleared; the label cannot be. The six
+    characters never change: they are printed (FS-035 rule 1)."""
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    label: Annotated[str | None, Field(default=None, min_length=1, max_length=120)]
+    campaign: Annotated[str | None, Field(default=None, max_length=120)]
+    partner_id: Annotated[str | None, Field(
+        default=None, pattern=UUID_RE,
+        description="New leads from this code go to this partner; earlier leads keep theirs.")]
+    territory_id: Annotated[str | None, Field(
+        default=None, pattern=UUID_RE, description="Preselected in the form's picker.")]
+    is_active: Annotated[bool | None, Field(
+        default=None, description="false switches the code off: the form then makes a "
+                                  "plain website enquiry.")]
+
+
 class QrCode(BaseModel):
     id: str
     code: str = Field(description="Six characters, no look-alikes.")

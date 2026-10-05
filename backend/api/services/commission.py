@@ -6,7 +6,7 @@ this service maps its refusals and shapes the reads. Services never commit."""
 from __future__ import annotations
 
 import json
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy import text
@@ -53,7 +53,7 @@ async def _call(db: AsyncSession, sql: str, params: dict[str, Any]) -> Any:
 
 
 def _m(v: Any) -> str | None:
-    return None if v is None else format(Decimal(v).quantize(Decimal("0.01")), "f")
+    return None if v is None else format(Decimal(v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), "f")
 
 
 def _p(v: Any) -> str:
@@ -61,8 +61,9 @@ def _p(v: Any) -> str:
 
 
 async def preview(db: AsyncSession, app_id: str) -> sch.Preview:
-    raw: Any = await _call(db, "SELECT commission_preview(CAST(:a AS uuid))", {"a": app_id})
-    d = raw if isinstance(raw, dict) else json.loads(raw)
+    # as text, parsed with Decimal: a jsonb number decoded by the driver is a float (PR 11 review)
+    raw: Any = await _call(db, "SELECT commission_preview(CAST(:a AS uuid))::text", {"a": app_id})
+    d = json.loads(raw, parse_float=Decimal)
     name = (await db.execute(text("SELECT name FROM channel_partner WHERE id = CAST(:p AS uuid)"),
                              {"p": d["partner_id"]})).scalar_one_or_none()
     return sch.Preview(partner=sch.CommissionRef(id=d["partner_id"], name=name),

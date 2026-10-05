@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy import text
@@ -51,7 +51,7 @@ def _num(v: Decimal | None) -> str | None:
 
 
 def _money(v: Any) -> str:
-    return format(Decimal(v).quantize(Decimal("0.01")), "f")
+    return format(Decimal(v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), "f")
 
 
 def _out(r: Any) -> sch.Scheme:
@@ -281,11 +281,12 @@ async def _refs(db: AsyncSession, ids: set[str]) -> dict[str, sch.SchemeRef]:
 
 async def order_preview(db: AsyncSession, order_id: str) -> sch.OrderSchemePreview:
     try:
-        raw: Any = (await db.execute(text("SELECT scheme_order_preview(CAST(:o AS uuid))"),
+        # as text, parsed with Decimal: never a float in between (PR 11 review)
+        raw: Any = (await db.execute(text("SELECT scheme_order_preview(CAST(:o AS uuid))::text"),
                                 {"o": order_id})).scalar_one()
     except DBAPIError as exc:
         raise map_db_error(exc) from exc
-    data = raw if isinstance(raw, dict) else json.loads(raw)
+    data = json.loads(raw, parse_float=Decimal)
     ids = {d["scheme_id"] for key in ("discounts", "entitlements", "on_delivery") for d in data[key]}
     refs = await _refs(db, ids)
     discounts = [sch.PreviewDiscount(scheme=refs[d["scheme_id"]], basis=_money(d["basis"]),
@@ -331,11 +332,11 @@ async def standing(db: AsyncSession, caller: Caller, scheme_id: str,
     if not (await db.execute(text("SELECT 1 FROM channel_partner WHERE id = CAST(:p AS uuid)"),
                              {"p": who})).first():
         raise NotFoundError("No such partner.")
-    raw: Any = (await db.execute(text("SELECT scheme_standing(CAST(:s AS uuid), CAST(:p AS uuid), :d)"),
+    raw: Any = (await db.execute(text("SELECT scheme_standing(CAST(:s AS uuid), CAST(:p AS uuid), :d)::text"),
                             {"s": scheme_id, "p": who, "d": today_ist()})).scalar_one()
     if raw is None:
         raise NotFoundError("The scheme has not started.")
-    d = raw if isinstance(raw, dict) else json.loads(raw)
+    d = json.loads(raw, parse_float=Decimal)
     return sch.Standing(period_start=d["period_start"], period_end=d["period_end"],
                         metric=d["metric"], achieved=_num(Decimal(str(d["achieved"]))) or "0",
                         min=_num(Decimal(str(d["min"]))) or "0",

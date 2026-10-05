@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from arq import cron
 
+from worker.jobs.leads import lead_dormancy
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
 from worker.jobs.quotations import quotation_expire, quotation_render_due
@@ -42,4 +43,7 @@ CRON_JOBS: list = [
     cron(tracking_auto_end, minute=set(range(0, 60, 5))),
     cron(visit_auto_close, minute=set(range(1, 60, 5))),
     cron(location_point_purge, hour=3, minute=23),
+    # FS-035: 00:30 IST is 19:00 UTC, after the quotation expiry, so a quotation that
+    # expired tonight no longer keeps its lead open.
+    cron(lead_dormancy, hour=19, minute=0),
 ]
