@@ -12,11 +12,30 @@
   to, for GAP-061. A line manager cannot read app_user, so this is a definer.
 - `dormant_after_days` (60, a stand-in, GAP-339) joins `lead_score_rule`.
 
+Also the PR 11 review of 033 to 039 (findings 1, 4 and the index):
+- `partner_visible_to_caller(p)`: 028's pasted partners guard, evaluated over the claim
+  inside a definer. A definer bypasses RLS, and an invoker function nested in one runs
+  as the owner (ISS-066), so `EXISTS (SELECT ... FROM channel_partner)` there sees every
+  dealer. `marketing_order_create()` and `scheme_standing()` now ask this instead, and
+  `marketing_order_create()` checks the office against the caller too.
+- `scheme_lock_on_use()`: every row that records a scheme's use (a benefit, a credit, a
+  ledger row) takes the scheme FOR SHARE first. An edit's BEFORE UPDATE trigger then
+  waits for the use to commit and sees it in `scheme_used()` (rule 16). A target change
+  takes the scheme FOR UPDATE before its own check.
+- `ix_dealer_commission_application`: the commission policy's column, unindexed but
+  for a partial unique index (CLAUDE.md 4.1 rule 9).
+
 Revision ID: 040_lead_small_gaps
 Revises: 039_subsidy_follow_ups
 """
 
+# ruff: noqa: E501  (embedded SQL)
+
 from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+from types import ModuleType
 
 from alembic import op
 
@@ -26,6 +45,31 @@ branch_labels = None
 depends_on = None
 
 APP_ROLE = "app_role"
+
+
+def _load(stem: str) -> ModuleType:
+    path = next(Path(__file__).parent.glob(f"{stem}_*.py"))
+    spec = importlib.util.spec_from_file_location(f"mig_{stem}_for_040", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"040: migration {stem} not found beside it")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _replace(text: str, old: str, new: str) -> str:
+    # an exception, not an assert: python -O drops asserts
+    if text.count(old) != 1:
+        raise RuntimeError(f"040: anchor not found once: {old[:70]!r}")
+    return text.replace(old, new)
+
+
+def _original(stem: str, name: str) -> str:
+    """The CREATE FUNCTION text of `name` as migration `stem` wrote it."""
+    found = [t for t in _load(stem).FUNCTIONS if f"FUNCTION {name}(" in t]
+    if len(found) != 1:
+        raise RuntimeError(f"040: {name} not found once in {stem}")
+    return found[0]
 
 # Nothing new on any table's grants or policies: lead_qr_code's UPDATE is 015's.
 GRANTS: dict[str, str] = {}
@@ -103,6 +147,75 @@ END $fn$""",
 ]
 
 
+# ── the PR 11 review of 033 to 039 ──────────────────────────────────────────
+
+def _visible_fn() -> str:
+    guard = _load("028").PARTNERS_GUARD
+    return f"""CREATE FUNCTION partner_visible_to_caller(p_partner uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+    -- 028's partners guard, pasted: the caller's own reach, not the owner's (ISS-066)
+    SELECT EXISTS (SELECT 1 FROM channel_partner WHERE id = p_partner AND {guard})
+$fn$"""
+
+
+_MKT_PARTNER_OLD = """           AND (v_caller_partner IS NOT NULL OR EXISTS (SELECT 1 FROM channel_partner WHERE id = v_partner));"""
+_MKT_PARTNER_NEW = """           AND (v_caller_partner IS NOT NULL OR partner_visible_to_caller(v_partner));"""
+_MKT_OFFICE_OLD = """    IF NOT EXISTS (SELECT 1 FROM org_unit WHERE id = p_office) THEN
+        RAISE EXCEPTION 'no office' USING ERRCODE = 'MKTVL';
+    END IF;"""
+_MKT_OFFICE_NEW = """    IF NOT EXISTS (SELECT 1 FROM org_unit WHERE id = p_office) THEN
+        RAISE EXCEPTION 'no office' USING ERRCODE = 'MKTVL';
+    END IF;
+    -- the office is the caller's, or the one over the dealer's territory (rule 6; PR 11 review)
+    IF app_current_org_unit() IS NOT NULL AND v_caller_partner IS NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM org_closure WHERE ancestor_id = app_current_org_unit()
+                        AND descendant_id = p_office) THEN
+            RAISE EXCEPTION 'the office is not yours' USING ERRCODE = '42501';
+        END IF;
+    ELSIF v_territory IS NULL OR NOT (
+            EXISTS (SELECT 1 FROM org_unit ou JOIN territory_closure tc ON tc.ancestor_id = ou.territory_id
+                     WHERE ou.id = p_office AND tc.descendant_id = v_territory)
+         OR NOT EXISTS (SELECT 1 FROM org_unit ou JOIN territory_closure tc ON tc.ancestor_id = ou.territory_id
+                         WHERE tc.descendant_id = v_territory)) THEN
+        RAISE EXCEPTION 'the office does not cover the dealer' USING ERRCODE = '42501';
+    END IF;"""
+
+_STANDING_OLD = """    IF s.id IS NULL OR NOT EXISTS (SELECT 1 FROM channel_partner WHERE id = p_partner) THEN"""
+_STANDING_NEW = """    IF NOT app_has_permission('schemes', 'view') OR s.id IS NULL
+       OR NOT partner_visible_to_caller(p_partner) THEN"""
+
+_TARGET_OLD = """BEGIN
+    IF scheme_used(coalesce(NEW.scheme_id, OLD.scheme_id)) THEN"""
+_TARGET_NEW = """BEGIN
+    -- the scheme first, so a use being written commits before this check (rule 16)
+    PERFORM 1 FROM scheme WHERE id = coalesce(NEW.scheme_id, OLD.scheme_id) FOR UPDATE;
+    IF scheme_used(coalesce(NEW.scheme_id, OLD.scheme_id)) THEN"""
+
+SCHEME_LOCK_FN = """CREATE FUNCTION scheme_lock_on_use() RETURNS trigger
+LANGUAGE plpgsql SET search_path = public, pg_temp AS $fn$
+BEGIN
+    -- rule 16: an edit's trigger waits for this use to commit, then sees it
+    PERFORM 1 FROM scheme WHERE id = NEW.scheme_id FOR SHARE;
+    RETURN NEW;
+END $fn$"""
+
+USE_TABLES = ("scheme_benefit", "scheme_entitlement", "reward_ledger")
+
+
+def _replaced() -> list[str]:
+    mkt = _original("038", "marketing_order_create")
+    mkt = _replace(_replace(mkt, _MKT_PARTNER_OLD, _MKT_PARTNER_NEW), _MKT_OFFICE_OLD, _MKT_OFFICE_NEW)
+    standing = _replace(_original("033", "scheme_standing"), _STANDING_OLD, _STANDING_NEW)
+    target = _replace(_original("033", "refuse_used_scheme_target"), _TARGET_OLD, _TARGET_NEW)
+    return [_replace(t, "CREATE FUNCTION", "CREATE OR REPLACE FUNCTION") for t in (mkt, standing, target)]
+
+
+def _restored() -> list[str]:
+    return [_replace(_original(stem, name), "CREATE FUNCTION", "CREATE OR REPLACE FUNCTION")
+            for stem, name in (("038", "marketing_order_create"), ("033", "scheme_standing"),
+                               ("033", "refuse_used_scheme_target"))]
+
+
 def upgrade() -> None:
     op.execute("ALTER TABLE lead ADD COLUMN dormant_from_stage lead_stage")
     # Nothing has ever moved a lead to dormant, so no row needs a backfill; refuse to
@@ -122,10 +235,27 @@ def upgrade() -> None:
                "FOR EACH ROW EXECUTE FUNCTION lead_dormant_clear()")
     op.execute(f"GRANT EXECUTE ON FUNCTION lead_dormant_sweep(timestamptz, int) TO {APP_ROLE}")
     op.execute(f"GRANT EXECUTE ON FUNCTION lead_owner_unit(uuid) TO {APP_ROLE}")
+    # the PR 11 review
+    op.execute(_visible_fn())
+    op.execute(f"GRANT EXECUTE ON FUNCTION partner_visible_to_caller(uuid) TO {APP_ROLE}")
+    for stmt in _replaced():
+        op.execute(stmt)
+    op.execute(SCHEME_LOCK_FN)
+    for table in USE_TABLES:
+        op.execute(f"CREATE TRIGGER trg_{table}_scheme_lock BEFORE INSERT ON {table} FOR EACH ROW "
+                   "WHEN (NEW.scheme_id IS NOT NULL) EXECUTE FUNCTION scheme_lock_on_use()")
+    op.execute("CREATE INDEX ix_dealer_commission_application ON dealer_commission (application_id)")
     op.execute("REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC")
 
 
 def downgrade() -> None:
+    op.execute("DROP INDEX IF EXISTS ix_dealer_commission_application")
+    for table in USE_TABLES:
+        op.execute(f"DROP TRIGGER IF EXISTS trg_{table}_scheme_lock ON {table}")
+    op.execute("DROP FUNCTION IF EXISTS scheme_lock_on_use()")
+    for stmt in _restored():
+        op.execute(stmt)
+    op.execute("DROP FUNCTION IF EXISTS partner_visible_to_caller(uuid)")
     op.execute("DROP TRIGGER IF EXISTS trg_lead_dormant_clear ON lead")
     op.execute("DROP FUNCTION IF EXISTS lead_dormant_clear()")
     op.execute("DROP FUNCTION IF EXISTS lead_dormant_sweep(timestamptz, int)")

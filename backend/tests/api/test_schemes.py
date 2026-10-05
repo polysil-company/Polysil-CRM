@@ -11,7 +11,6 @@ never spent twice.
 
 from __future__ import annotations
 
-import asyncio
 import datetime as dt
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -28,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.config import get_settings
 from api.db.session import enter_role
 from api.services.clock import today_ist
+from tests.api import test_order_concurrency as conc
 from tests.api import test_order_endpoints as endpoints
 from tests.api.conftest import V1, _key
 from worker.jobs.outbox import enter_as_principal
@@ -319,10 +319,10 @@ async def test_an_order_without_a_partner_earns_nothing_and_a_partner_order_coun
 # ── one credit, two orders at once ───────────────────────────────────────────
 
 async def test_two_orders_submitted_at_once_spend_one_credit_once(
-        client: httpx.AsyncClient, shop: Shop, made: list[str]) -> None:
-    """The guarded UPDATE (status = 'available', then the row count) is what makes this
-    hold; the FOR UPDATE orders the work. This test proves the outcome, not the lock
-    (code review F-4)."""
+        client: httpx.AsyncClient, shop: Shop, made: list[str], sessions: Sessions) -> None:
+    """The FOR UPDATE on the credit orders the two submits; the guarded UPDATE keeps it
+    single. Run through the service on two connections, the second shown waiting
+    (PR 11 review: a bare gather never proved the two overlapped)."""
     s = await _scheme(client, shop, made, scheme_type="next_order",
                       benefit={"kind": "flat", "value": "200", "entitlement_days": 30})
     first = await endpoints._approve_all(client, shop, await _submit(
@@ -330,11 +330,11 @@ async def test_two_orders_submitted_at_once_spend_one_credit_once(
     await _dispatch_all(client, shop, first)
     a = await _order(client, shop, _with_partner(shop))
     b = await _order(client, shop, _with_partner(shop))
-    ho = await endpoints._as(client, shop, "field_officer")
-    ra, rb = await asyncio.gather(
-        client.post(f"{V1}/orders/{a['id']}/submit", json={}, headers={**ho, **_key()}),
-        client.post(f"{V1}/orders/{b['id']}/submit", json={}, headers={**ho, **_key()}))
-    assert ra.status_code == 200 and rb.status_code == 200, (ra.text, rb.text)
+    me = shop.ids["field_officer"]
+    got, waited = await conc._race(sessions, (me, conc._submit(shop, a["id"])),
+                                   (me, conc._submit(shop, b["id"])), on="scheme_entitlement")
+    assert waited, "the second submit never waited on the credit: not a race"
+    assert [conc._outcome(g) for g in got] == ["ok", "ok"], got
     used = []
     for o in (a, b):
         got = await _get(client, shop, o["id"])

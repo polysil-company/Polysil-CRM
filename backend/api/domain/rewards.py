@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
+from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal
 
 # The SQLSTATEs migration 036 raises, and what each is to the API: (status, code)
 SQLSTATE_TO_ERROR: dict[str, tuple[int, str]] = {
@@ -35,16 +35,19 @@ def points_for(value: Decimal, per_amount: Decimal, points: int) -> int:
     return int(blocks) * points
 
 
-def redemption_split(points: int, point_value: Decimal,
-                     payable_left: Decimal) -> tuple[Decimal, int]:
+def redemption_split(points: int, point_value: Decimal, payable_left: Decimal,
+                     limit: Decimal) -> tuple[Decimal, int]:
     """At submit: the rupees applied and the points used. Mirrors 036's trigger arm:
-    the points' value or the payable left, whichever is less; the points used are the
-    applied amount over the point value, rounded up; the rest go back."""
-    amount = min((Decimal(points) * point_value).quantize(Decimal("0.01")), payable_left)
-    if amount <= 0:
+    the room is the least of the points' value, the payable left and the limit
+    (max_redeem_pct of the total, rounded to the paisa); whole points only, so the
+    points used are the room over the point value rounded down, and the amount is
+    those points times the value (GAP-316). The rest go back."""
+    room = min((Decimal(points) * point_value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+               payable_left, limit)
+    if room <= 0:
         return Decimal("0.00"), 0
-    used = int((amount / point_value).to_integral_value(rounding=ROUND_CEILING))
-    return amount, used
+    used = int((room / point_value).to_integral_value(rounding=ROUND_FLOOR))
+    return (Decimal(used) * point_value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), used
 
 
 @dataclass(frozen=True)
