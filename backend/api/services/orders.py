@@ -34,7 +34,7 @@ from api.authz.modules import SPECS
 from api.authz.predicate import Caller, scope_predicate
 from api.config import Settings
 from api.domain import orders as domain
-from api.domain.identity import normalise_mobile
+from api.domain.identity import MobileError, normalise_mobile
 from api.domain.pricing.types import PricedLine
 from api.errors import (
     ApiError,
@@ -218,7 +218,11 @@ def _check_type(order_type: str) -> None:
 
 
 def _party_values(p: sch.OrderParty) -> dict[str, Any]:
-    return {"pn": p.name, "pm": normalise_mobile(p.mobile) if p.mobile else None,
+    try:
+        mobile = normalise_mobile(p.mobile) if p.mobile else None
+    except MobileError as exc:   # a 422 on the field, never a 500 (PR 11 review)
+        raise ValidationFailed(fields={"party.mobile": str(exc)}) from exc
+    return {"pn": p.name, "pm": mobile,
             "pa": p.address, "pg": p.gstin.upper() if p.gstin else None}
 
 
