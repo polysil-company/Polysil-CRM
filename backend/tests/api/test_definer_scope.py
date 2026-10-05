@@ -115,8 +115,9 @@ async def test_scheme_standing_answers_only_inside_the_callers_reach(
     that RLS cannot filter, so a direct call read any dealer's period standing."""
     today = today_ist()
     start = (today.replace(day=1) - dt.timedelta(days=1)).replace(day=1)
+    end = (today.replace(day=1) + dt.timedelta(days=40)).replace(day=1) - dt.timedelta(days=1)
     s = await schemes._scheme(client, shop, made, scheme_type="period", period="month",
-                              valid_from=start.isoformat(),
+                              valid_from=start.isoformat(), valid_to=end.isoformat(),
                               condition={"metric": "order_value", "min": "1"},
                               benefit={"kind": "pct", "value": "4", "entitlement_days": 60})
     call = "SELECT scheme_standing(CAST(:s AS uuid), CAST(:p AS uuid), :d) IS NOT NULL"

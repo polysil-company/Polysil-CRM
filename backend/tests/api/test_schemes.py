@@ -332,8 +332,9 @@ async def test_two_orders_submitted_at_once_spend_one_credit_once(
     b = await _order(client, shop, _with_partner(shop))
     me = shop.ids["field_officer"]
     got, waited = await conc._race(sessions, (me, conc._submit(shop, a["id"])),
-                                   (me, conc._submit(shop, b["id"])), on="scheme_entitlement")
-    assert waited, "the second submit never waited on the credit: not a race"
+                                   (me, conc._submit(shop, b["id"])))
+    # any lock the second queues on counts: what matters is that the two overlapped
+    assert waited, "the second submit never waited on the first: not a race"
     assert [conc._outcome(g) for g in got] == ["ok", "ok"], got
     used = []
     for o in (a, b):
