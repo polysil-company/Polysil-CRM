@@ -1,12 +1,14 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import type * as React from "react";
 
 import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { FilterPill, SingleFilterPill } from "@/components/patterns/filter-pill";
 import { SearchField } from "@/components/patterns/search-field";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportLeads } from "@/features/leads/api/leads.api";
 import { LEAD_INQUIRY_TYPES, LEAD_STAGES } from "@/features/leads/api/leads.schemas";
@@ -55,6 +57,7 @@ function sourcesMessage(isPending: boolean, isError: boolean): string {
  */
 export function LeadsToolbar(): React.JSX.Element {
   const { params, setFilters, resetFilters, activeFilterCount } = useLeadListParams();
+  const canEdit = useCan("leads", "edit");
   const sources = useQuery(lookupListQueryOptions("lead-sources"));
   const canCreate = useCan("leads", "create");
 
@@ -115,6 +118,11 @@ export function LeadsToolbar(): React.JSX.Element {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {canEdit ? (
+          <Link href="/leads/duplicates" className={buttonVariants({ variant: "ghost" })}>
+            Possible duplicates
+          </Link>
+        ) : null}
         <DownloadExcelButton
           download={() => exportLeads(params)}
           fallbackName="leads.xlsx"
