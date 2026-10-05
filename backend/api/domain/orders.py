@@ -88,6 +88,12 @@ SQLSTATE_TO_ERROR: Final[dict[str, tuple[int, str]]] = {
     "DSPPR": (422, "unit_precision"),
     "DSPVD": (409, "dispatch_voided"),
     "DSPNF": (404, "not_found"),
+    # FS-023: dispatch_record resolves a warehouse (code review F-1)
+    "STKWI": (409, "warehouse_inactive"),
+    "STKNW": (409, "no_default_warehouse"),
+    "STKNF": (422, "no_such_warehouse"),
+    # FS-022: a paid order's dealer does not change (code review F-2)
+    "PAYPC": (409, "order_has_payments"),
 }
 
 

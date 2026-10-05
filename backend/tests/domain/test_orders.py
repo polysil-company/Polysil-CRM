@@ -23,7 +23,14 @@ def test_every_custom_sqlstate_the_migration_raises_has_an_api_error_and_no_othe
     documents an error that cannot happen."""
     raised = {c for c in re.findall(r"ERRCODE = '([A-Z0-9]{5})'", ENGINE)
               if not c[0].isdigit()}
-    assert raised == set(domain.SQLSTATE_TO_ERROR), raised ^ set(domain.SQLSTATE_TO_ERROR)
+    # FS-022 and FS-023 reach the order paths too: dispatch_record resolves a
+    # warehouse (032) and a paid order's dealer is fixed (031)
+    later = ((_VERSIONS / "031_payments.py").read_text("utf-8")
+             + (_VERSIONS / "032_stock.py").read_text("utf-8"))
+    through_orders = {"STKWI", "STKNW", "STKNF", "PAYPC"}
+    assert through_orders <= set(re.findall(r"ERRCODE = '([A-Z0-9]{5})'", later))
+    expected = raised | through_orders
+    assert expected == set(domain.SQLSTATE_TO_ERROR), expected ^ set(domain.SQLSTATE_TO_ERROR)
 
 
 def test_every_order_type_is_either_priced_or_names_its_question() -> None:

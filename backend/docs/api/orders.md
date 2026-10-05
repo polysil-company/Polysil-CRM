@@ -104,6 +104,7 @@ draft has no number until it is submitted.
 | `seller_gstin_id` | string \| null |  | The selling registration. Omit for the default one. |
 | `price_effective_date` | date \| null |  | A direct order's price date, today in India by default. |
 | `payment_terms` | `full_payment` \| `credit` |  | Recorded, not enforced. There is no credit check. Default `full_payment`. |
+| `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 
@@ -272,6 +273,7 @@ On an order from quotations the fields they fix are fixed.
 | `seller_gstin_id` | string \| null |  |  |
 | `price_effective_date` | date \| null |  |  |
 | `payment_terms` | `full_payment` \| `credit` \| null |  |  |
+| `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
 | `remarks` | string \| null |  |  |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
@@ -421,6 +423,7 @@ number is recorded as given; this system does not issue invoices.
 | `dispatched_at` | date-time | yes | When the goods left; not in the future. |
 | `transporter` | string \| null |  |  |
 | `vehicle_no` | string \| null |  |  |
+| `warehouse_id` | string \| null |  | Where the goods left (FS-023). Defaults to the order's warehouse, then the default. |
 | `lines` | DispatchLineIn[] | yes | At least one; each order line at most once. |
 
 **Responses**
@@ -639,6 +642,7 @@ and only the outcome to a dealer.
 | `dispatched_by` | UserRef \| null | yes |  |
 | `voided_at` | string \| null | yes | Set when voided; its quantities are open again. |
 | `void_remark` | string \| null | yes |  |
+| `warehouse` | WarehouseRef \| null |  | Where the goods left (FS-023). |
 | `lines` | DispatchLineOut[] | yes |  |
 | `warnings` | string[] |  | invoice_before_dc, duplicate_invoice_no. Recorded anyway. |
 
@@ -653,6 +657,7 @@ and only the outcome to a dealer.
 | `dispatched_at` | date-time | yes | When the goods left; not in the future. |
 | `transporter` | string \| null |  |  |
 | `vehicle_no` | string \| null |  |  |
+| `warehouse_id` | string \| null |  | Where the goods left (FS-023). Defaults to the order's warehouse, then the default. |
 | `lines` | DispatchLineIn[] | yes | At least one; each order line at most once. |
 
 **`DispatchLineIn`**
@@ -722,6 +727,16 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
+**`InstalmentOut`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `seq` | integer | yes |  |
+| `due_on` | string | yes |  |
+| `amount` | string | yes |  |
+| `note` | string \| null | yes |  |
+| `covered` | boolean | yes | Received has reached this instalment, taken in due order. |
+
 **`LastRejection`**
 
 | Field | Type | Required | Notes |
@@ -729,6 +744,13 @@ and only the outcome to a dealer.
 | `remark` | string | yes | For a dealer, a fixed text in place of the reason. |
 | `role` | string | yes |  |
 | `at` | string | yes |  |
+
+**`LineStock`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `available` | string | yes | At the order's warehouse, now. |
+| `short` | boolean | yes | True when available is below what this line still needs. |
 
 **`Order`**
 
@@ -767,6 +789,8 @@ and only the outcome to a dealer.
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
 | `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
+| `warehouse` | WarehouseRef \| null |  | "Order to" (FS-023); null means the default. Always null for a dealer. |
+| `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `cancelled_at` | string \| null | yes |  |
@@ -807,6 +831,7 @@ and only the outcome to a dealer.
 | `seller_gstin_id` | string \| null |  | The selling registration. Omit for the default one. |
 | `price_effective_date` | date \| null |  | A direct order's price date, today in India by default. |
 | `payment_terms` | `full_payment` \| `credit` |  | Recorded, not enforced. There is no credit check. Default `full_payment`. |
+| `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 
@@ -828,6 +853,7 @@ and only the outcome to a dealer.
 | `hsn_code` | string | yes |  |
 | `uom` | string | yes |  |
 | `uom_decimals` | integer | yes | How many decimals the unit takes; 0 for pieces. |
+| `stock` | LineStock \| null |  | Availability at the order's warehouse while the line is open (FS-023). A warning, never a block. Null without stock.view or once shipped. |
 | `qty` | string | yes |  |
 | `rate` | string | yes |  |
 | `gross` | string | yes |  |
@@ -889,8 +915,22 @@ and only the outcome to a dealer.
 | `seller_gstin_id` | string \| null |  |  |
 | `price_effective_date` | date \| null |  |  |
 | `payment_terms` | `full_payment` \| `credit` \| null |  |  |
+| `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
 | `remarks` | string \| null |  |  |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
+
+**`OrderPayments`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `payable` | string | yes | The order total; 0 when cancelled. Less scheme benefits once schemes land. |
+| `received` | string | yes |  |
+| `balance` | string | yes |  |
+| `status` | `not_applicable` \| `unpaid` \| `part_paid` \| `paid` \| `overpaid` | yes |  |
+| `overdue` | boolean | yes |  |
+| `overdue_amount` | string | yes |  |
+| `schedule` | InstalmentOut[] | yes |  |
+| `receipts` | ReceiptOut[] | yes |  |
 
 **`OrderSchemePreview`**
 
@@ -1006,6 +1046,17 @@ and only the outcome to a dealer.
 | `quote_no` | string \| null | yes |  |
 | `version` | integer | yes |  |
 
+**`ReceiptOut`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `payment_id` | string | yes |  |
+| `received_on` | string | yes |  |
+| `mode` | `neft` \| `upi` \| `cheque` \| `cash` \| `adjustment` | yes |  |
+| `ref_no` | string \| null | yes |  |
+| `amount` | string | yes | What this receipt put on this order. |
+| `is_short_payment` | boolean | yes |  |
+
 **`RemarkRequest`**
 
 | Field | Type | Required | Notes |
@@ -1070,6 +1121,14 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
+
+**`WarehouseRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
 
 **`api__schemas__leads__PartnerRef`**
 

@@ -1,10 +1,10 @@
 """Half one of the parity suite: the permission matrix (FS-002 5.5).
 
-20 modules x 16 roles x 5 actions = 1,600 cells, enumerated from RBAC.md section
+22 modules x 16 roles x 5 actions = 1,760 cells, enumerated from RBAC.md section
 6 by the seed generator and never from what happens to be seeded. For each cell
 both layers must agree with the document: app_has_permission() is true exactly
 where the matrix has a cell, app_scope() is the cell's scope, and require()
-raises 403 where it is blank. 1,129 of the 1,600 are blank; those are the
+raises 403 where it is blank. the rest of the 1,760 are blank; those are the
 assertions that matter (FS-002 9.3 A-1).
 
 The matrix rows are written inside the rolled-back transaction, over whatever the
@@ -39,13 +39,23 @@ DENIED = denied_cells(GRANTS)
 PORTAL = {"distributor", "dealer", "sub_dealer"}
 
 
-def test_the_matrix_is_sixteen_by_twenty_by_five() -> None:
-    """ISS-031: 1,600, not 1,440. The generator enumerates rather than hard-codes,
-    so this is the one place the count is asserted."""
+def test_the_matrix_is_sixteen_by_twenty_two_by_five() -> None:
+    """ISS-031: 1,600, not 1,440; FS-021 adds `tracking`, FS-025 `targets`. The generator enumerates
+    rather than hard-codes, so this is the one place the count is asserted."""
     assert len(ROLES) == 16
-    assert len(MODULES) == 20
+    assert len(MODULES) == 22
     assert len(ACTIONS) == 5
-    assert len(GRANTED) + len(DENIED) == 1600
+    assert len(GRANTED) + len(DENIED) == 1760
+    assert "tracking" in MODULES
+
+
+def test_the_board_sees_everything_except_tracking_and_stock() -> None:
+    """RBAC.md 6.4's Except line (FS-021 GAP-195, FS-023 B-1). The board's other
+    modules are untouched, and no portal role holds stock."""
+    for m in ('tracking', 'stock'):
+        assert ('board', m, 'view') in DENIED
+    assert all(('board', m, 'view') in GRANTED for m in MODULES if m not in ('tracking', 'stock'))
+    assert all((r, 'stock', 'view') in DENIED for r in PORTAL)
     assert "campaigns" in MODULES and "stock" in MODULES
 
 
@@ -95,7 +105,7 @@ async def _claim(db: AsyncSession, user_id: str) -> None:
 
 async def test_the_database_answers_every_cell_from_the_matrix(
         db: AsyncSession, matrix: dict[str, str]) -> None:
-    """All 1,600, one statement per role, as app_role. A cell the document leaves
+    """All 1,760, one statement per role, as app_role. A cell the document leaves
     blank must be false, and app_scope() must be the view row's scope or NULL."""
     await enter_role(db, "app_role")
     wrong: list[tuple[str, str, str, object, object]] = []
@@ -112,7 +122,7 @@ async def test_the_database_answers_every_cell_from_the_matrix(
             expected_scope = GRANTED.get((role, module, "view"))
             if allowed != expected or scope != expected_scope:
                 wrong.append((role, module, action, allowed, scope))
-    assert checked == 1600
+    assert checked == 1760
     assert not wrong, f"{len(wrong)} cells disagree with RBAC.md: {wrong[:10]}"
 
 
@@ -120,7 +130,7 @@ async def test_require_answers_403_exactly_where_the_cell_is_blank(
         db: AsyncSession, matrix: dict[str, str]) -> None:
     """The service gate. require() asks app_has_permission() inside the same
     transaction, so one granted and one blank cell per role is the assertion that
-    it reads the same row the policies read; the full 1,600 are the test above."""
+    it reads the same row the policies read; the full 1,760 are the test above."""
     await enter_role(db, "app_role")
     for role, user in matrix.items():
         await _claim(db, user)

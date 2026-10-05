@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.config import get_settings
 from api.services.clock import today_ist
 from api.storage import LocalStorage
-from tests.api.conftest import PASSWORD, V1, _key, _login
+from tests.api.conftest import PASSWORD, V1, _key, _login, only_these_render
 from worker.jobs.orders import render_one as render_order
 
 pytestmark = pytest.mark.db
@@ -152,6 +152,8 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
             # FS-013: a quotation's discount approval
             f"DELETE FROM approval_step WHERE request_id IN (SELECT id FROM approval_request WHERE entity_id IN {quotations})",
             f"DELETE FROM approval_request WHERE entity_id IN {quotations}",
+            # FS-023: a dispatch line moves stock; the movement points at it
+            f"DELETE FROM stock_movement WHERE dispatch_line_id IN (SELECT dl.id FROM dispatch_line dl JOIN dispatch d ON d.id = dl.dispatch_id WHERE d.sales_order_id IN {orders})",
             f"DELETE FROM dispatch WHERE sales_order_id IN {orders}",
             f"DELETE FROM activity_event WHERE entity_id IN {orders}",
             "DELETE FROM sales_order WHERE territory_id = CAST(:d AS uuid)",
@@ -180,7 +182,8 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
             "DELETE FROM gst_rate WHERE hsn_code = :h",
             "DELETE FROM product WHERE id = CAST(:p AS uuid)",
             "DELETE FROM seller_gstin WHERE id = CAST(:sg AS uuid)",
-            "DELETE FROM org_unit WHERE id = CAST(:o AS uuid)",
+            # every office in the district: a test may add a sibling (test_reports)
+            "DELETE FROM org_unit WHERE id = CAST(:o AS uuid) OR territory_id = CAST(:d AS uuid)",
             "DELETE FROM territory WHERE id = CAST(:d AS uuid)",
             "DELETE FROM territory WHERE id = CAST(:s AS uuid)",
         ):
@@ -550,7 +553,8 @@ async def test_the_order_counts_and_the_inbox_badge(client: httpx.AsyncClient, s
 # ── the order PDF (FS-012) ───────────────────────────────────────────────────
 
 async def test_the_order_pdf_follows_approval_and_is_withdrawn_on_cancel(
-        client: httpx.AsyncClient, shop: Shop, tmp_path: pathlib.Path) -> None:
+        client: httpx.AsyncClient, shop: Shop, tmp_path: pathlib.Path,
+        sessions: Callable[[], AsyncSession]) -> None:
     ho = await _as(client, shop, "field_officer")
     draft = await _create(client, ho, _direct(shop, remarks="Internal: rate agreed below list"))
     assert draft["pdf_state"] == "none"
@@ -564,9 +568,8 @@ async def test_the_order_pdf_follows_approval_and_is_withdrawn_on_cancel(
 
     settings = get_settings().model_copy(update={"pdf_renderer": "html"})
     storage = LocalStorage(root=tmp_path, secret=b"test", public_base="")
-    for _ in range(5):          # another pending order may be claimed first
-        if await render_order(settings, storage) is None:
-            break
+    async with only_these_render(sessions, "sales_order", [order["id"]]):
+        assert await render_order(settings, storage) == "ready"
     got = (await client.get(f"{V1}/orders/{order['id']}", headers=ho)).json()["data"]
     assert got["pdf_state"] == "ready", got["pdf_state"]
     link = (await client.get(f"{V1}/orders/{order['id']}/pdf", headers=ho)).json()["data"]
@@ -587,3 +590,11 @@ async def test_the_order_pdf_follows_approval_and_is_withdrawn_on_cancel(
     assert r.status_code == 200, r.text
     r = await client.get(f"{V1}/orders/{order['id']}/pdf", headers=ho)
     assert r.status_code == 409 and r.json()["error"]["code"] == "order_cancelled"
+
+
+async def test_a_bad_party_mobile_is_a_422(client: httpx.AsyncClient, shop: Shop) -> None:
+    """PR 11 review: normalise_mobile raises, and that was a 500."""
+    fo = await _as(client, shop, "field_officer")
+    body = _direct(shop, party={"name": "Rameshbhai Patel", "mobile": "12345", "address": "Vadod"})
+    r = await client.post(f"{V1}/orders", headers={**fo, **_key()}, json=body)
+    assert r.status_code == 422 and "party.mobile" in r.json()["error"]["fields"], r.text

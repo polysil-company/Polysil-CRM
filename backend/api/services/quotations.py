@@ -44,7 +44,7 @@ from api.config import Settings
 from api.domain import leads as leads_domain
 from api.domain import orders as order_domain
 from api.domain import quotations as domain
-from api.domain.identity import normalise_mobile
+from api.domain.identity import MobileError, normalise_mobile
 from api.domain.pricing.types import PricedLine
 from api.errors import ConflictError, ForbiddenError, NotFoundError, ValidationFailed
 from api.schemas import quotations as sch
@@ -260,9 +260,10 @@ def _party_from(lead: Any) -> dict[str, Any]:
 
 def _party_values(party: sch.Party | dict[str, Any]) -> dict[str, Any]:
     p = party.model_dump() if isinstance(party, sch.Party) else dict(party)
-    mobile = normalise_mobile(p["mobile"])
-    if mobile is None:
-        raise ValidationFailed(fields={"party.mobile": "not an Indian mobile number"})
+    try:
+        mobile = normalise_mobile(p["mobile"])
+    except MobileError as exc:   # a 422 on the field, never a 500 (PR 11 review)
+        raise ValidationFailed(fields={"party.mobile": str(exc)}) from exc
     return {"party_name": p["name"], "party_mobile": mobile, "party_address": p.get("address"),
             "party_gstin": p["gstin"].upper() if p.get("gstin") else None}
 

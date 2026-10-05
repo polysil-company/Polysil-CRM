@@ -28,7 +28,7 @@ from api.errors import ApiError
 from api.services import quotations as service
 from api.services.clock import today_ist
 from api.storage import LocalStorage
-from tests.api.conftest import PASSWORD, V1, Catalogue, Staff, _auth, _key
+from tests.api.conftest import PASSWORD, V1, Catalogue, Staff, _auth, _key, only_these_render
 from worker.jobs.quotations import render_one
 
 pytestmark = pytest.mark.db
@@ -152,8 +152,10 @@ async def qenv(sessions: Callable[[], AsyncSession], quoter: Staff,
             "WHERE territory_id = :d",
             "DELETE FROM quotation WHERE territory_id = :d",
             "ALTER TABLE quotation ENABLE TRIGGER trg_quotation_refuse_sent_edit",
+            # this test's own keys only: a shared database holds other users' retries
+            # (PR 11 review); the quoter's own teardown removes the rest of its keys
             "DELETE FROM idempotency_record WHERE route LIKE '%/quotations%' "
-            "AND created_at > now() - interval '1 hour'",
+            "AND user_id = CAST(:u AS uuid)",
             f"DELETE FROM lead_duplicate_link WHERE lead_a_id IN {leads} OR lead_b_id IN {leads}",
             "DELETE FROM notification_outbox WHERE recipient IN "
             "(SELECT mobile FROM lead WHERE territory_id = :d)",
@@ -163,7 +165,7 @@ async def qenv(sessions: Callable[[], AsyncSession], quoter: Staff,
             "DELETE FROM territory WHERE id = :d",
             "DELETE FROM territory WHERE id = :s",
         ):
-            await c.execute(text(stmt), {"d": district, "s": state, "c": code})
+            await c.execute(text(stmt), {"d": district, "s": state, "c": code, "u": quoter.id})
         await c.commit()
 
 
@@ -225,10 +227,11 @@ def _local_settings(tmp: pathlib.Path):
                                              "public_web_url": "http://localhost:3000"})
 
 
-async def _render(tmp: pathlib.Path) -> str | None:
+async def _render(tmp: pathlib.Path, sessions: Callable[[], AsyncSession], qid: str) -> str | None:
     settings = _local_settings(tmp)
     storage = LocalStorage(root=tmp, secret=b"test", public_base="")
-    return await render_one(settings, storage)
+    async with only_these_render(sessions, "quotation", [qid]):
+        return await render_one(settings, storage)
 
 
 # ── create ───────────────────────────────────────────────────────────────────
@@ -299,6 +302,10 @@ async def test_patching_a_draft_reprices_and_uppercases_the_gstin(
         client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue) -> None:
     h = await _auth(client, quoter)
     q = await _draft(client, h, qenv, catalogue)
+    bad = await client.patch(f"{V1}/quotations/{q['id']}", headers={**h, **_key()}, json={
+        "party": {"name": "Patel Agro Pvt Ltd", "mobile": "12345"}, "expected_status": "draft"})
+    assert bad.status_code == 422 and "party.mobile" in bad.json()["error"]["fields"], \
+        "a bad mobile is the caller's mistake, not a 500 (PR 11 review)"
     r = await client.patch(f"{V1}/quotations/{q['id']}", headers={**h, **_key()}, json={
         "party": {"name": "Patel Agro Pvt Ltd", "mobile": q["party"]["mobile"],
                   "gstin": "24aaacp1234a1z5"},
@@ -570,7 +577,7 @@ async def test_the_pdf_is_pending_until_the_worker_renders_it(
     r = await client.get(f"{V1}/quotations/{q['id']}/pdf", headers=h)
     assert r.status_code == 409 and r.json()["error"]["code"] == "pdf_pending"
 
-    assert await _render(tmp_path) == "ready"
+    assert await _render(tmp_path, sessions, q["id"]) == "ready"
     got = (await client.get(f"{V1}/quotations/{q['id']}", headers=h)).json()["data"]
     assert got["pdf_state"] == "ready"
     link = (await client.get(f"{V1}/quotations/{q['id']}/pdf", headers=h)).json()["data"]
@@ -590,7 +597,7 @@ async def test_the_pdf_is_pending_until_the_worker_renders_it(
 
 async def test_the_public_link_shows_no_party_data_and_records_the_view_on_the_pdf(
         client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue,
-        tmp_path: pathlib.Path) -> None:
+        tmp_path: pathlib.Path, sessions: Callable[[], AsyncSession]) -> None:
     h = await _auth(client, quoter)
     q = await _draft(client, h, qenv, catalogue)
     sent = await _send(client, h, q["id"])
@@ -615,7 +622,7 @@ async def test_the_public_link_shows_no_party_data_and_records_the_view_on_the_p
 
     pending = await client.get(body["pdf_url"], follow_redirects=False)
     assert pending.status_code == 409 and pending.json()["error"]["code"] == "pdf_pending"
-    assert await _render(tmp_path) == "ready"
+    assert await _render(tmp_path, sessions, q["id"]) == "ready"
     opened = await client.get(body["pdf_url"], follow_redirects=False)
     assert opened.status_code == 302 and "/public/files/" in opened.headers["location"]
     got = (await client.get(f"{V1}/quotations/{q['id']}", headers=h)).json()["data"]
@@ -644,7 +651,7 @@ async def test_a_storage_failure_never_names_configuration_to_the_public_link(
     h = await _auth(client, quoter)
     q = await _draft(client, h, qenv, catalogue)
     sent = await _send(client, h, q["id"])
-    assert await _render(tmp_path) == "ready"
+    assert await _render(tmp_path, sessions, q["id"]) == "ready"
     token = sent["share_url"].rsplit("/", 1)[1]
     s = sessions()
     try:

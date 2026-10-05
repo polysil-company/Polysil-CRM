@@ -26,6 +26,7 @@ from api.schemas.quotations import Quotation
 from api.services import approval_view, people
 from api.services import complaints as complaint_service
 from api.services import orders as order_service
+from api.services import payments as payments_service
 from api.services import quotations as quotation_service
 from api.services.leads import _decode_cursor, _encode_cursor
 
@@ -102,6 +103,8 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
         "WHERE c.id = ANY(CAST(:ids AS uuid[]))"),
         {"ids": ids})).all()}
     names = await people.resolve(db, list(docs.values()), [("created_by", "full_name")])
+    order_ids = {str(r.entity_id) for r in rows if r.doc_type == "sales_order"}
+    paid = await payments_service.statuses(db, sorted(order_ids & docs.keys()))
     data = []
     for r in rows:
         d = docs.get(str(r.entity_id))
@@ -116,6 +119,7 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
                 raised_by=names.user(d.created_by, d.full_name),
                 raised_at=(d.submitted_at or d.created_at).isoformat(),
                 discount_pct=None if d.pct is None else f"{d.pct:.2f}",
+                payment_status=paid.get(str(d.id)),
                 request_remark=d.ask_remark),
             waiting_since=r.waiting_since.isoformat()))
     return sch.QueuePage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,

@@ -47,6 +47,8 @@ LIVE_TABLES: dict[str, str] = {
 # FS-014: tasks and meeting minutes, and FS-015's complaints, never in ENTITY_REFS: a
 # task or a complaint may carry no lead,
 # and the CHECK would demand one (plan review B-4).
+# FS-021: a visit may carry no lead, and duty and consent never do; each resolves
+# through its own table's tracking policies.
 ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory", "quotation", "sales_order",
                                  "lead_qr_code", "task", "meeting_minutes", "complaint",
                                  "subsidy_application",
@@ -55,7 +57,10 @@ ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory", "quotation", "sales_or
                                  # FS-034: marketing orders; an office-use order has no partner
                                  "marketing_order",
                                  # FS-032: the reward masters (code review F-3)
-                                 "reward_rule", "gift", "reward_setting")
+                                 "reward_rule", "gift", "reward_setting",
+                                 # FS-021: field tracking
+                                 "visit", "duty_session",
+                                 "tracking_consent")
 
 # A type in both LIVE_TABLES and ENTITY_BY_ID would emit two `WHEN` arms, the
 # first through its reference column's table and the second dead, and PostgreSQL
