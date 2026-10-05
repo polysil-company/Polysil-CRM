@@ -450,8 +450,8 @@ def f_lead() -> None:
               "An unknown or closed QR code: a plain website lead.",
               w=460, colour=YELLOW)
     e += note("nGrey1", 300, y + 20,
-              "Not here: inbound WhatsApp as a source (11za webhook settings),\n"
-              "editing or switching off a QR code, dealership enquiries (GAP-135).",
+              "Not here: inbound WhatsApp as a source (GAP-337, question 3a.1),\n"
+              "dealership enquiries (GAP-135). Editing a QR code: canvas 46.",
               w=560, colour=GREY)
     write("04-lead-capture", e)
 
@@ -1600,7 +1600,9 @@ def f_bell_and_messages() -> None:
               "A DEALER IS NEVER TOLD WHO DECIDED\n\n"
               "Titles never name the decider; the actor is dropped at\n"
               "write time for a partner recipient. A reject does not\n"
-              "notify the next step's role.", w=420, colour=RED)
+              "notify the next step's role.\n\n"
+              "A decided or ended request clears everyone's 'waits for\n"
+              "your approval' on the document first (029, ISS-108).", w=420, colour=RED)
     e += note("nRed3", 1240, 520,
               "MARK READ UP TO A MESSAGE, NEVER 'NOW'\n\n"
               "A message committing while the reader marks read would\n"
@@ -1768,6 +1770,201 @@ def f_subsidy_applications() -> None:
     write("17-subsidy-applications", e)
 
 
+def f_field_tracking() -> None:
+    e, n = [], {}
+    e += title("Field tracking: duty, background points, visits, the map",
+               sub="The Android app records while on duty and uploads in batches; managers "
+                   "read their team's map and routes (FS-021, ADR-044).",
+               status="BUILT (backend). /me/tracking-config, /tracking/*, /locations/batch, "
+                      "/visits; migration 030. The app is the frontend track's.",
+               status_colour=GREEN)
+    steps = [
+        ("t1", "GET /me/tracking-config\nfilters, hours, consent version, open duty", BLUE),
+        ("t2", "POST /tracking/consent (current version)\nwithdraw: ends the open duty", BLUE),
+        ("t3", "POST /tracking/duty/start {id from the phone}\n200 + the open one if already on duty", BLUE),
+        ("t4", "POST /locations/batch {sent_at, points}\nown ids = duplicates; skew corrected; reasons named", VIOLET),
+        ("t5", "location_point + tracking_latest (forward only)\nduty.last_point_at; answer carries the duty state", GREEN),
+        ("t6", "POST /tracking/duty/end, or the worker:\nidle 30 min after hours, or 14 h; end = last point", BLUE),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(steps):
+        els = node(eid, 0, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid])
+        prev = eid
+    side = [
+        ("v1", "POST /visits: a lead, a dealer or a place\nno duty needed; one open visit per person", BLUE),
+        ("v2", "POST /visits/{id}/photos (up to 3, 24 h)\nPOST /visits/{id}/check-out {outcome}", BLUE),
+        ("v3", "GET /tracking/team/latest\nGET /tracking/users/{id}/route?date=", VIOLET),
+        ("v4", "tracking_view_log: every look at someone else\nread by admin and MD only", GREEN),
+    ]
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(side):
+        els = node(eid, 620, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid])
+        prev = eid
+    e += note("nRed1", 1240, 0,
+              "NEVER ON CONFLICT DO NOTHING ON A CLIENT ID\n\n"
+              "Under RLS it hides another user's row and reports a\n"
+              "duplicate; the phone deletes the point. The batch looks\n"
+              "up the caller's own ids; a 23505 is id_in_use.", w=420, colour=RED)
+    e += note("nRed2", 1240, 220,
+              "THE IDEMPOTENCY STORE REPLAYS A 4XX\n\n"
+              "A new key per distinct payload (sha256 of the sorted\n"
+              "point ids). A split batch under the old key replays\n"
+              "batch_too_large for ever.", w=420, colour=RED)
+    e += note("nRed3", 1240, 440,
+              "A PERSON WRITES ONLY THEIR OWN ROWS\n\n"
+              "Every insert and update checks user_id = me, at any\n"
+              "scope. No ScopeSpec: its write branches check the office.\n"
+              "Points carry the duty's office, so a transfer splits nothing.", w=420, colour=RED)
+    e += note("nGreen1", 1240, 660,
+              "No position in any event payload; visit events are for\n"
+              "staff on the lead timeline. The board holds no tracking.", w=420, colour=GREEN)
+    e += note("nYellow1", 1240, 820,
+              "Stand-ins: hours Mon-Sat 9-7, photo optional, 90-day\n"
+              "retention, our consent text (GAP-191 to GAP-201).", w=420, colour=YELLOW)
+    write("29-field-tracking", e)
+
+
+def _column(e: list, n: dict, steps: list, x: int) -> None:
+    prev = None
+    for i, (eid, lbl, colour) in enumerate(steps):
+        els = node(eid, x, i * 120, lbl, w=520, h=90, colour=colour, size=14)
+        n[eid] = els[0]
+        e += els
+        if prev:
+            e += edge(f"e_{eid}", n[prev], n[eid])
+        prev = eid
+
+
+def f_payments() -> None:
+    e, n = [], {}
+    e += title("Payments: receipts, allocation, instalments, the ledger",
+               sub="Accounts records money received and spreads it over orders; the order, the "
+                   "inbox and the dealer ledger read a derived position (FS-022, ADR-045).",
+               status="BUILT (backend). /payments, /orders/{id}/payment-schedule, "
+                      "/partners/{id}/ledger; migration 031.",
+               status_colour=GREEN)
+    _column(e, n, [
+        ("p1", "POST /payments {dealer, mode, ref, amount, allocations}\nAccounts, admin, MD only", BLUE),
+        ("p2", "payment_record(): lock orders by id, check status,\ndealer, sums; receipt + allocations", VIOLET),
+        ("p3", "events: payment.received (dealer),\npayment.allocated (each order); no amounts", VIOLET),
+        ("p4", "order_payment_position(): payable, received, due\n-> status, overdue in the domain", GREEN),
+    ], 0)
+    _column(e, n, [
+        ("q1", "PUT /orders/{id}/payment-schedule\n0 to 5 instalments, within payable", BLUE),
+        ("q2", "GET /orders/{id} -> payments block\nGET /approvals/pending -> payment_status", GREEN),
+        ("q3", "GET /partners/{id}/ledger\norders on approval, receipts in full", GREEN),
+        ("q4", "POST /payments/{id}/void {reason}\nnever edited; allocations stop counting", BLUE),
+    ], 620)
+    e += note("nRed1", 1240, 0,
+              "WRITES ARE DEFINERS\n\n"
+              "Accounts holds no sales_orders.edit. Under RLS a FOR UPDATE\n"
+              "it may not perform matches zero rows, so a direct write\n"
+              "could not lock the orders it pays.", w=420, colour=RED)
+    e += note("nRed2", 1240, 220,
+              "NO AMOUNT IN ANY EVENT\n\n"
+              "Order and lead timelines reach field officers and dealers,\n"
+              "who hold no payments.view.", w=420, colour=RED)
+    e += note("nRed3", 1240, 420,
+              "POLICIES MUST NOT REFERENCE EACH OTHER\n\n"
+              "payment_allocation carries the dealer, so the arrows run\n"
+              "payment -> allocation -> order or dealer.", w=420, colour=RED)
+    e += note("nYellow1", 1240, 620,
+              "Stand-ins: payable = total, even closed short; ledger on\n"
+              "approval; no debit to a dealer (GAP-205 to GAP-214).", w=420, colour=YELLOW)
+    write("30-payments", e)
+
+
+def f_stock() -> None:
+    e, n = [], {}
+    e += title("Stock: warehouses, the ledger, availability, dispatch",
+               sub="A signed movement ledger; on hand and committed derived; a dispatch moves its "
+                   "own warehouse (FS-023, ADR-046).",
+               status="BUILT (backend). /warehouses, /stock, /stock/movements, "
+                      "/stock/availability; migration 032.",
+               status_colour=GREEN)
+    _column(e, n, [
+        ("s1", "POST /stock/movements: receipt or adjustment\nstock_record(): xact advisory lock, sorted", BLUE),
+        ("s2", "stock_movement: signed, never edited\non hand = sum; committed = open order qty", GREEN),
+        ("s3", "GET /stock/availability on the order form\nshort warns, never blocks", GREEN),
+    ], 0)
+    _column(e, n, [
+        ("d1", "POST /orders/{id}/dispatches {warehouse_id?}\nelse the order's, else the default", BLUE),
+        ("d2", "trigger on dispatch_line: -qty at the\ndispatch's warehouse (may go negative)", VIOLET),
+        ("d3", "void: trigger negates the stored movement\nnever recomputed from the order", VIOLET),
+    ], 620)
+    e += note("nRed1", 1240, 0,
+              "A SESSION ADVISORY LOCK OUTLIVES THE CLIENT\n\n"
+              "Under PgBouncer it stays on the server connection.\n"
+              "Use pg_advisory_xact_lock only.", w=420, colour=RED)
+    e += note("nRed2", 1240, 200,
+              "THE WAREHOUSE IS ON THE DISPATCH\n\n"
+              "An approved order's warehouse cannot change: the\n"
+              "submitted-order trigger refuses it.", w=420, colour=RED)
+    e += note("nGreen1", 1240, 400,
+              "Dealers and the board hold no stock permission.\n"
+              "MAIN is seeded as the default.", w=420, colour=GREEN)
+    e += note("nYellow1", 1240, 540,
+              "Stand-ins: warn only; one default warehouse; no dealer\n"
+              "stock (GAP-215 to GAP-218).", w=420, colour=YELLOW)
+    write("31-stock", e)
+
+
+def f_reports() -> None:
+    e, n = [], {}
+    e += title("Reports and the lead 360",
+               sub="Live aggregates scoped like the lists; a figure without its module is null "
+                   "(FS-024, ADR-047).",
+               status="BUILT (backend). /reports/*, /leads/{id}/360; migration 034 (won_at, "
+                      "lost_at). Excel through the exports writer (GAP-220 closed).",
+               status_colour=GREEN)
+    _column(e, n, [
+        ("r1", "GET /reports/<name>?from&to&territory_id&owner_id\nreports.view + the base module, else 403", BLUE),
+        ("r2", "aggregate: scope_predicate per table\n+ deleted_at IS NULL, RLS beneath", VIOLET),
+        ("r3", "rows (1,000 max) + totals over everything\nnull for a figure without its module", GREEN),
+    ], 0)
+    _column(e, n, [
+        ("l1", "lead stage change -> trigger sets\nwon_at / lost_at (every path)", VIOLET),
+        ("l2", "GET /leads/{id}/360: tiles + same-mobile leads\nthe timeline is /leads/{id}/timeline", GREEN),
+    ], 620)
+    e += note("nRed1", 1240, 0,
+              "RLS ALONE GIVES FALSE ZEROS\n\n"
+              "Accounts holds no tasks or tracking; a State Co-ordinator\n"
+              "no orders. A figure the caller cannot see is null.", w=420, colour=RED)
+    e += note("nYellow1", 1240, 200,
+              "Stand-ins: conversion = won / created; sales = commercial,\n"
+              "industrial, export, subsidised (GAP-220 to GAP-226).", w=420, colour=YELLOW)
+    write("32-reports", e)
+
+
+def f_targets() -> None:
+    e, n = [], {}
+    e += title("Targets and achievement",
+               sub="Monthly per-person targets; achievement through the reports' counting (FS-025).",
+               status="BUILT (backend). /targets, /targets/achievement; migration 035.",
+               status_colour=GREEN)
+    _column(e, n, [
+        ("t1", "PUT /targets {user, month, targets}\nbelow me: my subtree, not me, lower rank", BLUE),
+        ("t2", "sales_target: append-only, latest wins\n+ target.set on the person", VIOLET),
+        ("t3", "GET /targets/achievement?month\nme + everyone below, with or without targets", GREEN),
+    ], 0)
+    e += note("nRed1", 620, 0,
+              "THE SUBTREE HOLDS ME AND MY PEERS\n\n"
+              "org_closure has self rows: a subtree test alone lets a\n"
+              "manager set their own or a peer's target. Rank decides.", w=420, colour=RED)
+    e += note("nYellow1", 620, 200,
+              "A transfer moves this and later months (trigger).\n"
+              "Stand-ins: four measures, monthly (GAP-230 to GAP-233).", w=420, colour=YELLOW)
+    write("33-targets", e)
+
+
 # ── session B, 3 Oct: canvases 40 to 49 ──────────────────────────────────────
 
 def _columns(name: str, head: str, sub: str, status: str, steps: list, side: list,
@@ -1888,12 +2085,30 @@ def f_subsidy_follow_ups() -> None:
          ("n2", "Not yet: printed GGRC quotations and consent letters\n(GAP-331, GAP-333).", YELLOW)])
 
 
+def f_lead_small_gaps() -> None:
+    _columns(
+        "46-lead-small-gaps", "Lead small gaps: QR edit, dormant leads, the office on assign",
+        "Three pieces FS-003 and FS-003a left open.",
+        "BUILT. FS-035: PATCH /lead-qr-codes/{id}, the nightly sweep, migration 040.",
+        [("s1", "nightly 00:30 IST: lead_dormant_sweep(now, 2000)\nthe System principal only", VIOLET),
+         ("s2", "open stage, no person's event for 60 days,\nno open task, no waiting quotation", BLUE),
+         ("s3", "FOR UPDATE SKIP LOCKED, stage re-checked\nplain UPDATE: stage = dormant, from-stage kept", GREEN),
+         ("s4", "POST /leads/{id}/reopen: back to the from-stage\nor transition to lost: lost_from = the from-stage", GREEN)],
+        [("d1", "assign: the office follows the owner\nlead_owner_unit(), else routed by territory", BLUE),
+         ("d2", "outside the assigner's scope: office kept", YELLOW),
+         ("d3", "PATCH /lead-qr-codes/{id}: label, campaign,\ndealer, territory, switch off; the code never changes", GREY)],
+        [("n1", "THE CLEAR TRIGGER GUARDS THE CHECK\n\nA merge moves a dormant loser to merged. Without\ntrg_lead_dormant_clear the CHECK fails with a 500.", RED),
+         ("n2", "DO NOT RUN THE SWEEP ON THE DEV DB\n\nIt parks every idle demo lead. The tests run it\n61 days ahead inside a rolled-back transaction.", RED),
+         ("n3", "Ours: 60 days, what keeps a lead open, only Reopen\nwakes it, nobody told (GAP-339 to GAP-342).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
     f_approval(); f_subsidy(); f_outbox(); f_money(); f_pricing()
     f_quotation(); f_order(); f_auth(); f_admin(); f_tasks(); f_complaints(); f_bell_and_messages()
-    f_subsidy_applications()
+    f_subsidy_applications(); f_field_tracking(); f_payments(); f_stock()
+    f_reports(); f_targets()
     f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
-    f_subsidy_follow_ups()
+    f_subsidy_follow_ups(); f_lead_small_gaps()
     print(f"\nwrote to {OUT}")

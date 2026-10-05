@@ -10,7 +10,6 @@ expiry takes only what is left of a lot.
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from collections.abc import AsyncIterator, Callable
 from decimal import Decimal
@@ -26,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.config import get_settings
 from api.db.session import enter_role
 from api.domain import rewards as domain
+from tests.api import test_order_concurrency as conc
 from tests.api import test_order_endpoints as endpoints
 from tests.api import test_schemes as schemes
 from tests.api.conftest import V1, _key
@@ -241,9 +241,16 @@ async def test_two_spends_at_once_never_take_the_balance_below_zero(
                               headers={**ha, **_key()})).json()["data"]["id"]
     ruled.append(gift)
     await _give(sessions, shop, 150)
-    outcomes = await asyncio.gather(_spend(sessions, shop, gift=gift), _spend(sessions, shop, gift=gift),
-                                    return_exceptions=True)
-    assert sum(isinstance(o, str) for o in outcomes) == 1, outcomes
+
+    async def spend(s: Any) -> Any:
+        return (await s.execute(text(
+            "SELECT reward_spend('gift', 'partner', CAST(:p AS uuid), 1, NULL, CAST(:g AS uuid))"),
+            {"p": shop.partner, "g": gift})).scalar_one()
+
+    # the first holds the holder's lock until PostgreSQL reports the second waiting on it
+    got, waited = await conc._race(sessions, (shop.ids["dealer"], spend), (shop.ids["dealer"], spend))
+    assert waited, "the second spend never waited on the first: not a race"
+    assert sorted(conc._outcome(g) for g in got) == ["RWDIN", "ok"], got
     assert sum(p for _, p in await _ledger(sessions, partner=shop.partner)) == 50
 
 

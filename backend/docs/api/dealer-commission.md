@@ -260,7 +260,7 @@ Final. Only company-wide payments roles (Accounts, admin).
 
 **Request body**
 
-**`Payment`**
+**`Payment-Input`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -524,7 +524,7 @@ the stored calculation, and the rate in force on the full-FP date.
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
 
-**`Payment`**
+**`Payment-Input`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|

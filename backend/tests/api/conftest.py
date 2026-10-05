@@ -8,6 +8,7 @@ modules use one fixture without importing each other.
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
@@ -19,6 +20,32 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import Dealer, Staff
+
+
+@contextlib.asynccontextmanager
+async def only_these_render(sessions: Callable[[], AsyncSession], table: str,
+                            ids: list[str]) -> AsyncIterator[None]:
+    """The render claim takes the earliest due row in the whole database, so a test
+    that renders would claim, and mark ready, someone else's document (PR 11 review).
+    Every other pending row on `table` is set aside for the duration, then restored."""
+    assert table in ("quotation", "sales_order")
+    s = sessions()
+    moved: list[str] = []
+    try:
+        moved = [str(x) for x in (await s.execute(text(
+            f"UPDATE {table} SET pdf_next_attempt_at = pdf_next_attempt_at + interval '100 years' "
+            "WHERE pdf_state = 'pending' AND pdf_next_attempt_at IS NOT NULL "
+            "AND id <> ALL(CAST(:i AS uuid[])) RETURNING id"), {"i": ids})).scalars().all()]
+        await s.commit()
+        yield
+    finally:
+        if moved:
+            await s.execute(text(
+                f"UPDATE {table} SET pdf_next_attempt_at = "
+                "pdf_next_attempt_at - interval '100 years' "
+                "WHERE id = ANY(CAST(:i AS uuid[]))"), {"i": moved})
+            await s.commit()
+        await s.close()
 
 __all__ = ["Admin", "Catalogue", "Dealer", "Staff", "admin", "catalogue", "scoped_admin"]
 

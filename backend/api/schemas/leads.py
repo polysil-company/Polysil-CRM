@@ -150,6 +150,8 @@ class Lead(BaseModel):
     lost_reason: ReasonRef | None
     lost_note: str | None
     reopen_count: int
+    dormant_from_stage: str | None = Field(
+        description="Set while the lead is dormant: the stage Reopen returns it to (FS-035).")
     merged_into: MergedRef | None = Field(
         description="Set on a merged lead; links to the survivor.")
     first_contacted_at: str | None

@@ -31,6 +31,12 @@ Conventions for every endpoint in this file:
 
 The codes in your scope, newest first, with how many leads each brought.
 
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `active` | query | boolean \| null |  | true: only codes that are on; false: only codes switched off. |
+
 **Responses**
 
 | Status | Body | Meaning |
@@ -69,6 +75,43 @@ and offer a download. Leads from it are credited to `partner_id` when set.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_QrCode_` | Successful Response |
+| `422` | `ErrorResponse` | A field. |
+
+---
+
+## `PATCH /api/v1/lead-qr-codes/{qr_id}`
+
+**Patch Qr**
+
+Rename a code, change its campaign, dealer or territory, or switch it off. The
+code and its URL never change, so printed codes keep working. A new dealer gets
+new leads only. Send only the fields that change.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `qr_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`QrCodePatch`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string \| null |  |  |
+| `campaign` | string \| null |  |  |
+| `partner_id` | string \| null |  | New leads from this code go to this partner; earlier leads keep theirs. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+| `is_active` | boolean \| null |  | false switches the code off: the form then makes a plain website enquiry. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_QrCode_` | Successful Response |
+| `404` | `ErrorResponse` | Not yours. |
 | `422` | `ErrorResponse` | A field. |
 
 ---
@@ -815,6 +858,7 @@ with the current stage in `fields.stage`.
 | `lost_reason` | ReasonRef \| null | yes |  |
 | `lost_note` | string \| null | yes |  |
 | `reopen_count` | integer | yes |  |
+| `dormant_from_stage` | string \| null | yes | Set while the lead is dormant: the stage Reopen returns it to (FS-035). |
 | `merged_into` | MergedRef \| null | yes | Set on a merged lead; links to the survivor. |
 | `first_contacted_at` | string \| null | yes |  |
 | `last_activity_at` | string | yes |  |
@@ -972,6 +1016,16 @@ with the current stage in `fields.stage`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | QrCode[] | yes |  |
+
+**`QrCodePatch`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string \| null |  |  |
+| `campaign` | string \| null |  |  |
+| `partner_id` | string \| null |  | New leads from this code go to this partner; earlier leads keep theirs. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+| `is_active` | boolean \| null |  | false switches the code off: the form then makes a plain website enquiry. |
 
 **`ReasonRef`**
 

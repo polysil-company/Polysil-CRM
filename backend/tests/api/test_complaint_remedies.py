@@ -64,6 +64,7 @@ async def remedies(shop: Shop, sessions: Sessions) -> AsyncIterator[Shop]:
             # the replacement orders' lines point at this list: they go first
             f"DELETE FROM approval_step WHERE request_id IN (SELECT id FROM approval_request WHERE doc_type = 'sales_order' AND entity_id IN {orders})",
             f"DELETE FROM approval_request WHERE doc_type = 'sales_order' AND entity_id IN {orders}",
+            f"DELETE FROM stock_movement WHERE dispatch_line_id IN (SELECT dl.id FROM dispatch_line dl JOIN dispatch d ON d.id = dl.dispatch_id WHERE d.sales_order_id IN {orders})",
             f"DELETE FROM dispatch WHERE sales_order_id IN {orders}",
             f"DELETE FROM activity_event WHERE entity_id IN {orders}",
             f"DELETE FROM notification WHERE resource_id IN {orders}",
@@ -162,6 +163,13 @@ async def test_a_refund_goes_through_its_managers_and_accounts_and_closes_the_co
     bells = await client.get(f"{V1}/notifications", headers=await _as(client, shop, "field_officer"))
     mine = [n["kind"] for n in bells.json()["data"] if (n.get("resource") or {}).get("id") == c["id"]]
     assert mine.count("complaint_refund_paid") == 1 and "complaint_closed" not in mine, mine
+    # reports review 3: the refund total follows the report's own filters
+    report = f"{V1}/reports/complaints"
+    got = (await client.get(report, headers=dm, params={"territory_id": shop.district})).json()["data"]
+    assert got["totals"]["refunds"] == {"count": 1, "amount": "12500.00"}, got["totals"]
+    got = (await client.get(report, headers=dm, params={"territory_id": shop.district,
+                                                        "owner_id": shop.ids["district_manager"]})).json()["data"]
+    assert got["totals"]["refunds"] == {"count": 0, "amount": "0.00"}, "another owner's complaints only"
 
 
 async def test_the_managers_stack_by_amount(client: httpx.AsyncClient, remedies: Shop) -> None:

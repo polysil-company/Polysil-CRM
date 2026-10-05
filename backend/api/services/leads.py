@@ -122,7 +122,7 @@ SELECT l.id, l.inquiry_no, l.stage, l.inquiry_type,
                    FROM unnest(l.crops) WITH ORDINALITY AS x(code, ord)
                    JOIN crop c ON c.code = x.code), '[]'::json) AS crops_json,
        l.lost_reason_id, wlr.code AS lost_reason_code, wlr.name AS lost_reason_name,
-       l.lost_note, l.reopen_count,
+       l.lost_note, l.reopen_count, l.dormant_from_stage::text AS dormant_from_stage,
        l.merged_into_id, mi.inquiry_no AS merged_into_no,
        l.first_contacted_at, l.last_activity_at, l.created_at,
        l.created_by, cb.full_name AS created_by_name
@@ -548,6 +548,7 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
         lost_reason=ReasonRef(id=str(row.lost_reason_id), code=row.lost_reason_code,
                               name=row.lost_reason_name) if row.lost_reason_id else None,
         lost_note=row.lost_note, reopen_count=row.reopen_count,
+        dormant_from_stage=row.dormant_from_stage,
         merged_into=MergedRef(id=str(row.merged_into_id), inquiry_no=row.merged_into_no)
         if row.merged_into_id and row.merged_into_no else None,
         first_contacted_at=_iso(row.first_contacted_at),
@@ -564,6 +565,7 @@ async def _lock(db: AsyncSession, lead_id: str) -> Any:
     after require('leads','edit') has already passed. Returns the locked row."""
     return (await db.execute(text(
         "SELECT stage::text AS stage, first_contacted_at, lost_from_stage::text AS lost_from, "
+        "dormant_from_stage::text AS dormant_from, "
         "lost_reason_id, lost_note, territory_id, owner_user_id, owner_org_unit_id, "
         "assigned_partner_id, deleted_at, crops::text[] AS crops "
         "FROM lead WHERE id = :id FOR UPDATE"),
@@ -623,7 +625,8 @@ async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
                 CASE WHEN :to = 'contacted' THEN now() END),
             lost_reason_id = CASE WHEN :to = 'lost' THEN CAST(:lr AS uuid) ELSE lost_reason_id END,
             lost_note = CASE WHEN :to = 'lost' THEN :ln ELSE lost_note END,
-            lost_from_stage = CASE WHEN :to = 'lost' THEN CAST(:frm AS lead_stage)
+            lost_from_stage = CASE WHEN :to = 'lost'
+                                   THEN COALESCE(dormant_from_stage, CAST(:frm AS lead_stage))
                                    ELSE lost_from_stage END
          WHERE id = :id"""),
         {"to": body.to_stage, "lr": body.lost_reason_id, "ln": body.lost_note,
@@ -634,16 +637,27 @@ async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
 
 async def reopen_lead(db: AsyncSession, caller: Caller, lead_id: str,
                       body: LeadReopen) -> Lead:
-    """Bring a lost lead back to the stage it was lost from (rule 11). The reason and
-    note move to the timeline and are cleared on the row; reopen_count goes up."""
+    """Bring a lost lead back to the stage it was lost from (rule 11), or a dormant
+    one back to the stage it was swept from (FS-035). A lost lead's reason and note
+    move to the timeline and are cleared on the row, and reopen_count goes up; a
+    dormant lead's does not, because the count is the conversion report's."""
     row = await _lock(db, lead_id)
     if row is None:
         raise NotFoundError("No such lead.")
-    if row.stage != "lost":
-        raise ValidationFailed("Only a lost lead can be reopened.", code="stage_terminal",
-                               fields={"stage": row.stage})
-    target = row.lost_from or "new"
+    if row.stage not in domain.REOPENABLE:
+        raise ValidationFailed("Only a lost or dormant lead can be reopened.",
+                               code="stage_terminal", fields={"stage": row.stage})
     actor = await _actor_name(db)
+    if row.stage == "dormant":
+        target = row.dormant_from or "new"
+        await _emit(db, lead_id=lead_id, kind="lead.reopened", actor_id=caller.user_id,
+                    actor_name=actor, **{"from": "dormant", "to": target, "note": body.note})
+        # trg_lead_dormant_clear clears dormant_from_stage
+        await db.execute(text("UPDATE lead SET stage = CAST(:t AS lead_stage) WHERE id = :id"),
+                         {"t": target, "id": lead_id})
+        await _rescore(db, lead_id)
+        return await get_lead(db, caller, lead_id)
+    target = row.lost_from or "new"
     await _emit(db, lead_id=lead_id, kind="lead.reopened", actor_id=caller.user_id,
                 actor_name=actor, **{"from": "lost", "to": target,
                                      "lost_reason_id": str(row.lost_reason_id)
@@ -783,11 +797,8 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
     read the target's app_user row); the partner is checked by authz_visible(), the
     same function the parent-guard trigger enforces underneath (rule 12).
 
-    GAP-061: owner_org_unit_id is not re-routed to the new owner's own sales unit
-    (rule 4 path A), because reading that unit needs users.view the assigner lacks.
-    The lead keeps its current unit, which stays in the assigner's scope; the new
-    owner sees it by owner_user_id. A definer that returns the owner's unit closes
-    this later."""
+    The office follows the owner (rule 4, GAP-061 closed by FS-035 rule 13): see
+    _owner_office()."""
     fields = body.model_fields_set
     if not ({"owner_user_id", "assigned_partner_id"} & fields):
         raise ValidationFailed(fields={"owner_user_id": "provide an owner or a partner"})
@@ -796,9 +807,11 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
     # wait on a handover that holds the person and wants the lead. An unassignable
     # owner on a missing or closed lead therefore answers 422 before the 404 or
     # stage_terminal would, which leaks nothing about the lead.
+    if "owner_user_id" in fields and caller.scopes.get("leads") not in ("global", "org_subtree"):
+        # setting or clearing: an own-scoped caller who clears the owner loses the row
+        # under the UPDATE policy, which would surface as a 500 (code review F-5)
+        raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
     if "owner_user_id" in fields and body.owner_user_id is not None:
-        if caller.scopes.get("leads") not in ("global", "org_subtree"):
-            raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
         ok: bool = (await db.execute(
             text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
             {"u": body.owner_user_id})).scalar_one()
@@ -819,6 +832,11 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
         sets.append("owner_user_id = CAST(:owner AS uuid)")
         params["owner"] = body.owner_user_id
         payload["owner_user_id"] = body.owner_user_id
+        oou = await _owner_office(db, caller, owner=body.owner_user_id, row=row)
+        if oou != str(row.owner_org_unit_id):
+            sets.append("owner_org_unit_id = CAST(:oou AS uuid)")
+            params["oou"] = oou
+            payload["owner_org_unit_id"] = oou
     if "assigned_partner_id" in fields:
         if body.assigned_partner_id is not None:
             vis: bool = (await db.execute(
@@ -835,6 +853,31 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
     await db.execute(text(f"UPDATE lead SET {', '.join(sets)} WHERE id = :id"), params)
     await _rescore(db, lead_id)
     return await get_lead(db, caller, lead_id)
+
+
+async def _owner_office(db: AsyncSession, caller: Caller, *, owner: str | None, row: Any) -> str:
+    """The office a lead belongs to once `owner` owns it (rule 4): the owner's own
+    sales office (lead_owner_unit, a definer, since the assigner cannot read
+    app_user), else the office covering the lead's territory, which is also the
+    answer when the owner is cleared. If that office would take the lead out of the
+    assigner's own scope, the lead keeps its office: the leads UPDATE policy would
+    refuse the row otherwise (FS-035 rule 13, plan review N-4)."""
+    current = str(row.owner_org_unit_id)
+    unit: str | None = None
+    if owner is not None:
+        found = (await db.execute(text("SELECT lead_owner_unit(CAST(:u AS uuid))"),
+                                  {"u": owner})).scalar_one_or_none()
+        unit = str(found) if found else None
+    if unit is None:
+        unit = await _covering_org_unit(db, str(row.territory_id))
+    try:
+        await _assert_insert_in_scope(
+            db, caller, territory_id=str(row.territory_id), owner_user_id=owner,
+            owner_org_unit_id=unit,
+            assigned_partner_id=str(row.assigned_partner_id) if row.assigned_partner_id else None)
+    except ValidationFailed:
+        return current
+    return unit
 
 
 async def assignees(db: AsyncSession, caller: Caller) -> list[Assignee]:
@@ -1204,7 +1247,7 @@ async def update_lookup(db: AsyncSession, table: str, item_id: str,
 
 # Caps and hour bands must stay positive or the score divides by zero (rule 7).
 _SCORING_POSITIVE = frozenset({"value_cap", "engagement_cap", "speed_fast_hours",
-                               "speed_slow_hours"})
+                               "speed_slow_hours", "dormant_after_days"})
 
 
 async def get_scoring(db: AsyncSession) -> list[ScoringItem]:

@@ -192,7 +192,7 @@ def _tables(markdown: str) -> Iterable[tuple[str, list[str], list[list[str]]]]:
 def parse_matrix(markdown: str) -> list[Grant]:
     """RBAC.md section 6 into positive permission rows. A blank cell is the absence
     of a row, never a row. The board (6.4) is prose, not a table: view on every
-    module at global.
+    module at global, except the modules its `**Except:**` line names.
 
     Enumerated from the document rather than from any seed, so a seed that grants
     a blank cell is caught rather than blessed (FS-002 9.3 A-1).
@@ -214,7 +214,11 @@ def parse_matrix(markdown: str) -> list[Grant]:
                 for action in actions:
                     grants.append(Grant(role, module, action, scope))
     if "### 6.4 Board" in markdown:
-        grants.extend(Grant("board", m, "view", "global") for m in modules)
+        board = markdown.split("### 6.4 Board", 1)[1].split("\n## ", 1)[0]
+        # FS-021: one prose line names the modules the board does not see
+        except_line = re.search(r"^\*\*Except:\*\* (.+)$", board, re.MULTILINE)
+        excluded = set(re.findall(r"`(\w+)`", except_line.group(1))) if except_line else set()
+        grants.extend(Grant("board", m, "view", "global") for m in modules if m not in excluded)
     out = sorted(set(grants))
     _check_view_row_rule(out)
     return out

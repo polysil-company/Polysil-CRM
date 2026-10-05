@@ -308,7 +308,9 @@ class Settings(BaseSettings):
         # PostgresDsn is a MultiHostUrl: it permits a comma-separated host list, so
         # the port lives on each host entry rather than on the URL.
         ports = [h.get("port") for h in v.hosts()]
-        wrong = [p for p in ports if p not in (6432, None)]
+        # 6433 is pgbouncer-b, the second PgBouncer a parallel worktree uses for its
+        # own copy of the database (infra/docker-compose.yml). Still pooled.
+        wrong = [p for p in ports if p not in (6432, 6433, None)]
         if wrong:
             raise ValueError(
                 f"database_url points at port {wrong[0]}, not PgBouncer's 6432. "

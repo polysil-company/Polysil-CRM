@@ -10,10 +10,12 @@ from __future__ import annotations
 
 from arq import cron
 
+from worker.jobs.leads import lead_dormancy
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
 from worker.jobs.quotations import quotation_expire, quotation_render_due
 from worker.jobs.schemes import scheme_nightly
+from worker.jobs.tracking import location_point_purge, tracking_auto_end, visit_auto_close
 
 CRON_JOBS: list = [
     # Every ten seconds. An OTP that arrives a minute after it was asked for is a
@@ -36,4 +38,12 @@ CRON_JOBS: list = [
          run_at_startup=True),
     # FS-031: 00:20 IST is 18:50 UTC. Expire credits, then credit ended periods.
     cron(scheme_nightly, hour=18, minute=50),
+    # FS-021: an idle duty ends and a day-old visit closes within five minutes;
+    # points past retention go nightly, beside the session purge.
+    cron(tracking_auto_end, minute=set(range(0, 60, 5))),
+    cron(visit_auto_close, minute=set(range(1, 60, 5))),
+    cron(location_point_purge, hour=3, minute=23),
+    # FS-035: 00:30 IST is 19:00 UTC, after the quotation expiry, so a quotation that
+    # expired tonight no longer keeps its lead open.
+    cron(lead_dormancy, hour=19, minute=0),
 ]

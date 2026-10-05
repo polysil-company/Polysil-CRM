@@ -111,10 +111,13 @@ async def test_stage_18_is_recorded_approved_and_paid_to_the_paisa(
                           json={"paid_on": today_ist().isoformat(), "payment_reference": "NEFT UTR 99"})
     assert r.status_code == 200 and r.json()["data"]["status"] == "paid"
 
-    tl = (await client.get(f"{V1}/subsidy-applications/{closed['id']}/timeline", headers=sc))
-    if tl.status_code == 200:
-        kinds = {e["kind"] for e in tl.json()["data"]}
-        assert {"subsidy.commission_recorded", "subsidy.commission_approved", "subsidy.commission_paid"} <= kinds
+    # the application's events sit on its lead's timeline (PR 11 review: the old read hit
+    # a route that does not exist and asserted nothing)
+    owner = await subsidy._as(client, office, "field_officer")
+    tl = await client.get(f"{V1}/leads/{closed['lead']['id']}/timeline", headers=owner)
+    assert tl.status_code == 200, tl.text
+    kinds = {e["kind"] for e in tl.json()["data"]}
+    assert {"subsidy.commission_recorded", "subsidy.commission_approved", "subsidy.commission_paid"} <= kinds
 
     r = await client.get(f"{V1}/dealer-commissions/export", headers=acc, params={"status": "paid"})
     assert r.status_code == 200 and r.content[:2] == b"PK"

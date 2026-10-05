@@ -21,15 +21,27 @@ from worker.jobs.outbox import enter_as_principal
 log = structlog.get_logger(__name__)
 
 
-async def scheme_nightly(ctx: dict[str, Any]) -> dict[str, int]:
+async def _step(sql: str, params: dict[str, Any] | None = None) -> int:
+    """One definer in its own transaction: a failure in one step rolls back only that
+    step, and the others still run tonight (PR 11 review)."""
     settings = get_settings()
     async with async_session_factory() as session, session.begin():
         await enter_as_principal(session, settings)
-        expired = int((await session.execute(
-            text("SELECT scheme_entitlement_expire()"))).scalar_one())
-        credited = int((await session.execute(
-            text("SELECT scheme_period_evaluate(:today)"), {"today": today_ist()})).scalar_one())
-        points = int((await session.execute(text("SELECT reward_points_expire()"))).scalar_one())
-    if expired or credited or points:
-        log.info("scheme.nightly", expired=expired, credited=credited, points_expired=points)
-    return {"expired": expired, "credited": credited, "points_expired": points}
+        return int((await session.execute(text(sql), params or {})).scalar_one())
+
+
+async def scheme_nightly(ctx: dict[str, Any]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for key, sql, params in (
+            ("expired", "SELECT scheme_entitlement_expire()", None),
+            ("credited", "SELECT scheme_period_evaluate(:today)", {"today": today_ist()}),
+            ("points_expired", "SELECT reward_points_expire()", None)):
+        try:
+            out[key] = await _step(sql, params)
+        except Exception:
+            # logged and skipped: the next night retries it, the other steps are unaffected
+            log.exception("scheme.nightly_step_failed", step=key)
+            out[key] = 0
+    if any(out.values()):
+        log.info("scheme.nightly", **out)
+    return out

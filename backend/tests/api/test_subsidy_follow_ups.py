@@ -138,23 +138,41 @@ async def test_a_cleared_date_counts_as_cleared_and_a_cancelled_application_stop
 
 @pytest_asyncio.fixture
 async def matrix_restore(sessions: Sessions) -> AsyncIterator[list[str]]:
-    """New matrices a test made; removed, and the one they closed reopened."""
+    """A quantity matrix in force for the test, a stand-in when the database has none
+    (CI starts empty). Afterwards: every matrix the test made is removed, and the rows
+    that were there get back only what changed on them (PR 11 review: the old fixture
+    skipped on CI and rewrote updated_by on every row)."""
     made: list[str] = []
     c = sessions()
-    # Closing stamps updated_by with the test admin, whose teardown then fails the FK.
-    actors = (await c.execute(text("SELECT id, updated_by FROM quantity_matrix"))).all()
+    before = {r.id: (r.effective_to, r.updated_by) for r in (await c.execute(text(
+        "SELECT id, effective_to, updated_by FROM quantity_matrix"))).all()}
+    open_now = (await c.execute(text(
+        "SELECT count(*) FROM quantity_matrix WHERE is_active AND effective_from <= CURRENT_DATE "
+        "AND (effective_to IS NULL OR effective_to > CURRENT_DATE)"))).scalar_one()
+    if not open_now:
+        stand_in = str((await c.execute(text(
+            "INSERT INTO quantity_matrix (scheme_id, system_type, effective_from, source) "
+            "SELECT id, 'sprinkler', DATE '2020-01-01', 'test stand-in' FROM subsidy_scheme WHERE code = 'GGRC' "
+            "RETURNING id"))).scalar_one())
+        await c.execute(text("INSERT INTO quantity_matrix_cell (matrix_id, component_code, area_breakpoint, qty) "
+                             "VALUES (CAST(:m AS uuid), 'PIPE', 1, 10)"), {"m": stand_in})
+        made.append(stand_in)
+    await c.commit()
     await c.close()
     yield made
     c = sessions()
-    for mid in made:
-        gone = (await c.execute(text("SELECT system_type::text, effective_from FROM quantity_matrix "
-                                     "WHERE id = CAST(:m AS uuid)"), {"m": mid})).one()
-        await c.execute(text("DELETE FROM quantity_matrix_cell WHERE matrix_id = CAST(:m AS uuid)"), {"m": mid})
-        await c.execute(text("DELETE FROM quantity_matrix WHERE id = CAST(:m AS uuid)"), {"m": mid})
-        await c.execute(text("UPDATE quantity_matrix SET effective_to = NULL WHERE effective_to = :d "
-                             "AND system_type::text = :t"), {"d": gone[1], "t": gone[0]})
-    for mid, by in actors:
-        await c.execute(text("UPDATE quantity_matrix SET updated_by = :b WHERE id = :m"), {"b": by, "m": mid})
+    # the test's own matrices first: reopening a closed one while they exist breaks ex_quantity_matrix
+    await c.execute(text("DELETE FROM quantity_matrix_cell WHERE matrix_id IN "
+                         "(SELECT id FROM quantity_matrix WHERE NOT (id = ANY(CAST(:keep AS uuid[]))))"),
+                    {"keep": list(before)})
+    await c.execute(text("DELETE FROM quantity_matrix WHERE NOT (id = ANY(CAST(:keep AS uuid[])))"),
+                    {"keep": list(before)})
+    now = {r.id: (r.effective_to, r.updated_by) for r in (await c.execute(text(
+        "SELECT id, effective_to, updated_by FROM quantity_matrix"))).all()}
+    for mid, (to, by) in before.items():
+        if now.get(mid) != (to, by):
+            await c.execute(text("UPDATE quantity_matrix SET effective_to = :t, updated_by = :b WHERE id = :m"),
+                            {"t": to, "b": by, "m": mid})
     await c.commit()
     await c.close()
 
@@ -164,8 +182,7 @@ async def test_a_new_matrix_starts_on_its_date_and_the_old_one_stays_in_force_be
     """Code review F-4: the listing, and a revision that closes rather than edits."""
     admin = await endpoints._as(client, shop, "admin_sales")
     before = (await client.get(f"{V1}/subsidy-masters/quantity-matrices/matrices", headers=admin)).json()["data"]
-    if not before:
-        pytest.skip("no quantity matrix loaded on this database")
+    assert before, "the fixture puts a matrix in force"
     old = before[0]
     start = today_ist() + dt.timedelta(days=30)
     r = await client.post(f"{V1}/subsidy-masters/quantity-matrices/matrices", headers={**admin, **_key()}, json={
@@ -179,7 +196,6 @@ async def test_a_new_matrix_starts_on_its_date_and_the_old_one_stays_in_force_be
     old_cells = (await c.execute(text("SELECT count(*) FROM quantity_matrix_cell WHERE matrix_id = CAST(:m AS uuid)"),
                                  {"m": old["id"]})).scalar_one()
     await c.close()
-    matrix_restore.append(mid)
     today = (await client.get(f"{V1}/subsidy-masters/quantity-matrices/matrices", headers=admin)).json()["data"]
     later = (await client.get(f"{V1}/subsidy-masters/quantity-matrices/matrices", headers=admin,
                               params={"on": start.isoformat()})).json()["data"]

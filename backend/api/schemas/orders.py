@@ -19,9 +19,11 @@ from api.schemas.approvals import ApprovalStep as ApprovalStep  # re-exported
 from api.schemas.approvals import Decision
 from api.schemas.complaints import Complaint
 from api.schemas.leads import UUID_RE, OrgUnitRef, PageMeta, PartnerRef, TerritoryRef, UserRef
+from api.schemas.payments import OrderPayments
 from api.schemas.products import MAX_LINES, _places
 from api.schemas.quotations import Quotation, QuotationLineIn, Totals
 from api.schemas.schemes import OrderBenefit
+from api.schemas.stock import LineStock, WarehouseRef
 
 OrderType = Literal["commercial", "industrial", "export", "sample", "marketing_material",
                     "subsidised", "replacement"]
@@ -81,6 +83,10 @@ class OrderCreate(BaseModel):
         default=None, description="A direct order's price date, today in India by default.")]
     payment_terms: PaymentTerms = Field(
         default="full_payment", description="Recorded, not enforced. There is no credit check.")
+    warehouse_id: Annotated[str | None, Field(
+        default=None, pattern=UUID_RE,
+        description="\"Order to\" (FS-023): staff only. Null means the default "
+                    "warehouse.")]
     remarks: Annotated[str | None, Field(default=None, max_length=2000)]
     lines: Annotated[list[QuotationLineIn], Field(
         default_factory=list, max_length=MAX_LINES,
@@ -107,6 +113,10 @@ class OrderPatch(BaseModel):
     seller_gstin_id: Annotated[str | None, Field(default=None, pattern=UUID_RE)]
     price_effective_date: dt.date | None = None
     payment_terms: PaymentTerms | None = None
+    warehouse_id: Annotated[str | None, Field(
+        default=None, pattern=UUID_RE,
+        description="\"Order to\" (FS-023): staff only. Null means the default "
+                    "warehouse.")]
     remarks: Annotated[str | None, Field(default=None, max_length=2000)]
     expected_status: OrderStatus | None = Field(default=None, description=_EXPECTED)
 
@@ -174,6 +184,10 @@ class DispatchCreate(BaseModel):
     dispatched_at: dt.datetime = Field(description="When the goods left; not in the future.")
     transporter: Annotated[str | None, Field(default=None, max_length=200)]
     vehicle_no: Annotated[str | None, Field(default=None, max_length=200)]
+    warehouse_id: Annotated[str | None, Field(
+        default=None, pattern=UUID_RE,
+        description="Where the goods left (FS-023). Defaults to the order's warehouse, "
+                    "then the default.")]
     lines: Annotated[list[DispatchLineIn], Field(
         max_length=MAX_LINES, description="At least one; each order line at most once.")]
 
@@ -226,6 +240,10 @@ class OrderLine(BaseModel):
     hsn_code: str
     uom: str
     uom_decimals: int = Field(description="How many decimals the unit takes; 0 for pieces.")
+    stock: LineStock | None = Field(
+        default=None, description="Availability at the order's warehouse while the line is "
+                                  "open (FS-023). A warning, never a block. Null without "
+                                  "stock.view or once shipped.")
     qty: str
     rate: str
     gross: str
@@ -286,6 +304,8 @@ class Dispatch(BaseModel):
     dispatched_by: UserRef | None
     voided_at: str | None = Field(description="Set when voided; its quantities are open again.")
     void_remark: str | None
+    warehouse: WarehouseRef | None = Field(
+        default=None, description="Where the goods left (FS-023).")
     lines: list[DispatchLineOut]
     warnings: list[str] = Field(
         default_factory=list,
@@ -353,6 +373,12 @@ class Order(BaseModel):
     payable: str | None = Field(
         default=None, description="What the buyer owes: the total minus the applied "
                                   "benefits. Payments count against this.")
+    warehouse: WarehouseRef | None = Field(
+        default=None, description="\"Order to\" (FS-023); null means the default. "
+                                  "Always null for a dealer.")
+    payments: OrderPayments | None = Field(
+        default=None, description="Payable, received, balance, instalments and receipts (FS-022). "
+                                  "Null for a caller who may not see payments.")
     submitted_at: str | None
     approved_at: str | None
     cancelled_at: str | None
@@ -405,6 +431,9 @@ class QueueDocument(BaseModel):
     discount_pct: str | None = Field(
         default=None, description="A quotation row: the effective discount asked for, in "
                                   "percent. Null on an order.")
+    payment_status: str | None = Field(
+        default=None, description="An order row: not_applicable, unpaid, part_paid, paid or "
+                                  "overpaid (FS-022), for the Accounts step. Null otherwise.")
     request_remark: str | None = Field(
         default=None, description="Why the approval was asked, as the person asking wrote "
                                   "it. Show it beside the figures. Null when none was given.")
