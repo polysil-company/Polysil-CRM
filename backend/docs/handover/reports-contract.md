@@ -13,7 +13,7 @@ All paths are under `/api/v1`. Reads only; no `Idempotency-Key`.
 | `from`, `to` | Indian dates, inclusive. Default: the last 30 days. At most a year; `422` if backwards |
 | `territory_id` | up to 20, comma-separated |
 | `owner_id` | one person |
-| `format` | `json`, or `xlsx`, which answers `501 export_not_ready` for now: disable the Excel button on 501 |
+| `format` | `json`, or `xlsx`: the same rows as an Excel attachment, `report-<name>-YYYY-MM-DD.xlsx`. Below the rows: a Total line, and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. Download it as a file (blob), as the list exports do |
 
 Every report answers `{ "data": { "rows": [...], "totals": {...}, "truncated": false, "filters": {...} } }`. At most 1,000 rows; `truncated: true` beyond, with totals still over everything. Money is a decimal string; percentages are strings like `"12.8"`.
 
@@ -58,7 +58,7 @@ Example:
 | Screen | Notes |
 |---|---|
 | Reports home | a card per report the user may open |
-| Each report | date range, territory, person, group by; a table and totals; Excel button (disabled on 501) |
+| Each report | date range, territory, person, group by; a table and totals; an Excel button that sends the same filters with `format=xlsx` |
 | Lead 360° | tiles, related leads, the timeline |
 
 ## Defaults the client has not confirmed

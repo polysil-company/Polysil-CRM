@@ -286,15 +286,21 @@ async def salesperson_performance(db: AsyncSession, caller: Caller, f: Filters) 
             {"lo": f.lo, "hi": f.hi, "o": f.owner_id})).all(), visits="n")
     names = await _user_names(db, [k for k in per if k])
     out = []
+    def sees(module: str, person: str) -> bool:
+        # ADR-047: a functional role holds tasks at `own` scope, so another person's
+        # task figure would read as a false 0; it is null unless the scope reaches them
+        scope = caller.scopes.get(module)
+        return scope is not None and (scope != "own" or person == caller.user_id)
+
     for k, v in sorted(per.items(), key=lambda kv: (-(kv[1].get("leads_created") or 0), names.get(kv[0], ""))):
         out.append({"user": {"id": k or None, "full_name": names.get(k, "Unassigned" if not k else "")},
                     "leads_created": v.get("leads_created", 0), "leads_won": v.get("leads_won", 0),
                     "quotations_sent": v.get("quotations_sent", 0) if has_q else None,
                     "orders": v.get("orders", 0) if has_o else None,
                     "order_value": _money(v.get("order_value")) if has_o else None,
-                    "visits": v.get("visits", 0) if has_v else None,
-                    "tasks_done": v.get("tasks_done", 0) if has_t else None,
-                    "tasks_overdue": v.get("tasks_overdue", 0) if has_t else None})
+                    "visits": v.get("visits", 0) if sees("tracking", k) else None,
+                    "tasks_done": v.get("tasks_done", 0) if sees("tasks", k) else None,
+                    "tasks_overdue": v.get("tasks_overdue", 0) if sees("tasks", k) else None})
     page, cut = _page(out)
     return {"rows": page, "truncated": cut, "filters": f.out(),
             "totals": {"leads_created": sum(r["leads_created"] for r in out),

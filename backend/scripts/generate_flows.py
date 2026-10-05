@@ -1923,7 +1923,7 @@ def f_reports() -> None:
                sub="Live aggregates scoped like the lists; a figure without its module is null "
                    "(FS-024, ADR-047).",
                status="BUILT (backend). /reports/*, /leads/{id}/360; migration 034 (won_at, "
-                      "lost_at). Excel waits on the exports writer.",
+                      "lost_at). Excel through the exports writer (GAP-220 closed).",
                status_colour=GREEN)
     _column(e, n, [
         ("r1", "GET /reports/<name>?from&to&territory_id&owner_id\nreports.view + the base module, else 403", BLUE),
