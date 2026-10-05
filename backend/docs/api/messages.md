@@ -38,6 +38,7 @@ Poll for new messages; there is no push.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `ConversationList` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -72,6 +73,7 @@ someone who is not active staff.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Conversation_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -99,6 +101,7 @@ A page of the thread, oldest first. The first page is the newest; follow
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `MessagePage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -135,6 +138,7 @@ marks the conversation read for you.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Message_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -172,6 +176,7 @@ backwards. Answers your new unread total.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_UnreadTotal_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -197,6 +202,7 @@ Colleagues you can message: every active staff member but you, by name.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_Person__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |

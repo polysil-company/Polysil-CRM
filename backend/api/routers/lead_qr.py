@@ -18,6 +18,10 @@ from api.services import public_leads as service
 router = APIRouter(prefix="/lead-qr-codes", tags=["leads"])
 
 _ERRORS: dict[int | str, dict[str, object]] = {
+    400: {"model": ErrorResponse,
+          "description": "`idempotency_key_required`: a write sent without an Idempotency-Key."},
+    401: {"model": ErrorResponse, "description": "Not signed in."},
+    403: {"model": ErrorResponse, "description": "No lead permission for QR codes."},
     422: {"model": ErrorResponse, "description": "A field."},
 }
 

@@ -42,6 +42,8 @@ lookups = APIRouter(tags=["subsidy applications"])
 Id = Annotated[str, Path(pattern=UUID_RE)]
 
 _ERRORS: dict[int | str, dict[str, object]] = {
+    400: {"model": ErrorResponse,
+          "description": "`idempotency_key_required`: a write sent without an Idempotency-Key."},
     401: {"model": ErrorResponse, "description": "Not signed in."},
     403: {"model": ErrorResponse, "description": "No subsidy permission: every dealer, and staff "
                                                  "without the module."},

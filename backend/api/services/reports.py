@@ -40,7 +40,7 @@ L = sa.table("lead", sa.column("id", _UUID), sa.column("created_at", _TS), sa.co
              sa.column("owner_user_id", _UUID), sa.column("owner_org_unit_id", _UUID),
              sa.column("territory_id", _UUID), sa.column("assigned_partner_id", _UUID),
              sa.column("lead_source_id", _UUID), sa.column("deleted_at", _TS), sa.column("won_at", _TS),
-             sa.column("lost_at", _TS), sa.column("lost_reason_id", _UUID), sa.column("lost_from_stage"),
+             sa.column("lost_at", _TS), sa.column("lost_reason_id", _UUID), sa.column("lost_from_stage"), sa.column("dormant_from_stage"),
              sa.column("mobile"), sa.column("inquiry_no"), sa.column("merged_into_id", _UUID))
 ORD = sa.table("sales_order", sa.column("id", _UUID), sa.column("status"), sa.column("order_type"),
              sa.column("total", sa.Numeric), sa.column("submitted_at", _TS), sa.column("owner_user_id", _UUID),
@@ -156,14 +156,15 @@ async def _partner_names(db: AsyncSession, ids: Sequence[str]) -> dict[str, str]
 _ORD = {s: i for i, s in enumerate(lead_domain.STAGES)}
 
 
-def _reached(stage: str, lost_from: str | None, k: str) -> bool:
-    """A stage at or past k, or lost from a stage at or past k (review B-4). A won
-    lead has passed every earlier stage (GAP-224)."""
+def _reached(stage: str, from_stage: str | None, k: str) -> bool:
+    """A stage at or past k, or lost or gone dormant from a stage at or past k
+    (review B-4; ISS-201: 040 keeps `dormant_from_stage`). A won lead has passed
+    every earlier stage (GAP-224)."""
     if stage == "won":
         return True
-    if stage == "lost":
-        return lost_from is not None and _ORD.get(lost_from, -1) >= _ORD[k]
-    return stage in _ORD and _ORD[stage] >= _ORD[k] and stage not in ("merged", "dormant")
+    if stage in ("lost", "dormant"):
+        return from_stage is not None and _ORD.get(from_stage, -1) >= _ORD[k]
+    return stage in _ORD and _ORD[stage] >= _ORD[k] and stage != "merged"
 
 
 async def lead_conversion(db: AsyncSession, caller: Caller, f: Filters, group_by: str) -> dict[str, Any]:
@@ -172,10 +173,11 @@ async def lead_conversion(db: AsyncSession, caller: Caller, f: Filters, group_by
     if key is None:
         raise ValidationFailed(fields={"group_by": "source, owner or territory"})
     rows = (await db.execute(sa.select(key.label("k"), sa.cast(L.c.stage, sa.Text).label("stage"),
-                                       sa.cast(L.c.lost_from_stage, sa.Text).label("lost_from"),
+                                       sa.cast(sa.func.coalesce(L.c.lost_from_stage, L.c.dormant_from_stage),
+                                               sa.Text).label("lost_from"),
                                        sa.func.count().label("n"))
                              .where(*_leads(caller, f), *f.window(L.c.created_at))
-                             .group_by(key, L.c.stage, L.c.lost_from_stage))).all()
+                             .group_by(key, L.c.stage, L.c.lost_from_stage, L.c.dormant_from_stage))).all()
     groups: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for r in rows:
         g = groups[str(r.k) if r.k else ""]

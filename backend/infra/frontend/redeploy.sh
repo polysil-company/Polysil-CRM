@@ -20,7 +20,9 @@ SRC=/srv/frontend-src
 if [ -n "${DEPLOY_TOKEN:-}" ]; then
     REPO="https://github.com/polysil-company/Polysil-CRM.git"
     AUTH="$(printf 'x-access-token:%s' "$DEPLOY_TOKEN" | base64 | tr -d '\n')"
-    git_() { git -c "http.extraHeader=Authorization: Basic $AUTH" "$@"; }
+    # through the environment, so the token never shows in `ps` (ISS-113)
+    git_() { GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader \
+             GIT_CONFIG_VALUE_0="Authorization: Basic $AUTH" git "$@"; }
 else
     REPO="git@github.com:polysil-company/Polysil-CRM.git"
     export GIT_SSH_COMMAND="ssh -i /keys/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/srv/known_hosts"
