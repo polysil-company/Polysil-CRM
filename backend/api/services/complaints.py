@@ -114,6 +114,11 @@ def _refusal(exc: DBAPIError) -> Exception | None:
         return ValidationFailed("The complaint's territory has no coded state.",
                                 code="territory_without_state_code",
                                 fields={"territory_id": "no coded state above it"})
+    if state == "CMPRW":
+        return ValidationFailed("The time to reopen this complaint has passed, or it was "
+                                "reopened as often as allowed.", code="reopen_window_closed")
+    if state == "CMPRK":
+        return ValidationFailed(code="remark_required", fields={"reason": "required"})
     if state == "CMPPD":
         return ValidationFailed("A target cannot start in the past.", code="target_in_the_past",
                                 fields={"effective_from": "today or later"})
@@ -204,7 +209,8 @@ async def _can(db: AsyncSession, caller: Caller, r: Any) -> sch.Can:
         "complaint_refusal(CAST(:c AS uuid), 'qc') AS qc, "
         "complaint_refusal(CAST(:c AS uuid), 'cancel') AS cancel, "
         "complaint_refusal(CAST(:c AS uuid), 'remedy') AS remedy, "
-        "complaint_refusal(CAST(:c AS uuid), 'withdraw') AS withdraw"), {"c": str(r.id)})).one()
+        "complaint_refusal(CAST(:c AS uuid), 'withdraw') AS withdraw, "
+        "complaint_reopen_refusal(CAST(:c AS uuid)) AS reopen"), {"c": str(r.id)})).one()
     perms = await _perms(db)
     draft = r.status_text == "draft"
     mine = caller.user_id in (str(r.raised_by), str(r.owner_user_id) if r.owner_user_id else "")
@@ -214,7 +220,8 @@ async def _can(db: AsyncSession, caller: Caller, r: Any) -> sch.Can:
     return sch.Can(edit=edit, submit=refusals.submit is None, check=refusals.check_ is None,
                    qc=refusals.qc is None, cancel=refusals.cancel is None,
                    delete=draft and r.submit_count == 0 and perms["delete"], upload=upload,
-                   remedy=refusals.remedy is None, withdraw=refusals.withdraw is None)
+                   remedy=refusals.remedy is None, withdraw=refusals.withdraw is None,
+                   reopen=refusals.reopen is None)
 
 
 async def _rows(db: AsyncSession, where: str, params: dict[str, Any]) -> list[Any]:
@@ -297,6 +304,8 @@ async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> 
         raised_by=names.user(r.raised_by, r.raiser_name),
         remedy=await _remedy(db, complaint_id, portal),
         closed_at=_iso(r.closed_at),
+        reopen_count=r.reopen_count, reopened_at=_iso(r.reopened_at),
+        reopen_reason=None if portal else r.reopen_reason,
         can=await _can(db, caller, r),
         created_at=r.created_at.isoformat(), updated_at=r.updated_at.isoformat(),
         submitted_at=_iso(r.submitted_at))
@@ -812,6 +821,13 @@ async def withdraw_remedy(db: AsyncSession, caller: Caller, complaint_id: str,
 
 async def cancel(db: AsyncSession, caller: Caller, complaint_id: str, body: sch.CancelIn) -> sch.Complaint:
     await _definer(db, "SELECT complaint_cancel(CAST(:c AS uuid), :r)", {"c": complaint_id, "r": body.reason})
+    return await get_complaint(db, caller, complaint_id)
+
+
+async def reopen(db: AsyncSession, caller: Caller, complaint_id: str, body: sch.ReopenIn) -> sch.Complaint:
+    """FS-036: a closed or rejected complaint starts a new round. The rules are
+    complaint_reopen_refusal()'s, in migration 041."""
+    await _definer(db, "SELECT complaint_reopen(CAST(:c AS uuid), :r)", {"c": complaint_id, "r": body.reason})
     return await get_complaint(db, caller, complaint_id)
 
 

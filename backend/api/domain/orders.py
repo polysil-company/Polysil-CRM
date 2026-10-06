@@ -94,6 +94,9 @@ SQLSTATE_TO_ERROR: Final[dict[str, tuple[int, str]]] = {
     "STKNF": (422, "no_such_warehouse"),
     # FS-022: a paid order's dealer does not change (code review F-2)
     "PAYPC": (409, "order_has_payments"),
+    # FS-036: amending an approved order (041)
+    "ORDTF": (422, "order_type_fixed"),
+    "ORDPA": (409, "order_has_payments"),
 }
 
 

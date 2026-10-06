@@ -48,6 +48,7 @@ interval with no end counts to today and says `running`.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `AgePage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
@@ -74,6 +75,7 @@ The ageing view as Excel, with the same filters.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | - | The workbook, as an attachment. |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
@@ -99,6 +101,7 @@ days in each stage, in stage order. Only stages holding an application appear.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `StagePage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
@@ -123,6 +126,7 @@ The stage report as Excel.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | - | The workbook, as an attachment. |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
@@ -148,6 +152,7 @@ Supplied means stage 7's supply date is recorded. Cancelled applications are lef
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `SupplyPage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
@@ -172,6 +177,7 @@ The supply report as Excel.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | - | The workbook, as an attachment. |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |

@@ -554,6 +554,9 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
             "AND entity_id = CAST(:o AS uuid) AND kind = 'order.approved' "
             "ORDER BY occurred_at DESC LIMIT 1"), {"o": order_id})).scalar_one_or_none(),
         remarks=r.remarks, submitted_at=_iso(r.submitted_at), approved_at=_iso(r.approved_at),
+        amend_count=r.amend_count,
+        amended_from_total=str(r.amended_from_total) if r.amended_from_total is not None else None,
+        amend_reason=None if portal else r.amend_reason,
         cancelled_at=_iso(r.cancelled_at),
         # a partner reads its own cancel reason, never a staff one (question 15.14)
         cancel_remark=(r.cancel_remark if not portal or str(r.updated_by) == caller.user_id
@@ -716,6 +719,7 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
             totals=_totals(r), is_provisional=r.is_provisional,
             dispatched_pct=domain.dispatched_pct(Decimal(x.ordered), Decimal(x.sent)),
             approval_waiting_on=x.waiting, submitted_at=_iso(r.submitted_at),
+            amend_count=r.amend_count,
             created_at=r.created_at.isoformat()))
     return sch.OrderPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
                                                   total=total, total_capped=capped))
@@ -1087,6 +1091,15 @@ async def submit_order(db: AsyncSession, caller: Caller, order_id: str,
 async def cancel_order(db: AsyncSession, caller: Caller, order_id: str,
                        body: sch.RemarkRequest, settings: Settings) -> sch.Order:
     await _call(db, "SELECT order_cancel(CAST(:o AS uuid), :r, :e)",
+                {"o": order_id, "r": body.remark, "e": body.expected_status})
+    return await get_order(db, caller, order_id)
+
+
+async def amend_order(db: AsyncSession, caller: Caller, order_id: str,
+                      body: sch.RemarkRequest, settings: Settings) -> sch.Order:
+    """FS-036: an approved order with nothing shipped or paid back to draft under its
+    number. The rules are order_amend()'s, in migration 041."""
+    await _call(db, "SELECT order_amend(CAST(:o AS uuid), :r, :e)",
                 {"o": order_id, "r": body.remark, "e": body.expected_status})
     return await get_order(db, caller, order_id)
 

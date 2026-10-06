@@ -246,6 +246,9 @@ order.
 | `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
+| `amend_count` | integer |  | How many times this order was amended after approval (FS-036). Default `0`. |
+| `amended_from_total` | string \| null |  | The approved total the last amend started from. |
+| `amend_reason` | string \| null |  | Why it was last amended. Staff only. |
 | `cancelled_at` | string \| null | yes |  |
 | `cancel_remark` | string \| null | yes |  |
 | `closed_at` | string \| null | yes |  |

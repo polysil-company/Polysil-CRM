@@ -9,7 +9,7 @@ any endpoint change, so it is always current rather than a snapshot.
 |---|---|---|
 | Approvals | 5 | [`approvals.md`](approvals.md) |
 | Auth | 7 | [`auth.md`](auth.md) |
-| Complaints | 21 | [`complaints.md`](complaints.md) |
+| Complaints | 22 | [`complaints.md`](complaints.md) |
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
 | Dealer Commission | 12 | [`dealer-commission.md`](dealer-commission.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
@@ -18,7 +18,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
 | Messages | 6 | [`messages.md`](messages.md) |
 | Notifications | 2 | [`notifications.md`](notifications.md) |
-| Orders | 16 | [`orders.md`](orders.md) |
+| Orders | 17 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 7 | [`partners.md`](partners.md) |
 | Payments | 7 | [`payments.md`](payments.md) |
@@ -29,6 +29,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Reports | 8 | [`reports.md`](reports.md) |
 | Rewards | 19 | [`rewards.md`](rewards.md) |
 | Schemes | 6 | [`schemes.md`](schemes.md) |
+| Settings | 2 | [`settings.md`](settings.md) |
 | Stock | 7 | [`stock.md`](stock.md) |
 | Subsidy | 4 | [`subsidy.md`](subsidy.md) |
 | Subsidy Applications | 14 | [`subsidy-applications.md`](subsidy-applications.md) |

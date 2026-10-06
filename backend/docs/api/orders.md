@@ -291,6 +291,48 @@ On an order from quotations the fields they fix are fixed.
 
 ---
 
+## `POST /api/v1/orders/{order_id}/amend`
+
+**Amend Order**
+
+Take an approved order back to draft to change it, keeping its number. Only
+before anything ships (`409 order_dispatched`) and before money is allocated to it
+(`409 order_has_payments`); never a replacement order (`422 order_type_fixed`).
+The owner, the creator or a holder of edit. Then edit and submit as usual: with
+the `order_amend_reapproval` setting at `value_rises`, a total that did not rise
+goes straight to Accounts. Payment instalments are cleared; the PDF returns on
+approval.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `order_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`RemarkRequest`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string | yes | Why. Kept on the order and its timeline. |
+| `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Order_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions, or not your step. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, the status moved on, prices changed (`rate_changed`), or the order is not in a state that allows it. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `POST /api/v1/orders/{order_id}/cancel`
 
 **Cancel Order**
@@ -793,6 +835,9 @@ and only the outcome to a dealer.
 | `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
+| `amend_count` | integer |  | How many times this order was amended after approval (FS-036). Default `0`. |
+| `amended_from_total` | string \| null |  | The approved total the last amend started from. |
+| `amend_reason` | string \| null |  | Why it was last amended. Staff only. |
 | `cancelled_at` | string \| null | yes |  |
 | `cancel_remark` | string \| null | yes |  |
 | `closed_at` | string \| null | yes |  |
@@ -974,6 +1019,7 @@ and only the outcome to a dealer.
 | `is_provisional` | boolean | yes |  |
 | `dispatched_pct` | integer | yes | Share of the ordered quantity sent, 0 to 100. |
 | `approval_waiting_on` | string \| null | yes | The role of the next undecided step. |
+| `amend_count` | integer |  | Default `0`. |
 | `submitted_at` | string \| null | yes |  |
 | `created_at` | string | yes |  |
 

@@ -381,6 +381,12 @@ class Order(BaseModel):
                                   "Null for a caller who may not see payments.")
     submitted_at: str | None
     approved_at: str | None
+    amend_count: int = Field(
+        default=0, description="How many times this order was amended after approval (FS-036).")
+    amended_from_total: str | None = Field(
+        default=None, description="The approved total the last amend started from.")
+    amend_reason: str | None = Field(
+        default=None, description="Why it was last amended. Staff only.")
     cancelled_at: str | None
     cancel_remark: str | None
     closed_at: str | None
@@ -400,6 +406,7 @@ class OrderSummary(BaseModel):
     is_provisional: bool
     dispatched_pct: int = Field(description="Share of the ordered quantity sent, 0 to 100.")
     approval_waiting_on: str | None = Field(description="The role of the next undecided step.")
+    amend_count: int = 0
     submitted_at: str | None
     created_at: str
 

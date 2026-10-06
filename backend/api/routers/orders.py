@@ -274,6 +274,23 @@ async def cancel_order(order_id: Id, body: RemarkRequest, db: DbSession, caller:
     return await _idem(db, claims, idem, f"POST /api/v1/orders/{order_id}/cancel", body, work)
 
 
+@router.post("/{order_id}/amend", response_model=Envelope[Order], responses=_MUTATION_ERRORS,
+             dependencies=[Depends(require("sales_orders", "view"))])
+async def amend_order(order_id: Id, body: RemarkRequest, db: DbSession, caller: CallerDep,
+                      claims: Claims, idem: IdemKey) -> Response:
+    """Take an approved order back to draft to change it, keeping its number. Only
+    before anything ships (`409 order_dispatched`) and before money is allocated to it
+    (`409 order_has_payments`); never a replacement order (`422 order_type_fixed`).
+    The owner, the creator or a holder of edit. Then edit and submit as usual: with
+    the `order_amend_reapproval` setting at `value_rises`, a total that did not rise
+    goes straight to Accounts. Payment instalments are cleared; the PDF returns on
+    approval."""
+    async def work() -> tuple[int, dict[str, Any]]:
+        return 200, _order(await service.amend_order(db, caller, order_id, body,
+                                                     get_settings()))
+    return await _idem(db, claims, idem, f"POST /api/v1/orders/{order_id}/amend", body, work)
+
+
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT,
                responses=_MUTATION_ERRORS,
                dependencies=[Depends(require("sales_orders", "delete"))])

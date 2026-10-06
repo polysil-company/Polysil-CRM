@@ -235,6 +235,7 @@ One approval chain.
 | `upload` | boolean | yes |  |
 | `remedy` | boolean | yes | Choose a remedy (FS-015b). |
 | `withdraw` | boolean | yes | Withdraw the pending remedy. |
+| `reopen` | boolean |  | Reopen a closed or rejected complaint (FS-036). Default `False`. |
 
 **`Cancellation`**
 
@@ -289,6 +290,9 @@ One approval chain.
 | `raised_by` | UserRef \| null | yes |  |
 | `remedy` | Remedy \| null |  | The live or the last remedy. |
 | `closed_at` | string \| null |  |  |
+| `reopen_count` | integer |  | Times reopened (FS-036). Default `0`. |
+| `reopened_at` | string \| null |  |  |
+| `reopen_reason` | string \| null |  | Why it was last reopened. Staff only. |
 | `can` | Can | yes |  |
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
@@ -474,6 +478,9 @@ One approval chain.
 | `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
+| `amend_count` | integer |  | How many times this order was amended after approval (FS-036). Default `0`. |
+| `amended_from_total` | string \| null |  | The approved total the last amend started from. |
+| `amend_reason` | string \| null |  | Why it was last amended. Staff only. |
 | `cancelled_at` | string \| null | yes |  |
 | `cancel_remark` | string \| null | yes |  |
 | `closed_at` | string \| null | yes |  |

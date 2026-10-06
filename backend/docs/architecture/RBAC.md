@@ -618,7 +618,7 @@ State Co-ordinators own subsidy stage entry (ADR-030), scoped by `user_territory
 
 ### 6.3 Portal
 
-Scope is `partner_subtree` throughout, served by the partner permissive branch (§5.1) on both SELECT and INSERT. A distributor sees its dealers and their sub-dealers; a sub-dealer sees only itself.
+Scope is `partner_subtree` throughout, served by the partner permissive branch (§5.1) on both SELECT and INSERT. The one exception is `tasks` (FS-037, ADR-034 as amended): own scope, the dealer user's own tasks, assigned by staff while the `tasks_for_dealers` setting is on; edit means completing, enforced by `task_partner_guard()`. A distributor sees its dealers and their sub-dealers; a sub-dealer sees only itself.
 
 | Module | distributor | dealer | sub_dealer |
 |---|---|---|---|
@@ -627,6 +627,7 @@ Scope is `partner_subtree` throughout, served by the partner permissive branch (
 | sales_orders | V CE | V CE | V CE |
 | dispatch | V | V | V |
 | complaints | V CE | V CE | V CE |
+| tasks | V:own E | V:own E | V:own E |
 | payments | V | V | V |
 | partners | V CE | V CE | |
 | products | V | V | V |

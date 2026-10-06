@@ -672,7 +672,8 @@ async def patch_user(db: AsyncSession, caller: Caller, user_id: str,
     active_change: str | None = None
     if "is_active" in fields and body.is_active is not None and body.is_active != row.is_active:
         if not body.is_active:
-            if staff and await _open_tasks(db, user_id):
+            # FS-037: a dealer's user may hold tasks too
+            if await _open_tasks(db, user_id):
                 raise ValidationFailed(
                     fields={"is_active": "hand over their open tasks first"})
             changed["sessions_revoked"] = revoked_early   # revoked above, before the lock
@@ -871,7 +872,7 @@ async def delete_user(db: AsyncSession, caller: Caller, user_id: str) -> None:
         if row.user_type == "staff" else 0
     if open_leads > 0:
         raise ValidationFailed(fields={"open_leads": "hand over their open leads first"})
-    if row.user_type == "staff" and await _open_tasks(db, user_id):
+    if await _open_tasks(db, user_id):
         raise ValidationFailed(fields={"open_tasks": "hand over their open tasks first"})
     await _execute_mapped(db, text(
         "UPDATE app_user SET deleted_at = now(), is_active = false, "
