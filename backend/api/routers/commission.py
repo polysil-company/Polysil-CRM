@@ -40,6 +40,8 @@ Id = Annotated[str, Path(pattern=UUID_RE)]
 _READ = Depends(require_any(("subsidy", "view"), ("payments", "view")))
 
 _ERRORS: dict[int | str, dict[str, object]] = {
+    400: {"model": ErrorResponse,
+          "description": "`idempotency_key_required`: a write sent without an Idempotency-Key."},
     401: {"model": ErrorResponse, "description": "Not signed in."},
     403: {"model": ErrorResponse, "description": "Not permitted, or `own_decision`."},
     404: {"model": ErrorResponse, "description": "Not found in your scope."},

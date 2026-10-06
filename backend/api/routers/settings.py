@@ -17,6 +17,8 @@ from api.services import settings as service
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 _ERRORS: dict[int | str, dict[str, Any]] = {
+    400: {"model": ErrorResponse,
+          "description": "`idempotency_key_required`: a write sent without an Idempotency-Key."},
     403: {"model": ErrorResponse, "description": "Staff only; changing needs masters.edit."},
     422: {"model": ErrorResponse, "description": "An unknown key, or a value outside its rule."},
 }

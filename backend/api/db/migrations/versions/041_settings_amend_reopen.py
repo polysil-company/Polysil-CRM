@@ -94,6 +94,11 @@ BEGIN
         IF jsonb_typeof(NEW.value) <> 'array' THEN
             RAISE EXCEPTION 'setting %: a list of role codes', NEW.key USING ERRCODE = 'SETVL';
         END IF;
+        -- a fresh database migrates before the roles are seeded (CI): the seed's codes are
+        -- checked from the first change on, once roles exist
+        IF TG_OP = 'INSERT' AND NOT EXISTS (SELECT 1 FROM role) THEN
+            RETURN NEW;
+        END IF;
         FOR r IN SELECT jsonb_array_elements_text(NEW.value) LOOP
             IF NOT EXISTS (SELECT 1 FROM role WHERE code = r AND deleted_at IS NULL) THEN
                 RAISE EXCEPTION 'setting %: no role %', NEW.key, r USING ERRCODE = 'SETVL';

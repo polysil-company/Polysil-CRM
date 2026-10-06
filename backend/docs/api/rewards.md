@@ -42,6 +42,7 @@ The gift catalogue, cheapest first.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_Gift__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -77,6 +78,7 @@ Add a gift.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Gift_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -114,6 +116,7 @@ Change a gift. A pending request keeps the points it was asked at.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Gift_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -140,6 +143,7 @@ Take the points off a draft; they go back to the balance.
 | Status | Body | Meaning |
 |---|---|---|
 | `204` | - | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -177,6 +181,7 @@ go back. `422 insufficient_points`, `over_redeem_limit`; `409 points_on_order`.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Redemption_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -196,6 +201,7 @@ The earning rules, active first.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_Rule__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -241,6 +247,7 @@ backwards.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Rule_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -266,6 +273,7 @@ One rule.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Rule_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -307,6 +315,7 @@ Change a rule. Once it has awarded points, only `valid_to` and `is_active`:
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Rule_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -326,6 +335,7 @@ What a point is worth today and the most of an order points may pay.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_SettingsOut_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -361,6 +371,7 @@ the value of their own date. Once a day: `409 settings_changed_today`.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_SettingsOut_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -397,6 +408,7 @@ Add or take away points by hand, with a reason. May take a balance below zero.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_LedgerRow_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -425,6 +437,7 @@ their scope: a field officer sees only their own.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Balance_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -453,6 +466,7 @@ Redemptions in your scope, newest first. `?status=pending` is the gift desk's qu
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `RedemptionPage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -487,6 +501,7 @@ held at once; a reject or a withdrawal gives them back.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Redemption_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -521,6 +536,7 @@ The gift was handed over. Not by the person who asked.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Redemption_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -555,6 +571,7 @@ Refuse the request, with a remark; the points go back.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Redemption_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -589,6 +606,7 @@ The requester takes it back while pending; the points go back.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Redemption_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -618,6 +636,7 @@ released, reversed, expired, adjusted.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `LedgerPage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not found in your scope. |
