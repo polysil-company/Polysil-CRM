@@ -13,6 +13,7 @@ import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.services.clock import today_ist
 from tests.api import test_order_endpoints as endpoints
 from tests.api.conftest import V1, _key
 
@@ -20,7 +21,7 @@ pytestmark = pytest.mark.db
 
 shop = endpoints.shop
 Shop = endpoints.Shop
-MONTH = dt.date.today().strftime("%Y-%m")
+MONTH = today_ist().strftime("%Y-%m")  # the IST month, as the service reads it
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -60,7 +61,7 @@ async def test_not_yourself_not_a_peer_not_a_past_month(client: httpx.AsyncClien
     assert r.status_code == 403 and r.json()["error"]["code"] == "not_your_team"
     r = await _put(client, dm, shop.ids["state_manager"])
     assert r.status_code == 403, "a higher rank is not below me"
-    last = (dt.date.today().replace(day=1) - dt.timedelta(days=1)).strftime("%Y-%m")
+    last = (today_ist().replace(day=1) - dt.timedelta(days=1)).strftime("%Y-%m")
     r = await _put(client, dm, shop.ids["field_officer"], month=last)
     assert r.status_code == 422 and r.json()["error"]["code"] == "month_closed"
     r = await _put(client, dm, shop.ids["field_officer"], orders="2.5")
