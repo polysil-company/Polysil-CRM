@@ -144,10 +144,14 @@ async def list_tasks(db: AsyncSession, caller: Caller, *, assigned_to: str | Non
     if status:
         where.append("t.status::text = ANY(:status)")
         params["status"] = status
-    for col, val in (("task_type", task_type), ("lead_id", lead_id),
-                     ("partner_id", partner_id), ("sales_order_id", sales_order_id)):
+    if task_type:
+        where.append("t.task_type::text = :task_type")
+        params["task_type"] = task_type
+    # as uuids, not text: an upper-case id is the same id (ISS-113)
+    for col, val in (("lead_id", lead_id), ("partner_id", partner_id),
+                     ("sales_order_id", sales_order_id)):
         if val:
-            where.append(f"t.{col}::text = :{col}")
+            where.append(f"t.{col} = CAST(:{col} AS uuid)")
             params[col] = val
     if due_from:
         where.append("t.due_at >= :df")
@@ -613,8 +617,10 @@ async def _record_meeting(db: AsyncSession, caller: Caller, body: sch.MinutesCre
     not cancelled; if open, it is completed as 'Minutes recorded'."""
     assert body.task_id is not None
     row = await _lock(db, body.task_id)
-    same = (str(row.lead_id) if row.lead_id else None) == body.lead_id and \
-           (str(row.partner_id) if row.partner_id else None) == body.partner_id
+    lead = body.lead_id.lower() if body.lead_id else None
+    partner = body.partner_id.lower() if body.partner_id else None
+    same = (str(row.lead_id) if row.lead_id else None) == lead and \
+           (str(row.partner_id) if row.partner_id else None) == partner
     if not same:
         raise ValidationFailed("That task is on something else.", code="task_link_mismatch",
                                fields={"task_id": "not on this lead or dealer"})

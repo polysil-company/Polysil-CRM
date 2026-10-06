@@ -351,8 +351,10 @@ class Settings(BaseSettings):
             origin = "http://localhost:3000"
         self.public_web_url = origin
         if self.environment != "local":
-            host = urlsplit(origin).hostname if origin else None
-            if not origin or host in _LOCAL_HOSTS:
+            parts = urlsplit(origin) if origin else None
+            host = parts.hostname if parts else None
+            if (parts is None or not host or host in _LOCAL_HOSTS
+                    or parts.scheme not in ("http", "https")):
                 raise ValueError("public_web_url must be the frontend's real origin outside "
                                  "local: the share link and the WhatsApp message carry it")
         if len(self.public_web_url) > 54:

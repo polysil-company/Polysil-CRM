@@ -13,6 +13,7 @@ misconfigured provider never reaches here: `get_settings()` refuses it at import
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any, ClassVar
 
@@ -67,7 +68,8 @@ async def on_startup(ctx: dict[str, Any]) -> None:
         log.error("quotation.renderer_unavailable", problem=problem)
     else:
         log.info("quotation.renderer_ok", renderer=settings.pdf_renderer)
-    storage_problem = get_storage(settings).probe()
+    # a hung bucket must not hold the first outbox drain (ISS-113)
+    storage_problem = await asyncio.to_thread(get_storage(settings).probe)
     if storage_problem:
         log.error("quotation.storage_unavailable", problem=storage_problem)
 

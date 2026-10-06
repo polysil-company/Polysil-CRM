@@ -42,6 +42,9 @@ The codes in your scope, newest first, with how many leads each brought.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `QrCodeList` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No lead permission for QR codes. |
 | `422` | `ErrorResponse` | A field. |
 
 ---
@@ -75,6 +78,9 @@ and offer a download. Leads from it are credited to `partner_id` when set.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_QrCode_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No lead permission for QR codes. |
 | `422` | `ErrorResponse` | A field. |
 
 ---
@@ -111,6 +117,9 @@ new leads only. Send only the fields that change.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_QrCode_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No lead permission for QR codes. |
 | `404` | `ErrorResponse` | Not yours. |
 | `422` | `ErrorResponse` | A field. |
 

@@ -46,6 +46,7 @@ The worklist, newest first, in your scope.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `ApplicationPage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -86,6 +87,7 @@ the category's subsidy and farmer share, and moves the lead to won. `422` on
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Application_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -118,6 +120,7 @@ narrow the filters. An empty list gives a file with the header row only.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | - | The workbook, as an attachment. |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -142,6 +145,7 @@ The application, with its current stage, figures, document count and ageing.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Application_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -167,6 +171,7 @@ POST /subsidy/calculate answers. Never recomputed.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_dict_str__Any__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -200,6 +205,7 @@ Withdraw the application, with a reason. The lead can be forwarded again.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Application_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -225,6 +231,7 @@ The checklist with the files uploaded against each item.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_ChecklistItem__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -258,6 +265,7 @@ already there. Refusals:
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Document_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | View only: adding a document needs subsidy create or edit. Hide the upload control. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -287,6 +295,7 @@ A ten-minute link to the file. Never fetch it with the bearer token.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_DocumentLink_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -314,6 +323,7 @@ Quantity, Amount, Remark. Our reading of the one sample the client gave (GAP-177
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | - | The PIMS sheet. |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -338,6 +348,7 @@ The stage history, oldest first, with each entry's values.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_Entry__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -377,6 +388,7 @@ itself once every stage-16 amount has its stage-17 received date. `422` on
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Application_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -396,6 +408,7 @@ The document checklist: the enclosures GGRC asks for. None is required yet.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_DocumentType__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
@@ -421,6 +434,7 @@ Build "Record stage" from this; the stages are data, not code.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_StageDef__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
