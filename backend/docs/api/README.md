@@ -13,6 +13,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
 | Dealer Commission | 12 | [`dealer-commission.md`](dealer-commission.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
+| Holidays | 3 | [`holidays.md`](holidays.md) |
 | Leads | 20 | [`leads.md`](leads.md) |
 | Lookups | 23 | [`lookups.md`](lookups.md) |
 | Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
@@ -21,7 +22,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Orders | 17 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 7 | [`partners.md`](partners.md) |
-| Payments | 7 | [`payments.md`](payments.md) |
+| Payments | 8 | [`payments.md`](payments.md) |
 | Pricing | 8 | [`pricing.md`](pricing.md) |
 | Products | 8 | [`products.md`](products.md) |
 | Public | 6 | [`public.md`](public.md) |

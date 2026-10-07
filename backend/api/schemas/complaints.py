@@ -301,6 +301,12 @@ class Complaint(BaseModel):
     reopened_at: str | None = None
     reopen_reason: str | None = Field(
         default=None, description="Why it was last reopened. Staff only.")
+    response_escalated_at: str | None = Field(
+        default=None, description="When the missed response target was escalated (FS-028); null "
+                                  "otherwise. Staff only.")
+    resolution_escalated_at: str | None = Field(
+        default=None, description="When the missed resolution target was escalated (FS-028); null "
+                                  "otherwise. Staff only.")
     can: Can
     created_at: str
     updated_at: str

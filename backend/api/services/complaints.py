@@ -306,6 +306,10 @@ async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> 
         closed_at=_iso(r.closed_at),
         reopen_count=r.reopen_count, reopened_at=_iso(r.reopened_at),
         reopen_reason=None if portal else r.reopen_reason,
+        response_escalated_at=None if portal or r.response_escalated_at is None
+        else r.response_escalated_at.isoformat(),
+        resolution_escalated_at=None if portal or r.resolution_escalated_at is None
+        else r.resolution_escalated_at.isoformat(),
         can=await _can(db, caller, r),
         created_at=r.created_at.isoformat(), updated_at=r.updated_at.isoformat(),
         submitted_at=_iso(r.submitted_at))

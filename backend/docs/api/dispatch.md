@@ -247,6 +247,7 @@ order.
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `fully_dispatched_at` | string \| null |  | When the last line shipped (dispatched, or closed short after a dispatch); null otherwise (FS-026). |
+| `over_credit_limit` | boolean \| null |  | Over the dealer's credit limit at submit (FS-027): true or false when checked, null when unchecked. Null for field officers and dealers, who may not read credit standing. |
 | `amend_count` | integer |  | How many times this order was amended after approval (FS-036). Default `0`. |
 | `amended_from_total` | string \| null |  | The approved total the last amend started from. |
 | `amend_reason` | string \| null |  | Why it was last amended. Staff only. |

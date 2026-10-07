@@ -317,6 +317,11 @@ class OrderComplaintRef(BaseModel):
     complaint_no: str | None
 
 
+_CREDIT_FLAG = ("Over the dealer's credit limit at submit (FS-027): true or false when "
+                "checked, null when unchecked. Null for field officers and dealers, who "
+                "may not read credit standing.")
+
+
 class Order(BaseModel):
     doc_type: Literal["sales_order"] = Field(
         default="sales_order", description="Always sales_order. Tells an order from a "
@@ -384,6 +389,7 @@ class Order(BaseModel):
     fully_dispatched_at: str | None = Field(
         default=None, description="When the last line shipped (dispatched, or closed short after "
                                   "a dispatch); null otherwise (FS-026).")
+    over_credit_limit: bool | None = Field(default=None, description=_CREDIT_FLAG)
     amend_count: int = Field(
         default=0, description="How many times this order was amended after approval (FS-036).")
     amended_from_total: str | None = Field(
@@ -410,6 +416,7 @@ class OrderSummary(BaseModel):
     dispatched_pct: int = Field(description="Share of the ordered quantity sent, 0 to 100.")
     approval_waiting_on: str | None = Field(description="The role of the next undecided step.")
     amend_count: int = 0
+    over_credit_limit: bool | None = Field(default=None, description=_CREDIT_FLAG)
     submitted_at: str | None
     created_at: str
 
@@ -444,6 +451,9 @@ class QueueDocument(BaseModel):
     payment_status: str | None = Field(
         default=None, description="An order row: not_applicable, unpaid, part_paid, paid or "
                                   "overpaid (FS-022), for the Accounts step. Null otherwise.")
+    over_credit_limit: bool | None = Field(
+        default=None, description="An order row: over the dealer's credit limit at submit "
+                                  "(FS-027); null when unchecked or not an order.")
     request_remark: str | None = Field(
         default=None, description="Why the approval was asked, as the person asking wrote "
                                   "it. Show it beside the figures. Null when none was given.")
