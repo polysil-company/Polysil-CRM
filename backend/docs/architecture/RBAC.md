@@ -527,7 +527,7 @@ Kept as the regression list. Each is a named test in `tests/rbac/`.
 
 ### 5.5 Reports — materialized views do not inherit RLS
 
-> **Live form, 4 Oct (ADR-047, FS-024).** Reports today are live aggregates, not materialized views. Their three rules: the module's scope predicate on every ScopeSpec table the query reads, with RLS beneath (six hand-policy tables are RLS-only, ISS-111); a figure without its module is null, never 0; and a cross-office leakage test per report and per export. The materialized-view form below applies when one is introduced.
+> **Live form, 4 Oct (ADR-047, FS-024).** Reports today are live aggregates, not materialized views. Their three rules: the module's scope predicate on every ScopeSpec table the query reads, with RLS beneath (six hand-policy tables are RLS-only, ISS-111); one exception by design: `order_paid_at()` (FS-026 rule 11) tells anyone who can see an order the day it was paid in full, a day and not an amount, so a salesperson without `payments.view` still sees their sales under payment mode; a figure without its module is null, never 0; and a cross-office leakage test per report and per export. The materialized-view form below applies when one is introduced.
 
 Reading a materialized view returns stored rows; it does **not** re-run the source query under the reader's policies. Without this every report is a company-wide aggregate readable by anyone who can reach it.
 

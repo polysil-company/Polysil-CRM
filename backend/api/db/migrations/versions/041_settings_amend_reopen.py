@@ -94,9 +94,10 @@ BEGIN
         IF jsonb_typeof(NEW.value) <> 'array' THEN
             RAISE EXCEPTION 'setting %: a list of role codes', NEW.key USING ERRCODE = 'SETVL';
         END IF;
-        -- a fresh database migrates before the roles are seeded (CI): the seed's codes are
-        -- checked from the first change on, once roles exist
-        IF TG_OP = 'INSERT' AND NOT EXISTS (SELECT 1 FROM role) THEN
+        -- the migrations' own rows: a fresh database migrates before the roles are seeded
+        -- (CI), and 005/015 insert roles, so the role table is never empty here. The
+        -- codes are checked from the first change on, by app_setting_set
+        IF TG_OP = 'INSERT' THEN
             RETURN NEW;
         END IF;
         FOR r IN SELECT jsonb_array_elements_text(NEW.value) LOOP
@@ -162,8 +163,10 @@ BEGIN
     IF v_order.deleted_at IS NOT NULL THEN
         RAISE EXCEPTION 'order not found' USING ERRCODE = 'ORDNF';
     END IF;
-    IF NOT (app_has_permission('sales_orders', 'edit') OR v_me IS NOT DISTINCT FROM v_order.owner_user_id
-            OR v_me IS NOT DISTINCT FROM v_order.created_by) THEN
+    -- staff only: portal roles hold sales_orders.edit at partner_subtree (GAP-352)
+    IF app_current_partner() IS NOT NULL
+       OR NOT (app_has_permission('sales_orders', 'edit') OR v_me IS NOT DISTINCT FROM v_order.owner_user_id
+               OR v_me IS NOT DISTINCT FROM v_order.created_by) THEN
         RAISE EXCEPTION 'not permitted to amend this order' USING ERRCODE = '42501';
     END IF;
     IF p_expected IS NOT NULL AND v_order.status::text <> p_expected THEN
@@ -257,6 +260,9 @@ BEGIN
     END IF;
     IF v_why = 'window_closed' THEN
         RAISE EXCEPTION 'the reopen window has closed' USING ERRCODE = 'CMPRW';
+    END IF;
+    IF NOT complaint_has_checker(p_id) THEN
+        RAISE EXCEPTION 'nobody can check this complaint' USING ERRCODE = 'CMPNC';
     END IF;
     v_clock := app_setting_text('complaint_reopen_clock');
     v_from := CASE WHEN v_clock = 'restart' THEN now() ELSE coalesce(c.clock_from, c.first_submitted_at) END;

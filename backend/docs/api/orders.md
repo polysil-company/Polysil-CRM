@@ -835,6 +835,7 @@ and only the outcome to a dealer.
 | `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
+| `fully_dispatched_at` | string \| null |  | When the last line shipped (dispatched, or closed short after a dispatch); null otherwise (FS-026). |
 | `amend_count` | integer |  | How many times this order was amended after approval (FS-036). Default `0`. |
 | `amended_from_total` | string \| null |  | The approved total the last amend started from. |
 | `amend_reason` | string \| null |  | Why it was last amended. Staff only. |

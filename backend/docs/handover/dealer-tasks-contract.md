@@ -17,3 +17,5 @@ A dealer user sees its own tasks (`GET /tasks?assigned_to=me`, `GET /tasks/{id}`
 
 Screens: a "Dealers" group in the assignee picker when the setting is on; a Tasks page in the
 dealer portal with Complete only.
+
+**Setting off:** a dealer gets 403 on every tasks route and no task figure on the dashboard, exactly as before. Hide the dealer's tasks screen unless `tasks_for_dealers` is `on`.

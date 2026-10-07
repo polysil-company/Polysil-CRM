@@ -381,6 +381,9 @@ class Order(BaseModel):
                                   "Null for a caller who may not see payments.")
     submitted_at: str | None
     approved_at: str | None
+    fully_dispatched_at: str | None = Field(
+        default=None, description="When the last line shipped (dispatched, or closed short after "
+                                  "a dispatch); null otherwise (FS-026).")
     amend_count: int = Field(
         default=0, description="How many times this order was amended after approval (FS-036).")
     amended_from_total: str | None = Field(

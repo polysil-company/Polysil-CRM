@@ -21,7 +21,11 @@ pytestmark = pytest.mark.db
 
 shop = endpoints.shop
 Shop = endpoints.Shop
-MONTH = today_ist().strftime("%Y-%m")  # the IST month, as the service reads it
+
+
+def _month() -> str:
+    """The IST month when called, as the service reads it; never an import-time constant."""
+    return today_ist().strftime("%Y-%m")
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -37,9 +41,9 @@ async def _forget_targets(shop: Shop, sessions: Callable[[], AsyncSession]) -> A
         await s.close()
 
 
-async def _put(client: httpx.AsyncClient, h: dict[str, str], user: str, month: str = MONTH, **targets: object) -> httpx.Response:
+async def _put(client: httpx.AsyncClient, h: dict[str, str], user: str, month: str | None = None, **targets: object) -> httpx.Response:
     return await client.put(f"{V1}/targets", headers={**h, **_key()},
-                            json={"user_id": user, "month": month, "targets": targets or {"orders": 10}})
+                            json={"user_id": user, "month": month or _month(), "targets": targets or {"orders": 10}})
 
 
 async def test_a_manager_sets_a_target_below_them_and_the_history_stays(client: httpx.AsyncClient, shop: Shop) -> None:
@@ -74,14 +78,18 @@ async def test_achievement_lists_people_without_a_target_and_counts_orders(clien
     dm = await endpoints._as(client, shop, "district_manager")
     await _put(client, dm, shop.ids["field_officer"], orders=4)
     fo = await endpoints._as(client, shop, "field_officer")
-    await endpoints._submit(client, fo, (await endpoints._create(client, fo, endpoints._direct(shop)))["id"])
-    data = (await client.get(f"{V1}/targets/achievement", headers=dm, params={"month": MONTH})).json()["data"]
+    order = await endpoints._submit(client, fo, (await endpoints._create(client, fo, endpoints._direct(shop)))["id"])
+    data = (await client.get(f"{V1}/targets/achievement", headers=dm, params={"month": _month()})).json()["data"]
+    assert data["rows"] and {r["user"]["id"]: r for r in data["rows"]}[shop.ids["field_officer"]]["metrics"]["orders"]["achieved"] == 0, \
+        "submitted is not yet a sale under the default (FS-026)"
+    await endpoints._approve_all(client, shop, order)
+    data = (await client.get(f"{V1}/targets/achievement", headers=dm, params={"month": _month()})).json()["data"]
     rows = {r["user"]["id"]: r for r in data["rows"]}
     me = rows[shop.ids["field_officer"]]["metrics"]["orders"]
     assert me == {"target": 4, "achieved": 1, "pct": "25.0"}
     assert shop.ids["district_manager"] in rows, "the caller is listed, without a target"
     assert shop.ids["state_manager"] not in rows, "review 7: a higher rank at my office is not mine to set"
-    own = (await client.get(f"{V1}/targets/achievement", headers=fo, params={"month": MONTH})).json()["data"]
+    own = (await client.get(f"{V1}/targets/achievement", headers=fo, params={"month": _month()})).json()["data"]
     assert [r["user"]["id"] for r in own["rows"]] == [shop.ids["field_officer"]]
 
 
