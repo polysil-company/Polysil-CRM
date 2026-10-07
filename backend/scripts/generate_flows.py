@@ -1928,6 +1928,7 @@ def f_reports() -> None:
     _column(e, n, [
         ("r1", "GET /reports/<name>?from&to&territory_id&owner_id\nreports.view + the base module, else 403", BLUE),
         ("r2", "aggregate: scope_predicate per table\n+ deleted_at IS NULL, RLS beneath", VIOLET),
+        ("r2b", "orders: setting sale_counted_at picks the date (FS-026)\nsubmitted_at | approved_at | fully_dispatched_at |\norder_paid_at(); never draft, cancelled, short-and-unshipped", YELLOW),
         ("r3", "rows (1,000 max) + totals over everything\nnull for a figure without its module", GREEN),
     ], 0)
     _column(e, n, [
@@ -1941,6 +1942,17 @@ def f_reports() -> None:
     e += note("nYellow1", 1240, 200,
               "Stand-ins: conversion = won / created; sales = commercial,\n"
               "industrial, export, subsidised (GAP-220 to GAP-226).", w=420, colour=YELLOW)
+    e += note("nRed2", 1240, 340,
+              "A NEW ORDER COLUMN MUST JOIN THE EDIT GUARD\n\n"
+              "refuse_submitted_order_edit compares the whole row\n"
+              "to an allow-list. 046 added fully_dispatched_at first;\n"
+              "without it the status trigger's write raises.", w=420, colour=RED)
+    e += note("nYellow2", 1240, 540,
+              "SALE DATE (FS-026, 046)\n\n"
+              "Default approval, admin-changeable; restates every period.\n"
+              "Paid day = earliest receipt day whose running total of live\n"
+              "allocations covers payable; a day, not an amount.\n"
+              "Ordered value counts, not shipped (GAP-234 to GAP-239).", w=420, colour=YELLOW)
     write("32-reports", e)
 
 
@@ -1953,7 +1965,7 @@ def f_targets() -> None:
     _column(e, n, [
         ("t1", "PUT /targets {user, month, targets}\nbelow me: my subtree, not me, lower rank", BLUE),
         ("t2", "sales_target: append-only, latest wins\n+ target.set on the person", VIOLET),
-        ("t3", "GET /targets/achievement?month\nme + everyone below, with or without targets", GREEN),
+        ("t3", "GET /targets/achievement?month\nme + everyone below, with or without targets\norders on the sale_counted_at date (FS-026)", GREEN),
     ], 0)
     e += note("nRed1", 620, 0,
               "THE SUBTREE HOLDS ME AND MY PEERS\n\n"

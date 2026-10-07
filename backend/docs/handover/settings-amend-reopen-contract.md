@@ -22,9 +22,9 @@ arrive with other features; render the list generically from `allowed` and the v
 
 ```jsonc
 // POST /api/v1/orders/{id}/amend         Idempotency-Key
-{ "reason": "Farmer wants 20 more laterals" }
+{ "remark": "Farmer wants 20 more laterals", "expected_status": "approved" }
 // 200 Order: status "draft", amend_count 1, amended_from_total "105000.00"
-// 409 order_has_shipped | order_has_payments | status_changed    422 remark_required | order_type_fixed
+// 409 order_dispatched | order_has_payments | status_changed    422 remark_required | order_type_fixed
 ```
 
 Only before anything ships and before any payment is allocated. Then edit and submit as usual.
@@ -38,7 +38,7 @@ Accounts to set again. An amended order cancelled while a draft still needs the 
 // POST /api/v1/complaints/{id}/reopen    Idempotency-Key
 { "reason": "The same emitters failed again" }
 // 200 Complaint: status "submitted", reopen_count 1
-// 403 role not allowed    409 status_changed    422 reopen_window_closed | remark_required
+// 403 role not allowed    409 status_changed    422 reopen_window_closed | remark_required | no_checker
 ```
 
 From `closed` (the raiser or an allowed role) or `qc_rejected` (allowed roles only), within the
@@ -50,3 +50,5 @@ window and under the cap. It starts a new round; the timeline shows `complaint.s
 - Admin: a Settings page.
 - Order detail when approved: "Amend" beside "Cancel"; after amend, a banner with the approved total.
 - Complaint detail when closed or rejected: "Reopen" while inside the window; "Reopened N times".
+
+**Note:** amend takes `remark`; reopen takes `reason`. Only staff amend; hide "Amend" in the dealer portal.

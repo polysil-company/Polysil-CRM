@@ -554,6 +554,7 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
             "AND entity_id = CAST(:o AS uuid) AND kind = 'order.approved' "
             "ORDER BY occurred_at DESC LIMIT 1"), {"o": order_id})).scalar_one_or_none(),
         remarks=r.remarks, submitted_at=_iso(r.submitted_at), approved_at=_iso(r.approved_at),
+        fully_dispatched_at=_iso(r.fully_dispatched_at),
         amend_count=r.amend_count,
         amended_from_total=str(r.amended_from_total) if r.amended_from_total is not None else None,
         amend_reason=None if portal else r.amend_reason,

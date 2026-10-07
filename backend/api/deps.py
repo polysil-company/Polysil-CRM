@@ -298,8 +298,22 @@ def require(module: str, action: str) -> Callable[..., Coroutine[Any, Any, None]
         )
         if not allowed.scalar_one():
             raise ForbiddenError()
+        if module == "tasks" and await _dealer_tasks_off(db):
+            raise ForbiddenError()
 
     return dep
+
+
+# FS-037: portal roles hold `tasks V:own E` (RBAC.md 6.3), but a dealer has tasks
+# only while the `tasks_for_dealers` setting is on. Off, a dealer is refused the
+# tasks routes and gets no tasks scope, as before 042.
+_DEALER_TASKS_OFF = text(
+    "SELECT app_current_partner() IS NOT NULL AND app_setting_text('tasks_for_dealers') <> 'on'"
+)
+
+
+async def _dealer_tasks_off(db: AsyncSession) -> bool:
+    return bool((await db.execute(_DEALER_TASKS_OFF)).scalar_one())
 
 
 def require_any(*pairs: tuple[str, str]) -> Callable[..., Coroutine[Any, Any, None]]:
@@ -346,6 +360,9 @@ _PERMS_QUERY = text(
 async def get_caller(db: DbSession, claims: Claims) -> Caller:
     anchor = (await db.execute(_ANCHOR_QUERY)).one()
     rows = (await db.execute(_PERMS_QUERY)).all()
+    holds_tasks = any(r.module == "tasks" for r in rows)
+    if anchor.partner_id is not None and holds_tasks and await _dealer_tasks_off(db):
+        rows = [r for r in rows if r.module != "tasks"]
     return Caller(
         user_id=claims.sub,
         org_unit_id=str(anchor.org_unit_id) if anchor.org_unit_id is not None else None,

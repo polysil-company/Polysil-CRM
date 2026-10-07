@@ -37,13 +37,17 @@ Sessions = Callable[[], AsyncSession]
 async def restore(sessions: Sessions) -> AsyncIterator[None]:
     """Every setting back to what it was, whatever the test changed."""
     c = sessions()
-    before = dict((await c.execute(text("SELECT key::text, value::text FROM app_setting"))).all())
+    before = {r.key: r for r in (await c.execute(text(
+        "SELECT key::text AS key, value::text AS value, updated_by FROM app_setting"))).all()}
     await c.close()
     yield
     c = sessions()
-    for key, value in before.items():
-        await c.execute(text("UPDATE app_setting SET value = CAST(:v AS jsonb) WHERE key = :k AND value <> CAST(:v AS jsonb)"),
-                        {"k": key, "v": value})
+    # updated_by too: a PATCH leaves the fixture's user there, and the shop's
+    # teardown deletes that user (app_setting_updated_by_fkey)
+    for key, row in before.items():
+        await c.execute(text("UPDATE app_setting SET value = CAST(:v AS jsonb), updated_by = CAST(:u AS uuid) "
+                             "WHERE key = :k AND (value <> CAST(:v AS jsonb) OR updated_by IS DISTINCT FROM CAST(:u AS uuid))"),
+                        {"k": key, "v": row.value, "u": row.updated_by and str(row.updated_by)})
     await c.execute(text("DELETE FROM activity_event WHERE kind = 'setting.changed'"))
     await c.commit()
     await c.close()
@@ -114,6 +118,20 @@ async def test_a_direct_bad_value_is_refused_by_the_database(sessions: Sessions)
         await c.rollback()
         await c.close()
 
+
+
+async def test_an_unknown_role_code_is_refused_on_change(sessions: Sessions) -> None:
+    """041 skips the role check on its own insert (roles are seeded after migrating);
+    every change after that is checked."""
+    c = sessions()
+    try:
+        with pytest.raises(DBAPIError) as err:
+            await c.execute(text("UPDATE app_setting SET value = '[\"support\", \"no_such_role\"]' "
+                                 "WHERE key = 'complaint_reopen_roles'"))
+        assert getattr(err.value.orig, "sqlstate", None) == "SETVL"
+    finally:
+        await c.rollback()
+        await c.close()
 
 # ── amend ────────────────────────────────────────────────────────────────────
 
@@ -227,6 +245,32 @@ async def test_order_amend_refuses_a_caller_who_cannot_see_the_order(
         await s.close()
 
 
+async def test_a_dealer_cannot_amend_its_own_partners_order(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """Review F-1: portal roles hold sales_orders.edit at partner_subtree, so the
+    order must be one the dealer can see for the refusal to mean anything."""
+    order = await conc._approved(client, shop)
+    s = sessions()
+    try:
+        # the dealer's partner on a staff order, in this transaction only: setting it on
+        # the draft reprices the lines at the dealer's tier and the submit refuses
+        guards = ("trg_sales_order_refuse_edit", "trg_sales_order_parent_guard")
+        for g in guards:
+            await s.execute(text(f"ALTER TABLE sales_order DISABLE TRIGGER {g}"))
+        await s.execute(text("UPDATE sales_order SET partner_id = CAST(:p AS uuid) WHERE id = CAST(:o AS uuid)"),
+                        {"p": shop.partner, "o": order["id"]})
+        for g in guards:
+            await s.execute(text(f"ALTER TABLE sales_order ENABLE TRIGGER {g}"))
+        await conc._as(s, shop.ids["dealer"])
+        assert (await s.execute(text("SELECT order_visible(CAST(:o AS uuid))"), {"o": order["id"]})).scalar_one()
+        with pytest.raises(DBAPIError) as err:
+            await s.execute(text("SELECT order_amend(CAST(:o AS uuid), 'mine now', NULL)"), {"o": order["id"]})
+        assert getattr(err.value.orig, "sqlstate", None) == "42501"
+    finally:
+        await s.rollback()
+        await s.close()
+
+
 # ── reopen ───────────────────────────────────────────────────────────────────
 
 async def _closed(client: httpx.AsyncClient, shop: Shop) -> dict[str, Any]:
@@ -237,6 +281,16 @@ async def _closed(client: httpx.AsyncClient, shop: Shop) -> dict[str, Any]:
     return dict(r.json()["data"])
 
 
+async def _backdate(sessions: Sessions, cid: str) -> None:
+    s = sessions()
+    await s.execute(text("UPDATE complaint SET first_submitted_at = first_submitted_at - interval '30 days', "
+                         "response_due_at = response_due_at - interval '30 days', "
+                         "resolution_due_at = resolution_due_at - interval '30 days' "
+                         "WHERE id = CAST(:c AS uuid)"), {"c": cid})
+    await s.commit()
+    await s.close()
+
+
 async def _reopen(client: httpx.AsyncClient, h: dict[str, str], cid: str) -> httpx.Response:
     return await complaints_t._post(client, h, f"/{cid}/reopen", {"reason": "The same emitters failed again"})
 
@@ -245,9 +299,13 @@ async def test_the_raiser_reopens_a_closed_complaint_into_a_new_round(
         client: httpx.AsyncClient, remedies: Shop, sessions: Sessions) -> None:
     shop = remedies
     c = await _closed(client, shop)
+    # review F-3: the first round a month back, so its targets are past and only a
+    # restarted clock puts the new response target in the future
+    await _backdate(sessions, c["id"])
     officer = await complaints_t._as(client, shop, "field_officer")
     detail = await remedies_t._get(client, officer, c["id"])
     assert detail["can"]["reopen"] is True
+    assert dt.datetime.fromisoformat(detail["sla"]["response_due_at"]) < dt.datetime.now(dt.UTC)
     r = await _reopen(client, officer, c["id"])
     assert r.status_code == 200, r.text
     got = r.json()["data"]
@@ -259,6 +317,24 @@ async def test_the_raiser_reopens_a_closed_complaint_into_a_new_round(
     dm = await complaints_t._as(client, shop, "district_manager")
     r = await complaints_t._post(client, dm, f"/{c['id']}/check", {"decision": "approve", "remark": "Again genuine"})
     assert r.status_code == 200, r.text
+
+
+async def test_a_reopen_nobody_can_check_is_refused(
+        client: httpx.AsyncClient, remedies: Shop, sessions: Sessions) -> None:
+    """Review F-4: as complaint_submit refuses, so does a reopen (CMPNC)."""
+    shop = remedies
+    c = await _closed(client, shop)
+    s = sessions()
+    try:
+        await s.execute(text("UPDATE role_permission SET deleted_at = now() "
+                             "WHERE module = 'complaints' AND action = 'approve' AND deleted_at IS NULL"))
+        await conc._as(s, shop.ids["field_officer"])
+        with pytest.raises(DBAPIError) as err:
+            await s.execute(text("SELECT complaint_reopen(CAST(:c AS uuid), 'Failed again')"), {"c": c["id"]})
+        assert getattr(err.value.orig, "sqlstate", None) == "CMPNC"
+    finally:
+        await s.rollback()
+        await s.close()
 
 
 async def test_continue_keeps_the_original_targets(

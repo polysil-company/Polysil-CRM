@@ -28,7 +28,12 @@ Shop = endpoints.Shop
 Sessions = Callable[[], AsyncSession]
 # the IST day, as the service books orders: the UTC date is a day behind between
 # 18:30 and 24:00 UTC, and CI once ran there (PR 70)
-TODAY = today_ist().isoformat()
+
+
+def _today() -> str:
+    """The IST day when called: a constant taken at import goes stale when a run
+    crosses midnight (a 17-minute suite did, 7 Oct)."""
+    return today_ist().isoformat()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -57,7 +62,7 @@ async def _approved(client: httpx.AsyncClient, shop: Shop, **over: Any) -> dict:
 
 
 async def _pay(client: httpx.AsyncClient, h: dict[str, str], body: dict[str, Any]) -> httpx.Response:
-    base = {"mode": "neft", "ref_no": "UTR" + uuid.uuid4().hex[:10], "received_on": TODAY}
+    base = {"mode": "neft", "ref_no": "UTR" + uuid.uuid4().hex[:10], "received_on": _today()}
     return await client.post(f"{V1}/payments", headers={**h, **_key()}, json={**base, **body})
 
 
@@ -146,7 +151,7 @@ async def test_a_retried_receipt_counts_once(client: httpx.AsyncClient, shop: Sh
     order = await _approved(client, shop)
     accounts = await endpoints._as(client, shop, "account_manager")
     key = _key()
-    body = {"mode": "cash", "received_on": TODAY, "amount": "50.00",
+    body = {"mode": "cash", "received_on": _today(), "amount": "50.00",
             "allocations": [{"sales_order_id": order["id"], "amount": "50.00"}]}
     for _ in range(2):
         r = await client.post(f"{V1}/payments", headers={**accounts, **key}, json=body)
