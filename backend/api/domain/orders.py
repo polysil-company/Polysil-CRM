@@ -59,6 +59,7 @@ def actor_hidden_from_partner(kind: str) -> bool:
 # 403 and 404 carry no code of their own beyond the envelope's.
 SQLSTATE_TO_ERROR: Final[dict[str, tuple[int, str]]] = {
     "ORDNS": (409, "order_not_draft"),
+    "CRDLM": (409, "credit_limit_exceeded"),   # FS-027, the block setting
     "ORDNA": (422, "no_approver"),
     "ORDST": (422, "territory_without_state_code"),
     "ORDDS": (409, "order_dispatched"),

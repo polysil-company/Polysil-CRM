@@ -555,6 +555,7 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
             "ORDER BY occurred_at DESC LIMIT 1"), {"o": order_id})).scalar_one_or_none(),
         remarks=r.remarks, submitted_at=_iso(r.submitted_at), approved_at=_iso(r.approved_at),
         fully_dispatched_at=_iso(r.fully_dispatched_at),
+        over_credit_limit=r.over_credit_limit if await _sees_credit_flag(db, caller) else None,
         amend_count=r.amend_count,
         amended_from_total=str(r.amended_from_total) if r.amended_from_total is not None else None,
         amend_reason=None if portal else r.amend_reason,
@@ -706,6 +707,7 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
     by_id = {str(r.id): r for r in rows}
     names = await people.resolve(db, rows, [("owner_user_id", "owner_name")],
                                  [("partner_id", "partner_name")])
+    credit = await _sees_credit_flag(db, caller)
     data = []
     for i in ids:
         r = by_id.get(i)
@@ -721,9 +723,22 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
             dispatched_pct=domain.dispatched_pct(Decimal(x.ordered), Decimal(x.sent)),
             approval_waiting_on=x.waiting, submitted_at=_iso(r.submitted_at),
             amend_count=r.amend_count,
+            over_credit_limit=r.over_credit_limit if credit else None,
             created_at=r.created_at.isoformat()))
     return sch.OrderPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
                                                   total=total, total_capped=capped))
+
+
+async def _sees_credit_flag(db: AsyncSession, caller: Caller) -> bool:
+    """Whether the caller may see that an order is over its dealer's credit limit:
+    staff who approve orders, edit dealers or read payments; never a portal
+    caller or a field officer (FS-027 rule 8, GAP-244)."""
+    if _is_portal(caller):
+        return False
+    return bool((await db.execute(text(
+        "SELECT app_has_permission('sales_orders', 'approve') "
+        "OR app_has_permission('partners', 'edit') "
+        "OR app_has_permission('payments', 'view')"))).scalar_one())
 
 
 async def timeline(db: AsyncSession, caller: Caller, order_id: str, *, limit: int = 100,

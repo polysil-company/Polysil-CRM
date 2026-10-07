@@ -25,6 +25,7 @@ from api.config import get_settings
 from api.integrations.whatsapp import get_provider
 from api.integrations.whatsapp.check import check_templates, unconfigured_templates
 from api.storage import get_storage
+from worker.jobs.complaints import complaint_escalation
 from worker.jobs.leads import lead_dormancy
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
@@ -84,7 +85,7 @@ class WorkerSettings:
     redis_settings = _redis_settings()
     functions: ClassVar[list] = [outbox_drain, purge_expired_sessions,
                                  quotation_render_due, quotation_expire, order_render_due,
-                                 scheme_nightly, lead_dormancy]
+                                 scheme_nightly, lead_dormancy, complaint_escalation]
     cron_jobs: ClassVar[list] = CRON_JOBS
     on_startup = on_startup
     on_shutdown = on_shutdown

@@ -29,7 +29,9 @@ def test_every_custom_sqlstate_the_migration_raises_has_an_api_error_and_no_othe
              + (_VERSIONS / "032_stock.py").read_text("utf-8"))
     # FS-036: order_amend (041)
     later += (_VERSIONS / "041_settings_amend_reopen.py").read_text("utf-8")
-    through_orders = {"STKWI", "STKNW", "STKNF", "PAYPC", "ORDTF", "ORDPA"}
+    # FS-027: order_submit's credit check (047)
+    later += (_VERSIONS / "047_dealer_credit_limit.py").read_text("utf-8")
+    through_orders = {"STKWI", "STKNW", "STKNF", "PAYPC", "ORDTF", "ORDPA", "CRDLM"}
     assert through_orders <= set(re.findall(r"ERRCODE = '([A-Z0-9]{5})'", later))
     expected = raised | through_orders
     assert expected == set(domain.SQLSTATE_TO_ERROR), expected ^ set(domain.SQLSTATE_TO_ERROR)

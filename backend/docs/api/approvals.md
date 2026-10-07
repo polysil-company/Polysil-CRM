@@ -293,6 +293,8 @@ One approval chain.
 | `reopen_count` | integer |  | Times reopened (FS-036). Default `0`. |
 | `reopened_at` | string \| null |  |  |
 | `reopen_reason` | string \| null |  | Why it was last reopened. Staff only. |
+| `response_escalated_at` | string \| null |  | When the missed response target was escalated (FS-028); null otherwise. Staff only. |
+| `resolution_escalated_at` | string \| null |  | When the missed resolution target was escalated (FS-028); null otherwise. Staff only. |
 | `can` | Can | yes |  |
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
@@ -479,6 +481,7 @@ One approval chain.
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
 | `fully_dispatched_at` | string \| null |  | When the last line shipped (dispatched, or closed short after a dispatch); null otherwise (FS-026). |
+| `over_credit_limit` | boolean \| null |  | Over the dealer's credit limit at submit (FS-027): true or false when checked, null when unchecked. Null for field officers and dealers, who may not read credit standing. |
 | `amend_count` | integer |  | How many times this order was amended after approval (FS-036). Default `0`. |
 | `amended_from_total` | string \| null |  | The approved total the last amend started from. |
 | `amend_reason` | string \| null |  | Why it was last amended. Staff only. |
@@ -671,6 +674,7 @@ One approval chain.
 | `raised_at` | string | yes | The submit time, or when a quotation's approval was asked. |
 | `discount_pct` | string \| null |  | A quotation row: the effective discount asked for, in percent. Null on an order. |
 | `payment_status` | string \| null |  | An order row: not_applicable, unpaid, part_paid, paid or overpaid (FS-022), for the Accounts step. Null otherwise. |
+| `over_credit_limit` | boolean \| null |  | An order row: over the dealer's credit limit at submit (FS-027); null when unchecked or not an order. |
 | `request_remark` | string \| null |  | Why the approval was asked, as the person asking wrote it. Show it beside the figures. Null when none was given. |
 
 **`QueuePage`**

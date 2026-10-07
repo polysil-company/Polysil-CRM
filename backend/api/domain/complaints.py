@@ -29,38 +29,52 @@ FREQUENCY_MAX: Final = 200
 
 # ── working time ─────────────────────────────────────────────────────────────
 
-def _next_open(at: dt.datetime) -> dt.datetime:
-    """The first working instant at or after `at`, in IST."""
+# A run of holidays must end the scan (FS-028 plan review B-2). The bound is on
+# consecutive non-working days, not the whole target, so a long policy still
+# computes (code review F-1); the SQL twin in migration 048 raises identically.
+HORIZON_DAYS = 400
+
+
+def _next_open(at: dt.datetime, holidays: frozenset[dt.date]) -> dt.datetime:
+    """The first working instant at or after `at`, in IST, skipping holidays."""
     t = at.astimezone(IST)
+    skipped = 0
     while True:
         start = dt.datetime.combine(t.date(), WORK_START, tzinfo=IST)
         end = dt.datetime.combine(t.date(), WORK_END, tzinfo=IST)
-        if t.weekday() in WORK_DAYS and t < end:
+        if t.weekday() in WORK_DAYS and t.date() not in holidays and t < end:
             return max(t, start)
+        skipped += 1
+        if skipped > HORIZON_DAYS:
+            raise ValueError(f"no working day within {HORIZON_DAYS} days")
         t = dt.datetime.combine(t.date() + dt.timedelta(days=1), WORK_START, tzinfo=IST)
 
 
-def add_working_hours(start: dt.datetime, hours: int) -> dt.datetime:
+def add_working_hours(start: dt.datetime, hours: int,
+                      holidays: frozenset[dt.date] = frozenset()) -> dt.datetime:
     """`start` plus `hours` of working time. A start outside hours counts from the
-    next opening; a target that lands exactly on closing time stays there."""
+    next opening; a target that lands exactly on closing time stays there. A
+    holiday counts like a Sunday (FS-028); the caller passes the days, so the
+    domain stays pure."""
     if start.tzinfo is None:
         raise ValueError("start must carry a timezone")
     remaining = dt.timedelta(hours=hours)
-    t = _next_open(start)
+    t = _next_open(start, holidays)
     while True:
         end = dt.datetime.combine(t.date(), WORK_END, tzinfo=IST)
         if t + remaining <= end:
             return t + remaining
         remaining -= end - t
-        t = _next_open(end)
+        t = _next_open(end, holidays)
 
 
-def due_at(start: dt.datetime, hours: int | None, business_hours_only: bool) -> dt.datetime | None:
+def due_at(start: dt.datetime, hours: int | None, business_hours_only: bool,
+           holidays: frozenset[dt.date] = frozenset()) -> dt.datetime | None:
     """A target from its policy row, or None when no row applied (EC-11)."""
     if hours is None:
         return None
     if business_hours_only:
-        return add_working_hours(start, hours)
+        return add_working_hours(start, hours, holidays)
     return start + dt.timedelta(hours=hours)
 
 

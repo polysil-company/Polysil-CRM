@@ -204,7 +204,9 @@ async def test_the_raiser_is_the_caller(db: AsyncSession) -> None:
 async def test_sql_working_hours_equal_the_domains(db: AsyncSession, start: dt.datetime, hours: int) -> None:
     sql = (await db.execute(text("SELECT complaint_add_working_hours(:s, :h)"),
                             {"s": start, "h": hours})).scalar_one()
-    assert sql == domain.add_working_hours(start, hours)
+    # the holidays the SQL reads (048), so a seeded one never splits the twins
+    holidays = frozenset((await db.execute(text("SELECT day FROM holiday"))).scalars())
+    assert sql == domain.add_working_hours(start, hours, holidays)
 
 
 # ── the flow ─────────────────────────────────────────────────────────────────

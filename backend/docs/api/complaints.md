@@ -908,6 +908,8 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `reopen_count` | integer |  | Times reopened (FS-036). Default `0`. |
 | `reopened_at` | string \| null |  |  |
 | `reopen_reason` | string \| null |  | Why it was last reopened. Staff only. |
+| `response_escalated_at` | string \| null |  | When the missed response target was escalated (FS-028); null otherwise. Staff only. |
+| `resolution_escalated_at` | string \| null |  | When the missed resolution target was escalated (FS-028); null otherwise. Staff only. |
 | `can` | Can | yes |  |
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |

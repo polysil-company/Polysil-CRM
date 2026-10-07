@@ -1216,7 +1216,17 @@ def f_order() -> None:
               "Short supply stays open until closed short.\n"
               "Invoice numbers recorded, not issued.\n"
               "A direct order does not move its lead.\n"
-              "No credit or stock check. Our number format.",
+              "No stock check. Our number format.",
+              w=460, colour=YELLOW)
+    e += note("nYellow3", 920, 1400,
+              "CREDIT LIMIT AT SUBMIT (FS-027, 047)\n\n"
+              "Setting dealer_credit_check: off | warn | block.\n"
+              "order_submit -> order_credit_check after the status\n"
+              "UPDATE, so benefits are counted. Exposure = owed on\n"
+              "payable orders less live receipts. Lock: order,\n"
+              "counter, then dealer FOR NO KEY UPDATE.\n"
+              "Block: 409, no figures. Warn: over_credit_limit for\n"
+              "approvers only (GAP-240 to 244).",
               w=460, colour=YELLOW)
 
     e += note("nYellow2", -420, 900,
@@ -1695,6 +1705,16 @@ def f_complaints() -> None:
               "Stand-ins: refund limits 25,000 / 1,00,000 / any;\n"
               "Dispatch alone approves a replacement; QC chooses;\n"
               "closing is automatic (GAP-179 to GAP-187).", w=420, colour=YELLOW)
+    e += note("nRed5", 1240, 1500,
+              "A RUN OF HOLIDAYS MUST END THE SCAN (FS-028, 048)\n\n"
+              "Working hours skip holidays like Sundays, read once for\n"
+              "400 days; past that, 22023, never a loop to the\n"
+              "statement timeout. The Python twin has the same bound.", w=420, colour=RED)
+    e += note("nYellow3", 1240, 1720,
+              "ESCALATION (FS-028): worker every 5 min as System.\n"
+              "One bell per missed due time: owner, the check's\n"
+              "manager, and the checkers or QC at that stage.\n"
+              "Setting complaint_escalation off | bell (GAP-245 to 249).", w=420, colour=YELLOW)
     e += note("nGreen1", 1240, 780,
               "Both enforcers agree: status, the number and the\n"
               "targets have no UPDATE grant; only the definers\n"
