@@ -37,6 +37,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 👀 | PR #34; the Dispatch queue in PR #56 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
+| [Subsidy](#subsidy) | 4 | 🧪 👀 | PR #PRNUM |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -196,6 +197,17 @@ Complaint types are set with the other lookups, in the admin masters.
 
 ---
 
+## Subsidy
+
+On the backend's contract (`backend/docs/api/subsidy.md`, handover `subsidy-calculation.md`) since PR #PRNUM ([changelog](../changelog/entries/2026-10-09--feature--SUBS-002--the-subsidy-calculator.md)). Walked through in the mock as a field employee: Drip with a crop, three field-unit items, two head-unit items and installation, then a group area the backend refused and a spacing with three decimals; Drip with two crop blocks in dark mode; Sprinkler on a 360 px phone in dark mode, with no sideways scroll. axe found nothing on any of them. The mock's figures are a stand-in for the engine's; not yet checked on the dev API. Screens: [empty, phone](screenshots/subsidy/calculator-empty-phone-light.jpg), [Drip](screenshots/subsidy/calculator-drip-desktop-light.jpg), [mistakes](screenshots/subsidy/calculator-mistakes-desktop-light.jpg), [two crop blocks, dark](screenshots/subsidy/calculator-two-blocks-desktop-dark.jpg), [Sprinkler, phone dark](screenshots/subsidy/calculator-sprinkler-phone-dark.jpg).
+
+- **SUBS-003 · Three systems from the scheme's config** (Sales → Subsidy, staff with `subsidy`; dealers and distributors neither see it nor reach it — the backend answers them 403): Drip, Mini Sprinkler and Sprinkler as three tabs (`?system=`), each shaped by `GET /subsidy/config` — how many crop blocks (two on Drip), a head unit and a group's area or not, Sprinkler's areas. Each tab keeps its own inputs. Before anything is calculated, the eight farmer categories are listed with their percentages. The crop pickers show each crop's standard spacing. 🧪 👀
+- **SUBS-002 · The calculation as the designer types:** crop and inter-crop, area, lateral spacing, crop spacing and field-unit items per block; the head unit once; installation and sump per hectare; a group's total area; Sprinkler's nozzle. After a pause the figures follow: the warnings (titled, naming the block, the seven-year ones apart); each block's designed, standard and used spacing — with why when the standard wins — the unit cost the scheme allows (`regular_for_cap`) and the seven-year one; all eight categories with the subsidy, its share and what the farmer pays (with GSDMA on small Mini Sprinkler areas), a category that doesn't apply greyed with its reason; and the 22-row summary, a column per block and the total. The figures are printed as the backend sends them, never added up on screen. Nothing is saved. 🧪 👀
+- **SUBS-002 · Sprinkler:** the area from the scheme's steps only, no lines and no head unit; the result lists the derived items, the pipe size and the DBT farmer payable. 🧪 👀
+- **SUBS-002 · Mistakes and refusals:** a missing area or spacing just waits; too many decimals, a half-typed item or a group area of 0 are named on the field once typing pauses; a refusal from the backend (`crops[0].area`, `group_total_area`…) lands on the same field, and one no field shows (too many blocks) is listed above the figures. Older figures stay dimmed while new ones load. A failure no field explains shows an error with a retry. 🧪 👀
+
+---
+
 ## Dashboard, notifications, messages
 
 The dashboard reads the backend's real shape since the demo-walk fixes ([changelog](../changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md)). The bell and messages follow the backend's contracts (BE-009, BE-010) since PR #43 ([changelog](../changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md)). None of the three has been checked on the dev API by hand yet. Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
@@ -225,4 +237,5 @@ The backend serves these, and the frontend has no screen for them — in the ord
 
 1. A consolidated order from several quotations on leads of one dealer.
 2. Complaint types, with the other lookups in the admin masters. Everything else in complaints is in PR #57 and PR #58.
-3. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.
+3. Subsidy applications, their stages, documents and PIMS export, and the subsidy reports.
+4. Admin masters: products, price lists, tax rates, users, offices, territories, partners.
