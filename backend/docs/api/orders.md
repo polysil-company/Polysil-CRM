@@ -48,6 +48,7 @@ has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)
 | `limit` | query | integer |  |  |
 | `cursor` | query | string \| null |  | From the previous page's next_cursor. |
 | `include_total` | query | boolean |  | Also count, up to 1,000. |
+| `waiting_on` | query | string \| null |  | A role code, such as `account_manager`: orders whose next approval step is that role's. The step's role, not everyone who may decide it. |
 
 **Responses**
 
@@ -146,6 +147,7 @@ narrow the filters. An empty list gives a file with the header row only.
 | `q` | query | string \| null |  | Order number, party name or mobile. |
 | `from` | query | string \| null |  | ISO date, IST. |
 | `to` | query | string \| null |  | ISO date, inclusive. |
+| `waiting_on` | query | string \| null |  | A role code, such as `account_manager`: orders whose next approval step is that role's. The step's role, not everyone who may decide it. |
 
 **Responses**
 
@@ -177,6 +179,7 @@ submitted orders by whose approval is next. Same scope and filters as the list.
 | `owner` | query | string \| null |  | `me`, or a user id. |
 | `from` | query | string \| null |  | ISO date, IST. |
 | `to` | query | string \| null |  | ISO date, inclusive. |
+| `waiting_on` | query | string \| null |  | A role code, such as `account_manager`: orders whose next approval step is that role's. The step's role, not everyone who may decide it. |
 
 **Responses**
 

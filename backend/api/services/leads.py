@@ -699,9 +699,9 @@ def _as_dict(payload: Any) -> dict[str, Any]:
 
 
 async def _timeline_refs(db: AsyncSession, lead_id: str, rows: Any,
-                         ) -> tuple[dict[str, str], dict[str, Any]]:
-    """The names an assignment event refers to and the quotations the page's
-    quotation events are about, one query each and only when the page needs them.
+                         ) -> tuple[dict[str, str], dict[str, Any], dict[str, Any]]:
+    """The names an assignment event refers to, and the quotations and orders the
+    page's events are about, one query each and only when the page needs them.
     Names through lead_event_people(): whoever sees the lead sees the people its
     history names, which people_names() cannot answer for a past owner (plan
     review B-2). Quotations under the reader's own policies: lead_timeline() has
@@ -720,11 +720,20 @@ async def _timeline_refs(db: AsyncSession, lead_id: str, rows: Any,
         quotes = {str(q.id): q for q in (await db.execute(text(
             "SELECT id, quote_no, version FROM quotation WHERE id = ANY(CAST(:ids AS uuid[]))"),
             {"ids": quote_ids})).all()}
-    return people_on, quotes
+    # BE-020: lead_timeline() already dropped the events of orders the reader cannot
+    # see, so a miss here is a delete race (FS-029 review E-1)
+    order_ids = sorted({str(r.entity_id) for r in rows
+                        if r.entity_type == "sales_order" and r.entity_id})
+    orders: dict[str, Any] = {}
+    if order_ids:
+        orders = {str(o.id): o for o in (await db.execute(text(
+            "SELECT id, order_no::text AS order_no FROM sales_order "
+            "WHERE id = ANY(CAST(:ids AS uuid[]))"), {"ids": order_ids})).all()}
+    return people_on, quotes, orders
 
 
 def _enrich(r: Any, payload: dict[str, Any], people_on: dict[str, str],
-            quotes: dict[str, Any]) -> dict[str, Any]:
+            quotes: dict[str, Any], orders: dict[str, Any]) -> dict[str, Any]:
     """Read-time additions, so old events carry them too. A name key is present
     whenever its id key is, null when the id is null (EC-6)."""
     if r.kind == "lead.assigned":
@@ -738,6 +747,12 @@ def _enrich(r: Any, payload: dict[str, Any], people_on: dict[str, str],
         payload = {**payload, "quotation_id": str(r.entity_id),
                    "quote_no": q.quote_no if q else None,
                    "version": q.version if q else None}
+    elif r.entity_type == "sales_order" and r.entity_id:
+        # every kind on an order, approvals and payments included (FS-029 review E-3);
+        # null until submitted, since a draft has no number
+        o = orders.get(str(r.entity_id))
+        payload = {**payload, "order_id": str(r.entity_id),
+                   "order_no": o.order_no if o else None}
     return payload
 
 
@@ -762,7 +777,7 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
         last = rows[limit - 1]
         next_cursor = _encode_cursor(last.occurred_at, str(last.id))
         rows = rows[:limit]
-    people_on, quotes = await _timeline_refs(db, lead_id, rows)
+    people_on, quotes, orders = await _timeline_refs(db, lead_id, rows)
 
     events: list[TimelineEvent] = []
     for r in rows:
@@ -782,7 +797,7 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
             actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name")
                             or people_on.get(str(r.actor_id)) or "")
         if isinstance(payload, dict):
-            payload = _enrich(r, payload, people_on, quotes)
+            payload = _enrich(r, payload, people_on, quotes, orders)
         events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso_req(r.occurred_at),
                                     actor=actor, payload=payload or {}))
     return TimelinePage(data=events, meta=PageMeta(limit=limit, next_cursor=next_cursor))
