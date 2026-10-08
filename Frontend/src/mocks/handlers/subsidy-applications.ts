@@ -43,6 +43,18 @@ const PAGE_SIZE = 25;
 const SEED_COUNT = 6;
 const FIRST_STAGE = MOCK_STAGE_DEFS[0];
 
+/** The date a seeded stage entry records, so the ageing report has figures to show. */
+const SEED_DATE_FIELD: Readonly<Record<string, string>> = {
+  submitted_wo_pending: "submission",
+  farmer_share: "supply",
+  wo_issued: "wo_received",
+  tpa_sent: "tpa_received",
+  inspection_call_pending: "tpa_cleared",
+  tr_pending: "inspection_sent",
+  tr_done: "tr_date",
+  fp_invoice_submitted: "fp_submitted",
+};
+
 interface Caller {
   readonly view: boolean;
   /** Start, record, upload and cancel need create or edit; view-only users get 403. */
@@ -232,7 +244,7 @@ function newEntry(
 }
 
 /** The latest value of each field, across every entry. */
-function latestValues(applicationId: string): Record<string, string | null> {
+export function latestValues(applicationId: string): Record<string, string | null> {
   const values: Record<string, string | null> = {};
   for (const entry of mockDb.subsidyEntries.get(applicationId) ?? []) {
     Object.assign(values, entry.values);
@@ -277,7 +289,7 @@ function refresh(application: ApplicationWire): void {
 }
 
 /** Seeds a few applications from subsidised leads on first use, at different stages. */
-function applications(): ApplicationWire[] {
+export function mockApplications(): ApplicationWire[] {
   if (mockDb.subsidyApplications !== null) return mockDb.subsidyApplications;
   mockDb.subsidyApplications = [];
   const today = todayInIndia();
@@ -314,9 +326,11 @@ function applications(): ApplicationWire[] {
     }
     // Later applications have moved further along.
     MOCK_STAGE_DEFS.slice(1, 1 + index * 2).forEach((stage, step) => {
-      const day = shiftDay(started, (step + 1) * 2);
+      const shifted = shiftDay(started, (step + 1) * 2);
       // Never after today: a business date can't be in the future.
-      newEntry(application, stage, day > today ? today : day, {}, null, lead.owner);
+      const day = shifted > today ? today : shifted;
+      const key = SEED_DATE_FIELD[stage.code];
+      newEntry(application, stage, day, key === undefined ? {} : { [key]: day }, null, lead.owner);
     });
     if (index === SEED_COUNT - 1) {
       application.status = "cancelled";
@@ -328,7 +342,7 @@ function applications(): ApplicationWire[] {
 }
 
 function findApplication(applicationId: unknown): ApplicationWire | Response {
-  const found = applications().find((item) => item.id === applicationId);
+  const found = mockApplications().find((item) => item.id === applicationId);
   return found ?? errorResponse(404, "not_found", "Not an application in your scope.");
 }
 
@@ -431,7 +445,7 @@ export const subsidyApplicationHandlers = [
     const rows =
       scenario === "empty"
         ? []
-        : applications().filter(
+        : mockApplications().filter(
             (row) =>
               (status === null || row.status === status) &&
               (stage === null || row.current_stage.code === stage) &&
@@ -458,7 +472,7 @@ export const subsidyApplicationHandlers = [
     return mockWorkbook(
       "subsidy-applications",
       ["Application No.", "Reg. No.", "Farmer", "Stage", "Days in stage", "Status"],
-      applications().map((row) => [
+      mockApplications().map((row) => [
         row.application_no,
         row.reg_no ?? "",
         row.farmer_name,
@@ -486,7 +500,7 @@ export const subsidyApplicationHandlers = [
           "That key was used for another request.",
         );
       }
-      const earlier = applications().find((item) => item.id === replay.applicationId);
+      const earlier = mockApplications().find((item) => item.id === replay.applicationId);
       if (earlier !== undefined) return HttpResponse.json({ data: earlier }, { status: 201 });
     }
     const parsed = createSchema.safeParse(JSON.parse(raw));
@@ -512,7 +526,9 @@ export const subsidyApplicationHandlers = [
         "lead_system_not_subsidised",
       );
     }
-    if (applications().some((item) => item.lead.id === lead.id && item.status !== "cancelled")) {
+    if (
+      mockApplications().some((item) => item.lead.id === lead.id && item.status !== "cancelled")
+    ) {
       return invalid({ lead_id: "the lead already has a live application" }, "already_forwarded");
     }
     const checked = checkCalculation(parsed.data.calculation);
@@ -544,7 +560,7 @@ export const subsidyApplicationHandlers = [
       parsed.data.survey_no?.trim() || null,
       today,
     );
-    applications().unshift(application);
+    mockApplications().unshift(application);
     if (FIRST_STAGE !== undefined) newEntry(application, FIRST_STAGE, today, {}, null, who.user);
     refresh(application);
     if (lead.stage !== "won") {

@@ -741,6 +741,28 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /subsidy-applications/{id}/pims.xlsx"],
   },
+  "SUBS-009": {
+    domain: "SUBS",
+    title: "Subsidy ageing — the client's six ageing figures per application, with its export",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-reports/ageing", "GET /subsidy-reports/ageing/export"],
+  },
+  "SUBS-010": {
+    domain: "SUBS",
+    title: "Subsidy stage report — applications and money in each stage, with its export",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-reports/stages", "GET /subsidy-reports/stages/export"],
+  },
+  "SUBS-011": {
+    domain: "SUBS",
+    title: "Subsidy supply report — supplied and not supplied by district, with its export",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-reports/supply", "GET /subsidy-reports/supply/export"],
+  },
+
   "REPO-001": {
     domain: "REPO",
     title: "Changelog system — one entry per change, generated CHANGELOG.md",

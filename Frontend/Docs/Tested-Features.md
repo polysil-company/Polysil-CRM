@@ -37,7 +37,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 👀 | PR #34; the Dispatch queue in PR #56 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
-| [Subsidy](#subsidy) | 9 | 🧪 👀 | calculator in PR #77; applications in PR #78 |
+| [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #PRNUM |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -258,6 +258,39 @@ axe found nothing on any of them. Not yet checked on the dev API. Screens: [work
   - 🧪 👀
 - **SUBS-008 · PIMS sheet:** a download from the application. 🧪 👀
 
+
+Subsidy reports (PR #PRNUM, stacked on #78; [changelog](../changelog/entries/2026-10-09--feature--SUBS-009--subsidy-reports.md)). Walked through in the mock as a State Manager:
+1. The three reports on a desktop, with the ageing download.
+2. Ageing and stages on a 360 px phone in dark mode.
+
+axe found nothing. Not yet checked on the dev API. Screens: [stages](screenshots/subsidy/reports-stages-desktop-light.jpg), [supply](screenshots/subsidy/reports-supply-desktop-light.jpg), [ageing](screenshots/subsidy/reports-ageing-desktop-light.jpg), [ageing, phone dark](screenshots/subsidy/reports-ageing-phone-dark.jpg), [stages, phone dark](screenshots/subsidy/reports-stages-phone-dark.jpg).
+
+- **SUBS-010 · Stages** (Subsidy → Reports, the default):
+  - one row per stage holding an application, in stage order;
+  - each with applications, total cost, subsidy, farmer share, and how long the oldest has waited;
+  - a total row;
+  - for one status at a time (open by default; the backend offers no "every status");
+  - Download Excel.
+  - On a phone, the two cost columns step aside so nothing scrolls sideways.
+  - 🧪 👀
+- **SUBS-011 · Supply:**
+  - supplied and not supplied by district, with their cost and a total row;
+  - "supplied" means stage 7's supply date is recorded;
+  - cancelled applications are left out unless chosen;
+  - Download Excel.
+  - 🧪 👀
+- **SUBS-009 · Ageing:** each application's six figures, newest first:
+  - supply to full payment;
+  - inward to submission;
+  - WO to TPA received;
+  - TPA cleared to inspection sent;
+  - inspection sent to TR;
+  - FP submitted to full payment.
+
+  A figure with no end yet counts to today and says "running", highlighted. A dash means its start isn't recorded.
+  - Filters: status, stage and search, in the URL; Show more; Download Excel.
+  - 🧪 👀
+
 ---
 
 ## Dashboard, notifications, messages
@@ -289,5 +322,5 @@ The backend serves these, and the frontend has no screen for them — in the ord
 
 1. A consolidated order from several quotations on leads of one dealer.
 2. Complaint types, with the other lookups in the admin masters. Everything else in complaints is in PR #57 and PR #58.
-3. The subsidy reports (ageing, stages, supply) and the masters' revisions.
+3. The subsidy masters and their revisions (categories, parameters, rates, crop spacings, matrices).
 4. Admin masters: products, price lists, tax rates, users, offices, territories, partners.
