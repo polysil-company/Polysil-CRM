@@ -198,7 +198,7 @@ function nextInquiryNumber(): string {
   return `POL/GJ/2026-27/${String(highest + 1).padStart(5, "0")}`;
 }
 
-function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
+export function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
   const territory = findMockTerritory(body.territory_id);
   if (territory === undefined) {
     return errorResponse(422, "validation_error", "Some fields need correcting.", {

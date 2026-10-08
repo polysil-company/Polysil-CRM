@@ -13,12 +13,17 @@ const PUBLIC_PATHS: readonly string[] = [SIGN_IN_PATH];
 
 /**
  * Pages anyone may open, signed in or not, and never redirected: the link a customer gets
- * with their quotation (QUOT-012). They call only the backend's `/public` endpoints.
+ * with their quotation (QUOT-012), and the enquiry page a printed QR code opens (LEAD-014).
+ * They call only the backend's `/public` endpoints.
  */
 const OPEN_PATH_PREFIXES: readonly string[] = ["/q/"];
+const OPEN_PATHS: readonly string[] = ["/enquiry"];
 
 export function isOpenPath(pathname: string): boolean {
-  return OPEN_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return (
+    OPEN_PATHS.includes(pathname) ||
+    OPEN_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  );
 }
 
 export const SESSION_END_REASONS = ["signed-out", "session-ended"] as const;
