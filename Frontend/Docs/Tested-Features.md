@@ -37,7 +37,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 👀 | PR #34; the Dispatch queue in PR #56 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
-| [Subsidy](#subsidy) | 9 | 🧪 👀 | calculator in PR #77; applications in PR #PRNUM |
+| [Subsidy](#subsidy) | 9 | 🧪 👀 | calculator in PR #77; applications in PR #78 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -207,7 +207,7 @@ On the backend's contract (`backend/docs/api/subsidy.md`, handover `subsidy-calc
 - **SUBS-002 · Mistakes and refusals:** a missing area or spacing just waits; too many decimals, a half-typed item or a group area of 0 are named on the field once typing pauses; a refusal from the backend (`crops[0].area`, `group_total_area`…) lands on the same field, and one no field shows (too many blocks) is listed above the figures. Older figures stay dimmed while new ones load. A failure no field explains shows an error with a retry. 🧪 👀
 
 
-Subsidy applications (PR #PRNUM, stacked on #77; [changelog](../changelog/entries/2026-10-09--feature--SUBS-004--subsidy-applications.md)). Walked through in the mock as a field employee:
+Subsidy applications (PR #78, stacked on #77; [changelog](../changelog/entries/2026-10-09--feature--SUBS-004--subsidy-applications.md)). Walked through in the mock as a field employee:
 1. A quoted drip lead's card, then "Start subsidy application".
 2. The design, a category and a survey number, then started.
 3. A Reg. No. recorded at stage 4: first refused for want of a remark, then given one.
