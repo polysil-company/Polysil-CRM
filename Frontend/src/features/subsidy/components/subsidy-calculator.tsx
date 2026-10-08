@@ -25,7 +25,10 @@ import {
   type SystemConfig,
   type SystemType,
 } from "@/features/subsidy/api/subsidy.schemas";
-import { useSubsidyCalculation } from "@/features/subsidy/hooks/use-subsidy-calculation";
+import {
+  useSubsidyCalculation,
+  type SubsidyCalculationState,
+} from "@/features/subsidy/hooks/use-subsidy-calculation";
 import {
   emptyCrop,
   emptyDraft,
@@ -142,7 +145,7 @@ export function SubsidyCalculator(): React.JSX.Element {
   );
 }
 
-interface SystemCalculatorProps {
+export interface SystemCalculatorProps {
   system: SystemConfig;
   parameters: Readonly<Record<string, string>>;
   catalogue: readonly SubsidyCrop[];
@@ -150,10 +153,12 @@ interface SystemCalculatorProps {
   onRetryCrops: () => void;
   draft: CalculatorDraft;
   onDraftChange: (next: CalculatorDraft) => void;
+  /** Shown under the figures, given the calculation: starting an application adds its pick. */
+  after?: (calculation: SubsidyCalculationState) => React.ReactNode;
 }
 
 /** SUBS-002 · One system's inputs beside its figures. */
-function SystemCalculator({
+export function SystemCalculator({
   system,
   parameters,
   catalogue,
@@ -161,6 +166,7 @@ function SystemCalculator({
   onRetryCrops,
   draft,
   onDraftChange,
+  after,
 }: SystemCalculatorProps): React.JSX.Element {
   const calculation = useSubsidyCalculation(draft, system);
   const categories = useQuery(subsidyCategoriesQueryOptions(system.systemType));
@@ -271,6 +277,7 @@ function SystemCalculator({
             />
           ) : null
         }
+        after={after?.(calculation)}
       />
     </div>
   );

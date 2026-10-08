@@ -75,6 +75,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-022** · An Accounts queue: orders waiting on the payment check, and what Accounts records · ACCT-001 · normal
 
+**Subsidy** — added as the application screens are built (SUBS-004…).
+
+- [ ] **BE-023** · Find a lead's subsidy application: a `lead_id` filter on `GET /subsidy-applications` · SUBS-005 · normal
+
 ---
 
 ## Details
@@ -440,5 +444,24 @@ in the same shape. Never renumber or reuse a number.
 - **Done when:** `GET /orders?waiting_on=account_manager` returns only the orders whose next
   step is Accounts, with `include_total`. And there is a decision on payments: either a
   contract, or "none planned".
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-023 · Find a lead's subsidy application: a `lead_id` filter on `GET /subsidy-applications`
+
+- **Status:** ⬜ Open
+- **Asked:** 9 Oct 2026 · SUBS-005
+- **What:** `GET /subsidy-applications?lead_id=` — the applications of one lead, newest first,
+  in the caller's scope. The same filter on `/subsidy-applications/export` is welcome but not
+  needed.
+- **Why:** the handover asks for "a tab on the lead: its application, if any", and the lead
+  page needs it to decide whether to offer "Start subsidy application" (a lead with a live
+  application gets `422 already_forwarded`). Today nothing finds a lead's application:
+  `q` matches the application number, the Reg. No. and the farmer's name (not the lead), and the
+  lead's timeline events (`subsidy.created` …) don't carry the application's id. The frontend
+  already sends `lead_id` and keeps only the rows whose `lead.id` matches, so until the filter
+  exists the lead's card may miss an application that isn't on the first page.
+- **Done when:** `GET /subsidy-applications?lead_id=<uuid>` returns only that lead's
+  applications.
 - **Done in:** —
 - **Backend notes:** —

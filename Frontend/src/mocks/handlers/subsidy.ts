@@ -97,7 +97,7 @@ const requestSchema = z.object({
   nozzle: z.enum(["plastic", "brass"]).optional(),
 });
 
-type CalculateBody = z.infer<typeof requestSchema>;
+export type CalculateBody = z.infer<typeof requestSchema>;
 
 const money = (value: number): string => value.toFixed(2);
 const sumLines = (lines: readonly { rate: string; qty: string }[]): number =>
@@ -273,7 +273,7 @@ function sprinklerLines(
   };
 }
 
-function calculate(body: CalculateBody): CalculateResponseWire["data"] {
+export function calculate(body: CalculateBody): CalculateResponseWire["data"] {
   const system = body.system_type;
   const totalArea = body.crops.reduce((total, crop) => total + Number(crop.area), 0);
   const groupArea = body.group_total_area === undefined ? totalArea : Number(body.group_total_area);
@@ -403,6 +403,29 @@ function calculate(body: CalculateBody): CalculateResponseWire["data"] {
   };
 }
 
+/** The request read and checked as the backend does: each refusal names its field path. */
+export function checkCalculation(
+  json: unknown,
+): { readonly body: CalculateBody } | { readonly fields: Record<string, string> } {
+  const parsed = requestSchema.safeParse(json);
+  if (!parsed.success) {
+    const fields: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const path = issue.path
+        .map((part, index) =>
+          typeof part === "number"
+            ? `[${String(part)}]`
+            : `${index === 0 ? "" : "."}${String(part)}`,
+        )
+        .join("");
+      fields[path] = issue.message;
+    }
+    return { fields };
+  }
+  const fields = refusals(parsed.data);
+  return Object.keys(fields).length > 0 ? { fields } : { body: parsed.data };
+}
+
 export const subsidyHandlers = [
   http.get(buildApiUrl("/subsidy/config"), async () => {
     const { failure } = await applyScenario();
@@ -464,25 +487,10 @@ export const subsidyHandlers = [
     const { failure } = await applyScenario();
     if (failure) return failure;
     if (!mayView()) return errorResponse(403, "forbidden", "You may not see subsidy.");
-    const parsed = requestSchema.safeParse(await request.json());
-    if (!parsed.success) {
-      const fields: Record<string, string> = {};
-      for (const issue of parsed.error.issues) {
-        const path = issue.path
-          .map((part, index) =>
-            typeof part === "number"
-              ? `[${String(part)}]`
-              : `${index === 0 ? "" : "."}${String(part)}`,
-          )
-          .join("");
-        fields[path] = issue.message;
-      }
-      return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+    const checked = checkCalculation(await request.json());
+    if ("fields" in checked) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", checked.fields);
     }
-    const fields = refusals(parsed.data);
-    if (Object.keys(fields).length > 0) {
-      return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
-    }
-    return HttpResponse.json({ data: calculate(parsed.data) });
+    return HttpResponse.json({ data: calculate(checked.body) });
   }),
 ];

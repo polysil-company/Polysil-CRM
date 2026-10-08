@@ -3,7 +3,6 @@ import { Suspense } from "react";
 import type * as React from "react";
 
 import { PageTransition } from "@/components/layout/page-transition";
-import { PageContainer } from "@/components/patterns/page-container";
 import {
   SubsidyCalculator,
   SubsidyCalculatorSkeleton,
@@ -11,18 +10,13 @@ import {
 
 export const metadata: Metadata = { title: "Subsidy calculator" };
 
-/**
- * SUBS-002 · The title and description sit in the top bar, from the navigation map. The system
- * tab is read from the URL, which needs a Suspense boundary during prerendering.
- */
+/** SUBS-002 · The system tab is read from the URL, which needs a Suspense boundary. */
 export default function SubsidyCalculatorPage(): React.JSX.Element {
   return (
     <PageTransition>
-      <PageContainer>
-        <Suspense fallback={<SubsidyCalculatorSkeleton />}>
-          <SubsidyCalculator />
-        </Suspense>
-      </PageContainer>
+      <Suspense fallback={<SubsidyCalculatorSkeleton />}>
+        <SubsidyCalculator />
+      </Suspense>
     </PageTransition>
   );
 }

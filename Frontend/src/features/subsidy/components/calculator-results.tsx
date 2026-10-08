@@ -273,12 +273,12 @@ function blockLabel(row: BlockRow, parameters: Readonly<Record<string, string>>)
  */
 function SummaryTable({
   result,
-  system,
+  hasHeadUnit,
   parameters,
   stale,
 }: {
   result: SubsidyCalculation;
-  system: SystemConfig;
+  hasHeadUnit: boolean;
   parameters: Readonly<Record<string, string>>;
   stale: boolean;
 }): React.JSX.Element {
@@ -293,7 +293,7 @@ function SummaryTable({
         { key: "total", label: "Total", blocks: result.total },
       ]
     : [{ key: "total", label: "Amount", blocks: result.total }];
-  const rows = BLOCK_ROWS.filter((row) => row.key !== "head_unit" || system.hasHeadUnit);
+  const rows = BLOCK_ROWS.filter((row) => row.key !== "head_unit" || hasHeadUnit);
 
   return (
     <Card className={cn("transition-opacity duration-fast", stale && "opacity-60")}>
@@ -411,6 +411,59 @@ function SprinklerCard({
   );
 }
 
+export interface CalculationFiguresProps {
+  result: SubsidyCalculation;
+  hasHeadUnit: boolean;
+  parameters: Readonly<Record<string, string>>;
+  /** The figures belong to older inputs: dimmed while the next arrive. */
+  stale?: boolean;
+  /** A stored calculation says so, instead of "a preview". */
+  stored?: boolean;
+}
+
+/**
+ * SUBS-002, SUBS-006 · A calculation's figures: the warnings, each crop block, Sprinkler's
+ * derived items and the summary. The live calculator and an application's stored calculation
+ * both print through this.
+ */
+export function CalculationFigures({
+  result,
+  hasHeadUnit,
+  parameters,
+  stale = false,
+  stored = false,
+}: CalculationFiguresProps): React.JSX.Element {
+  return (
+    <>
+      <CalculationWarnings result={result} />
+      {result.crops.map((crop, index) => (
+        <CropResultCard
+          key={`${String(index)}-${crop.crop ?? ""}`}
+          crop={crop}
+          index={index}
+          many={result.crops.length > 1}
+          stale={stale}
+        />
+      ))}
+      {result.sprinkler === null ? null : (
+        <SprinklerCard sprinkler={result.sprinkler} stale={stale} />
+      )}
+      <SummaryTable
+        result={result}
+        hasHeadUnit={hasHeadUnit}
+        parameters={parameters}
+        stale={stale}
+      />
+      <p className="text-xs text-muted-foreground">
+        Formula {result.formulaVersion}
+        {stored
+          ? `, masters of ${formatFullDate(result.asOf)}. Stored when the application started.`
+          : ". A preview: nothing is saved."}
+      </p>
+    </>
+  );
+}
+
 // ── the panel ─────────────────────────────────────────────────────────────────────
 
 export interface CalculatorResultsProps {
@@ -427,6 +480,8 @@ export interface CalculatorResultsProps {
   /** Problems no input shows, e.g. too many crop blocks. */
   unplaced: readonly string[];
   failed: React.ReactNode;
+  /** Shown under the figures, e.g. the farmer's category when starting an application. */
+  after?: React.ReactNode;
 }
 
 /**
@@ -444,6 +499,7 @@ export function CalculatorResults({
   categories,
   unplaced,
   failed,
+  after = null,
 }: CalculatorResultsProps): React.JSX.Element {
   const stale = result !== null && !upToDate;
   const status = calculating
@@ -475,26 +531,14 @@ export function CalculatorResults({
       {result === null ? (
         <CategoryPreview categories={categories} />
       ) : (
-        <>
-          <CalculationWarnings result={result} />
-          {result.crops.map((crop, index) => (
-            <CropResultCard
-              key={`${String(index)}-${crop.crop ?? ""}`}
-              crop={crop}
-              index={index}
-              many={result.crops.length > 1}
-              stale={stale}
-            />
-          ))}
-          {result.sprinkler === null ? null : (
-            <SprinklerCard sprinkler={result.sprinkler} stale={stale} />
-          )}
-          <SummaryTable result={result} system={system} parameters={parameters} stale={stale} />
-          <p className="text-xs text-muted-foreground">
-            Formula {result.formulaVersion}. A preview: nothing is saved.
-          </p>
-        </>
+        <CalculationFigures
+          result={result}
+          hasHeadUnit={system.hasHeadUnit}
+          parameters={parameters}
+          stale={stale}
+        />
       )}
+      {after}
     </section>
   );
 }
