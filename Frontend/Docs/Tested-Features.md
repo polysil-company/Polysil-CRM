@@ -37,7 +37,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 👀 | PR #34; the Dispatch queue in PR #56 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
-| [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #PRNUM |
+| [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -259,7 +259,7 @@ axe found nothing on any of them. Not yet checked on the dev API. Screens: [work
 - **SUBS-008 · PIMS sheet:** a download from the application. 🧪 👀
 
 
-Subsidy reports (PR #PRNUM, stacked on #78; [changelog](../changelog/entries/2026-10-09--feature--SUBS-009--subsidy-reports.md)). Walked through in the mock as a State Manager:
+Subsidy reports (PR #79, stacked on #78; [changelog](../changelog/entries/2026-10-09--feature--SUBS-009--subsidy-reports.md)). Walked through in the mock as a State Manager:
 1. The three reports on a desktop, with the ageing download.
 2. Ageing and stages on a 360 px phone in dark mode.
 
