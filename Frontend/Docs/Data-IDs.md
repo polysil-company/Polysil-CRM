@@ -140,6 +140,11 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-007 | Move a lead's stage — contact, qualify, mark lost, reopen (`POST /leads/{leadId}/transition`, `POST /leads/{leadId}/reopen`) | shared | in-progress |
 | LEAD-008 | Assign a lead — owner and channel partner (`POST /leads/{leadId}/assign`, `GET /leads/assignees`, `GET /lookups/partners`) | shared | in-progress |
 | LEAD-009 | Export the lead list to Excel (`GET /leads/export`) | shared | in-progress |
+| LEAD-010 | Edit a lead's own fields (`PATCH /leads/{leadId}`) | shared | in-progress |
+| LEAD-011 | Delete a lead (`DELETE /leads/{leadId}`) | shared | in-progress |
+| LEAD-012 | Duplicate review — dismiss a pair, or merge one lead into the other (`GET /leads/duplicates`, `POST /leads/duplicates/{linkId}/dismiss`, `POST /leads/{leadId}/merge`) | shared | in-progress |
+| LEAD-013 | Lead QR codes — make, print, rename or switch off (`GET /lead-qr-codes`, `POST /lead-qr-codes`, `PATCH /lead-qr-codes/{qrId}`) | shared | in-progress |
+| LEAD-014 | The public enquiry page — /enquiry, with or without a QR code (`GET /public/lead-form`, `GET /public/territories`, `POST /public/leads/verify`, `POST /public/leads`) | shared | in-progress |
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
 | RPT-002 | Reports | shared | planned |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |

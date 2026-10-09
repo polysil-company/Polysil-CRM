@@ -2166,6 +2166,59 @@ def f_customer_record() -> None:
         [("n1", "SEE A LEAD, SEE ITS CUSTOMER\n\ncustomer_sel is EXISTS over lead, under the\nlead's own policies. The customer's details show\nto everyone who sees any of its leads (GAP-263).", RED),
          ("n2", "CUSTOMER EVENTS CARRY NO lead_id\n\nThey would land on every lead timeline and\nbreak its counts.", RED),
          ("n3", "Not yet: shared phones, a customer merge, orders\nwithout a lead (GAP-258 to GAP-264).", YELLOW)])
+def f_settings_amend_reopen() -> None:
+    _columns(
+        "47-settings-amend-reopen", "Company settings, amending an approved order, reopening a complaint",
+        "Client blockers built as admin settings with our defaults.",
+        "BUILT. FS-036: /settings, POST /orders/{id}/amend, POST /complaints/{id}/reopen, migration 041.",
+        [("s1", "PATCH /settings (masters.edit)\napp_setting_set(): checked, one setting.changed event", YELLOW),
+         ("s2", "POST /orders/{id}/amend {remark}: staff only\napproved, nothing dispatched, no payment allocated", BLUE),
+         ("s3", "order_amend(): approved -> draft, amend_count + 1\nschedule cleared, PDF withdrawn, scheme benefits reversed", GREEN),
+         ("s4", "resubmit: order_amend_reapproval\nalways = the full chain; value_rises = Accounts + Dispatch\nunless the total went above amended_from_total", YELLOW)],
+        [("r1", "POST /complaints/{id}/reopen {reason}\nclosed or qc_rejected, inside the window, under the cap", BLUE),
+         ("r2", "who: the raiser for a closed one;\ncomplaint_reopen_roles for a rejection", YELLOW),
+         ("r3", "a new round: submitted, submit_count + 1\nrestart: targets from now; continue: original targets", GREEN),
+         ("r4", "complaint.submitted (reopened: true)\nthe checker's queue and the bell need nothing new", GREEN)],
+        [("n1", "A DEALER MUST NOT AMEND\n\nPortal roles hold sales_orders.edit at partner_subtree.\norder_amend() refuses any partner caller (review F-1).", RED),
+         ("n2", "THE SEED INSERT SKIPS THE ROLE CHECK\n\nRoles are seeded after migrating, and 005/015 already\ninsert roles, so 'table empty' never fired. INSERT skips;\nevery change is checked.", RED),
+         ("n3", "A reopen nobody can check is refused (no_checker),\nas a submit is. An amended draft needs delete to cancel.", GREEN),
+         ("n4", "Ours: every default in /settings\n(GAP-343 to GAP-348).", YELLOW)])
+
+
+def f_dealer_tasks() -> None:
+    _columns(
+        "48-dealer-tasks", "Tasks for dealers",
+        "A manager assigns a task to a dealer's user; the dealer completes it.",
+        "BUILT, OFF BY DEFAULT. FS-037: setting tasks_for_dealers, migration 042.",
+        [("s1", "admin: tasks_for_dealers = on", YELLOW),
+         ("s2", "GET /tasks/assignees?include_partners=true\ntask_partner_assignees(): dealers the caller can see", BLUE),
+         ("s3", "POST /tasks: authz_user_assignable('tasks')\npartner arm: caller assigns downwards, setting on", BLUE),
+         ("s4", "the task lives in the assigner's office;\nthe link must be visible to the dealer", GREEN),
+         ("s5", "dealer: GET /tasks?assigned_to=me,\nPOST /tasks/{id}/complete", GREEN)],
+        [("d1", "dealer: patch, cancel, reopen, create -> 403", RED),
+         ("d2", "task_partner_guard(): completion columns only (42501)", GREEN),
+         ("d3", "setting off: require('tasks') refuses a dealer,\nget_caller drops tasks; dashboard shows null", YELLOW)],
+        [("n1", "OFF MEANS NO TASKS, IN THE API ONLY\n\nRLS still shows a dealer its own old task rows and\ntimeline events after a switch-off (GAP-353).", RED),
+         ("n2", "The arm is tasks-only: leads call the same\nauthz_user_assignable and must not reach dealers.", RED),
+         ("n3", "Ours: off by default; a dealer only completes;\nclosing a dealer leaves tasks open (GAP-349 to GAP-351).", YELLOW)])
+
+
+def f_whatsapp_webhook() -> None:
+    _columns(
+        "49-whatsapp-webhook-capture", "WhatsApp webhook capture",
+        "Step one: keep what 11za sends, exactly as it arrived. Step two reads it.",
+        "BUILT. FS-038: two public routes, migration 043, scripts/whatsapp_webhook.py.",
+        [("s1", "11za calls GET/HEAD/POST\n/api/v1/public/webhooks/whatsapp/{secret}/inbound|status", GREY),
+         ("s2", "UploadLimit: over 64 KB -> 413,\nbefore the body is read", BLUE),
+         ("s3", "secret as bytes, constant time;\nwrong or unset -> 404, no session opened", BLUE),
+         ("s4", "whatsapp_webhook_record() as app_anon:\nmethod, address, header pairs, raw bytes", GREEN),
+         ("s5", "200 {ok: true}. Nothing else happens yet", GREEN)],
+        [("d1", "nightly purge_expired_sessions:\nwhatsapp_webhook_purge(now - 30 days)", VIOLET),
+         ("d2", "script: get / register --base-url / delete --type\nevery command ends with a get", YELLOW),
+         ("d3", "FS-038b: inbound -> lead (source whatsapp),\nstatus -> outbox delivered/read", GREY)],
+        [("n1", "THE SECRET IS IN THE URL\n\nEvery path that reaches a log goes through redact_path():\nstructlog path, the 500 handler, uvicorn.access.\nNew code that logs a path must use it too.", RED),
+         ("n2", "11ZA SIGNS NOTHING\n\nThe path secret is the only lock until we know\n11za's addresses (GAP-355).", RED),
+         ("n3", "Ours: 30 days kept, no rate limit, a call during\na DB outage is lost (GAP-356, GAP-357).", YELLOW)])
 
 
 if __name__ == "__main__":
@@ -2178,4 +2231,5 @@ if __name__ == "__main__":
     f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
     f_subsidy_follow_ups(); f_lead_small_gaps()
     f_campaigns(); f_customer_record()
+    f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook()
     print(f"\nwrote to {OUT}")

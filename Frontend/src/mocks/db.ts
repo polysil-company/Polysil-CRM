@@ -1,5 +1,6 @@
 import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
 import type { SlaPolicyWire } from "@/features/complaints/api/complaints.schemas";
+import type { QrCodeWire } from "@/features/lead-capture/api/lead-capture.schemas";
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
@@ -8,6 +9,7 @@ import type { QuotationWire } from "@/features/quotations/api/quotations.schemas
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
+import { seedQrCodes } from "./data/lead-capture";
 import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
@@ -77,6 +79,12 @@ export interface MockDb {
   complaintFiles: Map<string, File>;
   /** The response and resolution targets (CMPL-008). */
   slaPolicies: SlaPolicyWire[];
+  /** Lead QR codes (LEAD-013). */
+  qrCodes: QrCodeWire[];
+  /** The enquiry page's WhatsApp codes sent, by mobile (LEAD-014). */
+  enquiryCodes: Map<string, number>;
+  /** Today's enquiry per mobile: a second one answers the first number (LEAD-014). */
+  enquiriesToday: Map<string, string>;
   /** How many events the mock has written, for their ids. */
   writtenEvents: number;
 }
@@ -130,6 +138,9 @@ function createMockDb(): MockDb {
     complaintEvents: new Map(),
     complaintFiles: new Map(),
     slaPolicies: seedSlaPolicies(),
+    qrCodes: seedQrCodes(),
+    enquiryCodes: new Map(),
+    enquiriesToday: new Map(),
     writtenEvents: 1,
   };
 }

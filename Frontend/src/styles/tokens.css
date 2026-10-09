@@ -177,6 +177,8 @@
   /* Selection and highlight — "sun" */
   --highlight: var(--sun-400);
   --highlight-border: var(--sun-600);
+  /* What a camera must read — a QR code — is white in both themes. */
+  --scan-surface: oklch(1 0 0);
   --highlight-foreground: var(--sand-950);
   --highlight-soft: var(--sun-100);
   --row-selected: var(--sun-100);
@@ -286,6 +288,7 @@
 
   --highlight: var(--sun-400);
   --highlight-border: var(--sun-500);
+  --scan-surface: oklch(1 0 0);
   --highlight-foreground: var(--ink-950);
   --highlight-soft: oklch(0.87 0.165 93 / 12%);
   --row-selected: oklch(0.87 0.165 93 / 7%);
@@ -481,6 +484,7 @@
 
   --color-highlight: var(--highlight);
   --color-highlight-border: var(--highlight-border);
+  --color-scan-surface: var(--scan-surface);
   --color-highlight-foreground: var(--highlight-foreground);
   --color-highlight-soft: var(--highlight-soft);
   --color-row-selected: var(--row-selected);

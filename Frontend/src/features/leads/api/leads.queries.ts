@@ -5,6 +5,7 @@ import {
   getLeadStats,
   getLeadTimeline,
   listAssignees,
+  listDuplicates,
   listLeadAreas,
   listLeads,
   searchPartners,
@@ -27,7 +28,21 @@ export const leadKeys = {
   assignees: () => [...leadKeys.all, "assignees"] as const,
   partners: (q: string) => [...leadKeys.all, "partners", q] as const,
   areas: (params: LeadAreasParams) => [...leadKeys.all, "areas", params] as const,
+  duplicates: () => [...leadKeys.all, "duplicates"] as const,
 };
+
+const FIRST_DUPLICATES: string | null = null;
+
+/** LEAD-012 · The duplicate review queue, a page at a time. */
+export function duplicatesQueryOptions() {
+  return infiniteQueryOptions({
+    queryKey: leadKeys.duplicates(),
+    queryFn: ({ pageParam, signal }) => listDuplicates(pageParam, signal),
+    initialPageParam: FIRST_DUPLICATES,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    meta: { dataId: "LEAD-012" },
+  });
+}
 
 /** The area filter's options change as leads come in; a few minutes is fresh enough. */
 export function leadAreasQueryOptions(params: LeadAreasParams) {

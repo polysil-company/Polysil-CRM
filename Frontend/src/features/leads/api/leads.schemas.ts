@@ -156,6 +156,54 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
 
 export type Lead = z.output<typeof leadSchema>;
 
+// ── edit, delete, duplicates and merge (LEAD-010 … LEAD-012) ─────────────────────
+
+/**
+ * LEAD-010 · PATCH /leads/{id} — only what changes. email, village, estimated_value and
+ * land_acres may be sent null to clear them; the rest can't be cleared.
+ */
+export type PatchLeadRequest = Partial<Omit<CreateLeadRequest, "note">>;
+
+/** LEAD-012 · One pending pair in the review queue: both leads are in the caller's scope. */
+const duplicatePairSchema = z
+  .object({
+    link_id: z.string().min(1),
+    signal: z.enum(DUPLICATE_SIGNALS),
+    score: z.string().nullish(),
+    state: z.enum(DUPLICATE_STATES),
+    created_at: isoDateTime,
+    lead_a: leadSchema,
+    lead_b: leadSchema,
+  })
+  .transform((wire) => ({
+    linkId: wire.link_id,
+    signal: wire.signal,
+    score: wire.score ?? null,
+    createdAt: wire.created_at,
+    leadA: wire.lead_a,
+    leadB: wire.lead_b,
+  }));
+
+export type DuplicatePair = z.output<typeof duplicatePairSchema>;
+export type DuplicatePairWire = z.input<typeof duplicatePairSchema>;
+
+export const DUPLICATE_PAGE_SIZE = 20;
+
+/** GET /leads/duplicates — a cursor page, newest first. */
+export const duplicatePageSchema = cursorPageSchema(duplicatePairSchema);
+export type DuplicatePage = CursorPage<DuplicatePair>;
+export type DuplicatePageWire = { data: DuplicatePairWire[]; meta: PageMetaWire };
+
+/** POST /leads/duplicates/{linkId}/dismiss */
+export const dismissResultSchema = z
+  .object({ data: z.object({ link_id: z.string().min(1), state: z.literal("dismissed") }) })
+  .transform(({ data }) => ({ linkId: data.link_id }));
+
+/** POST /leads/{id}/merge — this lead (the loser) into the survivor. */
+export interface MergeLeadRequest {
+  readonly into_lead_id: string;
+}
+
 /** GET /leads/{id} and POST /leads: `{ data: Lead }`. */
 export const leadResponseSchema = z.object({ data: leadSchema }).transform(({ data }) => data);
 

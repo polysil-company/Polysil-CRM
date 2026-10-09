@@ -198,6 +198,11 @@ class Settings(BaseSettings):
     # A total deadline per send: httpx's timeout bounds each socket operation, not
     # the request. Re-sized from the smoke's slowest sends.
     whatsapp_send_timeout: float = 10.0
+    # FS-038: the path secret on the webhook URLs 11za calls. 11za signs nothing,
+    # so this is the credential; unset, the routes answer 404 (GAP-355).
+    whatsapp_webhook_secret: SecretStr | None = None
+    # FS-038 rule 6: raw calls hold farmers' numbers and words (GAP-356)
+    whatsapp_webhook_retention: timedelta = timedelta(days=30)
     # FS-007 rule 7: how long one drain keeps claiming rows. Under the ten-second
     # tick, eight seconds lets at most two drains overlap.
     outbox_drain_budget: float = 8.0
@@ -327,10 +332,14 @@ class Settings(BaseSettings):
             raise ValueError("whatsapp_provider is 11za but whatsapp_auth_token is unset")
         if self.environment == "production" and self.whatsapp_provider == "mock":
             raise ValueError("whatsapp_provider is mock in production; no message would leave")
+        secret = self.whatsapp_webhook_secret
+        if secret is not None and len(secret.get_secret_value()) < 32:
+            raise ValueError("whatsapp_webhook_secret must be at least 32 characters")
         return self
 
     @field_validator("whatsapp_template_quotation_share", "r2_endpoint", "r2_bucket",
-                     "r2_access_key_id", "r2_secret_access_key", mode="before")
+                     "r2_access_key_id", "r2_secret_access_key", "whatsapp_webhook_secret",
+                     mode="before")
     @classmethod
     def _empty_is_unset(cls, v: object) -> object:
         """The compose files pass `${VAR:-}`, and an empty string is not a value:
