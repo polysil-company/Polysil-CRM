@@ -2221,6 +2221,37 @@ def f_whatsapp_webhook() -> None:
          ("n3", "Ours: 30 days kept, no rate limit, a call during\na DB outage is lost (GAP-356, GAP-357).", YELLOW)])
 
 
+def f_consumer_portal() -> None:
+    _columns(
+        "52-consumer-portal", "Consumer portal: a farmer reads their own record",
+        "Off by default. A consumer account per customer; the switch flips them all.",
+        "BUILT. FS-044: /portal, migration 052.",
+        [("s1", "customer made at qualification (FS-041)\ntrigger: consumer app_user on its Indian mobile", BLUE),
+         ("s2", "admin: PATCH /settings consumer_portal = on\nevery live consumer account active", YELLOW),
+         ("s3", "farmer: OTP request and verify\nget_db lets a consumer reach /auth and /portal only", GREEN),
+         ("s4", "GET /portal/*: definers keyed on portal_customer()\nleads still on the customer's own number", VIOLET)],
+        [("d1", "off: accounts inactive, token_version bumped\nnext request 401", YELLOW),
+         ("d2", "a staff or dealer user on a farmer's number\nreleases the consumer account", GREY),
+         ("d3", "PATCH /portal/me: consent, channel portal", GREY)],
+        [("n1", "THE CONSUMER FLOOR\n\nOne restrictive policy on every RLS table.\n\"Not a partner\" is not staff: before it, a\nconsumer read about 50 tables. A new RLS table\nadds consumer_floor.policy_sql(t).", RED),
+         ("n2", "SWITCHING ON COSTS MONEY\n\nEvery customer number can be sent a paid\nWhatsApp code; no overall ceiling (GAP-269).", RED),
+         ("n3", "Not yet: complaints, ratings, products from the\nportal (GAP-265, question 10.3).", YELLOW)])
+
+
+def f_assistant() -> None:
+    _columns(
+        "53-in-app-assistant", "In-app assistant: one search box for actions and records",
+        "A navigation aid, no model.",
+        "BUILT. FS-045: /assistant, no migration.",
+        [("s1", "GET /assistant?q=...\nthe catalogue in api/domain/assistant.py", BLUE),
+         ("s2", "actions: any-of permission sets the caller holds\nstaff-only and the dealer-tasks gate", GREEN),
+         ("s3", "records from 3 characters: number, mobile, name\nscope_predicate and RLS, never deleted or merged", VIOLET)],
+        [("d1", "customers come from the matched leads", GREY),
+         ("d2", "one row per quotation number:\nthe current version", GREY)],
+        [("n1", "RLS ALONE IS NOT ENOUGH\n\nEvery read carries the service predicate too\n(ADR-039, plan review B-1).", RED),
+         ("n2", "Not yet: Hindi and Gujarati action words,\npattern indexes, numberless drafts (GAP-268,\nGAP-273, GAP-274).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2230,6 +2261,6 @@ if __name__ == "__main__":
     f_reports(); f_targets()
     f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
     f_subsidy_follow_ups(); f_lead_small_gaps()
-    f_campaigns(); f_customer_record()
+    f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook()
     print(f"\nwrote to {OUT}")

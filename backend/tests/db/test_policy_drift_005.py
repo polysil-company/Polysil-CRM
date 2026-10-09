@@ -22,6 +22,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.authz import consumer_floor
 from api.authz.modules import SPECS
 from api.authz.policy_sql import drop_policies_for, has_bare_helper_call, indexes_for, policies_for
 from api.db.session import enter_role
@@ -41,9 +42,12 @@ _HELPER = re.compile(r"app_(?:scope|has_permission|current_\w+|is_system)\(")
 
 
 async def _snapshot(db: AsyncSession, table: str) -> list[tuple]:
+    """The table's own policies. The consumer floor (052) sits on every RLS table and
+    is checked on its own, by tests/db/test_consumer_floor.py."""
     return [tuple(r) for r in (await db.execute(text(
         "SELECT policyname, permissive, cmd, roles, qual, with_check "
-        "FROM pg_policies WHERE tablename = :t ORDER BY policyname"), {"t": table})).all()]
+        "FROM pg_policies WHERE tablename = :t AND policyname <> :floor ORDER BY policyname"),
+        {"t": table, "floor": consumer_floor.name(table)})).all()]
 
 
 async def _regenerated(db: AsyncSession, table: str, drops: list[str],
@@ -119,6 +123,10 @@ async def test_no_table_carries_a_policy_the_migration_does_not_declare(db: Asyn
     for spec in SPECS.values():
         declared |= {(spec.table, m.group(1)) for s in policies_for(spec)
                      for m in [_NAME.match(s)] if m}
+    rls = (await db.execute(text(
+        "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity"))).scalars().all()
+    declared |= {(t, consumer_floor.name(t)) for t in rls}
     assert live == declared, live ^ declared
 
 
