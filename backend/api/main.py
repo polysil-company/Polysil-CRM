@@ -44,9 +44,11 @@ from api.routers import (
     products,
     public,
     quotations,
+    ratings,
     reports,
     rewards,
     schemes,
+    seller_gstins,
     stock,
     subsidy,
     subsidy_applications,
@@ -227,6 +229,9 @@ def create_app() -> FastAPI:
     app.include_router(subsidy_follow_ups.reports, prefix=API_PREFIX)
     app.include_router(subsidy_follow_ups.masters, prefix=API_PREFIX)
     app.include_router(subsidy_schemes.router, prefix=API_PREFIX)
+    app.include_router(seller_gstins.router, prefix=API_PREFIX)
+    app.include_router(ratings.router, prefix=API_PREFIX)
+    app.include_router(ratings.partners, prefix=API_PREFIX)
     app.include_router(tracking.me, prefix=API_PREFIX)
     app.include_router(tracking.router, prefix=API_PREFIX)
     app.include_router(tracking.locations, prefix=API_PREFIX)

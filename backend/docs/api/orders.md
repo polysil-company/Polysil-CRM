@@ -95,7 +95,7 @@ draft has no number until it is submitted.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial or industrial. The other five are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial, industrial, export or sample. export and sample are staff only (403 type_staff_only); a sample is typed in, never from quotations. The other three are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
 | `quotation_ids` | string[] |  | Accepted quotations that agree on partner, place of supply, seller, price date, office and territory. Their lines are imported. |
 | `lead_id` | string \| null |  | A direct order's lead, qualified or later. Leave out when ordering from quotations: the lead comes from them. |
 | `partner_id` | string \| null |  | OMIT for your own partner (a dealer) or none (staff). Null is a direct sale, refused from a dealer. |
@@ -106,6 +106,7 @@ draft has no number until it is submitted.
 | `price_effective_date` | date \| null |  | A direct order's price date, today in India by default. |
 | `payment_terms` | `full_payment` \| `credit` |  | Recorded, not enforced. There is no credit check. Default `full_payment`. |
 | `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
+| `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 
@@ -268,8 +269,9 @@ On an order from quotations the fields they fix are fixed.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` \| null |  |  |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` \| null |  | Fixed once the order is amended or made from quotations (422 order_type_fixed). A change re-reads the export and sample settings and re-prices the lines. |
 | `partner_id` | string \| null |  | Omit to keep. Null makes it a direct sale, which a dealer cannot do. |
+| `export_country` | string \| null |  | The buyer's country. Omit to keep. Required on an export. |
 | `party` | OrderParty \| null |  |  |
 | `delivery_address` | string \| null |  |  |
 | `place_of_supply_territory_id` | string \| null |  |  |
@@ -819,6 +821,10 @@ and only the outcome to a dealer.
 | `seller` | OrderSeller \| null | yes | The selling registration at the tax date. |
 | `place_of_supply` | TerritoryRef | yes |  |
 | `intra_state` | boolean | yes |  |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` | yes | domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or export_igst. Fixed when the order is created. |
+| `export_country` | string \| null | yes |  |
+| `lut_arn` | string \| null | yes | The LUT an export_lut order is zero-rated under. Taken at submit; null on a draft. |
+| `sample_pricing` | `free` \| `charged` \| null | yes | On a sample only. free: every line 100 % off, total 0, and the approval runs on the gross. |
 | `price_effective_date` | string | yes |  |
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
@@ -871,7 +877,7 @@ and only the outcome to a dealer.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial or industrial. The other five are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial, industrial, export or sample. export and sample are staff only (403 type_staff_only); a sample is typed in, never from quotations. The other three are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
 | `quotation_ids` | string[] |  | Accepted quotations that agree on partner, place of supply, seller, price date, office and territory. Their lines are imported. |
 | `lead_id` | string \| null |  | A direct order's lead, qualified or later. Leave out when ordering from quotations: the lead comes from them. |
 | `partner_id` | string \| null |  | OMIT for your own partner (a dealer) or none (staff). Null is a direct sale, refused from a dealer. |
@@ -882,6 +888,7 @@ and only the outcome to a dealer.
 | `price_effective_date` | date \| null |  | A direct order's price date, today in India by default. |
 | `payment_terms` | `full_payment` \| `credit` |  | Recorded, not enforced. There is no credit check. Default `full_payment`. |
 | `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
+| `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 
@@ -957,8 +964,9 @@ and only the outcome to a dealer.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` \| null |  |  |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` \| null |  | Fixed once the order is amended or made from quotations (422 order_type_fixed). A change re-reads the export and sample settings and re-prices the lines. |
 | `partner_id` | string \| null |  | Omit to keep. Null makes it a direct sale, which a dealer cannot do. |
+| `export_country` | string \| null |  | The buyer's country. Omit to keep. Required on an export. |
 | `party` | OrderParty \| null |  |  |
 | `delivery_address` | string \| null |  |  |
 | `place_of_supply_territory_id` | string \| null |  |  |

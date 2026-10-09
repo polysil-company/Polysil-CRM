@@ -21,6 +21,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 from collections.abc import Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
@@ -159,6 +160,8 @@ def map_db_error(exc: DBAPIError) -> Exception:
         sentence = msg.split("\n", 1)[0]
         if status == 404:
             return NotFoundError("No such document.")
+        if status == 403:
+            return ForbiddenError(sentence, code=api_code)
         if status == 409:
             return ConflictError(sentence, code=api_code)
         return ValidationFailed(sentence, code=api_code)
@@ -190,7 +193,9 @@ async def _lock(db: AsyncSession, order_id: str) -> Any:
     """The order row, locked, as the caller sees it (rule 12)."""
     row = (await db.execute(text(
         "SELECT id, status::text AS status, lead_id, partner_id, place_of_supply_territory_id, "
-        "seller_gstin_id, price_effective_date, territory_id, owner_org_unit_id, total, order_no "
+        "seller_gstin_id, price_effective_date, territory_id, owner_org_unit_id, total, order_no, "
+        "order_type::text AS order_type, tax_treatment, export_country, sample_pricing, "
+        "amend_count, party_gstin::text AS party_gstin "
         "FROM sales_order WHERE id = CAST(:o AS uuid) AND deleted_at IS NULL FOR UPDATE"),
         {"o": order_id})).one_or_none()
     if row is None:
@@ -217,6 +222,86 @@ def _check_type(order_type: str) -> None:
                                code="order_type_unsupported", fields={"order_type": order_type})
 
 
+@dataclass(frozen=True)
+class _Mode:
+    """How a document is taxed and priced (FS-042): read from the settings once, at
+    create or at a type change, then stored and re-used (rule 5)."""
+
+    treatment: str = "domestic"
+    sample_pricing: str | None = None
+
+
+async def _setting(db: AsyncSession, key: str) -> str:
+    return str((await db.execute(text("SELECT app_setting_text(:k)"), {"k": key})).scalar_one())
+
+
+async def _new_mode(db: AsyncSession, order_type: str) -> _Mode:
+    treatment = (domain.treatment_for(order_type, await _setting(db, "export_tax_treatment"))
+                 if order_type == "export" else "domestic")
+    pricing_mode = await _setting(db, "sample_pricing") if order_type == "sample" else None
+    return _Mode(treatment, pricing_mode)
+
+
+def _row_mode(row: Any) -> _Mode:
+    return _Mode(row.tax_treatment, row.sample_pricing)
+
+
+def _moded(specs: list[LineSpec], mode: _Mode, *, was_free: bool = False) -> list[LineSpec]:
+    """A free sample's lines are every one 100 % off (rule 11). A line leaving a
+    free sample drops the 100 %, or it would be a commercial order worth nothing."""
+    if mode.sample_pricing == "free":
+        return [LineSpec(s.product_id, s.qty, domain.FREE_DISCOUNTS) for s in specs]
+    if was_free:
+        return [LineSpec(s.product_id, s.qty) for s in specs]
+    return specs
+
+
+def _check_staff(caller: Caller, order_type: str) -> None:
+    # user_type, not partner_id: a consumer has no partner either (FS-044)
+    if order_type in domain.STAFF_ONLY_TYPES and caller.user_type != "staff":
+        raise ForbiddenError(f"{order_type.capitalize()} orders are raised by Polysil staff.",
+                             code="type_staff_only")
+
+
+def _check_export(order_type: str, country: str | None, party_gstin: str | None) -> None:
+    problems = domain.export_problems(order_type, country, party_gstin)
+    if problems:
+        code = next(iter(problems.values()))[0]
+        raise ValidationFailed(fields={k: m for k, (_, m) in problems.items()}, code=code)
+
+
+async def _export_pos(db: AsyncSession, seller: str | None) -> str:
+    """Rule 7: an export is priced from the seller's state, which is stored as the
+    place of supply for pricing only."""
+    _, state, _ = await pricing.seller_state(db, gstin_id=seller, as_of=today_ist())
+    return state
+
+
+async def _check_sample(db: AsyncSession, order_type: str, ctx: PricedContext) -> None:
+    """Rule 13: on the gross as priced, against the setting in force now."""
+    if order_type != "sample":
+        return
+    limit = Decimal(str((await db.execute(text(
+        "SELECT app_setting_json('sample_max_value') #>> '{}'"))).scalar_one()))
+    gross = ctx.document.totals.gross
+    if gross > limit:
+        raise ValidationFailed(f"A sample may be worth up to {_s(limit)} at list price; this one "
+                               f"is {_s(gross)}.", code="sample_over_limit",
+                               fields={"lines": f"gross {_s(gross)} over {_s(limit)}"})
+
+
+async def _check_lut(db: AsyncSession, treatment: str, seller: str) -> None:
+    """Rule 4: an order is taxed on its submit day, so a LUT must cover today."""
+    if treatment != "export_lut":
+        return
+    arn: str | None = (await db.execute(text("SELECT seller_gstin_lut_on(CAST(:g AS uuid), :d)"),
+                            {"g": seller, "d": today_ist()})).scalar_one()
+    if arn is None:
+        raise ValidationFailed("No LUT of the seller registration covers today. Record the "
+                               "year's LUT under Seller GSTINs.", code="lut_missing",
+                               fields={"seller_gstin_id": seller})
+
+
 def _party_values(p: sch.OrderParty) -> dict[str, Any]:
     try:
         mobile = normalise_mobile(p.mobile) if p.mobile else None
@@ -236,12 +321,14 @@ async def _linked_quotations(db: AsyncSession, order_id: str) -> list[str]:
 
 async def _price(db: AsyncSession, *, partner_id: str | None, pos: str, seller: str | None,
                  as_of: dt.date | None, specs: list[LineSpec], existing: bool,
-                 submitting: bool = False) -> PricedContext:
-    """Rates at the price date, tax at today (rule 3)."""
+                 submitting: bool = False, treatment: str = "domestic") -> PricedContext:
+    """Rates at the price date, tax at today (rule 3), under the order's stored
+    treatment (FS-042 rule 5)."""
     try:
         return await pricing.price_document(
             db, partner_id=partner_id, place_of_supply_territory_id=pos, seller_gstin_id=seller,
-            as_of=as_of, lines=specs, existing=existing, tax_as_of=today_ist())
+            as_of=as_of, lines=specs, existing=existing, tax_as_of=today_ist(),
+            tax_treatment=treatment)
     except ValidationFailed as exc:
         if exc.fields and "as_of" in exc.fields:
             exc.fields = {("price_effective_date" if k == "as_of" else k): v
@@ -543,7 +630,9 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         delivery_address=r.delivery_address, payment_terms=r.terms_text, seller=seller,
         place_of_supply=TerritoryRef(id=str(r.place_of_supply_territory_id), name=r.pos_name,
                                      level=r.pos_level),
-        intra_state=r.intra_state, price_effective_date=r.price_effective_date.isoformat(),
+        intra_state=r.intra_state, tax_treatment=r.tax_treatment,
+        export_country=r.export_country, lut_arn=r.lut_arn, sample_pricing=r.sample_pricing,
+        price_effective_date=r.price_effective_date.isoformat(),
         tax_date=_iso(r.tax_date), is_provisional=r.is_provisional, lines=lines,
         totals=totals, approval=approval, last_rejection=last_rejection,
         dispatches=await _dispatches(db, order_id, portal), warnings=_warnings(r, lines),
@@ -819,7 +908,8 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
         "SELECT q.id, q.status::text AS status, q.lead_id, q.partner_id, q.superseded_by_id, "
         "q.place_of_supply_territory_id, q.seller_gstin_id, q.price_effective_date, "
         "q.owner_user_id, q.owner_org_unit_id, q.territory_id, q.party_name, q.party_mobile, "
-        "q.party_address, q.party_gstin::text AS party_gstin, q.quote_no::text AS quote_no "
+        "q.party_address, q.party_gstin::text AS party_gstin, q.quote_no::text AS quote_no, "
+        "q.sales_type::text AS sales_type, q.tax_treatment, q.export_country "
         "FROM quotation q WHERE q.id = ANY(CAST(:ids AS uuid[])) AND q.deleted_at IS NULL"),
         {"ids": ids})).all()
     if len(rows) != len(ids):
@@ -830,6 +920,14 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
                                    f"current quotation is ordered.",
                                    code="quotation_not_accepted",
                                    fields={"quotation_ids": str(r.id)})
+    # FS-042 rule 17: an export order from export quotations only, one treatment.
+    # Commercial and industrial keep FS-011's behaviour.
+    exports = {r.sales_type == "export" for r in rows}
+    if len(exports) > 1 or exports != {body.order_type == "export"} \
+            or len({(r.tax_treatment, r.export_country) for r in rows}) > 1:
+        raise ValidationFailed("An export order is made from export quotations only, all taxed "
+                               "the same way.", code="type_mismatch",
+                               fields={"order_type": body.order_type})
     for field in domain.PARTY_FIELDS_FROM_QUOTATIONS:
         if len({getattr(r, field) for r in rows}) > 1:
             raise ValidationFailed(f"The quotations differ on {field}.",
@@ -893,7 +991,8 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
             "office": str(first.owner_org_unit_id), "territory": str(first.territory_id),
             "pos": str(first.place_of_supply_territory_id),
             "seller": str(first.seller_gstin_id), "day": first.price_effective_date,
-            "lines": list(lines)}
+            "lines": list(lines), "mode": _Mode(first.tax_treatment, None),
+            "country": first.export_country}
 
 
 def _repriced(source: list[Any], ctx: PricedContext) -> list[str]:
@@ -909,9 +1008,14 @@ def _repriced(source: list[Any], ctx: PricedContext) -> list[str]:
 async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
                        settings: Settings) -> sch.Order:
     _check_type(body.order_type)
+    _check_staff(caller, body.order_type)
     if body.quotation_ids and body.lines:
         raise ValidationFailed("Order from quotations or type lines in, not both.",
                                fields={"lines": "not with quotation_ids"})
+    if body.order_type == "sample" and body.quotation_ids:
+        raise ValidationFailed("A sample is typed in, not made from quotations.",
+                               code="sample_from_quotation",
+                               fields={"quotation_ids": "not on a sample"})
     if _is_portal(caller) and body.partner_given and body.partner_id is None:
         raise ValidationFailed("A dealer's order is its own.", code="partner_required",
                                fields={"partner_id": "required"})
@@ -921,8 +1025,15 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
     snaps: list[Any] | None = None
     if body.quotation_ids:
         src = await _from_quotations(db, caller, body)
+        mode: _Mode = src["mode"]
+        country = src["country"]
+        if body.export_country is not None and body.export_country != country:
+            raise ValidationFailed("An order from quotations takes the country from them.",
+                                   code="quotations_disagree",
+                                   fields={"export_country": "fixed by the quotations"})
         ctx = await _price(db, partner_id=src["partner"], pos=src["pos"], seller=src["seller"],
-                           as_of=src["day"], specs=_specs(src["lines"]), existing=True)
+                           as_of=src["day"], specs=_specs(src["lines"]), existing=True,
+                           treatment=mode.treatment)
         warnings += _repriced(src["lines"], ctx)
         sources = [str(r.id) for r in src["lines"]]
         snaps = src["lines"]
@@ -943,11 +1054,18 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
             if lead.stage not in domain.LEAD_STAGES_ORDERABLE or lead.merged_into_id:
                 raise ValidationFailed(f"The lead is {lead.stage}.", code="lead_not_open",
                                        fields={"lead_stage": lead.stage})
+        mode = await _new_mode(db, body.order_type)
+        country = body.export_country
+        _check_export(body.order_type, country, body.party.gstin)
         pos = body.place_of_supply_territory_id or (str(lead.territory_id) if lead else None)
         if pos is None:
             raise ValidationFailed("Where are the goods going?",
                                    fields={"place_of_supply_territory_id": "required"})
         territory = str(lead.territory_id) if lead else pos
+        if mode.treatment != "domestic":
+            # rule 7: priced from the seller's state; the office and the approvers stay
+            # those of the territory the order was raised in
+            pos = await _export_pos(db, body.seller_gstin_id)
         owner, office, _ = await _route(db, caller, territory)
         if _is_portal(caller) and lead is not None and lead.owner_user_id:
             owner = str(lead.owner_user_id)
@@ -957,29 +1075,35 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
         party = _party_values(body.party)
         ctx = await _price(db, partner_id=partner, pos=pos, seller=body.seller_gstin_id,
                            as_of=body.price_effective_date,
-                           specs=[LineSpec(product_id=ln.product_id, qty=ln.qty,
-                                           discounts=ln.discounts) for ln in body.lines],
-                           existing=False)
+                           specs=_moded([LineSpec(product_id=ln.product_id, qty=ln.qty,
+                                                  discounts=ln.discounts) for ln in body.lines],
+                                        mode),
+                           existing=False, treatment=mode.treatment)
         _compare_preview(body.lines, ctx)
+    await _check_sample(db, body.order_type, ctx)
+    await _check_lut(db, mode.treatment, ctx.seller_gstin_id)
     try:
         order_id = str((await db.execute(text("""
             INSERT INTO sales_order (order_type, lead_id, partner_id, party_name, party_mobile,
                 party_address, party_gstin, delivery_address, owner_user_id, owner_org_unit_id,
                 territory_id, seller_gstin_id, place_of_supply_territory_id,
                 place_of_supply_state_id, intra_state, price_effective_date, payment_terms,
-                remarks, created_by, updated_by, warehouse_id)
+                remarks, created_by, updated_by, warehouse_id, tax_treatment, export_country,
+                sample_pricing)
             VALUES (CAST(:ty AS order_type), CAST(:lead AS uuid), CAST(:p AS uuid), :pn, :pm,
                 :pa, :pg, :da, CAST(:ou AS uuid), CAST(:oou AS uuid), CAST(:terr AS uuid),
                 CAST(:sg AS uuid), CAST(:pos AS uuid), CAST(:ps AS uuid), :intra, :day,
                 CAST(:pt AS order_payment_terms), :rem, CAST(:me AS uuid), CAST(:me AS uuid),
-                CAST(:wh AS uuid))
+                CAST(:wh AS uuid), :tt, :ec, :sp)
             RETURNING id"""),
             {"ty": body.order_type, "lead": lead_id, "p": ctx.partner_id if partner else None,
              **party, "da": body.delivery_address, "ou": owner, "oou": office,
              "terr": territory, "sg": ctx.seller_gstin_id, "pos": pos,
              "ps": ctx.place_of_supply_state_id, "intra": ctx.intra_state, "day": ctx.as_of,
              "pt": body.payment_terms, "rem": body.remarks, "me": caller.user_id,
-             "wh": body.warehouse_id})).scalar_one())
+             "wh": body.warehouse_id, "tt": mode.treatment,
+             "ec": country.strip() if country else None,
+             "sp": mode.sample_pricing})).scalar_one())
     except DBAPIError as exc:
         raise map_db_error(exc) from exc
     await _write_lines(db, order_id, ctx, snaps, sources)
@@ -1005,16 +1129,38 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
     if body.order_type:
         _check_type(body.order_type)
     linked = await _linked_quotations(db, order_id)
+    new_type = body.order_type or row.order_type
+    _check_staff(caller, new_type)
+    mode = _row_mode(row)
+    if new_type != row.order_type:
+        # FS-042 rule 18: an amended order, or one made from quotations, keeps its type
+        if row.amend_count > 0 or linked:
+            raise ValidationFailed("This order's type is fixed.", code="order_type_fixed",
+                                   fields={"order_type": row.order_type})
+        mode = await _new_mode(db, new_type)
+    if "export_country" in body.model_fields_set:
+        country = body.export_country
+    else:
+        country = row.export_country if new_type == "export" else None
+    gstin = (body.party.gstin if body.party is not None else row.party_gstin)
+    _check_export(new_type, country, gstin)
     partner = (body.partner_id if body.partner_given else
                (str(row.partner_id) if row.partner_id else None))
     pos = body.place_of_supply_territory_id or str(row.place_of_supply_territory_id)
     seller = body.seller_gstin_id or str(row.seller_gstin_id)
+    if mode.treatment != "domestic":
+        pos = await _export_pos(db, seller)
+    elif row.order_type == "export" and not body.place_of_supply_territory_id:
+        # code review F-1: back to the territory the order is routed to, which an
+        # export kept (rule 7)
+        pos = str(row.territory_id)
     day = body.price_effective_date or row.price_effective_date
     if linked:
         fixed = {"partner_id": (partner, row.partner_id),
                  "place_of_supply_territory_id": (pos, row.place_of_supply_territory_id),
                  "seller_gstin_id": (seller, row.seller_gstin_id),
-                 "price_effective_date": (day, row.price_effective_date)}
+                 "price_effective_date": (day, row.price_effective_date),
+                 "export_country": (country, row.export_country)}
         for field, (new, old) in fixed.items():
             if (str(new) if new is not None else None) != (str(old) if old is not None else None):
                 raise ValidationFailed(f"An order from quotations takes {field} from them.",
@@ -1026,8 +1172,13 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
     await stock_service.check_order_warehouse(db, caller, body.warehouse_id)
     stored = await _stored(db, order_id)
     ctx = await _price(db, partner_id=partner, pos=pos, seller=seller, as_of=day,
-                       specs=_specs(stored), existing=True)
-    sets: dict[str, Any] = {}
+                       specs=_moded(_specs(stored), mode,
+                                    was_free=row.sample_pricing == "free"),
+                       existing=True, treatment=mode.treatment)
+    await _check_sample(db, new_type, ctx)
+    await _check_lut(db, mode.treatment, ctx.seller_gstin_id)
+    sets: dict[str, Any] = {"tt": mode.treatment, "ec": country.strip() if country else None,
+                            "sp": mode.sample_pricing}
     if body.order_type:
         sets["order_type"] = body.order_type
     if body.party is not None:
@@ -1044,11 +1195,15 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
                "pn": "party_name = :pn", "pm": "party_mobile = :pm", "pa": "party_address = :pa",
                "pg": "party_gstin = :pg", "da": "delivery_address = :da",
                "pt": "payment_terms = CAST(:pt AS order_payment_terms)", "rem": "remarks = :rem",
-               "wh": "warehouse_id = CAST(:wh AS uuid)"}
+               "wh": "warehouse_id = CAST(:wh AS uuid)", "tt": "tax_treatment = :tt",
+               "ec": "export_country = :ec", "sp": "sample_pricing = :sp"}
     assignments = [columns[k] for k in sets] + [
         "partner_id = CAST(:p AS uuid)", "place_of_supply_territory_id = CAST(:pos AS uuid)",
         "updated_by = CAST(:me AS uuid)"]
-    if not row.lead_id and pos != str(row.place_of_supply_territory_id):
+    # an export's stored place of supply is the seller's state (rule 7), not where
+    # the order is routed
+    if not row.lead_id and mode.treatment == "domestic" \
+            and pos != str(row.place_of_supply_territory_id):
         assignments.append("territory_id = CAST(:pos AS uuid)")
     try:
         await db.execute(text(f"UPDATE sales_order SET {', '.join(assignments)} "
@@ -1072,13 +1227,15 @@ async def replace_lines(db: AsyncSession, caller: Caller, order_id: str,
     row = await _lock(db, order_id)
     _expect(row, body.expected_status)
     _must_be_draft(row)
+    mode = _row_mode(row)
     ctx = await _price(db, partner_id=str(row.partner_id) if row.partner_id else None,
                        pos=str(row.place_of_supply_territory_id), seller=str(row.seller_gstin_id),
                        as_of=row.price_effective_date,
-                       specs=[LineSpec(product_id=ln.product_id, qty=ln.qty,
-                                       discounts=ln.discounts) for ln in body.lines],
-                       existing=False)
+                       specs=_moded([LineSpec(product_id=ln.product_id, qty=ln.qty,
+                                              discounts=ln.discounts) for ln in body.lines], mode),
+                       existing=False, treatment=mode.treatment)
     _compare_preview(body.lines, ctx)
+    await _check_sample(db, row.order_type, ctx)
     await _write_lines(db, order_id, ctx)
     await _write_figures(db, order_id, ctx, caller)
     await _emit(db, order_id=order_id, lead_id=row.lead_id, kind="order.lines_replaced",
@@ -1102,9 +1259,13 @@ async def submit_order(db: AsyncSession, caller: Caller, order_id: str,
     ctx = await _price(db, partner_id=str(row.partner_id) if row.partner_id else None,
                        pos=str(row.place_of_supply_territory_id), seller=str(row.seller_gstin_id),
                        as_of=row.price_effective_date, specs=_specs(stored), existing=True,
-                       submitting=True)
+                       submitting=True, treatment=row.tax_treatment)
     _compare_stored(stored, ctx)
-    if ctx.document.totals.total <= 0:
+    _check_staff(caller, row.order_type)
+    await _check_sample(db, row.order_type, ctx)
+    await _check_lut(db, row.tax_treatment, str(row.seller_gstin_id))
+    # FS-042 rule 14: a free sample is worth nothing by design; nothing else may be
+    if ctx.document.totals.total <= 0 and row.sample_pricing != "free":
         raise ValidationFailed("An order worth nothing cannot be approved.", code="zero_total",
                                fields={"total": "0.00"})
     if row.lead_id:

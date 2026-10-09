@@ -12,15 +12,43 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Final
 
-# rule 18 / GAP-121: the two order types priced today; the rest name their question
-TYPES_ACCEPTED: Final = frozenset({"commercial", "industrial"})
+# rule 18 / GAP-121: the order types priced today; the rest name their question.
+# FS-042 added export and sample, each on a setting standing in for its question.
+TYPES_ACCEPTED: Final = frozenset({"commercial", "industrial", "export", "sample"})
 TYPE_BLOCKED_ON: Final[dict[str, str]] = {
-    "export": "the export tax treatment (question 14.5)",
-    "sample": "who approves samples and whether they are charged (question 6.12)",
     "marketing_material": "the marketing material split and limits (question 6.11)",
     "subsidised": "the subsidy stages (Milestone 3)",
     "replacement": "complaints (W5)",
 }
+
+# FS-042: the types only staff raise (GAP-370)
+STAFF_ONLY_TYPES: Final = frozenset({"export", "sample"})
+# the setting's value, as the treatment stored on the document (rule 2)
+EXPORT_TREATMENT: Final[dict[str, str]] = {"lut": "export_lut", "igst": "export_igst"}
+# a free sample is every line at 100 % off, tier one (rule 11; FS-015b's free order)
+FREE_DISCOUNTS: Final = (Decimal(100), Decimal(0), Decimal(0))
+
+
+def treatment_for(order_type: str, setting: str) -> str:
+    """The tax treatment a new export document stores; domestic for every other
+    type. Read once, at create (FS-042 rule 5)."""
+    return EXPORT_TREATMENT[setting] if order_type == "export" else "domestic"
+
+
+def export_problems(order_type: str, country: str | None, party_gstin: str | None
+                    ) -> dict[str, tuple[str, str]]:
+    """Rule 6, before the CHECK: field -> (code, message)."""
+    out: dict[str, tuple[str, str]] = {}
+    if order_type == "export":
+        if not country or not 2 <= len(country.strip()) <= 60:
+            out["export_country"] = ("export_country_required",
+                                     "An export names the buyer's country (2 to 60 characters).")
+        if party_gstin:
+            out["party.gstin"] = ("export_party_gstin", "An export buyer has no Indian GSTIN.")
+    elif country:
+        out["export_country"] = ("export_country_not_export", "Only an export names a country.")
+    return out
+
 
 # rule 15: a direct order's lead is open and qualified or later
 LEAD_STAGES_ORDERABLE: Final = frozenset({"qualified", "quoted", "negotiation", "won"})
@@ -47,7 +75,9 @@ _DECIDER_KINDS: Final = frozenset({"order.returned", "order.approved",
                                     "complaint.replacement_cancelled", "complaint.closed",
                                     # a replacement cancelled by its approver or by QC
                                     # (PR 38 review): a dealer may see the order
-                                    "order.replacement_cancelled"})
+                                    "order.replacement_cancelled",
+                                    # FS-043 rule 14: who entered a customer's rating
+                                    "rating.recorded"})
 
 
 def actor_hidden_from_partner(kind: str) -> bool:
@@ -98,6 +128,12 @@ SQLSTATE_TO_ERROR: Final[dict[str, tuple[int, str]]] = {
     # FS-036: amending an approved order (041)
     "ORDTF": (422, "order_type_fixed"),
     "ORDPA": (409, "order_has_payments"),
+    # FS-042: export and sample orders (045)
+    "ORDXS": (403, "type_staff_only"),
+    "ORDSF": (422, "free_sample_priced"),
+    "ORDSL": (422, "sample_over_limit"),
+    "ORDLT": (422, "lut_missing"),
+    "ORDLX": (422, "lut_line_taxed"),
 }
 
 

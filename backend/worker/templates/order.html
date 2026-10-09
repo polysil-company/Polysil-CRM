@@ -58,7 +58,8 @@
     <div class="box">
       <h3>Delivery</h3>
       {% if o.delivery_address %}<div>{{ o.delivery_address }}</div>{% else %}<div class="muted">As the buyer's address</div>{% endif %}
-      {% if o.place_of_supply %}<div>Place of supply: {{ o.place_of_supply }}</div>{% endif %}
+      {% if o.export_country %}<div>Place of supply: Outside India ({{ o.export_country }})</div>
+      {% elif o.place_of_supply %}<div>Place of supply: {{ o.place_of_supply }}</div>{% endif %}
     </div>
   </div>
 
@@ -110,6 +111,12 @@
     </tfoot>
   </table>
   <div class="amounts">Amounts in Indian rupees (&#8377;).</div>
+  {% if o.tax_treatment == 'export_lut' %}
+  <div class="terms">Supply meant for export under LUT without payment of IGST{% if o.lut_arn %} (ARN {{ o.lut_arn }}){% endif %}.</div>
+  {% endif %}
+  {% if o.sample_pricing == 'free' %}
+  <div class="terms">Free sample: no charge. The rates show the list value.</div>
+  {% endif %}
 
   <div class="terms"><strong>Payment terms</strong><br>{{ o.payment_terms | replace('_', ' ') | capitalize }}</div>
 

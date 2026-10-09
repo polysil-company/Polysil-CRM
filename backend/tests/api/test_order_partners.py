@@ -68,7 +68,7 @@ async def _as_dealer(sessions: Sessions, shop: Shop) -> tuple[AsyncSession, Call
     await enter_role(s, "app_role")
     return s, Caller(shop.ids["dealer"], None, shop.partner,
                      scopes={"sales_orders": "partner_subtree", "leads": "partner_subtree",
-                             "dispatch": "partner_subtree"})
+                             "dispatch": "partner_subtree"}, user_type="partner_user")
 
 
 async def test_a_dealer_reads_that_its_order_was_returned_but_not_why_or_by_whom(

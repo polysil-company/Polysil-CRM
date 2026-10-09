@@ -31,7 +31,10 @@ def test_every_custom_sqlstate_the_migration_raises_has_an_api_error_and_no_othe
     later += (_VERSIONS / "041_settings_amend_reopen.py").read_text("utf-8")
     # FS-027: order_submit's credit check (047)
     later += (_VERSIONS / "047_dealer_credit_limit.py").read_text("utf-8")
-    through_orders = {"STKWI", "STKNW", "STKNF", "PAYPC", "ORDTF", "ORDPA", "CRDLM"}
+    # FS-042: order_submit's export and sample gates (045)
+    later += (_VERSIONS / "045_export_sample_orders.py").read_text("utf-8")
+    through_orders = {"STKWI", "STKNW", "STKNF", "PAYPC", "ORDTF", "ORDPA", "CRDLM",
+                      "ORDXS", "ORDSF", "ORDSL", "ORDLT", "ORDLX"}
     assert through_orders <= set(re.findall(r"ERRCODE = '([A-Z0-9]{5})'", later))
     expected = raised | through_orders
     assert expected == set(domain.SQLSTATE_TO_ERROR), expected ^ set(domain.SQLSTATE_TO_ERROR)
@@ -86,3 +89,35 @@ def test_open_quantity_is_what_is_left_and_never_negative() -> None:
 
 def test_the_orderable_lead_stages_are_qualified_or_later_and_open() -> None:
     assert {"qualified", "quoted", "negotiation", "won"} == domain.LEAD_STAGES_ORDERABLE
+
+
+# ── FS-042: export and sample ────────────────────────────────────────────────
+
+@pytest.mark.parametrize(("order_type", "setting", "treatment"), [
+    ("export", "lut", "export_lut"),
+    ("export", "igst", "export_igst"),
+    ("commercial", "lut", "domestic"),
+    ("sample", "igst", "domestic"),
+])
+def test_the_treatment_comes_from_the_setting_for_an_export_only(
+        order_type: str, setting: str, treatment: str) -> None:
+    assert domain.treatment_for(order_type, setting) == treatment
+
+
+@pytest.mark.parametrize(("order_type", "country", "gstin", "codes"), [
+    ("export", "Kenya", None, {}),
+    ("export", None, None, {"export_country": "export_country_required"}),
+    ("export", " K ", None, {"export_country": "export_country_required"}),
+    ("export", "Kenya", "24AAACP1234A1Z5", {"party.gstin": "export_party_gstin"}),
+    ("commercial", None, "24AAACP1234A1Z5", {}),
+    ("commercial", "Kenya", None, {"export_country": "export_country_not_export"}),
+])
+def test_export_problems(order_type: str, country: str | None, gstin: str | None,
+                         codes: dict[str, str]) -> None:
+    got = domain.export_problems(order_type, country, gstin)
+    assert {k: c for k, (c, _) in got.items()} == codes
+
+
+def test_a_free_sample_is_every_line_at_full_discount_on_tier_one() -> None:
+    assert (Decimal(100), Decimal(0), Decimal(0)) == domain.FREE_DISCOUNTS
+    assert {"export", "sample"} == domain.STAFF_ONLY_TYPES
