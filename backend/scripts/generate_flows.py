@@ -2270,6 +2270,26 @@ def f_new_state_scheme() -> None:
          ("n4", "Ours: one active scheme per state, stages copied from\nGGRC, GGRC's formulas only (GAP-359 to GAP-361).", YELLOW)])
 
 
+
+def f_export_sample_orders() -> None:
+    _columns(
+        "55-export-and-sample-orders", "Export and sample orders",
+        "Two order types that waited on client questions, built on settings standing in for the answers.",
+        "BUILT. FS-042: migration 045, /seller-gstins.",
+        [("s1", "staff: quotation or order, type export\ncountry required, no party GSTIN", GREY),
+         ("s2", "setting export_tax_treatment, read ONCE at create:\nlut -> every line IGST 0 %   |   igst -> IGST at the slab", BLUE),
+         ("s3", "under lut: a LUT of the seller GSTIN must cover the tax day\n(quotation: price date; order: submit day). ARN stored", GREEN),
+         ("s4", "staff: direct order, type sample\nsetting sample_pricing, read ONCE at create", GREY),
+         ("s5", "free: every line 100 % off, total 0, no GST\nchain worked out on the GROSS, not the total", GREEN),
+         ("s6", "gross over sample_max_value: refused\nat create, edit and submit", GREEN)],
+        [("d1", "order_submit re-checks all of it (second enforcer):\nstaff only, free lines, limit, LUT, no taxed LUT line", VIOLET),
+         ("d2", "GET /seller-gstins, POST / DELETE their LUTs\none per financial year; a LUT a document carries stays", YELLOW),
+         ("d3", "amend under value_rises: a sample compares its gross\nwith amended_from_gross", YELLOW)],
+        [("n1", "THE SETTING IS READ ONCE\n\nEvery re-price, revision, submit and amend uses the\ntreatment stored on the document. Read the setting again\nand a draft's tax changes under it, then fails rate_changed.", RED),
+         ("n2", "AN EXPORT IS NEVER INTRA-STATE\n\nIts stored place of supply is the seller's own state, for\npricing only, so seller == pos is TRUE. price_document\nforces intra_state false for both export treatments.", RED),
+         ("n3", "A FREE SAMPLE IS NOT A ZERO-RUPEE ORDER\n\nzero_total is skipped for it alone; its approval runs on\nthe gross, and the party gets no 0.00 confirmation.", RED),
+         ("n4", "Ours: LUT by default, free samples up to 50,000 list,\nstaff only, rupees only, priced from the seller state's list\n(GAP-364 to GAP-371).", YELLOW)])
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2281,4 +2301,5 @@ if __name__ == "__main__":
     f_subsidy_follow_ups(); f_lead_small_gaps()
     f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
+    f_export_sample_orders()
     print(f"\nwrote to {OUT}")
