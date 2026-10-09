@@ -51,6 +51,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { LeadAssignDialog } from "./lead-assign-dialog";
+import { LeadDeleteDialog, LeadEditDialog } from "./lead-edit-dialog";
 import { LeadNoteComposer } from "./lead-note-composer";
 import { LeadStageBadge } from "./lead-stage-badge";
 import { LeadStageMenu } from "./lead-stage-menu";
@@ -161,6 +162,12 @@ function LeadNotices({ lead }: { lead: Lead }): React.JSX.Element | null {
           </li>
         ))}
       </ul>
+      <Link
+        href="/leads/duplicates"
+        className="w-fit font-medium text-primary-text underline-offset-4 hover:underline"
+      >
+        Review and merge
+      </Link>
     </LeadNotice>
   );
 }
@@ -170,6 +177,7 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
   const canEdit = useCan("leads", "edit");
   const canSeeQuotations = useCan("quotations");
   const canOrder = useCan("sales_orders", "create");
+  const canDelete = useCan("leads", "delete");
   const canSeeTasks = useCan("tasks") && session?.userType === "staff";
   const whatsappNumber = lead.phone.replace(/\D/g, "");
   const lost = lead.stage === "lost";
@@ -238,6 +246,8 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
               New order
             </Link>
           ) : null}
+          {/* LEAD-011 · Holders of leads.delete only. */}
+          {canDelete ? <LeadDeleteDialog lead={lead} /> : null}
           {/* LEAD-007 · The main action on a lead, for whoever may edit it. */}
           {canEdit ? <LeadStageMenu lead={lead} /> : null}
         </div>
@@ -250,7 +260,12 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
           <CardHeader>
             <CardTitle level={3}>Details</CardTitle>
             {/* LEAD-008 · A closed lead (won, lost, merged) cannot be reassigned. */}
-            {canEdit && !CLOSED_STAGES.has(lead.stage) ? <LeadAssignDialog lead={lead} /> : null}
+            {canEdit && !CLOSED_STAGES.has(lead.stage) ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <LeadEditDialog lead={lead} />
+                <LeadAssignDialog lead={lead} />
+              </div>
+            ) : null}
           </CardHeader>
           <CardContent>
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">

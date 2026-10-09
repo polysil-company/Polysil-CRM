@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
@@ -11,6 +13,9 @@ import {
   timelineEventResponseSchema,
   timelinePageSchema,
   assigneeListResponseSchema,
+  dismissResultSchema,
+  DUPLICATE_PAGE_SIZE,
+  duplicatePageSchema,
   partnerPickListResponseSchema,
   type AddLeadNoteRequest,
   type AssignLeadRequest,
@@ -27,6 +32,9 @@ import {
   type LeadStats,
   type TimelineEvent,
   type TimelinePage,
+  type DuplicatePage,
+  type MergeLeadRequest,
+  type PatchLeadRequest,
 } from "./leads.schemas";
 
 const log = createLogger({ file: "features/leads/api/leads.api.ts", dataId: "LEAD-001" });
@@ -136,6 +144,104 @@ export function createLead({ body, idempotencyKey }: CreateLeadInput): Promise<L
     fn: "createLead",
     method: "POST",
     path: "/leads",
+    body,
+    idempotencyKey,
+    schema: leadResponseSchema,
+  });
+}
+
+/** LEAD-010 · PATCH /leads/{id} — only the fields that changed. */
+export function patchLead({
+  leadId,
+  body,
+  idempotencyKey,
+}: {
+  leadId: string;
+  body: PatchLeadRequest;
+  idempotencyKey: string;
+}): Promise<Lead> {
+  return apiRequest({
+    dataId: "LEAD-010",
+    logger: log,
+    fn: "patchLead",
+    method: "PATCH",
+    path: `/leads/${encodeURIComponent(leadId)}`,
+    body,
+    idempotencyKey,
+    schema: leadResponseSchema,
+  });
+}
+
+/** LEAD-011 · DELETE /leads/{id} — a soft delete; 204 always, a repeat included. */
+export async function deleteLead({
+  leadId,
+  idempotencyKey,
+}: {
+  leadId: string;
+  idempotencyKey: string;
+}): Promise<void> {
+  await apiRequest({
+    dataId: "LEAD-011",
+    logger: log,
+    fn: "deleteLead",
+    method: "DELETE",
+    path: `/leads/${encodeURIComponent(leadId)}`,
+    idempotencyKey,
+    schema: z.undefined(),
+  });
+}
+
+/** LEAD-012 · GET /leads/duplicates — the review queue, newest first. */
+export function listDuplicates(
+  cursor: string | null,
+  signal?: AbortSignal,
+): Promise<DuplicatePage> {
+  return apiRequest({
+    dataId: "LEAD-012",
+    logger: log,
+    fn: "listDuplicates",
+    path: "/leads/duplicates",
+    query: { limit: DUPLICATE_PAGE_SIZE, cursor },
+    schema: duplicatePageSchema,
+    signal,
+  });
+}
+
+/** LEAD-012 · POST /leads/duplicates/{linkId}/dismiss — not a duplicate after all. */
+export function dismissDuplicate({
+  linkId,
+  idempotencyKey,
+}: {
+  linkId: string;
+  idempotencyKey: string;
+}): Promise<{ linkId: string }> {
+  return apiRequest({
+    dataId: "LEAD-012",
+    logger: log,
+    fn: "dismissDuplicate",
+    method: "POST",
+    path: `/leads/duplicates/${encodeURIComponent(linkId)}/dismiss`,
+    idempotencyKey,
+    schema: dismissResultSchema,
+  });
+}
+
+/** LEAD-012 · POST /leads/{id}/merge — this lead into the survivor; answers the survivor. */
+export function mergeLead({
+  leadId,
+  body,
+  idempotencyKey,
+}: {
+  leadId: string;
+  body: MergeLeadRequest;
+  idempotencyKey: string;
+}): Promise<Lead> {
+  return apiRequest({
+    dataId: "LEAD-012",
+    logger: log,
+    fn: "mergeLead",
+    method: "POST",
+    path: `/leads/${encodeURIComponent(leadId)}/merge`,
     body,
     idempotencyKey,
     schema: leadResponseSchema,
