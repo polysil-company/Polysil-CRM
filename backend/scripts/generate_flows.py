@@ -2189,6 +2189,26 @@ def f_whatsapp_webhook() -> None:
          ("n3", "Ours: 30 days kept, no rate limit, a call during\na DB outage is lost (GAP-356, GAP-357).", YELLOW)])
 
 
+
+def f_new_state_scheme() -> None:
+    _columns(
+        "50-new-state-subsidy-scheme", "A new state's subsidy scheme",
+        "The admin adds another state's scheme; applications take the scheme of the lead's state.",
+        "BUILT. FS-039: /subsidy-schemes, migration 044.",
+        [("s1", "POST /subsidy-schemes\ncode, name, state, template GGRC", GREY),
+         ("s2", "subsidy_scheme_create(): mode lock, state row FOR UPDATE;\ncopies engine settings + every stage and field", BLUE),
+         ("s3", "readiness: what a calculation would refuse on,\nthrough the engine's own reads, in its order", GREEN),
+         ("s4", "admin fills figures through the FS-009a\nrevisions and matrices until ready", BLUE),
+         ("s5", "POST /subsidy-applications: the lead's state's scheme;\nthe definer checks again under the state lock", GREEN)],
+        [("d1", "GET /subsidy-schemes/for-lead/{id}\nthe scheme the preview must send", VIOLET),
+         ("d2", "PATCH: rename, switch off, link GGRC to its state once;\nrename a stage", YELLOW),
+         ("d3", "PIMS export: GGRC only (GAP-363)", YELLOW)],
+        [("n1", "NO FIGURE IS COPIED\n\nA copied GGRC Jantri would quote a UP farmer a Gujarat\nsubsidy with no warning. An empty scheme refuses to\ncalculate and the panel says what is missing.", RED),
+         ("n2", "LEGACY MODE\n\nWhile no active scheme has a state, every lead takes GGRC.\nOnce one has, an unmapped state is refused. The API\nnever lets the two mix (409 unlinked_scheme_exists).", RED),
+         ("n3", "citext = text compares as text: codes are stored\nupper case and every lookup uses upper(:c).", RED),
+         ("n4", "Ours: one active scheme per state, stages copied from\nGGRC, GGRC's formulas only (GAP-359 to GAP-361).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2198,5 +2218,5 @@ if __name__ == "__main__":
     f_reports(); f_targets()
     f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
     f_subsidy_follow_ups(); f_lead_small_gaps()
-    f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook()
+    f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
     print(f"\nwrote to {OUT}")

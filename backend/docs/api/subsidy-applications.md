@@ -91,8 +91,8 @@ the category's subsidy and farmer share, and moves the lead to won. `422` on
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
-| `409` | `ErrorResponse` | `idempotency_key_reused`: the same key was sent with a different body. |
-| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+| `409` | `ErrorResponse` | `scheme_changed`: a scheme for the lead's state was added or switched meanwhile; calculate again. `idempotency_key_reused`: the same key was sent with a different body. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. `calculation.scheme`: not the lead's scheme (GET /subsidy-schemes/for-lead/{id}). `no_scheme_for_state`: the lead's state has none. |
 
 ---
 
@@ -311,6 +311,7 @@ A ten-minute link to the file. Never fetch it with the bearer token.
 The PIMS sheet for the GGRC portal: one row per line of the stored
 calculation, in the columns CostType, Crop, ItemCode, Item, Size, Unit, Rate,
 Quantity, Amount, Remark. Our reading of the one sample the client gave (GAP-177).
+GGRC applications only: another scheme's is 422 `pims_not_for_scheme` (GAP-363).
 
 **Parameters**
 
