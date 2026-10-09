@@ -61,6 +61,33 @@ Replace the order's planned instalments: 0 to 5, each a date and an amount.
 
 ---
 
+## `GET /api/v1/partners/{partner_id}/credit`
+
+**Partner Credit**
+
+A dealer's credit limit, what it owes on open orders less its receipts, and
+what is left (FS-027). For Accounts, and for staff who manage dealers and can
+see this one. A dealer, a distributor or a field officer gets 403: credit terms
+are never shown to them.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `partner_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_PartnerCredit_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `GET /api/v1/partners/{partner_id}/ledger`
 
 **Partner Ledger**
@@ -290,6 +317,12 @@ counting. `409 already_void`.
 |---|---|---|---|
 | `data` | OrderPayments | yes |  |
 
+**`Envelope_PartnerCredit_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PartnerCredit | yes |  |
+
 **`Envelope_Payment_`**
 
 | Field | Type | Required | Notes |
@@ -379,6 +412,16 @@ counting. `409 already_void`.
 | `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
+
+**`PartnerCredit`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `partner_id` | string | yes |  |
+| `credit_limit` | string \| null | yes | The dealer's limit; null when none is set, and then the dealer is never checked. |
+| `exposure` | string | yes | Owed on the dealer's open orders less its live receipts. Negative: the dealer is in credit. |
+| `available` | string \| null | yes | Limit less exposure; null when there is no limit. Negative: over the limit. |
+| `check` | string | yes | The company setting dealer_credit_check: off, warn or block. |
 
 **`PartnerName`**
 

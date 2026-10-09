@@ -16,12 +16,13 @@ from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.idempotency import payload_digest, run_idempotent
 from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
-from api.schemas.leads import UUID_RE, UserRef
+from api.schemas.leads import UUID_RE
 from api.schemas.tasks import (
     Minutes,
     MinutesCreate,
     PlannerDay,
     Task,
+    TaskAssignee,
     TaskCancel,
     TaskComplete,
     TaskCreate,
@@ -111,11 +112,15 @@ async def list_tasks(
         overdue=overdue, limit=limit, cursor=cursor, include_total=include_total)
 
 
-@router.get("/assignees", response_model=Envelope[list[UserRef]], responses=_ERRORS,
+@router.get("/assignees", response_model=Envelope[list[TaskAssignee]], responses=_ERRORS,
             dependencies=[Depends(require("tasks", "create"))])
-async def task_assignees(db: DbSession, caller: CallerDep) -> Envelope[list[UserRef]]:
-    """The assignee picker: you first, then the active staff below you."""
-    return Envelope(data=await service.assignees(db, caller))
+async def task_assignees(db: DbSession, caller: CallerDep, include_partners: Annotated[
+        bool, Query(description="Add the users of dealers you can see, when the "
+                                "`tasks_for_dealers` setting is on (FS-037).")] = False
+                         ) -> Envelope[list[TaskAssignee]]:
+    """The assignee picker: you first, then the active staff below you, then, when
+    asked and allowed, dealers' users (`kind: partner`)."""
+    return Envelope(data=await service.assignees(db, caller, include_partners))
 
 
 @router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},

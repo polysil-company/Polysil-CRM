@@ -352,7 +352,12 @@ async def purge_expired_sessions(ctx: dict[str, Any]) -> int:
             text("SELECT lead_intake_purge(:cut)"),
             {"cut": now - settings.public_lead_code_retention},
         )).scalar_one()
+        # FS-038: 11za's raw webhook calls carry farmers' numbers and words (GAP-356)
+        webhook = (await session.execute(
+            text("SELECT whatsapp_webhook_purge(:cut)"),
+            {"cut": now - settings.whatsapp_webhook_retention},
+        )).scalar_one()
 
     log.info("retention.purged", sessions=sessions, attempts=attempts, idempotency=idem,
-             outbox=outbox, lead_codes=codes)
-    return int(sessions) + int(attempts) + int(idem) + int(outbox) + int(codes)
+             outbox=outbox, lead_codes=codes, webhook_calls=webhook)
+    return int(sessions) + int(attempts) + int(idem) + int(outbox) + int(codes) + int(webhook)

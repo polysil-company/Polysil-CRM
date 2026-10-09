@@ -8,32 +8,40 @@ any endpoint change, so it is always current rather than a snapshot.
 | Module | Endpoints | Doc |
 |---|---|---|
 | Approvals | 5 | [`approvals.md`](approvals.md) |
+| Assistant | 2 | [`assistant.md`](assistant.md) |
 | Auth | 7 | [`auth.md`](auth.md) |
-| Complaints | 21 | [`complaints.md`](complaints.md) |
+| Campaigns | 5 | [`campaigns.md`](campaigns.md) |
+| Complaints | 22 | [`complaints.md`](complaints.md) |
+| Customers | 4 | [`customers.md`](customers.md) |
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
 | Dealer Commission | 12 | [`dealer-commission.md`](dealer-commission.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
+| Holidays | 3 | [`holidays.md`](holidays.md) |
 | Leads | 20 | [`leads.md`](leads.md) |
 | Lookups | 23 | [`lookups.md`](lookups.md) |
 | Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
-| Messages | 6 | [`messages.md`](messages.md) |
+| Messages | 7 | [`messages.md`](messages.md) |
 | Notifications | 2 | [`notifications.md`](notifications.md) |
-| Orders | 16 | [`orders.md`](orders.md) |
+| Orders | 17 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 7 | [`partners.md`](partners.md) |
-| Payments | 7 | [`payments.md`](payments.md) |
+| Payments | 8 | [`payments.md`](payments.md) |
+| Portal | 6 | [`portal.md`](portal.md) |
 | Pricing | 8 | [`pricing.md`](pricing.md) |
 | Products | 8 | [`products.md`](products.md) |
 | Public | 6 | [`public.md`](public.md) |
 | Quotations | 14 | [`quotations.md`](quotations.md) |
-| Reports | 8 | [`reports.md`](reports.md) |
+| Reports | 9 | [`reports.md`](reports.md) |
 | Rewards | 19 | [`rewards.md`](rewards.md) |
 | Schemes | 6 | [`schemes.md`](schemes.md) |
+| Seller Gstins | 3 | [`seller-gstins.md`](seller-gstins.md) |
+| Settings | 2 | [`settings.md`](settings.md) |
 | Stock | 7 | [`stock.md`](stock.md) |
 | Subsidy | 4 | [`subsidy.md`](subsidy.md) |
 | Subsidy Applications | 14 | [`subsidy-applications.md`](subsidy-applications.md) |
 | Subsidy Masters | 4 | [`subsidy-masters.md`](subsidy-masters.md) |
 | Subsidy Reports | 6 | [`subsidy-reports.md`](subsidy-reports.md) |
+| Subsidy Schemes | 6 | [`subsidy-schemes.md`](subsidy-schemes.md) |
 | Targets | 3 | [`targets.md`](targets.md) |
 | Tasks | 14 | [`tasks.md`](tasks.md) |
 | Territories | 4 | [`territories.md`](territories.md) |

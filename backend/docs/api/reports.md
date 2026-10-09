@@ -50,6 +50,37 @@ may not see is null.
 
 ---
 
+## `GET /api/v1/reports/campaign-performance`
+
+**Campaign Performance**
+
+Per campaign: the leads you can see created in the window that name it, how far
+they got, their sales (whenever sold, under the company's sale setting), and cost
+per lead and per win. A campaign whose dates overlap the window shows with zeros
+(no end date is one day); with `owner_id`, only campaigns with leads show.
+Cost figures need campaigns.view; sales need sales_orders. Staff only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `from` | query | date \| null |  | IST date, inclusive. Default: 30 days before `to`. |
+| `to` | query | date \| null |  | IST date, inclusive. Default: today. |
+| `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
+| `owner_id` | query | string \| null |  | One person. |
+| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
+| `422` | `ErrorResponse` | A bad window or filter. |
+
+---
+
 ## `GET /api/v1/reports/complaints`
 
 **Complaints**

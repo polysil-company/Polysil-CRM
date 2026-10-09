@@ -114,6 +114,14 @@ class SystemPolicy:
     exact_area_match_required: bool = True
 
 
+def rate_matches(row: ComponentRate, code: str, pipe_size_mm: int | None,
+                 nozzle: str | None) -> bool:
+    """`rate_for`'s match, shared with the readiness panel (FS-039)."""
+    return (row.code == code
+            and (pipe_size_mm is None or row.pipe_size_mm == pipe_size_mm)
+            and (nozzle is None or row.nozzle == nozzle))
+
+
 @dataclass(frozen=True)
 class Masters:
     regular: Matrix2D | Mapping[Decimal, Decimal]
@@ -140,13 +148,8 @@ class Masters:
     def rate_for(self, code: str, *, pipe_size_mm: int | None = None,
                  nozzle: str | None = None) -> ComponentRate:
         for row in self.component_rates:
-            if row.code != code:
-                continue
-            if pipe_size_mm is not None and row.pipe_size_mm != pipe_size_mm:
-                continue
-            if nozzle is not None and row.nozzle != nozzle:
-                continue
-            return row
+            if rate_matches(row, code, pipe_size_mm, nozzle):
+                return row
         raise SubsidyError("component_rate_missing",
                            f"no rate for {code} (size {pipe_size_mm}, nozzle {nozzle})")
 

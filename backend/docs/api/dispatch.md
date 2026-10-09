@@ -227,6 +227,10 @@ order.
 | `seller` | OrderSeller \| null | yes | The selling registration at the tax date. |
 | `place_of_supply` | TerritoryRef | yes |  |
 | `intra_state` | boolean | yes |  |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` | yes | domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or export_igst. Fixed when the order is created. |
+| `export_country` | string \| null | yes |  |
+| `lut_arn` | string \| null | yes | The LUT an export_lut order is zero-rated under. Taken at submit; null on a draft. |
+| `sample_pricing` | `free` \| `charged` \| null | yes | On a sample only. free: every line 100 % off, total 0, and the approval runs on the gross. |
 | `price_effective_date` | string | yes |  |
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
@@ -246,6 +250,11 @@ order.
 | `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
+| `fully_dispatched_at` | string \| null |  | When the last line shipped (dispatched, or closed short after a dispatch); null otherwise (FS-026). |
+| `over_credit_limit` | boolean \| null |  | Over the dealer's credit limit at submit (FS-027): true or false when checked, null when unchecked. Null for field officers and dealers, who may not read credit standing. |
+| `amend_count` | integer |  | How many times this order was amended after approval (FS-036). Default `0`. |
+| `amended_from_total` | string \| null |  | The approved total the last amend started from. |
+| `amend_reason` | string \| null |  | Why it was last amended. Staff only. |
 | `cancelled_at` | string \| null | yes |  |
 | `cancel_remark` | string \| null | yes |  |
 | `closed_at` | string \| null | yes |  |

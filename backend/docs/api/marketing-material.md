@@ -42,6 +42,7 @@ The catalogue with today's price and company share. A partner user sees active i
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_Material__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -80,6 +81,7 @@ Add a catalogue item with its price from today.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Material_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -120,6 +122,7 @@ already placed keep their own figures. Once a day: `409 price_changed_today`.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Material_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -151,6 +154,7 @@ user its own subtree's.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `MarketingOrderPage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -189,6 +193,7 @@ District Manager over the office; there is no draft.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_MarketingOrder_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -217,6 +222,7 @@ Marketing orders as Excel, with the same filters (FS-030).
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | - | The workbook, as an attachment. |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -242,6 +248,7 @@ One order with its lines, the decision, the dispatch and `can`.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_MarketingOrder_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -276,6 +283,7 @@ The District Manager over the order's office (or above it, or an admin) approves
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_MarketingOrder_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -310,6 +318,7 @@ The requester cancels while submitted; the marketing team cancels an approved on
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_MarketingOrder_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -345,6 +354,7 @@ The marketing team marks an approved order sent, with the date and a reference.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_MarketingOrder_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -379,6 +389,7 @@ Reject with a remark (required).
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_MarketingOrder_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |

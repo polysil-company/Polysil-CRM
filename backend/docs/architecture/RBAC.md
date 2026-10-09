@@ -527,7 +527,7 @@ Kept as the regression list. Each is a named test in `tests/rbac/`.
 
 ### 5.5 Reports — materialized views do not inherit RLS
 
-> **Live form, 4 Oct (ADR-047, FS-024).** Reports today are live aggregates, not materialized views. Their three rules: the module's scope predicate on every ScopeSpec table the query reads, with RLS beneath (six hand-policy tables are RLS-only, ISS-111); a figure without its module is null, never 0; and a cross-office leakage test per report and per export. The materialized-view form below applies when one is introduced.
+> **Live form, 4 Oct (ADR-047, FS-024).** Reports today are live aggregates, not materialized views. Their three rules: the module's scope predicate on every ScopeSpec table the query reads, with RLS beneath (six hand-policy tables are RLS-only, ISS-111); one exception by design: `order_paid_at()` (FS-026 rule 11) tells anyone who can see an order the day it was paid in full, a day and not an amount, so a salesperson without `payments.view` still sees their sales under payment mode; a figure without its module is null, never 0; and a cross-office leakage test per report and per export. The materialized-view form below applies when one is introduced.
 
 Reading a materialized view returns stored rows; it does **not** re-run the source query under the reader's policies. Without this every report is a company-wide aggregate readable by anyone who can reach it.
 
@@ -577,6 +577,7 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | pricing | V:global | V:global | V:global | V:global | V:global CEAD | V:global CEAD |
 | partners | V:org | V:org CE | V:org CE | V:org | V:global CEAD | V:global CEAD |
 | marketing_material | V:global C | V:global CA | V:global CA | V:global A | V:global CEAD | V:global CEAD |
+| campaigns | | | | | V:global | V:global |
 | rewards | V:own | V:org | V:org | V:org | V:global CEAD | V:global CEAD |
 | tasks | V:own CE | V:org CE | V:org CE | V:org CE | V:global CEAD | V:global CEAD |
 | reports | V:own | V:org | V:org | V:org | V:global | V:global |
@@ -608,6 +609,8 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | chat | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
 | stock | V:global | V:global C | V:global | V:global | V:global | V:global |
 
+*FS-040: every staff user reads the campaign list (the lead form's picker), whatever this row says. The service hides cost from anyone without `campaigns` view; RLS is the row floor (ADR-039).*
+
 State Co-ordinators own subsidy stage entry (ADR-030), scoped by `user_territory`.
 
 > **Whoever can see a lead, quotation or order sees the people on it.** Every role that views a document module views `users` at a scope that covers the people named on those documents: the line managers over their org subtree, the functional roles company-wide. Before this, the row was blank for them, and every list showed the owner as unassigned. The `users` spec has no territory branch, so State Co-ordinators read people company-wide (GAP-134). Write access (`C`, `E`, `D`) on `users` stays with the administrators.
@@ -618,7 +621,7 @@ State Co-ordinators own subsidy stage entry (ADR-030), scoped by `user_territory
 
 ### 6.3 Portal
 
-Scope is `partner_subtree` throughout, served by the partner permissive branch (§5.1) on both SELECT and INSERT. A distributor sees its dealers and their sub-dealers; a sub-dealer sees only itself.
+Scope is `partner_subtree` throughout, served by the partner permissive branch (§5.1) on both SELECT and INSERT. The one exception is `tasks` (FS-037, ADR-034 as amended): own scope, the dealer user's own tasks, assigned by staff while the `tasks_for_dealers` setting is on; edit means completing, enforced by `task_partner_guard()`. A distributor sees its dealers and their sub-dealers; a sub-dealer sees only itself.
 
 | Module | distributor | dealer | sub_dealer |
 |---|---|---|---|
@@ -627,6 +630,7 @@ Scope is `partner_subtree` throughout, served by the partner permissive branch (
 | sales_orders | V CE | V CE | V CE |
 | dispatch | V | V | V |
 | complaints | V CE | V CE | V CE |
+| tasks | V:own E | V:own E | V:own E |
 | payments | V | V | V |
 | partners | V CE | V CE | |
 | products | V | V | V |

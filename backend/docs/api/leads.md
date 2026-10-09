@@ -42,6 +42,9 @@ The codes in your scope, newest first, with how many leads each brought.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `QrCodeList` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No lead permission for QR codes. |
 | `422` | `ErrorResponse` | A field. |
 
 ---
@@ -66,7 +69,8 @@ and offer a download. Leads from it are credited to `partner_id` when set.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `label` | string | yes | What staff will recognise: the dealer, the stall, the leaflet. |
-| `campaign` | string \| null |  |  |
+| `campaign` | string \| null |  | A free-text label. |
+| `campaign_id` | string \| null |  | An active campaign (FS-040). Leads from this code take it. |
 | `partner_id` | string \| null |  | Leads from this code are assigned to this partner. |
 | `territory_id` | string \| null |  | Preselected in the form's picker. |
 
@@ -75,6 +79,9 @@ and offer a download. Leads from it are credited to `partner_id` when set.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_QrCode_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No lead permission for QR codes. |
 | `422` | `ErrorResponse` | A field. |
 
 ---
@@ -102,6 +109,7 @@ new leads only. Send only the fields that change.
 |---|---|---|---|
 | `label` | string \| null |  |  |
 | `campaign` | string \| null |  |  |
+| `campaign_id` | string \| null |  | An active campaign; null clears it. New leads take it; earlier leads keep theirs. |
 | `partner_id` | string \| null |  | New leads from this code go to this partner; earlier leads keep theirs. |
 | `territory_id` | string \| null |  | Preselected in the form's picker. |
 | `is_active` | boolean \| null |  | false switches the code off: the form then makes a plain website enquiry. |
@@ -111,6 +119,9 @@ new leads only. Send only the fields that change.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_QrCode_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No lead permission for QR codes. |
 | `404` | `ErrorResponse` | Not yours. |
 | `422` | `ErrorResponse` | A field. |
 
@@ -155,6 +166,7 @@ day it is the slowest thing on the screen.
 | `created_from` | query | string \| null |  | ISO date, inclusive. |
 | `created_to` | query | string \| null |  | ISO date, inclusive. |
 | `q` | query | string \| null |  | Name, mobile or inquiry number. |
+| `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
 | `limit` | query | integer |  |  |
 | `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 | `include_total` | query | boolean |  | Also count how many leads match, for a "1 to 25 of 137" caption. Off by default: it costs a second query over everything in your scope, and most screens do not need it. |
@@ -214,6 +226,7 @@ the stored `201` and creates nothing; the same key with a different body is
 | `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
 | `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
 | `land_acres` | number \| string \| null |  |  |
+| `campaign_id` | string \| null |  | Optional. An active campaign from GET /campaigns?active=true. Staff only. A lead from a QR code with a campaign gets it on its own. |
 
 **Responses**
 
@@ -355,6 +368,7 @@ narrow the filters. An empty list gives a file with the header row only.
 | `created_from` | query | string \| null |  | ISO date, inclusive. |
 | `created_to` | query | string \| null |  | ISO date, inclusive. |
 | `q` | query | string \| null |  | Name, mobile or inquiry number. |
+| `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
 | `sort` | query | `created_at` \| `farmer_name` \| `estimated_value` |  | The column to sort by. `farmer_name` ignores case; leads with no `estimated_value` come last in both orders. |
 | `order` | query | `asc` \| `desc` |  | asc or desc. |
 
@@ -393,6 +407,7 @@ column and its list always agree. Every stage is present, 0 when empty.
 | `created_from` | query | string \| null |  | ISO date, inclusive. |
 | `created_to` | query | string \| null |  | ISO date, inclusive. |
 | `q` | query | string \| null |  | Name, mobile or inquiry number. |
+| `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
 
 **Responses**
 
@@ -496,6 +511,7 @@ the change. A closed lead (won, lost, merged) is `422 stage_terminal`.
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
 | `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
 | `land_acres` | number \| string \| null |  | null clears it. |
+| `campaign_id` | string \| null |  | An active campaign; null clears it. The campaign already on the lead may be re-sent even if it has been switched off. |
 
 **Responses**
 
@@ -860,6 +876,9 @@ with the current stage in `fields.stage`.
 | `reopen_count` | integer | yes |  |
 | `dormant_from_stage` | string \| null | yes | Set while the lead is dormant: the stage Reopen returns it to (FS-035). |
 | `merged_into` | MergedRef \| null | yes | Set on a merged lead; links to the survivor. |
+| `campaign_id` | string \| null |  | The campaign that brought it (FS-040). |
+| `campaign_name` | string \| null |  | Its name. Null for a dealer, who does not read campaigns. |
+| `customer_id` | string \| null |  | The customer (FS-041), set when the lead reached qualified. |
 | `first_contacted_at` | string \| null | yes |  |
 | `last_activity_at` | string | yes |  |
 | `created_at` | string | yes |  |
@@ -900,6 +919,7 @@ with the current stage in `fields.stage`.
 | `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
 | `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
 | `land_acres` | number \| string \| null |  |  |
+| `campaign_id` | string \| null |  | Optional. An active campaign from GET /campaigns?active=true. Staff only. A lead from a QR code with a campaign gets it on its own. |
 
 **`LeadMerge`**
 
@@ -935,6 +955,7 @@ with the current stage in `fields.stage`.
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
 | `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
 | `land_acres` | number \| string \| null |  | null clears it. |
+| `campaign_id` | string \| null |  | An active campaign; null clears it. The campaign already on the lead may be re-sent even if it has been switched off. |
 
 **`LeadReopen`**
 
@@ -995,7 +1016,9 @@ with the current stage in `fields.stage`.
 | `code` | string | yes | Six characters, no look-alikes. |
 | `url` | string | yes | What the printed QR encodes; the frontend draws it. |
 | `label` | string | yes |  |
-| `campaign` | string \| null | yes |  |
+| `campaign` | string \| null | yes | The free-text label. |
+| `campaign_id` | string \| null |  | The linked campaign (FS-040). |
+| `campaign_name` | string \| null |  | Its name. |
 | `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
 | `territory` | TerritoryRef \| null | yes |  |
 | `is_active` | boolean | yes |  |
@@ -1007,7 +1030,8 @@ with the current stage in `fields.stage`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `label` | string | yes | What staff will recognise: the dealer, the stall, the leaflet. |
-| `campaign` | string \| null |  |  |
+| `campaign` | string \| null |  | A free-text label. |
+| `campaign_id` | string \| null |  | An active campaign (FS-040). Leads from this code take it. |
 | `partner_id` | string \| null |  | Leads from this code are assigned to this partner. |
 | `territory_id` | string \| null |  | Preselected in the form's picker. |
 
@@ -1023,6 +1047,7 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `label` | string \| null |  |  |
 | `campaign` | string \| null |  |  |
+| `campaign_id` | string \| null |  | An active campaign; null clears it. New leads take it; earlier leads keep theirs. |
 | `partner_id` | string \| null |  | New leads from this code go to this partner; earlier leads keep theirs. |
 | `territory_id` | string \| null |  | Preselected in the form's picker. |
 | `is_active` | boolean \| null |  | false switches the code off: the form then makes a plain website enquiry. |

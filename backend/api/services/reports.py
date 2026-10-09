@@ -28,6 +28,7 @@ from api.authz.modules import SPECS
 from api.authz.predicate import Caller, scope_predicate
 from api.domain import leads as lead_domain
 from api.domain import reports as domain
+from api.domain import sales as sales_domain
 from api.errors import ForbiddenError, NotFoundError, ValidationFailed
 from api.services import people
 from api.services.clock import today_ist
@@ -40,12 +41,14 @@ L = sa.table("lead", sa.column("id", _UUID), sa.column("created_at", _TS), sa.co
              sa.column("owner_user_id", _UUID), sa.column("owner_org_unit_id", _UUID),
              sa.column("territory_id", _UUID), sa.column("assigned_partner_id", _UUID),
              sa.column("lead_source_id", _UUID), sa.column("deleted_at", _TS), sa.column("won_at", _TS),
-             sa.column("lost_at", _TS), sa.column("lost_reason_id", _UUID), sa.column("lost_from_stage"),
-             sa.column("mobile"), sa.column("inquiry_no"), sa.column("merged_into_id", _UUID))
+             sa.column("lost_at", _TS), sa.column("lost_reason_id", _UUID), sa.column("lost_from_stage"), sa.column("dormant_from_stage"),
+             sa.column("mobile"), sa.column("inquiry_no"), sa.column("merged_into_id", _UUID),
+             sa.column("campaign_id", _UUID))
 ORD = sa.table("sales_order", sa.column("id", _UUID), sa.column("status"), sa.column("order_type"),
              sa.column("total", sa.Numeric), sa.column("submitted_at", _TS), sa.column("owner_user_id", _UUID),
              sa.column("owner_org_unit_id", _UUID), sa.column("territory_id", _UUID),
-             sa.column("partner_id", _UUID), sa.column("lead_id", _UUID), sa.column("deleted_at", _TS))
+             sa.column("partner_id", _UUID), sa.column("lead_id", _UUID), sa.column("deleted_at", _TS),
+             sa.column("approved_at", _TS), sa.column("fully_dispatched_at", _TS))
 Q = sa.table("quotation", sa.column("id", _UUID), sa.column("quote_no"), sa.column("sent_at", _TS),
              sa.column("owner_user_id", _UUID), sa.column("owner_org_unit_id", _UUID),
              sa.column("territory_id", _UUID), sa.column("partner_id", _UUID), sa.column("lead_id", _UUID),
@@ -69,7 +72,8 @@ P = sa.table("channel_partner", sa.column("id", _UUID), sa.column("parent_id", _
 SALE_TYPES = ("commercial", "industrial", "export", "subsidised")
 # the statuses an order is paid in (031 _PAYABLE)
 PAYABLE = ("submitted", "approved", "partially_dispatched", "dispatched", "closed_short")
-STAFF_ONLY = frozenset({"salesperson-performance", "follow-ups", "territory-performance"})
+STAFF_ONLY = frozenset({"salesperson-performance", "follow-ups", "territory-performance",
+                        "campaign-performance"})
 
 
 def _has(caller: Caller, module: str) -> bool:
@@ -94,6 +98,13 @@ class Filters:
         self.lo, self.hi = domain.instants(self.start, self.end)
         self.territories = _id_list(territory_id, "territory_id") if territory_id else []
         self.owner_id = owner_id
+        self.sale_mode: sales_domain.Mode = sales_domain.DEFAULT
+
+    async def load_sale_mode(self, db: AsyncSession) -> Filters:
+        """FS-026: the company's sale setting, read once per request."""
+        raw = (await db.execute(text("SELECT app_setting_text('sale_counted_at')"))).scalar_one()
+        self.sale_mode = sales_domain.mode_of(raw)
+        return self
 
     def area(self, column: Any) -> list[Any]:
         return [column.in_(_under("territory_closure", *self.territories))] if self.territories else []
@@ -106,7 +117,8 @@ class Filters:
 
     def out(self) -> dict[str, Any]:
         return {"from": self.start.isoformat(), "to": self.end.isoformat(),
-                "territory_id": self.territories or None, "owner_id": self.owner_id}
+                "territory_id": self.territories or None, "owner_id": self.owner_id,
+                "sale_counted_at": self.sale_mode}
 
 
 def _leads(caller: Caller, f: Filters) -> list[Any]:
@@ -114,10 +126,30 @@ def _leads(caller: Caller, f: Filters) -> list[Any]:
             sa.cast(L.c.stage, sa.Text) != "merged", *f.area(L.c.territory_id), *f.owner(L.c.owner_user_id)]
 
 
-def _orders(caller: Caller, f: Filters) -> list[Any]:
+def _sale_orders(caller: Caller) -> list[Any]:
+    """The scoped sale orders. Never a draft (rejected or amended) or a cancelled
+    order, nor a closed-short order with nothing shipped (FS-026 plan review B-2, B-3)."""
+    status = sa.cast(ORD.c.status, sa.Text)
     return [scope_predicate(SPECS["sales_orders"], caller, ORD), ORD.c.deleted_at.is_(None),
-            sa.cast(ORD.c.order_type, sa.Text).in_(SALE_TYPES), sa.cast(ORD.c.status, sa.Text) != "cancelled",
-            ORD.c.submitted_at.is_not(None), *f.area(ORD.c.territory_id), *f.owner(ORD.c.owner_user_id)]
+            sa.cast(ORD.c.order_type, sa.Text).in_(SALE_TYPES), status.notin_(("draft", "cancelled")),
+            sa.not_(sa.and_(status == "closed_short", ORD.c.fully_dispatched_at.is_(None))),
+            ORD.c.submitted_at.is_not(None)]
+
+
+def _orders(caller: Caller, f: Filters) -> list[Any]:
+    return [*_sale_orders(caller), *f.area(ORD.c.territory_id), *f.owner(ORD.c.owner_user_id)]
+
+
+def _sold_on(f: Filters) -> Any:
+    """The date an order counts as a sale under the company's setting (FS-026);
+    null exactly when it must not count, so the window drops it."""
+    name = sales_domain.DATE_OF[f.sale_mode]
+    return sa.func.order_paid_at(ORD.c.id) if name == "order_paid_at" else ORD.c[name]
+
+
+def _sales(caller: Caller, f: Filters) -> list[Any]:
+    """The orders that count as sales in the window."""
+    return [*_orders(caller, f), *f.window(_sold_on(f))]
 
 
 def _live_lead() -> list[Any]:
@@ -156,14 +188,15 @@ async def _partner_names(db: AsyncSession, ids: Sequence[str]) -> dict[str, str]
 _ORD = {s: i for i, s in enumerate(lead_domain.STAGES)}
 
 
-def _reached(stage: str, lost_from: str | None, k: str) -> bool:
-    """A stage at or past k, or lost from a stage at or past k (review B-4). A won
-    lead has passed every earlier stage (GAP-224)."""
+def _reached(stage: str, from_stage: str | None, k: str) -> bool:
+    """A stage at or past k, or lost or gone dormant from a stage at or past k
+    (review B-4; ISS-201: 040 keeps `dormant_from_stage`). A won lead has passed
+    every earlier stage (GAP-224)."""
     if stage == "won":
         return True
-    if stage == "lost":
-        return lost_from is not None and _ORD.get(lost_from, -1) >= _ORD[k]
-    return stage in _ORD and _ORD[stage] >= _ORD[k] and stage not in ("merged", "dormant")
+    if stage in ("lost", "dormant"):
+        return from_stage is not None and _ORD.get(from_stage, -1) >= _ORD[k]
+    return stage in _ORD and _ORD[stage] >= _ORD[k] and stage != "merged"
 
 
 async def lead_conversion(db: AsyncSession, caller: Caller, f: Filters, group_by: str) -> dict[str, Any]:
@@ -172,10 +205,11 @@ async def lead_conversion(db: AsyncSession, caller: Caller, f: Filters, group_by
     if key is None:
         raise ValidationFailed(fields={"group_by": "source, owner or territory"})
     rows = (await db.execute(sa.select(key.label("k"), sa.cast(L.c.stage, sa.Text).label("stage"),
-                                       sa.cast(L.c.lost_from_stage, sa.Text).label("lost_from"),
+                                       sa.cast(sa.func.coalesce(L.c.lost_from_stage, L.c.dormant_from_stage),
+                                               sa.Text).label("lost_from"),
                                        sa.func.count().label("n"))
                              .where(*_leads(caller, f), *f.window(L.c.created_at))
-                             .group_by(key, L.c.stage, L.c.lost_from_stage))).all()
+                             .group_by(key, L.c.stage, L.c.lost_from_stage, L.c.dormant_from_stage))).all()
     groups: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for r in rows:
         g = groups[str(r.k) if r.k else ""]
@@ -266,7 +300,7 @@ async def salesperson_performance(db: AsyncSession, caller: Caller, f: Filters) 
     if has_o:
         put((await db.execute(sa.select(ORD.c.owner_user_id.label("k"), sa.func.count().label("n"),
                                         sa.func.sum(ORD.c.total).label("v"))
-                              .where(*_orders(caller, f), *f.window(ORD.c.submitted_at))
+                              .where(*_sales(caller, f))
                               .group_by(ORD.c.owner_user_id))).all(), orders="n", order_value="v")
     if has_t:
         put((await db.execute(sa.select(T.c.assigned_to.label("k"),
@@ -342,7 +376,7 @@ async def dealer_performance(db: AsyncSession, caller: Caller, f: Filters) -> di
     _need(caller, "dealer-performance", "sales_orders", "partners")
     orders = (await db.execute(sa.select(ORD.c.partner_id.label("k"), sa.func.count().label("n"),
                                          sa.func.sum(ORD.c.total).label("v"))
-                               .where(*_orders(caller, f), ORD.c.partner_id.is_not(None), *f.window(ORD.c.submitted_at))
+                               .where(*_sales(caller, f), ORD.c.partner_id.is_not(None))
                                .group_by(ORD.c.partner_id))).all()
     per: dict[str, dict[str, Any]] = defaultdict(dict)
     for r in orders:
@@ -401,6 +435,96 @@ async def dealer_performance(db: AsyncSession, caller: Caller, f: Filters) -> di
                        "order_value": _money(sum(Decimal(r["order_value"]) for r in out))}}
 
 
+# ── campaign performance (FS-040) ───────────────────────────────────────────
+
+async def campaign_figures(db: AsyncSession, caller: Caller, f: Filters, *, windowed: bool,
+                           ids: Sequence[str] | None = None, sales: bool = True
+                           ) -> dict[str, dict[str, Any]]:
+    """Per campaign: the scoped leads that name it (created in the window when
+    `windowed`), how far they got, and their orders that count as sales under the
+    company's setting, whenever sold (rule 6). Sales are absent without sales_orders."""
+    lw = [*_leads(caller, f), L.c.campaign_id.is_not(None)]
+    if windowed:
+        lw += f.window(L.c.created_at)
+    if ids is not None:
+        lw.append(L.c.campaign_id.in_(list(ids)))
+    per: dict[str, dict[str, Any]] = defaultdict(lambda: defaultdict(int))
+    rows = (await db.execute(sa.select(L.c.campaign_id.label("k"), sa.cast(L.c.stage, sa.Text).label("stage"),
+                                       sa.cast(sa.func.coalesce(L.c.lost_from_stage, L.c.dormant_from_stage),
+                                               sa.Text).label("lost_from"),
+                                       sa.func.count().label("n"))
+                             .where(*lw)
+                             .group_by(L.c.campaign_id, L.c.stage, L.c.lost_from_stage, L.c.dormant_from_stage))).all()
+    for r in rows:
+        g = per[str(r.k)]
+        g["leads"] += r.n
+        g["qualified"] += r.n if _reached(r.stage, r.lost_from, "qualified") else 0
+        g["won"] += r.n if r.stage == "won" else 0
+        g["lost"] += r.n if r.stage == "lost" else 0
+    if sales and _has(caller, "sales_orders") and per:
+        sold = (await db.execute(sa.select(L.c.campaign_id.label("k"), sa.func.count(ORD.c.id).label("n"),
+                                            sa.func.sum(ORD.c.total).label("v"))
+                                  .select_from(ORD.join(L, L.c.id == ORD.c.lead_id))
+                                  # the area and owner pick the leads; an order on one counts
+                                  # wherever it was raised (FS-040 edge case 6)
+                                  .where(*lw, *_sale_orders(caller), _sold_on(f).is_not(None))
+                                  .group_by(L.c.campaign_id))).all()
+        for r in sold:
+            per[str(r.k)].update(sales_count=r.n, sales_value=r.v)
+    return per
+
+
+def campaign_cost(planned: Any, actual: Any) -> Decimal:
+    """Rule 7: the actual cost once entered, else the planned one."""
+    return Decimal(actual if actual is not None else planned or 0)
+
+
+def per_unit(cost: Decimal | None, n: int) -> str | None:
+    return _money(cost / n) if cost is not None and n else None
+
+
+async def campaign_performance(db: AsyncSession, caller: Caller, f: Filters) -> dict[str, Any]:
+    _need(caller, "campaign-performance", "leads")
+    per = await campaign_figures(db, caller, f, windowed=True)
+    # a campaign whose dates overlap the window shows with zeros, so money spent for
+    # nothing is visible. No end date is a one-day campaign (edge case 4). Under an area
+    # filter: campaigns over it, under it or with no area (edge case 11). An owner filter
+    # is about leads, so it shows only campaigns with some.
+    overlap = "" if f.owner_id else (
+        " OR (c.start_date <= :hi AND coalesce(c.end_date, c.start_date) >= :lo"
+        + (" AND (c.territory_id IS NULL OR EXISTS (SELECT 1 FROM territory_closure tc "
+           "WHERE tc.ancestor_id = ANY(CAST(:t AS uuid[])) AND tc.descendant_id = c.territory_id "
+           "OR tc.descendant_id = ANY(CAST(:t AS uuid[])) AND tc.ancestor_id = c.territory_id)))"
+           if f.territories else ")"))
+    camps = (await db.execute(text(
+        "SELECT c.id::text AS id, c.name::text AS name, c.type, c.start_date, c.end_date, c.is_active, "
+        "c.cost_planned, c.cost_actual FROM campaign c "
+        f"WHERE c.id = ANY(CAST(:ids AS uuid[])){overlap}"),
+        {"ids": list(per), "lo": f.start, "hi": f.end, "t": f.territories})).all()
+    see_cost, see_sales = _has(caller, "campaigns"), _has(caller, "sales_orders")
+    out = []
+    for c in camps:
+        g = per.get(c.id) or defaultdict(int)
+        cost = campaign_cost(c.cost_planned, c.cost_actual) if see_cost else None
+        out.append({
+            "campaign": {"id": c.id, "name": c.name, "type": c.type, "start_date": c.start_date.isoformat(),
+                         "end_date": c.end_date.isoformat() if c.end_date else None, "is_active": c.is_active},
+            "leads": g["leads"], "qualified": g["qualified"], "won": g["won"], "lost": g["lost"],
+            "open": g["leads"] - g["won"] - g["lost"], "conversion_pct": str(domain.pct(g["won"], g["leads"])),
+            "sales_count": g["sales_count"] if see_sales else None,
+            "sales_value": _money(g.get("sales_value")) if see_sales else None,
+            "cost_planned": _money(c.cost_planned) if see_cost else None,
+            "cost_actual": _money(c.cost_actual) if see_cost and c.cost_actual is not None else None,
+            "cost": _money(cost) if cost is not None else None,
+            "cost_per_lead": per_unit(cost, g["leads"]), "cost_per_won": per_unit(cost, g["won"])})
+    out.sort(key=lambda r: (-r["leads"], r["campaign"]["name"].lower()))
+    page, cut = _page(out)
+    totals: dict[str, Any] = {"leads": sum(r["leads"] for r in out), "won": sum(r["won"] for r in out),
+                              "sales_value": _money(sum(Decimal(r["sales_value"]) for r in out)) if see_sales else None,
+                              "cost": _money(sum(Decimal(r["cost"]) for r in out)) if see_cost else None}
+    return {"rows": page, "truncated": cut, "filters": f.out(), "totals": totals}
+
+
 # ── territory performance ───────────────────────────────────────────────────
 
 async def territory_performance(db: AsyncSession, caller: Caller, f: Filters, level: str) -> dict[str, Any]:
@@ -423,7 +547,7 @@ async def territory_performance(db: AsyncSession, caller: Caller, f: Filters, le
     if has_o:
         for r in (await db.execute(sa.select(area.c.at.label("k"), sa.func.count().label("n"), sa.func.sum(ORD.c.total).label("v"))
                                    .select_from(ORD.outerjoin(area, area.c.leaf == ORD.c.territory_id))
-                                   .where(*_orders(caller, f), *f.window(ORD.c.submitted_at)).group_by(area.c.at))).all():
+                                   .where(*_sales(caller, f)).group_by(area.c.at))).all():
             per[str(r.k)].update(orders=r.n, order_value=r.v)
     labels = await _labels(db, "territory", [k for k in per if k != "None"])
     labels["None"] = "Above this level"
@@ -486,9 +610,14 @@ async def lead_360(db: AsyncSession, caller: Caller, lead_id: str) -> dict[str, 
                           {"l": lead_id})).scalar_one() if _has(caller, "quotations") else None
     orders = None
     if _has(caller, "sales_orders"):
+        mode = (await Filters(start=None, end=None, territory_id=None, owner_id=None).load_sale_mode(db)).sale_mode
+        name = sales_domain.DATE_OF[mode]
+        sold = "order_paid_at(id)" if name == "order_paid_at" else name   # from a fixed map, never input
         orders = (await db.execute(text(
             "SELECT count(*) AS n, COALESCE(sum(total), 0) AS v FROM sales_order WHERE lead_id = CAST(:l AS uuid) "
-            "AND deleted_at IS NULL AND status <> 'cancelled' AND submitted_at IS NOT NULL"), {"l": lead_id})).one()
+            "AND deleted_at IS NULL AND status NOT IN ('draft', 'cancelled') "
+            "AND NOT (status = 'closed_short' AND fully_dispatched_at IS NULL) "
+            f"AND {sold} IS NOT NULL"), {"l": lead_id})).one()
     received = None
     if _has(caller, "payments"):
         received = (await db.execute(text(

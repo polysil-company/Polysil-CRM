@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from pydantic import AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field
 
 from api.domain import tasks as domain
-from api.schemas.leads import UUID_RE, PageMeta, UserRef
+from api.schemas.leads import UUID_RE, PageMeta, PartnerRef, UserRef
 
 TaskType = Literal["call", "visit", "meeting", "followup", "other"]
 TaskStatus = Literal["open", "done", "cancelled"]
@@ -187,3 +187,11 @@ class Minutes(BaseModel):
     created_by: UserRef | None
     created_at: str
     action_items: list[Task] = Field(description="Each action item's task, as it stands now.")
+
+
+class TaskAssignee(BaseModel):
+    """The assignee picker's row (FS-037): staff, or a dealer's user."""
+    id: str
+    full_name: str
+    kind: Literal["staff", "partner"] = "staff"
+    partner: PartnerRef | None = Field(default=None, description="The dealer, for a partner user.")

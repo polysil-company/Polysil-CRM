@@ -108,7 +108,7 @@ SELECT q.id, q.quote_no, q.version, q.status, q.sales_type, q.source,
        CASE WHEN q.status = 'draft' THEN sst.code ELSE q.seller_state_code END AS seller_state_code,
        q.place_of_supply_territory_id, pt.name AS pos_name, pt.level AS pos_level,
        ps.code AS pos_state_code,
-       q.intra_state, q.price_effective_date,
+       q.intra_state, q.price_effective_date, q.tax_treatment, q.export_country, q.lut_arn,
        q.price_list_id, pl.name AS price_list_name,
        q.gross, q.discount, q.taxable, q.cgst, q.sgst, q.igst, q.total,
        q.is_provisional, q.terms, q.valid_until, q.sent_at, q.viewed_at, q.open_count,
@@ -225,7 +225,8 @@ async def _lock_quotation(db: AsyncSession, quotation_id: str) -> Any:
         "SELECT id, lead_id, quote_no, version, status::text AS status, sales_type::text AS "
         "sales_type, supersedes_id, superseded_by_id, valid_until, partner_id, "
         "place_of_supply_territory_id, seller_gstin_id, price_effective_date, party_name, "
-        "party_mobile, party_address, party_gstin, terms, deleted_at, pdf_state, pdf_key "
+        "party_mobile, party_address, party_gstin, terms, deleted_at, pdf_state, pdf_key, "
+        "tax_treatment, export_country, territory_id "
         "FROM quotation WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL FOR UPDATE"),
         {"id": quotation_id})).one_or_none()
     if row is None:
@@ -250,6 +251,39 @@ def _check_sales_type(sales_type: str) -> None:
         why = domain.SALES_TYPE_BLOCKED_ON[sales_type]
         raise ValidationFailed(f"{sales_type} quotations are not built yet: {why}.",
                                code="sales_type_unsupported", fields={"sales_type": sales_type})
+
+
+async def _export_treatment(db: AsyncSession) -> str:
+    """FS-042 rule 5: read once, when an export is created or a draft becomes one."""
+    setting: str = (await db.execute(text("SELECT app_setting_text('export_tax_treatment')"))
+               ).scalar_one()
+    return order_domain.treatment_for("export", str(setting))
+
+
+def _check_export(sales_type: str, country: str | None, party_gstin: str | None) -> None:
+    problems = order_domain.export_problems(sales_type, country, party_gstin)
+    if problems:
+        code = next(iter(problems.values()))[0]
+        raise ValidationFailed(fields={k: m for k, (_, m) in problems.items()}, code=code)
+
+
+async def _export_pos(db: AsyncSession, seller: str | None, day: dt.date | None) -> str:
+    """Rule 7: priced from the seller's state, stored as the place of supply."""
+    _, state, _ = await pricing.seller_state(db, gstin_id=seller, as_of=day or today_ist())
+    return state
+
+
+async def _lut(db: AsyncSession, treatment: str, ctx: PricedContext) -> str | None:
+    """Rule 4: a quotation is taxed at its price date, so the LUT must cover it."""
+    if treatment != "export_lut":
+        return None
+    arn: str | None = (await db.execute(text("SELECT seller_gstin_lut_on(CAST(:g AS uuid), :d)"),
+                                        {"g": ctx.seller_gstin_id, "d": ctx.as_of})).scalar_one()
+    if arn is None:
+        raise ValidationFailed(f"No LUT of the seller registration covers {ctx.as_of}. Record "
+                               f"the year's LUT under Seller GSTINs.", code="lut_missing",
+                               fields={"seller_gstin_id": ctx.seller_gstin_id})
+    return arn
 
 
 def _party_from(lead: Any) -> dict[str, Any]:
@@ -285,11 +319,13 @@ async def _lead_defaults(db: AsyncSession, lead_id: str) -> Any:
 
 async def _price(db: AsyncSession, *, partner_id: str | None, pos_territory_id: str,
                  seller_gstin_id: str | None, as_of: dt.date | None,
-                 specs: list[LineSpec], existing: bool) -> PricedContext:
+                 specs: list[LineSpec], existing: bool,
+                 treatment: str = "domestic") -> PricedContext:
     try:
         return await pricing.price_document(
             db, partner_id=partner_id, place_of_supply_territory_id=pos_territory_id,
-            seller_gstin_id=seller_gstin_id, as_of=as_of, lines=specs, existing=existing)
+            seller_gstin_id=seller_gstin_id, as_of=as_of, lines=specs, existing=existing,
+            tax_treatment=treatment)
     except ValidationFailed as exc:
         # the pipeline speaks the preview's field name; a quotation's is
         # price_effective_date, and a screen attaches errors by field (PR #10 review)
@@ -522,7 +558,9 @@ def _to_quotation(row: Any, line_rows: list[Any], settings: Settings,
             territory=TerritoryRef(id=str(row.place_of_supply_territory_id), name=row.pos_name,
                                    level=row.pos_level),
             state=row.pos_state_code),
-        intra_state=row.intra_state, price_effective_date=row.price_effective_date.isoformat(),
+        intra_state=row.intra_state, tax_treatment=row.tax_treatment,
+        export_country=row.export_country, lut_arn=row.lut_arn,
+        price_effective_date=row.price_effective_date.isoformat(),
         price_list=(sch.PriceListRef(id=str(row.price_list_id), name=row.price_list_name)
                     if row.price_list_id and row.price_list_name else None),
         price_list_ids=sorted({ln.price_list_id for ln in lines}),
@@ -779,11 +817,17 @@ async def create_quotation(db: AsyncSession, caller: Caller, body: sch.Quotation
         str(lead.assigned_partner_id) if lead.assigned_partner_id else None)
     pos_territory = body.place_of_supply_territory_id or str(lead.territory_id)
     party = _party_values(body.party or _party_from(lead))
+    _check_export(sales_type, body.export_country, party["party_gstin"])
+    treatment = "domestic"
+    if sales_type == "export":
+        treatment = await _export_treatment(db)
+        pos_territory = await _export_pos(db, body.seller_gstin_id, body.price_effective_date)
 
     ctx = await _price(db, partner_id=partner_id, pos_territory_id=pos_territory,
                        seller_gstin_id=body.seller_gstin_id, as_of=body.price_effective_date,
-                       specs=_specs_from_body(body.lines), existing=False)
+                       specs=_specs_from_body(body.lines), existing=False, treatment=treatment)
     _compare(body.lines, ctx)
+    arn = await _lut(db, treatment, ctx)
 
     try:
         quotation_id: Any = (await db.execute(text("""
@@ -791,19 +835,21 @@ async def create_quotation(db: AsyncSession, caller: Caller, body: sch.Quotation
                 owner_org_unit_id, territory_id, party_name, party_mobile, party_address,
                 party_gstin, seller_gstin_id, place_of_supply_territory_id,
                 place_of_supply_state_id, intra_state, price_effective_date, terms,
-                created_by, updated_by)
+                created_by, updated_by, tax_treatment, export_country, lut_arn)
             VALUES (CAST(:lead AS uuid), CAST(:st AS quotation_sales_type), CAST(:p AS uuid),
                 CAST(:ou AS uuid), CAST(:oou AS uuid), CAST(:terr AS uuid),
                 :party_name, :party_mobile, :party_address, :party_gstin,
                 CAST(:sg AS uuid), CAST(:pos AS uuid), CAST(:ps AS uuid), :intra, :day, :terms,
-                CAST(:me AS uuid), CAST(:me AS uuid))
+                CAST(:me AS uuid), CAST(:me AS uuid), :tt, :ec, :arn)
             RETURNING id"""),
             {"lead": body.lead_id, "st": sales_type, "p": ctx.partner_id,
              "ou": str(lead.owner_user_id) if lead.owner_user_id else None,
              "oou": str(lead.owner_org_unit_id), "terr": str(lead.territory_id),
              **party, "sg": ctx.seller_gstin_id, "pos": pos_territory,
              "ps": ctx.place_of_supply_state_id, "intra": ctx.intra_state, "day": ctx.as_of,
-             "terms": body.terms, "me": caller.user_id})).scalar_one()
+             "terms": body.terms, "me": caller.user_id, "tt": treatment,
+             "ec": body.export_country.strip() if body.export_country else None,
+             "arn": arn})).scalar_one()
     except DBAPIError as exc:
         raise _map_write_error(exc) from exc
     await _write_lines(db, quotation_id, ctx)
@@ -861,11 +907,30 @@ async def patch_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     day = body.price_effective_date or row.price_effective_date
     party = _party_values(body.party) if body.party else None
     terms = body.terms if "terms" in body.model_fields_set else row.terms
+    # FS-042 rule 5: the stored treatment, unless the draft becomes or stops being an export
+    if sales_type != "export":
+        treatment = "domestic"
+    elif row.sales_type == "export":
+        treatment = row.tax_treatment
+    else:
+        treatment = await _export_treatment(db)
+    if "export_country" in body.model_fields_set:
+        country = body.export_country
+    else:
+        country = row.export_country if sales_type == "export" else None
+    _check_export(sales_type, country, party["party_gstin"] if party else row.party_gstin)
+    if treatment != "domestic":
+        pos_territory = await _export_pos(db, seller, day)
+    elif row.sales_type == "export" and not body.place_of_supply_territory_id:
+        # code review F-1: the seller's state was the place of supply for pricing only;
+        # a draft leaving export goes back to the lead's territory
+        pos_territory = str(row.territory_id)
 
     stored = await _stored_lines(db, row.id)
     ctx = await _price(db, partner_id=partner_id, pos_territory_id=pos_territory,
                        seller_gstin_id=seller, as_of=day, specs=_specs_from_rows(stored),
-                       existing=True)
+                       existing=True, treatment=treatment)
+    arn = await _lut(db, treatment, ctx)
     try:
         await db.execute(text("""
             UPDATE quotation SET sales_type = CAST(:st AS quotation_sales_type),
@@ -874,9 +939,11 @@ async def patch_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                 party_name = COALESCE(:party_name, party_name),
                 party_mobile = COALESCE(:party_mobile, party_mobile),
                 party_address = CASE WHEN :party_given THEN :party_address ELSE party_address END,
-                party_gstin = CASE WHEN :party_given THEN :party_gstin ELSE party_gstin END
+                party_gstin = CASE WHEN :party_given THEN :party_gstin ELSE party_gstin END,
+                tax_treatment = :tt, export_country = :ec, lut_arn = :arn
             WHERE id = CAST(:q AS uuid)"""),
             {"st": sales_type, "p": ctx.partner_id, "pos": pos_territory, "terms": terms,
+             "tt": treatment, "ec": country.strip() if country else None, "arn": arn,
              "me": caller.user_id, "party_given": party is not None,
              "party_name": party["party_name"] if party else None,
              "party_mobile": party["party_mobile"] if party else None,
@@ -907,7 +974,8 @@ async def replace_lines(db: AsyncSession, caller: Caller, quotation_id: str,
     ctx = await _price(db, partner_id=str(row.partner_id) if row.partner_id else None,
                        pos_territory_id=str(row.place_of_supply_territory_id),
                        seller_gstin_id=str(row.seller_gstin_id), as_of=row.price_effective_date,
-                       specs=_specs_from_body(body.lines), existing=False)
+                       specs=_specs_from_body(body.lines), existing=False,
+                       treatment=row.tax_treatment)
     _compare(body.lines, ctx)
     await _write_lines(db, row.id, ctx)
     await _write_header_figures(db, row.id, ctx)
@@ -967,7 +1035,8 @@ async def send_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     ctx = await _price(db, partner_id=str(row.partner_id) if row.partner_id else None,
                        pos_territory_id=str(row.place_of_supply_territory_id),
                        seller_gstin_id=str(row.seller_gstin_id), as_of=row.price_effective_date,
-                       specs=_specs_from_rows(stored), existing=True)
+                       specs=_specs_from_rows(stored), existing=True,
+                       treatment=row.tax_treatment)
     _compare_stored(stored, ctx)
     gate: str = (await db.execute(text("SELECT quotation_send_gate(CAST(:q AS uuid))"),
                              {"q": quotation_id})).scalar_one()
@@ -1152,19 +1221,23 @@ async def revise_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     ctx = await _price(db, partner_id=str(src.partner_id) if src.partner_id else None,
                        pos_territory_id=str(src.place_of_supply_territory_id),
                        seller_gstin_id=str(src.seller_gstin_id), as_of=body.price_effective_date,
-                       specs=_specs_from_rows(stored), existing=True)
+                       specs=_specs_from_rows(stored), existing=True,
+                       treatment=src.tax_treatment)
+    # rule 5: the treatment as it was; the ARN looked up again at the new price date
+    arn = await _lut(db, src.tax_treatment, ctx)
     try:
         new_id: Any = (await db.execute(text("""
             INSERT INTO quotation (quote_no, version, supersedes_id, lead_id, sales_type,
                 partner_id, owner_user_id, owner_org_unit_id, territory_id, party_name,
                 party_mobile, party_address, party_gstin, seller_gstin_id,
                 place_of_supply_territory_id, place_of_supply_state_id, intra_state,
-                price_effective_date, terms, created_by, updated_by)
+                price_effective_date, terms, created_by, updated_by, tax_treatment,
+                export_country, lut_arn)
             VALUES (:no, :ver, CAST(:src AS uuid), CAST(:lead AS uuid),
                 CAST(:st AS quotation_sales_type), CAST(:p AS uuid), CAST(:ou AS uuid),
                 CAST(:oou AS uuid), CAST(:terr AS uuid), :pn, :pm, :pa, :pg, CAST(:sg AS uuid),
                 CAST(:pos AS uuid), CAST(:ps AS uuid), :intra, :day, :terms,
-                CAST(:me AS uuid), CAST(:me AS uuid))
+                CAST(:me AS uuid), CAST(:me AS uuid), :tt, :ec, :arn)
             RETURNING id"""),
             {"no": src.quote_no, "ver": next_version, "src": quotation_id, "lead": lead_id,
              "st": src.sales_type, "p": ctx.partner_id,
@@ -1174,7 +1247,8 @@ async def revise_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
              "pg": src.party_gstin, "sg": ctx.seller_gstin_id,
              "pos": str(src.place_of_supply_territory_id), "ps": ctx.place_of_supply_state_id,
              "intra": ctx.intra_state, "day": ctx.as_of, "terms": src.terms,
-             "me": caller.user_id})).scalar_one()
+             "me": caller.user_id, "tt": src.tax_treatment, "ec": src.export_country,
+             "arn": arn})).scalar_one()
     except DBAPIError as exc:
         raise _map_write_error(exc) from exc
     await _write_lines(db, new_id, ctx, snapshots=stored)
