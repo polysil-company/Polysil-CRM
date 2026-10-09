@@ -292,6 +292,18 @@ axe found nothing. Not yet checked on the dev API. Screens: [stages](screenshots
   - Filters: status, stage and search, in the URL; Show more; Download Excel.
   - 🧪 👀
 
+Subsidy masters and state schemes (PR #PRNUM, stacked on #79; [changelog](../changelog/entries/2026-10-10--feature--SUBS-012--subsidy-masters-and-state-schemes.md)). Walked through in the mock as an Admin: the GGRC overview; setting up UPMIS for Uttar Pradesh with Drip and Sprinkler, its readiness, and opening the unit-cost tab from it; the overview and the switch-off confirm on a 360 px phone in dark mode, with no sideways scroll. axe found nothing on any of them. Not yet checked on the dev API. Screens: [overview](screenshots/subsidy/masters-overview-desktop-light.jpg), [new scheme](screenshots/subsidy/masters-new-scheme-desktop-light.jpg), [not ready](screenshots/subsidy/masters-not-ready-desktop-light.jpg), [empty matrix tab](screenshots/subsidy/masters-empty-matrix-desktop-light.jpg), [phone, dark](screenshots/subsidy/masters-overview-phone-dark.jpg), [switch off, phone](screenshots/subsidy/masters-switch-off-phone-dark.jpg).
+
+- **SUBS-014 · A scheme's overview** (Admin → Subsidy masters, staff with `masters`; others see it read-only): pick the scheme (`?scheme=`) and a date (`?on=`).
+  - Each system says "Can calculate", or lists what a calculation would refuse on, each with Open to the tab that fills it.
+  - Stages in order; Rename refuses an empty or unchanged name.
+  - Switch off / on after a confirm naming the applications.
+  - 🧪 👀
+- **SUBS-014 · New scheme:** code (2 to 20 of A-Z, 0-9, _), name, state, template and systems. A taken code and a state with a scheme are marked on their fields. It opens on its overview, not ready. While an active scheme has no state, a banner asks to link it first and New scheme stays off. 🧪 👀
+- **SUBS-012 · Tables:** the rows in force on the date; Revise from a date sends only changed rows, from today or later; an empty table offers Add rows from a date; a refusal lands on its row. 🧪
+- **SUBS-013 · Matrices:** each as a grid with Copy as grid; New matrix from blank or from the one in force, pasted from Excel, each bad cell named. 🧪
+- **SUBS-014 · The calculator's scheme picker:** shown once two schemes are active; a scheme's own systems only. 🧪 👀
+
 ---
 
 ## Dashboard, notifications, messages

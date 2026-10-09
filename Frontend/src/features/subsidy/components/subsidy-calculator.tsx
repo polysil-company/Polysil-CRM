@@ -2,7 +2,7 @@
 
 import { Add01Icon, Calculator01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { parseAsStringLiteral, useQueryState } from "nuqs";
+import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 
@@ -11,9 +11,19 @@ import { ErrorState } from "@/components/patterns/error-state";
 import { Notice } from "@/components/patterns/notice";
 import { QueryView } from "@/components/patterns/query-view";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { schemeListQueryOptions } from "@/features/subsidy/api/subsidy-schemes.queries";
+import type { SchemeRow } from "@/features/subsidy/api/subsidy-schemes.schemas";
 import {
   subsidyCategoriesQueryOptions,
   subsidyConfigQueryOptions,
@@ -63,15 +73,20 @@ function unplacedProblems(problems: DraftProblems): string[] {
  * SUBS-002 · The subsidy calculator. Drip, Mini Sprinkler and Sprinkler are three screens, each
  * shaped by `GET /subsidy/config` rather than hard-coded: how many crop blocks, whether there is
  * a head unit or a group, which areas Sprinkler takes. Each keeps its own inputs while the
- * designer moves between them. Nothing is saved.
+ * designer moves between them. Nothing is saved. Where more than one state's scheme is active,
+ * the designer picks the scheme to calculate under (SUBS-014); none picked is the backend's
+ * default.
  */
 export function SubsidyCalculator(): React.JSX.Element {
   const [systemType, setSystemType] = useQueryState(
     "system",
     parseAsStringLiteral(SYSTEM_TYPES).withDefault("drip"),
   );
-  const config = useQuery(subsidyConfigQueryOptions());
-  const crops = useQuery(subsidyCropsQueryOptions());
+  const [scheme, setScheme] = useQueryState("scheme", parseAsString);
+  const schemes = useQuery(schemeListQueryOptions());
+  const config = useQuery(subsidyConfigQueryOptions(scheme));
+  const crops = useQuery(subsidyCropsQueryOptions(scheme));
+  const active = (schemes.data ?? []).filter((row) => row.active);
   const [drafts, setDrafts] = useState<Drafts>(() => ({
     drip: emptyDraft("drip"),
     mini_sprinkler: emptyDraft("mini_sprinkler"),
@@ -84,6 +99,15 @@ export function SubsidyCalculator(): React.JSX.Element {
         Enter the design as you would on the scheme&apos;s sheet. The figures come from the
         scheme&apos;s masters in force today and update as you type.
       </p>
+      {active.length > 1 ? (
+        <SchemePicker
+          schemes={active}
+          value={scheme}
+          onChange={(next) => {
+            void setScheme(next);
+          }}
+        />
+      ) : null}
       <QueryView
         query={config}
         pending={<SubsidyCalculatorSkeleton />}
@@ -133,6 +157,7 @@ export function SubsidyCalculator(): React.JSX.Element {
                       onDraftChange={(next) => {
                         setDrafts((current) => ({ ...current, [type]: next }));
                       }}
+                      scheme={scheme}
                     />
                   )}
                 </TabsContent>
@@ -142,6 +167,47 @@ export function SubsidyCalculator(): React.JSX.Element {
         )}
       </QueryView>
     </div>
+  );
+}
+
+/** SUBS-014 · Which state's scheme to calculate under; the first active one stands for none. */
+function SchemePicker({
+  schemes,
+  value,
+  onChange,
+}: {
+  schemes: readonly SchemeRow[];
+  value: string | null;
+  onChange: (next: string | null) => void;
+}): React.JSX.Element {
+  const fallback = schemes[0]?.code ?? "";
+  const items = schemes.map((row) => ({
+    value: row.code,
+    label: `${row.code} · ${row.state?.name ?? row.name}`,
+  }));
+  return (
+    <Field className="sm:w-72">
+      <FieldLabel htmlFor="calculator-scheme">Scheme</FieldLabel>
+      <Select
+        items={items}
+        value={value ?? fallback}
+        onValueChange={(next) => {
+          if (typeof next !== "string") return;
+          onChange(next === fallback ? null : next);
+        }}
+      >
+        <SelectTrigger id="calculator-scheme" className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
   );
 }
 

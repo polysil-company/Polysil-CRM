@@ -21,6 +21,8 @@ import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
 import { generateQuotations } from "./data/quotations";
+import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
+import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
 
 export interface MockDb {
@@ -103,6 +105,13 @@ export interface MockDb {
   subsidyFiles: Map<string, File>;
   /** POST /subsidy-applications replays: Idempotency-Key → the request and the application. */
   subsidyWrites: Map<string, { body: string; applicationId: string }>;
+  /**
+   * Each scheme's subsidy masters and matrices, every revision kept with its window (SUBS-012,
+   * SUBS-013), by scheme code.
+   */
+  subsidyMasters: Map<string, MockSubsidyMasters>;
+  /** The subsidy schemes, one per state (SUBS-014). */
+  subsidySchemes: MockScheme[];
   /** How many events the mock has written, for their ids. */
   writtenEvents: number;
 }
@@ -165,6 +174,8 @@ function createMockDb(): MockDb {
     subsidyDocuments: new Map(),
     subsidyFiles: new Map(),
     subsidyWrites: new Map(),
+    subsidyMasters: new Map([[MOCK_DEFAULT_SCHEME, seedSubsidyMasters()]]),
+    subsidySchemes: seedSubsidySchemes(),
     writtenEvents: 1,
   };
 }
