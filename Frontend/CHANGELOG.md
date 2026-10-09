@@ -394,6 +394,7 @@ axe found nothing on any of these. `npm run build` passes, the prerendered calcu
 #### Before
 
 Applications could be worked one at a time (#78), but no report showed the state of the business. The backend serves the client's three reports (FS-009a, handover `subsidy-reports-and-masters.md`), each with an Excel export:
+
 - the six ageing figures per application;
 - the stage dashboard;
 - supply by district.
