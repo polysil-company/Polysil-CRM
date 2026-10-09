@@ -74,6 +74,9 @@ class LeadCreate(BaseModel):
         description="Optional. Becomes the first entry on the lead's timeline.")]
     crops: CropCodes = Field(default_factory=list)
     land_acres: Acres | None = None
+    campaign_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
+        description="Optional. An active campaign from GET /campaigns?active=true. "
+        "Staff only. A lead from a QR code with a campaign gets it on its own.")]
 
 
 class UserRef(BaseModel):
@@ -154,6 +157,12 @@ class Lead(BaseModel):
         description="Set while the lead is dormant: the stage Reopen returns it to (FS-035).")
     merged_into: MergedRef | None = Field(
         description="Set on a merged lead; links to the survivor.")
+    campaign_id: str | None = Field(default=None,
+                                    description="The campaign that brought it (FS-040).")
+    campaign_name: str | None = Field(
+        default=None, description="Its name. Null for a dealer, who does not read campaigns.")
+    customer_id: str | None = Field(
+        default=None, description="The customer (FS-041), set when the lead reached qualified.")
     first_contacted_at: str | None
     last_activity_at: str
     created_at: str
@@ -360,6 +369,9 @@ class LeadPatch(BaseModel):
         description="Replaces the list. [] clears it; null is refused. A switched-off crop "
         "already on the lead may be sent again.")]
     land_acres: Acres | None = Field(default=None, description="null clears it.")
+    campaign_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
+        description="An active campaign; null clears it. The campaign already on the lead "
+        "may be re-sent even if it has been switched off.")]
 
 
 # ── duplicates ───────────────────────────────────────────────────────────────

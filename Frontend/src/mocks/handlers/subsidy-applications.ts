@@ -380,6 +380,13 @@ const stageSchema = z.object({
 
 const cancelSchema = z.object({ reason: z.string().trim().min(1).max(500) });
 
+/** The mock's one scheme: every lead's state runs GGRC. */
+const MOCK_SCHEME = {
+  code: "GGRC",
+  name: "Gujarat Green Revolution Company",
+  ready: true,
+} as const;
+
 /** The backend's per-type checks on a stage's values. */
 function valueProblems(
   stage: MockStageDef,
@@ -411,6 +418,15 @@ function valueProblems(
 const base = (rest = ""): string => buildApiUrl(`/subsidy-applications${rest}`);
 
 export const subsidyApplicationHandlers = [
+  http.get(buildApiUrl("/subsidy-schemes/for-lead/:leadId"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!caller().view) return forbidden();
+    const lead = mockDb.leads.find((item) => item.id === params.leadId);
+    if (lead === undefined) return errorResponse(404, "not_found", "No such visible lead.");
+    return HttpResponse.json({ data: MOCK_SCHEME });
+  }),
+
   http.get(buildApiUrl("/subsidy-stages"), async () => {
     const { failure } = await applyScenario();
     if (failure) return failure;
@@ -538,6 +554,9 @@ export const subsidyApplicationHandlers = [
           Object.entries(checked.fields).map(([path, reason]) => [`calculation.${path}`, reason]),
         ),
       );
+    }
+    if ((checked.body.scheme ?? MOCK_SCHEME.code) !== MOCK_SCHEME.code) {
+      return invalid({ "calculation.scheme": "not the lead's scheme" });
     }
     if (checked.body.system_type !== system) {
       return invalid({ "calculation.system_type": "must be the lead's system" });

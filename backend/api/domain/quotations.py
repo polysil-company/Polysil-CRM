@@ -36,12 +36,12 @@ REVISABLE: frozenset[str] = frozenset({"sent", "viewed", "negotiation", "rejecte
 # rule 9, the client's answer of 4 Sep
 VALIDITY_DAYS = 45
 
-# rule 18: the two sales types priced today; the other four name their question
-SALES_TYPES_ACCEPTED: frozenset[str] = frozenset({"commercial", "industrial"})
+# rule 18: the sales types priced today; the other three name their question.
+# FS-042 added export, on a setting standing in for question 14.5.
+SALES_TYPES_ACCEPTED: frozenset[str] = frozenset({"commercial", "industrial", "export"})
 SALES_TYPE_BLOCKED_ON: dict[str, str] = {
-    "export": "question 14.5: zero-rated under a LUT, or IGST charged and refunded",
     "marketing": "questions 6.11 and 14.6: the 50/50 split, limits and approval",
-    "sample": "question 6.12: charged or free, and who approves",
+    "sample": "a sample is an order, not a quotation (FS-042 rule 10, GAP-367)",
     "subsidised": "Milestone 3: the subsidised quotation is built on the FS-008 calculator",
 }
 

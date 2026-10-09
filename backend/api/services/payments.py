@@ -223,6 +223,32 @@ async def list_payments(db: AsyncSession, caller: Caller, *, partner_id: str | N
                            meta=PageMeta(limit=limit, next_cursor=next_cursor))
 
 
+# ── the dealer's credit (FS-027) ────────────────────────────────────────────
+
+async def credit(db: AsyncSession, caller: Caller, partner_id: str) -> sch.PartnerCredit:
+    """The definer decides who may read it (plan review B-2) and raises 42501
+    for anyone else, so this maps its refusal rather than repeating the rule."""
+    try:
+        async with db.begin_nested():
+            row = (await db.execute(text(
+                "SELECT credit_limit, exposure, available FROM partner_credit_position(CAST(:p AS uuid))"),
+                {"p": partner_id})).one()
+    except DBAPIError as exc:
+        if _sqlstate(exc) == "42501":
+            raise ForbiddenError("A dealer's credit is for Accounts and the staff who manage dealers.",
+                                 code="credit_not_permitted") from exc
+        if _sqlstate(exc) == "P0002":
+            raise NotFoundError("No such dealer.") from exc
+        raise
+    check = (await db.execute(text("SELECT app_setting_text('dealer_credit_check')"))).scalar_one()
+    return sch.PartnerCredit(
+        partner_id=partner_id,
+        credit_limit=None if row.credit_limit is None else f"{row.credit_limit:.2f}",
+        exposure=f"{row.exposure:.2f}",
+        available=None if row.available is None else f"{row.available:.2f}",
+        check=str(check))
+
+
 # ── the dealer ledger ───────────────────────────────────────────────────────
 
 async def ledger(db: AsyncSession, caller: Caller, partner_id: str, *, start: dt.date | None,

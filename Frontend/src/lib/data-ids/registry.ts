@@ -700,7 +700,7 @@ export const DATA_IDS = {
     title: "Start a subsidy application from a lead — the calculation and the farmer's category",
     owner: "shared",
     status: "in-progress",
-    endpoints: ["POST /subsidy-applications"],
+    endpoints: ["POST /subsidy-applications", "GET /subsidy-schemes/for-lead/{leadId}"],
   },
   "SUBS-005": {
     domain: "SUBS",

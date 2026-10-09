@@ -177,7 +177,7 @@ function ApplicationView({ application }: { application: Application }): React.J
             </CardContent>
           </Card>
 
-          <StageHistory applicationId={application.id} />
+          <StageHistory applicationId={application.id} scheme={application.scheme} />
           <ApplicationDocuments application={application} canWrite={canWrite} />
         </div>
 
@@ -265,9 +265,15 @@ function labelOf(defs: readonly StageDef[], key: string): string {
 }
 
 /** SUBS-006 · Every entry, oldest first, with what was entered and why. */
-function StageHistory({ applicationId }: { applicationId: string }): React.JSX.Element {
+function StageHistory({
+  applicationId,
+  scheme,
+}: {
+  applicationId: string;
+  scheme: string;
+}): React.JSX.Element {
   const entries = useQuery(stageEntriesQueryOptions(applicationId));
-  const defs = useQuery(stageDefsQueryOptions()).data ?? [];
+  const defs = useQuery(stageDefsQueryOptions(scheme)).data ?? [];
 
   return (
     <Card>

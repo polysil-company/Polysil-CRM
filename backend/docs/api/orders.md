@@ -48,6 +48,7 @@ has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)
 | `limit` | query | integer |  |  |
 | `cursor` | query | string \| null |  | From the previous page's next_cursor. |
 | `include_total` | query | boolean |  | Also count, up to 1,000. |
+| `waiting_on` | query | string \| null |  | A role code, such as `account_manager`: orders whose next approval step is that role's. The step's role, not everyone who may decide it. |
 
 **Responses**
 
@@ -94,7 +95,7 @@ draft has no number until it is submitted.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial or industrial. The other five are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial, industrial, export or sample. export and sample are staff only (403 type_staff_only); a sample is typed in, never from quotations. The other three are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
 | `quotation_ids` | string[] |  | Accepted quotations that agree on partner, place of supply, seller, price date, office and territory. Their lines are imported. |
 | `lead_id` | string \| null |  | A direct order's lead, qualified or later. Leave out when ordering from quotations: the lead comes from them. |
 | `partner_id` | string \| null |  | OMIT for your own partner (a dealer) or none (staff). Null is a direct sale, refused from a dealer. |
@@ -105,6 +106,7 @@ draft has no number until it is submitted.
 | `price_effective_date` | date \| null |  | A direct order's price date, today in India by default. |
 | `payment_terms` | `full_payment` \| `credit` |  | Recorded, not enforced. There is no credit check. Default `full_payment`. |
 | `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
+| `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 
@@ -146,6 +148,7 @@ narrow the filters. An empty list gives a file with the header row only.
 | `q` | query | string \| null |  | Order number, party name or mobile. |
 | `from` | query | string \| null |  | ISO date, IST. |
 | `to` | query | string \| null |  | ISO date, inclusive. |
+| `waiting_on` | query | string \| null |  | A role code, such as `account_manager`: orders whose next approval step is that role's. The step's role, not everyone who may decide it. |
 
 **Responses**
 
@@ -177,6 +180,7 @@ submitted orders by whose approval is next. Same scope and filters as the list.
 | `owner` | query | string \| null |  | `me`, or a user id. |
 | `from` | query | string \| null |  | ISO date, IST. |
 | `to` | query | string \| null |  | ISO date, inclusive. |
+| `waiting_on` | query | string \| null |  | A role code, such as `account_manager`: orders whose next approval step is that role's. The step's role, not everyone who may decide it. |
 
 **Responses**
 
@@ -265,8 +269,9 @@ On an order from quotations the fields they fix are fixed.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` \| null |  |  |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` \| null |  | Fixed once the order is amended or made from quotations (422 order_type_fixed). A change re-reads the export and sample settings and re-prices the lines. |
 | `partner_id` | string \| null |  | Omit to keep. Null makes it a direct sale, which a dealer cannot do. |
+| `export_country` | string \| null |  | The buyer's country. Omit to keep. Required on an export. |
 | `party` | OrderParty \| null |  |  |
 | `delivery_address` | string \| null |  |  |
 | `place_of_supply_territory_id` | string \| null |  |  |
@@ -275,6 +280,48 @@ On an order from quotations the fields they fix are fixed.
 | `payment_terms` | `full_payment` \| `credit` \| null |  |  |
 | `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
 | `remarks` | string \| null |  |  |
+| `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Order_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions, or not your step. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, the status moved on, prices changed (`rate_changed`), or the order is not in a state that allows it. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
+## `POST /api/v1/orders/{order_id}/amend`
+
+**Amend Order**
+
+Take an approved order back to draft to change it, keeping its number. Only
+before anything ships (`409 order_dispatched`) and before money is allocated to it
+(`409 order_has_payments`); never a replacement order (`422 order_type_fixed`).
+The owner, the creator or a holder of edit. Then edit and submit as usual: with
+the `order_amend_reapproval` setting at `value_rises`, a total that did not rise
+goes straight to Accounts. Payment instalments are cleared; the PDF returns on
+approval.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `order_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`RemarkRequest`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string | yes | Why. Kept on the order and its timeline. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
 **Responses**
@@ -774,6 +821,10 @@ and only the outcome to a dealer.
 | `seller` | OrderSeller \| null | yes | The selling registration at the tax date. |
 | `place_of_supply` | TerritoryRef | yes |  |
 | `intra_state` | boolean | yes |  |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` | yes | domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or export_igst. Fixed when the order is created. |
+| `export_country` | string \| null | yes |  |
+| `lut_arn` | string \| null | yes | The LUT an export_lut order is zero-rated under. Taken at submit; null on a draft. |
+| `sample_pricing` | `free` \| `charged` \| null | yes | On a sample only. free: every line 100 % off, total 0, and the approval runs on the gross. |
 | `price_effective_date` | string | yes |  |
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
@@ -793,6 +844,11 @@ and only the outcome to a dealer.
 | `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
+| `fully_dispatched_at` | string \| null |  | When the last line shipped (dispatched, or closed short after a dispatch); null otherwise (FS-026). |
+| `over_credit_limit` | boolean \| null |  | Over the dealer's credit limit at submit (FS-027): true or false when checked, null when unchecked. Null for field officers and dealers, who may not read credit standing. |
+| `amend_count` | integer |  | How many times this order was amended after approval (FS-036). Default `0`. |
+| `amended_from_total` | string \| null |  | The approved total the last amend started from. |
+| `amend_reason` | string \| null |  | Why it was last amended. Staff only. |
 | `cancelled_at` | string \| null | yes |  |
 | `cancel_remark` | string \| null | yes |  |
 | `closed_at` | string \| null | yes |  |
@@ -821,7 +877,7 @@ and only the outcome to a dealer.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial or industrial. The other five are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial, industrial, export or sample. export and sample are staff only (403 type_staff_only); a sample is typed in, never from quotations. The other three are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
 | `quotation_ids` | string[] |  | Accepted quotations that agree on partner, place of supply, seller, price date, office and territory. Their lines are imported. |
 | `lead_id` | string \| null |  | A direct order's lead, qualified or later. Leave out when ordering from quotations: the lead comes from them. |
 | `partner_id` | string \| null |  | OMIT for your own partner (a dealer) or none (staff). Null is a direct sale, refused from a dealer. |
@@ -832,6 +888,7 @@ and only the outcome to a dealer.
 | `price_effective_date` | date \| null |  | A direct order's price date, today in India by default. |
 | `payment_terms` | `full_payment` \| `credit` |  | Recorded, not enforced. There is no credit check. Default `full_payment`. |
 | `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
+| `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 
@@ -907,8 +964,9 @@ and only the outcome to a dealer.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` \| null |  |  |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` \| null |  | Fixed once the order is amended or made from quotations (422 order_type_fixed). A change re-reads the export and sample settings and re-prices the lines. |
 | `partner_id` | string \| null |  | Omit to keep. Null makes it a direct sale, which a dealer cannot do. |
+| `export_country` | string \| null |  | The buyer's country. Omit to keep. Required on an export. |
 | `party` | OrderParty \| null |  |  |
 | `delivery_address` | string \| null |  |  |
 | `place_of_supply_territory_id` | string \| null |  |  |
@@ -974,6 +1032,8 @@ and only the outcome to a dealer.
 | `is_provisional` | boolean | yes |  |
 | `dispatched_pct` | integer | yes | Share of the ordered quantity sent, 0 to 100. |
 | `approval_waiting_on` | string \| null | yes | The role of the next undecided step. |
+| `amend_count` | integer |  | Default `0`. |
+| `over_credit_limit` | boolean \| null |  | Over the dealer's credit limit at submit (FS-027): true or false when checked, null when unchecked. Null for field officers and dealers, who may not read credit standing. |
 | `submitted_at` | string \| null | yes |  |
 | `created_at` | string | yes |  |
 

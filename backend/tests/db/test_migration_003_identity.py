@@ -53,6 +53,9 @@ PRE_AUTH = {
     "lead_qr_public": "p_code text",
     "lead_public_form": "",
     "lead_public_territories": "p_parent uuid",
+    # FS-038: 11za's webhook calls, kept as they arrived
+    "whatsapp_webhook_record": ("p_kind text, p_method text, p_ip inet, p_headers jsonb, "
+                                "p_body_raw bytea, p_body_text text, p_body jsonb"),
 }
 
 

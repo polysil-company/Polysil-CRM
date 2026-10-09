@@ -77,6 +77,7 @@ const lineSchema = z.object({
 });
 
 const requestSchema = z.object({
+  scheme: z.string().max(30).optional(),
   system_type: systemTypeSchema,
   crops: z
     .array(

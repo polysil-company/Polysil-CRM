@@ -194,7 +194,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SUBS-001 | Subsidy forms and case status | shared | planned |
 | SUBS-002 | Subsidy calculator — the scheme's cost blocks and every farmer category's share (`POST /subsidy/calculate`) | shared | in-progress |
 | SUBS-003 | Subsidy scheme lookups — what each system accepts, the crops and the categories (`GET /subsidy/config`, `GET /subsidy/crops`, `GET /subsidy/categories`) | shared | in-progress |
-| SUBS-004 | Start a subsidy application from a lead — the calculation and the farmer's category (`POST /subsidy-applications`) | shared | in-progress |
+| SUBS-004 | Start a subsidy application from a lead — the calculation and the farmer's category (`POST /subsidy-applications`, `GET /subsidy-schemes/for-lead/{leadId}`) | shared | in-progress |
 | SUBS-005 | Subsidy applications worklist, with its Excel export (`GET /subsidy-applications`, `GET /subsidy-applications/export`) | shared | in-progress |
 | SUBS-006 | A subsidy application — its figures, stored calculation, stages and cancel (`GET /subsidy-applications/{id}`, `GET /subsidy-applications/{id}/calculation`, `GET /subsidy-applications/{id}/stages`, `POST /subsidy-applications/{id}/stages`, `POST /subsidy-applications/{id}/cancel`, `GET /subsidy-stages`) | shared | in-progress |
 | SUBS-007 | A subsidy application's document checklist and uploads (`GET /subsidy-applications/{id}/documents`, `POST /subsidy-applications/{id}/documents`, `GET /subsidy-applications/{id}/documents/{docId}`) | shared | in-progress |

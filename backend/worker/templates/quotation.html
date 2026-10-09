@@ -54,6 +54,7 @@
       {% if q.party_address %}<div>{{ q.party_address }}</div>{% endif %}
       <div>{{ q.party_mobile }}</div>
       {% if q.party_gstin %}<div>GSTIN {{ q.party_gstin }}</div>{% endif %}
+      {% if q.export_country %}<div>Place of supply: Outside India ({{ q.export_country }})</div>{% endif %}
     </div>
   </div>
 
@@ -105,6 +106,9 @@
     </tfoot>
   </table>
   <div class="amounts">Amounts in Indian rupees (&#8377;).</div>
+  {% if q.tax_treatment == 'export_lut' %}
+  <div class="terms">Supply meant for export under LUT without payment of IGST{% if q.lut_arn %} (ARN {{ q.lut_arn }}){% endif %}.</div>
+  {% endif %}
 
   {% if q.terms %}
   <div class="terms"><strong>Terms</strong><br>{{ q.terms }}</div>

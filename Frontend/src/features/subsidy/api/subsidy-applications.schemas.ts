@@ -151,6 +151,16 @@ export interface CreateApplicationRequest {
   readonly survey_no: string | null;
 }
 
+/**
+ * GET /subsidy-schemes/for-lead/{leadId} — the scheme an application on this lead uses: the
+ * active scheme of the lead's state. Its `code` goes as `scheme` in the calculation.
+ */
+export const leadSchemeSchema = z
+  .object({ data: z.object({ code: z.string().min(1), name: z.string(), ready: z.boolean() }) })
+  .transform(({ data }) => data);
+
+export type LeadScheme = z.output<typeof leadSchemeSchema>;
+
 /** GET /subsidy-applications/{id}/calculation — the calculator's shape, as stored. */
 export const storedCalculationSchema = calculateResponseSchema;
 

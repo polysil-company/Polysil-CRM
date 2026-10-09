@@ -121,6 +121,12 @@ async def start(db: AsyncSession, caller: Caller,
     return bool(row.created), await _conversation(db, str(row.id))
 
 
+async def get(db: AsyncSession, caller: Caller, conversation_id: str) -> sch.Conversation:
+    """One conversation the caller is in, written in or not (BE-021)."""
+    _staff(caller)
+    return await _conversation(db, conversation_id)
+
+
 async def _peer(db: AsyncSession, conversation_id: str) -> Any:
     peer = (await db.execute(text(
         "SELECT * FROM conversation_peers() WHERE conversation_id = CAST(:c AS uuid)"),

@@ -32,6 +32,8 @@ directory = APIRouter(tags=["messages"])
 ConversationId = Annotated[str, Path(pattern=UUID_RE)]
 
 _ERRORS: dict[int | str, dict[str, object]] = {
+    400: {"model": ErrorResponse,
+          "description": "`idempotency_key_required`: a write sent without an Idempotency-Key."},
     401: {"model": ErrorResponse, "description": "Not signed in."},
     403: {"model": ErrorResponse, "description": "Messages are for staff: every dealer, "
                                                  "distributor and sub-dealer gets this."},
@@ -79,6 +81,15 @@ async def start_conversation(body: StartConversation, db: DbSession, caller: Cal
         created, conv = await service.start(db, caller, body)
         return (201 if created else 200), conv
     return await _idem(db, claims, idem, "POST /api/v1/conversations", body, work)
+
+
+@router.get("/{conversation_id}", response_model=Envelope[Conversation], responses=_ERRORS)
+async def get_conversation(conversation_id: ConversationId, db: DbSession,
+                           caller: CallerDep) -> Envelope[Conversation]:
+    """One of your conversations: the colleague, the last message and your unread
+    count. Works before anyone has written in it, so a thread opened from a link or
+    after a reload can name whom it writes to. `404` when it is not yours."""
+    return Envelope(data=await service.get(db, caller, conversation_id))
 
 
 @router.get("/{conversation_id}/messages", response_model=MessagePage, responses=_ERRORS)

@@ -13,6 +13,7 @@ misconfigured provider never reaches here: `get_settings()` refuses it at import
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any, ClassVar
 
@@ -24,6 +25,7 @@ from api.config import get_settings
 from api.integrations.whatsapp import get_provider
 from api.integrations.whatsapp.check import check_templates, unconfigured_templates
 from api.storage import get_storage
+from worker.jobs.complaints import complaint_escalation
 from worker.jobs.leads import lead_dormancy
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
@@ -67,7 +69,8 @@ async def on_startup(ctx: dict[str, Any]) -> None:
         log.error("quotation.renderer_unavailable", problem=problem)
     else:
         log.info("quotation.renderer_ok", renderer=settings.pdf_renderer)
-    storage_problem = get_storage(settings).probe()
+    # a hung bucket must not hold the first outbox drain (ISS-113)
+    storage_problem = await asyncio.to_thread(get_storage(settings).probe)
     if storage_problem:
         log.error("quotation.storage_unavailable", problem=storage_problem)
 
@@ -82,7 +85,7 @@ class WorkerSettings:
     redis_settings = _redis_settings()
     functions: ClassVar[list] = [outbox_drain, purge_expired_sessions,
                                  quotation_render_due, quotation_expire, order_render_due,
-                                 scheme_nightly, lead_dormancy]
+                                 scheme_nightly, lead_dormancy, complaint_escalation]
     cron_jobs: ClassVar[list] = CRON_JOBS
     on_startup = on_startup
     on_shutdown = on_shutdown

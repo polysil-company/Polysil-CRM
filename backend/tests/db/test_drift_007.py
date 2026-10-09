@@ -68,6 +68,12 @@ def _statements() -> dict[str, str]:
         match = _HEAD.search(stmt)
         assert match and match.group(1) in out, stmt[:80]
         out[match.group(1)] = stmt
+    # 042 patches authz_user_assignable from its live text (FS-037): the same swap
+    m42 = _load("042_dealer_tasks")
+    if m42 is not None:
+        body = out["authz_user_assignable"]
+        assert body.count(m42._ASSIGNABLE_OLD) == 1
+        out["authz_user_assignable"] = body.replace(m42._ASSIGNABLE_OLD, m42._ASSIGNABLE_NEW)
     return out
 
 

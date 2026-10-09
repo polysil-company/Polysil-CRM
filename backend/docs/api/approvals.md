@@ -235,6 +235,7 @@ One approval chain.
 | `upload` | boolean | yes |  |
 | `remedy` | boolean | yes | Choose a remedy (FS-015b). |
 | `withdraw` | boolean | yes | Withdraw the pending remedy. |
+| `reopen` | boolean |  | Reopen a closed or rejected complaint (FS-036). Default `False`. |
 
 **`Cancellation`**
 
@@ -289,6 +290,11 @@ One approval chain.
 | `raised_by` | UserRef \| null | yes |  |
 | `remedy` | Remedy \| null |  | The live or the last remedy. |
 | `closed_at` | string \| null |  |  |
+| `reopen_count` | integer |  | Times reopened (FS-036). Default `0`. |
+| `reopened_at` | string \| null |  |  |
+| `reopen_reason` | string \| null |  | Why it was last reopened. Staff only. |
+| `response_escalated_at` | string \| null |  | When the missed response target was escalated (FS-028); null otherwise. Staff only. |
+| `resolution_escalated_at` | string \| null |  | When the missed resolution target was escalated (FS-028); null otherwise. Staff only. |
 | `can` | Can | yes |  |
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
@@ -455,6 +461,10 @@ One approval chain.
 | `seller` | OrderSeller \| null | yes | The selling registration at the tax date. |
 | `place_of_supply` | TerritoryRef | yes |  |
 | `intra_state` | boolean | yes |  |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` | yes | domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or export_igst. Fixed when the order is created. |
+| `export_country` | string \| null | yes |  |
+| `lut_arn` | string \| null | yes | The LUT an export_lut order is zero-rated under. Taken at submit; null on a draft. |
+| `sample_pricing` | `free` \| `charged` \| null | yes | On a sample only. free: every line 100 % off, total 0, and the approval runs on the gross. |
 | `price_effective_date` | string | yes |  |
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
@@ -474,6 +484,11 @@ One approval chain.
 | `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
 | `approved_at` | string \| null | yes |  |
+| `fully_dispatched_at` | string \| null |  | When the last line shipped (dispatched, or closed short after a dispatch); null otherwise (FS-026). |
+| `over_credit_limit` | boolean \| null |  | Over the dealer's credit limit at submit (FS-027): true or false when checked, null when unchecked. Null for field officers and dealers, who may not read credit standing. |
+| `amend_count` | integer |  | How many times this order was amended after approval (FS-036). Default `0`. |
+| `amended_from_total` | string \| null |  | The approved total the last amend started from. |
+| `amend_reason` | string \| null |  | Why it was last amended. Staff only. |
 | `cancelled_at` | string \| null | yes |  |
 | `cancel_remark` | string \| null | yes |  |
 | `closed_at` | string \| null | yes |  |
@@ -663,6 +678,7 @@ One approval chain.
 | `raised_at` | string | yes | The submit time, or when a quotation's approval was asked. |
 | `discount_pct` | string \| null |  | A quotation row: the effective discount asked for, in percent. Null on an order. |
 | `payment_status` | string \| null |  | An order row: not_applicable, unpaid, part_paid, paid or overpaid (FS-022), for the Accounts step. Null otherwise. |
+| `over_credit_limit` | boolean \| null |  | An order row: over the dealer's credit limit at submit (FS-027); null when unchecked or not an order. |
 | `request_remark` | string \| null |  | Why the approval was asked, as the person asking wrote it. Show it beside the figures. Null when none was given. |
 
 **`QueuePage`**
@@ -704,6 +720,9 @@ One approval chain.
 | `seller_gstin` | SellerRef | yes |  |
 | `place_of_supply` | PlaceOfSupply | yes |  |
 | `intra_state` | boolean | yes |  |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` | yes | domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or export_igst. Fixed when the quotation is created; a revision keeps it. |
+| `export_country` | string \| null | yes |  |
+| `lut_arn` | string \| null | yes | The LUT an export_lut quotation is zero-rated under, as of its price date. |
 | `price_effective_date` | string | yes |  |
 | `price_list` | PriceListRef \| null | yes | Null when the lines drew from more than one list. |
 | `price_list_ids` | string[] | yes |  |

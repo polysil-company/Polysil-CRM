@@ -26,6 +26,7 @@ from tests.api.conftest import PASSWORD, V1, _key
 from tests.api.test_payments import (
     _forget_payments,  # noqa: F401  (autouse: payment rows before the shop)
 )
+from tests.api.test_settings_amend_reopen import restore  # noqa: F401  (fixture)
 
 pytestmark = pytest.mark.db
 
@@ -193,7 +194,7 @@ async def _second_office(client: httpx.AsyncClient, shop: Shop, sessions: Sessio
 
 
 async def test_a_manager_counts_their_office_only_and_the_dealer_balance_agrees(
-        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions, restore: None) -> None:  # noqa: F811
     """Review 1 and 2: a sibling office's leads, orders and receipts stay out of a
     District Manager's figures, and received is over the same orders as payable."""
     fo_b = await _second_office(client, shop, sessions)
@@ -204,6 +205,12 @@ async def test_a_manager_counts_their_office_only_and_the_dealer_balance_agrees(
         client, fo, endpoints._direct(shop, partner_id=shop.partner)))["id"])
     theirs = await endpoints._submit(client, fo_b, (await endpoints._create(
         client, fo_b, endpoints._direct(shop, partner_id=shop.partner)))["id"])
+    # the sibling office has no approvers of its own; this test is about scope,
+    # so it counts sales from submission (FS-026), restored by `restore`
+    s = sessions()
+    await s.execute(text("UPDATE app_setting SET value = '\"submission\"' WHERE key = 'sale_counted_at'"))
+    await s.commit()
+    await s.close()
     accounts = await endpoints._as(client, shop, "account_manager")
     r = await payments_t._pay(client, accounts, {"partner_id": shop.partner, "amount": theirs["totals"]["total"],
                                                  "allocations": [{"sales_order_id": theirs["id"],

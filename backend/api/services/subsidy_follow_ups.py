@@ -97,11 +97,12 @@ async def ageing(db: AsyncSession, *, status: str | None = None, stage: str | No
 
 async def stage_report(db: AsyncSession, status: str | None = "open") -> sch.StagePage:
     rows = (await db.execute(text(
-        "SELECT d.seq, d.code, d.name, count(a.id) AS n, sum(a.total_cost) AS cost, sum(a.subsidy) AS subsidy, "
+        "SELECT d.seq, d.code, COALESCE(min(d.name) FILTER (WHERE s.code = 'GGRC'), min(d.name)) AS name, count(a.id) AS n, sum(a.total_cost) AS cost, sum(a.subsidy) AS subsidy, "
         "sum(a.farmer_share) AS farmer, max(CAST(:today AS date) - a.current_since) AS oldest "
         "FROM subsidy_application a JOIN subsidy_stage_def d ON d.id = a.current_stage_id "
+        "JOIN subsidy_scheme s ON s.id = d.scheme_id "
         "WHERE (CAST(:st AS text) IS NULL OR a.status::text = :st) "
-        "GROUP BY d.seq, d.code, d.name ORDER BY d.seq"), {"today": today_ist(), "st": status})).all()
+        "GROUP BY d.seq, d.code ORDER BY d.seq"), {"today": today_ist(), "st": status})).all()
     data = [sch.StageRow(seq=r.seq, code=r.code, name=r.name, count=r.n, total_cost=_m(r.cost),
                          subsidy=_m(r.subsidy), farmer_share=_m(r.farmer), oldest_days_in_stage=r.oldest)
             for r in rows]

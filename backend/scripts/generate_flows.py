@@ -1216,7 +1216,17 @@ def f_order() -> None:
               "Short supply stays open until closed short.\n"
               "Invoice numbers recorded, not issued.\n"
               "A direct order does not move its lead.\n"
-              "No credit or stock check. Our number format.",
+              "No stock check. Our number format.",
+              w=460, colour=YELLOW)
+    e += note("nYellow3", 920, 1400,
+              "CREDIT LIMIT AT SUBMIT (FS-027, 047)\n\n"
+              "Setting dealer_credit_check: off | warn | block.\n"
+              "order_submit -> order_credit_check after the status\n"
+              "UPDATE, so benefits are counted. Exposure = owed on\n"
+              "payable orders less live receipts. Lock: order,\n"
+              "counter, then dealer FOR NO KEY UPDATE.\n"
+              "Block: 409, no figures. Warn: over_credit_limit for\n"
+              "approvers only (GAP-240 to 244).",
               w=460, colour=YELLOW)
 
     e += note("nYellow2", -420, 900,
@@ -1695,6 +1705,16 @@ def f_complaints() -> None:
               "Stand-ins: refund limits 25,000 / 1,00,000 / any;\n"
               "Dispatch alone approves a replacement; QC chooses;\n"
               "closing is automatic (GAP-179 to GAP-187).", w=420, colour=YELLOW)
+    e += note("nRed5", 1240, 1500,
+              "A RUN OF HOLIDAYS MUST END THE SCAN (FS-028, 048)\n\n"
+              "Working hours skip holidays like Sundays, read once for\n"
+              "400 days; past that, 22023, never a loop to the\n"
+              "statement timeout. The Python twin has the same bound.", w=420, colour=RED)
+    e += note("nYellow3", 1240, 1720,
+              "ESCALATION (FS-028): worker every 5 min as System.\n"
+              "One bell per missed due time: owner, the check's\n"
+              "manager, and the checkers or QC at that stage.\n"
+              "Setting complaint_escalation off | bell (GAP-245 to 249).", w=420, colour=YELLOW)
     e += note("nGreen1", 1240, 780,
               "Both enforcers agree: status, the number and the\n"
               "targets have no UPDATE grant; only the definers\n"
@@ -1928,6 +1948,7 @@ def f_reports() -> None:
     _column(e, n, [
         ("r1", "GET /reports/<name>?from&to&territory_id&owner_id\nreports.view + the base module, else 403", BLUE),
         ("r2", "aggregate: scope_predicate per table\n+ deleted_at IS NULL, RLS beneath", VIOLET),
+        ("r2b", "orders: setting sale_counted_at picks the date (FS-026)\nsubmitted_at | approved_at | fully_dispatched_at |\norder_paid_at(); never draft, cancelled, short-and-unshipped", YELLOW),
         ("r3", "rows (1,000 max) + totals over everything\nnull for a figure without its module", GREEN),
     ], 0)
     _column(e, n, [
@@ -1941,6 +1962,17 @@ def f_reports() -> None:
     e += note("nYellow1", 1240, 200,
               "Stand-ins: conversion = won / created; sales = commercial,\n"
               "industrial, export, subsidised (GAP-220 to GAP-226).", w=420, colour=YELLOW)
+    e += note("nRed2", 1240, 340,
+              "A NEW ORDER COLUMN MUST JOIN THE EDIT GUARD\n\n"
+              "refuse_submitted_order_edit compares the whole row\n"
+              "to an allow-list. 046 added fully_dispatched_at first;\n"
+              "without it the status trigger's write raises.", w=420, colour=RED)
+    e += note("nYellow2", 1240, 540,
+              "SALE DATE (FS-026, 046)\n\n"
+              "Default approval, admin-changeable; restates every period.\n"
+              "Paid day = earliest receipt day whose running total of live\n"
+              "allocations covers payable; a day, not an amount.\n"
+              "Ordered value counts, not shipped (GAP-234 to GAP-239).", w=420, colour=YELLOW)
     write("32-reports", e)
 
 
@@ -1953,7 +1985,7 @@ def f_targets() -> None:
     _column(e, n, [
         ("t1", "PUT /targets {user, month, targets}\nbelow me: my subtree, not me, lower rank", BLUE),
         ("t2", "sales_target: append-only, latest wins\n+ target.set on the person", VIOLET),
-        ("t3", "GET /targets/achievement?month\nme + everyone below, with or without targets", GREEN),
+        ("t3", "GET /targets/achievement?month\nme + everyone below, with or without targets\norders on the sale_counted_at date (FS-026)", GREEN),
     ], 0)
     e += note("nRed1", 620, 0,
               "THE SUBTREE HOLDS ME AND MY PEERS\n\n"
@@ -2102,6 +2134,162 @@ def f_lead_small_gaps() -> None:
          ("n3", "Ours: 60 days, what keeps a lead open, only Reopen\nwakes it, nobody told (GAP-339 to GAP-342).", YELLOW)])
 
 
+def f_campaigns() -> None:
+    _columns(
+        "50-campaigns", "Campaigns: which campaign brought the lead, and what it cost",
+        "Marketing keeps the list; a lead or QR code names one; a report sets cost against leads and sales.",
+        "BUILT. FS-040: /campaigns, /reports/campaign-performance, migration 049.",
+        [("s1", "Marketing: POST /campaigns\nname, type, dates, area, planned and actual cost", BLUE),
+         ("s2", "staff put an active campaign on a lead\n(POST or PATCH /leads campaign_id)", GREEN),
+         ("s3", "a QR code with a campaign: its leads take it\ntrg_lead_campaign_from_qr, at insert", GREEN),
+         ("s4", "GET /reports/campaign-performance\nleads created in the window, their sales whenever sold", VIOLET)],
+        [("d1", "switched off: no new lead or code takes it\nlinked codes keep crediting it (GAP-254)", YELLOW),
+         ("d2", "delete only while nothing names it\ncampaign_in_use counts hidden leads too", YELLOW),
+         ("d3", "merge: an unlinked survivor takes the loser's", GREY)],
+        [("n1", "COST IS FOR campaigns.view\n\nEvery staff user reads the list (the lead form's\npicker). Cost is cut in the service, and a cost\nchange never puts the figure in the event.", RED),
+         ("n2", "COST PER LEAD NEEDS A WHOLE WINDOW\n\nThe whole cost against the leads in the window.\nA window over half the campaign doubles it\n(GAP-252).", RED),
+         ("n3", "Not yet: an editable type list, history before 049,\nattribution that expires (GAP-250 to GAP-257).", YELLOW)])
+
+
+def f_customer_record() -> None:
+    _columns(
+        "51-customer-record", "Customer record: one farmer across leads, quotations and orders",
+        "A lead reaching qualified finds or makes its customer by mobile.",
+        "BUILT. FS-041: /customers, migration 050.",
+        [("s1", "a lead moves to qualified, quoted, negotiation\nor won, by any path", BLUE),
+         ("s2", "trg_lead_link_customer (definer)\nINSERT ... ON CONFLICT (mobile) DO NOTHING, read again", GREEN),
+         ("s3", "GET /customers/{id}\nits leads, quotations, orders that you can see", VIOLET),
+         ("s4", "GET /customers/{id}/timeline\neach visible lead's own timeline, merged", VIOLET)],
+        [("d1", "PATCH: staff with leads.edit; consent stamp\nre-sent unchanged keeps the first date", YELLOW),
+         ("d2", "merge: an unlinked survivor takes the loser's", GREY),
+         ("d3", "050 backfill: the oldest lead that got past\ncontacted names the customer", GREY)],
+        [("n1", "SEE A LEAD, SEE ITS CUSTOMER\n\ncustomer_sel is EXISTS over lead, under the\nlead's own policies. The customer's details show\nto everyone who sees any of its leads (GAP-263).", RED),
+         ("n2", "CUSTOMER EVENTS CARRY NO lead_id\n\nThey would land on every lead timeline and\nbreak its counts.", RED),
+         ("n3", "Not yet: shared phones, a customer merge, orders\nwithout a lead (GAP-258 to GAP-264).", YELLOW)])
+def f_settings_amend_reopen() -> None:
+    _columns(
+        "47-settings-amend-reopen", "Company settings, amending an approved order, reopening a complaint",
+        "Client blockers built as admin settings with our defaults.",
+        "BUILT. FS-036: /settings, POST /orders/{id}/amend, POST /complaints/{id}/reopen, migration 041.",
+        [("s1", "PATCH /settings (masters.edit)\napp_setting_set(): checked, one setting.changed event", YELLOW),
+         ("s2", "POST /orders/{id}/amend {remark}: staff only\napproved, nothing dispatched, no payment allocated", BLUE),
+         ("s3", "order_amend(): approved -> draft, amend_count + 1\nschedule cleared, PDF withdrawn, scheme benefits reversed", GREEN),
+         ("s4", "resubmit: order_amend_reapproval\nalways = the full chain; value_rises = Accounts + Dispatch\nunless the total went above amended_from_total", YELLOW)],
+        [("r1", "POST /complaints/{id}/reopen {reason}\nclosed or qc_rejected, inside the window, under the cap", BLUE),
+         ("r2", "who: the raiser for a closed one;\ncomplaint_reopen_roles for a rejection", YELLOW),
+         ("r3", "a new round: submitted, submit_count + 1\nrestart: targets from now; continue: original targets", GREEN),
+         ("r4", "complaint.submitted (reopened: true)\nthe checker's queue and the bell need nothing new", GREEN)],
+        [("n1", "A DEALER MUST NOT AMEND\n\nPortal roles hold sales_orders.edit at partner_subtree.\norder_amend() refuses any partner caller (review F-1).", RED),
+         ("n2", "THE SEED INSERT SKIPS THE ROLE CHECK\n\nRoles are seeded after migrating, and 005/015 already\ninsert roles, so 'table empty' never fired. INSERT skips;\nevery change is checked.", RED),
+         ("n3", "A reopen nobody can check is refused (no_checker),\nas a submit is. An amended draft needs delete to cancel.", GREEN),
+         ("n4", "Ours: every default in /settings\n(GAP-343 to GAP-348).", YELLOW)])
+
+
+def f_dealer_tasks() -> None:
+    _columns(
+        "48-dealer-tasks", "Tasks for dealers",
+        "A manager assigns a task to a dealer's user; the dealer completes it.",
+        "BUILT, OFF BY DEFAULT. FS-037: setting tasks_for_dealers, migration 042.",
+        [("s1", "admin: tasks_for_dealers = on", YELLOW),
+         ("s2", "GET /tasks/assignees?include_partners=true\ntask_partner_assignees(): dealers the caller can see", BLUE),
+         ("s3", "POST /tasks: authz_user_assignable('tasks')\npartner arm: caller assigns downwards, setting on", BLUE),
+         ("s4", "the task lives in the assigner's office;\nthe link must be visible to the dealer", GREEN),
+         ("s5", "dealer: GET /tasks?assigned_to=me,\nPOST /tasks/{id}/complete", GREEN)],
+        [("d1", "dealer: patch, cancel, reopen, create -> 403", RED),
+         ("d2", "task_partner_guard(): completion columns only (42501)", GREEN),
+         ("d3", "setting off: require('tasks') refuses a dealer,\nget_caller drops tasks; dashboard shows null", YELLOW)],
+        [("n1", "OFF MEANS NO TASKS, IN THE API ONLY\n\nRLS still shows a dealer its own old task rows and\ntimeline events after a switch-off (GAP-353).", RED),
+         ("n2", "The arm is tasks-only: leads call the same\nauthz_user_assignable and must not reach dealers.", RED),
+         ("n3", "Ours: off by default; a dealer only completes;\nclosing a dealer leaves tasks open (GAP-349 to GAP-351).", YELLOW)])
+
+
+def f_whatsapp_webhook() -> None:
+    _columns(
+        "49-whatsapp-webhook-capture", "WhatsApp webhook capture",
+        "Step one: keep what 11za sends, exactly as it arrived. Step two reads it.",
+        "BUILT. FS-038: two public routes, migration 043, scripts/whatsapp_webhook.py.",
+        [("s1", "11za calls GET/HEAD/POST\n/api/v1/public/webhooks/whatsapp/{secret}/inbound|status", GREY),
+         ("s2", "UploadLimit: over 64 KB -> 413,\nbefore the body is read", BLUE),
+         ("s3", "secret as bytes, constant time;\nwrong or unset -> 404, no session opened", BLUE),
+         ("s4", "whatsapp_webhook_record() as app_anon:\nmethod, address, header pairs, raw bytes", GREEN),
+         ("s5", "200 {ok: true}. Nothing else happens yet", GREEN)],
+        [("d1", "nightly purge_expired_sessions:\nwhatsapp_webhook_purge(now - 30 days)", VIOLET),
+         ("d2", "script: get / register --base-url / delete --type\nevery command ends with a get", YELLOW),
+         ("d3", "FS-038b: inbound -> lead (source whatsapp),\nstatus -> outbox delivered/read", GREY)],
+        [("n1", "THE SECRET IS IN THE URL\n\nEvery path that reaches a log goes through redact_path():\nstructlog path, the 500 handler, uvicorn.access.\nNew code that logs a path must use it too.", RED),
+         ("n2", "11ZA SIGNS NOTHING\n\nThe path secret is the only lock until we know\n11za's addresses (GAP-355).", RED),
+         ("n3", "Ours: 30 days kept, no rate limit, a call during\na DB outage is lost (GAP-356, GAP-357).", YELLOW)])
+
+
+def f_consumer_portal() -> None:
+    _columns(
+        "52-consumer-portal", "Consumer portal: a farmer reads their own record",
+        "Off by default. A consumer account per customer; the switch flips them all.",
+        "BUILT. FS-044: /portal, migration 052.",
+        [("s1", "customer made at qualification (FS-041)\ntrigger: consumer app_user on its Indian mobile", BLUE),
+         ("s2", "admin: PATCH /settings consumer_portal = on\nevery live consumer account active", YELLOW),
+         ("s3", "farmer: OTP request and verify\nget_db lets a consumer reach /auth and /portal only", GREEN),
+         ("s4", "GET /portal/*: definers keyed on portal_customer()\nleads still on the customer's own number", VIOLET)],
+        [("d1", "off: accounts inactive, token_version bumped\nnext request 401", YELLOW),
+         ("d2", "a staff or dealer user on a farmer's number\nreleases the consumer account", GREY),
+         ("d3", "PATCH /portal/me: consent, channel portal", GREY)],
+        [("n1", "THE CONSUMER FLOOR\n\nOne restrictive policy on every RLS table.\n\"Not a partner\" is not staff: before it, a\nconsumer read about 50 tables. A new RLS table\nadds consumer_floor.policy_sql(t).", RED),
+         ("n2", "SWITCHING ON COSTS MONEY\n\nEvery customer number can be sent a paid\nWhatsApp code; no overall ceiling (GAP-269).", RED),
+         ("n3", "Not yet: complaints, ratings, products from the\nportal (GAP-265, question 10.3).", YELLOW)])
+
+
+def f_assistant() -> None:
+    _columns(
+        "53-in-app-assistant", "In-app assistant: one search box for actions and records",
+        "A navigation aid, no model.",
+        "BUILT. FS-045: /assistant, no migration.",
+        [("s1", "GET /assistant?q=...\nthe catalogue in api/domain/assistant.py", BLUE),
+         ("s2", "actions: any-of permission sets the caller holds\nstaff-only and the dealer-tasks gate", GREEN),
+         ("s3", "records from 3 characters: number, mobile, name\nscope_predicate and RLS, never deleted or merged", VIOLET)],
+        [("d1", "customers come from the matched leads", GREY),
+         ("d2", "one row per quotation number:\nthe current version", GREY)],
+        [("n1", "RLS ALONE IS NOT ENOUGH\n\nEvery read carries the service predicate too\n(ADR-039, plan review B-1).", RED),
+         ("n2", "Not yet: Hindi and Gujarati action words,\npattern indexes, numberless drafts (GAP-268,\nGAP-273, GAP-274).", YELLOW)])
+
+def f_new_state_scheme() -> None:
+    _columns(
+        "54-new-state-subsidy-scheme", "A new state's subsidy scheme",
+        "The admin adds another state's scheme; applications take the scheme of the lead's state.",
+        "BUILT. FS-039: /subsidy-schemes, migration 044.",
+        [("s1", "POST /subsidy-schemes\ncode, name, state, template GGRC", GREY),
+         ("s2", "subsidy_scheme_create(): mode lock, state row FOR UPDATE;\ncopies engine settings + every stage and field", BLUE),
+         ("s3", "readiness: what a calculation would refuse on,\nthrough the engine's own reads, in its order", GREEN),
+         ("s4", "admin fills figures through the FS-009a\nrevisions and matrices until ready", BLUE),
+         ("s5", "POST /subsidy-applications: the lead's state's scheme;\nthe definer checks again under the state lock", GREEN)],
+        [("d1", "GET /subsidy-schemes/for-lead/{id}\nthe scheme the preview must send", VIOLET),
+         ("d2", "PATCH: rename, switch off, link GGRC to its state once;\nrename a stage", YELLOW),
+         ("d3", "PIMS export: GGRC only (GAP-363)", YELLOW)],
+        [("n1", "NO FIGURE IS COPIED\n\nA copied GGRC Jantri would quote a UP farmer a Gujarat\nsubsidy with no warning. An empty scheme refuses to\ncalculate and the panel says what is missing.", RED),
+         ("n2", "LEGACY MODE\n\nWhile no active scheme has a state, every lead takes GGRC.\nOnce one has, an unmapped state is refused. The API\nnever lets the two mix (409 unlinked_scheme_exists).", RED),
+         ("n3", "citext = text compares as text: codes are stored\nupper case and every lookup uses upper(:c).", RED),
+         ("n4", "Ours: one active scheme per state, stages copied from\nGGRC, GGRC's formulas only (GAP-359 to GAP-361).", YELLOW)])
+
+
+
+def f_export_sample_orders() -> None:
+    _columns(
+        "55-export-and-sample-orders", "Export and sample orders",
+        "Two order types that waited on client questions, built on settings standing in for the answers.",
+        "BUILT. FS-042: migration 045, /seller-gstins.",
+        [("s1", "staff: quotation or order, type export\ncountry required, no party GSTIN", GREY),
+         ("s2", "setting export_tax_treatment, read ONCE at create:\nlut -> every line IGST 0 %   |   igst -> IGST at the slab", BLUE),
+         ("s3", "under lut: a LUT of the seller GSTIN must cover the tax day\n(quotation: price date; order: submit day). ARN stored", GREEN),
+         ("s4", "staff: direct order, type sample\nsetting sample_pricing, read ONCE at create", GREY),
+         ("s5", "free: every line 100 % off, total 0, no GST\nchain worked out on the GROSS, not the total", GREEN),
+         ("s6", "gross over sample_max_value: refused\nat create, edit and submit", GREEN)],
+        [("d1", "order_submit re-checks all of it (second enforcer):\nstaff only, free lines, limit, LUT, no taxed LUT line", VIOLET),
+         ("d2", "GET /seller-gstins, POST / DELETE their LUTs\none per financial year; a LUT a document carries stays", YELLOW),
+         ("d3", "amend under value_rises: a sample compares its gross\nwith amended_from_gross", YELLOW)],
+        [("n1", "THE SETTING IS READ ONCE\n\nEvery re-price, revision, submit and amend uses the\ntreatment stored on the document. Read the setting again\nand a draft's tax changes under it, then fails rate_changed.", RED),
+         ("n2", "AN EXPORT IS NEVER INTRA-STATE\n\nIts stored place of supply is the seller's own state, for\npricing only, so seller == pos is TRUE. price_document\nforces intra_state false for both export treatments.", RED),
+         ("n3", "A FREE SAMPLE IS NOT A ZERO-RUPEE ORDER\n\nzero_total is skipped for it alone; its approval runs on\nthe gross, and the party gets no 0.00 confirmation.", RED),
+         ("n4", "Ours: LUT by default, free samples up to 50,000 list,\nstaff only, rupees only, priced from the seller state's list\n(GAP-364 to GAP-371).", YELLOW)])
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2111,4 +2299,7 @@ if __name__ == "__main__":
     f_reports(); f_targets()
     f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
     f_subsidy_follow_ups(); f_lead_small_gaps()
+    f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
+    f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
+    f_export_sample_orders()
     print(f"\nwrote to {OUT}")
