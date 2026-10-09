@@ -41,7 +41,7 @@ scope, which is not an error; a 403 means you may not view people at all.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `q` | query | string \| null |  | Name, email or mobile substring. |
-| `user_type` | query | string \| null |  | staff or partner_user. |
+| `user_type` | query | string \| null |  | staff, partner_user or consumer. Left out, the list is staff and partner users: farmers' portal accounts (FS-044) only when asked. |
 | `role` | query | string \| null |  | A role code. |
 | `org_unit_id` | query | string \| null |  | Staff anchored on this office. |
 | `partner_id` | query | string \| null |  | Users anchored on this partner. |
@@ -129,7 +129,7 @@ narrow the filters. An empty list gives a file with the header row only.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `q` | query | string \| null |  | Name, email or mobile substring. |
-| `user_type` | query | string \| null |  | staff or partner_user. |
+| `user_type` | query | string \| null |  | staff, partner_user or consumer. Left out, the list is staff and partner users: farmers' portal accounts (FS-044) only when asked. |
 | `role` | query | string \| null |  | A role code. |
 | `org_unit_id` | query | string \| null |  | Staff anchored on this office. |
 | `partner_id` | query | string \| null |  | Users anchored on this partner. |

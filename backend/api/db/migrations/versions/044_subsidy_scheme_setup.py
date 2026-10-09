@@ -14,7 +14,7 @@
   takes, and refuses a calculation made on another scheme's figures.
 
 Revision ID: 044_subsidy_scheme_setup
-Revises: 043_whatsapp_webhook_capture
+Revises: 052_consumer_portal
 """
 
 # ruff: noqa: E501  (embedded SQL)
@@ -25,7 +25,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision: str = "044_subsidy_scheme_setup"
-down_revision: str | None = "043_whatsapp_webhook_capture"
+down_revision: str | None = "052_consumer_portal"
 branch_labels = None
 depends_on = None
 
