@@ -40,6 +40,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Subsidy Applications | 14 | [`subsidy-applications.md`](subsidy-applications.md) |
 | Subsidy Masters | 4 | [`subsidy-masters.md`](subsidy-masters.md) |
 | Subsidy Reports | 6 | [`subsidy-reports.md`](subsidy-reports.md) |
+| Subsidy Schemes | 6 | [`subsidy-schemes.md`](subsidy-schemes.md) |
 | Targets | 3 | [`targets.md`](targets.md) |
 | Tasks | 14 | [`tasks.md`](tasks.md) |
 | Territories | 4 | [`territories.md`](territories.md) |

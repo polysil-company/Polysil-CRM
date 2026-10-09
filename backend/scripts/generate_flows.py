@@ -2251,6 +2251,24 @@ def f_assistant() -> None:
         [("n1", "RLS ALONE IS NOT ENOUGH\n\nEvery read carries the service predicate too\n(ADR-039, plan review B-1).", RED),
          ("n2", "Not yet: Hindi and Gujarati action words,\npattern indexes, numberless drafts (GAP-268,\nGAP-273, GAP-274).", YELLOW)])
 
+def f_new_state_scheme() -> None:
+    _columns(
+        "54-new-state-subsidy-scheme", "A new state's subsidy scheme",
+        "The admin adds another state's scheme; applications take the scheme of the lead's state.",
+        "BUILT. FS-039: /subsidy-schemes, migration 044.",
+        [("s1", "POST /subsidy-schemes\ncode, name, state, template GGRC", GREY),
+         ("s2", "subsidy_scheme_create(): mode lock, state row FOR UPDATE;\ncopies engine settings + every stage and field", BLUE),
+         ("s3", "readiness: what a calculation would refuse on,\nthrough the engine's own reads, in its order", GREEN),
+         ("s4", "admin fills figures through the FS-009a\nrevisions and matrices until ready", BLUE),
+         ("s5", "POST /subsidy-applications: the lead's state's scheme;\nthe definer checks again under the state lock", GREEN)],
+        [("d1", "GET /subsidy-schemes/for-lead/{id}\nthe scheme the preview must send", VIOLET),
+         ("d2", "PATCH: rename, switch off, link GGRC to its state once;\nrename a stage", YELLOW),
+         ("d3", "PIMS export: GGRC only (GAP-363)", YELLOW)],
+        [("n1", "NO FIGURE IS COPIED\n\nA copied GGRC Jantri would quote a UP farmer a Gujarat\nsubsidy with no warning. An empty scheme refuses to\ncalculate and the panel says what is missing.", RED),
+         ("n2", "LEGACY MODE\n\nWhile no active scheme has a state, every lead takes GGRC.\nOnce one has, an unmapped state is refused. The API\nnever lets the two mix (409 unlinked_scheme_exists).", RED),
+         ("n3", "citext = text compares as text: codes are stored\nupper case and every lookup uses upper(:c).", RED),
+         ("n4", "Ours: one active scheme per state, stages copied from\nGGRC, GGRC's formulas only (GAP-359 to GAP-361).", YELLOW)])
+
 
 if __name__ == "__main__":
     print("generating flows:")
@@ -2262,5 +2280,5 @@ if __name__ == "__main__":
     f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
     f_subsidy_follow_ups(); f_lead_small_gaps()
     f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
-    f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook()
+    f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
     print(f"\nwrote to {OUT}")

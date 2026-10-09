@@ -53,7 +53,12 @@ _ERRORS: dict[int | str, dict[str, object]] = {
 _REUSED = "`idempotency_key_reused`: the same key was sent with a different body."
 _CREATE_ERRORS: dict[int | str, dict[str, object]] = {
     **_ERRORS,
-    409: {"model": ErrorResponse, "description": _REUSED},
+    409: {"model": ErrorResponse, "description": (
+        "`scheme_changed`: a scheme for the lead's state was added or switched meanwhile; "
+        "calculate again. " + _REUSED)},
+    422: {"model": ErrorResponse, "description": (
+        "A field needs correcting; see `fields`. `calculation.scheme`: not the lead's scheme "
+        "(GET /subsidy-schemes/for-lead/{id}). `no_scheme_for_state`: the lead's state has none.")},
 }
 _MUTATION_ERRORS: dict[int | str, dict[str, object]] = {
     **_ERRORS,
@@ -249,7 +254,8 @@ async def document_link(app_id: Id, doc_id: Id, db: DbSession) -> Envelope[Docum
 async def pims(app_id: Id, db: DbSession) -> Response:
     """The PIMS sheet for the GGRC portal: one row per line of the stored
     calculation, in the columns CostType, Crop, ItemCode, Item, Size, Unit, Rate,
-    Quantity, Amount, Remark. Our reading of the one sample the client gave (GAP-177)."""
+    Quantity, Amount, Remark. Our reading of the one sample the client gave (GAP-177).
+    GGRC applications only: another scheme's is 422 `pims_not_for_scheme` (GAP-363)."""
     rows = await service.pims_rows(db, app_id)
     data = await asyncio.to_thread(service.pims_workbook, rows)
     return Response(content=data,
