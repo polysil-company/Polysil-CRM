@@ -54,7 +54,8 @@ async def _cleanup(sessions: Sessions, mobiles: list[str]) -> None:
     """Customers point at nothing the shop removes, but leads point at them."""
     e164 = ["+91" + m for m in mobiles]
     c = sessions()
-    for stmt in ("UPDATE lead SET customer_id = NULL WHERE mobile = ANY(:m)",
+    for stmt in ("UPDATE lead SET customer_id = NULL WHERE mobile = ANY(:m) "
+                 "OR customer_id IN (SELECT id FROM customer WHERE mobile = ANY(:m))",
                  "DELETE FROM activity_event WHERE entity_type = 'customer' AND customer_id IN (SELECT id FROM customer WHERE mobile = ANY(:m))",
                  "DELETE FROM customer WHERE mobile = ANY(:m)"):
         await c.execute(text(stmt), {"m": e164})

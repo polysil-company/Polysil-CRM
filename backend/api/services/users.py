@@ -238,6 +238,10 @@ async def list_users(db: AsyncSession, caller: Caller, *, q: str | None = None,
              user_t.c.id.notin_(_principals())]
     if user_type:
         where.append(sa.cast(user_t.c.user_type, sa.Text) == user_type)
+    else:
+        # FS-044: every customer has a portal account; the people list is staff and
+        # dealers unless consumers are asked for (edge case 18)
+        where.append(sa.cast(user_t.c.user_type, sa.Text) != "consumer")
     if role:
         where.append(user_t.c.role_id.in_(
             sa.select(sa.column("id", _UUID)).select_from(sa.table("role"))
@@ -416,7 +420,13 @@ async def _assert_anchor_in_scope(db: AsyncSession, caller: Caller, *,
 
 async def _identifier_free(db: AsyncSession, column: str, value: str) -> None:
     """The pre-check among live rows; the partial unique index is the enforcer, and
-    a 23505 the caller's scope hid from this read is mapped to the same field."""
+    a 23505 the caller's scope hid from this read is mapped to the same field.
+
+    FS-044: a farmer's portal account never blocks a staff or dealer user. It is
+    released first, in this transaction, by a definer (a consumer row has no anchor
+    a scoped admin could reach), and the farmer loses portal access (GAP-266)."""
+    if column == "mobile":
+        await db.execute(text("SELECT consumer_release_mobile(:v)"), {"v": value})
     taken = (await db.execute(text(
         f"SELECT 1 FROM app_user WHERE {column} = :v AND deleted_at IS NULL"),
         {"v": value})).first()
