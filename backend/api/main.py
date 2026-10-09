@@ -25,6 +25,7 @@ from api.errors import (
     internal_error_handler,
     validation_error_handler,
 )
+from api.redact import install_access_log_filter, redact_path
 from api.routers import (
     auth,
     commission,
@@ -73,6 +74,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # FS-038 rule 2: uvicorn's access log writes the webhook path, secret and all
+    install_access_log_filter()
 
     app = FastAPI(
         title="Polysil CRM API",
@@ -96,7 +99,8 @@ def create_app() -> FastAPI:
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
-        structlog.contextvars.bind_contextvars(request_id=request_id, path=request.url.path)
+        structlog.contextvars.bind_contextvars(request_id=request_id,
+                                               path=redact_path(request.url.path))
         try:
             response = await call_next(request)
         finally:
