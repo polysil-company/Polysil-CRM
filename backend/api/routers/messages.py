@@ -83,6 +83,15 @@ async def start_conversation(body: StartConversation, db: DbSession, caller: Cal
     return await _idem(db, claims, idem, "POST /api/v1/conversations", body, work)
 
 
+@router.get("/{conversation_id}", response_model=Envelope[Conversation], responses=_ERRORS)
+async def get_conversation(conversation_id: ConversationId, db: DbSession,
+                           caller: CallerDep) -> Envelope[Conversation]:
+    """One of your conversations: the colleague, the last message and your unread
+    count. Works before anyone has written in it, so a thread opened from a link or
+    after a reload can name whom it writes to. `404` when it is not yours."""
+    return Envelope(data=await service.get(db, caller, conversation_id))
+
+
 @router.get("/{conversation_id}/messages", response_model=MessagePage, responses=_ERRORS)
 async def list_messages(conversation_id: ConversationId, db: DbSession, caller: CallerDep,
                         cursor: Annotated[str | None, Query(description="From "

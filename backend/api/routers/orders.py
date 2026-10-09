@@ -56,6 +56,11 @@ Id = Annotated[str, Path(pattern=UUID_RE)]
 Cursor = Annotated[str | None, Query(description="From the previous page's next_cursor.")]
 ToDate = Annotated[str | None, Query(alias="to", description="ISO date, inclusive.")]
 _OWNER_RE = "^(me|" + UUID_RE.strip("^$") + ")$"
+# BE-022: an unknown role is an empty page, not a 422 (FS-029 §3); only the shape is checked
+WaitingOn = Annotated[str | None, Query(
+    pattern="^[a-z][a-z0-9_]{0,63}$",
+    description="A role code, such as `account_manager`: orders whose next approval step "
+                "is that role's. The step's role, not everyone who may decide it.")]
 
 _ERRORS: dict[int | str, dict[str, object]] = {
     401: {"model": ErrorResponse, "description": "Not signed in."},
@@ -138,13 +143,15 @@ async def list_orders(
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     cursor: Cursor = None,
     include_total: Annotated[bool, Query(description="Also count, up to 1,000.")] = False,
+    waiting_on: WaitingOn = None,
 ) -> OrderPage:
     """The orders in your scope, newest first, keyset-paged. Each row carries how much
     has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)."""
     return await service.list_orders(
         db, caller, status=status_, order_type=order_type, partner_id=partner_id,
         lead_id=lead_id, owner=owner, q=q, created_from=created_from, created_to=created_to,
-        limit=limit, cursor=cursor, include_total=include_total, quotation_id=quotation_id)
+        limit=limit, cursor=cursor, include_total=include_total, quotation_id=quotation_id,
+        waiting_on=waiting_on)
 
 
 @router.get("/stats", response_model=OrderStats, responses=_ERRORS,
@@ -160,12 +167,14 @@ async def order_stats(
                                        description="`me`, or a user id.")] = None,
     created_from: Annotated[str | None, Query(alias="from", description="ISO date, IST.")] = None,
     created_to: ToDate = None,
+    waiting_on: WaitingOn = None,
 ) -> OrderStats:
     """Counts for the order board and the dashboard tiles: every status, and the
     submitted orders by whose approval is next. Same scope and filters as the list."""
     return await service.order_stats(
         db, caller, status=status_, order_type=order_type, partner_id=partner_id,
-        lead_id=lead_id, owner=owner, created_from=created_from, created_to=created_to)
+        lead_id=lead_id, owner=owner, created_from=created_from, created_to=created_to,
+        waiting_on=waiting_on)
 
 
 @router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
