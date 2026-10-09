@@ -214,6 +214,7 @@ LEADS: Final = (
     Column("First contacted", "first_contacted_at", "datetime"),
     Column("Last activity", "last_activity_at", "datetime"),
     Column("Created", "created_at", "datetime"), Column("Created by", "created_by.full_name"),
+    Column("Campaign", "campaign_name"),
 )
 
 _TOTALS: Final = (

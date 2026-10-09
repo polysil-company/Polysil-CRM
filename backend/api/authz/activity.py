@@ -32,6 +32,8 @@ ENTITY_REFS: dict[str, str] = {
 LIVE_TABLES: dict[str, str] = {
     "channel_partner": "channel_partner",
     "lead": "lead",
+    # FS-041: a customer's own events, through its row (see a lead, see its customer)
+    "customer": "customer",
 }
 
 # Entity types with no denormalised reference column: the row is visible when the
@@ -60,7 +62,9 @@ ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory", "quotation", "sales_or
                                  "reward_rule", "gift", "reward_setting",
                                  # FS-021: field tracking
                                  "visit", "duty_session",
-                                 "tracking_consent")
+                                 "tracking_consent",
+                                 # FS-040: campaigns; every staff user reads the list
+                                 "campaign")
 
 # A type in both LIVE_TABLES and ENTITY_BY_ID would emit two `WHEN` arms, the
 # first through its reference column's table and the second dead, and PostgreSQL

@@ -42,7 +42,8 @@ L = sa.table("lead", sa.column("id", _UUID), sa.column("created_at", _TS), sa.co
              sa.column("territory_id", _UUID), sa.column("assigned_partner_id", _UUID),
              sa.column("lead_source_id", _UUID), sa.column("deleted_at", _TS), sa.column("won_at", _TS),
              sa.column("lost_at", _TS), sa.column("lost_reason_id", _UUID), sa.column("lost_from_stage"), sa.column("dormant_from_stage"),
-             sa.column("mobile"), sa.column("inquiry_no"), sa.column("merged_into_id", _UUID))
+             sa.column("mobile"), sa.column("inquiry_no"), sa.column("merged_into_id", _UUID),
+             sa.column("campaign_id", _UUID))
 ORD = sa.table("sales_order", sa.column("id", _UUID), sa.column("status"), sa.column("order_type"),
              sa.column("total", sa.Numeric), sa.column("submitted_at", _TS), sa.column("owner_user_id", _UUID),
              sa.column("owner_org_unit_id", _UUID), sa.column("territory_id", _UUID),
@@ -71,7 +72,8 @@ P = sa.table("channel_partner", sa.column("id", _UUID), sa.column("parent_id", _
 SALE_TYPES = ("commercial", "industrial", "export", "subsidised")
 # the statuses an order is paid in (031 _PAYABLE)
 PAYABLE = ("submitted", "approved", "partially_dispatched", "dispatched", "closed_short")
-STAFF_ONLY = frozenset({"salesperson-performance", "follow-ups", "territory-performance"})
+STAFF_ONLY = frozenset({"salesperson-performance", "follow-ups", "territory-performance",
+                        "campaign-performance"})
 
 
 def _has(caller: Caller, module: str) -> bool:
@@ -124,14 +126,18 @@ def _leads(caller: Caller, f: Filters) -> list[Any]:
             sa.cast(L.c.stage, sa.Text) != "merged", *f.area(L.c.territory_id), *f.owner(L.c.owner_user_id)]
 
 
-def _orders(caller: Caller, f: Filters) -> list[Any]:
+def _sale_orders(caller: Caller) -> list[Any]:
     """The scoped sale orders. Never a draft (rejected or amended) or a cancelled
     order, nor a closed-short order with nothing shipped (FS-026 plan review B-2, B-3)."""
     status = sa.cast(ORD.c.status, sa.Text)
     return [scope_predicate(SPECS["sales_orders"], caller, ORD), ORD.c.deleted_at.is_(None),
             sa.cast(ORD.c.order_type, sa.Text).in_(SALE_TYPES), status.notin_(("draft", "cancelled")),
             sa.not_(sa.and_(status == "closed_short", ORD.c.fully_dispatched_at.is_(None))),
-            ORD.c.submitted_at.is_not(None), *f.area(ORD.c.territory_id), *f.owner(ORD.c.owner_user_id)]
+            ORD.c.submitted_at.is_not(None)]
+
+
+def _orders(caller: Caller, f: Filters) -> list[Any]:
+    return [*_sale_orders(caller), *f.area(ORD.c.territory_id), *f.owner(ORD.c.owner_user_id)]
 
 
 def _sold_on(f: Filters) -> Any:
@@ -427,6 +433,96 @@ async def dealer_performance(db: AsyncSession, caller: Caller, f: Filters) -> di
     return {"rows": page, "truncated": cut, "filters": f.out(),
             "totals": {"orders": sum(r["orders"] for r in out),
                        "order_value": _money(sum(Decimal(r["order_value"]) for r in out))}}
+
+
+# ── campaign performance (FS-040) ───────────────────────────────────────────
+
+async def campaign_figures(db: AsyncSession, caller: Caller, f: Filters, *, windowed: bool,
+                           ids: Sequence[str] | None = None, sales: bool = True
+                           ) -> dict[str, dict[str, Any]]:
+    """Per campaign: the scoped leads that name it (created in the window when
+    `windowed`), how far they got, and their orders that count as sales under the
+    company's setting, whenever sold (rule 6). Sales are absent without sales_orders."""
+    lw = [*_leads(caller, f), L.c.campaign_id.is_not(None)]
+    if windowed:
+        lw += f.window(L.c.created_at)
+    if ids is not None:
+        lw.append(L.c.campaign_id.in_(list(ids)))
+    per: dict[str, dict[str, Any]] = defaultdict(lambda: defaultdict(int))
+    rows = (await db.execute(sa.select(L.c.campaign_id.label("k"), sa.cast(L.c.stage, sa.Text).label("stage"),
+                                       sa.cast(sa.func.coalesce(L.c.lost_from_stage, L.c.dormant_from_stage),
+                                               sa.Text).label("lost_from"),
+                                       sa.func.count().label("n"))
+                             .where(*lw)
+                             .group_by(L.c.campaign_id, L.c.stage, L.c.lost_from_stage, L.c.dormant_from_stage))).all()
+    for r in rows:
+        g = per[str(r.k)]
+        g["leads"] += r.n
+        g["qualified"] += r.n if _reached(r.stage, r.lost_from, "qualified") else 0
+        g["won"] += r.n if r.stage == "won" else 0
+        g["lost"] += r.n if r.stage == "lost" else 0
+    if sales and _has(caller, "sales_orders") and per:
+        sold = (await db.execute(sa.select(L.c.campaign_id.label("k"), sa.func.count(ORD.c.id).label("n"),
+                                            sa.func.sum(ORD.c.total).label("v"))
+                                  .select_from(ORD.join(L, L.c.id == ORD.c.lead_id))
+                                  # the area and owner pick the leads; an order on one counts
+                                  # wherever it was raised (FS-040 edge case 6)
+                                  .where(*lw, *_sale_orders(caller), _sold_on(f).is_not(None))
+                                  .group_by(L.c.campaign_id))).all()
+        for r in sold:
+            per[str(r.k)].update(sales_count=r.n, sales_value=r.v)
+    return per
+
+
+def campaign_cost(planned: Any, actual: Any) -> Decimal:
+    """Rule 7: the actual cost once entered, else the planned one."""
+    return Decimal(actual if actual is not None else planned or 0)
+
+
+def per_unit(cost: Decimal | None, n: int) -> str | None:
+    return _money(cost / n) if cost is not None and n else None
+
+
+async def campaign_performance(db: AsyncSession, caller: Caller, f: Filters) -> dict[str, Any]:
+    _need(caller, "campaign-performance", "leads")
+    per = await campaign_figures(db, caller, f, windowed=True)
+    # a campaign whose dates overlap the window shows with zeros, so money spent for
+    # nothing is visible. No end date is a one-day campaign (edge case 4). Under an area
+    # filter: campaigns over it, under it or with no area (edge case 11). An owner filter
+    # is about leads, so it shows only campaigns with some.
+    overlap = "" if f.owner_id else (
+        " OR (c.start_date <= :hi AND coalesce(c.end_date, c.start_date) >= :lo"
+        + (" AND (c.territory_id IS NULL OR EXISTS (SELECT 1 FROM territory_closure tc "
+           "WHERE tc.ancestor_id = ANY(CAST(:t AS uuid[])) AND tc.descendant_id = c.territory_id "
+           "OR tc.descendant_id = ANY(CAST(:t AS uuid[])) AND tc.ancestor_id = c.territory_id)))"
+           if f.territories else ")"))
+    camps = (await db.execute(text(
+        "SELECT c.id::text AS id, c.name::text AS name, c.type, c.start_date, c.end_date, c.is_active, "
+        "c.cost_planned, c.cost_actual FROM campaign c "
+        f"WHERE c.id = ANY(CAST(:ids AS uuid[])){overlap}"),
+        {"ids": list(per), "lo": f.start, "hi": f.end, "t": f.territories})).all()
+    see_cost, see_sales = _has(caller, "campaigns"), _has(caller, "sales_orders")
+    out = []
+    for c in camps:
+        g = per.get(c.id) or defaultdict(int)
+        cost = campaign_cost(c.cost_planned, c.cost_actual) if see_cost else None
+        out.append({
+            "campaign": {"id": c.id, "name": c.name, "type": c.type, "start_date": c.start_date.isoformat(),
+                         "end_date": c.end_date.isoformat() if c.end_date else None, "is_active": c.is_active},
+            "leads": g["leads"], "qualified": g["qualified"], "won": g["won"], "lost": g["lost"],
+            "open": g["leads"] - g["won"] - g["lost"], "conversion_pct": str(domain.pct(g["won"], g["leads"])),
+            "sales_count": g["sales_count"] if see_sales else None,
+            "sales_value": _money(g.get("sales_value")) if see_sales else None,
+            "cost_planned": _money(c.cost_planned) if see_cost else None,
+            "cost_actual": _money(c.cost_actual) if see_cost and c.cost_actual is not None else None,
+            "cost": _money(cost) if cost is not None else None,
+            "cost_per_lead": per_unit(cost, g["leads"]), "cost_per_won": per_unit(cost, g["won"])})
+    out.sort(key=lambda r: (-r["leads"], r["campaign"]["name"].lower()))
+    page, cut = _page(out)
+    totals: dict[str, Any] = {"leads": sum(r["leads"] for r in out), "won": sum(r["won"] for r in out),
+                              "sales_value": _money(sum(Decimal(r["sales_value"]) for r in out)) if see_sales else None,
+                              "cost": _money(sum(Decimal(r["cost"]) for r in out)) if see_cost else None}
+    return {"rows": page, "truncated": cut, "filters": f.out(), "totals": totals}
 
 
 # ── territory performance ───────────────────────────────────────────────────
