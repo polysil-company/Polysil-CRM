@@ -242,6 +242,57 @@ export const DATA_IDS = {
     endpoints: ["GET /leads/export"],
     notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
   },
+  "LEAD-010": {
+    domain: "LEAD",
+    title: "Edit a lead's own fields",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["PATCH /leads/{leadId}"],
+    notes: "Only what changes. A closed lead (won, lost, merged) is 422 stage_terminal.",
+  },
+  "LEAD-011": {
+    domain: "LEAD",
+    title: "Delete a lead",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["DELETE /leads/{leadId}"],
+    notes: "Soft delete, leads.delete only; its pending duplicate pairs close.",
+  },
+  "LEAD-012": {
+    domain: "LEAD",
+    title: "Duplicate review — dismiss a pair, or merge one lead into the other",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /leads/duplicates",
+      "POST /leads/duplicates/{linkId}/dismiss",
+      "POST /leads/{leadId}/merge",
+    ],
+    notes: "Neither lead may be won, lost or merged (merge_terminal); never into itself.",
+  },
+  "LEAD-013": {
+    domain: "LEAD",
+    title: "Lead QR codes — make, print, rename or switch off",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lead-qr-codes", "POST /lead-qr-codes", "PATCH /lead-qr-codes/{qrId}"],
+    notes:
+      "The code and its URL never change, so printed codes keep working. The QR is drawn here.",
+  },
+  "LEAD-014": {
+    domain: "LEAD",
+    title: "The public enquiry page — /enquiry, with or without a QR code",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /public/lead-form",
+      "GET /public/territories",
+      "POST /public/leads/verify",
+      "POST /public/leads",
+    ],
+    notes:
+      "No sign-in. The mobile is checked with a six-digit WhatsApp code before the lead is made.",
+  },
   "RPT-001": {
     domain: "RPT",
     title: "Dashboard overview — KPIs, pipeline, follow-ups",

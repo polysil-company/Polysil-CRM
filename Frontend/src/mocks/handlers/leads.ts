@@ -18,6 +18,8 @@ import {
   type LeadStatsWire,
   type TimelinePageWire,
   type LeadWire,
+  type DuplicatePageWire,
+  type DuplicatePairWire,
 } from "@/features/leads/api/leads.schemas";
 import { summarizeSchemaIssues } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
@@ -196,7 +198,7 @@ function nextInquiryNumber(): string {
   return `POL/GJ/2026-27/${String(highest + 1).padStart(5, "0")}`;
 }
 
-function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
+export function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
   const territory = findMockTerritory(body.territory_id);
   if (territory === undefined) {
     return errorResponse(422, "validation_error", "Some fields need correcting.", {
@@ -355,6 +357,53 @@ function replayStageChange(
   };
 }
 
+const patchLeadRequestSchema = createLeadRequestSchema.omit({ note: true }).partial();
+
+function validationError(fields: Record<string, string>): Response {
+  return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+}
+
+function mayDo(action: "edit" | "delete"): boolean {
+  return mockPermissionsFor(readMockRole()).some(
+    (permission) => permission.module === "leads" && permission.actions.includes(action),
+  );
+}
+
+/** Every pending pair once, both leads still there, newest lead first (LEAD-012). */
+function pendingPairs(): DuplicatePairWire[] {
+  const seen = new Set<string>();
+  const pairs: DuplicatePairWire[] = [];
+  for (const lead of mockDb.leads) {
+    for (const link of lead.duplicates ?? []) {
+      if (link.state !== "pending" || seen.has(link.link_id)) continue;
+      const other = mockDb.leads.find((item) => item.id === link.lead_id);
+      // A merged lead's pairs were re-pointed or closed when it merged.
+      if (other === undefined || other.stage === "merged" || lead.stage === "merged") continue;
+      seen.add(link.link_id);
+      const [a, b] = lead.created_at >= other.created_at ? [lead, other] : [other, lead];
+      pairs.push({
+        link_id: link.link_id,
+        signal: link.signal,
+        score: link.score ?? null,
+        state: "pending",
+        created_at: a.created_at,
+        lead_a: a,
+        lead_b: b,
+      });
+    }
+  }
+  return pairs.sort((x, y) => y.created_at.localeCompare(x.created_at));
+}
+
+/** Sets one pair's state on both leads. */
+function settleLink(linkId: string, state: "merged" | "dismissed"): void {
+  for (const lead of mockDb.leads) {
+    lead.duplicates = (lead.duplicates ?? []).map((link) =>
+      link.link_id === linkId ? { ...link, state } : link,
+    );
+  }
+}
+
 /**
  * Who the previewed role may make an owner: everyone for a global or office-tree lead
  * scope, nobody otherwise — as the backend's GET /leads/assignees answers.
@@ -471,6 +520,51 @@ export const leadHandlers = [
         lead.territory.name,
       ]),
     );
+  }),
+
+  /** LEAD-012 · The duplicate review queue. Before /leads/:leadId. */
+  http.get(buildApiUrl("/leads/duplicates"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+    const url = new URL(request.url);
+    const limit = Math.min(MAX_LIMIT, Number(url.searchParams.get("limit") ?? 20) || 20);
+    const cursor = url.searchParams.get("cursor");
+    const offset = cursor === null ? 0 : decodeCursor(cursor);
+    if (offset === null) return validationError({ cursor: "malformed cursor" });
+    const pairs = scenario === "empty" ? [] : pendingPairs();
+    const body: DuplicatePageWire = {
+      data: pairs.slice(offset, offset + limit),
+      meta: {
+        limit,
+        next_cursor: offset + limit < pairs.length ? encodeCursor(offset + limit) : null,
+        total: null,
+        total_capped: false,
+      },
+    };
+    return HttpResponse.json(body);
+  }),
+
+  /** LEAD-012 · Not a duplicate: the pair leaves the queue; both timelines record it. */
+  http.post(buildApiUrl("/leads/duplicates/:linkId/dismiss"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const linkId = String(params.linkId);
+    const idempotency = replayStageChange(request, linkId, null);
+    if (idempotency.kind === "respond") return idempotency.response;
+    if (!mayDo("edit")) return errorResponse(403, "forbidden", "You may not review duplicates.");
+    const pair = pendingPairs().find((item) => item.link_id === linkId);
+    if (pair === undefined) return errorResponse(404, "not_found", "No such pending pair.");
+    settleLink(linkId, "dismissed");
+    for (const id of [pair.lead_a.id, pair.lead_b.id]) {
+      const lead = mockDb.leads.find((item) => item.id === id);
+      if (lead !== undefined)
+        recordLeadEvent(lead, "lead.duplicate_dismissed", { link_id: linkId });
+    }
+    mockDb.stageChanges.set(idempotency.key, {
+      body: idempotency.serialized,
+      leadId: pair.lead_a.id,
+    });
+    return HttpResponse.json({ data: { link_id: linkId, state: "dismissed" } });
   }),
 
   http.get(buildApiUrl("/leads/:leadId"), async ({ params }) => {
@@ -779,6 +873,139 @@ export const leadHandlers = [
     recordLeadEvent(lead, "lead.assigned", payload);
     mockDb.stageChanges.set(idempotency.key, { body: idempotency.serialized, leadId: lead.id });
     return HttpResponse.json({ data: lead } satisfies LeadResponseWire);
+  }),
+
+  /** LEAD-010 · Correct the lead's own fields; a closed lead is refused. */
+  http.patch(buildApiUrl("/leads/:leadId"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const raw: unknown = await request.json();
+    const leadId = String(params.leadId);
+    const idempotency = replayStageChange(request, leadId, raw);
+    if (idempotency.kind === "respond") return idempotency.response;
+    if (!mayDo("edit")) return errorResponse(403, "forbidden", "You may not edit leads.");
+    const parsed = patchLeadRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      return validationError(
+        Object.fromEntries(
+          summarizeSchemaIssues(parsed.error).map((issue) => [issue.path, issue.message]),
+        ),
+      );
+    }
+    const lead = mockDb.leads.find((item) => item.id === leadId);
+    if (!lead) return errorResponse(404, "not_found", "No such lead.");
+    if (TERMINAL_STAGES.includes(lead.stage)) {
+      return errorResponse(422, "stage_terminal", "This lead is closed and cannot be edited.", {
+        stage: lead.stage,
+      });
+    }
+    const body = parsed.data;
+    const changed: Record<string, unknown> = {};
+    if (body.territory_id !== undefined && body.territory_id !== lead.territory.id) {
+      const territory = findMockTerritory(body.territory_id);
+      if (territory === undefined || territory.level === "state") {
+        return validationError({ territory_id: "a district, taluka or village in your scope" });
+      }
+      lead.territory = toTerritoryRef(territory);
+      changed.territory_id = body.territory_id;
+    }
+    if (body.crops !== undefined) {
+      const crops = mockLookupRows("crops");
+      lead.crops = body.crops.map((code) => ({
+        code,
+        name: crops.find((crop) => crop.code === code)?.name ?? code,
+        is_active: crops.find((crop) => crop.code === code)?.is_active !== false,
+      }));
+      changed.crops = body.crops;
+    }
+    const scalar = {
+      farmer_name: body.farmer_name,
+      mobile: body.mobile,
+      email: body.email,
+      village: body.village,
+      inquiry_type: body.inquiry_type,
+      mis_system: body.mis_system,
+      source: body.source ?? undefined,
+      estimated_value:
+        body.estimated_value === undefined
+          ? undefined
+          : body.estimated_value === null
+            ? null
+            : Number(body.estimated_value).toFixed(2),
+      land_acres:
+        body.land_acres === undefined
+          ? undefined
+          : body.land_acres === null
+            ? null
+            : Number(body.land_acres).toFixed(2),
+    } as const;
+    for (const [key, value] of Object.entries(scalar)) {
+      if (value === undefined) continue;
+      Object.assign(lead, { [key]: value });
+      changed[key] = value;
+    }
+    if (Object.keys(changed).length > 0) recordLeadEvent(lead, "lead.updated", { changed });
+    mockDb.stageChanges.set(idempotency.key, { body: idempotency.serialized, leadId: lead.id });
+    return HttpResponse.json({ data: lead } satisfies LeadResponseWire);
+  }),
+
+  /** LEAD-011 · Soft delete (leads.delete). The mock drops it; its pending pairs close. */
+  http.delete(buildApiUrl("/leads/:leadId"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const leadId = String(params.leadId);
+    const key = request.headers.get("idempotency-key")?.trim() ?? "";
+    if (key === "") {
+      return errorResponse(400, "idempotency_key_required", "An Idempotency-Key is required.");
+    }
+    if (!mayDo("delete")) return errorResponse(403, "forbidden", "You may not delete leads.");
+    const lead = mockDb.leads.find((item) => item.id === leadId);
+    if (lead !== undefined) {
+      for (const link of lead.duplicates ?? []) {
+        if (link.state === "pending") settleLink(link.link_id, "dismissed");
+      }
+      mockDb.leads = mockDb.leads.filter((item) => item.id !== leadId);
+    }
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  /** LEAD-012 · Merge this lead (the loser) into the survivor. */
+  http.post(buildApiUrl("/leads/:leadId/merge"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const raw: unknown = await request.json();
+    const leadId = String(params.leadId);
+    const idempotency = replayStageChange(request, leadId, raw);
+    if (idempotency.kind === "respond") return idempotency.response;
+    if (!mayDo("edit")) return errorResponse(403, "forbidden", "You may not merge leads.");
+    const into =
+      typeof raw === "object" && raw !== null && "into_lead_id" in raw ? raw.into_lead_id : null;
+    if (typeof into !== "string" || into === "") {
+      return validationError({ into_lead_id: "required" });
+    }
+    if (into === leadId) {
+      return errorResponse(422, "merge_self", "A lead cannot merge into itself.");
+    }
+    const loser = mockDb.leads.find((item) => item.id === leadId);
+    const survivor = mockDb.leads.find((item) => item.id === into);
+    if (!loser || !survivor) return errorResponse(404, "not_found", "No such lead.");
+    if (TERMINAL_STAGES.includes(loser.stage) || TERMINAL_STAGES.includes(survivor.stage)) {
+      return errorResponse(422, "merge_terminal", "A won, lost or merged lead cannot be merged.");
+    }
+    for (const link of loser.duplicates ?? []) {
+      if (link.state !== "pending") continue;
+      settleLink(link.link_id, link.lead_id === survivor.id ? "merged" : "dismissed");
+    }
+    loser.stage = "merged";
+    loser.merged_into = { id: survivor.id, inquiry_no: survivor.inquiry_no };
+    const payload = { loser: loser.id, survivor: survivor.id };
+    recordLeadEvent(survivor, "lead.merged", payload);
+    recordLeadEvent(loser, "lead.merged", payload);
+    mockDb.stageChanges.set(idempotency.key, {
+      body: idempotency.serialized,
+      leadId: survivor.id,
+    });
+    return HttpResponse.json({ data: survivor } satisfies LeadResponseWire);
   }),
 
   http.post(buildApiUrl("/leads"), async ({ request }) => {

@@ -11,6 +11,10 @@ import {
   addLeadNote,
   assignLead,
   createLead,
+  deleteLead,
+  dismissDuplicate,
+  mergeLead,
+  patchLead,
   reopenLead,
   transitionLead,
   type AddLeadNoteInput,
@@ -130,6 +134,68 @@ export function useAssignLead(): UseMutationResult<Lead, Error, AssignLeadInput>
     },
     onError: (_error, { leadId }) => {
       void queryClient.invalidateQueries({ queryKey: leadKeys.detail(leadId) });
+    },
+  });
+}
+
+/** LEAD-010 · Correct the lead's own fields. */
+export function usePatchLead(): UseMutationResult<Lead, Error, Parameters<typeof patchLead>[0]> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...leadKeys.all, "patch"],
+    mutationFn: patchLead,
+    meta: { dataId: "LEAD-010" },
+    onSuccess: (lead) => {
+      applyLeadChange(queryClient, lead);
+    },
+  });
+}
+
+/** LEAD-011 · Delete a lead. The page leaves it, so the lists and counts refetch. */
+export function useDeleteLead(): UseMutationResult<void, Error, Parameters<typeof deleteLead>[0]> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...leadKeys.all, "delete"],
+    mutationFn: deleteLead,
+    meta: { dataId: "LEAD-011" },
+    onSuccess: (_result, { leadId }) => {
+      queryClient.removeQueries({ queryKey: leadKeys.detail(leadId) });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.stats() });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.duplicates() });
+    },
+  });
+}
+
+/** LEAD-012 · Not a duplicate: the pair leaves the queue; both leads refetch. */
+export function useDismissDuplicate(): UseMutationResult<
+  { linkId: string },
+  Error,
+  Parameters<typeof dismissDuplicate>[0]
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...leadKeys.all, "dismiss-duplicate"],
+    mutationFn: dismissDuplicate,
+    meta: { dataId: "LEAD-012" },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: leadKeys.duplicates() });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.details() });
+    },
+  });
+}
+
+/** LEAD-012 · Merge one lead into another; the survivor comes back. */
+export function useMergeLead(): UseMutationResult<Lead, Error, Parameters<typeof mergeLead>[0]> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...leadKeys.all, "merge"],
+    mutationFn: mergeLead,
+    meta: { dataId: "LEAD-012" },
+    onSuccess: (survivor, { leadId }) => {
+      applyLeadChange(queryClient, survivor);
+      void queryClient.invalidateQueries({ queryKey: leadKeys.detail(leadId) });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.duplicates() });
     },
   });
 }

@@ -15,7 +15,7 @@
 - `activity_event_sel` gains the `campaign` arm from `api/authz/activity.py`.
 
 Revision ID: 049_campaigns
-Revises: 048_complaint_escalation
+Revises: 043_whatsapp_webhook_capture
 """
 
 # ruff: noqa: E501  (embedded SQL)
@@ -29,7 +29,7 @@ from types import ModuleType
 from alembic import op
 
 revision: str = "049_campaigns"
-down_revision: str | None = "048_complaint_escalation"
+down_revision: str | None = "043_whatsapp_webhook_capture"
 branch_labels = None
 depends_on = None
 
