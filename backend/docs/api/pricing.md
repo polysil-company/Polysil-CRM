@@ -333,6 +333,7 @@ base, and nobody has told us which.
 | `as_of` | date \| null |  | Price against the masters in force on this date. Today in India by default. A future date is allowed and warns; more than a year ahead is refused. |
 | `partner_id` | string \| null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
 | `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
 
 **Responses**
 
@@ -532,6 +533,7 @@ base, and nobody has told us which.
 | `as_of` | date \| null |  | Price against the masters in force on this date. Today in India by default. A future date is allowed and warns; more than a year ahead is refused. |
 | `partner_id` | string \| null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
 | `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
 
 **`QuoteLinesResponse`**
 

@@ -491,7 +491,7 @@ async def test_cancel_and_delete_follow_the_state_table(client: httpx.AsyncClien
 async def test_a_zero_total_and_an_unbuilt_type_are_refused(client: httpx.AsyncClient,
                                                             shop: Shop) -> None:
     ho = await _as(client, shop, "field_officer")
-    r = await client.post(f"{V1}/orders", json=_direct(shop, order_type="export"),
+    r = await client.post(f"{V1}/orders", json=_direct(shop, order_type="marketing_material"),
                           headers={**ho, **_key()})
     assert r.status_code == 422 and r.json()["error"]["code"] == "order_type_unsupported"
     free = _direct(shop)

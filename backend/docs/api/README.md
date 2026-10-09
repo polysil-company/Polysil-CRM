@@ -34,6 +34,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Reports | 9 | [`reports.md`](reports.md) |
 | Rewards | 19 | [`rewards.md`](rewards.md) |
 | Schemes | 6 | [`schemes.md`](schemes.md) |
+| Seller Gstins | 3 | [`seller-gstins.md`](seller-gstins.md) |
 | Settings | 2 | [`settings.md`](settings.md) |
 | Stock | 7 | [`stock.md`](stock.md) |
 | Subsidy | 4 | [`subsidy.md`](subsidy.md) |

@@ -461,6 +461,10 @@ One approval chain.
 | `seller` | OrderSeller \| null | yes | The selling registration at the tax date. |
 | `place_of_supply` | TerritoryRef | yes |  |
 | `intra_state` | boolean | yes |  |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` | yes | domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or export_igst. Fixed when the order is created. |
+| `export_country` | string \| null | yes |  |
+| `lut_arn` | string \| null | yes | The LUT an export_lut order is zero-rated under. Taken at submit; null on a draft. |
+| `sample_pricing` | `free` \| `charged` \| null | yes | On a sample only. free: every line 100 % off, total 0, and the approval runs on the gross. |
 | `price_effective_date` | string | yes |  |
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
@@ -716,6 +720,9 @@ One approval chain.
 | `seller_gstin` | SellerRef | yes |  |
 | `place_of_supply` | PlaceOfSupply | yes |  |
 | `intra_state` | boolean | yes |  |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` | yes | domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or export_igst. Fixed when the quotation is created; a revision keeps it. |
+| `export_country` | string \| null | yes |  |
+| `lut_arn` | string \| null | yes | The LUT an export_lut quotation is zero-rated under, as of its price date. |
 | `price_effective_date` | string | yes |  |
 | `price_list` | PriceListRef \| null | yes | Null when the lines drew from more than one list. |
 | `price_list_ids` | string[] | yes |  |
