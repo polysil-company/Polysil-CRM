@@ -2134,6 +2134,38 @@ def f_lead_small_gaps() -> None:
          ("n3", "Ours: 60 days, what keeps a lead open, only Reopen\nwakes it, nobody told (GAP-339 to GAP-342).", YELLOW)])
 
 
+def f_campaigns() -> None:
+    _columns(
+        "50-campaigns", "Campaigns: which campaign brought the lead, and what it cost",
+        "Marketing keeps the list; a lead or QR code names one; a report sets cost against leads and sales.",
+        "BUILT. FS-040: /campaigns, /reports/campaign-performance, migration 049.",
+        [("s1", "Marketing: POST /campaigns\nname, type, dates, area, planned and actual cost", BLUE),
+         ("s2", "staff put an active campaign on a lead\n(POST or PATCH /leads campaign_id)", GREEN),
+         ("s3", "a QR code with a campaign: its leads take it\ntrg_lead_campaign_from_qr, at insert", GREEN),
+         ("s4", "GET /reports/campaign-performance\nleads created in the window, their sales whenever sold", VIOLET)],
+        [("d1", "switched off: no new lead or code takes it\nlinked codes keep crediting it (GAP-254)", YELLOW),
+         ("d2", "delete only while nothing names it\ncampaign_in_use counts hidden leads too", YELLOW),
+         ("d3", "merge: an unlinked survivor takes the loser's", GREY)],
+        [("n1", "COST IS FOR campaigns.view\n\nEvery staff user reads the list (the lead form's\npicker). Cost is cut in the service, and a cost\nchange never puts the figure in the event.", RED),
+         ("n2", "COST PER LEAD NEEDS A WHOLE WINDOW\n\nThe whole cost against the leads in the window.\nA window over half the campaign doubles it\n(GAP-252).", RED),
+         ("n3", "Not yet: an editable type list, history before 049,\nattribution that expires (GAP-250 to GAP-257).", YELLOW)])
+
+
+def f_customer_record() -> None:
+    _columns(
+        "51-customer-record", "Customer record: one farmer across leads, quotations and orders",
+        "A lead reaching qualified finds or makes its customer by mobile.",
+        "BUILT. FS-041: /customers, migration 050.",
+        [("s1", "a lead moves to qualified, quoted, negotiation\nor won, by any path", BLUE),
+         ("s2", "trg_lead_link_customer (definer)\nINSERT ... ON CONFLICT (mobile) DO NOTHING, read again", GREEN),
+         ("s3", "GET /customers/{id}\nits leads, quotations, orders that you can see", VIOLET),
+         ("s4", "GET /customers/{id}/timeline\neach visible lead's own timeline, merged", VIOLET)],
+        [("d1", "PATCH: staff with leads.edit; consent stamp\nre-sent unchanged keeps the first date", YELLOW),
+         ("d2", "merge: an unlinked survivor takes the loser's", GREY),
+         ("d3", "050 backfill: the oldest lead that got past\ncontacted names the customer", GREY)],
+        [("n1", "SEE A LEAD, SEE ITS CUSTOMER\n\ncustomer_sel is EXISTS over lead, under the\nlead's own policies. The customer's details show\nto everyone who sees any of its leads (GAP-263).", RED),
+         ("n2", "CUSTOMER EVENTS CARRY NO lead_id\n\nThey would land on every lead timeline and\nbreak its counts.", RED),
+         ("n3", "Not yet: shared phones, a customer merge, orders\nwithout a lead (GAP-258 to GAP-264).", YELLOW)])
 def f_settings_amend_reopen() -> None:
     _columns(
         "47-settings-amend-reopen", "Company settings, amending an approved order, reopening a complaint",
@@ -2189,24 +2221,35 @@ def f_whatsapp_webhook() -> None:
          ("n3", "Ours: 30 days kept, no rate limit, a call during\na DB outage is lost (GAP-356, GAP-357).", YELLOW)])
 
 
-
-def f_new_state_scheme() -> None:
+def f_consumer_portal() -> None:
     _columns(
-        "50-new-state-subsidy-scheme", "A new state's subsidy scheme",
-        "The admin adds another state's scheme; applications take the scheme of the lead's state.",
-        "BUILT. FS-039: /subsidy-schemes, migration 044.",
-        [("s1", "POST /subsidy-schemes\ncode, name, state, template GGRC", GREY),
-         ("s2", "subsidy_scheme_create(): mode lock, state row FOR UPDATE;\ncopies engine settings + every stage and field", BLUE),
-         ("s3", "readiness: what a calculation would refuse on,\nthrough the engine's own reads, in its order", GREEN),
-         ("s4", "admin fills figures through the FS-009a\nrevisions and matrices until ready", BLUE),
-         ("s5", "POST /subsidy-applications: the lead's state's scheme;\nthe definer checks again under the state lock", GREEN)],
-        [("d1", "GET /subsidy-schemes/for-lead/{id}\nthe scheme the preview must send", VIOLET),
-         ("d2", "PATCH: rename, switch off, link GGRC to its state once;\nrename a stage", YELLOW),
-         ("d3", "PIMS export: GGRC only (GAP-363)", YELLOW)],
-        [("n1", "NO FIGURE IS COPIED\n\nA copied GGRC Jantri would quote a UP farmer a Gujarat\nsubsidy with no warning. An empty scheme refuses to\ncalculate and the panel says what is missing.", RED),
-         ("n2", "LEGACY MODE\n\nWhile no active scheme has a state, every lead takes GGRC.\nOnce one has, an unmapped state is refused. The API\nnever lets the two mix (409 unlinked_scheme_exists).", RED),
-         ("n3", "citext = text compares as text: codes are stored\nupper case and every lookup uses upper(:c).", RED),
-         ("n4", "Ours: one active scheme per state, stages copied from\nGGRC, GGRC's formulas only (GAP-359 to GAP-361).", YELLOW)])
+        "52-consumer-portal", "Consumer portal: a farmer reads their own record",
+        "Off by default. A consumer account per customer; the switch flips them all.",
+        "BUILT. FS-044: /portal, migration 052.",
+        [("s1", "customer made at qualification (FS-041)\ntrigger: consumer app_user on its Indian mobile", BLUE),
+         ("s2", "admin: PATCH /settings consumer_portal = on\nevery live consumer account active", YELLOW),
+         ("s3", "farmer: OTP request and verify\nget_db lets a consumer reach /auth and /portal only", GREEN),
+         ("s4", "GET /portal/*: definers keyed on portal_customer()\nleads still on the customer's own number", VIOLET)],
+        [("d1", "off: accounts inactive, token_version bumped\nnext request 401", YELLOW),
+         ("d2", "a staff or dealer user on a farmer's number\nreleases the consumer account", GREY),
+         ("d3", "PATCH /portal/me: consent, channel portal", GREY)],
+        [("n1", "THE CONSUMER FLOOR\n\nOne restrictive policy on every RLS table.\n\"Not a partner\" is not staff: before it, a\nconsumer read about 50 tables. A new RLS table\nadds consumer_floor.policy_sql(t).", RED),
+         ("n2", "SWITCHING ON COSTS MONEY\n\nEvery customer number can be sent a paid\nWhatsApp code; no overall ceiling (GAP-269).", RED),
+         ("n3", "Not yet: complaints, ratings, products from the\nportal (GAP-265, question 10.3).", YELLOW)])
+
+
+def f_assistant() -> None:
+    _columns(
+        "53-in-app-assistant", "In-app assistant: one search box for actions and records",
+        "A navigation aid, no model.",
+        "BUILT. FS-045: /assistant, no migration.",
+        [("s1", "GET /assistant?q=...\nthe catalogue in api/domain/assistant.py", BLUE),
+         ("s2", "actions: any-of permission sets the caller holds\nstaff-only and the dealer-tasks gate", GREEN),
+         ("s3", "records from 3 characters: number, mobile, name\nscope_predicate and RLS, never deleted or merged", VIOLET)],
+        [("d1", "customers come from the matched leads", GREY),
+         ("d2", "one row per quotation number:\nthe current version", GREY)],
+        [("n1", "RLS ALONE IS NOT ENOUGH\n\nEvery read carries the service predicate too\n(ADR-039, plan review B-1).", RED),
+         ("n2", "Not yet: Hindi and Gujarati action words,\npattern indexes, numberless drafts (GAP-268,\nGAP-273, GAP-274).", YELLOW)])
 
 
 if __name__ == "__main__":
@@ -2218,5 +2261,6 @@ if __name__ == "__main__":
     f_reports(); f_targets()
     f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
     f_subsidy_follow_ups(); f_lead_small_gaps()
-    f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
+    f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
+    f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook()
     print(f"\nwrote to {OUT}")

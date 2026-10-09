@@ -81,6 +81,33 @@ someone who is not active staff.
 
 ---
 
+## `GET /api/v1/conversations/{conversation_id}`
+
+**Get Conversation**
+
+One of your conversations: the colleague, the last message and your unread
+count. Works before anyone has written in it, so a thread opened from a link or
+after a reload can name whom it writes to. `404` when it is not yours.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `conversation_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Conversation_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
+| `404` | `ErrorResponse` | Not a conversation you are in. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
 ## `GET /api/v1/conversations/{conversation_id}/messages`
 
 **List Messages**

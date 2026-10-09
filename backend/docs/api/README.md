@@ -8,8 +8,11 @@ any endpoint change, so it is always current rather than a snapshot.
 | Module | Endpoints | Doc |
 |---|---|---|
 | Approvals | 5 | [`approvals.md`](approvals.md) |
+| Assistant | 2 | [`assistant.md`](assistant.md) |
 | Auth | 7 | [`auth.md`](auth.md) |
+| Campaigns | 5 | [`campaigns.md`](campaigns.md) |
 | Complaints | 22 | [`complaints.md`](complaints.md) |
+| Customers | 4 | [`customers.md`](customers.md) |
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
 | Dealer Commission | 12 | [`dealer-commission.md`](dealer-commission.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
@@ -17,17 +20,18 @@ any endpoint change, so it is always current rather than a snapshot.
 | Leads | 20 | [`leads.md`](leads.md) |
 | Lookups | 23 | [`lookups.md`](lookups.md) |
 | Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
-| Messages | 6 | [`messages.md`](messages.md) |
+| Messages | 7 | [`messages.md`](messages.md) |
 | Notifications | 2 | [`notifications.md`](notifications.md) |
 | Orders | 17 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 7 | [`partners.md`](partners.md) |
 | Payments | 8 | [`payments.md`](payments.md) |
+| Portal | 6 | [`portal.md`](portal.md) |
 | Pricing | 8 | [`pricing.md`](pricing.md) |
 | Products | 8 | [`products.md`](products.md) |
 | Public | 6 | [`public.md`](public.md) |
 | Quotations | 14 | [`quotations.md`](quotations.md) |
-| Reports | 8 | [`reports.md`](reports.md) |
+| Reports | 9 | [`reports.md`](reports.md) |
 | Rewards | 19 | [`rewards.md`](rewards.md) |
 | Schemes | 6 | [`schemes.md`](schemes.md) |
 | Settings | 2 | [`settings.md`](settings.md) |

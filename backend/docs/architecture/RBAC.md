@@ -577,6 +577,7 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | pricing | V:global | V:global | V:global | V:global | V:global CEAD | V:global CEAD |
 | partners | V:org | V:org CE | V:org CE | V:org | V:global CEAD | V:global CEAD |
 | marketing_material | V:global C | V:global CA | V:global CA | V:global A | V:global CEAD | V:global CEAD |
+| campaigns | | | | | V:global | V:global |
 | rewards | V:own | V:org | V:org | V:org | V:global CEAD | V:global CEAD |
 | tasks | V:own CE | V:org CE | V:org CE | V:org CE | V:global CEAD | V:global CEAD |
 | reports | V:own | V:org | V:org | V:org | V:global | V:global |
@@ -607,6 +608,8 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | tasks | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
 | chat | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
 | stock | V:global | V:global C | V:global | V:global | V:global | V:global |
+
+*FS-040: every staff user reads the campaign list (the lead form's picker), whatever this row says. The service hides cost from anyone without `campaigns` view; RLS is the row floor (ADR-039).*
 
 State Co-ordinators own subsidy stage entry (ADR-030), scoped by `user_territory`.
 

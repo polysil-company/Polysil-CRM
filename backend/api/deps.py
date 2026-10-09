@@ -65,7 +65,7 @@ log = structlog.get_logger()
 # held.
 _CLAIMS_QUERY = text(
     """
-    SELECT u.is_active, u.token_version, u.must_change_password
+    SELECT u.is_active, u.token_version, u.must_change_password, u.user_type::text AS user_type
       FROM app_user u
       JOIN session s ON s.id = :sid AND s.user_id = u.id
      WHERE u.id = :sub
@@ -92,6 +92,18 @@ def _password_change_allowed(request: Request) -> bool:
     path = getattr(route, "path", None) or request.url.path
     path = _API_PREFIX_RE.sub("", path)
     return (request.method.upper(), path) in _PASSWORD_CHANGE_ALLOWED
+
+
+# FS-044: a consumer reaches the auth routes and the portal, nothing else. Checked
+# here, on the matched route, so a new router can never forget it (plan review B-1);
+# the consumer floor in the database is the second belt.
+_CONSUMER_PREFIXES = ("/auth", "/portal")
+
+
+def _consumer_allowed(request: Request) -> bool:
+    route = request.scope.get("route")
+    path = _API_PREFIX_RE.sub("", getattr(route, "path", None) or request.url.path)
+    return any(path == p or path.startswith(p + "/") for p in _CONSUMER_PREFIXES)
 
 
 def bearer_token(request: Request) -> str | None:
@@ -138,6 +150,8 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
         # answer is password_change_required rather than insufficient_permission.
         if row.must_change_password and not _password_change_allowed(request):
             raise PasswordChangeRequiredError()
+        if row.user_type == "consumer" and not _consumer_allowed(request):
+            raise ForbiddenError("This is for staff and dealers.", code="consumer_not_allowed")
 
         # TRANSACTION-LOCAL. The third argument is the whole point: a plain SET
         # here leaks this user's identity onto whichever request next borrows this
@@ -348,7 +362,8 @@ def require_any(*pairs: tuple[str, str]) -> Callable[..., Coroutine[Any, Any, No
 # predicate for it is the self row or false -- the service never issues an
 # unscoped read (rule 2).
 _ANCHOR_QUERY = text(
-    "SELECT org_unit_id, partner_id FROM app_user WHERE id = (SELECT app_current_user_id())"
+    "SELECT org_unit_id, partner_id, user_type::text AS user_type FROM app_user "
+    "WHERE id = (SELECT app_current_user_id())"
 )
 _PERMS_QUERY = text(
     "SELECT rp.module, rp.action::text AS action, rp.scope::text AS scope "
@@ -369,6 +384,8 @@ async def get_caller(db: DbSession, claims: Claims) -> Caller:
         partner_id=str(anchor.partner_id) if anchor.partner_id is not None else None,
         scopes={r.module: r.scope for r in rows if r.action == "view"},
         deletes=frozenset(r.module for r in rows if r.action == "delete"),
+        user_type=anchor.user_type,
+        permissions=frozenset((r.module, r.action) for r in rows),
     )
 
 

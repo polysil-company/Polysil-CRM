@@ -151,7 +151,7 @@ async def _create(db: AsyncSession, challenge_id: str | None, body: sch.PublicLe
                    territory_id=body.territory_id, village=body.village,
                    mis_system=body.mis_system, inquiry_type=body.inquiry_type,
                    note=body.note, source="qr_code" if qr else "website",
-                   email=None, estimated_value=None),
+                   email=None, estimated_value=None, campaign_id=None),
         intake=True, intake_partner_id=qr[1] if qr else None,
         qr_code_id=qr[0] if qr else None)
     await _record(db, challenge_id, lead.id)
@@ -183,12 +183,14 @@ async def _qr(db: AsyncSession, code: str | None) -> tuple[str, str | None] | No
 
 _QR_SELECT = """
 SELECT q.id, q.code::text AS code, q.label, q.campaign, q.is_active, q.created_at,
+       q.campaign_id, cmp.name::text AS campaign_name,
        q.partner_id, cp.name AS partner_name, cp.partner_type::text AS partner_type,
        q.territory_id, t.name AS territory_name, t.level::text AS territory_level,
        (SELECT count(*) FROM lead l WHERE l.qr_code_id = q.id) AS lead_count
   FROM lead_qr_code q
   LEFT JOIN channel_partner cp ON cp.id = q.partner_id
-  LEFT JOIN territory t ON t.id = q.territory_id"""
+  LEFT JOIN territory t ON t.id = q.territory_id
+  LEFT JOIN campaign cmp ON cmp.id = q.campaign_id"""
 
 
 def _qr_out(r: Any) -> sch.QrCode:
@@ -196,6 +198,7 @@ def _qr_out(r: Any) -> sch.QrCode:
     return sch.QrCode(
         id=str(r.id), code=r.code, url=f"{base}/enquiry?qr={r.code}", label=r.label,
         campaign=r.campaign, is_active=r.is_active, lead_count=int(r.lead_count),
+        campaign_id=str(r.campaign_id) if r.campaign_id else None, campaign_name=r.campaign_name,
         partner=(PartnerRef(id=str(r.partner_id), name=r.partner_name,
                             partner_type=r.partner_type) if r.partner_id and r.partner_name
                  else None),
@@ -221,16 +224,18 @@ async def create_qr(db: AsyncSession, caller: Caller, body: sch.QrCodeCreate) ->
     if body.territory_id is not None:
         # the form it prefills would refuse a state after the farmer's code (FS-016 EC-11)
         await lead_service.check_lead_territory(db, str(body.territory_id))
+    await lead_service.check_campaign(db, body.campaign_id)
     for _ in range(5):
         code = "".join(secrets.choice(QR_ALPHABET) for _ in range(QR_LENGTH))
         try:
             async with db.begin_nested():
                 new_id: Any = (await db.execute(text(
                     "INSERT INTO lead_qr_code (code, label, campaign, partner_id, territory_id, "
-                    "owner_org_unit_id, created_by, updated_by) VALUES (:c, :l, :cmp, "
+                    "owner_org_unit_id, created_by, updated_by, campaign_id) VALUES (:c, :l, :cmp, "
                     "CAST(:p AS uuid), CAST(:t AS uuid), CAST(:u AS uuid), CAST(:me AS uuid), "
-                    "CAST(:me AS uuid)) RETURNING id"),
-                    {"c": code, "l": body.label, "cmp": body.campaign, "p": body.partner_id,
+                    "CAST(:me AS uuid), CAST(:cid AS uuid)) RETURNING id"),
+                    {"c": code, "l": body.label, "cmp": body.campaign, "cid": body.campaign_id,
+                     "p": body.partner_id,
                      "t": body.territory_id, "u": unit, "me": caller.user_id})).scalar_one()
         except IntegrityError as exc:
             if "uq_lead_qr_code_code" in str(exc.orig):
@@ -250,9 +255,10 @@ async def create_qr(db: AsyncSession, caller: Caller, body: sch.QrCodeCreate) ->
             "INSERT INTO activity_event (entity_type, entity_id, kind, actor_id, payload) "
             "VALUES ('lead_qr_code', :i, 'lead_qr_code.created', CAST(:me AS uuid), "
             "jsonb_build_object('code', CAST(:c AS text), 'label', CAST(:l AS text), "
-            "'partner_id', CAST(:p AS text), 'territory_id', CAST(:t AS text)))"),
+            "'partner_id', CAST(:p AS text), 'territory_id', CAST(:t AS text), "
+            "'campaign_id', CAST(:cid AS text)))"),
             {"i": new_id, "me": caller.user_id, "c": code, "l": body.label,
-             "p": body.partner_id, "t": body.territory_id})
+             "p": body.partner_id, "t": body.territory_id, "cid": body.campaign_id})
         row = (await db.execute(text(_QR_SELECT + " WHERE q.id = :i"), {"i": new_id})).one()
         return _qr_out(row)
     raise RuntimeError("no free QR code after five tries")
@@ -279,7 +285,8 @@ async def patch_qr(db: AsyncSession, caller: Caller, qr_id: str,
         if f in fields and getattr(body, f) is None:
             raise ValidationFailed(fields={f: "cannot be cleared"})
     row = (await db.execute(text(
-        "SELECT label, campaign, partner_id, territory_id, is_active FROM lead_qr_code "
+        "SELECT label, campaign, partner_id, territory_id, is_active, campaign_id "
+        "FROM lead_qr_code "
         "WHERE id = CAST(:i AS uuid) FOR UPDATE"), {"i": qr_id})).one_or_none()
     if row is None:
         raise NotFoundError("No such QR code.")
@@ -287,7 +294,8 @@ async def patch_qr(db: AsyncSession, caller: Caller, qr_id: str,
         "label": row.label, "campaign": row.campaign,
         "partner_id": str(row.partner_id) if row.partner_id else None,
         "territory_id": str(row.territory_id) if row.territory_id else None,
-        "is_active": row.is_active}
+        "is_active": row.is_active,
+        "campaign_id": str(row.campaign_id) if row.campaign_id else None}
     new = {**old, **{f: getattr(body, f) for f in fields}}
     changed = {f: new[f] for f in fields if new[f] != old[f]}
     if not changed:
@@ -301,6 +309,8 @@ async def patch_qr(db: AsyncSession, caller: Caller, qr_id: str,
             raise ValidationFailed(fields={"partner_id": "not found"})
     if "territory_id" in changed and new["territory_id"] is not None:
         await lead_service.check_lead_territory(db, str(new["territory_id"]))
+    if "campaign_id" in changed:
+        await lead_service.check_campaign(db, new["campaign_id"])
     if caller.scopes.get("leads") == "territory":
         # the policy's WITH CHECK, asked first so the answer is a 422 (FS-035 rule 15)
         mine = new["territory_id"] is not None and bool((await db.execute(text(
@@ -312,9 +322,9 @@ async def patch_qr(db: AsyncSession, caller: Caller, qr_id: str,
             raise ValidationFailed(fields={"territory_id": "choose a territory in your area"})
     await db.execute(text(
         "UPDATE lead_qr_code SET label = :l, campaign = :c, partner_id = CAST(:p AS uuid), "
-        "territory_id = CAST(:t AS uuid), is_active = :a, updated_by = CAST(:me AS uuid) "
-        "WHERE id = CAST(:i AS uuid)"),
-        {"l": new["label"], "c": new["campaign"], "p": new["partner_id"],
+        "territory_id = CAST(:t AS uuid), is_active = :a, updated_by = CAST(:me AS uuid), "
+        "campaign_id = CAST(:cid AS uuid) WHERE id = CAST(:i AS uuid)"),
+        {"l": new["label"], "c": new["campaign"], "p": new["partner_id"], "cid": new["campaign_id"],
          "t": new["territory_id"], "a": new["is_active"], "me": caller.user_id, "i": qr_id})
     # CLAUDE.md 4.1 rule 7, in the same transaction
     await db.execute(text(

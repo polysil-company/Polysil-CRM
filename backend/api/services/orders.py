@@ -580,7 +580,7 @@ def _order_filters(caller: Caller, *, status: str | None = None,
                    order_type: str | None = None, partner_id: str | None = None,
                    lead_id: str | None = None, owner: str | None = None, q: str | None = None,
                    created_from: str | None = None, created_to: str | None = None,
-                   quotation_id: str | None = None) -> list[Any]:
+                   quotation_id: str | None = None, waiting_on: str | None = None) -> list[Any]:
     """The scope and every filter of the order list, shared with the counts."""
     where: list[Any] = [scope_predicate(_ORDERS, caller, order_t)]
     if status:
@@ -599,6 +599,23 @@ def _order_filters(caller: Caller, *, status: str | None = None,
         where.append(sa.exists(
             sa.select(sa.literal(1)).select_from(_oq_t)
             .where(_oq_t.c.sales_order_id == order_t.c.id, _oq_t.c.quotation_id == quotation_id)))
+    if waiting_on:
+        # BE-022: the role of the lowest undecided step of a pending request, the same
+        # rule as the row's approval_waiting_on, read under the same policies
+        step = _step_t.alias("s")
+        lower = _step_t.alias("lower")
+        where.append(sa.exists(
+            sa.select(sa.literal(1))
+            .select_from(_request_t.join(step, step.c.request_id == _request_t.c.id)
+                         .join(_role_t, _role_t.c.id == step.c.approver_role_id))
+            .where(_request_t.c.doc_type == "sales_order",
+                   _request_t.c.entity_id == order_t.c.id,
+                   sa.cast(_request_t.c.status, sa.Text) == "pending",
+                   step.c.decision.is_(None),
+                   sa.cast(_role_t.c.code, sa.Text) == waiting_on,
+                   ~sa.exists(sa.select(sa.literal(1)).where(
+                       lower.c.request_id == step.c.request_id,
+                       lower.c.decision.is_(None), lower.c.seq < step.c.seq)))))
     if owner == "me":
         where.append(order_t.c.owner_user_id == caller.user_id)
     elif owner:
@@ -663,12 +680,13 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
                       created_from: str | None = None, created_to: str | None = None,
                       limit: int = 25, cursor: str | None = None,
                       include_total: bool = False,
-                      quotation_id: str | None = None) -> sch.OrderPage:
+                      quotation_id: str | None = None,
+                      waiting_on: str | None = None) -> sch.OrderPage:
     limit = max(1, min(limit, _MAX_LIMIT))
     where = _order_filters(caller, status=status, order_type=order_type,
                            partner_id=partner_id, lead_id=lead_id, owner=owner, q=q,
                            created_from=created_from, created_to=created_to,
-                           quotation_id=quotation_id)
+                           quotation_id=quotation_id, waiting_on=waiting_on)
     filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)
