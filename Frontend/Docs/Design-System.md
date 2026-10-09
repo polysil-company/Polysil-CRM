@@ -96,6 +96,7 @@ In light mode `text-subtle-foreground` is as dark as `text-muted-foreground`: a 
 | `bg-secondary` / `hover:bg-secondary-hover` | Secondary actions | — |
 | `bg-destructive` | Irreversible actions (delete) | Error *messages* (use `danger`) |
 | `bg-highlight`, `bg-row-selected` | Selection only | Status, emphasis |
+| `bg-scan-surface` | Behind a QR code: white in light and dark, so a camera reads it | Anything else |
 | `text-success` / `bg-success-soft` | Won, completed, positive change | Brand accents |
 | `text-warning` / `bg-warning-soft` | Needs attention, negotiation | — |
 | `text-danger` / `bg-danger-soft` | Errors, lost, overdue | Destructive *buttons* |

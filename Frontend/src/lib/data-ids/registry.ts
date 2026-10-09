@@ -270,6 +270,29 @@ export const DATA_IDS = {
     ],
     notes: "Neither lead may be won, lost or merged (merge_terminal); never into itself.",
   },
+  "LEAD-013": {
+    domain: "LEAD",
+    title: "Lead QR codes — make, print, rename or switch off",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lead-qr-codes", "POST /lead-qr-codes", "PATCH /lead-qr-codes/{qrId}"],
+    notes:
+      "The code and its URL never change, so printed codes keep working. The QR is drawn here.",
+  },
+  "LEAD-014": {
+    domain: "LEAD",
+    title: "The public enquiry page — /enquiry, with or without a QR code",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /public/lead-form",
+      "GET /public/territories",
+      "POST /public/leads/verify",
+      "POST /public/leads",
+    ],
+    notes:
+      "No sign-in. The mobile is checked with a six-digit WhatsApp code before the lead is made.",
+  },
   "RPT-001": {
     domain: "RPT",
     title: "Dashboard overview — KPIs, pipeline, follow-ups",
