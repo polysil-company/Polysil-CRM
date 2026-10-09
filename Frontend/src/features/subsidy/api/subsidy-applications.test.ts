@@ -190,7 +190,7 @@ describe("[SUBS-006] Stages and cancel", () => {
 
   it("records a stage with its values, sets the Reg. No., and wants a remark going back", async () => {
     const id = await fresh();
-    const stages = await listStageDefs();
+    const stages = await listStageDefs(null);
     expect(stages.map((stage) => stage.seq)).toEqual([
       4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
     ]);

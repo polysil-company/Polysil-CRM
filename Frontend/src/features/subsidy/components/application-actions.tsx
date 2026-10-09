@@ -59,6 +59,9 @@ const log = createLogger({
   dataId: "SUBS-006",
 });
 
+/** The scheme whose portal takes the PIMS sheet. */
+const PIMS_SCHEME = "GGRC";
+
 type Refusal = { readonly title: string; readonly message: string } | null;
 
 /** A closed or cancelled application refuses entries with 409 status_changed. */
@@ -103,6 +106,8 @@ export function ApplicationActions({
 }): React.JSX.Element {
   const [dialog, setDialog] = useState<"stage" | "cancel" | null>(null);
   const open = application.status === "open";
+  // The PIMS sheet is GGRC's portal format; other schemes have none yet (backend GAP-363).
+  const hasPims = application.scheme === PIMS_SCHEME;
   const pims = useAsyncAction({
     action: () => downloadPims(application.id),
     logger: log,
@@ -112,8 +117,11 @@ export function ApplicationActions({
       saveFile(file, `pims-${application.number.replaceAll("/", "-")}.xlsx`);
     },
     onError: (error) => {
-      const view = toUserFacingError(error);
-      toast.error("The PIMS sheet couldn't be downloaded", { description: view.description });
+      const description =
+        isApiError(error) && error.code === "pims_not_for_scheme"
+          ? "Only GGRC applications have a PIMS sheet."
+          : toUserFacingError(error).description;
+      toast.error("The PIMS sheet couldn't be downloaded", { description });
     },
   });
   const close = (): void => {
@@ -122,19 +130,21 @@ export function ApplicationActions({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
-        variant="outline"
-        state={pims.state}
-        loadingLabel="Downloading…"
-        successLabel="Downloaded"
-        errorLabel="Not downloaded"
-        onClick={() => {
-          void pims.run();
-        }}
-      >
-        <Icon icon={Download04Icon} />
-        PIMS sheet
-      </Button>
+      {hasPims ? (
+        <Button
+          variant="outline"
+          state={pims.state}
+          loadingLabel="Downloading…"
+          successLabel="Downloaded"
+          errorLabel="Not downloaded"
+          onClick={() => {
+            void pims.run();
+          }}
+        >
+          <Icon icon={Download04Icon} />
+          PIMS sheet
+        </Button>
+      ) : null}
       {canWrite && open ? (
         <>
           <Button
@@ -185,7 +195,7 @@ function RecordStageForm({
   application: Application;
   onClose: () => void;
 }): React.JSX.Element {
-  const stages = useQuery(stageDefsQueryOptions());
+  const stages = useQuery(stageDefsQueryOptions(application.scheme));
   const entries = useQuery(stageEntriesQueryOptions(application.id));
   const defs = stages.data ?? [];
   const latest = latestValues(entries.data ?? []);

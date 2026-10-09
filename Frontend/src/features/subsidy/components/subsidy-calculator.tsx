@@ -155,6 +155,8 @@ export interface SystemCalculatorProps {
   onDraftChange: (next: CalculatorDraft) => void;
   /** Shown under the figures, given the calculation: starting an application adds its pick. */
   after?: (calculation: SubsidyCalculationState) => React.ReactNode;
+  /** The scheme to calculate under; null leaves the backend's default (GGRC). */
+  scheme?: string | null;
 }
 
 /** SUBS-002 · One system's inputs beside its figures. */
@@ -167,9 +169,10 @@ export function SystemCalculator({
   draft,
   onDraftChange,
   after,
+  scheme = null,
 }: SystemCalculatorProps): React.JSX.Element {
-  const calculation = useSubsidyCalculation(draft, system);
-  const categories = useQuery(subsidyCategoriesQueryOptions(system.systemType));
+  const calculation = useSubsidyCalculation(draft, system, scheme);
+  const categories = useQuery(subsidyCategoriesQueryOptions(system.systemType, scheme));
   const { problems, plan } = calculation;
   const blocks = draft.crops.slice(0, system.cropCountMax);
   const label = SYSTEM_LABELS[system.systemType];

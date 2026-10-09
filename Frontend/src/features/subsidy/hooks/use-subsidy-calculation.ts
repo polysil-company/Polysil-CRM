@@ -46,8 +46,9 @@ export interface SubsidyCalculationState {
 export function useSubsidyCalculation(
   draft: CalculatorDraft,
   system: SystemConfig,
+  scheme: string | null = null,
 ): SubsidyCalculationState {
-  const plan = useMemo(() => planCalculation(draft, system), [draft, system]);
+  const plan = useMemo(() => planCalculation(draft, system, scheme), [draft, system, scheme]);
   const debounced = useDebouncedValue(plan, CALCULATE_DEBOUNCE_MS);
   const query = useQuery({
     ...subsidyCalculationQueryOptions(debounced.request ?? NOTHING),

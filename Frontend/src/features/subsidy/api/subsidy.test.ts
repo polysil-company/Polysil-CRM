@@ -33,7 +33,7 @@ describe("[SUBS-003] Subsidy lookups", () => {
 
   it("reads what each system accepts, the crops and the categories", async () => {
     writeMockRole("employee");
-    const config = await getSubsidyConfig();
+    const config = await getSubsidyConfig(null);
     expect(config.systems.map((system) => system.systemType)).toEqual([
       "drip",
       "mini_sprinkler",
@@ -44,17 +44,17 @@ describe("[SUBS-003] Subsidy lookups", () => {
     expect(sprinkler?.sprinklerAreas).toContain("2.010");
     expect(config.parameters.insurance_rate).toBe("0.0028");
 
-    const crops = await listSubsidyCrops();
+    const crops = await listSubsidyCrops(null);
     expect(crops).toContainEqual({ crop: "Mango", standardSpacing: "5.00" });
 
-    const categories = await listSubsidyCategories("mini_sprinkler");
+    const categories = await listSubsidyCategories("mini_sprinkler", null);
     expect(categories).toHaveLength(8);
     expect(categories[0]).toMatchObject({ code: "small_farmer", gsdmaPct: "10" });
   });
 
   it("refuses a dealer: portal users have no subsidy", async () => {
     writeMockRole("dealer");
-    await expect(getSubsidyConfig()).rejects.toMatchObject({ status: 403 });
+    await expect(getSubsidyConfig(null)).rejects.toMatchObject({ status: 403 });
   });
 });
 

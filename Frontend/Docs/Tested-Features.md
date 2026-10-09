@@ -226,6 +226,7 @@ axe found nothing on any of them. Not yet checked on the dev API. Screens: [work
   - The start page is the calculator for the lead's system. Then the farmer's category: only those that apply on every crop block, each with its subsidy. Then an optional survey number.
   - Start stays off until the figures are in. Without a category it asks for one.
   - Starting moves the lead to won and opens the application at stage 4.
+  - The calculation runs under the lead's state's scheme (`GET /subsidy-schemes/for-lead`). A state with no scheme, or one not ready, says "Subsidy for this state is not set up yet".
   - Refusals say what is wrong: not subsidised, not forwardable, no calculation for the system, already forwarded, a category that doesn't apply, a calculation field.
   - 🧪 👀
 - **SUBS-005 · The worklist** (Subsidy → Applications), newest first.
@@ -256,7 +257,7 @@ axe found nothing on any of them. Not yet checked on the dev API. Screens: [work
   - Each file is checked first: PDF, JPEG, PNG, WebP or HEIC, 10 MB, 40 per application. Then each is sent on its own, with "Uploading…" and **Try again**.
   - "Files can't be stored right now" covers a `503`.
   - 🧪 👀
-- **SUBS-008 · PIMS sheet:** a download from the application. 🧪 👀
+- **SUBS-008 · PIMS sheet:** a download from the application, GGRC applications only (GAP-363). 🧪 👀
 
 ---
 

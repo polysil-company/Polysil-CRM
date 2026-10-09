@@ -268,6 +268,7 @@ axe found nothing on any of these.
 #### Before
 
 The calculator (#77) could show what the scheme pays, but a subsidised sale couldn't go anywhere from there. The backend has served applications since FS-009 (`/subsidy-applications*`, `/subsidy-stages`; handover `subsidy-applications-contract.md`):
+
 - starting one from a lead;
 - the fourteen GGRC stages;
 - the document checklist;
@@ -300,6 +301,13 @@ None of it had a screen.
   - Files go up against an item, each checked before it is sent and uploaded on its own.
   - Each is opened through a ten-minute link.
 - On a phone, the figures come before the long checklist. Checked at 360 px in dark mode, with no sideways scroll.
+
+- **Each lead's own scheme** (backend 044, handover `subsidy-schemes-contract.md`):
+  - Starting asks `GET /subsidy-schemes/for-lead/{id}`. The calculator reads that scheme's systems, crops and categories, and the calculation is sent with its code.
+  - A state with no scheme, or one not yet ready, says "Subsidy for this state is not set up yet".
+  - `scheme_changed` reads the scheme again and says why.
+  - Record stage reads the application's scheme's stages.
+  - The PIMS sheet shows only on GGRC applications, the only scheme with one (GAP-363).
 
 #### Discussion
 
@@ -354,6 +362,10 @@ None of it had a screen.
   - cancel, refused to a view-only role.
 
 **`src/features/subsidy/components/applications-ui.test.tsx`:**
+
+- a state with no scheme, and a scheme that isn't ready;
+- the calculator asking for the lead's scheme;
+- no PIMS sheet on another scheme's application;
 
 - the worklist;
 - recording a stage: the remark, a paise mistake, then the entry in the history;

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -21,7 +21,12 @@ import { leadDetailQueryOptions } from "@/features/leads/api/leads.queries";
 import type { Lead } from "@/features/leads/api/leads.schemas";
 import { useCan } from "@/features/session/hooks/use-session";
 import { useCreateApplication } from "@/features/subsidy/api/subsidy-applications.mutations";
-import { applicationListQueryOptions } from "@/features/subsidy/api/subsidy-applications.queries";
+import {
+  applicationKeys,
+  applicationListQueryOptions,
+  leadSchemeQueryOptions,
+} from "@/features/subsidy/api/subsidy-applications.queries";
+import type { LeadScheme } from "@/features/subsidy/api/subsidy-applications.schemas";
 import {
   subsidyConfigQueryOptions,
   subsidyCropsQueryOptions,
@@ -46,7 +51,20 @@ const log = createLogger({
 });
 
 /** The refusals a start can meet, in words (handover `subsidy-applications-contract.md`). */
+/** Shown when the lead's state has no scheme ready for applications. */
+const NOT_SET_UP = "Subsidy for this state is not set up yet. Ask an administrator.";
+
+/** Why `GET /subsidy-schemes/for-lead` gave no scheme to use. */
+const SCHEME_REFUSALS: Readonly<Record<string, string>> = {
+  no_scheme_for_state: NOT_SET_UP,
+  territory_without_state_code:
+    "The lead's area isn't linked to a state, so no scheme applies to it.",
+};
+
 const LEAD_REFUSALS: Readonly<Record<string, string>> = {
+  scheme_changed:
+    "The state's subsidy scheme changed meanwhile. The page has reloaded it: check the figures and start again.",
+  no_scheme_for_state: NOT_SET_UP,
   lead_not_subsidised: "This lead isn't a subsidised enquiry.",
   lead_not_forwardable: "The lead needs to be qualified, quoted, in negotiation or won.",
   lead_system_not_subsidised: "The lead's irrigation system has no subsidy calculation.",
@@ -60,7 +78,22 @@ const LEAD_REFUSALS: Readonly<Record<string, string>> = {
  */
 export function StartApplication({ leadId }: { leadId: string | null }): React.JSX.Element {
   const lead = useQuery({ ...leadDetailQueryOptions(leadId ?? ""), enabled: leadId !== null });
-  const config = useQuery(subsidyConfigQueryOptions());
+  // The lead's state decides the scheme; the calculator then reads that scheme's masters.
+  const scheme = useQuery({ ...leadSchemeQueryOptions(leadId ?? ""), enabled: leadId !== null });
+  const schemeBlocked =
+    scheme.status === "error" &&
+    isApiError(scheme.error) &&
+    scheme.error.code !== undefined &&
+    SCHEME_REFUSALS[scheme.error.code] !== undefined
+      ? (SCHEME_REFUSALS[scheme.error.code] ?? null)
+      : scheme.data?.ready === false
+        ? NOT_SET_UP
+        : null;
+  const usable = scheme.data !== undefined && scheme.data.ready;
+  const config = useQuery({
+    ...subsidyConfigQueryOptions(scheme.data?.code ?? null),
+    enabled: usable,
+  });
 
   if (leadId === null) {
     return (
@@ -72,16 +105,36 @@ export function StartApplication({ leadId }: { leadId: string | null }): React.J
       </Notice>
     );
   }
-  if (lead.status === "pending" || config.status === "pending") {
+  if (lead.status === "pending" || (scheme.status === "pending" && schemeBlocked === null)) {
     return <SubsidyCalculatorSkeleton />;
   }
-  if (lead.status === "error" || config.status === "error") {
-    const error = lead.status === "error" ? lead.error : config.error;
+  if (lead.status === "error") {
     return (
       <ErrorState
-        error={error}
+        error={lead.error}
         onRetry={() => {
           void lead.refetch();
+        }}
+      />
+    );
+  }
+  if (schemeBlocked !== null || scheme.status === "error") {
+    return (
+      <StartForLead
+        lead={lead.data}
+        scheme={null}
+        system={null}
+        parameters={{}}
+        blocked={schemeBlocked ?? toUserFacingError(scheme.error).title}
+      />
+    );
+  }
+  if (config.status === "pending") return <SubsidyCalculatorSkeleton />;
+  if (config.status === "error") {
+    return (
+      <ErrorState
+        error={config.error}
+        onRetry={() => {
           void config.refetch();
         }}
       />
@@ -89,22 +142,37 @@ export function StartApplication({ leadId }: { leadId: string | null }): React.J
   }
   const system = config.data.systems.find((item) => item.systemType === subsidySystemOf(lead.data));
   return (
-    <StartForLead lead={lead.data} system={system ?? null} parameters={config.data.parameters} />
+    <StartForLead
+      lead={lead.data}
+      scheme={scheme.data ?? null}
+      system={system ?? null}
+      parameters={config.data.parameters}
+      blocked={null}
+    />
   );
 }
 
 function StartForLead({
   lead,
+  scheme,
   system,
   parameters,
+  blocked: schemeBlocked,
 }: {
   lead: Lead;
+  /** The lead's scheme; null when it has none to use. */
+  scheme: LeadScheme | null;
   system: SystemConfig | null;
   parameters: Readonly<Record<string, string>>;
+  /** Why the lead's scheme can't take an application, when it can't. */
+  blocked: string | null;
 }): React.JSX.Element {
   const canCreate = useCan("subsidy", "create");
   const canEdit = useCan("subsidy", "edit");
-  const crops = useQuery(subsidyCropsQueryOptions());
+  const crops = useQuery({
+    ...subsidyCropsQueryOptions(scheme?.code ?? null),
+    enabled: scheme !== null,
+  });
   const existing = useInfiniteQuery(
     applicationListQueryOptions({ status: null, stage: null, q: "", leadId: lead.id }),
   );
@@ -129,15 +197,18 @@ function StartForLead({
       <h2 className="text-xl font-semibold text-foreground">Start a subsidy application</h2>
       <p className="text-sm text-muted-foreground">
         <span className="font-mono">{lead.code}</span>
-        {system === null ? "" : ` · ${SYSTEM_LABELS[system.systemType]}`} · Starting moves the lead
-        to won.
+        {system === null ? "" : ` · ${SYSTEM_LABELS[system.systemType]}`}
+        {scheme === null ? "" : ` · ${scheme.name}`} · Starting moves the lead to won.
       </p>
     </div>
   );
 
+  // The lead's own reason first; then the scheme's; then the system's tables.
   const blocked = !(canCreate || canEdit)
     ? "You can view applications but not start one."
-    : (reason ?? (system === null ? "The scheme has no tables in force for this system." : null));
+    : (reason ??
+      schemeBlocked ??
+      (system === null ? "The scheme has no tables in force for this system." : null));
 
   if (blocked !== null || system === null) {
     return (
@@ -170,6 +241,7 @@ function StartForLead({
     <div className="flex flex-col gap-4">
       {header}
       <SystemCalculator
+        scheme={scheme?.code ?? null}
         system={system}
         parameters={parameters}
         catalogue={crops.data ?? []}
@@ -208,6 +280,7 @@ function CategoryPick({
   calculation: SubsidyCalculationState;
 }): React.JSX.Element {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [category, setCategory] = useState<string | null>(null);
   const [surveyNo, setSurveyNo] = useState("");
   const [shown, setShown] = useState(false);
@@ -244,6 +317,10 @@ function CategoryPick({
       router.push(`/subsidy/${application.id}`);
     },
     onError: (error) => {
+      if (isApiError(error) && error.code === "scheme_changed") {
+        // Read the lead's scheme again; the calculator follows it.
+        void queryClient.invalidateQueries({ queryKey: applicationKeys.leadScheme(lead.id) });
+      }
       const known =
         isApiError(error) && error.code !== undefined ? LEAD_REFUSALS[error.code] : undefined;
       if (known !== undefined) {

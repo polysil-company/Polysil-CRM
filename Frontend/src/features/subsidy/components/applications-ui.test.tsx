@@ -61,6 +61,15 @@ async function openApplicationId(): Promise<string> {
   return first.id;
 }
 
+/** A second qualified lead, made subsidised drip, other than the one given. */
+function forwardableLeadOther(otherThan: string): string {
+  const lead = mockDb.leads.find((item) => item.stage === "qualified" && item.id !== otherThan);
+  if (lead === undefined) throw new Error("No second qualified lead");
+  lead.inquiry_type = "subsidised";
+  lead.mis_system = "drip";
+  return lead.id;
+}
+
 /** A qualified lead made into a subsidised drip enquiry. */
 function forwardableLead(): LeadWire {
   const lead = mockDb.leads.find((item) => item.stage === "qualified");
@@ -148,6 +157,17 @@ describe("[SUBS-006] ApplicationDetail", () => {
     expect(within(checklist).queryAllByRole("button", { name: /^Add a file/ })).toHaveLength(0);
   });
 
+  it("offers the PIMS sheet only on a GGRC application", async () => {
+    signInAs("employee");
+    const id = await openApplicationId();
+    const application = mockDb.subsidyApplications?.find((row) => row.id === id);
+    if (application === undefined) throw new Error("No application");
+    application.scheme = "UPMIS";
+    show(<ApplicationDetail applicationId={id} />);
+    expect(await screen.findByRole("button", { name: "Record stage" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "PIMS sheet" })).not.toBeInTheDocument();
+  });
+
   it("refuses a file over 10 MB before sending it", async () => {
     signInAs("employee");
     const id = await openApplicationId();
@@ -198,6 +218,49 @@ describe("[SUBS-004] Start a subsidy application", () => {
       expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/subsidy\/[\w-]+$/));
     });
     expect(wire.stage).toBe("won");
+  });
+
+  it("says when the lead's state has no subsidy scheme set up", async () => {
+    signInAs("employee");
+    const wire = forwardableLead();
+    server.use(
+      http.get(buildApiUrl("/subsidy-schemes/for-lead/:leadId"), () =>
+        HttpResponse.json(
+          { error: { code: "no_scheme_for_state", message: "No scheme for this state." } },
+          { status: 422 },
+        ),
+      ),
+    );
+    show(<StartApplication leadId={wire.id} />);
+    expect(
+      await screen.findByText("Subsidy for this state is not set up yet. Ask an administrator."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /^Area/ })).not.toBeInTheDocument();
+  });
+
+  it("calculates under the lead's scheme, and refuses one that isn't ready", async () => {
+    signInAs("employee");
+    const wire = forwardableLead();
+    const asked: (string | null)[] = [];
+    server.use(
+      http.get(buildApiUrl("/subsidy/config"), ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get("scheme"));
+        return undefined;
+      }),
+    );
+    const user = show(<StartApplication leadId={wire.id} />);
+    await user.type(await screen.findByRole("textbox", { name: /^Area/ }), "1");
+    expect(asked).toContain("GGRC");
+
+    server.use(
+      http.get(buildApiUrl("/subsidy-schemes/for-lead/:leadId"), () =>
+        HttpResponse.json({ data: { code: "UPMIS", name: "UP Micro Irrigation", ready: false } }),
+      ),
+    );
+    show(<StartApplication leadId={forwardableLeadOther(wire.id)} />);
+    expect(
+      await screen.findByText("Subsidy for this state is not set up yet. Ask an administrator."),
+    ).toBeInTheDocument();
   });
 
   it("says why a commercial lead can't start one", async () => {

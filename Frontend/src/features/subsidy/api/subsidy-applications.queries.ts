@@ -3,6 +3,7 @@ import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import {
   getApplication,
   getDocumentLink,
+  getLeadScheme,
   getStoredCalculation,
   listApplications,
   listChecklist,
@@ -23,7 +24,8 @@ export const applicationKeys = {
     [...applicationKeys.detail(applicationId), "documents"] as const,
   document: (applicationId: string, documentId: string) =>
     [...applicationKeys.checklist(applicationId), documentId] as const,
-  stageDefs: () => [...applicationKeys.all, "stage-defs"] as const,
+  stageDefs: (scheme: string | null) => [...applicationKeys.all, "stage-defs", scheme] as const,
+  leadScheme: (leadId: string) => [...applicationKeys.all, "lead-scheme", leadId] as const,
 };
 
 /** The first page has no cursor. */
@@ -68,13 +70,23 @@ export function stageEntriesQueryOptions(applicationId: string) {
   });
 }
 
-/** SUBS-006 · The stages and their fields. Fixed for now; an admin screen comes later. */
-export function stageDefsQueryOptions() {
+/** SUBS-006 · A scheme's stages and their fields (null: the default scheme, GGRC). */
+export function stageDefsQueryOptions(scheme: string | null = null) {
   return queryOptions({
-    queryKey: applicationKeys.stageDefs(),
-    queryFn: ({ signal }) => listStageDefs(signal),
+    queryKey: applicationKeys.stageDefs(scheme),
+    queryFn: ({ signal }) => listStageDefs(scheme, signal),
     staleTime: 10 * 60_000,
     meta: { dataId: "SUBS-006" },
+  });
+}
+
+/** SUBS-004 · The scheme a lead's application uses. A refusal (no scheme) isn't retried. */
+export function leadSchemeQueryOptions(leadId: string) {
+  return queryOptions({
+    queryKey: applicationKeys.leadScheme(leadId),
+    queryFn: ({ signal }) => getLeadScheme(leadId, signal),
+    retry: false,
+    meta: { dataId: "SUBS-004" },
   });
 }
 

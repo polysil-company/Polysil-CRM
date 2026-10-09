@@ -8,6 +8,7 @@ import {
   applicationResponseSchema,
   checklistSchema,
   documentLinkSchema,
+  leadSchemeSchema,
   stageDefsSchema,
   stageEntriesSchema,
   storedCalculationSchema,
@@ -19,6 +20,7 @@ import {
   type ChecklistItem,
   type CreateApplicationRequest,
   type DocumentLink,
+  type LeadScheme,
   type RecordStageRequest,
   type StageDef,
   type StageEntry,
@@ -65,6 +67,21 @@ export function createApplication({
     body,
     idempotencyKey,
     schema: applicationResponseSchema,
+  });
+}
+
+/**
+ * SUBS-004 · GET /subsidy-schemes/for-lead/{leadId} — the scheme the lead's state runs. 422
+ * `no_scheme_for_state` or `territory_without_state_code` when there is none to use.
+ */
+export function getLeadScheme(leadId: string, signal?: AbortSignal): Promise<LeadScheme> {
+  return apiRequest({
+    dataId: "SUBS-004",
+    logger: log,
+    fn: "getLeadScheme",
+    path: `/subsidy-schemes/for-lead/${encodeURIComponent(leadId)}`,
+    schema: leadSchemeSchema,
+    signal,
   });
 }
 
@@ -124,13 +141,17 @@ export function getStoredCalculation(
   });
 }
 
-/** SUBS-006 · GET /subsidy-stages — the stages and their fields; data, never hard-coded. */
-export function listStageDefs(signal?: AbortSignal): Promise<StageDef[]> {
+/**
+ * SUBS-006 · GET /subsidy-stages — a scheme's stages and their fields; data, never hard-coded.
+ * Null asks for the backend's default (GGRC).
+ */
+export function listStageDefs(scheme: string | null, signal?: AbortSignal): Promise<StageDef[]> {
   return apiRequest({
     dataId: "SUBS-006",
     logger: log,
     fn: "listStageDefs",
     path: "/subsidy-stages",
+    query: { scheme: scheme ?? undefined },
     schema: stageDefsSchema,
     signal,
   });
