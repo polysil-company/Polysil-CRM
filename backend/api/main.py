@@ -55,6 +55,8 @@ from api.routers import (
     tracking,
     users,
 )
+from api.routers import campaigns as campaign_routes
+from api.routers import customers as customer_routes
 from api.routers import holidays as holiday_routes
 from api.routers import settings as settings_routes
 from api.upload_limit import BodyTooLarge, UploadLimit, body_too_large_handler
@@ -235,6 +237,8 @@ def create_app() -> FastAPI:
     app.include_router(targets.router, prefix=API_PREFIX)
     app.include_router(settings_routes.router, prefix=API_PREFIX)
     app.include_router(holiday_routes.router, prefix=API_PREFIX)
+    app.include_router(campaign_routes.router, prefix=API_PREFIX)
+    app.include_router(customer_routes.router, prefix=API_PREFIX)
     # The farmer's link and the website form: no session, definer functions on
     # app_anon (FS-005 4, FS-003a). Served under /api/v1, because a deployment's
     # proxy sends only /api/v1 to the API and the rest to the frontend: at the root

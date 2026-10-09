@@ -2134,6 +2134,38 @@ def f_lead_small_gaps() -> None:
          ("n3", "Ours: 60 days, what keeps a lead open, only Reopen\nwakes it, nobody told (GAP-339 to GAP-342).", YELLOW)])
 
 
+def f_campaigns() -> None:
+    _columns(
+        "50-campaigns", "Campaigns: which campaign brought the lead, and what it cost",
+        "Marketing keeps the list; a lead or QR code names one; a report sets cost against leads and sales.",
+        "BUILT. FS-040: /campaigns, /reports/campaign-performance, migration 049.",
+        [("s1", "Marketing: POST /campaigns\nname, type, dates, area, planned and actual cost", BLUE),
+         ("s2", "staff put an active campaign on a lead\n(POST or PATCH /leads campaign_id)", GREEN),
+         ("s3", "a QR code with a campaign: its leads take it\ntrg_lead_campaign_from_qr, at insert", GREEN),
+         ("s4", "GET /reports/campaign-performance\nleads created in the window, their sales whenever sold", VIOLET)],
+        [("d1", "switched off: no new lead or code takes it\nlinked codes keep crediting it (GAP-254)", YELLOW),
+         ("d2", "delete only while nothing names it\ncampaign_in_use counts hidden leads too", YELLOW),
+         ("d3", "merge: an unlinked survivor takes the loser's", GREY)],
+        [("n1", "COST IS FOR campaigns.view\n\nEvery staff user reads the list (the lead form's\npicker). Cost is cut in the service, and a cost\nchange never puts the figure in the event.", RED),
+         ("n2", "COST PER LEAD NEEDS A WHOLE WINDOW\n\nThe whole cost against the leads in the window.\nA window over half the campaign doubles it\n(GAP-252).", RED),
+         ("n3", "Not yet: an editable type list, history before 049,\nattribution that expires (GAP-250 to GAP-257).", YELLOW)])
+
+
+def f_customer_record() -> None:
+    _columns(
+        "51-customer-record", "Customer record: one farmer across leads, quotations and orders",
+        "A lead reaching qualified finds or makes its customer by mobile.",
+        "BUILT. FS-041: /customers, migration 050.",
+        [("s1", "a lead moves to qualified, quoted, negotiation\nor won, by any path", BLUE),
+         ("s2", "trg_lead_link_customer (definer)\nINSERT ... ON CONFLICT (mobile) DO NOTHING, read again", GREEN),
+         ("s3", "GET /customers/{id}\nits leads, quotations, orders that you can see", VIOLET),
+         ("s4", "GET /customers/{id}/timeline\neach visible lead's own timeline, merged", VIOLET)],
+        [("d1", "PATCH: staff with leads.edit; consent stamp\nre-sent unchanged keeps the first date", YELLOW),
+         ("d2", "merge: an unlinked survivor takes the loser's", GREY),
+         ("d3", "050 backfill: the oldest lead that got past\ncontacted names the customer", GREY)],
+        [("n1", "SEE A LEAD, SEE ITS CUSTOMER\n\ncustomer_sel is EXISTS over lead, under the\nlead's own policies. The customer's details show\nto everyone who sees any of its leads (GAP-263).", RED),
+         ("n2", "CUSTOMER EVENTS CARRY NO lead_id\n\nThey would land on every lead timeline and\nbreak its counts.", RED),
+         ("n3", "Not yet: shared phones, a customer merge, orders\nwithout a lead (GAP-258 to GAP-264).", YELLOW)])
 def f_settings_amend_reopen() -> None:
     _columns(
         "47-settings-amend-reopen", "Company settings, amending an approved order, reopening a complaint",
@@ -2198,5 +2230,6 @@ if __name__ == "__main__":
     f_reports(); f_targets()
     f_exports(); f_schemes(); f_rewards(); f_commission(); f_marketing()
     f_subsidy_follow_ups(); f_lead_small_gaps()
+    f_campaigns(); f_customer_record()
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook()
     print(f"\nwrote to {OUT}")

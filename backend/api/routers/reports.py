@@ -100,6 +100,18 @@ async def dealer_performance(db: DbSession, caller: CallerDep, from_: From = Non
     return await _answer(await service.dealer_performance(db, caller, await _filters(db, from_, to, territory_id, None)), fmt, "dealer-performance", caller)
 
 
+@router.get("/campaign-performance", responses=_ERRORS)
+async def campaign_performance(db: DbSession, caller: CallerDep, from_: From = None, to: To = None,
+                               territory_id: Territory = None, owner_id: Owner = None,
+                               fmt: Format = "json") -> Response:
+    """Per campaign: the leads you can see created in the window that name it, how far
+    they got, their sales (whenever sold, under the company's sale setting), and cost
+    per lead and per win. A campaign whose dates overlap the window shows with zeros
+    (no end date is one day); with `owner_id`, only campaigns with leads show.
+    Cost figures need campaigns.view; sales need sales_orders. Staff only."""
+    return await _answer(await service.campaign_performance(db, caller, await _filters(db, from_, to, territory_id, owner_id)), fmt, "campaign-performance", caller)
+
+
 @router.get("/territory-performance", responses=_ERRORS)
 async def territory_performance(db: DbSession, caller: CallerDep, from_: From = None, to: To = None,
                                 territory_id: Territory = None, fmt: Format = "json",
