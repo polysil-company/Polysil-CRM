@@ -317,7 +317,14 @@ class TimelineEvent(BaseModel):
     kind: str = Field(description="e.g. lead.created, lead.stage_changed, lead.note_added.")
     occurred_at: str
     actor: UserRef | None = Field(default=None, description="Who caused the event, if known.")
-    payload: dict[str, object] = Field(default_factory=dict)
+    payload: dict[str, object] = Field(
+        default_factory=dict,
+        description="The event's own detail. Added at read time: `lead.merged` carries "
+                    "`loser_inquiry_no` and `survivor_inquiry_no`; each of "
+                    "`lead.duplicate_flagged`'s `matches` carries `inquiry_no`; "
+                    "`lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. "
+                    "A number is null when you cannot see that lead. For a channel partner, "
+                    "staff notes, the lost reason and duplicate handling are left out.")
 
 
 class TimelinePage(BaseModel):

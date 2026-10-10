@@ -109,10 +109,14 @@ class ElevenZaProvider:
         except Exception as exc:
             # A provider never raises: a transport error, a timeout, and a bad
             # base URL (httpx.InvalidURL is not an HTTPError) all leave as their
-            # class name, transient, for the breaker to see (code review F-3).
+            # class name for the breaker to see (code review F-3). Only a failure
+            # before the request left is surely unsent; after it, 11za may have
+            # delivered, and a resend is a duplicate (GAP-073).
+            unsent = isinstance(exc, _UNSENT)
             log.warning("outbox.transport_failure", recipient=mask(msg.recipient),
-                        kind=type(exc).__name__)
-            return ProviderResult(Outcome.TRANSIENT, None, type(exc).__name__)
+                        kind=type(exc).__name__, unsent=unsent)
+            return ProviderResult(Outcome.TRANSIENT if unsent else Outcome.UNCERTAIN,
+                                  None, type(exc).__name__)
 
         self.last_response = (response.status_code, scrub_body(response.text, secrets))
         result = classify(response.status_code, response.text, secrets)
@@ -138,6 +142,13 @@ class ElevenZaProvider:
             if fetched < LIST_PAGE:
                 return out
             page += 1
+
+
+# Failures raised before any byte of the request reached 11za. Everything else
+# (a read timeout, the total deadline, a dropped connection mid-answer) is uncertain.
+_UNSENT: tuple[type[BaseException], ...] = (
+    httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout,
+    httpx.InvalidURL, httpx.UnsupportedProtocol)
 
 
 def classify(status: int, text: str, secrets: list[str]) -> ProviderResult:

@@ -1084,7 +1084,7 @@ with the current stage in `fields.stage`.
 | `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
 | `occurred_at` | string | yes |  |
 | `actor` | UserRef \| null |  | Who caused the event, if known. |
-| `payload` | object |  |  |
+| `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |
 
 **`TimelinePage`**
 

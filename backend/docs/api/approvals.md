@@ -208,6 +208,7 @@ One approval chain.
 | `by` | UserRef \| null | yes | Null for a dealer, always. |
 | `remark` | string \| null | yes | Null for a dealer, always. |
 | `decided_at` | string \| null | yes |  |
+| `stalled` | boolean |  | True on the step waiting now when nobody of its own role can decide it (none covers the document, or the only one raised it). A higher manager decides it instead and sees it in their inbox. Show "No <role> to decide; with the next manager up" rather than "Waiting on <role>". Always false for a dealer. Default `False`. |
 
 **`Attachment`**
 

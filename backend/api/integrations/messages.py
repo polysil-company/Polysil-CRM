@@ -60,13 +60,18 @@ class TemplateSpec:
     params: tuple[str, ...]      # payload keys, in the template's positional order
     button: str | None           # the payload key sent as the copy-code button's value
     max_age: timedelta | None    # None: derived from settings (the OTP's TTL less a minute)
+    # GAP-073: after an uncertain send (no answer in time), send again? Yes for a code:
+    # a duplicate code is a nuisance, a lost one locks the person out (FS-001). No for
+    # the rest: a duplicate order message is a fee and looks broken to the customer.
+    resend_uncertain: bool = False
 
 
 TEMPLATES: Final[dict[str, TemplateSpec]] = {
-    TEMPLATE_AUTH_OTP: TemplateSpec("whatsapp_template_otp", ("code",), "code", None),
+    TEMPLATE_AUTH_OTP: TemplateSpec("whatsapp_template_otp", ("code",), "code", None,
+                                    resend_uncertain=True),
     # the challenge lives ten minutes; a code older than nine is not worth sending
     TEMPLATE_LEAD_VERIFY: TemplateSpec("whatsapp_template_otp", ("code",), "code",
-                                       timedelta(minutes=9)),
+                                       timedelta(minutes=9), resend_uncertain=True),
     # GAP-072: farmer_name is an officer-typed value on Polysil's number, bounded by
     # normalise_value and by rule 10b (once a day per number) until the client decides.
     TEMPLATE_LEAD_ACK: TemplateSpec("whatsapp_template_lead_ack",

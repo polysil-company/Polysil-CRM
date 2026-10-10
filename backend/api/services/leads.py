@@ -455,7 +455,10 @@ async def get_lead(db: AsyncSession, caller: Caller, lead_id: str) -> Lead:
     if row is None:
         raise NotFoundError("No such lead.")
 
-    lead = _row_to_lead(row, duplicates=await _duplicates(db, lead_id))
+    if caller.partner_id is not None:
+        lead = _partner_view(_row_to_lead(row, duplicates=[]))
+    else:
+        lead = _row_to_lead(row, duplicates=await _duplicates(db, lead_id))
 
     # The people, authoritatively. lead_people() is a definer read that answers for
     # a visible lead, so a manager who can see the lead but not the owner's user row
@@ -472,6 +475,17 @@ async def get_lead(db: AsyncSession, caller: Caller, lead_id: str) -> Lead:
                 id=str(p.id), name=p.name, partner_type=p.detail)
         elif p.kind == "merged_into":
             lead.merged_into = MergedRef(id=str(p.id), inquiry_no=p.detail)
+    return lead
+
+
+def _partner_view(lead: Lead) -> Lead:
+    """GAP-284: what a partner does not read on a lead. The priority score and the
+    duplicate check are staff tools; the lost reason and note are staff words, the
+    same ones the timeline strips (walk F-1, code review F-1)."""
+    lead.score = None
+    lead.duplicates = []
+    lead.lost_reason = None
+    lead.lost_note = None
     return lead
 
 
@@ -755,6 +769,56 @@ async def _timeline_refs(db: AsyncSession, lead_id: str, rows: Any,
     return people_on, quotes, orders
 
 
+async def _lead_refs(db: AsyncSession, rows: Any) -> dict[str, str | None]:
+    """lead id -> inquiry_no for the other leads that merge, dismissal and flag
+    events name (walk F-16), read under the caller's own policies: a lead the
+    reader cannot see stays unnamed. A dismissal names its link, so the link's two
+    leads are read too."""
+    ids: set[str] = set()
+    links: set[str] = set()
+    for r in rows:
+        p = _as_dict(r.payload)
+        if r.kind == "lead.merged":
+            ids.update(str(p[k]) for k in ("loser", "survivor") if p.get(k))
+        elif r.kind == "lead.duplicate_flagged":
+            ids.update(str(m["lead_id"]) for m in p.get("matches") or [] if m.get("lead_id"))
+        elif r.kind == "lead.duplicate_dismissed" and p.get("link_id"):
+            links.add(str(p["link_id"]))
+    out: dict[str, str | None] = {}
+    if links:
+        for lk in (await db.execute(text(
+                "SELECT id, lead_a_id, lead_b_id FROM lead_duplicate_link "
+                "WHERE id = ANY(CAST(:ids AS uuid[]))"), {"ids": sorted(links)})).all():
+            out["link:" + str(lk.id)] = f"{lk.lead_a_id} {lk.lead_b_id}"
+            ids.update((str(lk.lead_a_id), str(lk.lead_b_id)))
+    if ids:
+        for ld in (await db.execute(text(
+                "SELECT id, inquiry_no::text AS inquiry_no FROM lead "
+                "WHERE id = ANY(CAST(:ids AS uuid[]))"), {"ids": sorted(ids)})).all():
+            out[str(ld.id)] = ld.inquiry_no
+    return out
+
+
+def _enrich_leads(r: Any, lead_id: str, payload: dict[str, Any],
+                  refs: dict[str, str | None]) -> dict[str, Any]:
+    """The inquiry numbers of the leads an event names. `other_*` is the lead that
+    is not the one whose timeline this is."""
+    if r.kind == "lead.merged":
+        return {**payload,
+                "loser_inquiry_no": refs.get(str(payload.get("loser"))),
+                "survivor_inquiry_no": refs.get(str(payload.get("survivor")))}
+    if r.kind == "lead.duplicate_flagged":
+        return {**payload, "matches": [{**m, "inquiry_no": refs.get(str(m.get("lead_id")))}
+                                       for m in payload.get("matches") or []]}
+    if r.kind == "lead.duplicate_dismissed":
+        pair = (refs.get("link:" + str(payload.get("link_id"))) or "").split()
+        own = str(r.entity_id) if r.entity_id else lead_id
+        other = next((x for x in pair if x != own), None)
+        return {**payload, "other_lead_id": other,
+                "other_inquiry_no": refs.get(other) if other else None}
+    return payload
+
+
 def _enrich(r: Any, payload: dict[str, Any], people_on: dict[str, str],
             quotes: dict[str, Any], orders: dict[str, Any]) -> dict[str, Any]:
     """Read-time additions, so old events carry them too. A name key is present
@@ -801,12 +865,29 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
         next_cursor = _encode_cursor(last.occurred_at, str(last.id))
         rows = rows[:limit]
     people_on, quotes, orders = await _timeline_refs(db, lead_id, rows)
+    lead_refs = await _lead_refs(db, rows)
 
     events: list[TimelineEvent] = []
+    merges: set[tuple[str, str]] = set()
     for r in rows:
         payload = r.payload
         if isinstance(payload, str):
             payload = json.loads(payload)
+        if r.kind == "lead.merged" and isinstance(payload, dict):
+            # 006 writes the merge on both leads, and the survivor's timeline folds in
+            # the loser's: one line per merge (walk F-16)
+            pair = (str(payload.get("loser")), str(payload.get("survivor")))
+            if pair in merges:
+                continue
+            merges.add(pair)
+        if caller.partner_id is not None and isinstance(payload, dict):
+            # ISS-107: staff notes, the lost reason and duplicate handling are internal
+            # (GAP-284). A short page keeps its cursor: the cursor is the raw row's.
+            own = r.actor_id is not None and str(r.actor_id) == caller.user_id
+            kept = domain.partner_timeline_entry(r.kind, payload, own=own)
+            if kept is None:
+                continue
+            payload = kept
         actor = None
         # question 15.14: a partner never learns which approver decided an order
         hidden = caller.partner_id is not None and actor_hidden_from_partner(r.kind)
@@ -821,6 +902,7 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
                             or people_on.get(str(r.actor_id)) or "")
         if isinstance(payload, dict):
             payload = _enrich(r, payload, people_on, quotes, orders)
+            payload = _enrich_leads(r, lead_id, payload, lead_refs)
         events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso_req(r.occurred_at),
                                     actor=actor, payload=payload or {}))
     return TimelinePage(data=events, meta=PageMeta(limit=limit, next_cursor=next_cursor))
@@ -1133,26 +1215,36 @@ async def _detect_duplicates(db: AsyncSession, caller: Caller, lead_id: str, *, 
             matches.setdefault(str(r.id), ("name_geo", Decimal(str(round(float(r.sim), 2)))))
     if not matches:
         return
+    new: dict[str, tuple[str, Decimal]] = {}
     for other, (signal, score) in matches.items():
-        await db.execute(text(
+        inserted = (await db.execute(text(
             "INSERT INTO lead_duplicate_link "
             "(lead_a_id, lead_b_id, signal, score, state, created_by) "
             "VALUES (least(CAST(:x AS uuid), CAST(:y AS uuid)), "
             "        greatest(CAST(:x AS uuid), CAST(:y AS uuid)), "
             "        CAST(:s AS lead_dup_signal), :sc, 'pending', CAST(:me AS uuid)) "
-            "ON CONFLICT (lead_a_id, lead_b_id) DO NOTHING"),
-            {"x": lead_id, "y": other, "s": signal, "sc": score, "me": caller.user_id})
+            "ON CONFLICT (lead_a_id, lead_b_id) DO NOTHING RETURNING id"),
+            {"x": lead_id, "y": other, "s": signal, "sc": score, "me": caller.user_id})).first()
+        if inserted is not None:
+            new[other] = (signal, score)
+    # Only pairs found now are news. An edit that re-finds known pairs, or pairs
+    # already dismissed, writes no line (walk 10 Oct F-16).
+    if not new:
+        return
     await _emit(db, lead_id=lead_id, kind="lead.duplicate_flagged", actor_id=caller.user_id,
                 actor_name=await _actor_name(db),
                 matches=[{"lead_id": o, "signal": s, "score": str(sc)}
-                         for o, (s, sc) in matches.items()])
+                         for o, (s, sc) in new.items()])
 
 
 async def duplicates(db: AsyncSession, caller: Caller, *, limit: int = 50,
                      cursor: str | None = None) -> DuplicatePage:
     """The review queue: pending pairs where both leads are in scope (the link
-    policy), newest first, keyset-paged by (created_at, id)."""
+    policy), newest first, keyset-paged by (created_at, id). Empty for a partner:
+    duplicate handling is staff work (GAP-284), as merging already is."""
     limit = max(1, min(limit, _MAX_LIMIT))
+    if caller.partner_id is not None:
+        return DuplicatePage(data=[], meta=PageMeta(limit=limit, next_cursor=None))
     where = ["dl.state = 'pending'"]
     params: dict[str, Any] = {"lim": limit + 1}
     if cursor:
@@ -1183,7 +1275,9 @@ async def duplicates(db: AsyncSession, caller: Caller, *, limit: int = 50,
 
 async def dismiss_duplicate(db: AsyncSession, caller: Caller, link_id: str) -> DismissResult:
     """Mark a pending pair as not a duplicate. The link's UPDATE policy needs both
-    leads visible and leads.edit; zero rows is 404."""
+    leads visible and leads.edit; zero rows is 404. Staff only, as merging is."""
+    if caller.partner_id is not None:
+        raise ForbiddenError("Only staff can review duplicates.")
     row = (await db.execute(text(
         "UPDATE lead_duplicate_link SET state = 'dismissed', resolved_by = CAST(:me AS uuid), "
         "resolved_at = now() WHERE id = CAST(:id AS uuid) AND state = 'pending' "
@@ -1579,6 +1673,9 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
     by_id = {str(r.id): r for r in rows}
     names = await people.resolve(db, rows, _LEAD_PEOPLE, _LEAD_PARTNERS)
     data = [_row_to_lead(by_id[i], duplicates=[], names=names) for i in ids if i in by_id]
+    if caller.partner_id is not None:
+        # the export reads through here too, so its lost columns are empty for a partner
+        data = [_partner_view(lead) for lead in data]
     return LeadPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
                                             total=total, total_capped=total_capped))
 
