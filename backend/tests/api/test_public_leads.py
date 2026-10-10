@@ -278,3 +278,24 @@ async def test_creating_a_qr_code_writes_its_event_visible_as_the_code_is(
         await c.execute(text("DELETE FROM lead_qr_code WHERE id = CAST(:q AS uuid)"), {"q": qr["id"]})
         await c.commit()
         await c.close()
+
+
+async def test_a_dealer_reads_qr_codes_but_never_writes_them_nor_reads_approval_limits(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """Walk F-8: a dealer's QR codes are read-only, and the approval limits are a
+    staff screen. Both writes and the limits are 403, not a 422 or an empty 200."""
+    from tests.api.test_complaints import _dealer, _forget
+    hd, mobile = await _dealer(client, shop, sessions)
+    try:
+        assert (await client.get(f"{V1}/lead-qr-codes", headers=hd)).status_code == 200
+        r = await client.post(f"{V1}/lead-qr-codes", headers={**hd, **_key()},
+                              json={"label": "My counter"})
+        assert r.status_code == 403, r.text
+        r = await client.patch(f"{V1}/lead-qr-codes/{uuid.uuid4()}", headers={**hd, **_key()},
+                               json={"is_active": False})
+        assert r.status_code == 403, r.text
+        assert (await client.get(f"{V1}/approvals/thresholds", headers=hd)).status_code == 403
+        ho = await endpoints._as(client, shop, "field_officer")
+        assert (await client.get(f"{V1}/approvals/thresholds", headers=ho)).status_code == 200
+    finally:
+        await _forget(sessions, mobile)

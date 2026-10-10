@@ -46,7 +46,7 @@ from api.domain import orders as order_domain
 from api.domain import quotations as domain
 from api.domain.identity import MobileError, normalise_mobile
 from api.domain.pricing.types import PricedLine
-from api.errors import ConflictError, ForbiddenError, NotFoundError, ValidationFailed
+from api.errors import ApiError, ConflictError, ForbiddenError, NotFoundError, ValidationFailed
 from api.schemas import quotations as sch
 from api.schemas.leads import (
     OrgUnitRef,
@@ -958,6 +958,35 @@ async def patch_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                 actor_id=caller.user_id, actor_name=await _actor_name(db),
                 fields=sorted(body.model_fields_set - {"expected_status"}))
     return _with_pricing_warnings(await get_quotation(db, quotation_id, settings), ctx)
+
+
+async def follow_lead_partner(db: AsyncSession, caller: Caller, lead_id: str,
+                              partner_id: str | None, settings: Settings
+                              ) -> tuple[list[str], list[str]]:
+    """The lead's channel partner changed: each draft on it takes the new partner and
+    is re-priced at that partner's tier, as an edit of the draft would (walk F-4). A
+    sent quotation never changes. A draft the caller may not edit, or one the new
+    tier cannot price, keeps its partner; each runs in its own savepoint so one
+    refusal never undoes the assignment. Returns the drafts that followed and those
+    that kept their partner."""
+    drafts: list[Any] = list((await db.execute(text(
+        "SELECT id FROM quotation WHERE lead_id = CAST(:l AS uuid) AND status = 'draft' "
+        "AND deleted_at IS NULL AND partner_id IS DISTINCT FROM CAST(:p AS uuid) "
+        "ORDER BY created_at, id"), {"l": lead_id, "p": partner_id})).scalars().all())
+    if not (await db.execute(text("SELECT app_has_permission('quotations', 'edit')"))).scalar_one():
+        return [], [str(q) for q in drafts]
+    followed: list[str] = []
+    kept: list[str] = []
+    for qid in drafts:
+        try:
+            async with db.begin_nested():
+                await patch_quotation(db, caller, str(qid), sch.QuotationPatch(
+                    partner_id=partner_id, expected_status="draft"), settings)
+        except ApiError:
+            kept.append(str(qid))
+            continue
+        followed.append(str(qid))
+    return followed, kept
 
 
 async def replace_lines(db: AsyncSession, caller: Caller, quotation_id: str,

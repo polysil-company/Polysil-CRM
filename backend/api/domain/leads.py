@@ -127,7 +127,9 @@ def score(
            + config["w_value"] * value
            + config["w_speed"] * speed
            + config["w_engagement"] * engagement)
-    total = raw.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    # a whole number: staff read 27.5 as more precise than the weights are (walk R-12),
+    # and the band follows the number they see
+    total = raw.quantize(_ONE, rounding=ROUND_HALF_UP)
 
     if total >= config["threshold_hot"]:
         band = "hot"
