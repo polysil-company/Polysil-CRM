@@ -31,6 +31,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Products | 8 | [`products.md`](products.md) |
 | Public | 6 | [`public.md`](public.md) |
 | Quotations | 14 | [`quotations.md`](quotations.md) |
+| Ratings | 4 | [`ratings.md`](ratings.md) |
 | Reports | 9 | [`reports.md`](reports.md) |
 | Rewards | 19 | [`rewards.md`](rewards.md) |
 | Schemes | 6 | [`schemes.md`](schemes.md) |
