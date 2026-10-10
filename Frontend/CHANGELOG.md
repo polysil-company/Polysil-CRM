@@ -7,11 +7,15 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-36 changes, newest first. Each title opens its entry.
+40 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-10 | [Subsidy masters and state schemes](changelog/entries/2026-10-10--feature--SUBS-012--subsidy-masters-and-state-schemes.md) | `feature` | `SUBS-012` `SUBS-013` `SUBS-014` |
 | 2026-10-09 | [Lead QR codes and the public enquiry page](changelog/entries/2026-10-09--feature--LEAD-013--lead-qr-codes-and-the-public-enquiry-page.md) | `feature` | `LEAD-013` `LEAD-014` |
+| 2026-10-09 | [The subsidy calculator](changelog/entries/2026-10-09--feature--SUBS-002--the-subsidy-calculator.md) | `feature` | `SUBS-002` `SUBS-003` |
+| 2026-10-09 | [Subsidy applications](changelog/entries/2026-10-09--feature--SUBS-004--subsidy-applications.md) | `feature` | `SUBS-004` `SUBS-005` `SUBS-006` `SUBS-007` `SUBS-008` |
+| 2026-10-09 | [Subsidy reports](changelog/entries/2026-10-09--feature--SUBS-009--subsidy-reports.md) | `feature` | `SUBS-009` `SUBS-010` `SUBS-011` |
 | 2026-10-05 | [Edit and delete a lead, and review duplicates](changelog/entries/2026-10-05--feature--LEAD-010--edit-and-delete-a-lead-and-review-duplicates.md) | `feature` | `LEAD-010` `LEAD-011` `LEAD-012` |
 | 2026-10-04 | [Complaints: raise, check and QC](changelog/entries/2026-10-04--feature--CMPL-001--complaints-raise-check-and-qc.md) | `feature` | `CMPL-001` `CMPL-002` `CMPL-003` `CMPL-004` `CMPL-005` |
 | 2026-10-04 | [Complaint files, remedies and targets](changelog/entries/2026-10-04--feature--CMPL-006--complaint-files-remedies-and-targets.md) | `feature` | `CMPL-006` `CMPL-007` `CMPL-008` `CMPL-009` `APPR-001` |
@@ -47,6 +51,114 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 10 October 2026
+
+### Subsidy masters and state schemes
+
+`feature` · `SUBS-012` `SUBS-013` `SUBS-014` · Nakul Srivastava · [entry](changelog/entries/2026-10-10--feature--SUBS-012--subsidy-masters-and-state-schemes.md)
+
+#### Before
+
+Every subsidy calculation reads the scheme's masters: categories, parameters, component rates, crop spacings, and the unit-cost and quantity matrices. Only the backend's seed could change them. Since migration 044 each state has its own scheme (FS-039, handover `subsidy-schemes-contract.md`). A new state's scheme starts empty and can't calculate until an administrator fills it, and nothing on screen did that.
+
+#### Now
+
+- **Admin → Subsidy masters** (`/subsidy-masters`, staff with `masters`), one scheme at a time:
+  - a **Scheme** picker (`?scheme=`, GGRC by default) and an **In force on** date (`?on=`, today by default) to see the figures that applied on any day;
+  - seven tabs (`?table=`): Overview, Categories, Parameters, Component rates, Crop spacings, Unit costs, Quantities.
+- **Overview (SUBS-014):**
+  - the scheme's name, code, state, number of applications, and a Ready / Not ready / Switched off badge;
+  - one card per system: "Can calculate", or each thing a calculation would still refuse on, in the engine's order, each with an **Open** button to the tab that fills it;
+  - its stages in order, each with **Rename**;
+  - **Switch off / Switch on**, after a confirm that says what happens to its applications;
+  - **New scheme:** code, name, state, the scheme to start from, and the systems to run. It copies the template's settings and stages, never its figures;
+  - while an active scheme has no state, a banner asks for it to be linked first, with a **Link to a state** dialog, and New scheme stays off.
+- **Tables (SUBS-012):** the rows in force on the date. **Revise from a date** edits any figure. Only changed rows are sent, from today or a later date. **Add rows from a date** fills an empty table, as a new scheme needs. Choices (system, variant, unit, nozzle) are pickers. A refusal on one row lands on that row.
+- **Matrices (SUBS-013):** each matrix in force as a grid, with **Copy as grid** for Excel. **New matrix** starts from blank or from the one in force: paste the grid back from Excel, and every bad cell is named by row and column.
+- **The calculator** gets a **Scheme** picker (`?scheme=`) once more than one scheme is active. Each scheme shows only its own systems.
+- On a phone everything stacks. Checked at 360 px in dark mode with no sideways scroll.
+
+#### Discussion
+
+**Decisions:**
+
+- **Overview first.** A new scheme is mostly a to-do list. Opening on what's missing, each item one click from its table, beats making the administrator guess which of six tables is short.
+- **The masters screen holds the schemes,** rather than a separate schemes page. Each scheme's figures are its masters, so one picker serves both, and the handover's three screens (list, new, detail) fit as a picker, a dialog and the Overview tab.
+- **Missing items are named in words,** with the backend's key kept where it is the table's own name (`parameters:insurance_rate` reads "The insurance_rate parameter", as the Parameters tab lists it). An item the screen doesn't know shows as sent, with no link. `stages` says "contact support", as the handover asks.
+- **Refusals land on fields:** `code_taken` on Code, `state_has_scheme` on State, 422 `fields` on their inputs. The rest show above the buttons.
+- **No invented rules.** Which states may take a scheme, and when a scheme is ready, are the backend's answers. The form checks only the code's shape and that fields are filled.
+
+**The mock:**
+
+- It follows migration 044:
+  - GGRC is linked to Gujarat, as the backfill does;
+  - a second state, Uttar Pradesh, sits after every other territory, so no existing id moves;
+  - one active scheme per state, a state set only once, and legacy mode never mixing with linked schemes;
+  - `for-lead` finds the lead's state's scheme, falling back to the one active scheme only in legacy mode.
+- The masters are kept per scheme, and a new scheme's start empty.
+- Readiness follows the engine's order. Its required parameters, quantity rows and rates are GGRC's.
+- The calculator's endpoints take `scheme`:
+  - an inactive or unknown scheme is a 422 on `scheme`;
+  - a scheme that lacks a table is a 404, as the engine answers.
+- A renamed stage shows in that scheme's stage list.
+
+#### Files changed
+
+- `src/features/subsidy/`:
+  - `api/subsidy-masters.{schemas,api,queries,mutations}.ts` and `api/subsidy-schemes.{schemas,api,queries,mutations}.ts`, with `api/subsidy-masters.test.ts`;
+  - `lib/master-revision.ts`, `lib/matrix-grid.ts`, `lib/scheme-readiness.ts`, with `lib/subsidy-masters-lib.test.ts`;
+  - `components/subsidy-masters.tsx`, `master-configs.tsx`, `master-panel.tsx`, `matrix-panel.tsx`, `scheme-overview.tsx`, with `subsidy-masters.test.tsx`;
+  - `components/subsidy-calculator.tsx`: the scheme picker, with tests in `subsidy-calculator.test.tsx`.
+- `src/app/(app)/subsidy-masters/page.tsx`: the route. `src/components/layout/navigation.ts`: Subsidy masters under Admin.
+- `src/mocks/`:
+  - `data/subsidy-masters.ts`, `data/subsidy-schemes.ts`: new;
+  - `data/reference.ts`, `data/territories.ts`: Uttar Pradesh;
+  - `handlers/subsidy-masters.ts`, `handlers/subsidy-schemes.ts`, `handlers/subsidy-readiness.ts`: new;
+  - `handlers/subsidy.ts`, `handlers/subsidy-applications.ts`: the scheme on the calculator, `for-lead`, the stage list and create;
+  - `db.ts`, `handlers/index.ts`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SUBS-012…014.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/subsidy/`: the records.
+
+#### Tests
+
+**`src/features/subsidy/lib/subsidy-masters-lib.test.ts`:**
+
+- `[SUBS-012]`: a figure, a choice and a whole number checked as typed; only changed rows sent, an emptied optional figure as null; today or later.
+- `[SUBS-013]`: a matrix copied as a grid and read back; Excel's grouped numbers; each bad cell named; a repeated component refused.
+- `[SUBS-014]`: every kind of missing item in words, with its table.
+
+**`src/features/subsidy/api/subsidy-masters.test.ts`:**
+
+- `[SUBS-012]`: a revision closes the old row and starts the new one; a backdated revision and a second one on the same day are refused; each scheme's masters stay apart.
+- `[SUBS-013]`: a new scheme's first matrix from blank, and its readiness follows.
+- `[SUBS-014]`:
+  - GGRC listed, linked to Gujarat, ready;
+  - a new scheme: upper-case code, the template's stages, no figures, not ready;
+  - a taken code, a covered state and an unknown template refused;
+  - an unlinked scheme blocks a new one, is linked once, and its state can't change;
+  - a renamed stage shows in the stage list, and a switched-off scheme leaves its leads with `no_scheme_for_state`.
+
+**`src/features/subsidy/components/subsidy-masters.test.tsx`:**
+
+- the GGRC overview, ready on every system, with its stages;
+- renaming a stage, refusing an empty name;
+- the new-scheme form's checks;
+- setting up a scheme, then opening a missing item's table;
+- the link banner, linking, then New scheme enabled;
+- switching off after the confirm;
+- nothing to change for a role without `masters` edit;
+- a new scheme's first crop spacing added from a date.
+
+**`src/features/subsidy/components/subsidy-calculator.test.tsx`:** no scheme picker with one scheme; under a second scheme only its systems are open.
+
+**By hand, in Chromium on the mock backend, as an Admin:**
+
+1. The GGRC overview, setting up UPMIS (drip and sprinkler), its readiness, and opening the unit-cost tab from it.
+2. The overview and the switch-off confirm on a 360 px phone in dark mode.
+3. The calculator as an employee with one scheme: no picker.
+
+axe found nothing on any of these.
 
 ## 9 October 2026
 
@@ -145,6 +257,318 @@ A farmer could only become a lead through staff, who typed them in. Two pieces w
 2. The list on a phone in dark mode.
 3. The enquiry at 360 px in light (through to the number) and dark.
 4. The empty form's mistakes on a desktop.
+
+axe found nothing on any of these.
+
+### The subsidy calculator
+
+`feature` · `SUBS-002` `SUBS-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-09--feature--SUBS-002--the-subsidy-calculator.md)
+
+#### Before
+
+Subsidy was a "Soon" item in the sidebar. The backend has served the GGRC calculation since its subsidy module (`POST /subsidy/calculate`, `GET /subsidy/config`, `/crops`, `/categories`; handover `subsidy-calculation.md`). The web app couldn't show a designer or a farmer what the scheme pays.
+
+The mock also gave dealers and distributors `subsidy`, though the backend answers portal users 403 on every subsidy endpoint.
+
+#### Now
+
+- **Sales → Subsidy** opens the calculator (`/subsidy/calculator`), for staff with `subsidy`. Dealers and distributors neither see it nor reach it.
+- **Three tabs: Drip, Mini Sprinkler and Sprinkler** (`?system=`). Each is shaped by `GET /subsidy/config`, not hard-coded:
+  - how many crop blocks it takes (two on Drip);
+  - whether it has a head unit and a group's area;
+  - which areas Sprinkler may use.
+
+  Each tab keeps its own inputs while the designer moves between them.
+
+- **The inputs:**
+  - per crop block: the crop and inter-crop, each showing its standard spacing; the area; the lateral spacing; the crop spacing as it prints; the field-unit items (item, unit, rate, quantity);
+  - the head unit, once for the quotation;
+  - installation and sump, per hectare;
+  - a group's total area, for farmers sharing one water source;
+  - on Sprinkler, the nozzle. Its area comes from the scheme's steps, and it takes no items.
+- **The figures follow the inputs,** recalculated after a pause in typing:
+  - the warnings, each with a title, the block it is about, and the seven-year ones kept apart;
+  - per block, the designed, standard and used spacing, and why when the standard wins;
+  - per block, the unit cost the scheme allows (`regular_for_cap`) and the seven-year one;
+  - all eight farmer categories, with the subsidy, its share and what the farmer pays. GSDMA shows where it applies, and a category that doesn't apply stays, greyed, with its reason;
+  - the 22-row quotation summary, a column per block and the total;
+  - on Sprinkler, the derived items, the pipe size and the DBT farmer payable.
+
+  Older figures stay, dimmed, while new ones load. Nothing is saved.
+
+- **Before anything is calculated,** the eight categories are listed with their percentages.
+- **Mistakes and refusals:**
+  - A missing area or spacing just waits.
+  - Too many decimals, a half-typed item, or a group's area of 0 is named on its field once typing pauses.
+  - A refusal from the backend (`crops[0].area`, `group_total_area`…) lands on the same field. One no field shows is listed above the figures.
+  - Anything else shows an error with a retry.
+- Checked at 360 px, light and dark, with no sideways scroll.
+
+#### Discussion
+
+**Decisions:**
+
+- **The screen prints, never computes.** Money, areas and unit costs stay the backend's decimal strings until they are formatted. Columns are never added on screen, so a summary that misses by a paisa matches the scheme's sheet, as the handover asks. The only arithmetic is turning a rate from the masters into a percentage for a label ("D · Insurance (0.28%)").
+- **Every request path is the backend's.** The draft becomes the request in one pure function. Its own checks use the backend's field paths (`crops[0].lines[1].rate`), so a local mistake and a 422 land on the same input. Blank item rows aren't sent, and paths count only the rows that are.
+- **Three screens, not one form with toggles,** as the handover says. A system's keys are left out of the request rather than sent empty: Sprinkler sends no lines, head unit, sump or group; the others send no nozzle.
+- **`/subsidy/calculator`, not `/subsidy`.** Subsidy applications come next and take `/subsidy`; the calculator then becomes one tab beside them.
+- **Channel partners lose `subsidy` in the mock,** matching the backend. The nav item is staff-only as well.
+
+**The mock:**
+
+- The mock follows the scheme's shape: the 8 categories per system, Sprinkler's area steps and pipe bands, the rates in the masters, and the refusals by field path.
+- Its arithmetic and crop spacings are a stand-in, not the client's figures. Only the backend's engine reproduces the workbooks.
+
+#### Files changed
+
+- `src/features/subsidy/`: new.
+  - `api/`: schemas, API, queries, and `subsidy.test.ts`.
+  - `lib/calculator-draft.ts`: the draft, its checks and the request; `subsidy-labels.ts`: systems, the summary's rows, warning titles. With `calculator-draft.test.ts`.
+  - `hooks/use-subsidy-calculation.ts`: the debounced calculation.
+  - `components/`: `subsidy-calculator.tsx` (the page and its tabs), `calculator-inputs.tsx`, `calculator-results.tsx`, `crop-picker.tsx`, and `subsidy-calculator.test.tsx`.
+- `src/app/(app)/subsidy/calculator/`: the route.
+- `src/components/layout/navigation.ts`: Subsidy opens the calculator, staff only.
+- `src/mocks/`: `handlers/subsidy.ts`, `data/subsidy.ts`, the handler list, and `subsidy` taken from channel partners in `data/permissions.ts`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SUBS-002 and SUBS-003.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/subsidy/`: the records.
+
+#### Tests
+
+**`src/features/subsidy/api/subsidy.test.ts`:**
+
+- `[SUBS-003]`: the config, crops and categories; a dealer gets 403.
+- `[SUBS-002]`:
+  - the blocks, the unit cost and eight categories, as decimal strings;
+  - the inter-crop sets the standard spacing;
+  - a refusal names its field;
+  - Sprinkler derives its lines and refuses an area off the table.
+
+**`src/features/subsidy/lib/calculator-draft.test.ts`:**
+
+- nothing is sent until area and spacing are in;
+- the request is built as typed, without blank rows;
+- mistakes are keyed by the backend's paths;
+- Sprinkler sends only what it takes;
+- row paths skip blank rows;
+- warnings are split, with the seven-year prefix;
+- rates print as percentages.
+
+**`src/features/subsidy/components/subsidy-calculator.test.tsx`:**
+
+- the categories first, then the figures;
+- the spacing the subsidy uses when the inter-crop's standard is wider;
+- a local mistake, and the backend's refusal, on their fields;
+- two crop blocks on Drip;
+- Sprinkler with a tabulated area and a nozzle;
+- a dealer is refused.
+
+**By hand, in Chromium on the mock backend, as a field employee:**
+
+1. The empty calculator on a phone.
+2. Drip with items and installation, then a refusal and a mistake.
+3. Two crop blocks in dark mode.
+4. Sprinkler on a 360 px phone in dark mode.
+
+axe found nothing on any of these.
+
+### Subsidy applications
+
+`feature` · `SUBS-004` `SUBS-005` `SUBS-006` `SUBS-007` `SUBS-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-09--feature--SUBS-004--subsidy-applications.md)
+
+#### Before
+
+The calculator (#77) could show what the scheme pays, but a subsidised sale couldn't go anywhere from there. The backend has served applications since FS-009 (`/subsidy-applications*`, `/subsidy-stages`; handover `subsidy-applications-contract.md`):
+
+- starting one from a lead;
+- the fourteen GGRC stages;
+- the document checklist;
+- the PIMS sheet;
+- cancel.
+
+None of it had a screen.
+
+#### Now
+
+- **Subsidy has two tabs: Applications and Calculator.** The sidebar's Subsidy opens the worklist.
+- **Starting from a lead.** A subsidised lead's page has a "Subsidy application" card.
+  - It offers **Start subsidy application** when all of these hold: the lead is qualified, quoted, in negotiation or won; its system has a subsidy calculation; it has no live application; and the user may change applications. Otherwise the card says why.
+  - The start page is the calculator for the lead's system. Then the farmer's category, listing only those that apply on every crop block, each with its subsidy. Then an optional survey number.
+  - Starting moves the lead to won and opens the application at stage 4.
+- **The worklist:**
+  - each application's number, status, Reg. No., subsidy, farmer, stage and days in that stage;
+  - filters on status, stage and a search, all in the URL;
+  - Download Excel.
+- **The application:**
+  - its stage and ageing, the Reg. No. and documents;
+  - the stored figures for the chosen category, and the farmer;
+  - every stage entry, oldest first;
+  - on request, the calculation as stored at the start.
+  - **Record stage** builds its form from the scheme's stage list. It sends only the fields that changed, asks for a remark when going back or repeating a stage, and closes the application when the last payment date is in.
+  - **Cancel**, with a reason.
+  - **PIMS sheet**, a download.
+  - View-only roles see everything but change nothing.
+- **Documents:** the 20-item checklist, each item with its files.
+  - Files go up against an item, each checked before it is sent and uploaded on its own.
+  - Each is opened through a ten-minute link.
+- On a phone, the figures come before the long checklist. Checked at 360 px in dark mode, with no sideways scroll.
+
+- **Each lead's own scheme** (backend 044, handover `subsidy-schemes-contract.md`):
+  - Starting asks `GET /subsidy-schemes/for-lead/{id}`. The calculator reads that scheme's systems, crops and categories, and the calculation is sent with its code.
+  - A state with no scheme, or one not yet ready, says "Subsidy for this state is not set up yet".
+  - `scheme_changed` reads the scheme again and says why.
+  - Record stage reads the application's scheme's stages.
+  - The PIMS sheet shows only on GGRC applications, the only scheme with one (GAP-363).
+
+#### Discussion
+
+**Decisions:**
+
+- **The stage form is data.** It is built from `GET /subsidy-stages`, never hard-coded, as the handover asks.
+  - It starts from each field's latest value.
+  - It sends only what changed, because an empty value clears a field on the backend. A field the user never touched can't be wiped.
+- **Categories are filtered on the screen,** to those that apply on every crop block: the rule the backend enforces with `category_code`.
+- **The stored calculation is shown, not recomputed.** It goes through the same figures component as the calculator, which was split out of the results panel for this (`CalculationFigures`).
+- **`NavTabs` now picks the longest matching tab.** That keeps Applications (`/subsidy`) from lighting up on `/subsidy/calculator`. No existing tab set nests, so nothing else changes.
+- **The lead's card.** `GET /subsidy-applications` can't filter by lead yet, so a new backend ask records it (**BE-023**). The frontend already sends `lead_id` and keeps only rows whose lead matches. Until the backend filters, an application beyond the first page could be missed.
+
+**The mock:**
+
+- Regional Managers and Accounts get subsidy as view-only, as the handover's table says.
+- The mock follows the backend's rules: the starting refusals, the remark, the closing rule (every stage-16 amount with its stage-17 date), 409 once closed or cancelled, and the upload limits.
+- Six applications are seeded from the subsidised won leads, at different stages, one of them cancelled.
+
+#### Files changed
+
+- `src/features/subsidy/`:
+  - `api/subsidy-applications.{schemas,api,queries,mutations}.ts`, with `subsidy-applications.test.ts`;
+  - `lib/application-labels.ts` (statuses, who may start), `lib/stage-form.ts` (the stage form's values);
+  - `components/`:
+    - `applications-list.tsx`, `application-detail.tsx`, `application-actions.tsx` (record stage, cancel, PIMS);
+    - `application-documents.tsx`, `start-application.tsx`, `lead-subsidy.tsx`, `subsidy-tabs.tsx`;
+    - `applications-ui.test.tsx`;
+  - `calculator-results.tsx`: `CalculationFigures`, split out; `subsidy-calculator.tsx`: `SystemCalculator` exported, with a slot under its figures.
+- `src/app/(app)/subsidy/`: the layout with tabs, the worklist, `[applicationId]`, `new`; the calculator moves under the layout.
+- `src/features/leads/components/lead-detail.tsx`: the lead's subsidy card.
+- `src/components/patterns/nav-tabs.tsx`: the longest match wins.
+- `src/components/layout/navigation.ts`: Subsidy opens `/subsidy`.
+- `src/mocks/`: `handlers/subsidy-applications.ts`, `data/subsidy-applications.ts`; the database, id spaces and handler list; `handlers/subsidy.ts` exports its checks; view-only subsidy for Regional Managers and Accounts.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SUBS-004…008.
+- `docs/Backend-Tasks.md`: BE-023.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/subsidy/`: the records.
+
+#### Tests
+
+**`src/features/subsidy/api/subsidy-applications.test.ts`:**
+
+- `[SUBS-004]`:
+  - a start lands at stage 4 today, wins the lead, stores the calculation, and replays on its key;
+  - refusals: not subsidised, a category that doesn't apply, already forwarded, a calculation field under `calculation.`.
+- `[SUBS-005]`:
+  - the list with its status, search and lead filters;
+  - a dealer gets 403.
+- `[SUBS-006]`:
+  - the stages in order; a Reg. No.; a remark wanted going back; paise checked;
+  - closing once every amount has its date, then 409;
+  - cancel, refused to a view-only role.
+
+**`src/features/subsidy/components/applications-ui.test.tsx`:**
+
+- a state with no scheme, and a scheme that isn't ready;
+- the calculator asking for the lead's scheme;
+- no PIMS sheet on another scheme's application;
+
+- the worklist;
+- recording a stage: the remark, a paise mistake, then the entry in the history;
+- cancel with a reason;
+- a view-only Regional Manager;
+- a file over 10 MB refused before sending;
+- starting from a lead's card;
+- why a commercial lead can't.
+
+**By hand, in Chromium on the mock backend, as a field employee:**
+
+1. The worklist.
+2. A lead's card, then started from it.
+3. A stage refused, then recorded.
+4. The stored calculation.
+5. The PIMS download.
+6. The worklist and an application on a 360 px phone in dark mode.
+
+axe found nothing on any of these. `npm run build` passes, the prerendered calculator included.
+
+### Subsidy reports
+
+`feature` · `SUBS-009` `SUBS-010` `SUBS-011` · Nakul Srivastava · [entry](changelog/entries/2026-10-09--feature--SUBS-009--subsidy-reports.md)
+
+#### Before
+
+Applications could be worked one at a time (#78), but no report showed the state of the business. The backend serves the client's three reports (FS-009a, handover `subsidy-reports-and-masters.md`), each with an Excel export:
+
+- the six ageing figures per application;
+- the stage dashboard;
+- supply by district.
+
+#### Now
+
+- **Subsidy → Reports**, a third tab, with three reports (`?report=`):
+  - **Stages:**
+    - one row per stage holding an application, in order;
+    - applications, total cost, subsidy, farmer share, and the oldest's days in the stage;
+    - a total row;
+    - for one status at a time, open by default.
+  - **Supply:**
+    - supplied and not supplied by district, with their cost and a total row;
+    - cancelled applications are left out unless chosen.
+  - **Ageing:** each application's six figures, newest first. A step with no end counts to today and says "running". A dash means its start isn't recorded. Filters: status, stage and search, with Show more.
+- Each report downloads as Excel with its filters.
+- On a phone, the cost columns step aside so the tables fit, and each ageing card lays its figures out two by two. Checked at 360 px in dark mode.
+
+#### Discussion
+
+**Decisions:**
+
+- **Ageing is cards, not a wide table.** Six figures and an application don't fit a phone as columns. Each card reads on its own, and shows three or six figures to a row on wider screens.
+- **No "every status" on the stage report.** The backend's `status` defaults to open and can't be emptied, so the filter offers one status at a time, and clearing it returns to open.
+- **Totals are added with `sumRupees`,** in whole paise, never through floating point. The totals are the screen's own, labelled "All stages" and "All districts". Neither the export nor the backend sends them.
+- **Phone tables leave out columns rather than scroll.** A sideways-scrolling box with nothing to focus fails axe (`scrollable-region-focusable`). The cost columns stay on the desktop and in the export.
+
+**The mock:**
+
+- The mock works the reports out from its applications with the backend's rules. Each figure runs from a recorded start to its end, or to today, or to the day it was cancelled. "Supplied" means stage 7's supply date is in.
+- The seeded applications now record a date at each stage they passed (submission, supply, WO, TPA, inspection, TR, FP), so the reports have figures to show.
+
+#### Files changed
+
+- `src/features/subsidy/`:
+  - `api/subsidy-reports.{schemas,api,queries}.ts`, with `subsidy-reports.test.ts`;
+  - `components/subsidy-reports.tsx` and `subsidy-reports.test.tsx`;
+  - `components/subsidy-tabs.tsx`: the Reports tab.
+- `src/app/(app)/subsidy/reports/page.tsx`: the route.
+- `src/mocks/handlers/subsidy-reports.ts`: new. `handlers/subsidy-applications.ts`: seeded stage dates, and its store exported. The handler list.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SUBS-009…011.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/subsidy/`: the records.
+
+#### Tests
+
+**`src/features/subsidy/api/subsidy-reports.test.ts`:**
+
+- `[SUBS-009]`:
+  - six figures per application; a supply date with no full payment runs from today;
+  - a status filter;
+  - a dealer gets 403.
+- `[SUBS-010]`: open applications counted by stage in stage order, with money.
+- `[SUBS-011]`: supplied and not supplied add up to every application that isn't cancelled.
+
+**`src/features/subsidy/components/subsidy-reports.test.tsx`:**
+
+- the stage report with its total row;
+- the supply report;
+- the ageing cards with their labels and "running".
+
+**By hand, in Chromium on the mock backend, as a State Manager:**
+
+1. The three reports on a desktop, and the ageing download.
+2. Ageing and stages on a 360 px phone in dark mode.
 
 axe found nothing on any of these.
 

@@ -37,6 +37,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 👀 | PR #34; the Dispatch queue in PR #56 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
+| [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
@@ -196,6 +197,115 @@ Complaint types are set with the other lookups, in the admin masters.
 
 ---
 
+## Subsidy
+
+On the backend's contract (`backend/docs/api/subsidy.md`, handover `subsidy-calculation.md`) since PR #77 ([changelog](../changelog/entries/2026-10-09--feature--SUBS-002--the-subsidy-calculator.md)). Walked through in the mock as a field employee: Drip with a crop, three field-unit items, two head-unit items and installation, then a group area the backend refused and a spacing with three decimals; Drip with two crop blocks in dark mode; Sprinkler on a 360 px phone in dark mode, with no sideways scroll. axe found nothing on any of them. The mock's figures are a stand-in for the engine's; not yet checked on the dev API. Screens: [empty, phone](screenshots/subsidy/calculator-empty-phone-light.jpg), [Drip](screenshots/subsidy/calculator-drip-desktop-light.jpg), [mistakes](screenshots/subsidy/calculator-mistakes-desktop-light.jpg), [two crop blocks, dark](screenshots/subsidy/calculator-two-blocks-desktop-dark.jpg), [Sprinkler, phone dark](screenshots/subsidy/calculator-sprinkler-phone-dark.jpg).
+
+- **SUBS-003 · Three systems from the scheme's config** (Sales → Subsidy, staff with `subsidy`; dealers and distributors neither see it nor reach it — the backend answers them 403): Drip, Mini Sprinkler and Sprinkler as three tabs (`?system=`), each shaped by `GET /subsidy/config` — how many crop blocks (two on Drip), a head unit and a group's area or not, Sprinkler's areas. Each tab keeps its own inputs. Before anything is calculated, the eight farmer categories are listed with their percentages. The crop pickers show each crop's standard spacing. 🧪 👀
+- **SUBS-002 · The calculation as the designer types:** crop and inter-crop, area, lateral spacing, crop spacing and field-unit items per block; the head unit once; installation and sump per hectare; a group's total area; Sprinkler's nozzle. After a pause the figures follow: the warnings (titled, naming the block, the seven-year ones apart); each block's designed, standard and used spacing — with why when the standard wins — the unit cost the scheme allows (`regular_for_cap`) and the seven-year one; all eight categories with the subsidy, its share and what the farmer pays (with GSDMA on small Mini Sprinkler areas), a category that doesn't apply greyed with its reason; and the 22-row summary, a column per block and the total. The figures are printed as the backend sends them, never added up on screen. Nothing is saved. 🧪 👀
+- **SUBS-002 · Sprinkler:** the area from the scheme's steps only, no lines and no head unit; the result lists the derived items, the pipe size and the DBT farmer payable. 🧪 👀
+- **SUBS-002 · Mistakes and refusals:** a missing area or spacing just waits; too many decimals, a half-typed item or a group area of 0 are named on the field once typing pauses; a refusal from the backend (`crops[0].area`, `group_total_area`…) lands on the same field, and one no field shows (too many blocks) is listed above the figures. Older figures stay dimmed while new ones load. A failure no field explains shows an error with a retry. 🧪 👀
+
+
+Subsidy applications (PR #78, stacked on #77; [changelog](../changelog/entries/2026-10-09--feature--SUBS-004--subsidy-applications.md)). Walked through in the mock as a field employee:
+1. A quoted drip lead's card, then "Start subsidy application".
+2. The design, a category and a survey number, then started.
+3. A Reg. No. recorded at stage 4: first refused for want of a remark, then given one.
+4. The stored calculation, and the PIMS sheet downloaded.
+5. The worklist and an application on a 360 px phone in dark mode, with no sideways scroll.
+
+axe found nothing on any of them. Not yet checked on the dev API. Screens: [worklist](screenshots/subsidy/applications-desktop-light.jpg), [the lead's card](screenshots/subsidy/lead-card-desktop-light.jpg), [start](screenshots/subsidy/start-desktop-light.jpg), [just started](screenshots/subsidy/application-new-desktop-light.jpg), [record stage, a mistake](screenshots/subsidy/record-stage-mistake-desktop-light.jpg), [an application](screenshots/subsidy/application-desktop-light.jpg), [worklist, phone dark](screenshots/subsidy/applications-phone-dark.jpg), [an application, phone dark](screenshots/subsidy/application-phone-dark.jpg).
+
+- **SUBS-004 · Start an application from a lead.** A subsidised lead's page has a "Subsidy application" card (staff with `subsidy`).
+  - "Start subsidy application" shows when all of these hold:
+    - the lead is qualified, quoted, in negotiation or won;
+    - its system is drip, mini sprinkler or sprinkler;
+    - there is no live application;
+    - the user may change applications.
+  - Otherwise the card says why.
+  - The start page is the calculator for the lead's system. Then the farmer's category: only those that apply on every crop block, each with its subsidy. Then an optional survey number.
+  - Start stays off until the figures are in. Without a category it asks for one.
+  - Starting moves the lead to won and opens the application at stage 4.
+  - The calculation runs under the lead's state's scheme (`GET /subsidy-schemes/for-lead`). A state with no scheme, or one not ready, says "Subsidy for this state is not set up yet".
+  - Refusals say what is wrong: not subsidised, not forwardable, no calculation for the system, already forwarded, a category that doesn't apply, a calculation field.
+  - 🧪 👀
+- **SUBS-005 · The worklist** (Subsidy → Applications), newest first.
+  - Each row: number, status, Reg. No., subsidy, farmer, stage, days in the stage, area and inquiry.
+  - Filters: status, stage (from the scheme's list) and a search on number, Reg. No. or farmer. All of them live in the URL.
+  - Download Excel.
+  - States: skeleton, "No applications yet", nothing matching with Reset, Show more.
+  - 🧪 👀
+- **SUBS-006 · The application.**
+  - Shows:
+    - the number, status, farmer, the lead's inquiry, system and scheme;
+    - the current stage, since when and for how many days; the Reg. No.; days since inward; documents on the checklist;
+    - the figures: subsidy, what the farmer pays, total cost and area;
+    - the farmer, the dealer and the owner;
+    - every stage entry, oldest first: its values, who entered it, the remark, and "Back" when it went back;
+    - on request, the calculation as stored, never recalculated.
+  - **Record stage** builds its form from `GET /subsidy-stages`:
+    - a date (not after today), and each field as a date, rupees or text, starting from what it holds now;
+    - only the fields that changed are sent, so nothing is cleared by accident;
+    - a remark is needed going back or repeating a stage;
+    - two decimals at most for amounts.
+  - A closed application says it is fully paid. A cancelled one shows its reason and takes no entries; a 409 says so.
+  - **Cancel** asks for a reason. Afterwards the lead can start again.
+  - View-only roles (Regional Manager, Accounts) see the application but get no buttons.
+  - 🧪 👀
+- **SUBS-007 · Documents:** the 20-item checklist. Each item shows its files, opened through a ten-minute link.
+  - Whoever may change the application adds files to an item.
+  - Each file is checked first: PDF, JPEG, PNG, WebP or HEIC, 10 MB, 40 per application. Then each is sent on its own, with "Uploading…" and **Try again**.
+  - "Files can't be stored right now" covers a `503`.
+  - 🧪 👀
+- **SUBS-008 · PIMS sheet:** a download from the application, GGRC applications only (GAP-363). 🧪 👀
+
+
+Subsidy reports (PR #79, stacked on #78; [changelog](../changelog/entries/2026-10-09--feature--SUBS-009--subsidy-reports.md)). Walked through in the mock as a State Manager:
+1. The three reports on a desktop, with the ageing download.
+2. Ageing and stages on a 360 px phone in dark mode.
+
+axe found nothing. Not yet checked on the dev API. Screens: [stages](screenshots/subsidy/reports-stages-desktop-light.jpg), [supply](screenshots/subsidy/reports-supply-desktop-light.jpg), [ageing](screenshots/subsidy/reports-ageing-desktop-light.jpg), [ageing, phone dark](screenshots/subsidy/reports-ageing-phone-dark.jpg), [stages, phone dark](screenshots/subsidy/reports-stages-phone-dark.jpg).
+
+- **SUBS-010 · Stages** (Subsidy → Reports, the default):
+  - one row per stage holding an application, in stage order;
+  - each with applications, total cost, subsidy, farmer share, and how long the oldest has waited;
+  - a total row;
+  - for one status at a time (open by default; the backend offers no "every status");
+  - Download Excel.
+  - On a phone, the two cost columns step aside so nothing scrolls sideways.
+  - 🧪 👀
+- **SUBS-011 · Supply:**
+  - supplied and not supplied by district, with their cost and a total row;
+  - "supplied" means stage 7's supply date is recorded;
+  - cancelled applications are left out unless chosen;
+  - Download Excel.
+  - 🧪 👀
+- **SUBS-009 · Ageing:** each application's six figures, newest first:
+  - supply to full payment;
+  - inward to submission;
+  - WO to TPA received;
+  - TPA cleared to inspection sent;
+  - inspection sent to TR;
+  - FP submitted to full payment.
+
+  A figure with no end yet counts to today and says "running", highlighted. A dash means its start isn't recorded.
+  - Filters: status, stage and search, in the URL; Show more; Download Excel.
+  - 🧪 👀
+
+Subsidy masters and state schemes (PR #86, stacked on #79; [changelog](../changelog/entries/2026-10-10--feature--SUBS-012--subsidy-masters-and-state-schemes.md)). Walked through in the mock as an Admin: the GGRC overview; setting up UPMIS for Uttar Pradesh with Drip and Sprinkler, its readiness, and opening the unit-cost tab from it; the overview and the switch-off confirm on a 360 px phone in dark mode, with no sideways scroll. axe found nothing on any of them. Not yet checked on the dev API. Screens: [overview](screenshots/subsidy/masters-overview-desktop-light.jpg), [new scheme](screenshots/subsidy/masters-new-scheme-desktop-light.jpg), [not ready](screenshots/subsidy/masters-not-ready-desktop-light.jpg), [empty matrix tab](screenshots/subsidy/masters-empty-matrix-desktop-light.jpg), [phone, dark](screenshots/subsidy/masters-overview-phone-dark.jpg), [switch off, phone](screenshots/subsidy/masters-switch-off-phone-dark.jpg).
+
+- **SUBS-014 · A scheme's overview** (Admin → Subsidy masters, staff with `masters`; others see it read-only): pick the scheme (`?scheme=`) and a date (`?on=`).
+  - Each system says "Can calculate", or lists what a calculation would refuse on, each with Open to the tab that fills it.
+  - Stages in order; Rename refuses an empty or unchanged name.
+  - Switch off / on after a confirm naming the applications.
+  - 🧪 👀
+- **SUBS-014 · New scheme:** code (2 to 20 of A-Z, 0-9, _), name, state, template and systems. A taken code and a state with a scheme are marked on their fields. It opens on its overview, not ready. While an active scheme has no state, a banner asks to link it first and New scheme stays off. 🧪 👀
+- **SUBS-012 · Tables:** the rows in force on the date; Revise from a date sends only changed rows, from today or later; an empty table offers Add rows from a date; a refusal lands on its row. 🧪
+- **SUBS-013 · Matrices:** each as a grid with Copy as grid; New matrix from blank or from the one in force, pasted from Excel, each bad cell named. 🧪
+- **SUBS-014 · The calculator's scheme picker:** shown once two schemes are active; a scheme's own systems only. 🧪 👀
+
+---
+
 ## Dashboard, notifications, messages
 
 The dashboard reads the backend's real shape since the demo-walk fixes ([changelog](../changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md)). The bell and messages follow the backend's contracts (BE-009, BE-010) since PR #43 ([changelog](../changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md)). None of the three has been checked on the dev API by hand yet. Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
@@ -225,4 +335,5 @@ The backend serves these, and the frontend has no screen for them — in the ord
 
 1. A consolidated order from several quotations on leads of one dealer.
 2. Complaint types, with the other lookups in the admin masters. Everything else in complaints is in PR #57 and PR #58.
-3. Admin masters: products, price lists, tax rates, subsidy, users, offices, territories, partners.
+3. The subsidy masters and their revisions (categories, parameters, rates, crop spacings, matrices).
+4. Admin masters: products, price lists, tax rates, users, offices, territories, partners.
