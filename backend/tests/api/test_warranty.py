@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 from collections.abc import AsyncIterator, Callable
 from typing import Any
@@ -34,6 +35,11 @@ async def _terms(shop: Shop, sessions: Sessions) -> AsyncIterator[None]:
     shop removes the admin who created the terms."""
     yield
     s = sessions()
+    # the approvals queue order messages, which no foreign key removes with the order;
+    # test_migration_016 counts the last minute's rows
+    await s.execute(text("DELETE FROM notification_outbox WHERE payload->>'order_no' IN "
+                         "(SELECT order_no::text FROM sales_order WHERE territory_id = CAST(:d AS uuid))"),
+                    {"d": shop.district})
     await s.execute(text("DELETE FROM activity_event WHERE kind = 'warranty_term.set'"))
     await s.execute(text("DELETE FROM warranty_term WHERE NOT (product_category_id IS NULL AND effective_from = DATE '2020-01-01')"))
     await s.execute(text("UPDATE warranty_term SET effective_to = NULL WHERE product_category_id IS NULL"))
@@ -196,3 +202,79 @@ async def test_without_an_order_the_supply_date_starts_it(client: httpx.AsyncCli
     c = await complaints_t._create(client, shop, ho, supply_date=None, dc_no=None)
     w = (await client.get(f"{V1}/complaints/{c['id']}", headers=ho)).json()["data"]["lines"][0]["warranty"]
     assert w == {"status": "unknown", "start": None, "end": None, "months": None, "basis": None}
+
+
+# ── code review ──────────────────────────────────────────────────────────────
+
+async def test_two_admins_setting_the_default_at_once_both_succeed(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    """F-1: the advisory lock serialises two sets. Without it the second overlaps
+    the first and the exclusion constraint makes it a 500."""
+    admin = await endpoints._as(client, shop, "admin_sales")
+    d1 = today_ist() + dt.timedelta(days=10)
+    d2 = today_ist() + dt.timedelta(days=20)
+    r1, r2 = await asyncio.gather(_term(client, admin, months=18, effective_from=d1.isoformat()),
+                                  _term(client, admin, months=24, effective_from=d2.isoformat()))
+    assert (r1.status_code, r2.status_code) == (201, 201), (r1.text, r2.text)
+    rows = (await client.get(f"{V1}/warranty-terms", headers=admin)).json()["data"]
+    assert [(t["months"], t["effective_from"], t["effective_to"]) for t in rows if t["product_category"] is None] == [
+        (12, "2020-01-01", d1.isoformat()), (18, d1.isoformat(), d2.isoformat()), (24, d2.isoformat(), None)]
+
+
+async def test_the_complaint_warranty_function_answers_only_who_sees_the_complaint(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """F-2: the definer's own gate, without the endpoint's 404 in front of it."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    c = await complaints_t._create(client, shop, ho)
+    s = sessions()
+    try:
+        counts = {}
+        for who in ("field_officer", "dealer"):
+            await s.execute(text("SELECT set_config('app.current_user_id', :u, true)"), {"u": shop.ids[who]})
+            await s.execute(text("SELECT set_config('role', 'app_role', true)"))
+            counts[who] = (await s.execute(text("SELECT count(*) FROM complaint_warranty(CAST(:c AS uuid))"),
+                                           {"c": c["id"]})).scalar_one()
+            await s.rollback()
+        assert counts == {"field_officer": 1, "dealer": 0}, counts
+    finally:
+        await s.close()
+
+
+async def test_a_dc_date_starts_it_and_an_old_one_has_expired(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    """F-4: the DC date arm, and expired on the order tab."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    order = await endpoints._approve_all(client, shop, await endpoints._submit(
+        client, ho, (await endpoints._create(client, ho, endpoints._direct(shop)))["id"]))
+    dm = await endpoints._as(client, shop, "dispatch_manager")
+    old = today_ist() - dt.timedelta(days=400)
+    r = await client.post(f"{V1}/orders/{order['id']}/dispatches", headers={**dm, **_key()}, json={
+        "dispatched_at": dt.datetime.now(dt.UTC).isoformat(), "dc_no": "DC-W1", "dc_date": old.isoformat(),
+        "lines": [{"order_line_id": order["lines"][0]["id"], "qty": "2"}]})
+    assert r.status_code == 201, r.text
+    line = (await _warranty(client, ho, order["id"])).json()["data"]["lines"][0]
+    d = line["dispatches"][0]
+    assert (d["start"], d["start_basis"], d["end"], d["status"], line["status"]) == (
+        old.isoformat(), "dc_date", warranty.end_date(old, 12).isoformat(), "expired", "expired")  # type: ignore[union-attr]
+
+
+async def test_a_line_without_its_own_dispatch_is_not_dispatched(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """F-3: the same product on two lines, only the first shipped."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    body = endpoints._direct(shop)
+    body["lines"] = [{"product_id": shop.product, "qty": "5", "discount_pct": "10"},
+                     {"product_id": shop.product, "qty": "3", "discount_pct": "10"}]
+    order = await endpoints._approve_all(client, shop, await endpoints._submit(
+        client, ho, (await endpoints._create(client, ho, body))["id"]))
+    dm = await endpoints._as(client, shop, "dispatch_manager")
+    r = await client.post(f"{V1}/orders/{order['id']}/dispatches", headers={**dm, **_key()}, json={
+        "dispatched_at": dt.datetime.now(dt.UTC).isoformat(),
+        "lines": [{"order_line_id": order["lines"][0]["id"], "qty": "5"}]})
+    assert r.status_code == 201, r.text
+    c = await complaints_t._create(client, shop, ho, sales_order_id=order["id"])
+    assert (await complaints_t._post(client, ho, f"/{c['id']}/submit")).status_code == 200
+    lines = (await _warranty(client, ho, order["id"])).json()["data"]["lines"]
+    assert [(ln["status"], len(ln["dispatches"])) for ln in lines] == [("active", 1), ("not_dispatched", 0)]
+    # the claim is on the product: both lines list it, against the product's anchor
+    assert [[x["warranty_status"] for x in ln["claims"]] for ln in lines] == [["in_warranty"], ["in_warranty"]]

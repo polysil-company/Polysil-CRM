@@ -36,7 +36,7 @@ class WarrantyTermIn(BaseModel):
     effective_from: dt.date = Field(description="Tomorrow (IST) or later: a term never restates a recorded dispatch.")
 
 
-class ProductRef(BaseModel):
+class WarrantyProduct(BaseModel):
     id: str
     description: str
 
@@ -63,11 +63,11 @@ class Claim(BaseModel):
 
 class WarrantyLine(BaseModel):
     order_line_id: str
-    product: ProductRef
+    product: WarrantyProduct
     qty_ordered: str
     qty_dispatched: str = Field(description="Across live dispatches.")
     dispatches: list[WarrantyDispatch]
-    status: LineStatus = Field(description="From the latest-ending live dispatch of this product on the order.")
+    status: LineStatus = Field(description="From this line's latest-ending live dispatch; not_dispatched when it has none.")
     claims: list[Claim] = Field(description="Submitted complaints on this product, linked to this order or replaced by it.")
 
 

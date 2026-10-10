@@ -2308,6 +2308,24 @@ def f_ratings() -> None:
          ("n3", "Left out of payment days: orders owing nothing,\nclosed-short orders, unpaid orders younger than the\nfirst band. Never below 0 days.", RED),
          ("n4", "Ours: 1-5 stars, never edited, the formula and bands,\nscore-only for dealers (GAP-372 to GAP-377).", YELLOW)])
 
+def f_warranty() -> None:
+    _columns(
+        "57-warranty", "Warranty: a period per category, a warranty per dispatch",
+        "Shown on the order and on each complaint line; never enforced.",
+        "BUILT. FS-046: /warranty-terms, /orders/{id}/warranty, migration 053.",
+        [("s1", "admin: POST /warranty-terms\ncategory or default, months 0-120, from tomorrow", YELLOW),
+         ("s2", "a dispatch: start = DC date, else the IST dispatch day\nmonths = the term in force that day", BLUE),
+         ("s3", "end = start + months - 1 day\n(a clamped month end is the end)", GREEN),
+         ("s4", "GET /orders/{id}/warranty: each line's dispatches,\nits status, the complaints on the product", VIOLET),
+         ("s5", "GET /complaints/{id}: lines[].warranty on the day raised\ncomplaint_warranty() definer", VIOLET)],
+        [("d1", "voided dispatch: no warranty", GREY),
+         ("d2", "0 months: none; no term on the day: unknown", GREY),
+         ("d3", "replacement order: a new period,\nnames the complaint it replaces (GAP-279)", YELLOW)],
+        [("n1", "THE SQL END DATE IS AUTHORITATIVE\n\n(start - 1) + n loses 29 Feb in leap years.\nA test holds Python equal over 2020 to 2040.", RED),
+         ("n2", "THE QC MANAGER CANNOT READ THE ORDER\n\nThe complaint side is a definer gated on\ncomplaint_visible(), so everyone sees one answer.", RED),
+         ("n3", "Ours: 12 months everywhere, per dispatch,\nshown not enforced (GAP-275 to GAP-283).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2319,5 +2337,5 @@ if __name__ == "__main__":
     f_subsidy_follow_ups(); f_lead_small_gaps()
     f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
-    f_export_sample_orders(); f_ratings()
+    f_export_sample_orders(); f_ratings(); f_warranty()
     print(f"\nwrote to {OUT}")

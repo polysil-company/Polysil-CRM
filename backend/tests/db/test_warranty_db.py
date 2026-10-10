@@ -45,11 +45,12 @@ async def test_the_default_term_and_the_constraints(db: AsyncSession) -> None:
         "AND effective_from = DATE '2020-01-01'"))).one()
     assert default.months == 12
     # a start before any term: no months, so the status is unknown (edge EC-5)
-    product = (await db.execute(text("SELECT id FROM product LIMIT 1"))).scalar_one()
-    assert (await db.execute(text("SELECT warranty_months(:p, DATE '2016-01-01')"),
+    # an id with no product row: no category, so the default applies (CI has no catalogue)
+    product = "00000000-0000-4000-8000-000000000046"
+    assert (await db.execute(text("SELECT warranty_months(CAST(:p AS uuid), DATE '2016-01-01')"),
                              {"p": product})).scalar_one() is None
-    assert (await db.execute(text("SELECT warranty_months(:p, DATE '2026-10-01')"),
-                             {"p": product})).scalar_one() is not None
+    assert (await db.execute(text("SELECT warranty_months(CAST(:p AS uuid), DATE '2026-10-01')"),
+                             {"p": product})).scalar_one() == 12
     cons = {r[0] for r in (await db.execute(text(
         "SELECT conname FROM pg_constraint WHERE conrelid = 'warranty_term'::regclass"))).all()}
     assert {"ck_warranty_term_dates", "ex_warranty_term_default", "ex_warranty_term_category"} <= cons
@@ -57,3 +58,15 @@ async def test_the_default_term_and_the_constraints(db: AsyncSession) -> None:
     with pytest.raises(Exception, match="ex_warranty_term_default"):
         await db.execute(text("INSERT INTO warranty_term (months, effective_from) VALUES (6, DATE '2030-01-01')"))
     await db.execute(text("ROLLBACK TO SAVEPOINT w"))
+
+
+async def test_a_term_is_in_force_up_to_the_day_before_its_end(db: AsyncSession) -> None:
+    """F-4: the exclusive effective_to, at the changeover (an owner insert, rolled back)."""
+    await db.execute(text("UPDATE warranty_term SET effective_to = DATE '2031-06-01' "
+                          "WHERE product_category_id IS NULL AND effective_to IS NULL"))
+    await db.execute(text("INSERT INTO warranty_term (months, effective_from) VALUES (24, DATE '2031-06-01')"))
+    product = "00000000-0000-4000-8000-000000000046"
+    got = {d: (await db.execute(text("SELECT warranty_months(CAST(:p AS uuid), :d)"),
+                                {"p": product, "d": dt.date.fromisoformat(d)})).scalar_one()
+           for d in ("2031-05-31", "2031-06-01", "2019-12-31", "2020-01-01")}
+    assert got == {"2031-05-31": 12, "2031-06-01": 24, "2019-12-31": None, "2020-01-01": 12}, got

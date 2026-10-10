@@ -50,7 +50,9 @@ async def set_term(db: AsyncSession, body: sch.WarrantyTermIn) -> list[sch.Warra
                              {"c": body.product_category_id, "m": body.months, "f": body.effective_from})
     except DBAPIError as exc:
         code = getattr(exc.orig, "sqlstate", None)
-        if code == "WRTEX":
+        # 23P01: an overlap the lock should prevent, e.g. a backdated row a migration
+        # wrote (GAP-282) racing a set; a 409, never a 500 (code review F-1)
+        if code in ("WRTEX", "23P01"):
             raise ConflictError("A term already starts that day.", code="term_exists") from exc
         if code == "WRTPA":
             raise ValidationFailed(fields={"effective_from": "from tomorrow on"}) from exc
@@ -66,6 +68,7 @@ async def order_warranty(db: AsyncSession, order_id: str) -> sch.OrderWarranty:
     """Four statements whatever the line count (edge EC-15), each under the
     caller's RLS, as GET /orders/{id}."""
     order = (await db.execute(text(
+        # GAP-279: a replacement's dispatch starts a full period; the tab names what it replaces
         "SELECT o.id, o.order_no::text AS order_no, o.order_type::text AS order_type, "
         "  (SELECT c.id FROM complaint_remedy r JOIN complaint c ON c.id = r.complaint_id "
         "    WHERE r.sales_order_id = o.id AND r.kind = 'replacement' ORDER BY r.chosen_at LIMIT 1) AS rc_id "
@@ -90,12 +93,13 @@ async def order_warranty(db: AsyncSession, order_id: str) -> sch.OrderWarranty:
         "  cl.defective_qty, (c.first_submitted_at AT TIME ZONE 'Asia/Kolkata')::date AS raised_on "
         "FROM complaint c JOIN complaint_line cl ON cl.complaint_id = c.id "
         "WHERE (c.sales_order_id = CAST(:o AS uuid) OR c.id = CAST(:rc AS uuid)) "
-        "  AND c.status::text NOT IN ('draft', 'cancelled') "
+        "  AND c.status::text NOT IN ('draft', 'cancelled') AND c.deleted_at IS NULL "
         "ORDER BY c.first_submitted_at, c.id"),
         {"o": order_id, "rc": str(order.rc_id) if order.rc_id else None})).all()
 
     today = ist_today(_now())
-    # rule 10: one anchor per product, the latest-ending live dispatch across its lines
+    # rule 10: one anchor per product, the latest-ending live dispatch across its lines.
+    # GAP-276: no serials, so the unit a complaint is about is unknown
     anchor: dict[str, Any] = {}
     for s in shipped:
         key, best = str(s.product_id), anchor.get(str(s.product_id))
@@ -104,17 +108,23 @@ async def order_warranty(db: AsyncSession, order_id: str) -> sch.OrderWarranty:
     out = []
     for ln in lines:
         mine = [s for s in shipped if s.order_line_id == ln.id]
+        # the line's status from its own dispatches (code review F-3); claims compare with
+        # the product's anchor, as the complaint page does
+        own = None
+        for s in mine:
+            if own is None or _later(s, own):
+                own = s
         a = anchor.get(str(ln.product_id))
         out.append(sch.WarrantyLine(
             order_line_id=str(ln.id),
-            product=sch.ProductRef(id=str(ln.product_id), description=ln.description),
+            product=sch.WarrantyProduct(id=str(ln.product_id), description=ln.description),
             qty_ordered=_qty(ln.qty), qty_dispatched=_qty(sum((s.qty for s in mine), Decimal(0))),
             dispatches=[sch.WarrantyDispatch(
                 dispatch_id=str(s.dispatch_id), dispatch_no=s.dispatch_no, qty=_qty(s.qty),
                 start=s.start_day.isoformat(), start_basis="dc_date" if s.dc_date else "dispatched_at",
                 end=_iso(s.end_day), months=s.months,
                 status=domain.status_on(s.months, s.end_day, today)) for s in mine],
-            status=domain.status_on(a.months, a.end_day, today) if a is not None else "not_dispatched",
+            status=domain.status_on(own.months, own.end_day, today) if own is not None else "not_dispatched",
             claims=[sch.Claim(
                 complaint_id=str(c.id), complaint_no=c.complaint_no, status=c.status,
                 raised_on=_iso(c.raised_on), defective_qty=_qty(c.defective_qty),
@@ -140,7 +150,8 @@ def _later(a: Any, b: Any) -> bool:
 
 
 async def complaint_lines(db: AsyncSession, complaint_id: str) -> dict[str, sch.LineWarranty]:
-    """Each complaint line's warranty, keyed by line id, from the definer (edge EC-1)."""
+    """Each complaint line's warranty, keyed by line id, from the definer (edge EC-1).
+    GAP-277: shown only; an expired line refuses nothing."""
     rows = (await db.execute(text("SELECT * FROM complaint_warranty(CAST(:c AS uuid))"),
                              {"c": complaint_id})).all()
     return {str(r.line_id): sch.LineWarranty(

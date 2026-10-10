@@ -1043,6 +1043,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `defective_qty` | string | yes |  |
 | `failure_frequency` | string \| null | yes |  |
 | `remark` | string \| null | yes |  |
+| `warranty` | LineWarranty \| null |  | FS-046: whether the product was in warranty on the day the complaint was raised. |
 
 **`LineIn`**
 
@@ -1053,6 +1054,16 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `defective_qty` | number \| string | yes | Zero or more, not more than supplied. |
 | `failure_frequency` | string \| null |  |  |
 | `remark` | string \| null |  |  |
+
+**`LineWarranty`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `status` | `in_warranty` \| `expired` \| `none` \| `unknown` | yes | On the day the complaint was raised (its first submit, or today for a draft). |
+| `start` | string \| null | yes |  |
+| `end` | string \| null | yes |  |
+| `months` | integer \| null | yes |  |
+| `basis` | `dispatch` \| `supply_date` \| null | yes | Where the start came from. |
 
 **`OrderLink`**
 

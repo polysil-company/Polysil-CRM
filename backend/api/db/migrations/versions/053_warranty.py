@@ -89,7 +89,8 @@ LANGUAGE sql IMMUTABLE SET search_path = public, pg_temp AS $fn$
         ELSE (p_start + make_interval(months => p_months))::date - 1
     END
 $fn$""",
-    # the category's own term in force on the day, else the default's, else null
+    # the category's own term in force on the day, else the default's, else null.
+    # GAP-281: the product's current category. GAP-280: order type is not considered
     """CREATE FUNCTION warranty_months(p_product uuid, p_day date) RETURNS integer
 LANGUAGE sql STABLE SET search_path = public, pg_temp AS $fn$
     SELECT t.months FROM warranty_term t
