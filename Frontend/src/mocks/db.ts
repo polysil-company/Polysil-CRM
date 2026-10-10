@@ -6,6 +6,7 @@ import type { ConversationWire, MessageWire } from "@/features/messages/api/mess
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
+import type { OfficeWire } from "@/features/users/api/users.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
@@ -16,6 +17,7 @@ import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
 import { generateQuotations } from "./data/quotations";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
+import { seedOffices, seedUsers, type MockUserRecord } from "./data/users";
 
 export interface MockDb {
   /** Newest first, in the backend's wire format. */
@@ -87,6 +89,12 @@ export interface MockDb {
   enquiriesToday: Map<string, string>;
   /** How many events the mock has written, for their ids. */
   writtenEvents: number;
+  /** Staff and partner users, deleted ones kept with `deleted_at` (ADMN-001…006). */
+  users: MockUserRecord[];
+  /** The offices a staff member is anchored on (`GET /org-units`). */
+  offices: OfficeWire[];
+  /** POST /users replays: Idempotency-Key → the request and the person made. */
+  userWrites: Map<string, { body: string; userId: string }>;
 }
 
 function createMockDb(): MockDb {
@@ -142,6 +150,9 @@ function createMockDb(): MockDb {
     enquiryCodes: new Map(),
     enquiriesToday: new Map(),
     writtenEvents: 1,
+    users: seedUsers(),
+    offices: seedOffices(),
+    userWrites: new Map(),
   };
 }
 

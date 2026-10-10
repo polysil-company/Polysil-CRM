@@ -281,6 +281,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 | Area | Data IDs | Endpoints |
 |---|---|---|
+| People (Admin → Users & roles) — the list with search, type, role and status filters and an Excel export; a person's sign-in state, role, office or partner and territories; add a staff member with a temporary password or a partner user; edit; set a temporary password, sign out everywhere, unlock; hand a leaver's leads and tasks over in batches, deactivate or reactivate, delete | ADMN-001…006 | `/users*`, `GET /lookups/roles`, `GET /org-units` |
 | Change your password; the forced change while a temporary password is in force (any `403 password_change_required` switches to it) | AUTH-007 | `POST /auth/password`, `must_change_password` on `GET /auth/me` |
 | Sign-in, session, refresh, sign-out | AUTH-001…006 | `/auth/login`, `/auth/otp/*`, `/auth/refresh`, `/auth/logout`, `/auth/me` |
 | Lead list — cursor paging in the URL, stage / source / type / area filters, search, sorting by customer or value (BE-001); the Area pill drills from districts to talukas, with lead counts | LEAD-001 | `GET /leads?territory_id=`, `GET /leads/areas` |
@@ -348,7 +349,7 @@ Picked up from the backend's finished asks: crops and land on a lead (BE-003: th
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
 | A **consolidated** order from several quotations on leads of one dealer (choosing several quotations at once) | `POST /orders` with several `quotation_ids` | `backend/docs/api/orders.md` | **1** |
-| Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 6 |
+| Products, price lists, tax rates, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/org-units`, `/territories`, `/partners` | `backend/docs/api/*.md` | 6 |
 
 | Complaint types (admin), with the other lookups (CMPL-008) | `/lookups/complaint-types` | `complaints-contract.md` | 5 |
 
