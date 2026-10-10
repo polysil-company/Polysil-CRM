@@ -680,6 +680,21 @@ export const DATA_IDS = {
     status: "planned",
     notes: "Calculation is owned by the backend; the frontend captures and displays.",
   },
+  "SUBS-002": {
+    domain: "SUBS",
+    title: "Subsidy calculator — the scheme's cost blocks and every farmer category's share",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /subsidy/calculate"],
+    notes: "A preview: nothing is stored. The backend calculates; the screen prints its figures.",
+  },
+  "SUBS-003": {
+    domain: "SUBS",
+    title: "Subsidy scheme lookups — what each system accepts, the crops and the categories",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy/config", "GET /subsidy/crops", "GET /subsidy/categories"],
+  },
   "REPO-001": {
     domain: "REPO",
     title: "Changelog system — one entry per change, generated CHANGELOG.md",
