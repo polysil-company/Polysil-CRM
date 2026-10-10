@@ -64,6 +64,7 @@ from api.routers import customers as customer_routes
 from api.routers import holidays as holiday_routes
 from api.routers import portal as portal_routes
 from api.routers import settings as settings_routes
+from api.routers import warranty as warranty_routes
 from api.upload_limit import BodyTooLarge, UploadLimit, body_too_large_handler
 
 log = structlog.get_logger()
@@ -247,6 +248,8 @@ def create_app() -> FastAPI:
     app.include_router(settings_routes.router, prefix=API_PREFIX)
     app.include_router(holiday_routes.router, prefix=API_PREFIX)
     app.include_router(campaign_routes.router, prefix=API_PREFIX)
+    app.include_router(warranty_routes.terms, prefix=API_PREFIX)
+    app.include_router(warranty_routes.orders, prefix=API_PREFIX)
     app.include_router(customer_routes.router, prefix=API_PREFIX)
     app.include_router(portal_routes.router, prefix=API_PREFIX)
     app.include_router(assistant_routes.router, prefix=API_PREFIX)
