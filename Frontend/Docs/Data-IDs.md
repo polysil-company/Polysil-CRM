@@ -192,6 +192,16 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
 | SUBS-001 | Subsidy forms and case status | shared | planned |
+| SUBS-002 | Subsidy calculator — the scheme's cost blocks and every farmer category's share (`POST /subsidy/calculate`) | shared | in-progress |
+| SUBS-003 | Subsidy scheme lookups — what each system accepts, the crops and the categories (`GET /subsidy/config`, `GET /subsidy/crops`, `GET /subsidy/categories`) | shared | in-progress |
+| SUBS-004 | Start a subsidy application from a lead — the calculation and the farmer's category (`POST /subsidy-applications`, `GET /subsidy-schemes/for-lead/{leadId}`) | shared | in-progress |
+| SUBS-005 | Subsidy applications worklist, with its Excel export (`GET /subsidy-applications`, `GET /subsidy-applications/export`) | shared | in-progress |
+| SUBS-006 | A subsidy application — its figures, stored calculation, stages and cancel (`GET /subsidy-applications/{id}`, `GET /subsidy-applications/{id}/calculation`, `GET /subsidy-applications/{id}/stages`, `POST /subsidy-applications/{id}/stages`, `POST /subsidy-applications/{id}/cancel`, `GET /subsidy-stages`) | shared | in-progress |
+| SUBS-007 | A subsidy application's document checklist and uploads (`GET /subsidy-applications/{id}/documents`, `POST /subsidy-applications/{id}/documents`, `GET /subsidy-applications/{id}/documents/{docId}`) | shared | in-progress |
+| SUBS-008 | Download a subsidy application's PIMS sheet (`GET /subsidy-applications/{id}/pims.xlsx`) | shared | in-progress |
+| SUBS-009 | Subsidy ageing — the client's six ageing figures per application, with its export (`GET /subsidy-reports/ageing`, `GET /subsidy-reports/ageing/export`) | shared | in-progress |
+| SUBS-010 | Subsidy stage report — applications and money in each stage, with its export (`GET /subsidy-reports/stages`, `GET /subsidy-reports/stages/export`) | shared | in-progress |
+| SUBS-011 | Subsidy supply report — supplied and not supplied by district, with its export (`GET /subsidy-reports/supply`, `GET /subsidy-reports/supply/export`) | shared | in-progress |
 | ACCT-001 | Accounts work queue | shared | planned |
 | DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |
 | DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |

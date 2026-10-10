@@ -6,6 +6,12 @@ import type { ConversationWire, MessageWire } from "@/features/messages/api/mess
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
+import type {
+  ApplicationDocumentWire,
+  ApplicationWire,
+  StageEntryWire,
+} from "@/features/subsidy/api/subsidy-applications.schemas";
+import type { CalculateResponseWire } from "@/features/subsidy/api/subsidy.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
@@ -85,6 +91,18 @@ export interface MockDb {
   enquiryCodes: Map<string, number>;
   /** Today's enquiry per mobile: a second one answers the first number (LEAD-014). */
   enquiriesToday: Map<string, string>;
+  /** Subsidy applications, newest first; seeded from the leads on first use (SUBS-005). */
+  subsidyApplications: ApplicationWire[] | null;
+  /** Each application's stage history, oldest first (SUBS-006). */
+  subsidyEntries: Map<string, StageEntryWire[]>;
+  /** Each application's calculation as stored at create (SUBS-006). */
+  subsidyCalculations: Map<string, CalculateResponseWire["data"]>;
+  /** Each application's files, by checklist code (SUBS-007). */
+  subsidyDocuments: Map<string, Map<string, ApplicationDocumentWire[]>>;
+  /** Uploaded application files, by document id, served back as object URLs. */
+  subsidyFiles: Map<string, File>;
+  /** POST /subsidy-applications replays: Idempotency-Key → the request and the application. */
+  subsidyWrites: Map<string, { body: string; applicationId: string }>;
   /** How many events the mock has written, for their ids. */
   writtenEvents: number;
 }
@@ -141,6 +159,12 @@ function createMockDb(): MockDb {
     qrCodes: seedQrCodes(),
     enquiryCodes: new Map(),
     enquiriesToday: new Map(),
+    subsidyApplications: null,
+    subsidyEntries: new Map(),
+    subsidyCalculations: new Map(),
+    subsidyDocuments: new Map(),
+    subsidyFiles: new Map(),
+    subsidyWrites: new Map(),
     writtenEvents: 1,
   };
 }
