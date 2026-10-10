@@ -3,22 +3,32 @@ import { z } from "zod";
 import type { ResourceRef } from "@/lib/navigation/resource-href";
 
 /**
- * NOTIF-001, NOTIF-002 · In-app notifications — a PROPOSED contract.
- *
- * The backend has no notification endpoints yet. This follows the conventions of
- * GET /auth/me: a `data` envelope, snake_case fields, optional fields read leniently.
- * Unknown `kind` and resource `type` values are kept and shown generically, so the
- * backend can add events without a frontend release.
- *
- * TODO(NOTIF-001): agree endpoints, field names, event kinds and paging with the backend
- * developer — and how new notifications reach the browser (polling today).
+ * NOTIF-001, NOTIF-002 · In-app notifications, as the backend serves them since BE-009
+ * (backend/docs/api/notifications.md). Unknown `kind` and resource `type` values are kept and
+ * shown generically, so the backend can add events without a frontend release. There is no
+ * push: the bell polls the unread count.
  */
 
 const isoDateTime = z.iso.datetime({ offset: true });
 const count = z.number().int().nonnegative();
 
-/** The events the bell presents with their own icon. Others still render. */
-export const NOTIFICATION_KINDS = ["approval_requested", "lead_assigned", "task_assigned"] as const;
+/** The events the backend sends today, each with its own icon. Others still render. */
+export const NOTIFICATION_KINDS = [
+  "lead_assigned",
+  "task_assigned",
+  "lead_note",
+  "approval_requested",
+  "order_approved",
+  "order_returned",
+  "discount_approved",
+  "discount_returned",
+  "complaint_assigned",
+  "complaint_to_check",
+  "complaint_to_qc",
+  "complaint_returned",
+  "complaint_qc_approved",
+  "complaint_qc_rejected",
+] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 const resourceRefSchema = z.object({
@@ -32,7 +42,8 @@ export const notificationWireSchema = z.object({
   kind: z.string().min(1),
   title: z.string().min(1),
   body: z.string().nullish(),
-  actor: z.object({ id: z.string().min(1), full_name: z.string().min(1) }).nullish(),
+  /** Null for a dealer told of a decision: a dealer is never told who decided. */
+  actor: z.object({ id: z.string().min(1), full_name: z.string() }).nullish(),
   resource: resourceRefSchema.nullish(),
   created_at: isoDateTime,
   read_at: isoDateTime.nullish(),
@@ -68,7 +79,11 @@ function toNotification(wire: z.output<typeof notificationWireSchema>): AppNotif
     kind: wire.kind,
     title: wire.title,
     body: wire.body ?? null,
-    actor: wire.actor ? { id: wire.actor.id, name: wire.actor.full_name } : null,
+    // A blank name (someone outside the reader's view of people) names nobody.
+    actor:
+      wire.actor && wire.actor.full_name.trim() !== ""
+        ? { id: wire.actor.id, name: wire.actor.full_name.trim() }
+        : null,
     resource: wire.resource ?? null,
     createdAt: wire.created_at,
     readAt: wire.read_at ?? null,

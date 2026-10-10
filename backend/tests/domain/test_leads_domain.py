@@ -9,9 +9,11 @@ from decimal import Decimal
 import pytest
 
 from api.domain.leads import (
+    REOPENABLE,
     REQUIRES_QUOTATION,
     TERMINAL,
     TRANSITIONS,
+    VIA_QUOTATION,
     MobileError,
     can_transition,
     financial_year,
@@ -43,8 +45,22 @@ def test_terminal_stages_have_no_transition_out() -> None:
     assert can_transition("merged", "new") is False
 
 
+def test_a_dormant_lead_can_only_be_lost_or_reopened() -> None:
+    """FS-035: the worker parks a lead; a person loses it or reopens it, and no
+    transition() call parks one or moves it anywhere else."""
+    assert TRANSITIONS["dormant"] == frozenset({"lost"})
+    assert "dormant" not in TERMINAL
+    assert frozenset({"lost", "dormant"}) == REOPENABLE
+    for frm in TRANSITIONS:
+        assert not can_transition(frm, "dormant")
+
+
 def test_the_quotation_gated_stages_are_marked() -> None:
-    assert set(REQUIRES_QUOTATION) == {"quoted", "negotiation", "won"}
+    """FS-005: quoted and negotiation are reached through the quotation, never from
+    the lead endpoint; won needs an accepted quotation on the lead."""
+    assert set(VIA_QUOTATION) == {"quoted", "negotiation"}
+    assert set(REQUIRES_QUOTATION) == {"won"}
+    assert "won" in TRANSITIONS["quoted"], "a quotation accepted as sent skips negotiation"
 
 
 # ── mobile normalisation ─────────────────────────────────────────────────────

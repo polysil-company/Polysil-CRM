@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowLeft01Icon, Call02Icon, Share08Icon, WhatsappIcon } from "@hugeicons/core-free-icons";
+import {
+  AlertCircleIcon,
+  ArrowLeft01Icon,
+  Call02Icon,
+  Share08Icon,
+  PackageIcon,
+  WhatsappIcon,
+} from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,18 +16,30 @@ import type * as React from "react";
 import { AvatarLabel } from "@/components/patterns/avatar-label";
 import { QueryView } from "@/components/patterns/query-view";
 import { RelativeDate } from "@/components/patterns/relative-date";
-import { SegmentedMeter } from "@/components/patterns/segmented-meter";
-import { describeTrend, Sparkline } from "@/components/patterns/sparkline";
-import { TagList } from "@/components/patterns/tag";
+import { Tag, toneForLabel } from "@/components/patterns/tag";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RelatedComplaints } from "@/features/complaints/components/related-complaints";
 import { leadDetailQueryOptions } from "@/features/leads/api/leads.queries";
-import type { Lead } from "@/features/leads/api/leads.schemas";
-import { LEAD_SOURCE_LABELS, ORDER_TYPE_LABELS } from "@/features/leads/lib/lead-labels";
+import type { Lead, LeadStage } from "@/features/leads/api/leads.schemas";
+import {
+  DUPLICATE_SIGNAL_LABELS,
+  formatAcres,
+  LEAD_INQUIRY_TYPE_LABELS,
+  LEAD_PRIORITY_BADGE,
+  LEAD_PRIORITY_LABELS,
+  partnerTypeLabel,
+} from "@/features/leads/lib/lead-labels";
+import { LookupName } from "@/features/lookups/components/lookup-name";
+import { formatTerritory } from "@/features/lookups/lib/lookup-labels";
 import { toShareParam } from "@/features/messages/lib/share-attachment";
-import { useSession } from "@/features/session/hooks/use-session";
+import { LeadQuotations } from "@/features/quotations/components/lead-quotations";
+import { useCan, useSession } from "@/features/session/hooks/use-session";
+import { LeadMinutes } from "@/features/tasks/components/lead-minutes";
+import { LeadTasks } from "@/features/tasks/components/lead-tasks";
 import { isApiError } from "@/lib/api/errors";
 import {
   EMPTY_VALUE,
@@ -31,7 +50,25 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { LeadStatusBadge } from "./lead-status-badge";
+import { LeadAssignDialog } from "./lead-assign-dialog";
+import { LeadDeleteDialog, LeadEditDialog } from "./lead-edit-dialog";
+import { LeadNoteComposer } from "./lead-note-composer";
+import { LeadStageBadge } from "./lead-stage-badge";
+import { LeadStageMenu } from "./lead-stage-menu";
+import { LeadTimeline, LeadTimelineSkeleton } from "./lead-timeline";
+
+/** Stages the backend closes to reassignment (`TERMINAL` in backend/api/domain/leads.py). */
+const CLOSED_STAGES: ReadonlySet<LeadStage> = new Set(["won", "lost", "merged"]);
+/** The stages an order may be placed on, as the backend allows (SO-005). */
+const ORDERABLE_STAGES: ReadonlySet<LeadStage> = new Set([
+  "qualified",
+  "quoted",
+  "negotiation",
+  "won",
+]);
+
+/** Detail rows that always render — the skeleton draws the same number. */
+const DETAIL_ROW_COUNT = 15;
 
 /** LEAD-003 · Lead detail. A 404 renders the route's not-found page. */
 export function LeadDetail({ leadId }: { leadId: string }): React.JSX.Element {
@@ -60,15 +97,90 @@ function DetailItem({
   return (
     <div className={cn("flex min-w-0 flex-col gap-1", className)}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-sm text-foreground">{children}</dd>
+      <dd className="min-w-0 text-sm wrap-break-word text-foreground">{children}</dd>
     </div>
+  );
+}
+
+/**
+ * A lead's next follow-up is a task on the backend (BE-002). TODO(TASK-001): show it once
+ * the tasks module is connected.
+ */
+function NotRecorded(): React.JSX.Element {
+  return <span className="text-subtle-foreground">{EMPTY_VALUE}</span>;
+}
+
+/** A notice above the details: a merged lead, or possible duplicates. */
+function LeadNotice({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border border-border bg-warning-soft p-3 text-sm text-foreground">
+      <Icon icon={AlertCircleIcon} className="mt-0.5 text-warning" />
+      <div className="flex min-w-0 flex-col gap-1">{children}</div>
+    </div>
+  );
+}
+
+function LeadNotices({ lead }: { lead: Lead }): React.JSX.Element | null {
+  const pending = lead.duplicates.filter((duplicate) => duplicate.state === "pending");
+
+  if (lead.mergedInto) {
+    return (
+      <LeadNotice>
+        <p>
+          This lead was merged into{" "}
+          <Link
+            href={`/leads/${lead.mergedInto.id}`}
+            className="font-mono font-medium text-primary-text underline-offset-4 hover:underline"
+          >
+            {lead.mergedInto.code}
+          </Link>
+          . Work on that lead instead.
+        </p>
+      </LeadNotice>
+    );
+  }
+
+  if (pending.length === 0) {
+    return null;
+  }
+
+  return (
+    <LeadNotice>
+      <p className="font-medium">
+        {pending.length === 1 ? "Possible duplicate" : `${pending.length} possible duplicates`}
+      </p>
+      <ul className="flex flex-col gap-0.5 text-muted-foreground">
+        {pending.map((duplicate) => (
+          <li key={duplicate.linkId}>
+            <Link
+              href={`/leads/${duplicate.leadId}`}
+              className="font-mono text-primary-text underline-offset-4 hover:underline"
+            >
+              {duplicate.code}
+            </Link>
+            : {DUPLICATE_SIGNAL_LABELS[duplicate.signal]}
+          </li>
+        ))}
+      </ul>
+      <Link
+        href="/leads/duplicates"
+        className="w-fit font-medium text-primary-text underline-offset-4 hover:underline"
+      >
+        Review and merge
+      </Link>
+    </LeadNotice>
   );
 }
 
 function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
   const { data: session } = useSession();
+  const canEdit = useCan("leads", "edit");
+  const canSeeQuotations = useCan("quotations");
+  const canOrder = useCan("sales_orders", "create");
+  const canDelete = useCan("leads", "delete");
+  const canSeeTasks = useCan("tasks") && session?.userType === "staff";
   const whatsappNumber = lead.phone.replace(/\D/g, "");
-  const location = [lead.village, lead.district, lead.state].filter(Boolean).join(", ");
+  const lost = lead.stage === "lost";
 
   return (
     <div className="flex flex-col gap-5">
@@ -84,11 +196,17 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
           </Link>
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="truncate text-xl font-semibold text-foreground">{lead.customerName}</h2>
-            <LeadStatusBadge status={lead.status} />
+            <LeadStageBadge stage={lead.stage} />
+            {/* Hot, warm or cold ranks open leads; a closed one no longer needs ranking. */}
+            {lead.priority && !CLOSED_STAGES.has(lead.stage) ? (
+              <Badge variant={LEAD_PRIORITY_BADGE[lead.priority]}>
+                {LEAD_PRIORITY_LABELS[lead.priority]}
+              </Badge>
+            ) : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            <span className="font-mono">{lead.code}</span> · {ORDER_TYPE_LABELS[lead.type]} ·{" "}
-            {LEAD_SOURCE_LABELS[lead.source]}
+            <span className="font-mono">{lead.code}</span> · {LEAD_INQUIRY_TYPE_LABELS[lead.type]} ·{" "}
+            <LookupName list="lead-sources" code={lead.source} />
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -118,72 +236,158 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
               Share with a colleague
             </Link>
           ) : null}
+          {/* SO-005 · An order typed in without a quotation, once the lead is qualified. */}
+          {canOrder && ORDERABLE_STAGES.has(lead.stage) ? (
+            <Link
+              href={`/sales-orders/new?lead=${lead.id}`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <Icon icon={PackageIcon} />
+              New order
+            </Link>
+          ) : null}
+          {/* LEAD-011 · Holders of leads.delete only. */}
+          {canDelete ? <LeadDeleteDialog lead={lead} /> : null}
+          {/* LEAD-007 · The main action on a lead, for whoever may edit it. */}
+          {canEdit ? <LeadStageMenu lead={lead} /> : null}
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <LeadNotices lead={lead} />
+
+      <div className="flex min-w-0 flex-col gap-4">
+        <Card>
           <CardHeader>
             <CardTitle level={3}>Details</CardTitle>
+            {/* LEAD-008 · A closed lead (won, lost, merged) cannot be reassigned. */}
+            {canEdit && !CLOSED_STAGES.has(lead.stage) ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <LeadEditDialog lead={lead} />
+                <LeadAssignDialog lead={lead} />
+              </div>
+            ) : null}
           </CardHeader>
           <CardContent>
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
               <DetailItem label="Mobile">{formatIndianPhone(lead.phone)}</DetailItem>
-              <DetailItem label="Location">{location || EMPTY_VALUE}</DetailItem>
+              <DetailItem label="Email">{lead.email ?? EMPTY_VALUE}</DetailItem>
+              <DetailItem label="Territory">{formatTerritory(lead.territory)}</DetailItem>
+              <DetailItem label="Village">{lead.village ?? EMPTY_VALUE}</DetailItem>
+              <DetailItem label="Irrigation system">
+                <LookupName list="mis-systems" code={lead.misSystem} />
+              </DetailItem>
               <DetailItem label="Estimated value">{formatInr(lead.estimatedValue)}</DetailItem>
-              <DetailItem label="Land">
-                {lead.acreage === null ? EMPTY_VALUE : `${formatNumber(lead.acreage)} acres`}
-              </DetailItem>
-              <DetailItem label="Crops">
-                <TagList items={lead.crops.map((crop) => ({ id: crop, label: crop }))} max={6} />
-              </DetailItem>
               <DetailItem label="Owner">
-                <AvatarLabel name={lead.owner.name} imageUrl={lead.owner.avatarUrl} size="xs" />
+                {lead.owner ? (
+                  <AvatarLabel
+                    name={lead.owner.name}
+                    secondary={lead.ownerOrgUnit.name}
+                    size="xs"
+                  />
+                ) : (
+                  <span className="text-muted-foreground">
+                    Unassigned · {lead.ownerOrgUnit.name}
+                  </span>
+                )}
               </DetailItem>
               <DetailItem label="Channel partner">
-                {lead.channelPartner?.name ?? EMPTY_VALUE}
+                {lead.channelPartner
+                  ? `${lead.channelPartner.name} · ${partnerTypeLabel(lead.channelPartner.partnerType)}`
+                  : EMPTY_VALUE}
+              </DetailItem>
+              <DetailItem label="Score">{lead.score ?? EMPTY_VALUE}</DetailItem>
+              <DetailItem label="Land">
+                {lead.landAcres === null ? EMPTY_VALUE : `${formatAcres(lead.landAcres)} acres`}
+              </DetailItem>
+              <DetailItem label="Crops">
+                {lead.crops.length === 0 ? (
+                  EMPTY_VALUE
+                ) : (
+                  <span className="flex flex-wrap gap-1.5">
+                    {lead.crops.map((crop) => (
+                      <Tag
+                        key={crop.code}
+                        tone={toneForLabel(crop.name)}
+                        className={crop.isActive ? undefined : "opacity-60"}
+                        title={crop.isActive ? undefined : "No longer in the crops list"}
+                      >
+                        {crop.name}
+                      </Tag>
+                    ))}
+                  </span>
+                )}
               </DetailItem>
               <DetailItem label="Follow-up">
-                <RelativeDate value={lead.followUpAt} highlightOverdue />
+                <NotRecorded />
+              </DetailItem>
+              <DetailItem label="First contacted">
+                {lead.firstContactedAt === null ? (
+                  "Not yet"
+                ) : (
+                  <RelativeDate value={lead.firstContactedAt} />
+                )}
               </DetailItem>
               <DetailItem label="Last activity">
                 <RelativeDate value={lead.lastActivityAt} />
               </DetailItem>
-              <DetailItem label="Created">{formatFullDate(lead.createdAt)}</DetailItem>
-              {lead.lostReason ? (
+              <DetailItem label="Created">
+                {formatFullDate(lead.createdAt)}
+                {lead.createdBy ? (
+                  <span className="text-muted-foreground"> · by {lead.createdBy.name}</span>
+                ) : null}
+              </DetailItem>
+              {lead.reopenCount > 0 ? (
+                <DetailItem label="Reopened">
+                  {lead.reopenCount === 1 ? "Once" : `${formatNumber(lead.reopenCount)} times`}
+                </DetailItem>
+              ) : null}
+              {lost ? (
                 <DetailItem label="Lost reason" className="sm:col-span-2">
-                  {lead.lostReason}
+                  {lead.lostReason?.name ?? EMPTY_VALUE}
+                  {lead.lostNote ? (
+                    <span className="mt-1 block text-muted-foreground">{lead.lostNote}</span>
+                  ) : null}
                 </DetailItem>
               ) : null}
             </dl>
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle level={3}>Win probability</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SegmentedMeter value={lead.winProbability} segments={10} label="Win probability" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-0.5">
-                <CardTitle level={3}>Engagement</CardTitle>
-                <CardDescription>Interactions per week, last 12 weeks</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Sparkline
-                values={lead.engagement}
-                label={describeTrend(lead.engagement, "Interactions per week")}
-                className="h-12 w-40"
-              />
-            </CardContent>
-          </Card>
-        </div>
+        {/* QUOT-001 · The lead's quotations, for whoever may see quotations. */}
+        {canSeeQuotations ? <LeadQuotations leadId={lead.id} leadStage={lead.stage} /> : null}
+
+        {/* CMPL-001 · Complaints about this lead, and raising one. */}
+        <RelatedComplaints about={{ leadId: lead.id }} readOnly={lead.stage === "merged"} />
+
+        {/* TASK-003, TASK-007 · Calls, visits and meetings about this lead, and their minutes. */}
+        {canSeeTasks ? (
+          <>
+            <LeadTasks
+              leadId={lead.id}
+              leadName={lead.customerName}
+              merged={lead.stage === "merged"}
+            />
+            <LeadMinutes
+              leadId={lead.id}
+              leadName={lead.customerName}
+              merged={lead.stage === "merged"}
+            />
+          </>
+        ) : null}
+
+        {/* LEAD-005, LEAD-006 · Notes and the lead's history. A merged lead is read-only. */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-0.5">
+              <CardTitle level={3}>Activity</CardTitle>
+              <CardDescription>Notes and every change, newest first</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            {canEdit && lead.stage !== "merged" ? <LeadNoteComposer leadId={lead.id} /> : null}
+            <LeadTimeline leadId={lead.id} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -207,14 +411,14 @@ export function LeadDetailSkeleton(): React.JSX.Element {
           <Skeleton className="h-control-md w-28 rounded-md" />
         </div>
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <div className="flex min-w-0 flex-col gap-4">
+        <Card>
           <CardHeader>
             <Skeleton className="h-6 w-20" />
           </CardHeader>
           <CardContent>
             <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              {Array.from({ length: 10 }, (_, index) => (
+              {Array.from({ length: DETAIL_ROW_COUNT }, (_, index) => (
                 <div key={index} className="flex flex-col gap-1">
                   <Skeleton className="h-4 w-20" />
                   <Skeleton className="h-5 w-36" />
@@ -223,27 +427,17 @@ export function LeadDetailSkeleton(): React.JSX.Element {
             </div>
           </CardContent>
         </Card>
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-3 w-40" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-0.5">
-                <Skeleton className="h-6 w-28" />
-                <Skeleton className="h-5 w-52" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-12 w-40" />
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-0.5">
+              <Skeleton className="h-6 w-20" />
+              <Skeleton className="h-5 w-56" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <LeadTimelineSkeleton />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

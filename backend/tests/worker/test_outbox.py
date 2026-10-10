@@ -25,6 +25,8 @@ from api.integrations import cache
 from api.integrations.messages import (
     TEMPLATE_AUTH_OTP,
     TEMPLATE_LEAD_ACK,
+    TEMPLATE_ORDER_CONFIRMED,
+    TEMPLATES,
     UnknownTemplateError,
     render,
 )
@@ -32,6 +34,7 @@ from api.integrations.whatsapp.provider import OutboundMessage, Outcome, Provide
 from worker.jobs.outbox import (
     BACKOFF_SECONDS,
     MAX_ATTEMPTS,
+    UNCERTAIN_PREFIX,
     _charge_after_error,
     outbox_drain,
     purge_expired_sessions,
@@ -41,6 +44,7 @@ pytestmark = pytest.mark.db
 
 ACCEPTED = ProviderResult(Outcome.ACCEPTED, "fake-1")
 TRANSIENT = ProviderResult(Outcome.TRANSIENT, None, "ReadTimeout")
+UNCERTAIN = ProviderResult(Outcome.UNCERTAIN, None, "ReadTimeout")
 REFUSED = ProviderResult(Outcome.REFUSED, None, "Something odd")
 PERMANENT = ProviderResult(Outcome.PERMANENT, None, "Invalid phone number")
 
@@ -222,6 +226,53 @@ async def test_one_row_per_transaction_so_a_later_failure_keeps_an_earlier_send(
         assert (state, attempts, error, later) == ("pending", 0, "ReadTimeout", True), got_second
     finally:
         await _drop(sessions(), first, second)
+        await cache.breaker_reset()
+
+
+# ── GAP-073: no answer after the request left ────────────────────────────────
+
+ORDER_PAYLOAD = ('{"_template": "polysil_order_confirmed", "party_name": "P", '
+                 '"order_no": "SO/GJ/2026-27/00011", "total": "2,858.32"}')
+
+
+def test_only_the_codes_resend_an_uncertain_send() -> None:
+    assert {k for k, v in TEMPLATES.items() if v.resend_uncertain} == {"auth.otp", "lead.verify"}
+
+
+async def test_an_uncertain_order_message_is_sent_once_and_never_again(
+        sessions: Callable[[], AsyncSession]) -> None:
+    """The walk on 10 Oct: three copies of one order confirmation, each timeout a
+    resend of a message 11za had delivered."""
+    row = await _queue(sessions(), recipient=_mobile(), template=TEMPLATE_ORDER_CONFIRMED,
+                       payload=ORDER_PAYLOAD)
+    provider = FakeProvider(UNCERTAIN, ACCEPTED)
+    try:
+        await cache.breaker_reset()
+        state, attempts, error, payload, _ = await _drain_until(sessions, row, provider)
+        assert (state, attempts, payload) == ("dead", 0, "{}"), (state, attempts, payload)
+        assert error == UNCERTAIN_PREFIX + "ReadTimeout"
+        for _ in range(3):
+            await outbox_drain({"provider": provider})
+        assert [c.reference for c in provider.calls].count(row) == 1, provider.calls
+    finally:
+        await _drop(sessions(), row)
+        await cache.breaker_reset()
+
+
+async def test_an_uncertain_code_waits_a_minute_and_charges_nothing(
+        sessions: Callable[[], AsyncSession]) -> None:
+    row = await _queue(sessions(), recipient=_mobile())
+    provider = FakeProvider(UNCERTAIN)
+    try:
+        await cache.breaker_reset()
+        for _ in range(60):
+            await outbox_drain({"provider": provider})
+            if any(c.reference == row for c in provider.calls):
+                break
+        state, attempts, error, _, later = await _state(sessions(), row)
+        assert (state, attempts, error, later) == ("pending", 0, "ReadTimeout", True)
+    finally:
+        await _drop(sessions(), row)
         await cache.breaker_reset()
 
 

@@ -49,6 +49,11 @@ class Caller:
     # modules where the caller holds `delete`, which is what lets them read a
     # soft-deleted row ({t}_res_deleted)
     deletes: frozenset[str] = frozenset()
+    # FS-044: staff, partner_user or consumer. A consumer has no role and no partner,
+    # so "not a partner" never means staff (plan review B-1)
+    user_type: str = "staff"
+    # FS-045: every (module, action) the role holds, for rendering only
+    permissions: frozenset[tuple[str, str]] = frozenset()
 
 
 def scope_predicate(spec: ScopeSpec, caller: Caller,
@@ -92,7 +97,13 @@ def _scope_clause(spec: ScopeSpec, caller: Caller,
         subtree = sa.select(org_closure.c.descendant_id).where(
             org_closure.c.ancestor_id == caller.org_unit_id)
         if spec.org_subtree_via:
-            return col.in_(sa.select(org_unit.c.territory_id).where(org_unit.c.id.in_(subtree)))
+            # at, under or above the offices' territories (FS-020), as the policy
+            offices = sa.select(org_unit.c.territory_id).where(org_unit.c.id.in_(subtree))
+            return sa.or_(
+                col.in_(sa.select(territory_closure.c.descendant_id).where(
+                    territory_closure.c.ancestor_id.in_(offices))),
+                col.in_(sa.select(territory_closure.c.ancestor_id).where(
+                    territory_closure.c.descendant_id.in_(offices))))
         return col.in_(subtree)
     if scope == "territory":
         return col.in_(

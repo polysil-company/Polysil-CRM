@@ -47,6 +47,33 @@ def _statements() -> dict[str, str]:
         match = _HEAD.search(stmt)
         assert match, stmt[:80]
         out[match.group(1)] = stmt
+    # a later migration that replaces a 007 body: the live body is the last one
+    m15 = _load("015_public_lead_capture")
+    if m15 is not None:
+        for stmt in m15._assignee_functions(patched=True):
+            match = _HEAD.search(stmt)
+            assert match and match.group(1) in out, stmt[:80]
+            out[match.group(1)] = stmt
+    # 018 extends both to tasks (FS-014); its text is the live one
+    m18 = _load("018_tasks_planner")
+    if m18 is not None:
+        for stmt in m18._after():
+            match = _HEAD.search(stmt)
+            if match and match.group(1) in out:
+                out[match.group(1)] = stmt
+    # 028 re-pastes the partners guard, which now reaches up and down (FS-020)
+    m28 = _load("028_dealer_area_access")
+    if m28 is not None:
+        stmt = m28.counts_after().replace("CREATE OR REPLACE FUNCTION", "CREATE FUNCTION", 1)
+        match = _HEAD.search(stmt)
+        assert match and match.group(1) in out, stmt[:80]
+        out[match.group(1)] = stmt
+    # 042 patches authz_user_assignable from its live text (FS-037): the same swap
+    m42 = _load("042_dealer_tasks")
+    if m42 is not None:
+        body = out["authz_user_assignable"]
+        assert body.count(m42._ASSIGNABLE_OLD) == 1
+        out["authz_user_assignable"] = body.replace(m42._ASSIGNABLE_OLD, m42._ASSIGNABLE_NEW)
     return out
 
 

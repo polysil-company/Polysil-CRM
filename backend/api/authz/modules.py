@@ -57,4 +57,84 @@ SPECS: dict[str, ScopeSpec] = {
         parents={"territory_id": "territory", "owner_org_unit_id": "org_unit",
                  "assigned_partner_id": "channel_partner"},
     ),
+    # A quotation is scoped like its lead: its owner, org unit and territory are
+    # the lead's, copied under the lead's lock and propagated by a trigger when
+    # the lead moves (FS-005 rule 11). partner_subtree is the channel partner the
+    # sale goes through, which decides the tier as well as who sees it. The lead
+    # is a parent, so the INSERT policy carries an EXISTS on it: a quotation can
+    # only be written on a lead the writer can see, by RLS as well as by the
+    # service. No self_column: a quotation is not a person.
+    "quotations": ScopeSpec(
+        module="quotations",
+        table="quotation",
+        own="owner_user_id",
+        org_subtree="owner_org_unit_id",
+        territory="territory_id",
+        partner_subtree="partner_id",
+        parents={"lead_id": "lead", "territory_id": "territory",
+                 "owner_org_unit_id": "org_unit", "partner_id": "channel_partner"},
+        # FS-020: the dealer on a lead or quotation the writer can see, though the
+        # dealer's own row is outside their area
+        parent_fallback={"partner_id": "partner_on_visible_document"},
+    ),
+    # FS-011: the quotation's shape. An order's scope is set at create (from its
+    # quotations, else the raiser or the portal routing) and follows nothing after
+    # (GAP-127); the parents guard a lead, office, territory or partner the caller
+    # cannot see (edge case 22).
+    "sales_orders": ScopeSpec(
+        module="sales_orders",
+        table="sales_order",
+        own="owner_user_id",
+        org_subtree="owner_org_unit_id",
+        territory="territory_id",
+        partner_subtree="partner_id",
+        parents={"lead_id": "lead", "territory_id": "territory",
+                 "owner_org_unit_id": "org_unit", "partner_id": "channel_partner"},
+        # FS-020: the dealer on a lead or quotation the writer can see, though the
+        # dealer's own row is outside their area
+        parent_fallback={"partner_id": "partner_on_visible_document"},
+    ),
+    # FS-014: a task is its assignee's (own) and sits under the assignee's office
+    # (org_subtree), which is where a manager and the assigner read it (ADR-034
+    # assigns only downwards). No partner branch: portal roles hold no tasks (RBAC
+    # 6.3, GAP-141). No soft delete: a task is cancelled, never deleted. The three
+    # links are parents, so a caller cannot hang a task off something they cannot see.
+    "tasks": ScopeSpec(
+        module="tasks",
+        table="task",
+        own="assigned_to",
+        org_subtree="owner_org_unit_id",
+        soft_delete=None,
+        parents={"lead_id": "lead", "partner_id": "channel_partner",
+                 "sales_order_id": "sales_order", "owner_org_unit_id": "org_unit"},
+    ),
+    # FS-015: the officer responsible (own), the owning office (org_subtree) and the
+    # dealer involved (partner_subtree), all set at create and following nothing
+    # (GAP-152). No territory branch: no role holds complaints at territory scope.
+    # The links are parents, so nobody raises a complaint on something they cannot
+    # see.
+    "complaints": ScopeSpec(
+        module="complaints",
+        table="complaint",
+        own="owner_user_id",
+        org_subtree="owner_org_unit_id",
+        partner_subtree="partner_id",
+        parents={"lead_id": "lead", "sales_order_id": "sales_order",
+                 "partner_id": "channel_partner", "owner_org_unit_id": "org_unit",
+                 "territory_id": "territory"},
+    ),
+    # FS-009: an application is its lead's, copied and frozen at create (D5): the
+    # owner (own), the office (org_subtree) and the territory, which is how the
+    # State Co-ordinator reaches it. No partner branch: dealers hold no subsidy
+    # row (RBAC 6.3). No soft delete: an application is cancelled.
+    "subsidy": ScopeSpec(
+        module="subsidy",
+        table="subsidy_application",
+        own="owner_user_id",
+        org_subtree="owner_org_unit_id",
+        territory="territory_id",
+        soft_delete=None,
+        parents={"lead_id": "lead", "territory_id": "territory",
+                 "owner_org_unit_id": "org_unit"},
+    ),
 }

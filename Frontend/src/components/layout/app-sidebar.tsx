@@ -12,12 +12,13 @@ import { Icon } from "@/components/ui/icon";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { leadSummaryQueryOptions } from "@/features/leads/api/leads.queries";
+import { approvalCountQueryOptions } from "@/features/approvals/api/approvals.queries";
+import { leadStatsQueryOptions } from "@/features/leads/api/leads.queries";
 import { conversationListQueryOptions } from "@/features/messages/api/messages.queries";
-import { useSession } from "@/features/session/hooks/use-session";
+import { useCanApprove, useSession } from "@/features/session/hooks/use-session";
 import { useModifierKeyLabel } from "@/hooks/use-modifier-key";
-import { clientEnv, type AppEnv } from "@/lib/env/client";
-import { formatNumber } from "@/lib/format";
+import { clientEnv, type ApiMockingMode, type AppEnv } from "@/lib/env/client";
+import { formatCount, formatNumber } from "@/lib/format";
 import { useSidebar } from "@/lib/sidebar/use-sidebar";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +31,13 @@ const ENVIRONMENT_LABELS: Readonly<Record<AppEnv, string>> = {
   feature: "Preview",
   staging: "Staging",
   production: "Production",
+};
+
+/** What the environment card calls the backend, by mocking mode. */
+const BACKEND_LABELS: Readonly<Record<ApiMockingMode, string>> = {
+  enabled: "Mock backend",
+  partial: "Dev API + mocks",
+  disabled: "Live API",
 };
 
 /** Clears the 56px rail, so a tooltip never covers the sidebar edge. */
@@ -276,6 +284,8 @@ function SidebarItem({
         <LeadsCount />
       ) : item.countSource === "messages" ? (
         <UnreadMessagesCount />
+      ) : item.countSource === "approvals" ? (
+        <ApprovalsCount />
       ) : null}
     </>
   );
@@ -323,8 +333,9 @@ function SidebarItem({
   );
 }
 
+/** LEAD-004 · How many leads the user can see, from the lead stats. */
 function LeadsCount(): React.JSX.Element | null {
-  const { data } = useQuery(leadSummaryQueryOptions());
+  const { data } = useQuery(leadStatsQueryOptions());
   if (data === undefined) {
     return null;
   }
@@ -332,6 +343,27 @@ function LeadsCount(): React.JSX.Element | null {
     <span className="text-xs text-subtle-foreground tabular-nums sidebar-collapsed:hidden">
       {formatNumber(data.total)}
     </span>
+  );
+}
+
+/** APPR-001 · Requests waiting on the user, for those who may decide them. */
+function ApprovalsCount(): React.JSX.Element | null {
+  const canApprove = useCanApprove();
+  const { data } = useQuery({ ...approvalCountQueryOptions(), enabled: canApprove });
+  if (!canApprove || data === undefined || data.total === 0) {
+    return null;
+  }
+  return (
+    <>
+      <Badge size="sm" variant="primary" className="tabular-nums sidebar-collapsed:hidden">
+        <span className="sr-only">Waiting for your decision: </span>
+        {formatCount(data.total, { atLeast: data.capped })}
+      </Badge>
+      <span
+        aria-hidden="true"
+        className="absolute top-1 right-1 hidden size-2 rounded-full bg-primary ring-2 ring-sidebar sidebar-collapsed:block"
+      />
+    </>
   );
 }
 
@@ -378,12 +410,24 @@ function SidebarNavSkeleton(): React.JSX.Element {
   );
 }
 
+/** The line under the environment card's title: what is real and what is mocked. */
+function backendNote(mode: ApiMockingMode): string {
+  switch (mode) {
+    case "enabled":
+      return "Preview any role or state from your account menu.";
+    case "partial":
+      return "Real sign-in, leads, quotations and approvals. Dashboard, notifications and messages are still mocked.";
+    case "disabled":
+      return clientEnv.apiBaseUrl;
+  }
+}
+
 function SidebarEnvironmentCard({ collapsed }: { collapsed: boolean }): React.JSX.Element | null {
   if (clientEnv.appEnv === "production") {
     return null;
   }
 
-  const backend = clientEnv.apiMocking === "enabled" ? "Mock backend" : "Live API";
+  const backend = BACKEND_LABELS[clientEnv.apiMocking];
 
   return (
     <>
@@ -392,11 +436,7 @@ function SidebarEnvironmentCard({ collapsed }: { collapsed: boolean }): React.JS
           <span aria-hidden="true" className="size-1.5 rounded-full bg-highlight" />
           {backend}
         </p>
-        <p className="mt-1 text-muted-foreground">
-          {clientEnv.apiMocking === "enabled"
-            ? "Preview any role or state from your account menu."
-            : clientEnv.apiBaseUrl}
-        </p>
+        <p className="mt-1 text-muted-foreground">{backendNote(clientEnv.apiMocking)}</p>
       </div>
       {/* The rail keeps the environment signal as a dot; its name is in the tooltip. */}
       <Tooltip disabled={!collapsed}>

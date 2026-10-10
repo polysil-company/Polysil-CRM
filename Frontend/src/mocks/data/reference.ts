@@ -1,23 +1,113 @@
 /**
- * Fictional reference data for the mock backend. Names and businesses are
- * invented; locations are real districts in Polysil's likely footprint.
+ * Fictional reference data for the mock backend, shaped like the backend's showcase seed
+ * (backend/scripts/showcase_data.py): Gujarat's real districts, codes and talukas; invented
+ * villages, people and dealers. Ids are UUID-shaped, like the real API's, so mock ids pass
+ * the same format checks.
  */
 
-export const LOCATIONS = [
-  { state: "Gujarat", district: "Vadodara", villages: ["Padra", "Savli", "Dabhoi", "Karjan"] },
-  { state: "Gujarat", district: "Anand", villages: ["Borsad", "Petlad", "Umreth"] },
-  { state: "Gujarat", district: "Rajkot", villages: ["Gondal", "Jetpur", "Dhoraji"] },
-  { state: "Gujarat", district: "Banaskantha", villages: ["Deesa", "Palanpur", "Dhanera"] },
-  { state: "Gujarat", district: "Junagadh", villages: ["Keshod", "Mangrol", "Visavadar"] },
-  { state: "Maharashtra", district: "Jalgaon", villages: ["Raver", "Yawal", "Chopda"] },
-  { state: "Maharashtra", district: "Nashik", villages: ["Niphad", "Dindori", "Pimpalgaon"] },
-  { state: "Rajasthan", district: "Jalore", villages: ["Bhinmal", "Sanchore", "Raniwara"] },
-  {
-    state: "Madhya Pradesh",
-    district: "Khargone",
-    villages: ["Kasrawad", "Bhikangaon", "Maheshwar"],
+/** A stable UUID-shaped id: mockUuid(0x7e, 12) → "0000007e-0000-4000-8000-00000000000c". */
+export function mockUuid(namespace: number, index: number): string {
+  const head = namespace.toString(16).padStart(8, "0");
+  const tail = index.toString(16).padStart(12, "0");
+  return `${head}-0000-4000-8000-${tail}`;
+}
+
+/** Id namespaces, one per kind of record. */
+export const MOCK_ID_SPACE = {
+  territory: 0x7e,
+  orgUnit: 0x0e,
+  staff: 0x5f,
+  partner: 0x9a,
+  lead: 0x1ead,
+  duplicate: 0xd0,
+  lookup: 0x10,
+  timeline: 0x71,
+  quotation: 0x9707,
+  approval: 0xa991,
+  order: 0x0de7,
+  orderLine: 0x0de1,
+  dispatch: 0xd15,
+  task: 0x7a5,
+  complaint: 0xc0,
+  qrCode: 0x9c,
+} as const;
+
+export const MOCK_STATE = { name: "Gujarat", code: "GJ" } as const;
+
+/** The 33 districts with the abbreviations the client's sheets use. */
+export const MOCK_DISTRICTS: readonly (readonly [name: string, code: string])[] = [
+  ["Ahmedabad", "AMD"],
+  ["Amreli", "AMR"],
+  ["Anand", "AND"],
+  ["Aravalli", "ARV"],
+  ["Banaskantha", "BK"],
+  ["Bharuch", "BHR"],
+  ["Bhavnagar", "BVN"],
+  ["Botad", "BTD"],
+  ["Chhota Udepur", "CTU"],
+  ["Dahod", "DH"],
+  ["Dang", "DN"],
+  ["Devbhumi Dwarka", "DBD"],
+  ["Gandhinagar", "GN"],
+  ["Gir Somnath", "GS"],
+  ["Jamnagar", "JMN"],
+  ["Junagadh", "JND"],
+  ["Kheda", "KH"],
+  ["Kutch", "KCT"],
+  ["Mahisagar", "MH"],
+  ["Mehsana", "MSN"],
+  ["Morbi", "MRB"],
+  ["Narmada", "NMD"],
+  ["Navsari", "NVS"],
+  ["Panchmahal", "PM"],
+  ["Patan", "PTN"],
+  ["Porbandar", "PBR"],
+  ["Rajkot", "RJT"],
+  ["Sabarkantha", "SK"],
+  ["Surat", "SRT"],
+  ["Surendranagar", "SNR"],
+  ["Tapi", "TP"],
+  ["Vadodara", "BRD"],
+  ["Valsad", "VLD"],
+];
+
+/** District → taluka → villages. Three districts carry the field work, as in the showcase. */
+export const MOCK_TALUKAS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  Rajkot: {
+    Gondal: ["Virpur", "Kolithad", "Shivrajpur", "Bhadar", "Vavdi"],
+    Jetpur: ["Khirasara", "Nagalpar", "Devki Gadhda", "Pithadiya"],
+    Jasdan: ["Atkot", "Vinchhiya Road", "Kamalapur", "Bhadla"],
+    Dhoraji: ["Supedi", "Patanvav", "Bhukhi"],
+    Upleta: ["Kolki", "Moti Panelii", "Bhayavadar"],
   },
-] as const;
+  Junagadh: {
+    Keshod: ["Balagam", "Ajab", "Mangrol Road"],
+    Manavadar: ["Bantva", "Sardargadh", "Vadal"],
+    Vanthali: ["Khorasa", "Sukhpur", "Dhandhusar"],
+    Visavadar: ["Bhalchhel", "Kalsari", "Sanosari"],
+  },
+  Amreli: {
+    Babra: ["Chamardi", "Jaliya", "Kotda Pitha"],
+    Savarkundla: ["Vijpadi", "Thordi", "Dedan"],
+    Dhari: ["Khambha Road", "Gopalgram", "Dalkhania"],
+    Lathi: ["Damnagar", "Chavand", "Ansodar"],
+  },
+};
+
+/** Districts with their own office; every other district is covered by the state office. */
+export const MOCK_DISTRICT_OFFICES: Readonly<Record<string, string>> = {
+  Rajkot: "Rajkot District",
+  Junagadh: "Junagadh District",
+  Amreli: "Amreli District",
+};
+
+export const MOCK_STATE_OFFICE = "Gujarat State";
+
+/**
+ * The one district no office covers in the mock, so the backend's
+ * `territory_without_org_unit` refusal can be previewed from the New lead form.
+ */
+export const MOCK_UNCOVERED_DISTRICT = "Dang";
 
 export const FIRST_NAMES = [
   "Ramesh",
@@ -58,54 +148,95 @@ export const LAST_NAMES = [
   "Makwana",
   "Thakor",
   "Vasava",
-  "Patil",
-  "Pawar",
-  "Choudhary",
-  "Yadav",
-  "Sharma",
+  "Vaghela",
+  "Radadiya",
+  "Sojitra",
+  "Dobariya",
+  "Gohil",
   "Rabari",
   "Dabhi",
-  "Gohil",
-  "Bhil",
-  "Mali",
+  "Bhalodiya",
+  "Ahir",
+  "Kathiriya",
 ] as const;
 
-export const CROPS = [
-  "Cotton",
-  "Groundnut",
-  "Banana",
-  "Sugarcane",
-  "Pomegranate",
-  "Castor",
-  "Cumin",
-  "Wheat",
-  "Onion",
-  "Potato",
-  "Papaya",
-  "Mango",
-] as const;
+/** Staff who own leads. Invented people. */
+export const MOCK_STAFF: readonly { readonly id: string; readonly full_name: string }[] = [
+  "Aarav Desai",
+  "Asha Patel",
+  "Ravi Joshi",
+  "Bharat Vaghela",
+  "Kajal Solanki",
+  "Nirav Shah",
+].map((fullName, index) => ({ id: mockUuid(MOCK_ID_SPACE.staff, index + 1), full_name: fullName }));
 
-export const OWNERS = [
-  { id: "emp-101", name: "Nirav Shah", avatarUrl: null },
-  { id: "emp-102", name: "Pooja Mehta", avatarUrl: null },
-  { id: "emp-103", name: "Rohit Joshi", avatarUrl: null },
-  { id: "emp-104", name: "Asha Parikh", avatarUrl: null },
-  { id: "emp-105", name: "Kunal Trivedi", avatarUrl: null },
-  { id: "emp-106", name: "Farhan Qureshi", avatarUrl: null },
-] as const;
+/** Channel partners, by the district they work in, with whom to ask for. Invented businesses and people. */
+export const MOCK_PARTNERS: readonly {
+  readonly id: string;
+  readonly name: string;
+  readonly partner_type: string;
+  readonly district: string;
+  readonly contact_person: string;
+}[] = [
+  {
+    name: "Saurashtra Agro Distributors",
+    partner_type: "distributor",
+    district: "Rajkot",
+    contact_person: "Mahesh Kotecha",
+  },
+  {
+    name: "Sorath Agri Distributors",
+    partner_type: "distributor",
+    district: "Junagadh",
+    contact_person: "Jignesh Vaghela",
+  },
+  {
+    name: "Shree Ganesh Agro Agency",
+    partner_type: "dealer",
+    district: "Rajkot",
+    contact_person: "Ganesh Bhalodia",
+  },
+  {
+    name: "Khodiyar Irrigation",
+    partner_type: "dealer",
+    district: "Rajkot",
+    contact_person: "Kishor Sakhiya",
+  },
+  {
+    name: "Patel Agro Traders",
+    partner_type: "dealer",
+    district: "Junagadh",
+    contact_person: "Haresh Patel",
+  },
+  {
+    name: "Ambika Krishi Kendra",
+    partner_type: "dealer",
+    district: "Amreli",
+    contact_person: "Dilip Savaliya",
+  },
+  {
+    name: "Virpur Agro Point",
+    partner_type: "sub_dealer",
+    district: "Rajkot",
+    contact_person: "Rasik Dhaduk",
+  },
+  {
+    name: "Balagam Krishi Seva",
+    partner_type: "sub_dealer",
+    district: "Junagadh",
+    contact_person: "Bhavesh Ladani",
+  },
+  {
+    name: "Babra Farm Supplies",
+    partner_type: "sub_dealer",
+    district: "Amreli",
+    contact_person: "Paresh Kakadiya",
+  },
+].map((partner, index) => ({ ...partner, id: mockUuid(MOCK_ID_SPACE.partner, index + 1) }));
 
-export const CHANNEL_PARTNERS = [
-  { id: "cp-201", name: "Shree Krishna Agro" },
-  { id: "cp-202", name: "Jay Kisan Traders" },
-  { id: "cp-203", name: "Narmada Irrigation Point" },
-  { id: "cp-204", name: "Saurashtra Drip Solutions" },
-  { id: "cp-205", name: "Khandesh Krishi Kendra" },
-] as const;
-
-export const LOST_REASONS = [
-  "Price too high",
-  "Chose a competitor",
-  "Subsidy not approved",
-  "No reliable water source",
-  "Postponed to next season",
+/** Short notes a salesperson leaves on a lost lead. */
+export const LOST_NOTES = [
+  "Went with a local installer at a lower price.",
+  "Waiting for the subsidy portal to reopen; will revisit next season.",
+  "Well water is not enough for drip on the whole plot.",
 ] as const;

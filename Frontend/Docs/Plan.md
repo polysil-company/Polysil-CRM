@@ -6,6 +6,8 @@
 
 **Changed in v0.3 (2026-08-14):** ERP confirmed as *planned, not live* -> [ADR-019](Docs/Decisions.md) seams, schedule risk drops from +1-1.5 weeks to ~1 day - WhatsApp moves to the client's BSP behind a provider port ([ADR-020](Docs/Decisions.md)), removing Meta verification from the critical path - scale confirmed at 700-800 users / 100+ concurrent -> [ADR-021](Docs/Decisions.md) and a new load-test gate.
 
+**Where the build stands now:** see [§9 Integration status](#9-integration-status--frontend--backend) — updated with every integration pull request.
+
 **Changed in v0.2:** window extended 5 → 6.5 weeks · code review replaced by test gating ([ADR-016](Docs/Decisions.md)) · Field Sales confirmed as a **native app**, moving from Phase 2 into scope · application count fixed at 3 · Meta Lead Ads and rewards pulled back into scope.
 
 ---
@@ -266,6 +268,100 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | 17 | Per-PR preview deploys | ⬜ Week 1 D5 |
 | 18 | Mutation testing on business logic | ⬜ Week 2 |
 | 19 | Generated RBAC test matrix | ⬜ Week 1 D5 |
+
+---
+
+## 9. Integration status — frontend ↔ backend
+
+> **Living section.** Update it in the same pull request that connects or disconnects a screen. Last updated **8 October 2026**: sales orders (#34) and approval limits (#35) merged into `integration`. The demo walk's fixes connect the dashboard to the backend's real shape (RPT-001), fix the customer link's PDF path, and pick up crops and land (BE-003) and the end of win probability (BE-004). The backend pick-ups follow: lead list sorting (BE-001), the territory levels a lead may sit in (BE-005), names on assignment events (BE-006), "Awaiting approval" in quotation lists, and one call to find a quotation's order (BE-019). Then notifications and messages connect to the backend (BE-009, BE-010): nothing on screen is mocked against a live backend any more, and `partial` mocking mocks nothing. Backend #49 and #50 are picked up: the Area filter on the lead list, the salesperson's reason in the approvals inbox, and finding a dealer by its contact person. Tasks follow (TASK-001…008): My day, Team, a lead's tasks and minutes, editing, and All tasks with an Excel export. Then the Dispatch queue (DISP-001); the Accounts queue waits on BE-022. Complaints follow (CMPL-001…005): the list and its queue, raising and editing a draft, submit, the manager's check, the QC verdict, cancel and delete. Then the rest of complaints (CMPL-006…009): files, the remedy with refunds in the approvals inbox, the targets, the export, and the complaints on a lead and an order; complaint types move to the admin masters. Then direct orders (SO-005) and the lead, quotation and order exports. Then editing and deleting a lead, and the duplicates queue with merge (LEAD-010…012). Then lead QR codes and the public enquiry page (LEAD-013, LEAD-014).
+
+**How the two sides meet.** The browser calls `/api/v1` on the app's own origin; `next.config.ts` forwards it to `API_PROXY_TARGET`. Every call goes through `apiRequest` (`src/lib/api/client.ts`): Zod-validated responses, `x-request-id` / `x-data-id`, `Idempotency-Key` on mutations, one refresh-and-retry on a 401. The backend's contract is `backend/docs/api/*.md` (generated) and the dev API's `/openapi.json`. `NEXT_PUBLIC_API_MOCKING=partial` sends everything to the dev API except the modules listed in `unbuiltHandlers` (`src/mocks/handlers/index.ts`).
+
+### 9.1 Connected to the real backend
+
+| Area | Data IDs | Endpoints |
+|---|---|---|
+| Sign-in, session, refresh, sign-out | AUTH-001…006 | `/auth/login`, `/auth/otp/*`, `/auth/refresh`, `/auth/logout`, `/auth/me` |
+| Lead list — cursor paging in the URL, stage / source / type / area filters, search, sorting by customer or value (BE-001); the Area pill drills from districts to talukas, with lead counts | LEAD-001 | `GET /leads?territory_id=`, `GET /leads/areas` |
+| New lead — territory picker (district, taluka or village: BE-005), crops and land, admin lookups, safe retries, field errors | LEAD-002 | `POST /leads`, `GET /lookups/territories?levels=` |
+| Lead page — the real record and possible duplicates | LEAD-003 | `GET /leads/{id}` |
+| Lead count — sidebar badge and Sales tab, exact | LEAD-004 | `GET /leads/stats` |
+| Lookups — sources, irrigation systems, lost reasons, territories | MSTR-002 | `/lookups/*`, `/territories` |
+| Lead history and notes — the Activity card on the lead page; assignments name the people (BE-006) | LEAD-005, LEAD-006 | `GET /leads/{id}/timeline`, `POST /leads/{id}/notes` |
+| Stage change and reopen — Update stage menu, lost reason, won and reopen dialogs | LEAD-007 | `POST /leads/{id}/transition`, `POST /leads/{id}/reopen` |
+| Assign owner and channel partner | LEAD-008 | `POST /leads/{id}/assign`, `GET /leads/assignees`, `GET /lookups/partners` |
+| Quotations list — the Quotations page and a lead's quotations; drafts waiting on a manager read "Awaiting approval" | QUOT-001 | `GET /quotations` |
+| Quotation detail — the document as printed, with its notices | QUOT-002 | `GET /quotations/{id}` |
+| Open a quotation's PDF | QUOT-003 | `GET /quotations/{id}/pdf` |
+| Quotation builder — a new draft from a lead, editing a draft's header and items | QUOT-004 | `POST /quotations`, `PATCH /quotations/{id}`, `PUT /quotations/{id}/lines` |
+| Live pricing while items are entered | QUOT-005 | `POST /pricing/quote-lines` |
+| Product picker | MSTR-003 | `GET /products` |
+| Send a quotation | QUOT-006 | `POST /quotations/{id}/send` |
+| Ask for discount approval | QUOT-007 | `POST /quotations/{id}/request-approval` |
+| Record the customer's answer | QUOT-008 | `POST /quotations/{id}/transition` |
+| Revise, and versions | QUOT-009 | `POST /quotations/{id}/revise`, `GET /quotations/{id}/versions` |
+| A quotation's history | QUOT-010 | `GET /quotations/{id}/timeline` |
+| Delete a draft | QUOT-011 | `DELETE /quotations/{id}` |
+| The customer's quotation page `/q/{token}` (no sign-in) | QUOT-012 | `GET /public/q/{token}`, `GET /public/q/{token}/pdf` |
+| Approvals inbox — quotation discounts and sales orders, the salesperson's reason for asking, approve or reject with a reason, sidebar count | APPR-001 | `GET /approvals/pending`, `POST /approvals/steps/{id}/decision` |
+| Tasks — My day (overdue on top, then the day by time), Team (due, done, overdue per person), a person's day, a lead's tasks and meetings; new task, done, cancel, reopen | TASK-001…005 | `GET /planner`, `GET /planner/team`, `GET /tasks?lead_id=`, `POST /tasks`, `GET /tasks/assignees`, `GET /lookups/meeting-types`, `POST /tasks/{id}/complete`, `/cancel`, `/reopen` |
+| Tasks — edit or reassign; meeting minutes with action items on a lead; All tasks with filters and Excel export (the first list export, through `apiDownload`) | TASK-006…008 | `PATCH /tasks/{id}`, `GET /minutes?lead_id=`, `POST /minutes`, `GET /tasks` filters, `GET /tasks/export` |
+| Sales orders list — status, whom it waits on, how much has shipped; filters and "only mine" in the URL | SO-001 | `GET /orders` |
+| Order page — lines with sent, short and open; the approval chain; notices; history; PDF | SO-002 | `GET /orders/{id}`, `GET /orders/{id}/timeline`, `GET /orders/{id}/pdf` |
+| Place an order from an accepted quotation, or open the live order that carries it (BE-019); a draft's delivery, terms and remarks; delete a never-submitted draft | SO-003 | `POST /orders`, `GET /orders?quotation_id=`, `PATCH /orders/{id}`, `DELETE /orders/{id}` |
+| Submit for approval (again, after a return); cancel with a reason | SO-004 | `POST /orders/{id}/submit`, `POST /orders/{id}/cancel` |
+| Dashboard — key figures, pipeline by stage, lead sources, the next follow-ups, in the backend's shape (decimal strings) | RPT-001 | `GET /dashboard/overview` |
+| Record a dispatch, void one, close the rest short | DISP-002 | `POST /orders/{id}/dispatches`, `POST /dispatches/{id}/void`, `POST /orders/{id}/close-short` |
+| Dispatch queue — approved orders to ship (Record a dispatch opens the order with the form open) and the dispatch log by day | DISP-001 | `GET /orders?status=approved,partially_dispatched`, `GET /dispatches` |
+| Complaints — the list (filters, counts, "Waiting on me"), raise and edit a draft with its products, submit, the manager's check (approve to QC or return, severity, owner), the QC verdict, cancel, delete, the history | CMPL-001…005 | `GET /complaints`, `/complaints/stats`, `POST /complaints`, `PATCH /complaints/{id}`, `PUT …/lines`, `…/submit`, `…/check`, `…/assignees`, `…/qc`, `…/cancel`, `DELETE /complaints/{id}`, `…/timeline` |
+| Complaints — photos and documents (upload, thumbnails, remove), the remedy (a refund through the managers and Accounts in the Approvals inbox, a replacement order, or none; withdraw), the response and resolution targets (admin), the Excel export, a lead's and an order's complaints | CMPL-006…009, APPR-001 | `…/attachments`, `…/attachments/{id}`, `…/remedy`, `…/remedy/withdraw`, `GET/POST /complaint-sla-policies`, `/complaints/export`, `/approvals/pending` (refund rows) |
+| Sales orders — a direct order typed in line by line (from a qualified lead, or afresh with the place of supply), editing a draft's items and header; Download Excel on the lead, quotation and order lists | SO-005, SO-006, LEAD-009, QUOT-013 | `POST /orders` with `lines`, `PUT /orders/{id}/lines`, `PATCH /orders/{id}` (party, type), `POST /pricing/quote-lines`, `GET /orders/export`, `/leads/export`, `/quotations/export` |
+| Leads — edit a lead's own fields, delete (leads.delete), the possible-duplicates queue: dismiss a pair or merge one lead into the other | LEAD-010…012 | `PATCH`/`DELETE /leads/{id}`, `GET /leads/duplicates`, `POST /leads/duplicates/{linkId}/dismiss`, `POST /leads/{id}/merge` |
+| Lead QR codes (make, download to print, copy the link, rename, re-point, switch off) and the public enquiry page `/enquiry` (with or without a code; mobile checked with a WhatsApp code) | LEAD-013, LEAD-014 | `GET`/`POST /lead-qr-codes`, `PATCH /lead-qr-codes/{id}`, `GET /public/lead-form`, `GET /public/territories`, `POST /public/leads/verify`, `POST /public/leads` |
+| Approval limits — order value and discount per role, company-wide and per territory; administrators change one level at a time | APPR-002 | `GET /approvals/thresholds`, `PUT /approvals/thresholds` |
+| Notification bell — the unread count polled with `limit=1`, the latest read when it opens, links to leads, quotations and sales orders; mark one or all read | NOTIF-001, NOTIF-002 | `GET /notifications`, `POST /notifications/read` |
+| Staff messages — conversations, the thread, send with a linked lead, the directory, read up to the newest message shown (`up_to`); a colleague who has left stays readable | MSG-001…005 | `/conversations*`, `/staff-directory` |
+
+**Permissions follow the backend's module codes** (`backend/docs/architecture/RBAC.md` §6): orders are `sales_orders`, dispatch is `dispatch`, and there is no `approvals` module — whoever holds `sales_orders.approve` or `quotations.approve` sees Approvals. Before this, the frontend asked for `orders` and `approvals`, so on the real backend Sales orders and Approvals would have stayed hidden.
+
+LEAD-005…008, QUOT-001…012, APPR-001…002, TASK-001…008, SO-001…004, DISP-001…002, CMPL-001…005, NOTIF-001…002, MSG-001…005 and MSTR-003 are built on the backend's contract and tested against the mock backend, which follows its rules. They go to the dev API in `partial` mode but have **not yet been checked there by hand** — do that before they reach staging.
+
+**`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
+
+| Old `/leads/summary` (guessed) | `GET /leads/stats` (real) |
+|---|---|
+| `total` | `total` — exact, never capped |
+| `byStatus` | `by_stage` — the backend's nine stages |
+| `bySource`, `byType` | not served |
+| `followUpsDueToday` | not served — the backend records no follow-up date yet |
+| — | `by_priority`, `unassigned` (new) |
+
+### 9.2 Still mocked — the backend serves them now, the frontend connects next
+
+Nothing. Notifications and messages were the last (BE-009, BE-010); `unbuiltHandlers` in `src/mocks/handlers/index.ts` is empty, so `partial` mocking sends every request to the real API. A module built before its endpoints exist goes back on that list until it is connected.
+
+Picked up from the backend's finished asks: crops and land on a lead (BE-003: the new-lead form, the lead page and the list), win probability and weekly activity removed (BE-004), quotation numbers with links in a lead's history (BE-017), sorting on `GET /leads` (BE-001), the territory levels filter (BE-005), names on assignment events (BE-006), `awaiting_approval` on quotation list rows, and the `quotation_id` filter on `GET /orders` (BE-019); from #49, `request_remark` on approval rows and partner search by contact person; from #50, `GET /leads/areas` and the `territory_id` list filter. Nothing the backend marked done is left to pick up. Order events in a lead's history need the order's id and number from the backend (BE-020).
+
+### 9.3 Served by the backend, not yet built on the frontend
+
+| Area | Endpoints | Contract | Order |
+|---|---|---|---|
+| A **consolidated** order from several quotations on leads of one dealer (choosing several quotations at once) | `POST /orders` with several `quotation_ids` | `backend/docs/api/orders.md` | **1** |
+| Products, price lists, tax rates, subsidy, users, org units, territories, partners (admin) | `/products`, `/price-lists`, `/tax-rates`, `/subsidy/*`, `/users`, `/org-units`, `/partners` | `backend/docs/api/*.md` | 6 |
+
+| Complaint types (admin), with the other lookups (CMPL-008) | `/lookups/complaint-types` | `complaints-contract.md` | 5 |
+
+Tasks and complaints reached `integration` in #25 (BE-011), with `GET /leads/stats` gaining `by_source`, `by_inquiry_type`, `follow_ups_due_today` and `follow_ups_overdue` (BE-007) — the dashboard's source breakdown and follow-up tiles can use them once it is connected (BE-008).
+
+### 9.4 Asked of the backend
+
+Every open ask — sorting, a follow-up date, crops and land, win probability, territory levels, names in assignment events, stats by source, the dashboard, notifications and messages endpoints, the dev API — is a task with a checkbox in **[`docs/Backend-Tasks.md`](../../docs/Backend-Tasks.md)** (BE-001…). The backend developer ticks it and writes the commit and any notes there; the frontend reads it after each merge.
+
+### 9.5 Housekeeping
+
+- Dependabot PRs #13–#17 target `integration`. Three are major upgrades — ESLint 10, `@vitest/browser` 5, jsdom 30 — and need a look before they merge.
+- PR #11, `integration` → `staging`, is open for the staging check ([Environments.md](Environments.md)).
+- Consider generating the Zod contracts from `/openapi.json`, as the backend handover suggests, so a contract change fails the type check rather than a screen.
 
 ---
 

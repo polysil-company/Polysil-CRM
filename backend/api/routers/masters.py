@@ -9,13 +9,14 @@ written under the partners permissions and scoped by the database underneath.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.idempotency import Outcome, payload_digest, run_idempotent
+from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE
 from api.schemas.masters import (
@@ -33,6 +34,7 @@ from api.schemas.masters import (
     TerritoryPage,
     TerritoryPatch,
 )
+from api.services import exports
 from api.services import masters as service
 
 org_units = APIRouter(prefix="/org-units", tags=["org-units"])
@@ -218,7 +220,7 @@ async def patch_territory(item_id: ItemId, body: TerritoryPatch, db: DbSession,
               dependencies=[Depends(require("partners", "view"))])
 async def list_partners(
     db: DbSession, caller: CallerDep,
-    q: Annotated[str | None, Query(description="Name or code substring.")] = None,
+    q: Annotated[str | None, Query(description="Name, code or contact person substring.")] = None,
     partner_type: Annotated[str | None, Query(
         description="distributor, dealer or sub_dealer.")] = None,
     parent_id: Annotated[str | None, Query(pattern=UUID_RE,
@@ -233,6 +235,23 @@ async def list_partners(
     return await service.list_partners(db, caller, q=q, partner_type=partner_type,
                                        parent_id=parent_id, is_active=is_active, limit=limit,
                                        cursor=cursor)
+
+
+@partners.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+              dependencies=[Depends(require("partners", "view"))])
+async def export_partners(
+    db: DbSession, caller: CallerDep,
+    filters: Annotated[dict[str, Any], Depends(filters_of(list_partners))],
+) -> Response:
+    """Download the partner list as an Excel file, with the same filters as the list.
+
+    The file holds exactly the rows the list would show for these filters, across
+    every page, and nothing outside your scope. Call it with `fetch` and the bearer
+    token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+    narrow the filters. An empty list gives a file with the header row only.
+    """
+    return await export(list_partners, stem="partners", title="Partners", columns=exports.PARTNERS,
+                        user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 
 @partners.get("/{item_id}", response_model=Envelope[Partner],

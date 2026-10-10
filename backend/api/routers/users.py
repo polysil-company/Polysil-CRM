@@ -9,13 +9,14 @@ document the frontend track builds against. They say what the endpoint is *for*.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.idempotency import payload_digest, redacted_digest, run_idempotent
+from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE
 from api.schemas.users import (
@@ -31,6 +32,7 @@ from api.schemas.users import (
     UserPage,
     UserPatch,
 )
+from api.services import exports
 from api.services import users as service
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -63,7 +65,9 @@ async def list_users(
     db: DbSession,
     caller: CallerDep,
     q: Annotated[str | None, Query(description="Name, email or mobile substring.")] = None,
-    user_type: Annotated[str | None, Query(description="staff or partner_user.")] = None,
+    user_type: Annotated[str | None, Query(
+        description="staff, partner_user or consumer. Left out, the list is staff and "
+                    "partner users: farmers' portal accounts (FS-044) only when asked.")] = None,
     role: Annotated[str | None, Query(description="A role code.")] = None,
     org_unit_id: Annotated[str | None, Query(pattern=UUID_RE,
                                               description="Staff anchored on this office.")] = None,
@@ -83,6 +87,23 @@ async def list_users(
     return await service.list_users(
         db, caller, q=q, user_type=user_type, role=role, org_unit_id=org_unit_id,
         partner_id=partner_id, is_active=is_active, limit=limit, cursor=cursor)
+
+
+@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+            dependencies=[Depends(require("users", "view"))])
+async def export_users(
+    db: DbSession, caller: CallerDep,
+    filters: Annotated[dict[str, Any], Depends(filters_of(list_users))],
+) -> Response:
+    """Download the user list as an Excel file, with the same filters as the list.
+
+    The file holds exactly the rows the list would show for these filters, across
+    every page, and nothing outside your scope. Call it with `fetch` and the bearer
+    token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+    narrow the filters. An empty list gives a file with the header row only.
+    """
+    return await export(list_users, stem="users", title="Users", columns=exports.USERS,
+                        user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 
 @router.get("/{user_id}", response_model=Envelope[UserDetail],

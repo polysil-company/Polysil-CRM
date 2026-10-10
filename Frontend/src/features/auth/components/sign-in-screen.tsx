@@ -11,6 +11,7 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import type * as React from "react";
+import { toast } from "sonner";
 
 import { Icon } from "@/components/ui/icon";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -52,8 +53,9 @@ export function SignInScreen({ next, reason }: SignInScreenProps): React.JSX.Ele
   );
 
   const finishSignIn = (tokens: SessionTokens): void => {
-    // Nothing cached before sign-in belongs to this user.
+    // Nothing cached or shown before sign-in belongs to this user.
     queryClient.clear();
+    toast.dismiss();
     acceptSessionTokens(tokens);
     router.replace(next ?? HOME_PATH);
   };

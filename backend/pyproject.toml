@@ -18,11 +18,16 @@ dependencies = [
     "httpx>=0.27",
     "structlog>=24.4",
     "python-multipart>=0.0.9",
+    # FS-005: the quotation PDF (ADR-024) and its store (ADR-026). One image serves
+    # the API and the worker, so both are core dependencies.
+    "jinja2>=3.1",
+    "weasyprint>=62",
+    "boto3>=1.35",
+    # FS-009: the PIMS sheet is built by the API (review B-1)
+    "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]
-docs = ["weasyprint>=62", "openpyxl>=3.1"]
-storage = ["boto3>=1.35"]
 observability = ["sentry-sdk[fastapi]>=2.14"]
 dev = [
     "pytest>=8.3",
@@ -32,6 +37,8 @@ dev = [
     "mypy>=1.11",
     "psycopg[binary]>=3.2",
     "types-redis",
+    # FS-005: the PDF text-layer test reads the rendered document back
+    "pypdf>=5.0",
 ]
 
 [build-system]

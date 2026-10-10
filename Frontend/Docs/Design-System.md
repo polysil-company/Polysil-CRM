@@ -73,7 +73,7 @@ They use the semantic tokens below.
 | `bg-overlay` | Dialog and sheet backdrop | 32% sand-950 | 55% black |
 | `text-foreground` | Primary text | sand-950 | ink-50 |
 | `text-muted-foreground` | Secondary text, labels | sand-600 | 68% L |
-| `text-subtle-foreground` | Placeholders, meta, disabled | 50% L (as muted) | 60% L |
+| `text-subtle-foreground` | Placeholders, meta, disabled | 50% L (as muted) | 63% L: at least 4.5:1 on the darkest surface it sits on, the popover |
 
 ### Interaction fills (translucent — they work on any surface)
 
@@ -96,6 +96,7 @@ In light mode `text-subtle-foreground` is as dark as `text-muted-foreground`: a 
 | `bg-secondary` / `hover:bg-secondary-hover` | Secondary actions | — |
 | `bg-destructive` | Irreversible actions (delete) | Error *messages* (use `danger`) |
 | `bg-highlight`, `bg-row-selected` | Selection only | Status, emphasis |
+| `bg-scan-surface` | Behind a QR code: white in light and dark, so a camera reads it | Anything else |
 | `text-success` / `bg-success-soft` | Won, completed, positive change | Brand accents |
 | `text-warning` / `bg-warning-soft` | Needs attention, negotiation | — |
 | `text-danger` / `bg-danger-soft` | Errors, lost, overdue | Destructive *buttons* |
@@ -311,8 +312,8 @@ Three layers, each allowed to use only the layers below it (lint-enforced):
 
 | Layer | Folder | Contains | Knows about the business? |
 |---|---|---|---|
-| Primitives | `src/components/ui` | shadcn/ui (Base UI) restyled: Button, Badge, Checkbox, Input, PasswordInput, OtpInput, Select, Dialog, Sheet, Menu, Tooltip, Tabs, ToggleGroup, Command, Field, Card, Skeleton, Spinner, Icon … | No |
-| Patterns | `src/components/patterns` | DataTable, QueryView, EmptyState, ErrorState, StatCard, Tag/TagList, SegmentedMeter, Sparkline, FilterPill, SearchField, NavTabs, PageContainer … | No |
+| Primitives | `src/components/ui` | shadcn/ui (Base UI) restyled: Button, Badge, Checkbox, RadioGroup, Input, PasswordInput, OtpInput, Select, Combobox, Dialog, Sheet, Menu, Tooltip, Tabs, ToggleGroup, Command, Field, Card, Skeleton, Spinner, Icon … | No |
+| Patterns | `src/components/patterns` | DataTable, QueryView, EmptyState, ErrorState, StatCard, Tag/TagList, SegmentedMeter, Sparkline, FilterPill, SingleFilterPill, SearchField, NavTabs, PageContainer … | No |
 | Layout | `src/components/layout` | App shell, sidebar, header, command menu, user menu, page transition | Navigation only |
 | Features | `src/features/*/components` | Sign-in, leads table, New lead dialog, dashboard, notification bell, messages | Yes |
 

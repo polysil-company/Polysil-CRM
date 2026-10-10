@@ -1,28 +1,39 @@
-import { Invoice03Icon } from "@hugeicons/core-free-icons";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import type * as React from "react";
 
 import { PageTransition } from "@/components/layout/page-transition";
-import { EmptyState } from "@/components/patterns/empty-state";
+import {
+  QuotationsTable,
+  QuotationsTableSkeleton,
+} from "@/features/quotations/components/quotations-table";
+import {
+  QuotationsToolbar,
+  QuotationsToolbarSkeleton,
+} from "@/features/quotations/components/quotations-toolbar";
 
 export const metadata: Metadata = { title: "Quotations" };
 
-// TODO(QUOT-001): build the quotations list on the same DataTable, QueryView and filter patterns as leads.
 export default function QuotationsPage(): React.JSX.Element {
   return (
     <PageTransition>
-      <section aria-label="Quotations" className="flex flex-1 flex-col">
-        <EmptyState
-          icon={Invoice03Icon}
-          title="Quotations are the next module"
-          description="Quote from a lead with type-based templates, versions and approvals."
-          action={
-            <code className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-              QUOT-001
-            </code>
+      <section
+        aria-label="Quotations"
+        data-page-fill
+        className="flex min-h-0 flex-1 flex-col gap-4"
+      >
+        {/* Filters are read from the URL, which needs a Suspense boundary during prerendering. */}
+        <Suspense
+          fallback={
+            <>
+              <QuotationsToolbarSkeleton />
+              <QuotationsTableSkeleton />
+            </>
           }
-          className="flex-1 rounded-xl border border-dashed border-border"
-        />
+        >
+          <QuotationsToolbar />
+          <QuotationsTable />
+        </Suspense>
       </section>
     </PageTransition>
   );

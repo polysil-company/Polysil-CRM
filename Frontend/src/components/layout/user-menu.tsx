@@ -106,12 +106,13 @@ export function UserMenu(): React.JSX.Element {
           </span>
         </div>
         <DropdownMenuSeparator />
-        {clientEnv.apiMocking === "enabled" ? (
+        {clientEnv.apiMocking === "disabled" ? null : (
           <>
-            <MockControls />
+            {/* Against a real API (`partial`) the session decides the role, so only scenarios remain. */}
+            <MockControls canPreviewRoles={clientEnv.apiMocking === "enabled"} />
             <DropdownMenuSeparator />
           </>
-        ) : null}
+        )}
         {clientEnv.appEnv === "production" ? null : (
           <>
             <LogLevelControl />
@@ -132,41 +133,46 @@ export function UserMenu(): React.JSX.Element {
   );
 }
 
-/** Developer controls for the mock backend: preview any role or any data state. */
-function MockControls(): React.JSX.Element {
+/**
+ * Developer controls for the mock backend: preview any role (full mock backend only) or
+ * any data state. In `partial` mode the scenarios apply to the modules still mocked.
+ */
+function MockControls({ canPreviewRoles }: { canPreviewRoles: boolean }): React.JSX.Element {
   const queryClient = useQueryClient();
   const [role, setRole] = useState<Role>(readMockRole);
   const [scenario, setScenario] = useState<MockScenario>(readMockScenario);
 
   return (
     <DropdownMenuGroup>
-      <DropdownMenuLabel>Mock backend</DropdownMenuLabel>
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>
-          <Icon icon={UserMultiple02Icon} />
-          Preview as role
-        </DropdownMenuSubTrigger>
-        <DropdownMenuContent side="right" align="start" sideOffset={4} className="w-56">
-          <DropdownMenuRadioGroup
-            value={role}
-            onValueChange={(value: unknown) => {
-              const next = ROLES.find((candidate) => candidate === value);
-              if (next === undefined) {
-                return;
-              }
-              writeMockRole(next);
-              setRole(next);
-              void queryClient.invalidateQueries();
-            }}
-          >
-            {ROLES.map((item) => (
-              <DropdownMenuRadioItem key={item} value={item}>
-                {ROLE_LABELS[item]}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenuSub>
+      <DropdownMenuLabel>{canPreviewRoles ? "Mock backend" : "Mocked modules"}</DropdownMenuLabel>
+      {canPreviewRoles ? (
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Icon icon={UserMultiple02Icon} />
+            Preview as role
+          </DropdownMenuSubTrigger>
+          <DropdownMenuContent side="right" align="start" sideOffset={4} className="w-56">
+            <DropdownMenuRadioGroup
+              value={role}
+              onValueChange={(value: unknown) => {
+                const next = ROLES.find((candidate) => candidate === value);
+                if (next === undefined) {
+                  return;
+                }
+                writeMockRole(next);
+                setRole(next);
+                void queryClient.invalidateQueries();
+              }}
+            >
+              {ROLES.map((item) => (
+                <DropdownMenuRadioItem key={item} value={item}>
+                  {ROLE_LABELS[item]}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenuSub>
+      ) : null}
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>
           <Icon icon={FlaskConicalIcon} />
@@ -201,7 +207,7 @@ function MockControls(): React.JSX.Element {
 const FOLLOW_SERVER = "server";
 
 const LOG_LEVEL_LABELS: Readonly<Record<LogLevel, string>> = {
-  debug: "Debug — everything",
+  debug: "Debug: everything",
   info: "Info",
   warn: "Warnings and errors",
   error: "Errors only",

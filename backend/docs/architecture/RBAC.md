@@ -57,6 +57,17 @@ Sixteen. Six in the line hierarchy, six functional, three portal, one board.
 |---|---|---|
 | 16 | `board` | Board of Directors — view-only, global |
 
+### Principals — not people, not in the matrix, never assignable
+
+| Code | Who | Holds |
+|---|---|---|
+| `system` | the worker (migration 005) | no matrix rows; its reach is explicit `app_is_system()` branches |
+| `intake` | the public lead form, "Website and QR" (migration 015, FS-003a) | leads view, create, edit and partners view, all global. Its claim is set only by `deps.intake_session`, after a WhatsApp code matched, and the route returns only an inquiry number. It has no password and no mobile, and a trigger refuses both, so it cannot sign in |
+
+Neither is in the parsed matrix below, in `ASSIGNABLE_ROLES`, or reconciled by the seed.
+
+Neither is administered either. `GET /users` never lists them, and every `/users/{id}` action refuses them (`422`, field `id`); a handover cannot name one as `to_user_id`. The intake account is also never a lead assignee: `authz_user_assignable()` and `staff_directory()` leave it out, although its role holds leads edit. Its trigger refuses a password, a mobile, a role or type change, deletion, deactivation and a move of office.
+
 > **Agent is not a role.** Dropped by ADR-030; `Requirements.md` REQ-1109 is void. A salesperson is a `field_officer`.
 
 ---
@@ -303,6 +314,7 @@ BEGIN
     WHEN 'quotation' THEN
       UPDATE quotation SET status = p_status
        WHERE id = p_entity_id AND status = 'sent';
+    -- complaints are not on the engine (ADR-042); this arm is historical
     WHEN 'complaint' THEN
       UPDATE complaint SET status = p_status
        WHERE id = p_entity_id AND status = 'under_review';
@@ -391,7 +403,7 @@ The first version passed `'approved'` / `'rejected'` straight through to the doc
 |---|---|---|
 | `sales_order` | `submitted` → **`approved`** | `submitted` → **`draft`** — back to the raiser (ADR-031) |
 | `quotation` | **no status change** — approval gates the *send action* | `draft` → stays `draft`, the request is what carries the rejection |
-| `complaint` | `under_review` → **`under_qc`** | `under_review` → **`draft`** |
+| `complaint` | not on the engine: ADR-042. `complaint_check()` moves `submitted` → **`under_qc`** | a return moves `submitted` → **`draft`** (FS-015) |
 
 The quotation row is the one worth pausing on. What gets approved there is a **discount above threshold**, not the document — so approval does not move the quotation, it unblocks sending it. `POST /quotations/{id}/send` checks there is no pending approval request; that is the gate.
 
@@ -408,6 +420,7 @@ BEGIN
        WHERE id = p_entity_id AND status = 'submitted';
     WHEN 'quotation' THEN
       NULL;                       -- deliberate: approval gates sending, not state
+    -- complaints are not on the engine (ADR-042); this arm is historical
     WHEN 'complaint' THEN
       UPDATE complaint
          SET status = CASE p_outcome WHEN 'approve' THEN 'under_qc'::complaint_status
@@ -514,6 +527,8 @@ Kept as the regression list. Each is a named test in `tests/rbac/`.
 
 ### 5.5 Reports — materialized views do not inherit RLS
 
+> **Live form, 4 Oct (ADR-047, FS-024).** Reports today are live aggregates, not materialized views. Their three rules: the module's scope predicate on every ScopeSpec table the query reads, with RLS beneath (six hand-policy tables are RLS-only, ISS-111); one exception by design: `order_paid_at()` (FS-026 rule 11) tells anyone who can see an order the day it was paid in full, a day and not an amount, so a salesperson without `payments.view` still sees their sales under payment mode; a figure without its module is null, never 0; and a cross-office leakage test per report and per export. The materialized-view form below applies when one is introduced.
+
 Reading a materialized view returns stored rows; it does **not** re-run the source query under the reader's policies. Without this every report is a company-wide aggregate readable by anyone who can reach it.
 
 ```sql
@@ -555,19 +570,23 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | sales_orders | V:own CE | V:org CEA | V:org CEAD | V:org A | V:global CEAD | V:global CEAD |
 | dispatch | V:own | V:org | V:org | V:org | V:global CE | V:global CE |
 | complaints | V:own CE | V:org CEA | V:org CEAD | V:org A | V:global CEAD | V:global CEAD |
-| payments | | V:org | V:org E | V:org | V:global CEAD | V:global CEAD |
+| payments | | V:org | V:org | V:org | V:global CEAD | V:global CEAD |
 | subsidy | V:own CE | V:org CE | V:org CE | V:org | V:global CEAD | V:global CEAD |
 | schemes | V:global | V:global | V:global | V:global | V:global CEAD | V:global CEAD |
 | products | V:global | V:global | V:global | V:global | V:global CEAD | V:global CEAD |
 | pricing | V:global | V:global | V:global | V:global | V:global CEAD | V:global CEAD |
 | partners | V:org | V:org CE | V:org CE | V:org | V:global CEAD | V:global CEAD |
 | marketing_material | V:global C | V:global CA | V:global CA | V:global A | V:global CEAD | V:global CEAD |
+| campaigns | | | | | V:global | V:global |
 | rewards | V:own | V:org | V:org | V:org | V:global CEAD | V:global CEAD |
 | tasks | V:own CE | V:org CE | V:org CE | V:org CE | V:global CEAD | V:global CEAD |
 | reports | V:own | V:org | V:org | V:org | V:global | V:global |
 | chat | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
-| users | | | | | V:global CEAD | V:global CEAD |
+| users | | V:org | V:org | V:org | V:global CEAD | V:global CEAD |
 | masters | | | | | V:global CEAD | V:global CEAD |
+| tracking | V:own CE | V:org CE | V:org CE | V:org CE | V:global CE | V:global CE |
+| stock | V:global | V:global | V:global | V:global | V:global CE | V:global CE |
+| targets | V:own | V:org C | V:org C | V:org C | V:global C | V:global C |
 
 *V = view · C = create · E = edit · A = approve · D = delete*
 
@@ -579,16 +598,22 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | quotations | V:global | | | **V:territory** | | V:global |
 | sales_orders | V:global A | V:global A | | | | V:global |
 | dispatch | V:global | V:global CEA | | | | V:global |
-| complaints | | | V:global CEA | | | V:global CE |
+| complaints | V:global | | V:global CEA | | | V:global CE |
 | payments | V:global CEA | | | | | |
 | subsidy | V:global | | | **V:territory CE** | | |
 | marketing_material | | | | | V:global CEAD | |
 | campaigns | | | | | V:global CEAD | |
 | reports | V:global | V:global | V:global | **V:territory** | V:global | V:global |
+| users | V:global | V:global | | V:global | V:global | V:global |
 | tasks | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
 | chat | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE | V:own CE |
+| stock | V:global | V:global C | V:global | V:global | V:global | V:global |
+
+*FS-040: every staff user reads the campaign list (the lead form's picker), whatever this row says. The service hides cost from anyone without `campaigns` view; RLS is the row floor (ADR-039).*
 
 State Co-ordinators own subsidy stage entry (ADR-030), scoped by `user_territory`.
+
+> **Whoever can see a lead, quotation or order sees the people on it.** Every role that views a document module views `users` at a scope that covers the people named on those documents: the line managers over their org subtree, the functional roles company-wide. Before this, the row was blank for them, and every list showed the owner as unassigned. The `users` spec has no territory branch, so State Co-ordinators read people company-wide (GAP-134). Write access (`C`, `E`, `D`) on `users` stays with the administrators.
 
 > **Their scope is `territory`, never `org`.** They sit at `hq_subsidy`, which has no sales descendants, so an org-subtree seed would give them access to nothing at all. This was wrong in the previous revision — a global find-and-replace collapsing `V:state` into `V:org` caught these four rows along with the line-manager ones.
 >
@@ -596,7 +621,7 @@ State Co-ordinators own subsidy stage entry (ADR-030), scoped by `user_territory
 
 ### 6.3 Portal
 
-Scope is `partner_subtree` throughout, served by the partner permissive branch (§5.1) on both SELECT and INSERT. A distributor sees its dealers and their sub-dealers; a sub-dealer sees only itself.
+Scope is `partner_subtree` throughout, served by the partner permissive branch (§5.1) on both SELECT and INSERT. The one exception is `tasks` (FS-037, ADR-034 as amended): own scope, the dealer user's own tasks, assigned by staff while the `tasks_for_dealers` setting is on; edit means completing, enforced by `task_partner_guard()`. A distributor sees its dealers and their sub-dealers; a sub-dealer sees only itself.
 
 | Module | distributor | dealer | sub_dealer |
 |---|---|---|---|
@@ -605,6 +630,7 @@ Scope is `partner_subtree` throughout, served by the partner permissive branch (
 | sales_orders | V CE | V CE | V CE |
 | dispatch | V | V | V |
 | complaints | V CE | V CE | V CE |
+| tasks | V:own E | V:own E | V:own E |
 | payments | V | V | V |
 | partners | V CE | V CE | |
 | products | V | V | V |
@@ -612,7 +638,6 @@ Scope is `partner_subtree` throughout, served by the partner permissive branch (
 | schemes | V *(applicable only)* | V | V |
 | marketing_material | V C | V C | V C |
 | rewards | V + redeem | V + redeem | V + redeem |
-| stock | V | V | V |
 | reports | V *(own subtree)* | V | V |
 
 > **Pricing visibility across tiers is a hard rule, not a UI choice.** A sub-dealer must never resolve dealer pricing, and a dealer must never see distributor pricing. Enforced by a restrictive policy on `price_list` keyed to the user's own `partner_type`.
@@ -623,13 +648,15 @@ Scope is `partner_subtree` throughout, served by the partner permissive branch (
 
 `view` on everything at `global`. No create, edit, approve or delete anywhere.
 
+**Except:** `tracking`, `stock`. Staff locations are not board information (FS-021, GAP-195); company stock is an operational figure the board reads in reports (FS-023).
+
 ---
 
 ## 7. Generated tests
 
 `tests/db/test_matrix_005.py` enumerates the cells from this file, through `api/domain/authz.py:parse_matrix()`, the same parser that seeds `role_permission`. Never hand-edited; a cell changed here changes the seed and the assertions together.
 
-**16 roles × 20 modules × 5 actions = 1,600 assertions** (ISS-031: an earlier count of 18 modules and 1,440 missed `campaigns` and `stock`), and the negatives matter more than the positives:
+**16 roles × 22 modules × 5 actions = 1,760 assertions** (ISS-031: an earlier count of 18 modules and 1,440 missed `campaigns` and `stock`; FS-021 added `tracking`, FS-025 `targets`), and the negatives matter more than the positives:
 
 | Class | Assertion |
 |---|---|

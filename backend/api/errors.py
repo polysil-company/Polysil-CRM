@@ -21,6 +21,8 @@ from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from api.redact import redact_path
+
 
 class ApiError(Exception):
     """Base for anything that should reach the client as an error envelope."""
@@ -122,6 +124,14 @@ class ValidationFailed(ApiError):
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     code = "validation_error"
     message = "Some fields need correcting."
+
+
+class RateLimitedError(ApiError):
+    """Too many requests from one number or address (FS-003a rule 5)."""
+
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "rate_limited"
+    message = "Too many attempts. Wait a few minutes and try again."
 
 
 class NotFoundError(ApiError):
@@ -235,7 +245,7 @@ async def internal_error_handler(request: Request, exc: Exception) -> JSONRespon
     """
     import structlog
 
-    structlog.get_logger().error("unhandled error", path=request.url.path,
+    structlog.get_logger().error("unhandled error", path=redact_path(request.url.path),
                                  error=type(exc).__name__)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

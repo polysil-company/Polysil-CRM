@@ -51,7 +51,7 @@ def dsn() -> dict:
     if missing:
         print(f"infra/.env is missing: {', '.join(missing)}")
         raise SystemExit(1)
-    return dict(host="127.0.0.1", port=6432, user=env["DB_USER"],
+    return dict(host="127.0.0.1", port=int(env.get("PGBOUNCER_PORT", "6432")), user=env["DB_USER"],
                 password=env["DB_PASSWORD"], dbname=env["DB_NAME"])
 
 

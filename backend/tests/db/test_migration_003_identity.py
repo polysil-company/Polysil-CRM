@@ -43,6 +43,19 @@ PRE_AUTH = {
     "auth_claim_refresh": "p_refresh_hash text",
     "auth_classify_refresh": "p_refresh_hash text",
     "auth_revoke_sessions": "p_session_id uuid, p_family_id uuid",
+    # FS-005: the public quotation link, two more definer functions on app_anon
+    "quotation_public_view": "p_token text",
+    "quotation_public_open": "p_token text, p_user_agent text",
+    # FS-003a: the public enquiry form and QR codes, five more
+    "lead_intake_issue": ("p_mobile text, p_ip inet, p_code text, p_code_hash text, "
+                          "p_ttl_seconds integer, p_ip_per_hour integer, p_codes_per_hour integer"),
+    "lead_intake_consume": "p_mobile text, p_code_hash text",
+    "lead_qr_public": "p_code text",
+    "lead_public_form": "",
+    "lead_public_territories": "p_parent uuid",
+    # FS-038: 11za's webhook calls, kept as they arrived
+    "whatsapp_webhook_record": ("p_kind text, p_method text, p_ip inet, p_headers jsonb, "
+                                "p_body_raw bytea, p_body_text text, p_body jsonb"),
 }
 
 
@@ -63,7 +76,7 @@ async def _lookup(db: AsyncSession, email: str):
 
 # ── the pre-auth surface ─────────────────────────────────────────────────────
 
-async def test_exactly_the_eight_pre_auth_functions_exist(db: AsyncSession) -> None:
+async def test_exactly_the_pre_auth_functions_exist(db: AsyncSession) -> None:
     """Keyed on the pre-auth role's privilege, not on the name prefix: 007 adds six
     `auth_*` functions that are not pre-auth. Extension functions are excluded,
     because app_anon inherits EXECUTE on 114 pgcrypto, pg_trgm and citext
@@ -973,11 +986,19 @@ async def test_the_audit_row_names_its_actor(db: AsyncSession, ids: Fixtures) ->
               "notification_outbox", "activity_event"])
 async def test_infrastructure_tables_are_not_audited(db: AsyncSession,
                                                      table: str) -> None:
-    """Append-and-expire. Auditing them duplicates their own content at volume."""
+    """Append-and-expire. Auditing them duplicates their own content at volume.
+    The one trigger allowed is 023's notifier on activity_event, which writes
+    notifications, not audit rows; it is checked by name, and its function must
+    not call audit_row()."""
     triggers = (await db.execute(text(
         "SELECT tgname FROM pg_trigger WHERE tgrelid = CAST(:t AS regclass) "
-        "AND NOT tgisinternal"), {"t": table})).scalars().all()
+        "AND NOT tgisinternal AND NOT (tgname = 'trg_notify_from_event' AND "
+        "tgrelid = 'activity_event'::regclass)"), {"t": table})).scalars().all()
     assert triggers == [], f"{table} carries {triggers}"
+    if table == "activity_event":
+        body = (await db.execute(text(
+            "SELECT prosrc FROM pg_proc WHERE proname = 'notify_from_event'"))).scalar_one()
+        assert "audit_row" not in body
 
 
 # ── idempotency ──────────────────────────────────────────────────────────────

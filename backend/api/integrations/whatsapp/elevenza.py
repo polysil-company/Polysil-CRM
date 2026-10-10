@@ -25,7 +25,11 @@ import httpx
 import structlog
 
 from api.config import Settings
-from api.integrations.messages import TEMPLATES, UnknownTemplateError, template_values
+from api.integrations.messages import (
+    UnknownTemplateError,
+    provider_template,
+    template_values,
+)
 from api.integrations.whatsapp.provider import (
     OutboundMessage,
     Outcome,
@@ -76,12 +80,16 @@ class ElevenZaProvider:
             values, button = template_values(msg.template_key, msg.payload)
         except UnknownTemplateError as exc:
             return ProviderResult(Outcome.PERMANENT, None, f"unknown template: {exc}")
-        spec = TEMPLATES[msg.template_key]
+        name = provider_template(msg.template_key, self._settings, msg.payload)
+        if name is None:
+            # an unset template name is a dead letter here, never a send with a null
+            # name whose outcome depends on how the provider words its refusal (GAP-110)
+            return ProviderResult(Outcome.PERMANENT, None, "template not configured")
         token = self._token()
         body: dict[str, Any] = {
             "authToken": token,
             "sendto": sendto,
-            "templateName": getattr(self._settings, spec.name_setting),
+            "templateName": name,
             "language": self._settings.whatsapp_template_language,
             "data": values,
             "tags": msg.reference,
@@ -101,10 +109,14 @@ class ElevenZaProvider:
         except Exception as exc:
             # A provider never raises: a transport error, a timeout, and a bad
             # base URL (httpx.InvalidURL is not an HTTPError) all leave as their
-            # class name, transient, for the breaker to see (code review F-3).
+            # class name for the breaker to see (code review F-3). Only a failure
+            # before the request left is surely unsent; after it, 11za may have
+            # delivered, and a resend is a duplicate (GAP-073).
+            unsent = isinstance(exc, _UNSENT)
             log.warning("outbox.transport_failure", recipient=mask(msg.recipient),
-                        kind=type(exc).__name__)
-            return ProviderResult(Outcome.TRANSIENT, None, type(exc).__name__)
+                        kind=type(exc).__name__, unsent=unsent)
+            return ProviderResult(Outcome.TRANSIENT if unsent else Outcome.UNCERTAIN,
+                                  None, type(exc).__name__)
 
         self.last_response = (response.status_code, scrub_body(response.text, secrets))
         result = classify(response.status_code, response.text, secrets)
@@ -125,11 +137,18 @@ class ElevenZaProvider:
                                         "search": ""}),
                 timeout=self._settings.whatsapp_send_timeout)
             self.last_response = (response.status_code, scrub_body(response.text, [token]))
-            rows = _template_rows(response.text)
+            rows, fetched = _template_page(response.text)
             out.extend(rows)
-            if len(rows) < LIST_PAGE:
+            if fetched < LIST_PAGE:
                 return out
             page += 1
+
+
+# Failures raised before any byte of the request reached 11za. Everything else
+# (a read timeout, the total deadline, a dropped connection mid-answer) is uncertain.
+_UNSENT: tuple[type[BaseException], ...] = (
+    httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout,
+    httpx.InvalidURL, httpx.UnsupportedProtocol)
 
 
 def classify(status: int, text: str, secrets: list[str]) -> ProviderResult:
@@ -193,14 +212,40 @@ def _int(value: object) -> int | None:
         return None
 
 
-def _template_rows(text: str) -> list[dict[str, object]]:
+def _template_page(text: str) -> tuple[list[dict[str, object]], int]:
+    """One page of the listing: the rows, and how many templates the page held.
+
+    W10, settled by the first live listing: `{"Data": {"docs": [...]}}`, each doc
+    with `name` and `category` and a `localizations` list carrying `language`,
+    `status` and `components`. Each localization becomes its own row, with the
+    BODY component's text as `body`. The count is of templates, not rows, because
+    it decides whether another page exists."""
     try:
         body = json.loads(text) if text else None
     except ValueError:
-        return []
+        return [], 0
     rows: Any = body
     if isinstance(body, dict):
         rows = body.get("data", body.get("Data", body.get("templates", [])))
         if isinstance(rows, dict):
-            rows = rows.get("data", rows.get("templates", rows.get("items", [])))
-    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+            rows = rows.get("docs", rows.get("data", rows.get("templates", rows.get("items", []))))
+    if not isinstance(rows, list):
+        return [], 0
+    docs = [r for r in rows if isinstance(r, dict)]
+    out: list[dict[str, object]] = []
+    for doc in docs:
+        locs = doc.get("localizations")
+        if not isinstance(locs, list):
+            out.append(doc)
+            continue
+        for loc in locs:
+            if not isinstance(loc, dict):
+                continue
+            components = loc.get("components")
+            text_ = next((c.get("text") for c in components
+                          if isinstance(c, dict) and str(c.get("type", "")).upper() == "BODY"),
+                         None) if isinstance(components, list) else None
+            out.append({"name": doc.get("name"), "category": doc.get("category"),
+                        "status": loc.get("status"), "language": loc.get("language"),
+                        "body": text_})
+    return out, len(docs)

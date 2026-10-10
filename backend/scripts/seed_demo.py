@@ -116,7 +116,7 @@ def main() -> None:
     pw = hasher.hash(DEMO_PASSWORD)
 
     with psycopg.connect(
-        host="127.0.0.1", port=6432, user=e["DB_USER"],
+        host="127.0.0.1", port=int(e.get("PGBOUNCER_PORT", "6432")), user=e["DB_USER"],
         password=e["DB_PASSWORD"], dbname=e["DB_NAME"],
     ) as conn:
         cur = conn.cursor()
@@ -164,6 +164,48 @@ def main() -> None:
         # rather than discovered when an UPDATE quietly affects nothing.
         cur.execute("SELECT assert_role_permission_invariants()")
 
+        # The approval thresholds name roles, and roles are created here, not by a
+        # migration. On a fresh database migration 013's seed finds no roles and
+        # inserts nothing (ISS-098). Seed the same stand-ins (question 15.1,
+        # GAP-122); an existing row, an admin's edit included, is left alone.
+        cur.execute(
+            """
+            INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount)
+            SELECT 'sales_order', r.id, NULL, v.amount
+              FROM (VALUES ('district_manager', 100000.00::numeric),
+                           ('state_manager', 500000.00), ('regional_manager', NULL)) v(code, amount)
+              JOIN role r ON r.code = v.code
+            ON CONFLICT (doc_type, role_id, territory_id) DO NOTHING
+            """
+        )
+        # FS-015b: the refund each manager may approve, in rupees (question 19.2,
+        # GAP-180); they stack, then Accounts pays. Migration 026 inserts the same
+        # where roles exist; a fresh database seeds its roles after migrating.
+        cur.execute(
+            """
+            INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount)
+            SELECT 'complaint', r.id, NULL, v.amount
+              FROM (VALUES ('district_manager', 25000.00::numeric), ('state_manager', 100000.00),
+                           ('regional_manager', NULL)) v(code, amount)
+              JOIN role r ON r.code = v.code
+            ON CONFLICT (doc_type, role_id, territory_id) DO NOTHING
+            """
+        )
+        # FS-013: the discount each role may give on a quotation, in percent
+        # (question 6.8, GAP-105). The officer's row is its own limit; Admin-Sales
+        # tops the ladder, uncapped. Migration 017 inserts the same where roles exist.
+        cur.execute(
+            """
+            INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount)
+            SELECT 'quotation', r.id, NULL, v.pct
+              FROM (VALUES ('field_officer', 5.00::numeric), ('district_manager', 10.00),
+                           ('state_manager', 15.00), ('regional_manager', 20.00),
+                           ('admin_sales', NULL)) v(code, pct)
+              JOIN role r ON r.code = v.code
+            ON CONFLICT (doc_type, role_id, territory_id) DO NOTHING
+            """
+        )
+
         territories = _tree(
             cur, "territory",
             [("Gujarat", "state", None), ("Rajkot", "district", "Gujarat"),
@@ -206,21 +248,24 @@ def main() -> None:
         # seeded before the table was created.
         distributor = uuid.uuid5(uuid.NAMESPACE_DNS, "polysil.demo.distributor")
         partner = uuid.uuid5(uuid.NAMESPACE_DNS, "polysil.demo.dealer")
-        for pid, parent, ptype, code, name in (
-            (distributor, None, "distributor", "DEMO-DIST", "Saurashtra Agro Distributors"),
-            (partner, distributor, "dealer", "DEMO-DLR", "Shah Irrigation, Rajkot"),
+        for pid, parent, ptype, code, name, contact in (
+            (distributor, None, "distributor", "DEMO-DIST", "Rajkot Agro Distributors", None),
+            (partner, distributor, "dealer", "DEMO-DLR", "Shah Irrigation, Rajkot",
+             "Bhavesh Shah"),
         ):
             cur.execute(
                 """
                 INSERT INTO channel_partner (id, parent_id, partner_type, code, name,
-                                             territory_id, price_tier)
-                VALUES (%s, %s, %s::partner_type, %s, %s, %s, %s::channel_tier)
+                                             territory_id, price_tier, contact_name)
+                VALUES (%s, %s, %s::partner_type, %s, %s, %s, %s::channel_tier, %s)
                 ON CONFLICT (id) DO UPDATE
                    SET parent_id = EXCLUDED.parent_id, name = EXCLUDED.name,
+                       contact_name = COALESCE(channel_partner.contact_name,
+                                               EXCLUDED.contact_name),
                        is_active = true, deleted_at = NULL
                 """,
                 (str(pid), str(parent) if parent else None, ptype, code, name,
-                 territories["Rajkot"], ptype),
+                 territories["Rajkot"], ptype, contact),
             )
         cur.execute(
             """

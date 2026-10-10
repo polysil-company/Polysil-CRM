@@ -35,6 +35,7 @@ from tests.api.conftest import (
 pytestmark = pytest.mark.db
 
 SYSTEM_ID = get_settings().system_user_id
+INTAKE_ID = get_settings().intake_user_id
 
 
 async def _complete_forced_change(client: httpx.AsyncClient, email: str) -> dict[str, str]:
@@ -330,14 +331,16 @@ async def test_handover_moves_open_leads_and_can_deactivate_the_leaver(
     r = await client.post(f"{V1}/users/{leaver['id']}/handover",
                           json={"to_user_id": target["id"]}, headers={**h, **key})
     assert r.status_code == 200, r.text
-    assert r.json()["data"] == {"leads_moved": 1, "remaining": 1, "deactivated": False}
+    assert r.json()["data"] == {"leads_moved": 1, "remaining": 1, "tasks_moved": 0,
+                                  "deactivated": False}
     replay = await client.post(f"{V1}/users/{leaver['id']}/handover",
                                json={"to_user_id": target["id"]}, headers={**h, **key})
     assert replay.json() == r.json()   # the same key moves nothing more
     monkeypatch.setattr(users_service, "HANDOVER_BATCH", 500)
     r = await client.post(f"{V1}/users/{leaver['id']}/handover",
                           json={"to_user_id": target["id"]}, headers={**h, **_key()})
-    assert r.json()["data"] == {"leads_moved": 1, "remaining": 0, "deactivated": False}
+    assert r.json()["data"] == {"leads_moved": 1, "remaining": 0, "tasks_moved": 0,
+                                  "deactivated": False}
     owned = await client.get(f"{V1}/leads", params={"owner_user_id": target["id"]}, headers=h)
     assert {x["id"] for x in owned.json()["data"]} == set(leads[:2])
     timeline = await client.get(f"{V1}/leads/{leads[0]}/timeline", headers=h)
@@ -348,7 +351,8 @@ async def test_handover_moves_open_leads_and_can_deactivate_the_leaver(
                              json={"to_user_id": target["id"], "deactivate": True},
                              headers={**h, **_key()})
     assert done.status_code == 200, done.text
-    assert done.json()["data"] == {"leads_moved": 0, "remaining": 0, "deactivated": True}
+    assert done.json()["data"] == {"leads_moved": 0, "remaining": 0, "tasks_moved": 0,
+                                     "deactivated": True}
     assert (await client.get(f"{V1}/users/{leaver['id']}", headers=h)
             ).json()["data"]["is_active"] is False
 
@@ -377,12 +381,15 @@ async def test_delete_refuses_open_leads_then_soft_deletes(client: httpx.AsyncCl
     assert me.status_code == 422 and "id" in me.json()["error"]["fields"]
 
 
-async def test_the_principal_is_never_listed_and_never_administrable(
-        client: httpx.AsyncClient, admin: Admin) -> None:
+@pytest.mark.parametrize("principal", [SYSTEM_ID, INTAKE_ID], ids=["system", "intake"])
+async def test_the_principals_are_never_listed_and_never_administrable(
+        client: httpx.AsyncClient, admin: Admin, principal: str) -> None:
+    """Rule 19, and code review F-3: the website's intake account is a principal
+    too. Deleting it, or handing leads to it, would strand the public form's leads."""
     h = await _auth(client, admin.user)
     page = await client.get(f"{V1}/users", params={"limit": 100}, headers=h)
-    assert SYSTEM_ID not in {u["id"] for u in page.json()["data"]}
-    assert (await client.get(f"{V1}/users/{SYSTEM_ID}", headers=h)).status_code == 404
+    assert principal not in {u["id"] for u in page.json()["data"]}
+    assert (await client.get(f"{V1}/users/{principal}", headers=h)).status_code == 404
     for method, path, body in (
         ("PATCH", "", {"full_name": "x"}),
         ("POST", "/password", {"password": TEMP}),
@@ -391,10 +398,13 @@ async def test_the_principal_is_never_listed_and_never_administrable(
         ("POST", "/handover", {"to_user_id": admin.user.id}),
         ("DELETE", "", None),
     ):
-        r = await client.request(method, f"{V1}/users/{SYSTEM_ID}{path}", json=body,
+        r = await client.request(method, f"{V1}/users/{principal}{path}", json=body,
                                  headers={**h, **_key()})
         assert r.status_code == 422, (method, path, r.text)
         assert "id" in r.json()["error"]["fields"], (method, path, r.text)
+    r = await client.post(f"{V1}/users/{admin.user.id}/handover", json={"to_user_id": principal},
+                          headers={**h, **_key()})
+    assert r.status_code == 422 and "to_user_id" in r.json()["error"]["fields"], r.text
 
 
 async def test_an_unknown_person_is_404_on_every_action(client: httpx.AsyncClient,

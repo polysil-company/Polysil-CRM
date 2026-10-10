@@ -9,13 +9,14 @@ document the frontend track builds against. They say what the endpoint is *for*.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.idempotency import payload_digest, run_idempotent
+from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import (
     UUID_RE,
@@ -23,6 +24,7 @@ from api.schemas.leads import (
     DismissResult,
     DuplicatePage,
     Lead,
+    LeadArea,
     LeadAssign,
     LeadCreate,
     LeadMerge,
@@ -30,6 +32,7 @@ from api.schemas.leads import (
     LeadPage,
     LeadPatch,
     LeadReopen,
+    LeadStats,
     LeadTransition,
     LookupCreate,
     LookupItem,
@@ -41,6 +44,7 @@ from api.schemas.leads import (
     TimelineEvent,
     TimelinePage,
 )
+from api.services import exports
 from api.services import leads as service
 
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -115,28 +119,121 @@ async def list_leads(
                                                 description="Leads owned by this user.")] = None,
     owner: Annotated[str | None, Query(
         description="`none` for the unassigned list a manager works from.")] = None,
-    territory_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
+    territory_id: Annotated[str | None, Query(
+        max_length=800,
+        description="Leads in these territories or anywhere under them, up to 20 ids "
+                    "comma-separated: a state selects its districts and talukas.")] = None,
+    owner_org_unit_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Leads owned by this office or any office under it (the hierarchy "
+                    "filter).")] = None,
+    assigned_partner_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Leads assigned to this partner or any partner under it: a "
+                    "distributor selects its dealers' leads too.")] = None,
     source: Annotated[str | None, Query(description="A source code.")] = None,
     inquiry_type: Annotated[str | None, Query()] = None,
     created_from: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
     created_to: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
     q: Annotated[str | None, Query(description="Name, mobile or inquiry number.")] = None,
+    campaign_id: Annotated[str | None, Query(
+        pattern=r"^(none|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+        description="Leads from this campaign, or `none` for leads with no campaign.")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: Annotated[str | None, Query(description="From a previous page's next_cursor.")] = None,
+    include_total: Annotated[bool, Query(
+        description="Also count how many leads match, for a \"1 to 25 of 137\" caption. "
+                    "Off by default: it costs a second query over everything in your "
+                    "scope, and most screens do not need it.")] = False,
+    sort: Annotated[Literal["created_at", "farmer_name", "estimated_value"], Query(
+        description="The column to sort by. `farmer_name` ignores case; leads with no "
+                    "`estimated_value` come last in both orders.")] = "created_at",
+    order: Annotated[Literal["asc", "desc"], Query(description="asc or desc.")] = "desc",
 ) -> LeadPage:
     """The lead list, filtered and in scope.
 
     Keyset pagination by `(created_at desc, id)`: pass the previous page's
-    `meta.next_cursor` as `cursor`; it is absent on the last page. There is no
-    total. An empty list means nothing in your scope, which is not an error.
+    `meta.next_cursor` as `cursor`; it is absent on the last page. An empty list
+    means nothing in your scope, which is not an error.
+
+    **There are no numbered pages, and that is deliberate.** Leads arrive while
+    you are reading, and they arrive at the top, because the list is newest
+    first. Offset paging would show you the same lead twice on page 2 and skip
+    another one entirely. A cursor names the row you got to, so the next page is
+    the next page whatever has been created since.
+
+    **`?include_total=true` gives you the count** in `meta.total`, for a caption
+    like "1 to 25 of 137". It is off by default because it costs a scan of
+    everything in your scope. The count stops at 1,000 and sets
+    `meta.total_capped`, so render "1000+" rather than an exact figure when that
+    is true: an unbounded count is a query that gets slower every month until one
+    day it is the slowest thing on the screen.
     """
     return await service.list_leads(
         db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id,
-        owner=owner, territory_id=territory_id, source=source, inquiry_type=inquiry_type,
-        created_from=created_from, created_to=created_to, q=q, limit=limit, cursor=cursor)
+        owner=owner, territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
+        assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
+        created_from=created_from, created_to=created_to, q=q, campaign_id=campaign_id,
+        limit=limit, cursor=cursor,
+        include_total=include_total, sort=sort, order=order)
+
+
+@router.get(
+    "/stats",
+    response_model=LeadStats,
+    responses=_ERRORS,
+    dependencies=[Depends(require("leads", "view"))],
+)
+async def lead_stats(
+    db: DbSession,
+    caller: CallerDep,
+    stage: Annotated[str | None, Query(description="Comma-separated stages.")] = None,
+    priority: Annotated[str | None, Query(description="hot, warm or cold.")] = None,
+    owner_user_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
+    owner: Annotated[str | None, Query(description="`none` for unassigned leads.")] = None,
+    territory_id: Annotated[str | None, Query(
+        max_length=800, description="These territories and everything under them, up to "
+                                    "20 ids comma-separated.")] = None,
+    owner_org_unit_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="This office and every office under it.")] = None,
+    assigned_partner_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="This partner and every partner under it.")] = None,
+    source: Annotated[str | None, Query(description="A source code.")] = None,
+    inquiry_type: Annotated[str | None, Query()] = None,
+    created_from: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
+    created_to: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
+    q: Annotated[str | None, Query(description="Name, mobile or inquiry number.")] = None,
+    campaign_id: Annotated[str | None, Query(
+        pattern=r"^(none|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+        description="Leads from this campaign, or `none` for leads with no campaign.")] = None,
+) -> LeadStats:
+    """Counts for the pipeline board and the dashboard tiles: leads by stage, by
+    priority, and unassigned. Same scope and same filters as the list, so a board
+    column and its list always agree. Every stage is present, 0 when empty."""
+    return await service.lead_stats(
+        db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id, owner=owner,
+        territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
+        assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
+        created_from=created_from, created_to=created_to, q=q, campaign_id=campaign_id)
 
 
 # Declared before the /{lead_id} routes so the literal path wins the match.
+@router.get("/areas", response_model=Envelope[list[LeadArea]], responses=_ERRORS,
+            dependencies=[Depends(require("leads", "view"))])
+async def lead_areas(
+    db: DbSession, caller: CallerDep,
+    level: Annotated[str, Query(description="state, district or taluka.")],
+    parent_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="Only areas under this territory.")] = None,
+) -> Envelope[list[LeadArea]]:
+    """The areas your leads are in, at one level, with a count each: the options for
+    the lead list's area filter. Start at the highest level with more than one
+    option (a one-state company starts at districts), then pass the picked area as
+    `parent_id` for the level below. An area holding none of your leads is not
+    listed. Send the picks to `GET /leads?territory_id=` as a comma list."""
+    return Envelope(data=await service.lead_areas(db, caller, level=level, parent_id=parent_id))
+
+
 @router.get("/assignees", response_model=Envelope[list[Assignee]], responses=_ERRORS,
             dependencies=[Depends(require("leads", "edit"))])
 async def list_assignees(db: DbSession, caller: CallerDep) -> Envelope[list[Assignee]]:
@@ -158,6 +255,23 @@ async def duplicate_queue(
     scope, newest first. From here, dismiss a pair or merge one lead into the other.
     """
     return await service.duplicates(db, caller, limit=limit, cursor=cursor)
+
+
+@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+            dependencies=[Depends(require("leads", "view"))])
+async def export_leads(
+    db: DbSession, caller: CallerDep,
+    filters: Annotated[dict[str, Any], Depends(filters_of(list_leads))],
+) -> Response:
+    """Download the lead list as an Excel file, with the same filters as the list.
+
+    The file holds exactly the rows the list would show for these filters, across
+    every page, and nothing outside your scope. Call it with `fetch` and the bearer
+    token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+    narrow the filters. An empty list gives a file with the header row only.
+    """
+    return await export(list_leads, stem="leads", title="Leads", columns=exports.LEADS,
+                        user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 
 @router.get(
@@ -191,8 +305,10 @@ async def transition(
     """Move a lead along its lifecycle: contact it, qualify it, or mark it lost.
 
     Only the moves the lifecycle allows are accepted. Marking a lead **lost** needs
-    a `lost_reason_id`. Stages from **quoted** onward are refused with
-    `quotation_required` until quotations ship. Pass `expected_stage` to act only if
+    a `lost_reason_id`. **quoted** and **negotiation** are reached by sending a
+    quotation and by recording a negotiation on it, never from here; **won** needs
+    an accepted quotation on the lead, and accepting one moves the lead itself.
+    All three answer `quotation_required` otherwise. Pass `expected_stage` to act only if
     the lead has not moved since you loaded it; if it has, you get `409 stage_changed`
     with the current stage in `fields.stage`.
     """
@@ -388,6 +504,13 @@ async def lead_sources(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
     return Envelope(data=await service.list_lead_sources(db))
 
 
+@lookups.get("/crops", response_model=Envelope[list[LookupItem]], responses=_ERRORS)
+async def crops(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
+    """The crops for a lead's crop picker. A switched-off crop is listed with
+    `is_active: false`: offer it only when it is already on the lead."""
+    return Envelope(data=await service.list_crops(db))
+
+
 @lookups.get("/mis-systems", response_model=Envelope[list[LookupItem]], responses=_ERRORS)
 async def mis_systems(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
     """The micro-irrigation systems for the new-lead form."""
@@ -408,15 +531,19 @@ async def territories(
     db: DbSession,
     _: Claims,
     level: Annotated[str | None, Query(description="state, district, taluka or village.")] = None,
+    levels: Annotated[str | None, Query(
+        description="Several levels, comma-separated: `district,taluka,village` for the "
+        "new-lead form, where a state is refused. Not together with `level`.")] = None,
     parent_id: Annotated[str | None, Query(pattern=UUID_RE,
                                             description="Only children of this territory.")] = None,
     q: Annotated[str | None, Query(description="Name substring.")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> Envelope[list[TerritoryPick]]:
     """The territory picker for the new-lead form. Pick a district, then its
-    talukas by passing `parent_id`, or search by name with `q`."""
+    talukas by passing `parent_id`, or search by name with `q`. `422` on `levels`
+    for an unknown level, or with `level` as well."""
     return Envelope(data=await service.list_territories(
-        db, level=level, parent_id=parent_id, q=q, limit=limit))
+        db, level=level, levels=levels, parent_id=parent_id, q=q, limit=limit))
 
 
 @lookups.get("/partners", response_model=Envelope[list[PartnerPick]], responses=_ERRORS,
@@ -424,7 +551,7 @@ async def territories(
 async def partners(
     db: DbSession,
     _: Claims,
-    q: Annotated[str | None, Query(description="Name or code substring.")] = None,
+    q: Annotated[str | None, Query(description="Name, code or contact person substring.")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> Envelope[list[PartnerPick]]:
     """The partner picker for assigning a lead to a channel partner. You see only
@@ -483,6 +610,22 @@ async def edit_lost_reason(item_id: ItemId, body: LookupUpdate, db: DbSession, c
     return await _update(db, claims, idem, "lost-reasons", "won_lost_reason", item_id, body)
 
 
+@lookups.post("/crops", response_model=Envelope[LookupItem],
+              status_code=status.HTTP_201_CREATED, responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def add_crop(body: LookupCreate, db: DbSession, claims: Claims,
+                   idem: IdemKey) -> JSONResponse:
+    """Add a crop to the list."""
+    return await _create(db, claims, idem, "crops", "crop", body)
+
+
+@lookups.patch("/crops/{item_id}", response_model=Envelope[LookupItem],
+               responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def edit_crop(item_id: ItemId, body: LookupUpdate, db: DbSession, claims: Claims,
+                    idem: IdemKey) -> JSONResponse:
+    """Switch a crop on or off, or reorder it. Names never change in place."""
+    return await _update(db, claims, idem, "crops", "crop", item_id, body)
+
+
 @lookups.post("/lead-sources", response_model=Envelope[LookupItem],
               status_code=status.HTTP_201_CREATED, responses=_ADMIN_ERRORS, dependencies=_ADMIN)
 async def add_lead_source(body: LookupCreate, db: DbSession, claims: Claims,
@@ -513,6 +656,54 @@ async def edit_mis_system(item_id: ItemId, body: LookupUpdate, db: DbSession, cl
                           idem: IdemKey) -> JSONResponse:
     """Switch a system on or off."""
     return await _update(db, claims, idem, "mis-systems", "mis_system", item_id, body)
+
+
+@lookups.get("/meeting-types", response_model=Envelope[list[LookupItem]], responses=_ERRORS)
+async def meeting_types(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
+    """The meeting types a meeting on a lead is one of (FS-014): By call, Survey &
+    Design, C & D understanding, Won or wait, Follow-up, and any an admin added.
+    Switched-off types come back with `is_active` false: show active ones only."""
+    return Envelope(data=await service.list_meeting_types(db))
+
+
+@lookups.post("/meeting-types", response_model=Envelope[LookupItem],
+              status_code=status.HTTP_201_CREATED, responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def add_meeting_type(body: LookupCreate, db: DbSession, claims: Claims,
+                           idem: IdemKey) -> JSONResponse:
+    """Add a meeting type."""
+    return await _create(db, claims, idem, "meeting-types", "meeting_type", body)
+
+
+@lookups.patch("/meeting-types/{item_id}", response_model=Envelope[LookupItem],
+               responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def edit_meeting_type(item_id: ItemId, body: LookupUpdate, db: DbSession, claims: Claims,
+                            idem: IdemKey) -> JSONResponse:
+    """Switch a meeting type on or off, or reorder it."""
+    return await _update(db, claims, idem, "meeting-types", "meeting_type", item_id, body)
+
+
+@lookups.get("/complaint-types", response_model=Envelope[list[LookupItem]], responses=_ERRORS)
+async def complaint_types(db: DbSession, _: Claims) -> Envelope[list[LookupItem]]:
+    """The complaint types (FS-015): Short Material, Dripline / Lateral / PVC,
+    Components, OEM's Components, Material Handling, and any an admin added.
+    Switched-off types come back with `is_active` false: show active ones only."""
+    return Envelope(data=await service.list_complaint_types(db))
+
+
+@lookups.post("/complaint-types", response_model=Envelope[LookupItem],
+              status_code=status.HTTP_201_CREATED, responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def add_complaint_type(body: LookupCreate, db: DbSession, claims: Claims,
+                             idem: IdemKey) -> JSONResponse:
+    """Add a complaint type."""
+    return await _create(db, claims, idem, "complaint-types", "complaint_type", body)
+
+
+@lookups.patch("/complaint-types/{item_id}", response_model=Envelope[LookupItem],
+               responses=_ADMIN_ERRORS, dependencies=_ADMIN)
+async def edit_complaint_type(item_id: ItemId, body: LookupUpdate, db: DbSession, claims: Claims,
+                              idem: IdemKey) -> JSONResponse:
+    """Switch a complaint type on or off, or reorder it."""
+    return await _update(db, claims, idem, "complaint-types", "complaint_type", item_id, body)
 
 
 @lookups.get("/scoring", response_model=Envelope[list[ScoringItem]], responses=_ERRORS)

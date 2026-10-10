@@ -34,12 +34,12 @@ def grants() -> list[Grant]:
 
 # ── the matrix ───────────────────────────────────────────────────────────────
 
-def test_sixteen_roles_and_twenty_modules(grants: list[Grant]) -> None:
-    """ISS-031: 20 modules, not 18. campaigns and stock appear in one matrix each."""
+def test_sixteen_roles_and_twenty_two_modules(grants: list[Grant]) -> None:
+    """ISS-031: 20 modules, not 18; FS-021 adds tracking and FS-025 targets."""
     assert len(roles_in(grants)) == 16
-    assert len(modules_in(grants)) == 20
-    assert {"campaigns", "stock"} <= set(modules_in(grants))
-    assert len(all_cells(grants)) == 16 * 20 * len(ACTIONS) == 1600
+    assert len(modules_in(grants)) == 22
+    assert {"campaigns", "stock", "tracking", "targets"} <= set(modules_in(grants))
+    assert len(all_cells(grants)) == 16 * 22 * len(ACTIONS) == 1760
 
 
 def test_the_two_overgrants_the_seed_carried_are_denied(grants: list[Grant]) -> None:
@@ -53,15 +53,22 @@ def test_the_state_coordinator_is_territory_scoped(grants: list[Grant]) -> None:
     """RBAC.md 6.2, and the regression it records: a find-and-replace once turned
     these into org, which at hq_subsidy is an empty subtree."""
     mine = {g for g in grants if g.role == "state_coordinator"}
-    # tasks and chat are own for every role; everything else this role holds is territory
-    assert {g.scope for g in mine if g.module not in ("tasks", "chat")} == {"territory"}
+    # tasks and chat are own for every role; users is global and read-only, because
+    # the users spec has no territory branch (GAP-134); stock is company-wide for all
+    # staff (FS-023); everything else is territory
+    others = {g.scope for g in mine if g.module not in ("tasks", "chat", "users", "stock")}
+    assert others == {"territory"}
+    assert {(g.action, g.scope) for g in mine if g.module == "users"} == {("view", "global")}
     assert "org_subtree" not in {g.scope for g in mine}
     assert Grant("state_coordinator", "subsidy", "create", "territory") in mine
 
 
 def test_portal_roles_are_partner_scoped_and_redeem_maps_to_create(grants: list[Grant]) -> None:
     portal = {g for g in grants if g.role in ("distributor", "dealer", "sub_dealer")}
-    assert {g.scope for g in portal} == {"partner_subtree"}
+    # FS-037: tasks is the one own-scope row, a dealer's own tasks behind a setting
+    assert {g.scope for g in portal if g.module != "tasks"} == {"partner_subtree"}
+    tasks = {(g.action, g.scope) for g in portal if g.module == "tasks"}
+    assert tasks == {("view", "own"), ("edit", "own")}
     assert Grant("dealer", "rewards", "create", "partner_subtree") in portal  # GAP-043
     assert Grant("sub_dealer", "partners", "view", "partner_subtree") not in portal
 

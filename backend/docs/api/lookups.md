@@ -25,6 +25,189 @@ Conventions for every endpoint in this file:
 
 ---
 
+## `GET /api/v1/lookups/complaint-types`
+
+**Complaint Types**
+
+The complaint types (FS-015): Short Material, Dripline / Lateral / PVC,
+Components, OEM's Components, Material Handling, and any an admin added.
+Switched-off types come back with `is_active` false: show active ones only.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_LookupItem__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/lookups/complaint-types`
+
+**Add Complaint Type**
+
+Add a complaint type.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`LookupCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
+| `name` | string | yes | Display name. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `PATCH /api/v1/lookups/complaint-types/{item_id}`
+
+**Edit Complaint Type**
+
+Switch a complaint type on or off, or reorder it.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `item_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`LookupUpdate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/lookups/crops`
+
+**Crops**
+
+The crops for a lead's crop picker. A switched-off crop is listed with
+`is_active: false`: offer it only when it is already on the lead.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_LookupItem__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/lookups/crops`
+
+**Add Crop**
+
+Add a crop to the list.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`LookupCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
+| `name` | string | yes | Display name. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `PATCH /api/v1/lookups/crops/{item_id}`
+
+**Edit Crop**
+
+Switch a crop on or off, or reorder it. Names never change in place.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `item_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`LookupUpdate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/lookups/lead-sources`
 
 **Lead Sources**
@@ -52,7 +235,7 @@ Add a lead source. `quality` (0 to 1) is its factor in the priority score.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -62,9 +245,9 @@ Add a lead source. `quality` (0 to 1) is its factor in the priority score.
 |---|---|---|---|
 | `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
 | `name` | string | yes | Display name. |
-| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
-| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
-| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
 
 **Responses**
 
@@ -90,7 +273,7 @@ Switch a source on or off, reorder it, or retune its quality factor.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -98,9 +281,9 @@ Switch a source on or off, reorder it, or retune its quality factor.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `is_active` | boolean | null |  |  |
-| `sort_order` | integer | null |  |  |
-| `quality` | number | string | null |  | Sources only. |
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
 
 **Responses**
 
@@ -144,7 +327,7 @@ Add a reason a lead can be marked lost with. `kind` defaults to lost.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -154,9 +337,9 @@ Add a reason a lead can be marked lost with. `kind` defaults to lost.
 |---|---|---|---|
 | `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
 | `name` | string | yes | Display name. |
-| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
-| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
-| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
 
 **Responses**
 
@@ -182,7 +365,7 @@ Switch a reason on or off, or reorder it. Names never change in place.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -190,9 +373,101 @@ Switch a reason on or off, or reorder it. Names never change in place.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `is_active` | boolean | null |  |  |
-| `sort_order` | integer | null |  |  |
-| `quality` | number | string | null |  | Sources only. |
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/lookups/meeting-types`
+
+**Meeting Types**
+
+The meeting types a meeting on a lead is one of (FS-014): By call, Survey &
+Design, C & D understanding, Won or wait, Follow-up, and any an admin added.
+Switched-off types come back with `is_active` false: show active ones only.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_LookupItem__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `POST /api/v1/lookups/meeting-types`
+
+**Add Meeting Type**
+
+Add a meeting type.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`LookupCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
+| `name` | string | yes | Display name. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_LookupItem_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | No such row. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `PATCH /api/v1/lookups/meeting-types/{item_id}`
+
+**Edit Meeting Type**
+
+Switch a meeting type on or off, or reorder it.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `item_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`LookupUpdate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
 
 **Responses**
 
@@ -234,7 +509,7 @@ Add a micro-irrigation system to the list.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -244,9 +519,9 @@ Add a micro-irrigation system to the list.
 |---|---|---|---|
 | `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
 | `name` | string | yes | Display name. |
-| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
-| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
-| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
 
 **Responses**
 
@@ -272,7 +547,7 @@ Switch a system on or off.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -280,9 +555,9 @@ Switch a system on or off.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `is_active` | boolean | null |  |  |
-| `sort_order` | integer | null |  |  |
-| `quality` | number | string | null |  | Sources only. |
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
 
 **Responses**
 
@@ -309,7 +584,7 @@ partners in its territories, an admin all of them.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `q` | query | string | null |  | Name or code substring. |
+| `q` | query | string \| null |  | Name, code or contact person substring. |
 | `limit` | query | integer |  |  |
 
 **Responses**
@@ -372,7 +647,7 @@ computation (the next create, transition, note, assign or reopen).
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -400,15 +675,17 @@ computation (the next create, transition, note, assign or reopen).
 **Territories**
 
 The territory picker for the new-lead form. Pick a district, then its
-talukas by passing `parent_id`, or search by name with `q`.
+talukas by passing `parent_id`, or search by name with `q`. `422` on `levels`
+for an unknown level, or with `level` as well.
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `level` | query | string | null |  | state, district, taluka or village. |
-| `parent_id` | query | string | null |  | Only children of this territory. |
-| `q` | query | string | null |  | Name substring. |
+| `level` | query | string \| null |  | state, district, taluka or village. |
+| `levels` | query | string \| null |  | Several levels, comma-separated: `district,taluka,village` for the new-lead form, where a state is refused. Not together with `level`. |
+| `parent_id` | query | string \| null |  | Only children of this territory. |
+| `q` | query | string \| null |  | Name substring. |
 | `limit` | query | integer |  |  |
 
 **Responses**
@@ -466,7 +743,7 @@ talukas by passing `parent_id`, or search by name with `q`.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -480,9 +757,9 @@ talukas by passing `parent_id`, or search by name with `q`.
 |---|---|---|---|
 | `code` | string | yes | Stable machine code, lowercase with underscores. Cannot change later. |
 | `name` | string | yes | Display name. |
-| `sort_order` | integer | null |  | Sources and reasons only. Lower sorts first. |
-| `quality` | number | string | null |  | Sources only. The source-quality factor in the score, 0 to 1. |
-| `kind` | `won` | `lost` | null |  | Reasons only. Defaults to lost. |
+| `sort_order` | integer \| null |  | Sources and reasons only. Lower sorts first. |
+| `quality` | number \| string \| null |  | Sources only. The source-quality factor in the score, 0 to 1. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. Defaults to lost. |
 
 **`LookupItem`**
 
@@ -497,9 +774,9 @@ talukas by passing `parent_id`, or search by name with `q`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `is_active` | boolean | null |  |  |
-| `sort_order` | integer | null |  |  |
-| `quality` | number | string | null |  | Sources only. |
+| `is_active` | boolean \| null |  |  |
+| `sort_order` | integer \| null |  |  |
+| `quality` | number \| string \| null |  | Sources only. |
 
 **`PartnerPick`**
 
@@ -509,7 +786,7 @@ talukas by passing `parent_id`, or search by name with `q`.
 | `code` | string | yes |  |
 | `name` | string | yes |  |
 | `partner_type` | string | yes | distributor, dealer or sub_dealer. |
-| `territory` | TerritoryParent | null |  |  |
+| `territory` | TerritoryParent \| null |  |  |
 
 **`RoleItem`**
 
@@ -549,5 +826,5 @@ talukas by passing `parent_id`, or search by name with `q`.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 | `level` | string | yes | state, district, taluka or village. |
-| `code` | string | null |  |  |
-| `parent` | TerritoryParent | null |  |  |
+| `code` | string \| null |  |  |
+| `parent` | TerritoryParent \| null |  |  |

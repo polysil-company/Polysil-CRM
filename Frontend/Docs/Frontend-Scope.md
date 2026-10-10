@@ -311,8 +311,12 @@ Built and ready to extend (details in the changelog):
    password, channel partners a one-time code; a short-lived bearer token plus an httpOnly refresh
    cookie; the API sits on the app's origin. See Frontend-Architecture §8.
 4. **API contract session** — when, and will staging have the shared seed data?
-5. **Money unit** in the API — rupees as decimals or integer paise.
-6. **Error format** — accept RFC 9457 problem details?
+5. ~~**Money unit**~~ — **Answered by the backend contract (21 September 2026):** rupees as decimal
+   strings (`"125000.00"`). The frontend formats them as they are and adds them in whole paise
+   (`sumRupees`), never in floating point.
+6. ~~**Error format**~~ — **Answered by the backend contract:** `{ error: { code, message, fields? } }`,
+   where a 422's `fields` maps each field path to its reason. Problem details are still read, for
+   proxies and gateways.
 
 **Needed soon**
 
@@ -323,6 +327,22 @@ Built and ready to extend (details in the changelog):
 11. **Subsidy forms** — fields to capture and what the backend returns.
 12. **GST invoices, or only quotations and sales orders?**
 13. **Brand assets** — logo, colours, typeface approval (the design tokens make this a small change).
+
+**Tracked for the backend in [`docs/Backend-Tasks.md`](../../docs/Backend-Tasks.md)** — questions 7 and 14–18 below are tasks BE-014 and BE-001…BE-005 there, with a checkbox, the commit that closes them and the backend's notes. Ask new backend questions there.
+
+**Asked of the backend for leads (22 September 2026)** — the lead screens run on the dev API; these
+gaps show as "—" or have no effect until they land:
+
+14. **Sorting on `GET /leads`** (LEAD-001) — `sort` = `created_at` | `farmer_name` |
+    `estimated_value`, `order` = `asc` | `desc`, keeping keyset paging (the cursor would carry the sort
+    key). The table's sort arrows already send these; today the list is always newest first.
+15. **Next follow-up date** on a lead (LEAD-001, LEAD-003) — the Follow-up column and field.
+16. **Crops and land (acres)** on a lead (LEAD-003) — captured on field visits.
+17. **Win probability and weekly activity** (LEAD-001, LEAD-003) — or confirm the `score` replaces
+    win probability, and the timeline replaces weekly activity, so the columns can go.
+18. **Which territory levels a lead may sit in** (LEAD-002) — the docs say "taluka or district", but
+    the picker's search also returns villages and the state. Should the API refuse those, or filter
+    them from `GET /lookups/territories`?
 
 **Deferred by the client**
 

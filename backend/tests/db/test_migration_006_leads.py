@@ -90,9 +90,10 @@ async def test_the_lookups_are_seeded(db: AsyncSession, table: str) -> None:
 
 async def test_scoring_keys_are_the_ones_the_function_reads(db: AsyncSession) -> None:
     keys = {r[0] for r in (await db.execute(text("SELECT key FROM lead_score_rule"))).all()}
+    # dormant_after_days is 040's: read by lead_dormant_sweep, not by score() (FS-035)
     assert {"w_source", "w_value", "w_speed", "w_engagement", "value_cap",
             "speed_fast_hours", "speed_slow_hours", "engagement_cap",
-            "threshold_hot", "threshold_warm"} == keys
+            "threshold_hot", "threshold_warm", "dormant_after_days"} == keys
 
 
 @pytest.mark.parametrize("table", [

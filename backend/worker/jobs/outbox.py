@@ -21,6 +21,9 @@ FS-007 shaped the drain around a real provider:
   minute out with `attempts` unchanged, and the third inside a window opens a
   shared breaker that every drain honours. Only the provider's refusal of a
   specific message spends one of its five attempts.
+* **an uncertain send is not repeated** (GAP-073): no answer after the request
+  left means 11za may have delivered it. A code is resent as a transient; any
+  other message is dead with a reason that says it may have arrived.
 * **every template has a maximum age** (rule 4), a code's row is retired when a
   newer code exists (rule 1a), an acknowledgement is withdrawn with its lead and
   sent once a day per number under a per-number lock (rules 10a, 10b), and a
@@ -46,6 +49,7 @@ from api.integrations import cache
 from api.integrations.messages import (
     TEMPLATE_AUTH_OTP,
     TEMPLATE_LEAD_ACK,
+    TEMPLATE_LEAD_VERIFY,
     TEMPLATES,
     UnknownTemplateError,
     max_age,
@@ -65,6 +69,9 @@ MAX_ATTEMPTS = len(BACKOFF_SECONDS)
 
 # Rule 8: an uncharged reschedule, and the breaker's window is the same minute.
 TRANSIENT_DELAY = timedelta(seconds=60)
+# GAP-073: the error on a row whose send got no answer. Support reads it as
+# "ask the customer before resending".
+UNCERTAIN_PREFIX = "no answer in time, may have arrived, not resent: "
 # Rule 17: more dead rows than this in one drain is an error log.
 DEAD_BURST = 10
 # Rule 10b: the acknowledgement's per-number lock. 1 is the OTP by number, 2 a
@@ -169,10 +176,10 @@ async def outbox_drain(ctx: dict[str, Any], *, batch: int | None = None) -> int:
             outcome = "retry"
         if outcome is None:
             break
-        if outcome == "dead":
+        if outcome in ("dead", "uncertain"):
             dead += 1
         # After the commit only, so a Redis failure never loses a send result.
-        if outcome == "transient" and await cache.breaker_note_transient():
+        if outcome in ("transient", "uncertain") and await cache.breaker_note_transient():
             log.error("outbox.breaker_opened", handled=handled)
             break
 
@@ -208,11 +215,12 @@ async def _handle(session: AsyncSession, row: Any, provider: MessageProvider,
         await _dead(session, row.id, "too old to send")
         return "dead"
 
-    if key == TEMPLATE_AUTH_OTP:
+    if key in (TEMPLATE_AUTH_OTP, TEMPLATE_LEAD_VERIFY):
+        # only the newest code of its kind can arrive (FS-007 rule 1a, FS-003a EC-5)
         newer = (await session.execute(text(
-            "SELECT EXISTS (SELECT 1 FROM notification_outbox o WHERE o.template_key = 'auth.otp' "
+            "SELECT EXISTS (SELECT 1 FROM notification_outbox o WHERE o.template_key = :k "
             "AND o.recipient = :r AND o.created_at > :c AND o.id <> :i)"),
-            {"r": row.recipient, "c": row.created_at, "i": row.id})).scalar_one()
+            {"k": key, "r": row.recipient, "c": row.created_at, "i": row.id})).scalar_one()
         if newer:
             await _dead(session, row.id, "superseded")
             return "dead"
@@ -254,7 +262,11 @@ async def _handle(session: AsyncSession, row: Any, provider: MessageProvider,
             {"p": result.provider_msg_id, "keep": keep, "i": row.id},
         )
         return "sent"
-    if result.outcome is Outcome.TRANSIENT:
+    if result.outcome is Outcome.UNCERTAIN and not TEMPLATES[key].resend_uncertain:
+        await _dead(session, row.id, f"{UNCERTAIN_PREFIX}{result.error}")
+        log.warning("outbox.uncertain_not_resent", template=key, row=str(row.id))
+        return "uncertain"
+    if result.outcome in (Outcome.TRANSIENT, Outcome.UNCERTAIN):
         # GAP-073: a timeout after the provider accepted is resent once the breaker
         # clears; at-least-once, as FS-001 chose for the code.
         await session.execute(
@@ -344,7 +356,18 @@ async def purge_expired_sessions(ctx: dict[str, Any]) -> int:
                  "AND created_at < :cut"),
             {"cut": now - settings.outbox_retention},
         )).rowcount
+        # FS-003a: the public form's codes hold a mobile and an address; a definer
+        # deletes them, because no policy admits either role to the table
+        codes = (await session.execute(
+            text("SELECT lead_intake_purge(:cut)"),
+            {"cut": now - settings.public_lead_code_retention},
+        )).scalar_one()
+        # FS-038: 11za's raw webhook calls carry farmers' numbers and words (GAP-356)
+        webhook = (await session.execute(
+            text("SELECT whatsapp_webhook_purge(:cut)"),
+            {"cut": now - settings.whatsapp_webhook_retention},
+        )).scalar_one()
 
     log.info("retention.purged", sessions=sessions, attempts=attempts, idempotency=idem,
-             outbox=outbox)
-    return int(sessions) + int(attempts) + int(idem) + int(outbox)
+             outbox=outbox, lead_codes=codes, webhook_calls=webhook)
+    return int(sessions) + int(attempts) + int(idem) + int(outbox) + int(codes) + int(webhook)

@@ -37,6 +37,20 @@ describe("[OBS-002] public environment", () => {
     ).toThrow(/mocking must be disabled in production/);
   });
 
+  it("accepts partial mocking, for local work against a real API", () => {
+    expect(parseClientEnv({ NEXT_PUBLIC_API_MOCKING: "partial" }).apiMocking).toBe("partial");
+  });
+
+  it("refuses partial mocking in staging and production too", () => {
+    expect(() =>
+      parseClientEnv({
+        NEXT_PUBLIC_APP_ENV: "staging",
+        NEXT_PUBLIC_API_BASE_URL: "/api/v1",
+        NEXT_PUBLIC_API_MOCKING: "partial",
+      }),
+    ).toThrow(/mocking must be disabled in staging/);
+  });
+
   it("requires an API base URL in staging and production", () => {
     expect(() => parseClientEnv({ NEXT_PUBLIC_APP_ENV: "staging" })).toThrow(/required in staging/);
   });

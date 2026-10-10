@@ -11,6 +11,7 @@ import re
 from datetime import timedelta
 from functools import lru_cache
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from pydantic import PostgresDsn, RedisDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -79,6 +80,14 @@ class Settings(BaseSettings):
     # role, seeded by migration 005 under this stable id. The worker sets it as
     # its claim and re-validates the row on every job. Nothing looks it up by name.
     system_user_id: str = "26809c63-290b-5bd9-9d6a-a717dc0b32e3"  # uuid5(DNS, "polysil.system")
+    # FS-003a: the public form's principal, migration 015; uuid5(DNS, "polysil.intake")
+    intake_user_id: str = "3f962ae5-f0d3-5583-91b5-5cea037139fc"
+    public_lead_code_ttl_seconds: int = 600
+    # rule 5: the sign-in value, so one carrier address at a fair is not a lockout
+    public_lead_codes_per_ip_per_hour: int = 200
+    # rule 9: a ceiling on paid messages from the public form, whatever the source
+    public_lead_codes_per_hour: int = 300
+    public_lead_code_retention: timedelta = timedelta(days=30)
 
     # FS-003 rule 4 (GAP-046, ISS-067). owner_org_unit_id is never user-supplied: it
     # is the sales-line unit whose territory covers the lead's territory. When no
@@ -181,10 +190,23 @@ class Settings(BaseSettings):
     # language until question 3.2 is answered (GAP-022).
     whatsapp_template_otp: str = "polysil_auth_otp"
     whatsapp_template_lead_ack: str = "polysil_lead_ack"
+    # FS-005: the quotation link. Optional, because a bare str would refuse to
+    # start every process until the client's BSP approves the template (GAP-110);
+    # the checker reports an unset name on its own line.
+    whatsapp_template_quotation_share: str | None = None
     whatsapp_template_language: str = "en"
     # A total deadline per send: httpx's timeout bounds each socket operation, not
-    # the request. Re-sized from the smoke's slowest sends.
-    whatsapp_send_timeout: float = 10.0
+    # the request. 11za took longer than 10 s on staging for the quotation and order
+    # messages (walk, 10 Oct), and each timeout was a duplicate (GAP-073).
+    whatsapp_send_timeout: float = 30.0
+    # Connecting is the only phase after which the request has surely not reached
+    # 11za, so a failure there is the only one every message may resend.
+    whatsapp_connect_timeout: float = 5.0
+    # FS-038: the path secret on the webhook URLs 11za calls. 11za signs nothing,
+    # so this is the credential; unset, the routes answer 404 (GAP-355).
+    whatsapp_webhook_secret: SecretStr | None = None
+    # FS-038 rule 6: raw calls hold farmers' numbers and words (GAP-356)
+    whatsapp_webhook_retention: timedelta = timedelta(days=30)
     # FS-007 rule 7: how long one drain keeps claiming rows. Under the ten-second
     # tick, eight seconds lets at most two drains overlap.
     outbox_drain_budget: float = 8.0
@@ -196,6 +218,24 @@ class Settings(BaseSettings):
 
     r2_endpoint: str | None = None
     r2_bucket: str | None = None
+    r2_access_key_id: str | None = None
+    r2_secret_access_key: SecretStr | None = None
+    # FS-005 5.3. The local adapter is for the dev box only (ADR-026 rejects local
+    # disk outright); outside local R2 is required, validated below.
+    storage_dir: str = "infra/storage"
+    # The frontend origin the share link points at, no trailing slash. A link is
+    # the origin plus 46 characters and the adapter's value bound is 100, so the
+    # origin is bounded at 54 (edge case 17).
+    public_web_url: str = "http://localhost:3000"
+    # weasyprint renders a PDF; html stores the rendered HTML as the document and
+    # is allowed on the dev box only, where WeasyPrint's native libraries are not.
+    pdf_renderer: Literal["weasyprint", "html"] = "weasyprint"
+    # The render lease (FS-005 5.2): longer than any render, shorter than a
+    # user's patience.
+    pdf_lease_minutes: int = 5
+    # seconds one render tick may keep claiming; under the 5 s cadence, so ticks do
+    # not pile up and hold the worker's job slots the outbox drain needs
+    pdf_render_budget: float = 4.0
 
     sentry_dsn: SecretStr | None = None
 
@@ -277,7 +317,9 @@ class Settings(BaseSettings):
         # PostgresDsn is a MultiHostUrl: it permits a comma-separated host list, so
         # the port lives on each host entry rather than on the URL.
         ports = [h.get("port") for h in v.hosts()]
-        wrong = [p for p in ports if p not in (6432, None)]
+        # 6433 is pgbouncer-b, the second PgBouncer a parallel worktree uses for its
+        # own copy of the database (infra/docker-compose.yml). Still pooled.
+        wrong = [p for p in ports if p not in (6432, 6433, None)]
         if wrong:
             raise ValueError(
                 f"database_url points at port {wrong[0]}, not PgBouncer's 6432. "
@@ -294,7 +336,57 @@ class Settings(BaseSettings):
             raise ValueError("whatsapp_provider is 11za but whatsapp_auth_token is unset")
         if self.environment == "production" and self.whatsapp_provider == "mock":
             raise ValueError("whatsapp_provider is mock in production; no message would leave")
+        secret = self.whatsapp_webhook_secret
+        if secret is not None and len(secret.get_secret_value()) < 32:
+            raise ValueError("whatsapp_webhook_secret must be at least 32 characters")
         return self
+
+    @field_validator("whatsapp_template_quotation_share", "r2_endpoint", "r2_bucket",
+                     "r2_access_key_id", "r2_secret_access_key", "whatsapp_webhook_secret",
+                     mode="before")
+    @classmethod
+    def _empty_is_unset(cls, v: object) -> object:
+        """The compose files pass `${VAR:-}`, and an empty string is not a value:
+        an empty template name would read as configured and fail every send."""
+        return None if isinstance(v, str) and not v.strip() else v
+
+    @model_validator(mode="after")
+    def _quotations_are_configured(self) -> Settings:
+        """FS-005 5.3. Three things that are fine on the dev box and wrong anywhere
+        else, refused at startup: HTML in place of a PDF, a share link the
+        WhatsApp adapter would truncate, and a share link that points at
+        localhost, which is what an unset origin would send to a farmer's phone.
+        A missing R2 bucket is not refused here: it takes the quotation PDF down,
+        not the CRM (edge case 20), and `storage_configured` says so at startup
+        and on every render."""
+        origin = self.public_web_url.strip().rstrip("/")
+        if not origin and self.environment == "local":
+            origin = "http://localhost:3000"
+        self.public_web_url = origin
+        if self.environment != "local":
+            parts = urlsplit(origin) if origin else None
+            host = parts.hostname if parts else None
+            if (parts is None or not host or host in _LOCAL_HOSTS
+                    or parts.scheme not in ("http", "https")):
+                raise ValueError("public_web_url must be the frontend's real origin outside "
+                                 "local: the share link and the WhatsApp message carry it")
+        if len(self.public_web_url) > 54:
+            raise ValueError("public_web_url is longer than 54 characters; the share link "
+                             "would exceed the WhatsApp value bound of 100")
+        if self.environment != "local" and self.pdf_renderer != "weasyprint":
+            raise ValueError("pdf_renderer must be weasyprint outside local")
+        return self
+
+    @property
+    def storage_configured(self) -> bool:
+        """R2 in full, or the local directory on the dev box. ADR-026 rejects local
+        disk anywhere else, so outside local an unset R2 means no storage at all."""
+        r2 = bool(self.r2_endpoint and self.r2_bucket and self.r2_access_key_id
+                  and self.r2_secret_access_key)
+        return r2 or self.environment == "local"
+
+
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1"})
 
 
 @lru_cache

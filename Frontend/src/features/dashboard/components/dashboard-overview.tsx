@@ -22,9 +22,14 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { dashboardOverviewQueryOptions } from "@/features/dashboard/api/dashboard.queries";
-import type { DashboardOverview as Overview } from "@/features/dashboard/api/dashboard.schemas";
-import { LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/features/leads/lib/lead-labels";
-import { formatInrCompact, formatNumber, formatPercent } from "@/lib/format";
+import {
+  figure,
+  trendPoints,
+  type DashboardKpi,
+  type DashboardOverview as Overview,
+} from "@/features/dashboard/api/dashboard.schemas";
+import { LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
+import { EMPTY_VALUE, formatInrCompact, formatNumber, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** RPT-001 · Dashboard overview with all states handled by QueryView. */
@@ -50,8 +55,17 @@ export function DashboardOverview(): React.JSX.Element {
   );
 }
 
+/** The card's change and sparkline from a KPI: `undefined` when the backend has none. */
+function kpiCardProps(kpi: DashboardKpi): { delta: number | undefined; trend: number[] } {
+  return { delta: figure(kpi.deltaPercent) ?? undefined, trend: trendPoints(kpi.trend) };
+}
+
 function DashboardContent({ data }: { data: Overview }): React.JSX.Element {
   const { kpis } = data;
+  const pipeline = kpiCardProps(kpis.pipelineValue);
+  const newLeads = kpiCardProps(kpis.newLeads);
+  const conversion = kpiCardProps(kpis.conversionRate);
+  const overdue = kpiCardProps(kpis.overdueFollowUps);
 
   return (
     <div className="flex flex-col gap-4">
@@ -59,39 +73,43 @@ function DashboardContent({ data }: { data: Overview }): React.JSX.Element {
         <StatCard
           label="Open pipeline"
           icon={IndianRupeeIcon}
-          value={formatInrCompact(kpis.pipelineValue.value)}
-          delta={kpis.pipelineValue.deltaPercent ?? undefined}
-          trend={kpis.pipelineValue.trend}
-          trendLabel={describeTrend(kpis.pipelineValue.trend, "Pipeline value per week")}
-          footnote={data.periodLabel}
+          value={
+            kpis.pipelineValue.value === null
+              ? EMPTY_VALUE
+              : formatInrCompact(kpis.pipelineValue.value)
+          }
+          delta={pipeline.delta}
+          trend={pipeline.trend}
+          trendLabel={describeTrend(pipeline.trend, "Pipeline value")}
+          footnote="Open leads, now"
         />
         <StatCard
           label="New leads"
           icon={UserAdd01Icon}
-          value={formatNumber(kpis.newLeads.value)}
-          delta={kpis.newLeads.deltaPercent ?? undefined}
-          trend={kpis.newLeads.trend}
-          trendLabel={describeTrend(kpis.newLeads.trend, "New leads per week")}
+          value={formatNumber(figure(kpis.newLeads.value))}
+          delta={newLeads.delta}
+          trend={newLeads.trend}
+          trendLabel={describeTrend(newLeads.trend, "New leads")}
           footnote={data.periodLabel}
         />
         <StatCard
           label="Conversion rate"
           icon={Target02Icon}
-          value={formatPercent(kpis.conversionRate.value, 1)}
-          delta={kpis.conversionRate.deltaPercent ?? undefined}
-          trend={kpis.conversionRate.trend}
-          trendLabel={describeTrend(kpis.conversionRate.trend, "Conversion rate per week")}
-          footnote="Won out of closed leads"
+          value={formatPercent(figure(kpis.conversionRate.value), 1)}
+          delta={conversion.delta}
+          trend={conversion.trend}
+          trendLabel={describeTrend(conversion.trend, "Conversion rate")}
+          footnote="Of the period's new leads, won now"
         />
         <StatCard
           label="Overdue follow-ups"
           icon={Clock01Icon}
-          value={formatNumber(kpis.overdueFollowUps.value)}
-          delta={kpis.overdueFollowUps.deltaPercent ?? undefined}
+          value={formatNumber(figure(kpis.overdueFollowUps.value))}
+          delta={overdue.delta}
           increaseIsGood={false}
-          trend={kpis.overdueFollowUps.trend}
-          trendLabel={describeTrend(kpis.overdueFollowUps.trend, "Overdue follow-ups per week")}
-          footnote="Past their follow-up date"
+          trend={overdue.trend}
+          trendLabel={describeTrend(overdue.trend, "Overdue follow-ups")}
+          footnote="Open tasks past their due date"
         />
       </section>
 
@@ -125,19 +143,15 @@ function PipelineCard({
       <CardContent>
         <ul className="flex flex-col gap-3">
           {pipeline.map((stage) => (
-            <li key={stage.status} className="grid grid-cols-[6.5rem_1fr_auto] items-center gap-3">
+            <li key={stage.stage} className="grid grid-cols-[6.5rem_1fr_auto] items-center gap-3">
               <span className="truncate text-sm text-muted-foreground">
-                {LEAD_STATUS_LABELS[stage.status]}
+                {LEAD_STAGE_LABELS[stage.stage]}
               </span>
               <ProportionBar
                 value={stage.count}
                 max={maxCount}
                 tone={
-                  stage.status === "won"
-                    ? "success"
-                    : stage.status === "lost"
-                      ? "danger"
-                      : "primary"
+                  stage.stage === "won" ? "success" : stage.stage === "lost" ? "danger" : "primary"
                 }
               />
               <span className="text-right text-sm whitespace-nowrap tabular-nums">
@@ -182,7 +196,7 @@ function FollowUpsCard({
         ) : (
           <ul className="flex flex-col">
             {followUps.map((item) => (
-              <li key={item.leadId}>
+              <li key={item.taskId}>
                 <Link
                   href={`/leads/${item.leadId}`}
                   transitionTypes={["nav-forward"]}
@@ -190,9 +204,16 @@ function FollowUpsCard({
                 >
                   <AvatarLabel
                     name={item.customerName}
-                    secondary={`${item.district} · ${item.ownerName}`}
+                    secondary={[item.district, item.ownerName ?? "Unassigned"]
+                      .filter((part) => part !== null)
+                      .join(" · ")}
                   />
-                  <RelativeDate value={item.dueAt} highlightOverdue className="shrink-0 text-xs" />
+                  <span className="flex shrink-0 flex-col items-end gap-0.5">
+                    <RelativeDate value={item.dueAt} highlightOverdue className="text-xs" />
+                    {item.overdue ? (
+                      <span className="text-2xs font-medium text-danger">Overdue</span>
+                    ) : null}
+                  </span>
                 </Link>
               </li>
             ))}
@@ -220,9 +241,7 @@ function SourcesCard({ sources }: { sources: Overview["sources"] }): React.JSX.E
           {sources.map((item) => (
             <li key={item.source} className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate text-muted-foreground">
-                  {LEAD_SOURCE_LABELS[item.source]}
-                </span>
+                <span className="truncate text-muted-foreground">{item.name}</span>
                 <span className="font-medium whitespace-nowrap text-foreground tabular-nums">
                   {formatNumber(item.count)}
                   <span className="ml-1.5 font-normal text-subtle-foreground">

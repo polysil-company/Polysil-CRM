@@ -57,14 +57,14 @@ sum of the crops by a paisa of rounding.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `scheme` | string |  | Subsidy scheme code. Default `GGRC`. |
-| `system_type` | `drip` | `mini_sprinkler` | `sprinkler` | yes | Which of the three calculation models to run. |
-| `as_of` | date | null |  | The masters in force on this date. Today in India by default; a future date is refused. |
+| `system_type` | `drip` \| `mini_sprinkler` \| `sprinkler` | yes | Which of the three calculation models to run. |
+| `as_of` | date \| null |  | The masters in force on this date. Today in India by default; a future date is refused. |
 | `crops` | CropRequest[] | yes |  |
-| `head_lines` | Line[] |  | The head unit, sent once for the whole quotation and shared across crops by area. |
-| `sump` | Sump | null |  |  |
-| `group_total_area` | number | string | null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
-| `installation_rate_per_ha` | number | string |  | The installation line's rate; its quantity is the area. Default `0`. |
-| `nozzle` | `plastic` | `brass` | null |  | Sprinkler only. The pipe size is not an input: it follows the area band and is returned. |
+| `head_lines` | Line-Input[] |  | The head unit, sent once for the whole quotation and shared across crops by area. |
+| `sump` | Sump \| null |  |  |
+| `group_total_area` | number \| string \| null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
+| `installation_rate_per_ha` | number \| string |  | The installation line's rate; its quantity is the area. Default `0`. |
+| `nozzle` | `plastic` \| `brass` \| null |  | Sprinkler only. The pipe size is not an input: it follows the area band and is returned. |
 
 **Responses**
 
@@ -90,9 +90,9 @@ wants to show the list, or the labels, before anything has been calculated.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `system_type` | query | `drip` | `mini_sprinkler` | `sprinkler` | yes |  |
+| `system_type` | query | `drip` \| `mini_sprinkler` \| `sprinkler` | yes |  |
 | `scheme` | query | string |  | Subsidy scheme code. |
-| `as_of` | query | date | null |  | Read the masters in force on this date. Today in India by default. |
+| `as_of` | query | date \| null |  | Read the masters in force on this date. Today in India by default. |
 
 **Responses**
 
@@ -122,7 +122,7 @@ applies. The figures come from the masters in force, so a screen that prints
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `scheme` | query | string |  | Subsidy scheme code. |
-| `as_of` | query | date | null |  | Read the masters in force on this date. Today in India by default. |
+| `as_of` | query | date \| null |  | Read the masters in force on this date. Today in India by default. |
 
 **Responses**
 
@@ -152,7 +152,7 @@ treated as no crop at all.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `scheme` | query | string |  | Subsidy scheme code. |
-| `as_of` | query | date | null |  | Read the masters in force on this date. Today in India by default. |
+| `as_of` | query | date \| null |  | Read the masters in force on this date. Today in India by default. |
 
 **Responses**
 
@@ -198,25 +198,25 @@ treated as no crop at all.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `scheme` | string |  | Subsidy scheme code. Default `GGRC`. |
-| `system_type` | `drip` | `mini_sprinkler` | `sprinkler` | yes | Which of the three calculation models to run. |
-| `as_of` | date | null |  | The masters in force on this date. Today in India by default; a future date is refused. |
+| `system_type` | `drip` \| `mini_sprinkler` \| `sprinkler` | yes | Which of the three calculation models to run. |
+| `as_of` | date \| null |  | The masters in force on this date. Today in India by default; a future date is refused. |
 | `crops` | CropRequest[] | yes |  |
-| `head_lines` | Line[] |  | The head unit, sent once for the whole quotation and shared across crops by area. |
-| `sump` | Sump | null |  |  |
-| `group_total_area` | number | string | null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
-| `installation_rate_per_ha` | number | string |  | The installation line's rate; its quantity is the area. Default `0`. |
-| `nozzle` | `plastic` | `brass` | null |  | Sprinkler only. The pipe size is not an input: it follows the area band and is returned. |
+| `head_lines` | Line-Input[] |  | The head unit, sent once for the whole quotation and shared across crops by area. |
+| `sump` | Sump \| null |  |  |
+| `group_total_area` | number \| string \| null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
+| `installation_rate_per_ha` | number \| string |  | The installation line's rate; its quantity is the area. Default `0`. |
+| `nozzle` | `plastic` \| `brass` \| null |  | Sprinkler only. The pipe size is not an input: it follows the area band and is returned. |
 
 **`CalculateResponse`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `system_type` | `drip` | `mini_sprinkler` | `sprinkler` | yes |  |
+| `system_type` | `drip` \| `mini_sprinkler` \| `sprinkler` | yes |  |
 | `scheme` | string | yes |  |
 | `masters` | MastersOut | yes |  |
 | `crops` | CropOut[] | yes |  |
 | `total` | TotalOut | yes |  |
-| `sprinkler` | SprinklerOut | null | yes |  |
+| `sprinkler` | SprinklerOut \| null | yes |  |
 | `warnings` | string[] | yes |  |
 
 **`CategoryItem`**
@@ -226,8 +226,8 @@ treated as no crop at all.
 | `code` | string | yes |  |
 | `name` | string | yes |  |
 | `pct` | string | yes |  |
-| `variant` | `regular` | `seven_year` | yes |  |
-| `gsdma_pct` | string | null | yes |  |
+| `variant` | `regular` \| `seven_year` | yes |  |
+| `gsdma_pct` | string \| null | yes |  |
 
 **`CategoryOut`**
 
@@ -236,13 +236,13 @@ treated as no crop at all.
 | `code` | string | yes |  |
 | `name` | string | yes |  |
 | `pct` | string | yes | The category's percentage, as the scheme prints it. |
-| `variant` | `regular` | `seven_year` | yes |  |
+| `variant` | `regular` \| `seven_year` | yes |  |
 | `applicable` | boolean | yes |  |
-| `reason` | string | null | yes | Why a row does not apply. Null when it does. |
+| `reason` | string \| null | yes | Why a row does not apply. Null when it does. |
 | `subsidy` | string | yes |  |
 | `farmer_share` | string | yes |  |
 | `subsidy_pct` | string | yes | Subsidy over cost, as a percentage with two decimals. |
-| `gsdma_farmer_share` | string | null | yes | Mini Sprinkler up to 2 Ha only; null elsewhere. |
+| `gsdma_farmer_share` | string \| null | yes | Mini Sprinkler up to 2 Ha only; null elsewhere. |
 
 **`ConfigOut`**
 
@@ -264,8 +264,8 @@ treated as no crop at all.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `crop` | string | null | yes |  |
-| `inter_crop` | string | null | yes |  |
+| `crop` | string \| null | yes |  |
+| `inter_crop` | string \| null | yes |  |
 | `area` | string | yes |  |
 | `lateral_spacing_designed` | string | yes |  |
 | `lateral_spacing_standard` | string | yes |  |
@@ -279,12 +279,12 @@ treated as no crop at all.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `crop` | string | null |  | From GET /subsidy/crops. Null means no crop chosen, which the workbook writes as 'Select Crop here' and which gives a standard spacing of zero. |
-| `inter_crop` | string | null |  | The second crop of the same block. When present it, not the main crop, sets the standard spacing. |
-| `area` | number | string | yes | Hectares, at most three decimals. |
+| `crop` | string \| null |  | From GET /subsidy/crops. Null means no crop chosen, which the workbook writes as 'Select Crop here' and which gives a standard spacing of zero. |
+| `inter_crop` | string \| null |  | The second crop of the same block. When present it, not the main crop, sets the standard spacing. |
+| `area` | number \| string | yes | Hectares, at most three decimals. |
 | `crop_spacing` | string |  | Free text such as '1.37 x 0.50'. Echoed on the document; the calculation does not read it. Default ``. |
-| `lateral_spacing` | number | string | yes | The designed lateral spacing in metres. |
-| `lines` | Line[] |  | Field-unit lines only. Empty for Sprinkler, which derives its own. |
+| `lateral_spacing` | number \| string | yes | The designed lateral spacing in metres. |
+| `lines` | Line-Input[] |  | Field-unit lines only. Empty for Sprinkler, which derives its own. |
 
 **`Envelope_CalculateResponse_`**
 
@@ -316,7 +316,7 @@ treated as no crop at all.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -337,17 +337,17 @@ treated as no crop at all.
 | `regular` | string | yes | The unit cost per hectare, four decimals. |
 | `regular_with_sump` | string | yes | Plus the sump rate times the area (rule 9). |
 | `regular_for_cap` | string | yes | What the subsidy is actually capped on: the figure above, pro-rated for a Mini Sprinkler block below 0.2 Ha. Equal to `regular_with_sump` everywhere else. This is the unit cost the scheme's own sheet prints. |
-| `seven_year` | string | null | yes | Null when the area is outside the window. |
+| `seven_year` | string \| null | yes | Null when the area is outside the window. |
 
-**`Line`**
+**`Line-Input`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `description` | string | yes | The item, as it prints on the quotation. |
 | `uom` | string | yes | Unit of measure, for the document. |
-| `rate` | number | string | yes | Rate per unit in rupees, at most two decimals. |
-| `qty` | number | string | yes | Quantity, at most three decimals. |
-| `product_id` | string | null |  | The catalogue row this line is, when the designer picked it from the product list. Optional, and additive: the rate and description still come from this request, because a subsidy quotation is costed at the scheme's figures rather than at ours. What it buys is the two checks the catalogue makes possible - a head-unit item cannot appear in a crop block, and an item marked not subsidy-eligible cannot appear at all. |
+| `rate` | number \| string | yes | Rate per unit in rupees, at most two decimals. |
+| `qty` | number \| string | yes | Quantity, at most three decimals. |
+| `product_id` | string \| null |  | The catalogue row this line is, when the designer picked it from the product list. Optional, and additive: the rate and description still come from this request, because a subsidy quotation is costed at the scheme's figures rather than at ours. What it buys is the two checks the catalogue makes possible - a head-unit item cannot appear in a crop block, and an item marked not subsidy-eligible cannot appear at all. |
 
 **`MastersOut`**
 
@@ -357,7 +357,7 @@ treated as no crop at all.
 | `formula_version` | string | yes |  |
 | `regular_matrix_id` | string | yes |  |
 | `seven_year_matrix_id` | string | yes |  |
-| `quantity_matrix_id` | string | null | yes |  |
+| `quantity_matrix_id` | string \| null | yes |  |
 
 **`SprinklerLineOut`**
 
@@ -375,7 +375,7 @@ treated as no crop at all.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `pipe_size_mm` | integer | yes | 75 up to 2.0 Ha, 90 from 2.01 (rule 19). |
-| `nozzle` | `plastic` | `brass` | yes |  |
+| `nozzle` | `plastic` \| `brass` | yes |  |
 | `lines` | SprinklerLineOut[] | yes |  |
 | `dbt_farmer_payable` | string | yes | The field unit with its GST. The workbook computes it; what it is for is still the client's question (GAP-077). |
 
@@ -383,21 +383,21 @@ treated as no crop at all.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `rate_per_ha` | number | string |  | Zero or absent means no sump. Default `0`. |
+| `rate_per_ha` | number \| string |  | Zero or absent means no sump. Default `0`. |
 
 **`SystemConfig`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `system_type` | `drip` | `mini_sprinkler` | `sprinkler` | yes |  |
+| `system_type` | `drip` \| `mini_sprinkler` \| `sprinkler` | yes |  |
 | `has_head_unit` | boolean | yes |  |
 | `supports_group` | boolean | yes |  |
 | `crop_count_max` | integer | yes |  |
 | `spacing_rule` | string | yes |  |
-| `seven_year_spacing_floor` | string | null | yes |  |
+| `seven_year_spacing_floor` | string \| null | yes |  |
 | `quantity_source` | string | yes |  |
 | `formula_version` | string | yes |  |
-| `sprinkler_areas` | string[] | null | yes | The tabulated areas a Sprinkler quotation may use. Null for the other two systems, which accept any area. |
+| `sprinkler_areas` | string[] \| null | yes | The tabulated areas a Sprinkler quotation may use. Null for the other two systems, which accept any area. |
 
 **`TotalOut`**
 
@@ -409,7 +409,7 @@ treated as no crop at all.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `loc` | string | integer[] | yes |  |
+| `loc` | string \| integer[] | yes |  |
 | `msg` | string | yes |  |
 | `type` | string | yes |  |
 | `input` | any |  |  |

@@ -169,3 +169,130 @@ test.describe("[LEAD-001] Leads", () => {
     await expectNoAccessibilityViolations(page);
   });
 });
+
+test.describe("[QUOT-012] A customer's quotation link", () => {
+  /** A sent quotation in the seeded mock data (src/mocks/data/quotations.ts: mock-{index}). */
+  const SHARED_LINK = "/q/mock-3";
+
+  test("opens without signing in and offers the PDF, never opening it by itself", async ({
+    page,
+  }) => {
+    await page.goto(SHARED_LINK);
+
+    await expect(page).toHaveURL(new RegExp(`${escapeRegExp(SHARED_LINK)}$`));
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("QT/GJ/");
+    await expect(page.getByRole("link", { name: "View quotation" })).toHaveAttribute(
+      "target",
+      "_blank",
+    );
+    await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
+  });
+
+  test("has no automatically detectable accessibility violations", async ({ page }) => {
+    await page.goto(SHARED_LINK);
+    await expect(page.getByRole("link", { name: "View quotation" })).toBeVisible();
+
+    await expectNoAccessibilityViolations(page);
+  });
+});
+
+test.describe("[APPR-001] Approvals", () => {
+  test("lists what waits on the manager and asks for a reason to reject", async ({ page }) => {
+    await signIn(page, "/approvals");
+
+    const inbox = page.getByRole("list", { name: /Waiting for your decision/ });
+    await expect(inbox.getByRole("listitem").first()).toBeVisible();
+    await inbox
+      .getByRole("listitem")
+      .first()
+      .getByRole("button", { name: /^Reject/ })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Reject" }).click();
+    await expect(dialog.getByText("Say why. The person who asked reads it.")).toBeVisible();
+  });
+
+  test("has no automatically detectable accessibility violations", async ({ page }) => {
+    await signIn(page, "/approvals");
+    await expect(
+      page
+        .getByRole("list", { name: /Waiting for your decision/ })
+        .getByRole("listitem")
+        .first(),
+    ).toBeVisible();
+
+    await expectNoAccessibilityViolations(page);
+  });
+});
+
+test.describe("[SO-001] Sales orders", () => {
+  test("lists orders and opens one with its approval chain and dispatches", async ({ page }) => {
+    await signIn(page, "/sales-orders?status=partially_dispatched");
+
+    const table = page.getByRole("table", { name: "Sales orders" });
+    await expect(table.getByRole("row").nth(1)).toBeVisible();
+    await table.getByRole("row").nth(1).getByRole("link").first().click();
+    await expect(page.getByRole("list", { name: "Approval steps, in order" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Dispatches, newest first" })).toBeVisible();
+  });
+
+  test("has no automatically detectable accessibility violations", async ({ page }) => {
+    await signIn(page, "/sales-orders");
+    await expect(
+      page.getByRole("table", { name: "Sales orders" }).getByRole("row").nth(1),
+    ).toBeVisible();
+
+    await expectNoAccessibilityViolations(page);
+  });
+});
+
+test.describe("[APPR-002] Approval limits", () => {
+  test("an administrator sees both ladders and may change a limit", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("polysil:mock-role", "admin");
+    });
+    await signIn(page, "/approval-limits");
+
+    const orders = page.getByRole("list", { name: "Order value, company-wide" });
+    await expect(orders.getByText("Up to ₹1,00,000")).toBeVisible();
+    await page
+      .getByRole("button", { name: "Change the State Manager limit (Order value, company-wide)" })
+      .click();
+    await expect(page.getByRole("dialog", { name: "State Manager's order limit" })).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+  });
+});
+
+test.describe("[NOTIF-001] Notifications", () => {
+  test("the bell lists the latest and opens the quotation one is about", async ({ page }) => {
+    await signIn(page, "/dashboard");
+
+    await page.getByRole("button", { name: /^Notifications, \d+ unread$/ }).click();
+    const list = page.getByRole("list", { name: "Latest notifications" });
+    await list.getByRole("link", { name: /needs your approval/ }).click();
+    await expect(page).toHaveURL(/\/quotations\/[^/]+$/);
+  });
+});
+
+test.describe("[MSG-002] Messages", () => {
+  test("opens a conversation and sends a message", async ({ page }) => {
+    await signIn(page, "/messages/conv-003");
+
+    const field = page.getByRole("textbox", { name: "Message Sanjay Rao" });
+    await field.fill("Order released.");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(
+      page.getByRole("log", { name: "Messages" }).getByText("Order released."),
+    ).toBeVisible();
+  });
+
+  test("keeps a conversation with a colleague who has left readable, and closed", async ({
+    page,
+  }) => {
+    await signIn(page, "/messages/conv-005");
+
+    await expect(page.getByText(/Meera Iyer has left Polysil/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send message" })).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
+  });
+});

@@ -5,6 +5,2222 @@
 Every change to this repository, newest first. Each entry records what existed before, what exists now, the discussion behind the change, the files it touched and how it is tested.
 How to write an entry: [changelog/README.md](changelog/README.md).
 
+## Index
+
+36 changes, newest first. Each title opens its entry.
+
+| Date | Change | Type | Data IDs |
+| --- | --- | --- | --- |
+| 2026-10-09 | [Lead QR codes and the public enquiry page](changelog/entries/2026-10-09--feature--LEAD-013--lead-qr-codes-and-the-public-enquiry-page.md) | `feature` | `LEAD-013` `LEAD-014` |
+| 2026-10-05 | [Edit and delete a lead, and review duplicates](changelog/entries/2026-10-05--feature--LEAD-010--edit-and-delete-a-lead-and-review-duplicates.md) | `feature` | `LEAD-010` `LEAD-011` `LEAD-012` |
+| 2026-10-04 | [Complaints: raise, check and QC](changelog/entries/2026-10-04--feature--CMPL-001--complaints-raise-check-and-qc.md) | `feature` | `CMPL-001` `CMPL-002` `CMPL-003` `CMPL-004` `CMPL-005` |
+| 2026-10-04 | [Complaint files, remedies and targets](changelog/entries/2026-10-04--feature--CMPL-006--complaint-files-remedies-and-targets.md) | `feature` | `CMPL-006` `CMPL-007` `CMPL-008` `CMPL-009` `APPR-001` |
+| 2026-10-04 | [Dispatch queue: orders to ship and the dispatch log](changelog/entries/2026-10-04--feature--DISP-001--dispatch-queue-orders-to-ship-and-the-dispatch-log.md) | `feature` | `DISP-001` `DISP-002` `ACCT-001` |
+| 2026-10-04 | [Direct orders and list exports](changelog/entries/2026-10-04--feature--SO-005--direct-orders-and-list-exports.md) | `feature` | `SO-005` `SO-006` `LEAD-009` `QUOT-013` |
+| 2026-10-04 | [Tasks: my day, team day and a lead's tasks](changelog/entries/2026-10-04--feature--TASK-001--tasks-my-day-team-day-and-a-lead-s-tasks.md) | `feature` | `TASK-001` `TASK-002` `TASK-003` `TASK-004` `TASK-005` |
+| 2026-10-04 | [Tasks: meeting minutes, edit and reassign, all tasks with an Excel export](changelog/entries/2026-10-04--feature--TASK-007--tasks-meeting-minutes-edit-and-reassign-all-tasks-with-an.md) | `feature` | `TASK-007` `TASK-006` `TASK-008` `TASK-003` `OBS-002` |
+| 2026-10-03 | [Area filter on leads, the asker's reason in approvals, dealer search by contact person](changelog/entries/2026-10-03--feature--LEAD-001--area-filter-on-leads-the-asker-s-reason-in-approvals-dealer.md) | `feature` | `LEAD-001` `APPR-001` `LEAD-008` |
+| 2026-10-02 | [Backend pick-ups: lead sorting, territory levels, names in assignments, awaiting approval, a quotation's order](changelog/entries/2026-10-02--api-integration--LEAD-001--backend-pick-ups-lead-sorting-territory-levels-names-in.md) | `api-integration` | `LEAD-001` `LEAD-002` `LEAD-005` `LEAD-008` `QUOT-001` `SO-003` |
+| 2026-10-02 | [Notifications and messages on the backend](changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md) | `api-integration` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-004` |
+| 2026-10-02 | [A demo guide: what's ready, and every flow click by click](changelog/entries/2026-10-02--docs--APP-001--a-demo-guide-what-s-ready-and-every-flow-click-by-click.md) | `docs` | `APP-001` |
+| 2026-10-02 | [A live test plan for the hosted app, by role and functionality](changelog/entries/2026-10-02--docs--OBS-002--a-live-test-plan-for-the-hosted-app-by-role-and.md) | `docs` | `OBS-002` |
+| 2026-10-02 | [Approval limits read the backend's refund limits instead of failing](changelog/entries/2026-10-02--fix--APPR-002--approval-limits-read-the-backend-s-refund-limits-instead-of.md) | `fix` | `APPR-002` |
+| 2026-10-02 | [Say what each lead stage means, and give long pages their bottom margin](changelog/entries/2026-10-02--fix--LEAD-007--say-what-each-lead-stage-means-and-give-long-pages-their.md) | `fix` | `LEAD-007` `LEAD-001` `SO-002` `DS-001` |
+| 2026-10-02 | [Demo walk fixes: the dashboard on the backend's contract, the customer's PDF link, crops and land, clearer lead history](changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md) | `fix` | `RPT-001` `QUOT-012` `LEAD-002` `LEAD-003` `LEAD-005` `APPR-001` `AUTH-005` |
+| 2026-10-02 | [Fix the three npm audit findings, and take the safe dependency updates](changelog/entries/2026-10-02--security--APP-001--fix-the-three-npm-audit-findings-and-take-the-safe.md) | `security` | `APP-001` |
+| 2026-09-30 | [Approval limits: an order's value and a quotation's discount per role, changed by an administrator](changelog/entries/2026-09-30--feature--APPR-002--approval-limits.md) | `feature` | `APPR-002` |
+| 2026-09-30 | [Sales orders and dispatch: place an order from a quotation, follow its approval, record what left](changelog/entries/2026-09-30--feature--SO-001--sales-orders-and-dispatch.md) | `feature` | `SO-001` `SO-002` `SO-003` `SO-004` `DISP-002` `APPR-001` |
+| 2026-09-28 | [A tested-features log with screenshots, and an index at the top of the changelog](changelog/entries/2026-09-28--docs--REPO-001--a-tested-features-log-with-screenshots-and-an-index-at-the.md) | `docs` | `REPO-001` |
+| 2026-09-28 | [Approvals inbox: quotation discounts and sales orders, approved or rejected in place](changelog/entries/2026-09-28--feature--APPR-001--approvals-inbox.md) | `feature` | `APPR-001` |
+| 2026-09-28 | [Quotations: the list, the document and its PDF, and a lead's quotations](changelog/entries/2026-09-28--feature--QUOT-001--quotations-list-and-detail.md) | `feature` | `QUOT-001` `QUOT-002` `QUOT-003` |
+| 2026-09-28 | [Quotations: make and edit a draft, priced live](changelog/entries/2026-09-28--feature--QUOT-004--quotations-make-and-edit-a-draft-priced-live.md) | `feature` | `QUOT-004` `QUOT-005` `MSTR-003` |
+| 2026-09-28 | [Quotations: send, discount approval, the customer's answer, revise and delete](changelog/entries/2026-09-28--feature--QUOT-006--quotations-send-discount-approval-the-customer-s-answer.md) | `feature` | `QUOT-006` `QUOT-007` `QUOT-008` `QUOT-009` `QUOT-010` `QUOT-011` |
+| 2026-09-28 | [Quotations: the customer's page for a shared link](changelog/entries/2026-09-28--feature--QUOT-012--quotations-the-customer-s-page-for-a-shared-link.md) | `feature` | `QUOT-012` |
+| 2026-09-28 | [Fixes from the code review of the integration-to-staging pull request](changelog/entries/2026-09-28--fix--LEAD-001--staging-review-fixes.md) | `fix` | `LEAD-001` `LEAD-006` `LEAD-008` `QUOT-001` `QUOT-002` `DS-001` `APP-001` |
+| 2026-09-27 | [The lead page shows its history, takes notes, moves the lead's stage and assigns it](changelog/entries/2026-09-27--feature--LEAD-005--lead-timeline-and-notes.md) | `feature` | `LEAD-005` `LEAD-006` `LEAD-007` `LEAD-008` `MSTR-002` |
+| 2026-09-22 | [Leads run on the backend's dev API — list, lead page and New lead form, with real lookups](changelog/entries/2026-09-22--api-integration--LEAD-001--leads-on-the-dev-api.md) **(breaking)** | `api-integration` | `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `MSTR-002` `OBS-002` `APP-004` `AUTH-004` `DS-001` |
+| 2026-09-22 | [One odd lead no longer blanks the page, and a source the administrators renamed still filters](changelog/entries/2026-09-22--fix--LEAD-001--one-odd-lead-no-longer-blanks-the-page.md) | `fix` | `LEAD-001` `LEAD-002` `MSTR-002` `DS-001` |
+| 2026-09-21 | [Small grey text and teal links meet WCAG AA contrast in light mode](changelog/entries/2026-09-21--fix--DS-001--text-colours-meet-wcag-aa-contrast.md) | `fix` | `DS-001` |
+| 2026-09-16 | [The leads table shares leftover width instead of pooling it in one column](changelog/entries/2026-09-16--design--LEAD-001--leads-table-shares-leftover-width-on-large-monitors.md) | `design` | `LEAD-001` `DS-001` |
+| 2026-09-16 | [Shift and the mouse wheel scroll a wide table sideways](changelog/entries/2026-09-16--feature--DS-001--shift-wheel-scrolls-wide-tables-sideways.md) | `feature` | `DS-001` |
+| 2026-09-15 | [Collapsible desktop sidebar, and page titles with descriptions in the top bar](changelog/entries/2026-09-15--feature--APP-005--collapsible-sidebar-and-page-titles-in-the-top-bar.md) **(breaking)** | `feature` | `APP-005` `APP-001` `DS-001` |
+| 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
+| 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
+| 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 9 October 2026
+
+### Lead QR codes and the public enquiry page
+
+`feature` · `LEAD-013` `LEAD-014` · Nakul Srivastava · [entry](changelog/entries/2026-10-09--feature--LEAD-013--lead-qr-codes-and-the-public-enquiry-page.md)
+
+#### Before
+
+A farmer could only become a lead through staff, who typed them in. Two pieces were missing from the web app, though the backend served both (handover `public-lead-capture-contract.md`, and since #66 a `PATCH` for codes):
+
+- The QR codes the client wants on dealer counters, fair stalls and leaflets.
+- The public form those codes open.
+
+#### Now
+
+- **QR codes** (Sales → QR codes, for staff who can see leads).
+  - Each code shows as a scannable QR, black on white in both themes. It also shows:
+    - its name, whether it is on, and its six-character code;
+    - how many leads it brought;
+    - its campaign, dealer, area and age.
+  - **New QR code** (`leads.create`): name, campaign, dealer and area.
+  - **Download to print** saves a 1024-pixel PNG. **Copy link** copies its address.
+  - **Edit** and **Switch off/on** (`leads.edit`). The code and its link never change, so printed copies keep working. A switched-off code's scans become plain website enquiries.
+  - A dealer the backend refuses is named on its field.
+  - States: skeleton, "No QR codes yet", and a phone in dark mode.
+- **The enquiry page** (`/enquiry`, no sign-in, made for a phone).
+  - "Enquiry through <dealer>" shows when a code opened it.
+  - The farmer gives:
+    - their name and mobile;
+    - their area: state, then district, then an optional taluka. A code's area is used as it is, with "Choose another area";
+    - their village, the system they want, how they'll buy, and a note.
+  - **Send me a code on WhatsApp**, then the six digits:
+    - the time left, and "Send a new code" after a minute;
+    - "Change my details";
+    - a wrong or expired code says so, and too many codes says to wait.
+  - Then the inquiry number to keep. The same number comes back when the mobile already enquired today. The page says the WhatsApp copy can be held back, so this is where to read it.
+  - A code no longer in use opens the plain form and says so.
+  - Checked at 360 px, light and dark, with no sideways scroll.
+
+#### Discussion
+
+**Decisions:**
+
+- **`qrcode.react` 4.2.0 draws the codes.** It has no dependencies, is ISC-licensed, and supports React 19. It renders an SVG (and a hidden canvas for the download), so no HTML is injected. It was the smallest option that fits both uses.
+- **A new token, `bg-scan-surface`.** It is white in both themes, because a camera can't read a QR on charcoal. It is explained in `Docs/Design-System.md`, and no interface colour changed.
+- **`/enquiry` is an open path,** an exact match, beside the `/q/` customer link. Signed in or not, nobody is redirected.
+- **The QR codes screen is under Sales.** The codes make leads, and whoever can see leads can see their codes.
+- **The form needs a district, not a taluka.** The backend takes a district or a taluka, never a state.
+
+**The mock:**
+
+- The mock sends no WhatsApp: any six digits match except `000000`, which stands for a wrong code.
+- After five codes to one number it answers `429`.
+- A lead from a code is credited to the code's dealer, as the backend does.
+
+#### Files changed
+
+- `src/features/lead-capture/`: new.
+  - `api/`: schemas, API, queries, mutations, and `lead-capture.test.ts`.
+  - `components/qr-codes.tsx`: the staff screen and its form.
+  - `components/enquiry-form.tsx`: the public page.
+  - `components/lead-capture-ui.test.tsx`: the UI tests.
+- `src/app/(app)/qr-codes/`, `src/app/(public)/enquiry/`: the routes.
+- `src/components/layout/navigation.ts`: QR codes under Sales.
+- `src/lib/auth/redirects.ts` and its test: `/enquiry` opens without signing in.
+- `src/styles/tokens.css`, `Docs/Design-System.md`: `scan-surface`.
+- `src/mocks/`: `handlers/lead-capture.ts`, `data/lead-capture.ts`, the database, and `createLeadFrom` exported from the leads mock.
+- `package.json`, `package-lock.json`: `qrcode.react` 4.2.0, pinned.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: LEAD-013 and LEAD-014.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/lead-capture/`: the records.
+
+#### Tests
+
+**`src/features/lead-capture/api/lead-capture.test.ts`:**
+
+- `[LEAD-013]`: a code is made with an `/enquiry?qr=` link, then renamed and switched off with the same code; an unknown dealer is refused.
+- `[LEAD-014]`:
+  - a dealer's code names the dealer, and the lead is credited to it once the code matches;
+  - the same mobile gets the same number;
+  - a wrong code, and a code no longer in use, are refused.
+
+**`src/features/lead-capture/components/lead-capture-ui.test.tsx`:**
+
+- the list with counts and states; making a code, then a mistake; switching a code off;
+- the whole enquiry through a dealer's code;
+- the district is asked for;
+- a wrong code;
+- a code no longer in use.
+
+**`src/lib/auth/redirects.test.ts`:** `/enquiry` opens signed in or out.
+
+**By hand, in Chromium on the mock backend:**
+
+1. QR codes as a State Manager: list, new code, download.
+2. The list on a phone in dark mode.
+3. The enquiry at 360 px in light (through to the number) and dark.
+4. The empty form's mistakes on a desktop.
+
+axe found nothing on any of these.
+
+## 5 October 2026
+
+### Edit and delete a lead, and review duplicates
+
+`feature` · `LEAD-010` `LEAD-011` `LEAD-012` · Nakul Srivastava · [entry](changelog/entries/2026-10-05--feature--LEAD-010--edit-and-delete-a-lead-and-review-duplicates.md)
+
+#### Before
+
+A lead's details couldn't be corrected once it was saved: a mistyped mobile or the wrong village stayed. A lead couldn't be deleted. A lead's page listed its possible duplicates, but nobody could act on them. The backend has served all three since the leads module (`PATCH`/`DELETE /leads/{id}`, `GET /leads/duplicates`, `POST /leads/duplicates/{id}/dismiss`, `POST /leads/{id}/merge`).
+
+#### Now
+
+- **Edit** sits beside Assign on an open lead, for whoever may edit leads.
+  - It has the same fields as New lead: name, mobile, email, territory, village, type, system, source, value, crops and land.
+  - Only the fields that changed are sent.
+  - A refused field is named on the form.
+  - A closed lead (won, lost or merged) has no Edit. If the backend refuses one anyway (`stage_terminal`), the dialog explains why.
+  - The history says which fields changed.
+- **Delete**, for holders of `leads.delete` (Admin in the mock): it asks first, then goes back to the list. The lead's pending duplicate pairs close.
+- **Possible duplicates** (`/leads/duplicates`), reached from the leads toolbar and from "Review and merge" on a lead's duplicate notice.
+  - Each pair shows side by side: name, stage, inquiry, mobile, place, owner, value and created, with what matched and how strongly.
+  - **Keep** one lead to merge the other into it. A confirmation first says the merged lead's history moves across and that this can't be undone.
+  - **Not a duplicate** clears the pair.
+  - A pair with a won or lost lead says it can't be merged and offers only Not a duplicate, since the backend refuses that merge (`merge_terminal`).
+  - States: skeleton, "No possible duplicates", Show more, and a phone in dark mode.
+
+#### Discussion
+
+- **One set of lead fields.** New lead's fields became `LeadFields`, shared with Edit, so the two forms can't drift. The first note stays on New lead only.
+- **The patch is a diff.** The form's values are parsed the same way as on New lead, then compared with the lead as loaded. Only the keys that differ go to the backend, which leaves the rest alone.
+- **Merge from the queue only.** The queue shows both leads side by side, so the user sees what they are merging. A lead's notice links there rather than offering a blind merge.
+
+**The mock:**
+
+- A deleted lead is dropped. The backend hides it from everyone but holders of `leads.delete`.
+- The queue leaves out pairs with a lead already merged, since the backend re-points those when the lead merges.
+
+#### Files changed
+
+- `src/features/leads/components/`:
+  - `lead-fields.tsx`: new; the fields from `new-lead-dialog.tsx`, which now uses it.
+  - `lead-edit-dialog.tsx`: new; `LeadEditDialog` and `LeadDeleteDialog`.
+  - `duplicate-review.tsx`: new.
+  - `lead-detail.tsx`: Edit, Delete, and Review and merge.
+  - `leads-toolbar.tsx`: Possible duplicates.
+  - `lead-edit.test.tsx`: the UI tests.
+- `src/features/leads/api/`:
+  - `leads.schemas.ts`: `PatchLeadRequest`, the duplicate pair and page, the dismiss result, `MergeLeadRequest`.
+  - `leads.api.ts`, `leads.queries.ts`, `leads.mutations.ts`: the new calls.
+  - `leads-edit.test.ts`: the API tests.
+- `src/app/(app)/(sales)/leads/duplicates/page.tsx`: the route.
+- `src/mocks/handlers/leads.ts`: `PATCH`, `DELETE`, the queue, dismiss and merge, with the backend's refusals.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: LEAD-010…012.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/leads/`: the records.
+
+#### Tests
+
+**`src/features/leads/api/leads-edit.test.ts`:**
+
+- `[LEAD-010]`: only what is sent changes, and the history records it; a closed lead is refused.
+- `[LEAD-011]`: delete for a holder of `leads.delete`; 403 for an employee.
+- `[LEAD-012]`: the queue, dismiss, and merge into the survivor; `merge_self` and `merge_terminal` are refused.
+
+**`src/features/leads/components/lead-edit.test.tsx`:**
+
+- Edit sends only the farmer's name, and a closed lead has no Edit.
+- Delete asks, then leaves; a manager without `leads.delete` sees no Delete.
+- The queue dismisses a pair and merges after confirming; a pair with a closed lead offers no merge; the empty state shows.
+
+All 145 lead tests pass, New lead's included.
+
+**By hand, in Chromium on the mock backend, as Admin:**
+
+1. The queue, and the merge dialog.
+2. A lead with a duplicate.
+3. Editing a contacted lead's village.
+4. The delete dialog.
+5. The queue on a phone in dark mode.
+
+axe found nothing on any of these.
+
+## 4 October 2026
+
+### Complaints: raise, check and QC
+
+`feature` · `CMPL-001` `CMPL-002` `CMPL-003` `CMPL-004` `CMPL-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-04--feature--CMPL-001--complaints-raise-check-and-qc.md)
+
+#### Before
+
+Complaints was a "Soon" item in the sidebar. The backend has served complaints since #25: 21 endpoints, documented in `backend/docs/api/complaints.md` and the handovers `complaints-contract.md` and `complaint-remedies-contract.md`. A farmer's report of cracked laterals had no place in the CRM: no number, no check, no QC, and no target to answer by.
+
+#### Now
+
+The complaint flow, from raising to the QC verdict.
+
+- **The list** (`/complaints`):
+  - Newest first. Each row shows the number, status, severity, a red "Late" when a target was missed, the contact, type, dealer, owner and age.
+  - Counts across the top: waiting for a check, with QC, late.
+  - Search, plus filters for status (each one explained), severity, type, late only and no owner. All of them are kept in the URL.
+  - **Waiting on me**, for managers and QC: what waits for their check or verdict, oldest first.
+- **Raise a complaint** (`/complaints/new`):
+  - type, severity, what went wrong, the contact and mobile, where it is installed, and the dealer;
+  - the challan and supply date, registration and PIMS numbers, and the sample's courier;
+  - the products, with supplied and defective quantities: 1 to 20, each once, defective not more than supplied.
+  - Every mistake is named on its field at once. It is saved as a draft.
+  - Opened as `?lead=` or `?order=`, the complaint is linked to that lead or order.
+- **Edit a draft** (`/complaints/{id}/edit`): only what changed is sent. The header and the products go as two separate calls.
+- **The complaint** (`/complaints/{id}`):
+  - what happened, the contact (tap to call), the dealer, the lead and order (linked), the challan, the owner, and who raised it;
+  - the products, with defective quantities in red;
+  - the **targets**: first response and resolution, due, met or missed. "No target" is never red.
+  - the manager's check and the QC verdict, internal notes included for staff;
+  - the remedy, read-only, when there is one;
+  - the history, newest first.
+  - A returned draft says who returned it and what to fix.
+- **Actions** follow the complaint's `can`:
+  - **Submit:** numbers the complaint and starts its targets. Without the challan or supply date, it says which one to add. With nothing defective, it says so.
+  - **Check** (managers): approve it to QC, optionally changing the severity or setting an owner, or return it to fix. Both need a remark the raiser reads; an internal note is optional.
+  - **QC verdict:** approved (a defect) or rejected (no defect), with what QC found and the sample's dates, none after today.
+  - **Cancel**, with a reason.
+  - **Delete**, for a draft never submitted.
+  - If someone acted first, the dialog closes and the page shows the latest.
+- **Notifications** about a complaint now open it.
+
+#### Discussion
+
+**What comes in the next PR (C2):**
+
+- photos and documents (multipart upload, ten-minute links, HEIC without a preview);
+- the remedy: a refund through the Approvals inbox, with a third limits tab; a replacement order; or no action; and withdrawing one;
+- the targets and complaint types admin screens;
+- the Excel export;
+- a lead's and an order's complaints.
+
+Every Data ID is registered (CMPL-001…009).
+
+**Decisions:**
+
+- **`can` decides every button**, not the user's role. The backend works out who may check, which depends on area and role, and who may give the verdict.
+- **The form shows all of a product's mistakes at once.** Zod skips an object's refinement while any of its fields fails, so a quantity mistake would otherwise appear only after the product was picked.
+- **Managers' mock permissions.** They gained complaints `approve`, as in RBAC.md §6.1 (District and State: CEA). Accounts gained complaints `view`: they see complaints because refunds are paid through them.
+- **The mock's targets.** They count plain hours, doubled. The backend counts working hours (Monday to Saturday, 09:30 to 18:30). The screen shows whatever the backend sends.
+
+#### Files changed
+
+- `src/features/complaints/api/`: `complaints.schemas.ts` (the whole contract, remedy included), `complaints.api.ts`, `complaints.queries.ts`, `complaints.mutations.ts`, `complaints.test.ts`.
+- `src/features/complaints/lib/complaint-labels.ts`: statuses, severities, the backend's refusals in plain words, and the history lines.
+- `src/features/complaints/hooks/use-complaint-list-params.ts`: the URL state.
+- `src/features/complaints/components/`: `complaints-list.tsx`, `complaint-form.tsx`, `dealer-picker.tsx`, `complaint-detail.tsx`, `complaint-actions.tsx`, `complaint-pages.tsx`, `complaints-ui.test.tsx`.
+- `src/app/(app)/complaints/`: the list, new, detail and edit routes.
+- `src/components/layout/navigation.ts`: Complaints is a link, with its description.
+- `src/lib/navigation/resource-href.ts`: complaints open from notifications.
+- `src/features/orders/api/orders.schemas.ts`: `approvalBlockSchema`, shared with a refund's approval.
+- `src/features/lookups/api/lookups.schemas.ts`, `src/mocks/data/lookups.ts`: complaint types.
+- `src/mocks/data/complaints.ts`, `src/mocks/handlers/complaints.ts`, `src/mocks/handlers/index.ts`, `src/mocks/db.ts`, `src/mocks/data/reference.ts`, `src/mocks/data/permissions.ts`: the mock backend, following the backend's rules.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: CMPL-001…009.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/complaints/`: the records.
+
+#### Tests
+
+**`src/features/complaints/api/complaints.test.ts`:**
+
+- `[CMPL-001]`:
+  - the list, newest first, with its count;
+  - the filters, and the parameters sent to the backend;
+  - a manager's queue and QC's queue;
+  - the stats.
+- `[CMPL-003]`:
+  - raise, then submit: it gets a number and targets;
+  - `missing_for_submit` names the missing fields; `nothing_defective`;
+  - defective more than supplied is refused on the line;
+  - edit the header and the products, refused once submitted;
+  - cancel; delete.
+- `[CMPL-004]`: approve with a severity and an owner; return; an officer refused; `status_changed`.
+- `[CMPL-005]`: a date after today is refused on its field; the verdict.
+- `[CMPL-002]`: the complaint's `can`, its history, and a contract violation.
+
+**`src/features/complaints/components/complaints-ui.test.tsx`:**
+
+- the list: rows, "Late", the counts, a status filter in the URL, a manager's queue, and nothing to do for Accounts;
+- the form names every mistake;
+- submit gets a number; a draft that isn't ready to submit says why; a returned draft shows its reason;
+- the check needs a remark, approves, and returns, and closes when someone acted first;
+- the QC rejection; QC has nothing to do before the check;
+- cancel with a reason.
+
+**By hand, in Chromium on the mock backend:**
+
+- raise (mistakes first), submit, check and QC as Admin on a desktop in light mode;
+- a District Manager's queue and a complaint on a phone in dark mode;
+- axe found nothing on any of the screens.
+
+### Complaint files, remedies and targets
+
+`feature` · `CMPL-006` `CMPL-007` `CMPL-008` `CMPL-009` `APPR-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-04--feature--CMPL-006--complaint-files-remedies-and-targets.md)
+
+#### Before
+
+PR #57 took a complaint from raising to the QC verdict, and stopped there:
+
+- A QC-approved complaint had no way forward. The remedy showed read-only, and nobody could choose one.
+- Photos of the defect and the challan had nowhere to go.
+- The response and resolution targets could not be seen or changed.
+- The list could not be downloaded.
+- A lead's or an order's page said nothing about its complaints.
+
+The backend has served all of it since #25 (`backend/docs/api/complaints.md`, handover `complaint-remedies-contract.md`).
+
+#### Now
+
+- **Files** on a complaint:
+  - Photos show as thumbnails from a ten-minute link, read again before it expires. HEIC and PDF show as files to open.
+  - Each file shows its kind (photo, document, challan), size and age.
+  - Pick a kind and one or more files. Each is checked first (JPEG, PNG, WebP, HEIC or PDF, up to 10 MB, 10 per complaint), then sent on its own. It shows "Uploading…"; a failure keeps its reason and offers **Try again**. One failure never loses the others.
+  - Removing a file asks first.
+  - Who may add files follows the backend:
+    - a draft or a submitted complaint: whoever may raise complaints;
+    - under QC: only QC;
+    - after that: nobody.
+  - After submit, only whoever added a file may remove it.
+  - Without file storage, the card says so and offers no upload.
+- **The remedy** (QC, on a QC-approved complaint):
+  - **Refund**: the amount, who is paid, optionally through a dealer, and why. Then:
+    - It goes to the managers by amount, then Accounts.
+    - The card shows each step, who decided, and the payment reference once paid.
+    - QC may **withdraw** it while it is open.
+    - A refund turned down goes back to QC to choose again, and says so.
+  - **Replacement**: a free order for the defective quantity.
+  - **No action**: closes the complaint at once.
+  - Each choice says what happens next.
+- **Refunds in the Approvals inbox:**
+  - A "Complaint refund" row, with **Open the complaint**.
+  - Managers decide it like an order.
+  - Accounts must enter the payment reference to approve. Approving closes the complaint.
+- **Complaint targets** (`/complaint-targets`, under Admin; anyone with complaints reads them):
+  - Each severity's first-response and resolution target, in working hours or round the clock (e.g. "27 working hours (3 days)").
+  - Its start day, and whether it is in force, scheduled or ended. Past targets show on request.
+  - Those who may edit masters set a new target from a day. The day can't be in the past, and resolution can't be quicker than the first response. A target can cover every complaint type or one.
+  - The target in force ends that day. Complaints already submitted keep theirs.
+- **Download Excel** on the complaints list, with the filters on screen.
+- **A Complaints card** on a lead's page and on a submitted order's: newest first, with **Raise a complaint** about it. A merged lead takes no new complaints.
+- **The history** names the backend's real events: sent for approval, paid, not approved, replacement ordered, withdrawn, file added or removed. "Approved by the manager" now reads `complaint.approved`, the event the backend writes. The mock wrote `complaint.checked`.
+
+States covered:
+
+- skeletons for the targets;
+- an empty files card, and an empty targets list;
+- an upload failing, or refused for its size or type;
+- storage unavailable;
+- someone acting first (the dialog closes and the page refreshes);
+- a phone and dark mode.
+
+#### Discussion
+
+**Decisions:**
+
+- **Uploads go one file at a time,** each with its own Idempotency-Key. A retry is replayed, not stored twice. The backend also answers the same file with the one it already has.
+- **The upload's answer is ignored.** It is `Envelope_Any_`, so no shape is promised; the complaint is read again for its files.
+- **`apiRequest` now sends `FormData`** without a JSON content type, so the browser sets the multipart boundary. Files are logged by name and size only.
+- **A refund's approval uses the order's approval view.** `OrderApproval`'s step list became `ApprovalChain`, since a refund carries the same `approvalBlockSchema`.
+- **The thumbnails use `<img>`, not `next/image`.** The links are signed for ten minutes, and `next/image` would cache them past that.
+- **Complaint types move to the admin masters PR,** with the other lookups.
+- **A refund's ladder** follows the "complaint" limits already on the Approval limits screen (#46).
+
+**The mock:**
+
+- **The refund's asker.** Every mock role signs in as one user, so the queue names the seeded QC officer as whoever asked for the refund. Otherwise the deciding manager would be refused as approving their own request.
+- **A replacement** names an existing order. The backend raises a new, free one.
+
+**Testing:**
+
+- **jsdom can't stream a `File` through `fetch`:** the request body never ends. So unit tests check the upload's multipart headers and its refusals. The mock's own checks on the file were walked through in Chromium.
+
+#### Files changed
+
+- `src/lib/api/client.ts`: `FormData` bodies, sent raw and logged by field.
+- `src/features/complaints/api/`:
+  - `complaints.schemas.ts`: the remedy, withdraw, attachment, link and target contracts.
+  - `complaints.api.ts`, `complaints.queries.ts`, `complaints.mutations.ts`: remedy, withdraw, upload, link, remove, export and targets.
+  - `complaints-remedy.test.ts`: the API tests.
+- `src/features/complaints/components/`:
+  - `remedy-card.tsx`: the remedy, choose and withdraw.
+  - `attachments-card.tsx`: files.
+  - `complaint-targets.tsx`: the targets screen.
+  - `related-complaints.tsx`: a lead's and an order's card.
+  - `complaint-dialog-parts.tsx`: `Refusal` and `useCloseLater`, moved out of `complaint-actions.tsx`.
+  - `complaint-detail.tsx`: the new cards.
+  - `complaints-list.tsx`: Download Excel.
+  - `complaints-remedy-ui.test.tsx`: the UI tests.
+- `src/features/complaints/lib/complaint-labels.ts`: the file refusals and the remedy history lines.
+- `src/features/approvals/`: refunds in the inbox and the decision dialog (payment reference), the doc type, and refreshing the complaint after a decision.
+- `src/features/orders/components/order-approval.tsx`: `ApprovalChain`.
+- `src/features/orders/components/order-detail.tsx`, `src/features/leads/components/lead-detail.tsx`: the Complaints card.
+- `src/app/(app)/complaint-targets/`: the route.
+- `src/components/layout/navigation.ts`: Complaint targets, under Admin.
+- `src/mocks/`:
+  - `handlers/complaints.ts`: remedy, withdraw, a refund's steps, files, export and targets.
+  - `handlers/approvals.ts`: deciding a refund's step.
+  - `data/approvals.ts`: `refundManagersFor`.
+  - `data/complaints.ts`: the seeded targets.
+  - `db.ts`: files and targets.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: CMPL-006…009 in progress.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/complaints/`: the records.
+
+#### Tests
+
+**`src/features/complaints/api/complaints-remedy.test.ts`:**
+
+- `[CMPL-007]`:
+  - a refund goes up the managers, then Accounts' payment reference closes it, and the history shows it;
+  - a refund turned down returns to QC;
+  - a refund without an amount is refused, and so is anyone but QC;
+  - a replacement, withdraw, then no action.
+- `[CMPL-006]`: the upload is multipart with the Idempotency-Key; a refusal names its code; a file's link, and removing it.
+- `[CMPL-009]`: a dated workbook.
+- `[CMPL-008]`: a new target ends the one in force that day; a past day is refused; so is someone who may not edit masters.
+
+**`src/features/complaints/components/complaints-remedy-ui.test.tsx`:**
+
+- the remedy dialog names its mistakes, then sends the refund and shows its steps;
+- no action says it closes;
+- nobody but QC is offered the remedy;
+- a refund in Accounts' inbox needs the payment reference;
+- files: the list, removing one, a file over 10 MB refused before sending, and storage unavailable;
+- targets: read-only for an officer; set by Admin, refusing a resolution quicker than the response;
+- a lead's complaints and "Raise a complaint"; hidden from Dispatch.
+
+**By hand, in Chromium on the mock backend:**
+
+1. QC added a photo to a complaint under QC.
+2. QC chose a ₹1,500 refund, trying the empty form first.
+3. The District Manager approved it in the inbox.
+4. Accounts approved it with the payment reference.
+5. The complaint closed, showing the reference.
+
+The targets were checked as Admin on a desktop and on a phone in dark mode. axe found nothing on any of these screens, after the targets' severity cards became level-2 headings.
+
+### Dispatch queue: orders to ship and the dispatch log
+
+`feature` · `DISP-001` `DISP-002` `ACCT-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-04--feature--DISP-001--dispatch-queue-orders-to-ship-and-the-dispatch-log.md)
+
+#### Before
+
+"Dispatch queue" and "Accounts queue" were "Soon" items in the sidebar. Dispatch could record a dispatch only by finding an approved order in the Sales orders list and opening it. Nothing showed what had left across all orders, though the backend serves `GET /dispatches`.
+
+#### Now
+
+**Dispatch queue** (`/dispatch`), for anyone with the `dispatch` module.
+
+**To ship** lists every approved order still waiting to leave:
+
+- each order's number and status, the party, the order type, the total, and when it was submitted;
+- how much has gone, as a bar with "46% sent";
+- a count at the top: "2 orders still to ship".
+
+**Record a dispatch** opens the order with the record form already open, using `?record=dispatch`:
+
+- Someone who may only look sees no button.
+- The link does nothing for them, or on an order that can't ship.
+
+**Dispatched** is the log of what left, newest first:
+
+- each dispatch's number, the order (linked) and party, and the item count;
+- the challan, invoice, transporter and vehicle, and who recorded it;
+- voided dispatches are marked, with their reason.
+
+It can be limited to the days between two dates, or show any day. The tab and the days are kept in the URL.
+
+States covered: skeletons, "Nothing waiting to ship", "Nothing sent on these days", errors, and a later page failing. Checked on a phone and a desktop, in light and dark.
+
+**Accounts queue.** This is not built yet; it waits on the backend (BE-022, below). Accounts' approval steps are already in their Approvals inbox.
+
+#### Discussion
+
+**Why the Accounts queue isn't built.** The plan's Accounts queue is "orders waiting on the payment check". `GET /orders` can't filter on `approval_waiting_on`, and filtering on the screen would break paging and the count. No endpoint serves the `payments` module that RBAC.md lists either. Accounts loses nothing meanwhile: their steps arrive in the Approvals inbox with the payment-check remark. So the screen waits, and BE-022 asks the backend for two things:
+
+- a `waiting_on` filter on `GET /orders`;
+- a decision on payments.
+
+**Why recording stays on the order page.** The queue doesn't copy the record form. The form needs the order's open quantities, and it already handles every rule and refusal there. The `?record=dispatch` link takes Dispatch straight to it, one click from the queue.
+
+**Refreshing the queue.** Its query keys sit under the order lists' key. Recording a dispatch, voiding one, or approving an order already invalidates that key, so the queue refreshes with no extra wiring.
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`: a dispatch keeps its order's number and party; `dispatchPageSchema`, `DispatchListParams`, `DISPATCH_PAGE_SIZE`.
+- `src/features/orders/api/orders.api.ts`: `listDispatches`.
+- `src/features/orders/api/orders.queries.ts`: `ordersToShipQueryOptions` and `dispatchListQueryOptions`, under `orderKeys.lists()`.
+- `src/features/orders/components/dispatch-queue.tsx`: new, the queue.
+- `src/features/orders/components/order-actions.tsx`: `?record=dispatch` opens the record form.
+- `src/app/(app)/dispatch/page.tsx`, `loading.tsx`: the route.
+- `src/components/layout/navigation.ts`: Dispatch queue is a link, for staff, with its description.
+- `src/mocks/handlers/orders.ts`: `GET /dispatches`, filtered by order, partner and day.
+- `src/features/orders/api/orders.test.ts`, `src/features/orders/components/orders-ui.test.tsx`: the tests.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: DISP-001 in progress; ACCT-001 waits on BE-022.
+- `../docs/Backend-Tasks.md`: BE-022.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/dispatch/`: the records.
+
+#### Tests
+
+**`src/features/orders/api/orders.test.ts`, `[DISP-001] listDispatches`:**
+
+- newest first, with each dispatch's order number and party;
+- the days are sent only when given;
+- nothing comes back for days with no dispatch.
+
+**`src/features/orders/components/orders-ui.test.tsx`:**
+
+- `[DISP-001] Dispatch queue`:
+  - the orders to ship, with their count and how much has gone;
+  - the record link and its URL;
+  - no recording for a manager;
+  - the log, with the tab and days in the URL, "Nothing sent on these days", and "Any day".
+- `[DISP-002]`: `?record=dispatch` opens the form for Dispatch, and does nothing for a manager.
+
+**By hand, in Chromium on the mock backend, as Dispatch:**
+
+- To ship and the log, on a desktop in light and on a phone in dark;
+- Record a dispatch from the queue lands on the order with the form open;
+- axe found nothing on either tab.
+
+### Direct orders and list exports
+
+`feature` · `SO-005` `SO-006` `LEAD-009` `QUOT-013` · Nakul Srivastava · [entry](changelog/entries/2026-10-04--feature--SO-005--direct-orders-and-list-exports.md)
+
+#### Before
+
+An order could only be placed from an accepted quotation. The backend has always taken a direct order typed in line by line (`POST /orders` with `lines`) and a draft's lines replaced (`PUT /orders/{id}/lines`). The mock answered a direct order with "at least one accepted quotation", marked `TODO(SO-005)`.
+
+A draft's items could not change once saved.
+
+The lead, quotation and order lists had no download, though the backend serves all three (`GET /leads/export`, `/quotations/export`, `/orders/export`).
+
+#### Now
+
+- **New order**, typed in without a quotation:
+  - It starts from a qualified lead's page (or one further on), or from the orders list.
+  - Items are picked and priced by the backend as they are typed, as in the quotation builder.
+  - The party, mobile, GSTIN and address come from the lead, and the lead fixes the place of supply. An order started afresh asks where the goods go first, and nothing is priced until it is chosen.
+  - It also takes the order type (commercial or industrial), delivery address, payment terms and remarks.
+  - Save stays off until there is a place and at least one item, and says which is missing.
+  - A price that moved since the preview is named on its line and priced again.
+  - A new lead says it can't take an order yet; a role without `sales_orders.create` sees no access.
+- **Edit items** on a draft order: its items and header in the same builder.
+  - An order made from quotations keeps the party they fixed.
+  - A submitted order can't be edited; the page says so and links to it.
+- **Download Excel** on the lead, quotation and order lists: the rows the filters show, every page, under the backend's file name. More than 5,000 rows: "narrow the filters".
+- The orders list's empty state mentions **New order**.
+
+#### Discussion
+
+**Decisions:**
+
+- **One pricing engine for both builders.** The quotation builder's line state, debounced preview and snapshot became `usePricedLines`. The items card, totals, warnings and text field became `builder-parts.tsx`. The quotation builder now uses them, and its 87 tests pass unchanged. Copying 780 lines would have let the two builders drift apart.
+- **The preview waits for a place of supply.** `usePricedLines` sends nothing while the place is empty, so an order typed in afresh is never priced against the wrong state.
+- **`partner_id` is the lead's dealer when there is one,** so the order is priced as the preview was. It is left out otherwise, which the backend reads as a direct sale by staff.
+- **"Edit items" sits beside "Edit delivery and terms".** The quick dialog stays for the common case; the builder covers the items.
+- **One `DownloadExcelButton`.** It replaces the inline copies in tasks and complaints, so all five lists say "Too many … to download" the same way.
+
+**Still to build:** a consolidated order from several quotations on leads of one dealer, which needs several quotations picked at once (Plan §9.3).
+
+**The mock:**
+
+- `POST /orders` with `lines` prices them as the preview does. It refuses a lead that isn't qualified (`lead_not_open`), a missing party or place, and a changed price (`rate_changed`).
+- `PUT /orders/{id}/lines` replaces a draft's lines.
+- `PATCH` takes the party and order type; the party is refused on an order made from quotations.
+- The three exports answer a dated workbook, built by one shared `mockWorkbook`.
+
+#### Files changed
+
+- `src/features/quotations/hooks/use-priced-lines.ts`: new; the priced lines, from the quotation builder.
+- `src/features/quotations/components/builder-parts.tsx`: new; the items card, summary, totals, warnings and text field.
+- `src/features/quotations/components/quotation-builder.tsx`: uses them.
+- `src/features/quotations/lib/builder-lines.ts`: `readAnyFields`, and the order's header fields for routing refusals.
+- `src/features/orders/api/`:
+  - `orders.schemas.ts`: `CreateDirectOrder`, `ReplaceOrderLinesRequest`, `OrderPartyRequest`; `PatchOrderRequest` takes the party and type.
+  - `orders.api.ts`: `replaceOrderLines`, `exportOrders`.
+  - `orders.mutations.ts`: `useSaveOrderDraft`.
+  - `orders-direct.test.ts`: the API tests.
+- `src/features/orders/components/`:
+  - `order-builder.tsx`, `order-builder-pages.tsx`: new.
+  - `order-builder.test.tsx`: the UI tests.
+  - `order-actions.tsx`: Edit items.
+  - `orders-toolbar.tsx`: New order and Download Excel.
+  - `orders-table.tsx`: the empty state.
+- `src/app/(app)/(sales)/sales-orders/new/`, `src/app/(app)/(sales)/sales-orders/[orderId]/edit/`: the routes.
+- `src/features/leads/`: New order on a qualified lead; `exportLeads` and Download Excel.
+- `src/features/quotations/api/quotations.api.ts`, `quotations-toolbar.tsx`: `exportQuotations` and Download Excel.
+- `src/components/patterns/download-excel-button.tsx`: new.
+- `src/features/tasks/components/all-tasks.tsx`, `src/features/complaints/components/complaints-list.tsx`: use it.
+- `src/mocks/`: the direct order, replacing lines, the party and type in `PATCH`, the three exports, and `mockWorkbook`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-005 in progress; SO-006, LEAD-009, QUOT-013 registered.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/orders/`: the records.
+
+#### Tests
+
+**`src/features/orders/api/orders-direct.test.ts`:**
+
+- `[SO-005]`:
+  - a direct draft on a qualified lead, priced, with no quotations;
+  - `lead_not_open`, and a party without a name, are refused;
+  - a draft's lines are replaced and its party changed;
+  - a submitted order's lines are refused.
+- `[SO-006] [LEAD-009] [QUOT-013]`: each list downloads as a dated workbook.
+
+**`src/features/orders/components/order-builder.test.tsx`:**
+
+- an item priced as typed, then saved as a draft that opens;
+- an order started afresh needs a place before pricing;
+- a new lead can't take an order;
+- QA has no access;
+- a draft's items are edited and every line saved;
+- a submitted order can't be edited.
+
+The quotation builder's and the tasks' existing tests pass on the shared pieces.
+
+**By hand, in Chromium on the mock backend, as Admin:**
+
+1. New order from a qualified lead: two items priced, saved, then the draft opened and edited.
+2. New order afresh from the orders list.
+3. Download Excel on the orders, leads and quotations lists; each saved its dated file.
+4. The builder on a phone in dark mode.
+
+axe found nothing on the builder, the draft, the order started afresh or the phone view.
+
+### Tasks: my day, team day and a lead's tasks
+
+`feature` · `TASK-001` `TASK-002` `TASK-003` `TASK-004` `TASK-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-04--feature--TASK-001--tasks-my-day-team-day-and-a-lead-s-tasks.md)
+
+#### Before
+
+Tasks was a "Soon" item in the sidebar. The backend has served tasks, the planner and meeting types since #25 (`backend/docs/api/tasks.md`, handover `tasks-and-planner-contract.md`). Follow-ups were dates on a lead, and nobody could see their day's calls and visits in one place, or a manager their team's.
+
+#### Now
+
+**Tasks page** (`/tasks`, staff with `tasks`; dealers have none):
+
+- **My day.** What is overdue from earlier sits on top (up to 90 days back). Below it, what is due that day, by time.
+  - Each task shows its kind (call, visit, meeting, follow-up, other), time, meeting type, the lead (linked) or dealer it is about, who gave it, and its notes.
+  - Done tasks say what happened; cancelled ones say why.
+  - Overdue is the server's word; the screen never works it out.
+- **The day** moves back and forward, jumps to any date, or returns to today. It is kept in the URL (`?date=`). A future day has nothing overdue.
+- **Team**, for anyone with people below them: one row per person, with due that day, done that day and overdue now.
+  - People with nothing to do are listed too.
+  - A row opens that person's day (`?user=`, so it can be sent as a link). "Back to team" returns, and a new task from there is for that person.
+  - Officers, Accounts, Dispatch and QA see no Team.
+- **New task:** what to do, the kind, the day, and an optional time (left empty, it is due at 18:00). Then who it is for (yourself first, then the people below you, from `GET /tasks/assignees`) and notes. Server field errors land on their fields, and a retry reuses its Idempotency-Key.
+- **Done** asks what happened, and for a meeting whether the gift was shown. **Cancel** asks why.
+  - A task someone else gave you isn't offered for cancelling: only they can (the backend's rule).
+  - **Reopen** a done task as its assignee or its giver. After 7 days the backend says to add a new one.
+  - A task someone moved on meanwhile closes the dialog and refreshes the list.
+
+**On a lead's page,** a "Tasks and meetings" card:
+
+- What is still to do comes first, then what was done or cancelled, each saying who it is for.
+- "Add task" makes a task about the lead. A meeting there names its kind (Survey & Design, Follow-up…, from `GET /lookups/meeting-types`).
+- A merged lead takes no new tasks.
+
+**States covered:**
+
+- skeletons that mirror the rows;
+- "A clear day" and "No tasks yet";
+- errors with retry;
+- a later page failing without losing what is shown;
+- phone and desktop, light and dark.
+
+#### Discussion
+
+- **Split in two.** This pull request is the daily loop: see the day, add, finish, cancel, reopen. Three things follow in the next one, each already registered:
+  - meeting minutes with action items (TASK-007);
+  - editing and reassigning a task (TASK-006);
+  - the full task list with filters and Excel export (TASK-008).
+- **Who sees Team.** It is decided from the `tasks` grant's scope in `/auth/me` (anything wider than `own`), not from the role name. That matches the backend's 403 for someone with no team.
+- **Cancelling is hidden** for a task given by someone else rather than shown and refused, because the backend's rule is simple to mirror. Reopening isn't hidden after 7 days: that needs the clock, and the backend's refusal explains it.
+- **Mock users.** In the mock, the signed-in user (usr-001) has a seeded day: six tasks today, three overdue from earlier in the week, and a spread of work for the five people below them.
+- **Pre-existing issue found during the walk.** axe flags the contrast of superseded quotation versions on a lead's page (`opacity-70` in `lead-quotations.tsx`). It isn't part of this change; it is noted as a follow-up.
+
+#### Files changed
+
+- `src/features/tasks/api/`: `tasks.schemas.ts` (Task, PlannerDay, TeamPage, the requests, the form schema), `tasks.api.ts`, `tasks.queries.ts`, `tasks.mutations.ts`, `tasks.test.ts`.
+- `src/features/tasks/lib/task-labels.ts`: kinds, icons, what a task is about, and the backend's refusals in plain words.
+- `src/features/tasks/hooks/use-task-params.ts`: the view, day and person in the URL; `useHasTeam`.
+- `src/features/tasks/components/`:
+  - `tasks-view.tsx`, `planner-day.tsx`, `team-day.tsx`, `task-row.tsx`;
+  - `task-action-dialog.tsx`, `new-task-dialog.tsx`, `lead-tasks.tsx`;
+  - `tasks-ui.test.tsx`.
+- `src/app/(app)/tasks/page.tsx`, `loading.tsx`: the route.
+- `src/components/layout/navigation.ts`: Tasks is a link, for staff, with its description.
+- `src/features/leads/components/lead-detail.tsx`: the Tasks and meetings card.
+- `src/features/lookups/api/lookups.schemas.ts`, `src/mocks/data/lookups.ts`: the meeting types list.
+- `src/lib/format/date.ts`, `index.ts`, `format.test.ts`: `shiftCalendarDay` and `formatCalendarDay`.
+- `src/mocks/data/tasks.ts`, `src/mocks/handlers/tasks.ts`, `src/mocks/handlers/index.ts`, `src/mocks/db.ts`, `src/mocks/data/reference.ts`: the mock backend, following the backend's rules (one link, meeting types, who may cancel or reopen, the 7-day window, 409 when not open, idempotent replays).
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: TASK-001…008.
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/tasks/`: the records.
+
+#### Tests
+
+- **`src/features/tasks/api/tasks.test.ts`:**
+  - `[TASK-001]`: the day's order and its overdue tasks; nothing overdue on a future day; a team member's day; a contract violation.
+  - `[TASK-002]`: the team rows; a 403 without a team.
+  - `[TASK-003]`: a lead's tasks with the total; a hidden link.
+  - `[TASK-004]`:
+    - assignees for a manager and for an officer;
+    - the form becoming the request (a date alone, or a date and time in India);
+    - the meeting type rule;
+    - creating a meeting on a lead;
+    - an idempotent replay;
+    - `not_assignable` on its field.
+  - `[TASK-005]`: complete then reopen; 409 when no longer open; cancel with a reason; 403 for a task someone else gave.
+- **`src/features/tasks/components/tasks-ui.test.tsx`:**
+  - My day: order, sections and summary; day navigation in the URL; mark done (a reason is required); cancel (not offered on a task someone else gave); a new task appearing in the day; error; empty.
+  - Team: hidden from officers; the rows; opening a person's day and going back.
+  - LeadTasks: the groups; adding a meeting that needs its kind; nothing new on a merged lead.
+- **`src/lib/format/format.test.ts`:** day shifting across months and years, and the day heading.
+- **By hand, in Chromium on the mock backend:**
+  - My day, mark done, new task, Team, a person's day and a lead's card on a desktop in light mode;
+  - My day and new task on a phone in dark mode;
+  - axe found nothing on the task screens.
+
+### Tasks: meeting minutes, edit and reassign, all tasks with an Excel export
+
+`feature` · `TASK-007` `TASK-006` `TASK-008` `TASK-003` `OBS-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-04--feature--TASK-007--tasks-meeting-minutes-edit-and-reassign-all-tasks-with-an.md)
+
+#### Before
+
+PR #54 built the daily loop: My day, Team, a lead's tasks, and new, done, cancel and reopen. Three parts of the backend's tasks contract were still unused:
+
+- `PATCH /tasks/{id}` to edit or reassign a task;
+- meeting minutes (`/minutes`);
+- the full task list with its filters and Excel export (`GET /tasks`, `GET /tasks/export`).
+
+The frontend also had no way to download a file through the API client. A plain link can't carry the access token.
+
+#### Now
+
+- **Edit or reassign** (TASK-006). An open task's menu has **Edit or reassign**. It changes what to do, the day and time, and notes, or who does it.
+  - A manager can pick anyone in their team. An officer's field says only a manager can give it to someone else.
+  - Only what changed is sent, with `expected_status: open`. If the task was done meanwhile, the save is refused and the list refreshes.
+  - Saving shows "Task updated", or "Given to Ravi Joshi" for a reassignment.
+- **Meeting minutes** (TASK-007). A **Meeting minutes** card sits on a lead's page, newest first. Each entry shows when, who was there, what was discussed, and each action item as its task stands now ("1 of 2 done", with overdue ones in red).
+  - **Record minutes** from the card, or from a planned meeting's menu, which then marks that meeting done.
+  - Who was there is one name per line.
+  - Each action item (what, due day, for whom, kind) becomes a task. Its row on the lead then says "From meeting minutes".
+  - It is one save: if the backend refuses one item, nothing is saved, and the reason appears on that item.
+- **All tasks** (TASK-003, TASK-008). A third view on the Tasks page lists everything the user can see, earliest due first, with a count.
+  - Filters: status, kind, person (for managers) and overdue only. All of them are kept in the URL.
+  - **Download Excel** saves exactly those tasks, every page, under the name the backend gives (`tasks-2026-10-04.xlsx`).
+  - More than 5,000 rows shows "Too many tasks to download — narrow the filters".
+  - States: skeleton, "No tasks match these filters" with Reset, and a later page failing.
+- **`apiDownload`** (OBS-002). The API client can now fetch a file. It works like any other call:
+  - the access token, and one refresh and retry after a 401;
+  - `x-request-id` and `x-data-id`, and the logs;
+  - the backend's error envelope as an `ApiError`.
+
+  `saveFile` saves the result. The backend's other seven list exports (`backend/docs/handover/list-exports.md`) can use the same pair.
+
+- **"Given by you"** replaces the user's own name on tasks they gave.
+
+#### Discussion
+
+- **Edit only what changed.** The form compares against the task as loaded, and sends a PATCH only when something differs. Closing an unchanged form sends nothing. This keeps a save from overwriting a field someone else changed meanwhile.
+- **Minutes from a planned meeting.** Recording minutes from a planned meeting sends `task_id`, so the backend completes that meeting with "Minutes recorded". From the card it records a meeting that wasn't planned.
+- **Field errors on action items.** The backend's `fields.action_items.1.assigned_to` paths are mapped to the matching item's field, so the reason sits where the mistake is.
+- **The blob is checked by shape, not `instanceof`.** A Blob from `fetch` can belong to another realm, as with Node's fetch under jsdom, and then fails `instanceof Blob`.
+- **The mock's export file.** The mock returns a stand-in file with the real headers. The real workbook comes from the backend.
+- **The mock seeds one set of minutes** on the earliest done meeting about a lead, with one action item done and one open, so the card has something to show in a demo.
+
+#### Files changed
+
+- `src/lib/api/client.ts`: `apiDownload`, `DownloadedFile`, `DOWNLOAD_TIMEOUT_MS`; the request runner is shared by JSON calls and files.
+- `src/lib/api/save-file.ts`: new, saves a downloaded file.
+- `src/lib/api/client.test.ts`: `[OBS-002] apiDownload`.
+- `src/lib/format/date.ts`, `index.ts`, `format.test.ts`: `calendarDayOf` and `timeOfDayOf`, for date and time inputs in India's time.
+- `src/features/tasks/api/`:
+  - `tasks.schemas.ts`: list filters, `leadTaskParams`, the PATCH request, and the minutes schemas and requests;
+  - `tasks.api.ts`: `patchTask`, `listLeadMinutes`, `createMinutes`, `exportTasks`, and the list filters;
+  - `tasks.queries.ts`, `tasks.mutations.ts`, `tasks.test.ts`.
+- `src/features/tasks/hooks/use-task-params.ts`: the All view and its filters in the URL.
+- `src/features/tasks/components/`:
+  - new: `all-tasks.tsx`, `edit-task-dialog.tsx`, `minutes-dialog.tsx`, `lead-minutes.tsx`, `task-dialogs.tsx`;
+  - changed: `task-row.tsx` (Edit and Record minutes in the menu, "From meeting minutes", "Given by you"), `task-action-dialog.tsx`, `tasks-view.tsx`, `lead-tasks.tsx`, `tasks-ui.test.tsx`.
+- `src/features/leads/components/lead-detail.tsx`: the Meeting minutes card.
+- `src/mocks/handlers/tasks.ts`: list filters, `GET /tasks/export`, `PATCH /tasks/{id}`, and `GET`/`POST /minutes`, following the backend's rules.
+- `src/mocks/data/tasks.ts`, `src/mocks/db.ts`: the seeded minutes, and plain outcomes for office tasks.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`, `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/tasks/`: the records.
+
+#### Tests
+
+- **`src/lib/api/client.test.ts` (`[OBS-002] apiDownload`):**
+  - the file, its name, the token, the Data ID and the query;
+  - no name;
+  - an error envelope read as an `ApiError`.
+- **`src/features/tasks/api/tasks.test.ts`:**
+  - `[TASK-003]`: filters by person, kind, status and overdue.
+  - `[TASK-006]`: only the sent fields change and the task is reassigned; a task no longer open is refused with 409.
+  - `[TASK-007]`:
+    - seeded minutes with their action items as they stand;
+    - recording minutes: action items become tasks, and the meeting is marked done;
+    - one bad action item refuses the whole save, with its field path.
+  - `[TASK-008]`: the same filters are sent with no cursor, the file is named by the backend, and an export that is too large is explained.
+- **`src/features/tasks/components/tasks-ui.test.tsx`:**
+  - `[TASK-006]`: rename and reassign.
+  - `[TASK-007]`: the card's "1 of 2 done"; recording with validation, attendees and an action item.
+  - `[TASK-008]`: overdue filter in the URL, then a download with the same filters; nothing matching, then Reset.
+  - My day: a task someone else gave offers editing, not cancelling.
+- **`src/lib/format/format.test.ts`:** an instant's day and time in India.
+- **By hand, in Chromium on the mock backend:**
+  - All tasks, a downloaded file named `tasks-2026-10-04.xlsx`, Edit, a lead's minutes and Record minutes, on a desktop in light mode;
+  - All tasks on a phone in dark mode;
+  - axe found nothing on All tasks, Edit or Record minutes.
+
+## 3 October 2026
+
+### Area filter on leads, the asker's reason in approvals, dealer search by contact person
+
+`feature` · `LEAD-001` `APPR-001` `LEAD-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-03--feature--LEAD-001--area-filter-on-leads-the-asker-s-reason-in-approvals-dealer.md)
+
+#### Before
+
+The backend shipped three things in #49 and #50 that the screens didn't use yet:
+
+- **Leads by area (FS-020).** `GET /leads?territory_id=` takes up to 20 territories, and `GET /leads/areas` lists the states, districts or talukas that hold leads, with counts. The lead list could filter by stage, source and type, but not by where the lead is.
+- **The asker's reason.** A salesperson writes a remark when asking for discount approval. The approvals queue now returns it as `request_remark`, but a manager deciding the request never saw it, so they had to open the quotation or phone the salesperson.
+- **Dealer search by contact person.** `GET /lookups/partners?q=` now also matches the person to ask for at a dealer. The assign dialog's hint still said "name or code".
+
+#### Now
+
+- **Area pill on the lead list.** It sits next to Stage, Source and Type.
+  - It lists the districts that hold a lead you can see, each with how many. With one state (Gujarat today), it starts at that state's districts.
+  - Tick several areas, or open a district (the arrow, named "Show talukas in Rajkot") to tick its talukas. "All districts" goes back.
+  - A district includes every taluka and village under it. Its count matches the filtered list: Rajkot reads 33, and the list shows "1–25 of 33".
+  - The backend takes at most 20 areas. Past that, the other boxes are disabled, with a note suggesting a district instead of its talukas.
+  - The choice is kept in the URL (`?area=…`), so a refresh or a shared link keeps it. The pill names the area picked, or shows "3 areas". Clear area and Reset filters remove it.
+  - States:
+    - loading: three skeleton rows;
+    - none: "No leads in any area yet";
+    - a district whose leads aren't filed under a taluka: says to go back and choose the district itself;
+    - error: the message and Try again.
+  - The picker loads only when it is opened. It reopens where it was left, on a phone and a desktop, in light and dark.
+- **The reason on approval requests.** The remark shows as a quote under each request in the inbox. It shows again at the top of the approve or reject dialog, as "Aarav Desai's reason: …". Requests raised without a remark look as before.
+- **Dealer search.** The assign dialog's partner search says "Dealer name, code or contact person". The mock backend matches the contact person too, as the real one does.
+
+#### Discussion
+
+- **Districts first, not one long list.** Gujarat has 33 districts and hundreds of talukas, so a flat list would be unusable on a phone. Drilling down keeps each list short, and the lead counts show where the work is.
+- **Skipping the single state.** Choosing the only state would filter nothing, so with one state the picker starts one level down. A second state brings the state level back by itself.
+- **The pill's name for an area.** The pill knows an area's name only after it is picked in this visit. A link opened fresh shows "1 area" until then. Resolving names would need another endpoint (`GET /territories/{id}`), which isn't worth a call per pill.
+- **The 20-area limit is the backend's.** It is enforced in the UI, and the URL parser also caps it at 20, so a hand-edited link can't trigger a 422.
+- **Shared code.** `FilterPillFrame` and `filterOptionRowClasses` are now exported from the filter-pill pattern, so the area pill looks and behaves exactly like the others. No visual change to the existing pills.
+
+#### Files changed
+
+- `src/features/leads/api/leads.schemas.ts`:
+  - `LeadListParams.areas`;
+  - `LEAD_AREA_LEVELS`, `MAX_LEAD_AREAS`;
+  - the `GET /leads/areas` schema and `LeadArea`.
+- `src/features/leads/api/leads.api.ts`: `territory_id` on the list; `listLeadAreas`.
+- `src/features/leads/api/leads.queries.ts`: `leadKeys.areas` and `leadAreasQueryOptions`.
+- `src/features/leads/hooks/use-lead-list-params.ts`: `?area=` in the URL, validated, deduplicated and capped at 20; it counts as a filter and is cleared by Reset.
+- `src/features/leads/components/lead-area-filter.tsx`: new, the Area pill and its drill-down picker.
+- `src/features/leads/components/leads-toolbar.tsx`: the Area pill; the skeleton gains a fourth pill.
+- `src/features/leads/components/lead-assign-dialog.tsx`: the partner search hint.
+- `src/components/patterns/filter-pill.tsx`: exports `FilterPillFrame` and `filterOptionRowClasses`.
+- `src/features/approvals/api/approvals.schemas.ts`: `request_remark` becomes `requestRemark`.
+- `src/features/approvals/components/approvals-inbox.tsx`: the reason under each request.
+- `src/features/approvals/components/approval-decision-dialog.tsx`: the reason in the dialog.
+- `src/mocks/handlers/leads.ts`: `GET /leads/areas`; `territory_id` filtering by a lead's territory or any area above it.
+- `src/mocks/data/territories.ts`: `mockTerritoryLineage`.
+- `src/mocks/handlers/lookups.ts`, `src/mocks/data/reference.ts`: partners carry a contact person, and search matches it.
+- `src/mocks/data/approvals.ts`, `src/mocks/handlers/approvals.ts`, `src/mocks/handlers/quotations.ts`: approval steps keep the request remark and return it.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`, `Docs/Plan.md` §9, `Docs/Tested-Features.md`: the records.
+- `Docs/screenshots/area-filter/`, `Docs/screenshots/approvals/`: the new screens.
+
+#### Tests
+
+- **`src/features/leads/api/leads.test.ts`:**
+  - `[LEAD-001] listLeads`:
+    - filtering by a district matches its count;
+    - several areas go as one comma-separated `territory_id`, and none when unset.
+  - `[LEAD-001] listLeadAreas`:
+    - the levels and counts;
+    - the level and parent sent;
+    - a contract violation.
+  - `[LEAD-008]`: finds a partner by contact person.
+- **`src/features/leads/components/leads-ui.test.tsx`:**
+  - drill from districts to Rajkot's talukas and back;
+  - the URL and the request carry the area;
+  - the pill names it;
+  - Clear removes it;
+  - a district with no taluka-level leads explains itself;
+  - a load error offers Try again.
+- **`src/features/approvals/components/approvals-inbox.test.tsx`:** the reason shows on the row and in the dialog, and only where one was given.
+- **By hand, in Chromium on the mock backend:**
+  - Leads, Area: Rajkot narrows 132 to 33, and the URL keeps it;
+  - talukas in Rajkot;
+  - a phone in dark mode;
+  - Approvals: the reason on four rows and in the approve dialog;
+  - axe found nothing on the open picker or the dialog.
+
+## 2 October 2026
+
+### Backend pick-ups: lead sorting, territory levels, names in assignments, awaiting approval, a quotation's order
+
+`api-integration` · `LEAD-001` `LEAD-002` `LEAD-005` `LEAD-008` `QUOT-001` `SO-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--api-integration--LEAD-001--backend-pick-ups-lead-sorting-territory-levels-names-in.md)
+
+#### Before
+
+The backend had finished five asks that the frontend did not use yet:
+
+- **Lead list sorting (BE-001).** `GET /leads` sorts by `farmer_name` or `estimated_value`, but the list hid its sort arrows behind a flag, so it was always newest first.
+- **Territory levels (BE-005).** A lead may sit in a district, taluka or village, and a state is refused. The New lead picker still offered the state when you typed its name, and the save then failed.
+- **Names on assignments (BE-006).** `lead.assigned` events carry `owner_name`, `partner_name` and, on a handover, `previous_owner_name`. The lead's history still said only "changed the owner and the channel partner".
+- **Awaiting approval.** Quotation list rows carry `awaiting_approval`, but a draft waiting on a manager looked like any other draft.
+- **A quotation's order (BE-019).** `GET /orders` takes `quotation_id`. To find the order carrying an accepted quotation, the quotation page still listed the lead's orders and read up to ten of them one by one.
+
+#### Now
+
+- **Lead list.** Customer and Value sort from their column headers, ascending then descending, with `aria-sort` on the header. The sort travels in the URL as before. Changing it starts again from page 1, because the backend refuses a cursor from another order (`422` on `cursor`).
+- **New lead.** Typing in the territory picker searches districts, talukas and villages only (`levels=district,taluka,village`). The state no longer shows, so "Guj" reads "No place matches". Opening the picker still lists districts.
+- **Lead history.** Assignments name the people:
+  - "assigned the lead to Ravi Joshi and made Khodiyar Irrigation the channel partner";
+  - "handed the lead from Asha Mehta to Ravi Joshi";
+  - "unassigned Asha Mehta".
+
+  An event without names (someone the backend could not name) still reads as before.
+
+- **Quotations.** A draft whose discount waits for a manager shows an amber "Awaiting approval" chip instead of "Draft". It shows in the quotations list, on the lead's quotations card, and on the quotation page, where it is read from the approval request.
+- **Place order.** "Open order" is found with one `GET /orders?quotation_id=…&status=<every status but cancelled>` call, instead of one call for the list and up to ten more.
+- **Mock backend.**
+  - It sorts as the backend does: names ignore case, a lead without a value comes last in both orders, and ties break by id.
+  - It filters territories by `levels`, refusing `levels` with `level`, or an unknown level.
+  - It refuses a lead in a state.
+  - It writes names on assignment events and seeds one assignment per owned lead.
+  - It sets `awaiting_approval` on list rows and filters orders by `quotation_id`.
+
+#### Discussion
+
+- **No new endpoints and no new Data IDs.** Each item uses an endpoint that was already connected; only a parameter or a field is new. Rows move within Plan §9.1.
+- **BE-019 was done but not ticked.** The backend shipped the `quotation_id` filter in #36 (commit c284913, `backend/docs/api/orders.md`) without ticking it. It is ticked here, with a note.
+- **"Awaiting approval" replaces "Draft" in the chip** rather than sitting beside it. Tables stay one chip wide, and filtering by Draft still includes these drafts, as on the backend.
+- **The `awaiting_approval` field is optional** in the schema, defaulting to false, so a backend from before #30 still parses.
+- **What is left from the backend's finished asks:** nothing. Notifications and messages (BE-009, BE-010) are served and connect next. BE-014 (approval threshold amounts) and BE-020 (order links in a lead's history) wait on the backend.
+
+#### Files changed
+
+- **Lead list sorting (BE-001)**
+  - `src/features/leads/components/leads-columns.tsx`: Customer and Value sortable; the `BACKEND_SORTS_LEADS` flag is removed.
+  - `leads-table.tsx`, `api/leads.schemas.ts`: comments updated.
+  - `src/mocks/handlers/leads.ts`: `sortLeads` sorts as the backend does.
+- **Territory levels (BE-005)**
+  - `src/features/lookups/api/lookups.schemas.ts`, `lookups.api.ts`: `levels` on the territory search.
+  - `components/territory-picker.tsx`: a `levels` prop.
+  - `src/features/leads/api/leads.schemas.ts`: `LEAD_TERRITORY_LEVELS`.
+  - `components/new-lead-dialog.tsx`: passes them.
+  - `src/mocks/handlers/lookups.ts`, `handlers/leads.ts`: the `levels` filter and its refusals; a lead in a state refused.
+- **Names on assignments (BE-006)**
+  - `src/features/leads/lib/timeline-entries.ts`: `AssignmentChange` with names, `previousOwnerName`, `assignmentSentence`.
+  - `components/lead-timeline.tsx`: uses it.
+  - `src/mocks/handlers/leads.ts`, `src/mocks/data/timeline.ts`: names on assignment events.
+- **Awaiting approval**
+  - `src/features/quotations/api/quotations.schemas.ts`: `awaitingApproval` on list rows.
+  - `components/quotation-status-badge.tsx`: the "Awaiting approval" chip.
+  - `quotations-columns.tsx`, `lead-quotations.tsx`, `quotation-detail.tsx`: pass it.
+  - `src/mocks/data/quotations.ts`: sets it.
+- **A quotation's order (BE-019)**
+  - `src/features/orders/api/orders.schemas.ts`, `orders.api.ts`, `hooks/use-order-list-params.ts`: `quotationId`.
+  - `components/place-order.tsx`: one filtered call.
+  - `src/mocks/handlers/orders.ts`: the filter.
+- **Records**
+  - `Docs/Plan.md` §9.
+  - `Docs/Tested-Features.md`.
+  - `../docs/Backend-Tasks.md`: BE-019 ticked.
+
+#### Tests
+
+- **`src/features/leads/components/leads-ui.test.tsx`**
+  - `[LEAD-001]` sorting by customer from page 2:
+    - it returns to page 1 and sends `sort=farmer_name&order=asc` with no cursor;
+    - the rows come back in order;
+    - Value then takes over the sort.
+  - `[LEAD-002]` the New lead picker searches with `levels` and never offers the state. This test fails when the picker is given `levels={null}`.
+- **`src/features/lookups/api/lookups.test.ts`** `[MSTR-002]`
+  - The levels filter.
+  - `levels` is sent comma-separated and never with `level`.
+- **`src/features/leads/lib/timeline-entries.test.ts`**
+  - `[LEAD-005]` names read beside the ids; a blank name is no name.
+  - `[LEAD-008] assignmentSentence`: new owner and partner, a handover, an unassigned owner, events without names.
+- **`src/features/leads/components/lead-assign.test.tsx`** `[LEAD-008]`: after assigning, the history names the new owner, the previous one and the partner.
+- **`src/features/quotations/components/quotations-ui.test.tsx`** `[QUOT-001]`: a waiting draft reads "Awaiting approval", and other drafts still read "Draft".
+- **`src/features/quotations/api/quotations.test.ts`** `[QUOT-001]`
+  - The flag is read for every draft.
+  - A row without it reads as not waiting.
+- **`src/features/orders/api/orders.test.ts`** `[SO-001]`
+  - `quotation_id` is sent.
+  - The carrying order is found.
+  - A free quotation finds none.
+- **`src/features/orders/components/orders-ui.test.tsx`**: "Open order" on an ordered quotation, now through the filter.
+
+### Notifications and messages on the backend
+
+`api-integration` · `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-004` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md)
+
+#### Before
+
+The bell and staff messages were built on a contract the frontend proposed (15 September), and ran on the mock backend even against a real API: `partial` mocking kept them in `unbuiltHandlers`. The backend has served both since #31 (BE-009, BE-010), close to that proposal but with differences the screens did not handle yet.
+
+- **The bell polled the whole list.** It fetched 20 notifications every 30 seconds. The backend asks the bell to poll `?limit=1` for the count; there is no push.
+- **Only three notification kinds had an icon.** The backend sends fourteen.
+- **Quotation and sales order notifications opened nothing.** Both screens exist now.
+- **Marking a conversation read sent no `up_to`.** A message that arrived while the call ran was marked read unseen.
+- **Colleagues who left weren't handled.** The backend marks them `is_active: false` and refuses a message with `422 participant_inactive`; the composer said only "Couldn't send".
+- **Unshareable leads weren't explained.** A lead the sender can't see is refused with `422` on `resource`.
+- **A new conversation lost its name.** The backend lists a conversation only once someone writes in it, so a conversation just opened from the directory had no name in its header.
+
+#### Now
+
+- **Bell (NOTIF-001, NOTIF-002)**
+  - **Polling.** The badge polls `GET /notifications?limit=1` every 30 seconds. The list of 20 is read when the bell opens, and polled only while it stays open.
+  - **Icons and links.** Each of the backend's 14 kinds has its own icon; an unknown kind gets the plain bell. A notification about a lead, quotation or sales order opens it; tasks and complaints have no screen yet.
+  - **Marking read.** Marking one or all read updates the list and the badge at once, restores both if the call fails, then takes the backend's new count.
+  - **Unknown names.** An actor whose name the backend leaves blank names nobody, instead of failing the contract.
+  - **Contrast fix.** The bell's time and record line uses `muted-foreground`. The subtle shade measured 4.27:1 against the dark popover, below the 4.5:1 minimum.
+- **Messages (MSG-001…005)**
+  - **`up_to`.** Opening a conversation marks it read up to the newest message on screen (`up_to`).
+  - **A colleague who has left** is shown as such. The conversation stays readable, with a notice in place of the message box. If the backend refuses a send because they have left, the notice appears and the draft stays, read-only, to copy.
+  - **Refusals.** A lead the sender can't see is refused with a reason: "This lead can't be shared…".
+  - **A new conversation** keeps its colleague's name and the "Say hello to …" prompt from the `POST /conversations` answer. Its first message then lists it.
+- **`partial` mocking now mocks nothing (APP-004).** `unbuiltHandlers` is empty, so every request goes to the real API, and no screen is mocked against a live backend.
+- **Mock backend** now behaves like the real one:
+  - error codes: `validation_error` with fields, `insufficient_permission`, `not_found`, `participant_inactive`;
+  - only written-in conversations are listed;
+  - the directory offers active staff only;
+  - `up_to` marks read only so far and refuses a message from another conversation;
+  - leads are labelled with their inquiry number;
+  - a colleague who has left (Meera Iyer) is seeded with an old conversation;
+  - the seeded notifications point at a real mock quotation and order.
+
+#### Discussion
+
+- **Count and list are two queries, as the backend suggests.** The count query is tiny and always on. The list query runs only while someone looks. The badge shows whichever answered last, so opening the bell never shows two different counts.
+- **A colleague who has left: notice instead of box.** An empty box that can't send invites typing that goes nowhere. The box comes back read-only only when it already holds a draft, so nothing written is lost.
+- **Older messages are not paged yet.** The thread shows the latest 50 (`TODO(MSG-002)`, `meta.next_cursor` is there). Enough for every conversation so far.
+- **Asked of the backend: BE-021.** `GET /conversations/{id}` (or listing a conversation once opened), so an empty conversation still has a name after a reload.
+- **Contrast is fixed locally, not in the token.** `subtle-foreground` is 4.27:1 on the dark popover; changing the token would move every screen. Worth a look in the design tokens.
+- **Partial mode's lead seam is gone.** The mock used to trust real lead ids in partial mode; it no longer needs to, since partial mode no longer mocks messages.
+
+#### Files changed
+
+- **Notifications**
+  - `src/features/notifications/api/notifications.schemas.ts`: the 14 kinds; blank actor names.
+  - `notifications.api.ts`: `countUnreadNotifications`.
+  - `notifications.queries.ts`: count and list queries.
+  - `notifications.mutations.ts`: optimistic list and badge.
+  - `lib/mark-read.ts`: `unreadAfterMarking`.
+  - `components/notification-bell.tsx`: count polling, list on open, icons, contrast.
+  - `src/lib/navigation/resource-href.ts`: quotation and sales order links.
+- **Messages**
+  - `src/features/messages/api/messages.schemas.ts`: `is_active`; the mark-read body.
+  - `messages.api.ts`: `up_to`.
+  - `messages.queries.ts`: the started conversation.
+  - `messages.mutations.ts`: the read variables; the first message lists a conversation.
+  - `lib/send-refusal.ts`: new.
+  - `components/conversation-thread.tsx`, `message-composer.tsx`: `up_to`, the closed conversation, refusals.
+- **Mock backend**
+  - `src/mocks/handlers/index.ts`: `unbuiltHandlers` empty.
+  - `handlers/notifications.ts`, `handlers/messages.ts`: the backend's rules and codes.
+  - `data/notifications.ts`, `data/messages.ts`, `db.ts`: seeds.
+- **Records**
+  - `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: NOTIF and MSG in progress; LEAD-001's note.
+  - `Docs/Plan.md` §9, `Docs/Environments.md`, `Docs/Tested-Features.md`.
+  - `../docs/Backend-Tasks.md`: BE-021.
+  - `Docs/screenshots/messages-notifications/`.
+
+#### Tests
+
+- **`src/features/notifications/api/notifications.api.test.ts`**
+  - `[NOTIF-001]` the backend's own page, with a nameless actor.
+  - `countUnreadNotifications` sends `limit=1`.
+- **`lib/mark-read.test.ts`**: `[NOTIF-002] unreadAfterMarking`.
+- **`components/notification-bell.test.tsx`**
+  - Only the count is polled until the bell opens. This test fails on the old bell, which fetched 20 at once.
+  - Quotation and order links.
+- **`src/features/messages/api/messages.api.test.ts`**
+  - `[MSG-003]` a lead that can't be shared is refused on `resource`; a colleague who has left gets `participant_inactive`.
+  - `[MSG-004]` a conversation is listed after its first message; the directory offers active staff only; a colleague who has left stays readable.
+  - `[MSG-005]` `up_to` leaves a later message unread; an `up_to` from another conversation is refused.
+- **`components/conversation-thread.test.tsx`** `[MSG-002]`
+  - Reads up to the newest message shown.
+  - A colleague who has left: notice, no box.
+  - A send refused because they left: the notice, and the draft kept read-only.
+  - A just-started conversation names its colleague.
+- **`lib/send-refusal.test.ts`**: `[MSG-003]` each refusal in words.
+- **`src/mocks/handlers/index.test.ts`**: `[APP-004]` nothing is mocked in partial mode.
+- **`e2e/smoke.spec.ts`** on desktop and phone, with axe: 6 passed.
+  - `[NOTIF-001]` the bell opens a quotation.
+  - `[MSG-002]` send a message; a colleague who has left.
+- **By hand, with axe:** the bell, a thread and a closed conversation on a desktop (light) and a phone (dark). axe found the bell's contrast issue, fixed here; after the fix, nothing.
+
+### A demo guide: what's ready, and every flow click by click
+
+`docs` · `APP-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--docs--APP-001--a-demo-guide-what-s-ready-and-every-flow-click-by-click.md)
+
+#### Before
+
+What's ready was spread across `Tested-Features.md` (written for developers), the changelog and pull requests. Nothing walked a presenter through the app click by click for a client demo.
+
+#### Now
+
+`Docs/Demo-Guide.md`, in plain words, for the team preparing a demo:
+
+1. **What's ready, at a glance:** short pointers per main feature, for everything merged into `integration` up to #47.
+2. **What each feature does:** signing in, the dashboard, leads, quotations, approvals and approval limits, sales orders and dispatch, notifications, messages.
+3. **Demo flows, click by click, with the exact button names on screen:**
+   - what to prepare the day before: logins, two windows, a safe mobile number;
+   - a suggested 20-minute order;
+   - 14 flows, from signing in to dispatch, including the discount and order approvals shown live in two windows.
+4. **Not built yet:** answers for the client's questions.
+
+`Docs/Tested-Features.md` links to it.
+
+#### Discussion
+
+- **Labels come from the code.** Button and field names were checked against the components, so the steps match the screen.
+- **No WhatsApp to real customers.** The guide says to send WhatsApp only to the presenter's own number.
+
+#### Files changed
+
+- `Docs/Demo-Guide.md`: new.
+- `Docs/Tested-Features.md`: a link to it.
+
+#### Tests
+
+Documentation only.
+
+### A live test plan for the hosted app, by role and functionality
+
+`docs` · `OBS-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--docs--OBS-002--a-live-test-plan-for-the-hosted-app-by-role-and.md)
+
+#### Before
+
+The automated tests run against the mock backend. Checks against the real backend were done by hand, one feature at a time, and nothing listed what to check on the hosted `integration` app. The approval-limits failure on the dev API (fixed in #46) was found by chance.
+
+#### Now
+
+`Docs/Live-Test-Plan.md`: a plan to test the hosted app against the dev API, by a person or by an agent driving a browser.
+
+- **Setup.** What's needed, the rules for a shared database (`TEST` names, no WhatsApp to real customers, approval limits restored), the roles, two screen sizes, what each result means, and the evidence to capture for a failure (screenshot, the REF code, the failing request with its `x-request-id`, console errors).
+- **Cases, sections A–Q.** About 100, each with an ID, the Data ID, the role, the steps and the expected result. They cover sign-in, navigation per role, the dashboard, leads, quotations, the customer link, approvals, approval limits, sales orders, dispatch, notifications and messages.
+- **Section R.** What isn't built yet, to list rather than test.
+- **Section S.** The whole demo story, from a new lead to dispatch, across roles.
+- **Two output formats:**
+  - a plain-words client walkthrough per functionality (works, works with a problem, doesn't work, not built yet, how to try it);
+  - a concise issue report for the developers, with the evidence each failure needs.
+
+`Docs/Tested-Features.md` links to it.
+
+#### Discussion
+
+- **The plan is self-contained,** so another agent can run it without this conversation's context.
+- **Credentials never go into the repository.** The plan says where they come from and forbids writing them anywhere.
+- **The two outputs are kept separate.** The client document has no technical terms; the issue report has all of them.
+
+#### Files changed
+
+- `Docs/Live-Test-Plan.md`: new.
+- `Docs/Tested-Features.md`: a link to it.
+
+#### Tests
+
+Documentation only. Checked that every route, label and rule it names matches the app and `Docs/Tested-Features.md` on `integration`.
+
+### Approval limits read the backend's refund limits instead of failing
+
+`fix` · `APPR-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--fix--APPR-002--approval-limits-read-the-backend-s-refund-limits-instead-of.md)
+
+#### Before
+
+On the dev API, Admin → Approval limits showed "We received data we couldn't read" (REF APPR-002) for everyone.
+
+Complaint remedies (backend #38, FS-015b, migration 026) added a third kind of approval limit: `doc_type: "complaint"`, the refund ladder. A refund is approved in rupees by the order's three managers, then paid by Accounts. The seeded limits are ₹25,000 for District, ₹1,00,000 for State, and no limit for Regional.
+
+The screen accepted only `sales_order` and `quotation`, so the first refund row made the whole answer a contract violation.
+
+#### Now
+
+- **The page shows three ladders:** Order value, Discount on a quotation, and the new **Refund on a complaint** (rupees; District, State and Regional managers, then Accounts).
+- **Administrators can change refund limits** with the same dialog and the same rules: each level above the one below, "No limit" only at the top. For example: "State Manager's refund limit: refunds up to this amount are approved at this level, then go to Accounts."
+- **Unknown kinds no longer break the page.** A limit row for a document the screen doesn't know yet is left out instead of failing it, so the backend can add one without taking the page down again.
+- **The mock backend** seeds the backend's refund limits and accepts changes to them.
+
+#### Discussion
+
+- **Refund requests don't show in the Approvals inbox yet.** The inbox reads its rows one at a time and leaves out a row it doesn't know, so it never failed. But there is no complaint screen to open yet: `TODO(CMPL-001)` adds refund steps with the complaint screens.
+- **No backend change is needed.** The backend's contract documents `complaint` in `ThresholdPut.doc_type` (`backend/docs/api/approvals.md`). Only the frontend lagged behind.
+
+#### Files changed
+
+- `src/features/approvals/api/approvals.schemas.ts`: `THRESHOLD_DOC_TYPES` with `complaint`; rows of unknown documents left out; `Threshold` as an explicit type.
+- `src/features/approvals/lib/approval-limits.ts`: the refund ladder uses the order's managers; `limitUnit`.
+- `src/features/approvals/components/approval-limits.tsx`: the "Refund on a complaint" ladder.
+- `src/features/approvals/components/approval-limit-dialog.tsx`: refund wording, and the unit from the document.
+- `src/mocks/data/approvals.ts`, `src/mocks/handlers/approvals.ts`: the refund limits, and changes to them.
+- `Docs/Tested-Features.md`.
+
+#### Tests
+
+- **`src/features/approvals/api/approval-limits.test.ts`** `[APPR-002]`
+  - Reads the refund limits.
+  - Leaves out an unknown document's rows. This test reproduces the reported error on the old schema.
+  - Changes a refund limit.
+- **`src/features/approvals/components/approval-limits.test.tsx`** `[APPR-002]`: the three ladders, refunds included.
+
+### Say what each lead stage means, and give long pages their bottom margin
+
+`fix` · `LEAD-007` `LEAD-001` `SO-002` `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--fix--LEAD-007--say-what-each-lead-stage-means-and-give-long-pages-their.md)
+
+#### Before
+
+- **Stages had no explanation.** The Stage filter and the Update stage menu listed stages by name only. Someone new couldn't tell Qualified from Contacted. Merged and Dormant meant nothing without asking: nobody moves a lead to either by hand.
+- **Long pages had no bottom margin.** On a desktop, the last card of a sales order, quotation or lead touched the bottom edge of the panel. The sales pages share one layout whose container was fixed to the panel's height, so the list tables could scroll inside it. A long detail page overflowed that fixed height, past the container's bottom padding.
+- **Faint grey text failed contrast in dark mode.** `subtle-foreground` measured 4.27:1 on the popover background, below the 4.5:1 that small text needs. axe found it in the Update stage menu, as it had in the notification bell.
+
+#### Now
+
+- **The Stage filter explains each stage.** Every stage shows one line under its name, in a wider popover that scrolls on a short screen. For example: "Merged: a duplicate, folded into another lead that carries its history. Hidden from the list unless chosen here." The text is always visible rather than in a hover tooltip, because tooltips don't work on phones.
+- **The Update stage menu explains too.** It starts with "Now Quoted" and what that stage means. Each move says what it does: "Mark as lost…: asks for the reason. The lead can be reopened later."
+- **Screen readers hear the same.** Each checkbox and menu item is named by its label alone and described by its line (`aria-describedby`), so the names stay short.
+- **`FilterPill` options take an optional `description`.** Any filter can use it.
+- **Long pages keep their bottom margin.** The sales layout's container fills the panel only when it holds a page that asks for it (`data-page-fill`): the leads, quotations and sales orders lists, and their loading states. Detail pages grow and scroll with the panel, keeping 24px below their last card on a desktop and 20px on a phone.
+- **`subtle-foreground` is lighter in dark mode,** raised from L 0.60 to 0.63, so it passes 4.5:1 on every surface, the popover included.
+- **The filter popover has a name** ("Stage filter"), so screen readers announce it.
+
+#### Discussion
+
+- **The stage descriptions follow the backend's rules.** The backend sets Quoted and Negotiation from the quotation. A lost lead reopens at the stage it was lost from. Only the backend's worker sets Dormant. Merged is a duplicate folded into the lead it duplicates.
+- **The spacing fix uses CSS, not route checks.** The layout can't tell a list from a detail page without client code; `has-data-page-fill` lets the page say so itself.
+- **The contrast fix changes the token, not the components.** Every faint label in a dark popover or card benefits. In light mode the token is unchanged.
+- **One axe finding stays: `region`, on menus.** Base UI portals a menu outside the page landmarks. It is a best-practice rule, not WCAG, and it applies to every dropdown in the app.
+
+#### Files changed
+
+- **Stage explanations**
+  - `src/features/leads/lib/lead-labels.ts`: `LEAD_STAGE_DESCRIPTIONS`.
+  - `lib/lead-lifecycle.ts`: `stageActionDescription`.
+  - `components/leads-toolbar.tsx`: the stage filter's descriptions.
+  - `components/lead-stage-menu.tsx`: the current stage and each move described (`StageMenuItem`).
+- **Filter popover** (`src/components/patterns/filter-pill.tsx` and `filter-pill.stories.tsx`)
+  - Option descriptions tied to their controls.
+  - A wider, scrollable popover, with a name.
+  - The `WithDescriptions` story.
+- **Spacing**
+  - `src/components/patterns/page-container.tsx`: `fill` only with `data-page-fill`.
+  - `src/app/(app)/(sales)/{leads,quotations,sales-orders}/page.tsx`, `leads/loading.tsx`, `sales-orders/loading.tsx`: `data-page-fill`.
+- **Contrast**
+  - `src/styles/tokens.css`, `Docs/Design-System.md`: dark `subtle-foreground` at 0.63.
+- **Records**
+  - `Docs/Tested-Features.md`.
+  - `Docs/screenshots/stage-help/`.
+
+#### Tests
+
+- **`src/components/patterns/filter-pill.test.tsx`**: `[LEAD-001] FilterPill with descriptions`. A checkbox is named by its label and described by its line.
+- **`src/features/leads/components/leads-ui.test.tsx`**: `[LEAD-001]` the Stage filter explains Merged and Dormant.
+- **`src/features/leads/components/lead-stage.test.tsx`**: `[LEAD-007]` the current stage and each move are described. Every earlier test still finds its items by their short names.
+- **By hand, with axe,** on a desktop (light) and a phone (dark):
+  - the bottom gap is now 24px and 20px, where it was 0;
+  - the leads list still scrolls inside its table, and the page itself doesn't scroll;
+  - the Stage filter is clean;
+  - the menu is clean apart from `region`.
+
+### Demo walk fixes: the dashboard on the backend's contract, the customer's PDF link, crops and land, clearer lead history
+
+`fix` · `RPT-001` `QUOT-012` `LEAD-002` `LEAD-003` `LEAD-005` `APPR-001` `AUTH-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md)
+
+#### Before
+
+The backend's walk of staging on 1 October, along the demo's path, found these (most urgent first):
+
+- **The dashboard failed for every role (D-1).** Its contract was a guess from before the backend had a dashboard: camelCase, numbers. The backend sends snake_case with decimal strings (BE-008), so every answer was rejected as a contract violation.
+- **The customer's PDF link would break (D-2).** The backend now sends `pdf_url` as `/api/v1/public/q/…/pdf`. The page put the API base in front again, giving `/api/v1/api/v1/…`.
+- **Vague lead history (D-6).** It said "Approval decided" or "Sales order submitted", without the step, the decision, the quotation's number or the dispatch number.
+- **The duplicate count (D-7).** The create toast named one possible duplicate while the lead page said "3 possible duplicates".
+- **The new-lead form (D-8):**
+  - it had no crops or land, though the backend takes both (BE-003);
+  - "Choose the inquiry type" and "Choose the irrigation system" showed in red the moment a dropdown opened.
+- **Polish:**
+  - em dashes in UI copy;
+  - the Accounts remark error read like a rejection;
+  - the leads list mixed "₹69,910" and "₹2.41 L";
+  - a lead's quotation card showed no paise;
+  - a won lead still showed "Warm" and an empty "Win probability" card;
+  - a toast survived signing out and in as someone else.
+
+#### Now
+
+**Dashboard (RPT-001).** It reads the backend's own shape from `backend/docs/api/dashboard.md`:
+
+- **Money stays a decimal string** until it is printed. Counts and percentages become numbers only for display and the sparklines.
+- **Snapshot figures** (open pipeline, overdue follow-ups) show no change or trend, because the backend sends none.
+- **Follow-ups** are the backend's tasks, with district, assignee (or "Unassigned") and an "Overdue" mark.
+- **The mock answers in the same shape.** In partial mode the dashboard goes to the real backend.
+
+**The customer's PDF link (QUOT-012).** A path from an answer is used as given. `asApiPath` strips the backend's own `/api/v1` prefix, so the base is never added twice. Older answers without the prefix keep working.
+
+**Lead history (LEAD-005):**
+
+- **Approvals:** "Ravi Joshi approved the District Manager step" (or "returned it at …"), with Accounts and Dispatch named by their desks.
+- **Quotation events:** the number and version as a link ("QT/GJ/2026-27/00009 · v2"), from the fields the backend added in BE-017.
+- **Dispatch events:** the dispatch number.
+- **Order events:** they link to the order once the backend names it (BE-020, asked here). Until then they say what happened.
+
+**Duplicates (LEAD-002).** The toast names every pending duplicate: "3 possible duplicates (A, B and C), flagged for review".
+
+**New lead form (LEAD-002):**
+
+- **Crops:** up to 10 from the admin-edited list (`GET /lookups/crops`), shown as "Cotton, Groundnut and 1 more".
+- **Land:** in acres, e.g. 4.5.
+- **Dropdowns** are checked on submit, then as they change, never just for being opened.
+
+**Lead page and list (LEAD-003):**
+
+- **Crops** show as tags (a switched-off crop greyed) beside the land in acres.
+- **Win probability and engagement** (the cards and the list's two columns) are gone, as the backend decided (BE-004).
+- **Hot, warm or cold** shows only while a lead is open.
+- **The list** shows its crops and every value in whole rupees.
+
+**Copy and polish:**
+
+- **Em dashes:** no em dash remains in UI copy.
+- **Accounts remark (APPR-001):** an Accounts approval asks for its **payment check** ("Note the payment check: what was received or agreed"); a return still asks why.
+- **Money:** the lead's quotation card shows paise.
+- **Toasts (AUTH-005):** they clear on sign-out and on sign-in.
+
+#### Discussion
+
+- **D-4** (no polling for "Open PDF") **and D-9** (first click ignored) need no code. The quotation and order pages already poll every 3 seconds while a PDF renders (`quotations.queries.ts`, `orders.queries.ts`); the walk likely ran an older build, or a PDF that never left `pending`. D-9 looks like the test robot clicking before the page hydrated. Both are to be checked by hand.
+- **Order links in the lead's history** need the backend: its order events carry `{}` or no order id. Asked as **BE-020**; the frontend reads `order_id` and `order_no` as soon as they arrive.
+- **Notifications and messages** are still mocked (BE-009, BE-010 are served). They connect in the next pull request, with sorting (BE-001), territory levels (BE-005) and assignment names (BE-006).
+- **Mock leads** take their crops and land from their position, not the random seed, so no other seeded figure moved.
+
+#### Files changed
+
+- `src/features/dashboard/api/dashboard.schemas.ts` — the backend's shape, `figure`, `trendPoints`; `components/dashboard-overview.tsx` — reads it; `src/mocks/handlers/dashboard.ts` — answers in it; `handlers/index.ts` — the dashboard leaves `unbuiltHandlers`
+- `src/lib/api/url.ts` — `asApiPath` takes the backend's `/api/v1` prefix; `src/mocks/handlers/quotations.ts` — `pdf_url` as the backend sends it
+- `src/features/leads/lib/timeline-entries.ts`, `components/lead-timeline.tsx` — approval, quotation, order and dispatch lines
+- `src/features/leads/lib/lead-labels.ts` — `describeCreatedLead` (every duplicate), `formatAcres`; `components/new-lead-dialog.tsx` — crops, land, dropdowns validated on submit
+- `src/features/lookups/components/crop-picker.tsx` — new; `api/lookups.schemas.ts` — `crops` list
+- `src/features/leads/api/leads.schemas.ts` — `crops`, `land_acres` on the lead and the create request; `lib/create-lead-errors.ts`
+- `src/features/leads/components/lead-detail.tsx`, `leads-columns.tsx`, `lib/lead-table-layout.ts` — crops and land; win probability and engagement removed; priority only on open leads; whole rupees
+- `src/features/approvals/` — `missingRemarkMessage`, the payment check on an Accounts approval
+- `src/features/auth/components/auth-gate.tsx`, `sign-in-screen.tsx` — toasts cleared
+- UI copy across `quotations`, `orders`, `leads`, `lookups`, `messages`, `layout` and `app` — no em dashes; `lead-quotations.tsx` — paise
+- `src/mocks/data/leads.ts`, `data/lookups.ts`, `handlers/leads.ts` — crops and land
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — RPT-001 in progress
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `../docs/Backend-Tasks.md` (BE-020), `Docs/screenshots/demo-fixes/`
+
+#### Tests
+
+- `src/features/dashboard/api/dashboard.test.ts` — `[RPT-001]` the backend's shape read with money as strings; the old shape refused as a contract violation; the mock answers the same way; figures and trends
+- `src/lib/api/url-and-errors.test.ts` — `[QUOT-012]` `asApiPath` with and without the backend's prefix, never a double base, other hosts refused
+- `src/features/leads/lib/timeline-entries.test.ts`, `components/lead-activity.test.tsx` — `[LEAD-005]` approval steps, quotation links, dispatch numbers; `[LEAD-003]` crops and land, no win probability, no priority on a won lead
+- `src/features/leads/lib/lead-labels.test.ts` — `[LEAD-002]` one or several duplicates
+- `src/features/leads/components/leads-ui.test.tsx` — `[LEAD-002]` a dropdown opened is not marked wrong (fails with the old `onBlur`); crops and land sent with the lead
+- `src/features/leads/api/leads.test.ts` — crops and land in the request; their field errors
+- `src/features/approvals/lib/approval-labels.test.ts` — `[APPR-001]` the reason to return and the Accounts payment check
+- `src/features/auth/components/auth-gate.test.tsx` — `[AUTH-006]` no toast survives a sign-out (fails without the fix)
+- `src/mocks/handlers/index.test.ts` — the dashboard goes to the real API in partial mode
+- `e2e/smoke.spec.ts` — the whole suite, desktop and phone, with axe: 35 passed
+- By hand (`npm run dev`): the dashboard on a desktop and a phone in dark mode; a new lead with three crops and 4.5 acres, a dropdown opened and closed without an error; a won lead with its crops and land and no "Warm". axe found nothing.
+
+### Fix the three npm audit findings, and take the safe dependency updates
+
+`security` · `APP-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-02--security--APP-001--fix-the-three-npm-audit-findings-and-take-the-safe.md)
+
+#### Before
+
+`npm install` reported 3 vulnerabilities:
+
+- **Critical: `next` 16.3.5.** Remote code execution in `next/og` `ImageResponse` (GHSA-vcvr-r3jv-pc5j). The app does not use `next/og`, so it was not reachable, but it shipped in the production dependency.
+- **High: `brace-expansion`.** CPU and stack denial of service on crafted brace patterns (GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p). It comes in through ESLint and its plugins: development only.
+- **Moderate: `fast-uri`.** Inconsistent host normalisation (GHSA-hrr3-gc8f-f4qj). It comes in through Ajv: development only.
+
+Dependabot's pull requests #13–#17 were open and failing:
+
+- **#13 (minor and patch group).** `@hugeicons/core-free-icons` 4.3.4 is a broken release: its index imports a file it does not ship, so every test that renders an icon failed.
+- **#14 (jsdom 30).** It needs Node ≥ 24.15, and we pin 24.13.1, so `npm ci` stopped.
+- **#15 (ESLint 10), #16 and #17 (`@vitest/browser` 5).** Major versions that need their peers moved with them. The Vitest 5 packages, for example, need `vitest` 5 itself.
+
+#### Now
+
+`npm audit` reports **0 vulnerabilities**.
+
+- **`next` and `eslint-config-next`: 16.3.5 → 16.3.8.** A patch release with the fix.
+- **`npm audit fix`:** `brace-expansion` and `fast-uri` move to fixed versions inside the lockfile; no direct dependency changes.
+- **#13's safe updates, all patch or minor:**
+  - `@tanstack/react-query`, `-devtools` and `eslint-plugin-query` 5.103.1;
+  - `motion` 13.4.0;
+  - `@commitlint/*` 21.2.3;
+  - `knip` 6.37.0;
+  - `prettier` 3.9.8;
+  - `tsx` 4.23.15.
+- **Left out:** `@hugeicons/core-free-icons` stays on 4.3.3, the release #13 wanted to replace with the broken 4.3.4.
+
+#### Discussion
+
+- **#13 is superseded by this pull request.** Close it, or let Dependabot close it once this merges.
+- **#14–#17 are major upgrades.** Each needs its own change, not a bump:
+  - jsdom 30 waits for a Node upgrade (`.nvmrc` to 24.15 or later, in CI and on every machine);
+  - ESLint 10 waits for `eslint-config-next` and the React, a11y and import plugins to support it;
+  - Vitest 5 means `vitest`, `@vitest/browser`, `@vitest/browser-playwright` and the Storybook Vitest addon together.
+
+  Closing them loses nothing: Dependabot opens them again for the next release.
+
+- **No code changed.** Prettier 3.9.8 formats every file the same way.
+
+#### Files changed
+
+- `package.json`: the versions above.
+- `package-lock.json`: regenerated by npm.
+
+#### Tests
+
+- `npm audit`: 0 vulnerabilities.
+- `npm run verify`: typecheck, lint, every unit test, changelog check.
+- `npm run build`: the production build on Next.js 16.3.8.
+- `npm run knip` and `prettier --check .`: clean.
+
+## 30 September 2026
+
+### Approval limits: an order's value and a quotation's discount per role, changed by an administrator
+
+`feature` · `APPR-002` · Nakul Srivastava · [entry](changelog/entries/2026-09-30--feature--APPR-002--approval-limits.md)
+
+#### Before
+
+The approval limits lived only in the backend's seed: District approves orders up to ₹1,00,000 and State up to ₹5,00,000 including GST, and discounts go from a field officer's 5 % up to Regional's 20 %. Nobody could see them in the app, and changing one needed a database change. The mock hard-coded the same bands.
+
+#### Now
+
+**Approval limits (APPR-002)** — `/approval-limits`, under Admin for roles with `masters`:
+
+- **Two ladders**, lowest level first:
+  - **Order value**, including GST: District, State and Regional Manager ("Up to ₹1,00,000", "No limit"), saying that a bigger order goes on to the next level, then to Accounts and Dispatch.
+  - **Discount on a quotation:** the field officer's own limit, then District, State, Regional and Admin-Sales.
+- **A territory's own limits** show under the company-wide ladder, marked "Own limits"; levels it doesn't set use the company-wide limit.
+- **Changing one level** (`masters.edit`, Admin in the mock) opens a dialog:
+  - it shows the current limit and what it means for that level;
+  - it gives the bounds in words ("Above ₹1,00,000, to keep each level above the one below");
+  - **No limit** is offered only at the top of a ladder;
+  - a limit out of order is refused on the field before it is sent.
+  - Saving shows the new ladder at once and says it applies from the next order or discount request.
+  - If the backend refuses because someone changed another level meanwhile (`thresholds_not_increasing`), the dialog says so and the ladders reload.
+- **Everyone else** reads the limits, with "Only an administrator changes these".
+- **States:** skeleton, a warning when no limits are set, errors with retry.
+
+**The mock** keeps the limits as rows, as the backend does, with one district's own order limit as an example. `PUT` follows the backend's rules:
+
+- only `masters.edit` may change a limit;
+- the levels must stay in order;
+- only Admin-Sales may have no discount limit;
+- an order limit must be above 0, and a discount at most 100.
+
+A changed limit now decides the next order's chain and the next discount's approver in the mock.
+
+#### Discussion
+
+- **Read by all, changed by administrators:** `GET /approvals/thresholds` is open to anyone signed in, so managers can see where their authority stops; `PUT` needs `masters.edit`, so the page sits under Admin with the `masters` module.
+- **No new territory override from this screen yet.** It edits the rows that exist, company-wide and per territory. Adding a territory's own limit needs a territory picker; `TODO(APPR-002)` when the client asks for it.
+- **The client's real figures are still owed** (BE-014). This screen lets an administrator enter them once they come, with no backend change.
+- **Axe on a phone:** a read-only page with nothing focusable in the scrolling `<main>` trips `scrollable-region-focusable`. The app shell's `main` is `tabIndex={-1}` on purpose (skip link target). Left as is; worth a look in the shell later.
+- **Also here:** the direct order builder (SO-005) is registered and planned, not built. It follows the backend pick-ups (BE-001…017), which matter more day to day.
+
+#### Files changed
+
+- `src/features/approvals/api/` — thresholds contract (`Threshold`, `ThresholdPutRequest`, the limit form), `getApprovalThresholds`, `putApprovalThreshold`, `approvalThresholdsQueryOptions`, `usePutApprovalThreshold`
+- `src/features/approvals/lib/approval-limits.ts` — ladders, bounds, who may have no limit, refusals; `approval-labels.ts` — `limitRoleLabel`
+- `src/features/approvals/components/approval-limits.tsx`, `approval-limit-dialog.tsx` — new
+- `src/app/(app)/approval-limits/page.tsx`, `loading.tsx` — new route; `src/components/layout/navigation.ts` — Approval limits under Admin
+- `src/mocks/data/approvals.ts` — `seedThresholds`, `limitOf`, `orderManagersFor`, `quotationApproverFor` from the rows; `data/orders.ts` — the chain from the limits; `handlers/approvals.ts` — `GET`/`PUT /approvals/thresholds`; `handlers/orders.ts`, `handlers/quotations.ts`, `db.ts` — read the limits
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — APPR-002 in progress, SO-005 planned
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `Docs/screenshots/approvals/limits-*`
+- `e2e/smoke.spec.ts` — the limits as Admin, with axe
+
+#### Tests
+
+- `src/features/approvals/lib/approval-limits.test.ts` — `[APPR-002]` ladders company-wide and per territory, bounds and their words, only the top without a limit, formatting
+- `src/features/approvals/api/approval-limits.test.ts` — `[APPR-002]` reading the rows; an administrator's change, `thresholds_not_increasing`, no discount limit below Admin-Sales, a discount over 100; refused without `masters.edit`
+- `src/features/approvals/components/approval-limits.test.tsx` — `[APPR-002]` read-only for a manager; an administrator's change refused out of order, then saved
+- `e2e/smoke.spec.ts` — `[APPR-002]` both ladders and the dialog as Admin; axe finds no violations; desktop and phone
+- By hand (`npm run dev`, Preview as role → Admin): open Admin → Approval limits; change State Manager's order limit to ₹50,000 (refused on the field), then ₹4,00,000. As State Manager: read-only. Light and dark, 360px and desktop.
+
+### Sales orders and dispatch: place an order from a quotation, follow its approval, record what left
+
+`feature` · `SO-001` `SO-002` `SO-003` `SO-004` `DISP-002` `APPR-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-30--feature--SO-001--sales-orders-and-dispatch.md)
+
+#### Before
+
+Sales orders was a "coming soon" page. An accepted quotation could not become an order, the approvals inbox decided orders that had no page ("Order details open from Sales orders once that module is built"), and the mock's order rows were stand-ins with no order behind them.
+
+The frontend also asked for permission modules the backend does not have: `orders` and `approvals`. The backend's are `sales_orders` and `dispatch`, and approving is the `approve` action on `sales_orders` or `quotations` (`backend/docs/architecture/RBAC.md` §6). On the real backend, Sales orders and Approvals would have stayed hidden from everyone.
+
+#### Now
+
+**The list (SO-001)** — `/sales-orders`: number (or "Draft order"), the dealer or "Direct sale", "Provisional", the party, the status with whom it waits on ("Waiting on Accounts"), how much has shipped (a share and a thin bar), type, owner, created, total. Filters by several statuses, one type and **Only my orders**, and a search by number, party or mobile, all in the URL. States: skeleton, "No sales orders yet" (orders come from an accepted quotation), nothing matches, a page link that no longer works, an emptied page, errors.
+
+**The order page (SO-002)** — `/sales-orders/{id}`:
+
+- The lines with ordered, sent, open and short once approved (phone: one card per line), and totals with CGST and SGST or IGST, as the backend prints them.
+- **The approval chain** step by step: the managers by value, then Accounts, then Dispatch. Each step says approved, returned, "Waiting now" or next, who decided and when, their remark, and when a higher manager covered it. Those who decide get **Open approvals**.
+- **Dispatches**, newest first: challan and invoice with dates, transporter, vehicle, who recorded it and each item's quantity. A voided one stays, struck through, with the reason.
+- Party, the quotations it came from, delivery address, payment terms ("recorded, not checked"), place of supply, seller, dates, remarks, and its **history**.
+- **Open PDF** once approved ("Preparing PDF…" while it renders; the page checks again by itself).
+- Notices: returned with the reason, cancelled or closed short with the reason, indicative pricing, no mobile for the customer's confirmation, the PDF failed.
+
+**Placing an order (SO-003)** — an accepted, current quotation has **Place order** for roles with `sales_orders.create`: order type (commercial or industrial; the others are not built on the backend), delivery address (the party's by default), payment terms, remarks. The draft opens. A quotation already on a live order shows **Open order** instead, so `409 quotation_on_order` is never a surprise. A draft's delivery, terms and remarks can be changed; a draft that was never submitted can be deleted by a holder of `sales_orders.delete`, and a numbered one is cancelled instead.
+
+**Submit and cancel (SO-004)** — **Submit for approval**, or **Submit again** after a return: the order gets its number and starts its chain; the dialog says what happens. **Cancel** needs a reason: the owner while it is a draft or waiting, a holder of delete once approved, nobody once something has shipped (close it short instead).
+
+**Dispatch (DISP-002)**, for Dispatch (`dispatch.create`/`edit`):
+
+- **Record a dispatch:** each open item's quantity (or **Everything open**), when it left (not in the future), challan, invoice, transporter, vehicle. Refused on the field before it is sent: nothing entered, more than is open, decimals on a whole-unit item. The backend's own refusals land on the same fields. An invoice dated before its challan, or an invoice number already used, is recorded with a warning toast.
+- **Void a dispatch** with a reason (its quantities are open again) and **close the rest short** with a reason.
+
+**Every action** retries safely with its Idempotency-Key and sends the status the screen showed. When someone else moved the order first, the dialog closes, a toast says what happened, and the page shows the latest; any other refusal stays in the dialog, in words ("Nobody can approve this order", "Prices changed since the draft was saved").
+
+**Approvals (APPR-001)** — order rows have **Open the order**. Order steps arrive one at a time, as on the backend: the next joins its inbox when the one before is approved. Accounts and Dispatch see only their own steps, and Accounts needs a remark on every decision (BE-018).
+
+**Permissions** now use the backend's codes: Sales orders follows `sales_orders`, and Approvals shows to whoever holds `sales_orders.approve` or `quotations.approve` (`canApprove`, `useCanApprove`). The mock's roles follow RBAC.md: field staff and partners view, create and edit orders; managers also approve; Accounts views and approves; Dispatch holds `dispatch` view, create, edit and approve, and approves orders.
+
+**The mock backend** now has real orders: eight made from the seeded accepted quotations, in every state (partly and fully dispatched, waiting at District and further up, approved, returned with a reason, cancelled, closed short), with their chains, dispatches and history, all in the past. It follows the backend's rules and codes: `quotation_on_order`, `quotation_not_accepted`, `quotations_disagree`, `order_not_draft`, `order_was_submitted`, `order_dispatched`, `order_not_cancellable`, `order_not_dispatchable`, `over_open_quantity`, `unit_precision`, `duplicate_line`, `dispatch_voided`, `order_closed`, `status_changed`, `remark_required` and `self_approval`. An approval at the last step approves the order and its PDF is ready a few seconds later.
+
+**Shared pieces:** the notice box and the PDF link button moved to `components/patterns` (`Notice`, `PdfLinkButton`), and the quotation page uses them too. "(optional)" on field labels is now `text-muted-foreground`, since the subtler tone failed contrast in dark dialogs (axe).
+
+#### Discussion
+
+- **Quotation first, then order.** The backend makes an order from accepted quotations or from typed-in lines. This slice builds the first — the path the sales team walks every day. The direct order builder, the consolidated dealer order and the approval limits screen are the next pull request (SO-005, APPR-002; Plan §9.3).
+- **Finding a quotation's order.** List rows carry no quotation ids, so the quotation page lists its lead's orders and reads each live one (up to ten) to find the match. One `GET /orders?quotation_id=` would do: asked as **BE-019**, `TODO(SO-003)` in `place-order.tsx`.
+- **The screen never totals money.** Every figure is the backend's; the "sent" share on the order page is a count of quantities, not money.
+- **Dispatch quantity checks are a courtesy.** The form checks against the open quantity and the unit's decimals so mistakes show at once; the backend checks the same and its answers are mapped onto the same fields.
+- **Void stays on a dispatched order.** The backend refuses a void only on a closed order (`409 order_closed`), so Dispatch can undo a mistaken last dispatch.
+- **Not checked on the dev API yet** (Plan §9.1): the flows are tested against the mock, which follows the contract; a hand check on the dev API is due before staging.
+
+#### Files changed
+
+- `src/features/orders/api/` — `orders.schemas.ts` (the contract, the header and remark forms, `dispatchFormSchemaFor`), `orders.api.ts`, `orders.queries.ts`, `orders.mutations.ts`
+- `src/features/orders/lib/` — `order-labels.ts`, `order-lifecycle.ts` (what can be done, refusals in words, history lines), `order-table-layout.ts`
+- `src/features/orders/hooks/` — `use-order-list-params.ts`, `use-order-actions.ts`
+- `src/features/orders/components/` — `orders-table.tsx`, `orders-columns.tsx`, `orders-toolbar.tsx`, `order-status-badge.tsx`, `order-detail.tsx`, `order-approval.tsx`, `order-dispatches.tsx`, `order-history.tsx`, `order-actions.tsx`, `order-action-dialog.tsx`, `order-dialog-shared.tsx`, `record-dispatch-form.tsx`, `place-order.tsx`
+- `src/app/(app)/(sales)/sales-orders/` — the list (replacing the placeholder), `loading.tsx`; `[orderId]/page.tsx`, `loading.tsx`, `not-found.tsx`
+- `src/components/patterns/notice.tsx`, `pdf-link-button.tsx` — new, shared; `src/features/quotations/components/quotation-detail.tsx`, `quotation-pdf-button.tsx` use them
+- `src/features/quotations/components/quotation-actions.tsx` — Place order / Open order on an accepted quotation
+- `src/features/approvals/components/approvals-inbox.tsx` — Open the order; `approval-labels.ts` — the Accounts remark rule by its role code; `approvals.mutations.ts` — a decision re-reads the order it decided and the order lists
+- `src/lib/auth/permissions.ts` — `sales_orders` for `orders`, no `approvals` module, `canApprove`; `src/components/layout/navigation.ts`, `app-sidebar.tsx`, `src/features/session/hooks/use-session.ts` (`useCanApprove`), `src/features/leads/components/sales-tabs.tsx`
+- `src/mocks/data/orders.ts`, `src/mocks/handlers/orders.ts` — new; `data/approvals.ts` — order steps from real orders, one at a time, `seq`; `handlers/approvals.ts` — the chain moves on, `remark_required`, `self_approval`; `data/permissions.ts` — RBAC.md's grants; `data/reference.ts`, `db.ts`, `handlers/index.ts`, `handlers/quotations.ts` — registered
+- `src/features/quotations/components/quotation-builder.tsx`, `quotation-action-dialog.tsx`, `src/features/approvals/components/approval-decision-dialog.tsx` — "(optional)" contrast
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — SO-001…004, DISP-002
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `../docs/Backend-Tasks.md` (BE-019), `Docs/screenshots/orders/`
+- `e2e/smoke.spec.ts` — sales orders, with axe
+
+#### Tests
+
+- `src/features/orders/api/orders.test.ts` — `[SO-001]` newest first with the count, status, type and search filters, the shipped share; `[SO-002]` the document, chain, dispatches and history, 404; `[SO-003]` a draft from an accepted quotation once (`quotation_on_order`), `quotation_not_accepted`, the header and `status_changed`, delete only never-submitted and only with delete; `[SO-004]` the whole chain with Accounts' remark (`remark_required`), a return to draft with the reason, cancel and `order_dispatched`; `[DISP-002]` over the open quantity, a future time, record, void, close short, `dispatch_voided`, refused without dispatch
+- `src/features/orders/api/orders.schemas.test.ts` — `[DISP-002]` the dispatch form: at least one item, not in the future, open quantity, unit precision, a number
+- `src/features/orders/lib/order-lifecycle.test.ts` — `[SO-004]` the actions by status and permission, refusals in words, `[SO-002]` history lines, `[SO-001]` labels
+- `src/features/orders/components/orders-ui.test.tsx` — `[SO-001]` the list, filters from the URL, empty; `[SO-002]` a manager sees the chain and dispatches without dispatch actions; `[SO-004]` a returned order submitted again; `[DISP-002]` the dispatch form's checks, then recorded; `[SO-003]` place an order from a quotation, and Open order when it already has one
+- `src/features/approvals/api/approvals.test.ts` — the reason to reject is `remark_required`, as the backend answers
+- `src/lib/auth/permissions.test.ts`, `src/mocks/data/permissions.test.ts` — the backend's module codes and who approves
+- `e2e/smoke.spec.ts` — `[SO-001]` the list opens an order with its chain and dispatches; axe finds no violations; desktop and phone
+- By hand (`npm run dev`): as State Manager, open Sales orders; filter Waiting for approval; open the returned draft, edit its delivery, submit it again; approve its first step in Approvals. As Dispatch Manager (Preview as role), open the partly dispatched order, record with nothing then too much, then Everything open; void it; close short. As Employee on a phone, open an accepted quotation and Place order. At 360px and on a wide screen, light and dark; axe finds nothing.
+
+## 28 September 2026
+
+### A tested-features log with screenshots, and an index at the top of the changelog
+
+`docs` · `REPO-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--docs--REPO-001--a-tested-features-log-with-screenshots-and-an-index-at-the.md)
+
+#### Before
+
+What a user can do — and how far each feature was tested — was spread over fourteen changelog entries, pull requests and chat. The screenshots taken while checking screens lived only on the machine that took them. `CHANGELOG.md` had no overview: to find a change you scrolled 865 lines.
+
+#### Now
+
+- **`Docs/Tested-Features.md`** — every user story built so far, by module, from the user's side: who can do what, the cases checked, and how far each is tested — 🧪 automated, 🌐 end to end, 👀 walked through in a browser, 🔌 checked on the backend's dev API — with where it lives (`integration` or an open pull request), links to the screenshots and to the changelog entry with the test files. A table at the top gives each module at a glance; the end lists what the backend serves that has no screen yet. Only leads (list, create, open) and staff sign-in are marked 🔌 — everything else still needs its dev-API check before staging, and the file says so.
+- **`Docs/screenshots/`** — 29 screenshots from the checks of the lead actions, the quotation screens, the builder, the lifecycle walk-through and the customer's page, by module, as WebP (1.2 MB instead of 3.9 MB as PNG).
+- **An index at the top of `CHANGELOG.md`** — one line per change: date, title linking to its entry, type and Data IDs. Generated like the rest, so it never drifts.
+- `AGENTS.md` §1 and `changelog/README.md` point to the new file.
+- **`AGENTS.md` §11, "The records every pull request keeps current"** — the rules, so every contributor and every new AI session keeps them without being asked: the changelog entry, the Data IDs, `Plan.md` §9, `docs/Backend-Tasks.md` for anything asked of the backend, `Tested-Features.md` for every user-facing change, screenshots saved as JPEG under `Docs/screenshots/<module>/`, and the pull request template (stacked pull requests say so first).
+- **`docs/Backend-Tasks.md`** — BE-002 (answered: follow-ups are tasks), BE-007 and BE-011 marked done in #25, which merged into `integration` without ticking them; the notes say what #25 changed.
+
+#### Discussion
+
+- **Why one file for features, apart from the changelog:** the changelog answers "what changed, when and why"; this answers "what works today, and can I trust it" without reading history. It is updated in the same pull request that adds a feature, like `Plan.md` §9.
+- **Why not split the changelog into volumes:** nothing is appended to a long file — each change is its own short entry, and `CHANGELOG.md` is rebuilt from them every commit. The index keeps the generated file navigable however long it grows. If it ever gets too long to open, the build can split it by month without touching the entries.
+- **Screenshots are WebP**, converted with the `sharp` already installed by Next.js; GitHub shows them inline. Walk-through scripts can save straight into this folder.
+- The earlier quotation screenshots were captured before the action bar (#22); the file says so.
+
+#### Files changed
+
+- `Docs/Tested-Features.md` — new
+- `Docs/screenshots/leads/`, `quotations/`, `public/` — new, 29 WebP screenshots
+- `scripts/changelog/lib.ts` — `renderIndex`, rendered at the top of `CHANGELOG.md`; `CHANGELOG.md` regenerated
+- `changelog/README.md`, `AGENTS.md` — point to the index and the new file; `AGENTS.md` §11 lists the records every pull request keeps current
+- `../docs/Backend-Tasks.md` — BE-002, BE-007, BE-011 recorded from #25
+- `Docs/Plan.md` — §9.3: tasks and complaints are on `integration` (#25), with the new lead stats
+
+#### Tests
+
+- `scripts/changelog/lib.test.ts` — `[REPO-001]` the index: one row per change, newest first, linking to its entry, marking breaking changes, before the entries
+- Every relative link in `Docs/Tested-Features.md` was checked to resolve to a file.
+
+### Approvals inbox: quotation discounts and sales orders, approved or rejected in place
+
+`feature` · `APPR-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--feature--APPR-001--approvals-inbox.md)
+
+#### Before
+
+A discount above an officer's limit could be sent for approval (QUOT-007), but no screen let a manager decide it: the mock approved every request by itself after eight seconds. Sales orders waiting for approval had no screen either. The sidebar listed Approvals as "Soon".
+
+#### Now
+
+**The approvals inbox (APPR-001)** — `/approvals`, in the sidebar for everyone who may see approvals, with a count of what waits on them (a dot on the collapsed rail).
+
+- **What waits on me, oldest first:** quotation discounts and sales orders side by side. Each shows what it is, its number (or "Draft quotation"), the party, the total, the discount asked, "Indicative pricing" on stand-in rates, who raised it and when, and how long it has waited. A quotation row has **Open the quotation**; an order row says its details come with the Sales orders module.
+- **Covering for a manager on leave:** **Include steps below me** (kept in the URL, `?below=true`) adds lower managers' steps, each marked whose it is ("District Manager's step"). A step nobody of its role covers always shows, marked "No District Manager to decide".
+- **Approve or reject** in place. Rejecting needs a reason ("Say why — the person who asked reads it"); approving takes a remark optionally. Retrying reuses the Idempotency-Key. The request leaves the inbox, the count drops, and a decided quotation is re-read: approved, the officer's button becomes **Send**; rejected, the draft shows the reason.
+- **When the request moved on** — decided by someone else, withdrawn, its draft edited after the request, an earlier step not yet decided, or not this role's step — the dialog closes, a toast says which, and the inbox shows the latest. A request you raised yourself says someone else must decide it.
+- **States:** skeleton, "Nothing waits on you" (suggesting the steps below), an error, a later page failing without losing what is shown. The inbox and the count re-read every minute.
+- **Permissions:** the page and count follow `approvals` in the permission list; without `approvals.approve` the rows show and the buttons don't. An Employee sees no Approvals.
+
+**The mock** keeps a queue as the backend does: every other seeded draft above its limit waits on its manager (District up to 10 %, State 15 %, Regional 20 %), and four sales orders wait at District, State and Regional level — one stalled. A request for approval now waits here; **the eight-second auto-approval is gone**. Editing or deleting a waiting draft withdraws its request; deciding answers with the quotation or a minimal order.
+
+#### Discussion
+
+- **One inbox for both kinds**, as the contract's Screens table asks: a manager's day is one queue. Order rows can be decided from the queue (the backend allows it); their full page comes with sales orders (SO-001), next in Plan §9.3.
+- **Cards, not a table:** each row carries a decision; on a phone the buttons sit full width under the figures.
+- **The remark rule:** the backend requires a remark to reject and on every Accounts decision. The Accounts role code isn't in the contract's examples, so any role naming "account" asks for one — `TODO(APPR-001)`, asked as **BE-018**.
+- **Not in this slice:** the approval limits screen for admins (`GET`/`PUT /approvals/thresholds`), and deciding from the quotation page itself.
+- **Stacked pull requests:** #22, #23 and #24 were merged into the branch below them, not into `integration`, because GitHub retargets a stacked pull request only when the merged branch is deleted. #28 carried them over. `AGENTS.md` §11 now says to retarget a stacked pull request to `integration` before merging it.
+- `Docs/Plan.md` §9.3 is renumbered: sales orders next, then lead edit and merge, QR codes, tasks and the planner, complaints, then the admin screens.
+
+#### Files changed
+
+- `src/features/approvals/` — new: `approvals.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`; `lib/approval-labels.ts` (labels, refusals, the remark rule); `components/approvals-inbox.tsx`, `approval-decision-dialog.tsx`
+- `src/app/(app)/approvals/page.tsx`, `loading.tsx` — new route
+- `src/components/layout/navigation.ts`, `app-sidebar.tsx` — Approvals links to the inbox, with its count
+- `src/mocks/data/approvals.ts`, `src/mocks/handlers/approvals.ts` — new: the queue and the decision; `handlers/quotations.ts` — requests wait in the queue, edits and deletes withdraw them, no auto-approval; `db.ts`, `data/reference.ts`, `handlers/index.ts` — registered
+- `src/features/quotations/api/quotations.lifecycle.test.ts` — approval now decided from the inbox
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — APPR-001 in progress, with its endpoints
+- `AGENTS.md` §11 — retarget a stacked pull request to `integration` before merging it
+- `Docs/Plan.md` §9, `Docs/Tested-Features.md`, `../docs/Backend-Tasks.md` (BE-018), `Docs/screenshots/approvals/`
+- `e2e/smoke.spec.ts` — the inbox and a reason to reject, with axe
+
+#### Tests
+
+- `src/features/approvals/api/approvals.test.ts` — `[APPR-001]` own steps and stalled lower ones, oldest first, with the count; lower steps when asked; approving a quotation discount (it leaves the inbox, the draft may be sent); a reason to reject, then returned with it; already decided; figures changed; a sales order decided
+- `src/features/approvals/components/approvals-inbox.test.tsx` — `[APPR-001]` both kinds with the count, stalled and discount; a reason required to reject, then the row leaves; approve without a remark; decided by someone else closes and refreshes; lower steps from the URL, no buttons without the permission; nothing waiting
+- `src/features/quotations/api/quotations.lifecycle.test.ts` — `[QUOT-007]` approved from the inbox, then sent
+- `e2e/smoke.spec.ts` — `[APPR-001]` the inbox lists requests and asks for a reason to reject; axe finds no violations
+- By hand (`npm run dev`, as State Manager): open Approvals — 7 waiting; reject one without, then with a reason; approve a quotation discount and open it; tick Include steps below me; switch to Employee — no Approvals. At 360px and on a wide screen, in light and dark.
+
+### Quotations: the list, the document and its PDF, and a lead's quotations
+
+`feature` · `QUOT-001` `QUOT-002` `QUOT-003` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--feature--QUOT-001--quotations-list-and-detail.md)
+
+#### Before
+
+The Quotations page said "Quotations are the next module". The backend already serves quotations — drafts, sending, the PDF, the customer's answer, revisions — but nothing on screen read them, and a lead page could not show its quotations.
+
+#### Now
+
+The read side of quotations, on the backend's contract (`backend/docs/handover/quotations-api-contract.md`). Creating, sending and deciding come in the next slices.
+
+**The Quotations page (QUOT-001)**
+
+- A table, newest first: the number (or **Draft** — a draft has no number until it is sent) with its version once there is more than one, the lead's inquiry number, the party and mobile, a status chip (Draft, Sent, Viewed, Negotiation, Accepted, Rejected, Expired — always labelled, never colour alone), the sales type, owner, sent date, validity and total.
+- Search by number, name or mobile; filter by several statuses at once and one sales type; **Show older versions** adds the versions a revision replaced, marked "Superseded by v2". Filters and the page live in the URL, with the backend's page cursors, as on the lead list; "1–25 of 49" from the backend's count.
+- States: skeleton, empty (with and without filters), error with a reference, a page link that no longer works, a page emptied since the link was made, and a notice when a refresh fails over older data.
+
+**A quotation (QUOT-002)** — `/quotations/{id}` prints the document as the backend sends it; the screen never computes a figure.
+
+- The number, version, status and sales type; for whom, and a link to the lead ("lead not visible" when it is outside the reader's scope).
+- **Notices, most important first:** "Version 2 replaced this one" with a link; **Indicative pricing** when rates or slabs are stand-ins (the PDF carries the same banner); the customer's decision with who recorded it and the remark; a PDF that is still being prepared (the page re-reads itself every few seconds until it is ready) or that failed, with the reason; and each backend warning as a sentence.
+- **Items** across the full width, in the client's own columns: quantity, rate, gross, the 1st, 2nd and 3rd discount (percentage and amount, each on the running balance — a tier shows only when a line uses it), taxable value, GST (slab, then CGST + SGST or IGST) and total. On a phone each line is a card with the same figures. Then the totals: gross, discount, taxable value, CGST and SGST (or IGST), total.
+- **Party** (name, mobile, address, GSTIN when given), **Terms**, and **Details**: owner and office, channel partner or "Direct sale", place of supply and whether the tax is within or across states, the seller's registration, the price date and price list, validity, when it was sent and how many times the customer opened it, and who created it. The customer link has a **Copy** button.
+- A 404 shows "Quotation not found" with a way back.
+
+**Open PDF (QUOT-003)** — asks the backend for a link that lasts ten minutes and opens it in a new tab; the file is never fetched with the sign-in token. The tab opens on the click, so pop-up blockers allow it; if one blocks it anyway, a toast offers **Open PDF**. While the PDF renders the button reads "Preparing PDF…" and is off; a refusal says why ("The PDF is still being prepared", "The PDF couldn't be made").
+
+**On the lead page** — a **Quotations** card lists the lead's quotations, every version, newest first: number, status, total, sent date, the older version muted and marked superseded. It shows to anyone who may see quotations.
+
+#### Discussion
+
+- **Read first, then write.** Quotations are thirteen endpoints and a live pricing preview. The list and the document come first: they are what a manager and a field officer read every day, and the builder, send, approval and decision screens reuse everything here.
+- **The screen prints, it never adds.** Money and rates stay decimal strings from the backend; totals are the backend's. Rates print without trailing zeros ("10%", "2.5%").
+- **Discount tiers 2 and 3 show only when a line uses them**, so a simple quotation is not a wall of "0%" columns; the order is always the client's sheet's order.
+- **The lead card shows every version**, as the contract asks: a revised quotation's history belongs to the lead.
+- **Mocks follow the backend's arithmetic:** each discount tier on the running balance, rounded to the paisa before the next, GST split into CGST and SGST within the state; a test checks every mock line and total adds up. The mock has no PDFs, so its links point at a placeholder address (`TODO(QUOT-003)`).
+- **Asked of the backend** (`docs/Backend-Tasks.md`): BE-015, set `PUBLIC_WEB_URL` so share links point at the app, not localhost; BE-016, say whether the dev API renders real PDFs or stores HTML.
+- **Next:** the builder (QUOT-004): create and edit drafts with the product picker and live pricing, `rate_changed` handling; then send and discount approval, the customer's answer, revise and versions; then the public `/q/{token}` page.
+
+#### Files changed
+
+- `src/features/quotations/api/` — new: the contract (`quotations.schemas.ts`), `listQuotations`, `getQuotation`, `getQuotationPdf`, and query options (the detail re-reads while the PDF renders)
+- `src/features/quotations/lib/quotation-labels.ts` — new: status, sales type and PDF labels, numbers and titles, rates and quantities, warnings split into code and sentence
+- `src/features/quotations/lib/quotation-table-layout.ts`, `hooks/use-quotation-list-params.ts` — new: the table layout and the list's URL state
+- `src/features/quotations/components/` — new: `QuotationsTable`, `QuotationsToolbar`, `quotationColumns`, `QuotationStatusBadge`, `QuotationDetail`, `QuotationPdfButton`, `LeadQuotations`, with skeletons
+- `src/app/(app)/(sales)/quotations/page.tsx` — the list instead of the placeholder; `[quotationId]/page.tsx`, `loading.tsx`, `not-found.tsx` — new
+- `src/features/leads/components/lead-detail.tsx` — the Quotations card, for anyone who may see quotations
+- `src/mocks/data/quotations.ts`, `src/mocks/handlers/quotations.ts` — new: quotations for the seeded leads and the three read endpoints; `src/mocks/handlers/shared.ts` — new: the error envelope and cursors, now shared with the lead handlers; `db.ts`, `handlers/index.ts`, `data/reference.ts` — registered
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — QUOT-001…003
+- `Docs/Plan.md` — §9: quotations' reads connected, the rest next
+- `../docs/Backend-Tasks.md` — BE-015 and BE-016
+
+#### Tests
+
+- `src/features/quotations/lib/quotation-labels.test.ts` — `[QUOT-002]` rates and quantities without trailing zeros (and "10%", not "1%"), Draft and version titles, warnings split on the first colon
+- `src/features/quotations/api/quotations.test.ts` — `[QUOT-001]` current versions newest first with the total, several statuses sent as one value and `current_only` only when off, every version of a lead's quotations, search by number; `[QUOT-002]` lines with every tier, a lead out of sight, 404; `[QUOT-003]` a signed link, 404 on a draft, 409 `pdf_pending`
+- `src/features/quotations/components/quotations-ui.test.tsx` — `[QUOT-001]` skeleton then rows and total, a status filter from the URL, nothing matches, older versions marked superseded; `[QUOT-002]` the document with items, totals, decision and party, a link to the version that replaced it, the indicative-pricing banner, the PDF opened in a new tab, a PDF still being prepared, a refused PDF link closing the tab and saying why; `[QUOT-001]` a lead's quotations with the superseded one, and none
+- `src/mocks/data/quotations.test.ts` — every mock quotation matches the contract, adds up to the paisa, drafts have no number, a revision shares its predecessor's number
+- By hand (`npm run dev`): open Quotations, filter by Negotiation, open a v2 — the notice, the full-width items, the totals; tick Show older versions; open a lead that has quotations and see the card; try Open PDF on a ready, a preparing and a failed one. At 360px and on a wide screen, in light and dark.
+
+### Quotations: make and edit a draft, priced live
+
+`feature` · `QUOT-004` `QUOT-005` `MSTR-003` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--feature--QUOT-004--quotations-make-and-edit-a-draft-priced-live.md)
+
+#### Before
+
+Quotations could be read — the list, the document, its PDF — but not made. A lead page had no way to start a quotation, and a draft could not be changed.
+
+#### Now
+
+The quotation builder, on the backend's contract (`backend/docs/handover/quotations-api-contract.md`). Sending, approval and the customer's answer come in the next slice.
+
+**Start a quotation (QUOT-004)** — the lead's **Quotations** card has **New quotation**, which opens `/quotations/new?lead=…`. It shows only to people who may create quotations. A lead that can't be quoted says why instead: "Qualify the lead first" (new, contacted), "Reopen the lead first" (lost), "The lead is dormant"; a merged lead points to the lead it was merged into.
+
+**Items** — each item is a product, a quantity and up to three discounts, each a percentage of the balance after the one before, in the client's sheet's order.
+
+- **The product picker (MSTR-003)** searches the catalogue on the server as you type, and names each product's unit, HSN and code, since two sizes of one pipe read alike. The quantity shows the product's unit.
+- **Live pricing (QUOT-005)** — once typing pauses, the whole basket is priced by the backend. Under each item: rate, taxable value, GST (CGST + SGST, or IGST, as the backend split them) and total, with **Indicative rate** when the rate or slab is a stand-in. The screen never adds money up; older figures stay on screen, dimmed, while new ones arrive.
+- A row says what it still needs ("Choose a product", "Enter a quantity above 0", "Discounts are percentages from 0 to 100"). Empty rows are ignored.
+
+**Customer and terms** — sales type (commercial or industrial; the other types wait on the client's rules), the party's name, mobile, GSTIN and address (filled from the lead), and terms. Validated in the browser and again by the backend, whose field errors land on the right field or item.
+
+**Summary** — gross, discount, taxable value, CGST and SGST (or IGST) and total, from the backend; its pricing notes; and **Save draft**. Save is off until every item is complete and priced, and says why.
+
+**Saving** — a draft has no number until it is sent. The save carries the price row and tax rate the preview used, so the backend can tell when prices changed since. Then:
+
+- **`rate_changed` (409):** "Prices changed since you priced this" — the affected items say "Rate: now …", the basket is priced again, and the next save is a new request.
+- "This lead can't be quoted yet", "This lead is closed", "That sales type isn't priced yet", "This quotation has moved on" (sent or changed by someone else), and field errors on their fields.
+- A retry of the same save reuses its `Idempotency-Key`, so a double click or a timeout never makes two drafts.
+- On success: "Draft saved", and the draft opens.
+
+**Edit a draft** — the draft's page has **Edit draft**, which opens `/quotations/{id}/edit` with its items and header. Saving sends the header only when it changed, then the items. A quotation that was sent says it is revised, not edited.
+
+#### Discussion
+
+- **The backend prices, the screen asks.** Every figure comes from `POST /pricing/quote-lines`; nothing is multiplied or added in the browser. Pricing runs 400 ms after typing stops and cancels a preview that is no longer needed.
+- **Why the save carries `price_list_item_id` and `gst_rate_id`:** the contract answers `rate_changed` when either moved since the preview, so a person never saves figures they didn't see.
+- **Discount above the owner's limit is not blocked here.** The contract lets a draft carry any discount and asks for approval at send; the edit screen repeats the last save's discount and limit. The send and approval screens come next.
+- **Mocks follow the contract:** products, preview, create, header and lines, `lead_not_qualified`, `sales_type_unsupported`, `rate_changed` (bump `mockDb.priceVersion`), replays by `Idempotency-Key`, and refusing to edit a sent quotation.
+- **Next:** send and discount approval; accept, reject and negotiation; revise, versions and delete; then the public `/q/{token}` page.
+
+#### Files changed
+
+- `src/features/quotations/api/quotations.schemas.ts` — products, the pricing preview, create, header and lines requests, the header form, `QuotationLine` shared by the document and the preview, and the draft's discount against the owner's limit
+- `src/features/quotations/api/quotations.api.ts`, `quotations.queries.ts` — `searchProducts`, `previewQuoteLines`, `createQuotation`, `patchQuotation`, `replaceQuotationLines`, with query options; `quotations.mutations.ts` — new: create and update, refreshing the document, the lists and the lead's timeline
+- `src/features/quotations/lib/builder-lines.ts` — new: rows, what each still needs, the preview request, the lines to save, and routing the backend's field errors to fields and rows
+- `src/features/quotations/lib/quotation-labels.ts` — why a lead can't be quoted yet
+- `src/features/quotations/components/` — new: `QuotationBuilder`, `QuotationLineRow`, `ProductPicker`, `NewQuotation` and `EditQuotation`; `LeadQuotations` — **New quotation**; `QuotationDetail` — **Edit draft**
+- `src/features/leads/components/lead-detail.tsx` — passes the lead's stage to its Quotations card
+- `src/app/(app)/(sales)/quotations/new/` and `[quotationId]/edit/` — new routes
+- `src/mocks/data/quotations.ts`, `src/mocks/handlers/quotations.ts`, `src/mocks/db.ts` — the products, pricing and the three writes
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — QUOT-004, QUOT-005, MSTR-003
+- `Docs/Plan.md` — §9: the builder connected
+
+#### Tests
+
+- `src/features/quotations/lib/builder-lines.test.ts` — `[QUOT-004]` what a row still needs; `[QUOT-005]` only finished rows priced, empty discounts sent as 0, partner and price date when known; `[QUOT-004]` priced lines matched to rows, saved lines carry the price row and tax rate, a draft read back into rows, backend field errors routed to fields and rows in words
+- `src/features/quotations/api/quotations.write.test.ts` — `[MSTR-003]` search by description, and nothing found; `[QUOT-005]` a basket priced with its tiers and tax split; `[QUOT-004]` a draft with no number and a replay by key, `lead_not_qualified`, `rate_changed` after the price list moved, header and lines edited, a sent quotation refused
+- `src/features/quotations/components/quotation-builder.test.tsx` — `[QUOT-004]` an item priced as it is entered, then saved and opened; `rate_changed` explained, re-priced and saved; Save off until an item is complete; no lead, a lead not yet qualified; a draft loaded for editing, a sent quotation not edited
+- `src/features/quotations/components/quotations-ui.test.tsx` — the lead's Quotations card with the lead's stage
+- By hand (`npm run dev`): open a qualified lead → New quotation; add a UPVC pipe with 10% and 5%, and an HDPE lateral (indicative rate); watch each item and the totals price; save and see the same figures on the draft; Edit draft, change the terms and a quantity, save. Try a new lead (explained). `rate_changed` needs the price list to move mid-edit, so the tests cover it. At 360px and on a wide screen, in light and dark.
+
+### Quotations: send, discount approval, the customer's answer, revise and delete
+
+`feature` · `QUOT-006` `QUOT-007` `QUOT-008` `QUOT-009` `QUOT-010` `QUOT-011` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--feature--QUOT-006--quotations-send-discount-approval-the-customer-s-answer.md)
+
+#### Before
+
+A draft could be made and edited (QUOT-004), but it stopped there: it could not be sent, a discount above the owner's limit could not be approved, the customer's answer could not be recorded, and a sent quotation could not be revised. A lead never moved to Quoted, Negotiation or Won through its quotation.
+
+#### Now
+
+The quotation's lifecycle, on the backend's contract (`backend/docs/handover/quotations-api-contract.md` §2 and §4). A quotation's page shows only the actions its status and the user's permissions allow.
+
+**Send (QUOT-006)** — a draft within the owner's discount limit has **Send**. The dialog offers **Send on WhatsApp** (to the party's mobile, once the PDF is ready) or **Don't send a message** (share the link by hand), and says what happens: the quotation gets its number and 45 days' validity, a qualified lead moves to Quoted, and a sent quotation is revised, not edited. A quotation on stand-in rates says the PDF carries the Indicative pricing banner. After sending, the page shows the number, "Preparing PDF…", then **Open PDF**.
+
+**Discount approval (QUOT-007)** — a draft above the limit shows **Ask for approval** instead of Send, and a notice with the discount and the limit ("11.8% off the list price is above your limit of 5%"). The request takes an optional reason. Then the notice reads "Waiting for a State Manager to approve…", Send becomes a disabled **Waiting for approval**, and the page re-reads itself every 30 seconds. Approved: **Send** and "Discount approved" with who approved. Refused: the approver's remark and **Ask for approval** again. Void (the figures changed after approval): says so and asks again. The builder warns that saving withdraws a waiting request, or cancels a granted approval.
+
+**The customer's answer (QUOT-008)** — **Record answer** on a sent, viewed or negotiating quotation: **Accepted…** (the lead moves to Won), **In negotiation…** (the lead moves to Negotiation), **Rejected…** (the lead does not move). Each asks for what the customer said (optional), kept on the history. Past its validity date no answer is offered, even before the nightly job marks it expired.
+
+**Revise and versions (QUOT-009)** — **Revise** on a sent, viewed, negotiating, rejected or expired quotation makes the next version as a draft at today's prices, and opens it; any repriced line is pointed out. A **Versions** card lists every version of the number with its status, date and total, the one on screen marked; sending the new version marks the old one replaced.
+
+**History (QUOT-010)** — a **History** card, newest first: drafted, edited, items changed, sent (on WhatsApp or by hand), opened (with the count), the answer with its remark, revised, and the discount approval's steps; older events a page at a time. The lead's history names the new quotation events too.
+
+**Delete a draft (QUOT-011)** — for roles holding `quotations.delete`, **More actions → Delete draft…** confirms, deletes and returns to the lead. A sent quotation is never deleted.
+
+**Refusals** — each is in words with what to do next. When someone else moved the quotation (`status_changed`, `quotation_not_draft`, `quotation_superseded`, `approval_pending`, `quotation_expired`, `predecessor_accepted`, `revision_exists`…) the dialog closes, a toast says what happened, and the page shows the latest. `rate_changed` and `no_lines` stay in the dialog with **Open the draft**; `no_approver` asks to lower the discount; `lead_not_open` says to reopen the lead.
+
+#### Discussion
+
+- **One action bar, driven by one rule.** `quotationActions()` decides from the status, `superseded_by`, the discount's `send_gate`, the validity date and the permissions; the backend still enforces every rule. A superseded version offers nothing: its notice links to the newer one.
+- **Permissions, not roles.** Send, approval, answers and revise need `quotations.edit`; delete needs `quotations.delete`, which only Admin holds in the mock.
+- **Every action is idempotent**: a retry reuses its `Idempotency-Key`; a new request (after `rate_changed`, or after success) gets a new one.
+- **Polling:** every 3 seconds while a PDF renders (as before), every 30 seconds while an approval waits. Both stop by themselves.
+- **"Today" is India's today** (`todayInIndia()` in `lib/format`), so the validity check matches the backend's dates.
+- **The mock** follows the contract's state machine and refusals and moves the lead beside the document. Two things only the mock does, so the flows can be tried end to end: a just-sent PDF is ready about 2.5 seconds later, and a request for approval is approved by a stand-in manager after 8 seconds, because the approvals inbox (APPR-001) is not built yet. Mock approvers: District 10%, State 15%, Regional 20%; above that, `no_approver`.
+- **Asked of the backend** (`docs/Backend-Tasks.md`): BE-017, put `quotation_id`, `quote_no` and `version` on quotation events in the lead's timeline, so the lead's history can say which quotation.
+- **Next:** the public `/q/{token}` page (QUOT-012), then the approvals inbox's quotation rows with APPR-001.
+
+#### Files changed
+
+- `src/features/quotations/api/quotations.schemas.ts` — send gates and approval statuses as enums; the approval request on the document; the send, approval, answer, revise and delete requests; versions; the remark form
+- `src/features/quotations/api/quotations.api.ts`, `quotations.queries.ts`, `quotations.mutations.ts` — `sendQuotation`, `requestQuotationApproval`, `transitionQuotation`, `reviseQuotation`, `listQuotationVersions`, `getQuotationTimeline`, `deleteQuotation`; versions and history queries; one mutation each, refreshing the document, lists, versions, history and the lead; polling while an approval waits
+- `src/features/quotations/lib/quotation-lifecycle.ts` — new: the actions a quotation offers, the send step by `send_gate`, the draft's discount notice, refusals in words, history lines
+- `src/features/quotations/components/` — new: `QuotationActions`, `QuotationActionDialog` (send, approval, answer, revise, delete), `QuotationVersions`, `QuotationHistory`; `QuotationDetail` — the action bar, the discount notice, the Versions and History cards; `QuotationBuilder` — the warning before saving over an approval
+- `src/features/leads/lib/timeline-entries.ts` — labels for the new quotation events on a lead's history
+- `src/lib/format/date.ts` — `todayInIndia()`
+- `src/mocks/handlers/quotations.ts` — the lifecycle endpoints; saves cancel an approval and keep a revision's version; history per quotation; `src/mocks/handlers/lead-events.ts` — new: the lead-event writer, now shared with quotations; `src/mocks/data/quotations.ts` — `withLines`, the seeded drafts' real discount; `src/mocks/db.ts` — history, PDF and approval timers, delete replays
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — QUOT-006…011
+- `Docs/Plan.md` — §9: the lifecycle connected
+- `../docs/Backend-Tasks.md` — BE-017
+
+#### Tests
+
+- `src/features/quotations/lib/quotation-lifecycle.test.ts` — `[QUOT-006]` the send step for each gate, refusals marked stale or kept; `[QUOT-008]` the actions for a draft, a sent, negotiating, rejected, expired, accepted, lapsed and superseded quotation, and without permissions; `[QUOT-007]` the discount notice for each gate with the approver's role and remark; `[QUOT-010]` history lines, unknown and odd events
+- `src/features/quotations/api/quotations.lifecycle.test.ts` — `[QUOT-006]` a send numbers, links and moves the lead; `discount_approval_required`, `no_lines`; `[QUOT-007]` a request to the right manager, `approval_pending`, then sent once approved; `approval_not_required`, `no_approver`; `[QUOT-008]` negotiation then acceptance wins the lead; `status_changed`, `invalid_transition`; `[QUOT-009]` version 2 of the same number supersedes version 1 once sent, `revision_exists`, no revising a draft; `[QUOT-010]` history newest first; `[QUOT-011]` delete and replay, never a sent one
+- `src/features/quotations/components/quotation-actions.test.tsx` — `[QUOT-006]` send without a message and see the number; a stale refusal closes the dialog; `[QUOT-007]` ask for approval, then wait; `[QUOT-008]` mark accepted; `[QUOT-009]` revise opens version 2; `[QUOT-011]` delete as Admin returns to the lead, no delete for a State Manager
+- `src/lib/format/format.test.ts` — `todayInIndia()` across midnight in India
+- By hand (`npm run dev`, role Admin): open a draft above the limit → Ask for approval → wait for "Discount approved" → Send → Open PDF once ready → Record answer → In negotiation → Revise → the new draft with Versions → More actions → Delete draft. At 360px and on a wide screen, in light and dark.
+
+### Quotations: the customer's page for a shared link
+
+`feature` · `QUOT-012` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--feature--QUOT-012--quotations-the-customer-s-page-for-a-shared-link.md)
+
+#### Before
+
+A sent quotation carries a customer link, `/q/{token}`, which the WhatsApp message also carries, but the app had no page there: a customer who tapped it was sent to sign in.
+
+#### Now
+
+**The customer's page (QUOT-012)** — `/q/{token}` opens without signing in, for anyone, signed in or not. It is built for a phone, in one narrow column:
+
+- **Quotation** and its number (with the version once there is more than one), **From** the seller and their GSTIN.
+- **Total, including GST**, large; the number of items, the date sent and **Valid until**.
+- **View quotation** opens the PDF in a new tab. Until the PDF is ready: "Preparing the PDF…", and the page checks again every few seconds.
+- An expired quotation says so ("Prices may have changed; ask for a new one"), and a replaced one says a newer version was sent. Both still open.
+- A link that doesn't match a quotation: "This link doesn't open a quotation", with what to do.
+
+Nothing personal is on the page — no name, mobile, address or items — as the backend's contract requires: a forwarded link shows a number and a total.
+
+#### Discussion
+
+- **The PDF opens only from the button, never on load.** Messengers fetch a link to draw its preview the moment it is sent; the backend records a view when the PDF is opened, so a page that fetched it would count every preview as the customer. The button is a real link, so it works however the phone opens it.
+- **No sign-in, and no redirect:** `/q/…` is an open path in the sign-in routing (`isOpenPath`), for signed-out and signed-in visitors alike. The page calls only the backend's `/public` endpoint, without a token.
+- **The token stays on the page:** the layout sets `referrer: no-referrer`, so the link's secret is not passed on when the PDF opens on another host.
+- **The mock** serves the page for every sent quotation, and its share links now point at the app's own origin, so **Copy** on a quotation gives a link that opens here. Opening the PDF records the view (the first moves a sent quotation to Viewed). The browser opens that link in a new tab, which the mock cannot answer (it has no PDFs), as with **Open PDF** — `TODO(QUOT-012)`.
+- **Backend:** BE-015 (`PUBLIC_WEB_URL`) decides where the real links point; until it is set, links from the dev API open localhost.
+- **Next:** the approvals inbox's quotation rows, with APPR-001.
+
+#### Files changed
+
+- `src/app/(public)/layout.tsx`, `src/app/(public)/q/[token]/page.tsx` — new: the route group for signed-out pages and the customer's page
+- `src/features/quotations/components/shared-quotation.tsx` — new: `SharedQuotation` and its skeleton
+- `src/features/quotations/api/quotations.schemas.ts`, `quotations.api.ts`, `quotations.queries.ts` — the public quotation contract, `getPublicQuotation` (no token), and its query, re-reading while the PDF renders
+- `src/lib/auth/redirects.ts` — `/q/…` is an open path
+- `src/lib/api/url.ts` — `asApiPath`, for a path an API response hands back
+- `src/mocks/handlers/quotations.ts` — `GET /public/q/{token}` and `GET /public/q/{token}/pdf`; `src/mocks/data/quotations.ts` — share links on the app's origin
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — QUOT-012
+- `Docs/Plan.md` — §9: the public page connected
+- `e2e/smoke.spec.ts` — the link opens signed out, with no accessibility violations
+
+#### Tests
+
+- `src/features/quotations/components/shared-quotation.test.tsx` — `[QUOT-012]` read without an `Authorization` header and with nothing personal; an unknown link is 404; the number, total and a new-tab link to the PDF; "Preparing the PDF…" with no link; expired and replaced, still opening; an unknown link explained
+- `src/lib/auth/redirects.test.ts` — `[AUTH-006]` a quotation link opens signed in or out; `/quotations` still needs a session
+- `e2e/smoke.spec.ts` — `[QUOT-012]` opens signed out on desktop and phone, the link opens a new tab, `no-referrer`, and axe finds no violations
+- By hand (`npm run dev`): sign out, open `/q/mock-3`, then `/q/anything`; signed in, copy a quotation's customer link and open it. At 360px and on a wide screen, in light and dark.
+
+### Fixes from the code review of the integration-to-staging pull request
+
+`fix` · `LEAD-001` `LEAD-006` `LEAD-008` `QUOT-001` `QUOT-002` `DS-001` `APP-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-28--fix--LEAD-001--staging-review-fixes.md)
+
+#### Before
+
+A code review of `integration` for staging (#11) found, among the frontend changes:
+
+- The lead table's sort arrows changed the arrow and the URL, but the backend doesn't sort yet (BE-001), so the rows stayed newest first while the user believed they were sorted.
+- A blank office, territory, price-list or seller name made a whole quotation fail to parse: the page showed an error and the list dropped the row. The backend doesn't guarantee those names are filled.
+- The lead page's Quotations card asked the backend to count every time, although it shows no total.
+- The table's Next button, when a caller gave no `hasNextPage`, fell back to a page count computed from a capped total (1,000), so it would stop at page 40.
+- The note's remaining-character count included spaces at the ends, which the backend trims before checking its 2,000 limit.
+- Nested ternaries in the sidebar, the lead history and the partner search, and an `if` without braces in the assign dialog.
+
+#### Now
+
+- **No sort arrows on the lead table** until the backend sorts (`BACKEND_SORTS_LEADS`, `TODO(LEAD-001)`). The sort still travels in the URL and the request, so turning them back on is one line.
+- **Blank names print "—"** in a quotation: the office, the territory and its level, the price list, the seller's name, GSTIN and state, the place of supply's state, and the seller on the customer's page. Ids still must be present.
+- **The Quotations card on a lead doesn't ask for a count** (`countTotal: false`); the Quotations page still does.
+- **A capped total never ends the list:** without `hasNextPage`, Next stays on past it.
+- **The note counter** counts the trimmed note, as the backend does.
+- **Readability:** the three nested ternaries are small helpers (`backendNote`, `stageTone`, `searchStatus`); the `if` has its braces. The sidebar's dev-API note now says what is really mocked — dashboard, notifications and messages — instead of listing leads, which have been real since #8.
+
+#### Discussion
+
+Findings not changed, and why:
+
+- **Approval state dropped by the quotation transform:** already carried through, since the discount-approval work (QUOT-007) landed on the branch after the reviewed commit.
+- **Em dashes in UI text:** the repository has no copy rule against them (neither `AGENTS.md` nor `Docs/Design-System.md`), and the app uses them consistently. If the team wants that rule, it belongs in `Docs/Design-System.md` first, and then one pass over every string, rather than changing a few.
+
+#### Files changed
+
+- `src/features/leads/components/leads-columns.tsx`, `leads-table.tsx` — no sort arrows until BE-001
+- `src/features/quotations/api/quotations.schemas.ts` — `displayText` for names the backend may leave blank; `countTotal` on the list parameters
+- `src/features/quotations/api/quotations.api.ts`, `components/lead-quotations.tsx` — no count for the lead's card
+- `src/components/patterns/data-table/data-table.tsx` — a capped total doesn't end the list
+- `src/features/leads/components/lead-note-composer.tsx` — the trimmed length
+- `src/components/layout/app-sidebar.tsx`, `src/features/leads/components/lead-timeline.tsx`, `lead-assign-dialog.tsx` — helpers instead of nested ternaries, braces
+- `Docs/Tested-Features.md` — the lead list says the sort arrows wait on BE-001
+
+#### Tests
+
+- `src/features/leads/components/leads-ui.test.tsx` — `[LEAD-001]` no sort control on Customer or Value
+- `src/features/quotations/api/quotations.test.ts` — `[QUOT-002]` a quotation with a blank office, territory, price list and seller name reads, printing "—"
+- `src/components/patterns/data-table/data-table.test.tsx` — `[DS-001]` Next stays on past a capped total
+- `src/features/leads/components/lead-activity.test.tsx` — `[LEAD-006]` 2,000 characters and trailing spaces is within the limit
+
+## 27 September 2026
+
+### The lead page shows its history, takes notes, moves the lead's stage and assigns it
+
+`feature` · `LEAD-005` `LEAD-006` `LEAD-007` `LEAD-008` `MSTR-002` · Nakul Srivastava · [entry](changelog/entries/2026-09-27--feature--LEAD-005--lead-timeline-and-notes.md)
+
+#### Before
+
+The lead page showed the record and nothing else. There was no way to see what had happened to a lead — who created it, when it moved stage, why it was lost — no way to write down a call or a visit, and no way to move a lead along, lose it, reopen it or hand it to someone. The backend already served all of it (`/timeline`, `/notes`, `/transition`, `/reopen`, `/assign`, `/leads/assignees`, `/lookups/partners`).
+
+`Docs/Plan.md` described the original delivery plan but not where the build stands, so nobody could see at a glance what runs on the real backend and what is still mocked.
+
+#### Now
+
+**Activity on the lead page (LEAD-005, LEAD-006)** — under Details, a new **Activity** card: a note box on top, the lead's history below, newest first.
+
+- **The history** reads as sentences with the person's name: "Asha Patel created the lead from Agri Fair", "Ravi Joshi moved the lead from Qualified to Lost" with the lost reason by name and the note, notes in a quoted block, "changed the farmer name and mobile", reopenings, assignments, merges (linking the other lead), duplicate flags, and the quotation and order events that touch the lead. Each kind has its own icon and a soft colour — green for won, red for lost, amber for reopened — never colour alone. A kind the frontend does not know yet still shows with a readable label ("Subsidy case opened"); an event is never dropped for its payload. An event whose actor is hidden from a partner reads "Polysil".
+- **Paging:** the first 20 events, then **Show older activity**. If an older page fails, what is shown stays, an inline message says so, and the button becomes **Try again**.
+- **States:** a skeleton that mirrors the rows; "No activity yet" when empty; an error with a copyable reference and a retry; a notice when a refresh fails but older data is on screen.
+- **Adding a note:** Enter adds a line, **Ctrl/⌘ + Enter** saves (hint shown on keyboards, hidden on touch screens). The button goes Saving… → Saved, the note appears at the top of the history at once, and the box clears. A counter appears in the last 200 characters and the button disables past 2,000. A failed save keeps the text and says so; retrying the same text reuses its Idempotency-Key, so a save whose reply was lost is never added twice. The lead's last activity and score refresh after a note.
+- **Who sees the note box:** anyone with `leads.edit` — never on a merged lead, which is read-only. Everyone who can see the lead sees its history.
+- Works from 360px up, in light and dark, with the existing tokens only.
+
+**Update stage (LEAD-007)** — the main button in the lead's header, for anyone with `leads.edit`.
+
+- It offers only the moves the backend's stage machine allows from where the lead is: New → **Mark as contacted**; Contacted → **Mark as qualified**; any open lead → **Mark as lost…**; Quoted or Negotiation → **Mark as won**; Lost → **Reopen lead…**. The menu names the current stage, and a step that happens on a quotation is listed but disabled with where it happens ("Quoted — happens when a quotation is sent"), so the way forward is never a mystery. A won, merged or dormant lead shows no menu.
+- **Contacted and qualified** happen at once: the button shows Updating…, a toast says "Moved to Contacted", the badge, the history, the lists and the counts update.
+- **Mark as lost** asks for a reason from the administrators' list (required, "Choose why the lead was lost") and an optional note, with a red confirm button. **Mark as won** confirms and says a won lead is closed. **Reopen** takes an optional note and the toast names the stage it returned to.
+- **Out of date:** every move sends the stage on screen; if someone moved the lead meanwhile, the backend refuses, the toast says "Someone moved this lead to Qualified while you had it open. It now shows the latest.", the dialog closes and the page refreshes. **Won without an accepted quotation** is explained inside the dialog: "A lead is won when a quotation on it is accepted. Accept the quotation first."
+- Retrying the same move reuses its Idempotency-Key, so a lost reply never moves a lead twice.
+
+**Assign (LEAD-008)** — an **Assign** button on the Details card, for anyone with `leads.edit`, on open leads only (the backend refuses to reassign a won, lost or merged lead).
+
+- **Owner:** a searchable list of the people the backend says you may assign, plus **Unassigned** ("back to the office's list"). Someone who may not set owners — the backend lists nobody for them — reads "Asha Patel — only a manager can change the owner." instead of a list that would fail. A failed list says so with **Try again**.
+- **Channel partner:** search partners in your area by name or code, each with its type and district, plus **No channel partner**.
+- **Save** is disabled until something changes, and only what changed is sent, so the other field is never overwritten. A refused owner or partner shows on its own field ("This partner isn't in your area"); a lead that closed meanwhile closes the dialog with a toast.
+
+**Plan (docs)** — `Docs/Plan.md` gains **§9 Integration status**: what runs on the real backend, what is still mocked and what the backend owes, what the backend serves that has no screen yet in build order, why `/leads/summary` is gone and how `/leads/stats` differs, questions for the backend, and housekeeping. A line at the top points to it. It is updated in the same pull request that connects a screen.
+
+**Backend tasks** — `docs/Backend-Tasks.md` at the repository root lists everything the frontend needs from the backend as a checklist (BE-001…BE-014): the lead gaps (sorting, follow-up date, crops and land, win probability, territory levels, names in assignment events, stats by source), the modules still mocked (dashboard, notifications, messages), merging the tasks and complaints contracts, the dev API, a docs fix and the approval thresholds. The backend developer ticks a task, sets its status and writes the commit and notes there.
+
+**Data IDs** — LEAD-005 (timeline), LEAD-006 (notes), LEAD-007 (stage change and reopen) and LEAD-008 (assign owner and partner) registered, in progress.
+
+#### Discussion
+
+- **Built straight on the real contract** (`backend/docs/api/leads.md`, `api/services/leads.py`): a note is 1–2,000 characters after trimming; the timeline is keyset-paged, newest first, and folds in the events of leads merged into this one; the actor's name travels in the payload and can be empty.
+- **Each event is read on its own.** The envelope (`id`, `kind`, `occurred_at`) is validated strictly and one broken event is left out and logged rather than blanking the history (`cursorPageSchema`, as the lead list does). The payload is read per kind in `lib/timeline-entries.ts`, a pure function with its own tests, so the backend adding a field or a kind never breaks the screen.
+- **20 events a page**, not the backend's default 100: the first paint stays short on a phone, and most leads have fewer.
+- **The stage menu mirrors the backend's rules, and the backend still decides.** `lib/lead-lifecycle.ts` copies `TRANSITIONS` from `backend/api/domain/leads.py` only to decide what to offer; every refusal code (`stage_changed`, `invalid_transition`, `stage_terminal`, `quotation_required`) has its own wording. Quoted and negotiation are never offered: the backend reaches them through a quotation (QUOT-001).
+- **One-click for forward steps, a dialog for the rest.** Contacting and qualifying are frequent and low-stakes; losing, winning and reopening change what the lead is, and losing needs a reason — so those ask first.
+- **Assignment sends only what changed**, following the backend's rule that a field left out is unchanged and a field sent as null is cleared. The owner list is the backend's answer, not a role check in the frontend.
+- **`useIdempotencyKey`** (new, in `src/hooks`) gives one key per distinct request body; the note box, the stage menu and the dialogs share it.
+- **Assignment events name no one yet.** The backend's `lead.assigned` payload carries ids only, so the history says "changed the owner" rather than "assigned to Ravi Joshi" — asked of the backend (Plan §9.4).
+- **Not yet checked on the dev API by hand**: all of this is built on the backend's contract and tested against the mock, which follows its rules. Check it on the dev API before staging.
+- **Next (Plan §9.3):** quotations (QUOT-001), which also move a lead to quoted, negotiation and won.
+
+#### Files changed
+
+- `src/features/leads/api/leads.schemas.ts` — timeline, note, stage change, reopen, assignee, partner and assign contracts; the Mark lost form
+- `src/features/leads/api/leads.api.ts` — `getLeadTimeline`, `addLeadNote`, `transitionLead`, `reopenLead`, `listAssignees`, `searchPartners`, `assignLead`
+- `src/features/leads/api/leads.queries.ts` — the timeline (infinite, cursor-paged), assignees and partner search
+- `src/features/leads/api/leads.mutations.ts` — `useAddLeadNote` (shows the note at once), `useTransitionLead`, `useReopenLead`, `useAssignLead`: the lead takes the answer, its history, the lists and the counts refresh
+- `src/features/leads/lib/timeline-entries.ts` — new: what each event means, read defensively
+- `src/features/leads/components/lead-timeline.tsx` — new: the history, its skeleton, paging and states
+- `src/features/leads/components/lead-note-composer.tsx` — new: the note box
+- `src/features/leads/lib/lead-lifecycle.ts` — new: what the stage menu offers, and what each refusal means
+- `src/features/leads/components/lead-stage-menu.tsx`, `lead-stage-dialog.tsx` — new: Update stage, and the lost, won and reopen dialogs
+- `src/features/leads/components/lead-assign-dialog.tsx` — new: Assign, with the owner and partner pickers
+- `src/hooks/use-idempotency-key.ts` — new: one Idempotency-Key per distinct request body
+- `src/features/leads/components/lead-detail.tsx` — the Activity card under Details, Update stage in the header, Assign on Details, each gated on `leads.edit`; skeleton to match
+- `src/features/lookups/lib/lookup-labels.ts` — `findLookupNameById`, for the lost reason in a stage event
+- `src/mocks/data/timeline.ts` — new: a history derived from each seeded lead
+- `src/mocks/handlers/leads.ts`, `lookups.ts`, `src/mocks/db.ts`, `src/mocks/data/reference.ts` — timeline, notes, transition, reopen, assignees (by the previewed role), partners and assign, with the backend's stage rules, paging, 404, Idempotency-Key replay, 409 and 422; each lead's history is snapshotted once so a later change adds one event
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — LEAD-005…008
+- `Docs/Plan.md` — §9 Integration status; §9.4 points to the backend task list
+- `Docs/Frontend-Scope.md` — §10 points to the backend task list
+- `../docs/Backend-Tasks.md` — new, at the repository root: every ask of the backend as a checklist (BE-001…BE-014) the backend developer ticks, with the commit and notes
+
+#### Tests
+
+- `src/features/leads/lib/timeline-entries.test.ts` — `[LEAD-005]` every kind, malformed payloads, unknown kinds, merge from both sides, field names in words
+- `src/features/leads/api/leads.test.ts` — `[LEAD-007]` contacted and recorded, stale view → 409 with the current stage, quoted and won-without-quotation refused, lost needs an active reason, reopen returns to the stage it was lost from, only a lost lead reopens, a retried move replayed once; `[LEAD-008]` assignees for a manager and nobody for an employee, partner search, owner and partner set and recorded, an unsent field left alone and a null one cleared, an unassignable owner on `owner_user_id`, a closed lead refused; `[LEAD-005]` newest first ending with creation, page size and cursor to older events, empty actor names kept, one broken event left out, 404; `[LEAD-006]` note becomes the newest event, retry replayed not duplicated, reused key → 409, blank note → 422 on `note`
+- `src/features/leads/components/lead-activity.test.tsx` — `[LEAD-005]` skeleton then history with the lost reason by name, Show older activity, older page failing keeps what is shown, empty, error; `[LEAD-006]` save shows the note first and clears the box, Ctrl + Enter saves and Enter adds a line, a failed save keeps the text and the retry reuses the key, counter and limit; the note box for `leads.edit` only, never on a merged lead
+- `src/features/leads/lib/lead-lifecycle.test.ts` — `[LEAD-007]` the moves per stage, nothing on closed leads, the quotation hints, labels, every refusal's wording and whether it is stale
+- `src/features/leads/components/lead-stage.test.tsx` — `[LEAD-007]` contacted from the menu, a reason required to lose a lead, reopen with a note, someone else moved it first, won refused inside the dialog, won with an accepted quotation, no menu on a won lead or without `leads.edit`
+- `src/features/leads/components/lead-assign.test.tsx` — `[LEAD-008]` owner and partner changed and shown, an employee told only a manager can change the owner, a refused partner on its field, no Assign on a closed lead
+- `src/hooks/use-idempotency-key.test.ts` — one key per body, a new one after reset, stable across renders
+- `src/mocks/data/timeline.test.ts` — every seeded lead's history matches the contract, runs newest first, ends lost or merged correctly, unique ids
+- By hand (`npm run dev`): open a lost lead — the history ends with the reason; add a note with Ctrl + Enter; switch the scenario to Error and Slow to see those states; Update stage on a new lead → Contacted; mark it lost with a reason, then reopen it; try Mark as won on a quoted lead (refused) and on one in negotiation (won); Assign a new owner and partner as State Manager, then open Assign as Employee; switch the role to Account Manager — the history shows, but no note box, menu or Assign. Check at 360px and on a wide screen, in light and dark.
+
+## 22 September 2026
+
+### Leads run on the backend's dev API — list, lead page and New lead form, with real lookups
+
+`api-integration` · `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `MSTR-002` `OBS-002` `APP-004` `AUTH-004` `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-22--api-integration--LEAD-001--leads-on-the-dev-api.md)
+
+> **Breaking change.** Read the discussion before you build on this.
+
+#### Before
+
+The app ran on the mock backend or on a backend started on the same machine — all or nothing. The backend team's shared dev API (`https://polysil-api.pranayx.tech`, real data, 20 staff accounts and a dealer) had no way in: turning mocks off would also have turned off the dashboard, notifications and messages, which it does not serve yet.
+
+Leads ran on a contract the frontend had guessed: page numbers, a `/leads/summary` count, six fixed sources, seven stages, money as numbers, district and state typed by hand. None of it matched the backend that now exists.
+
+#### Now
+
+**Local development against the dev API (OBS-002, APP-004, AUTH-004)**
+
+- **A third mocking mode, `partial`.** `NEXT_PUBLIC_API_MOCKING=partial` mocks only what the backend does not serve yet — dashboard figures, notifications and messages — and sends everything else to `API_PROXY_TARGET`: sign-in, the session, sign-out, leads and the lookups. Like `enabled`, it is refused in staging and production builds.
+- **One list of what is still mocked:** `unbuiltHandlers` in `src/mocks/handlers/index.ts`, each with a `TODO(DATA-ID)`. Connecting a module means taking it out of that list — leads and lookups are out.
+- **The account menu** keeps the data scenarios in `partial` mode and drops "Preview as role", because the real session decides the role. The sidebar card reads "Dev API + mocks".
+
+**The leads list (LEAD-001)**
+
+- Pages with the backend's page tokens. The tokens of the pages already passed sit in the URL (`?cursors=…`), so a refresh, a bookmark or a shared link lands on the same page; "Previous" steps back through them. Changing a filter, the sort or the page size returns to the first page.
+- The caption reads "1–25 of 74" from the backend's count. When the backend stops counting at 1,000 it says so, and the caption reads "1–25 of 1,000+" with "Page 3" instead of a page count that would be wrong. The table then tells assistive tech its row count is unknown.
+- Filters: **Stage** (several at once; with none chosen the backend leaves out merged leads), **Source** and **Type** (one at a time, as the backend filters — these two pills are now single-choice radios). Source options come from the administrators' list, with a "Loading sources…" or error line until they arrive. Search matches the farmer's name, part of the mobile number, or the exact inquiry number.
+- Columns stay as they were. Stage shows the backend's nine stages (merged and dormant are new); Source shows the list's name ("Agri Fair"); Owner shows "Unassigned" for leads waiting in a manager's list; Value reads the backend's decimal strings. Crops, Probability, Activity and Follow-up show "—" until the backend records them.
+- The sort arrows on Customer and Value send `sort` and `order`. The backend lists newest first and does not sort yet — asked (Frontend-Scope §10). The mock backend sorts, so the behaviour can be previewed.
+- New states: a page link the backend no longer accepts ("This page link no longer works", with a way back to the first page); a later page that has emptied since the link was made. Clicking "Next" twice while a page loads no longer skips a page.
+- The selection bar adds the selected leads' values exactly, in whole paise.
+
+**The lead count (LEAD-004)** — the sidebar badge and the Sales tab read `GET /leads/stats`: the exact number of leads the user can see, never capped, and no lead rows fetched just to count them. The stats also carry counts by stage and priority and the unassigned total, parsed and ready for the dashboard tiles. The tab no longer asks when the user cannot see leads.
+
+**The lead page (LEAD-003)** — the real record: stage and priority badges; mobile, email, territory with its level, village, irrigation system, estimated value, owner and office (or "Unassigned · office"), channel partner and type, score, first contact, last activity, created on and by, times reopened, and for a lost lead its reason and note. A merged lead points to the lead it was merged into; possible duplicates are listed with how they matched ("same mobile number"). Land, crops, follow-up, win probability and engagement show "—".
+
+**The New lead form (LEAD-002)**
+
+- Fields match the backend: farmer name, mobile, email (optional), **territory** — a searchable picker that lists districts when opened and finds any taluka or village as you type, naming the place above each ("Gondal · Taluka in Rajkot") — village (optional), inquiry type, irrigation system (from the administrators' list), source (optional; left empty, the backend records who entered it), estimated value (optional) and a note that becomes the first timeline entry.
+- Lists that fail to load say so, with "Try again" beside the field. The picker shows "Loading districts…", "Searching…", "No place matches" and a connection message.
+- Saving retries safely: the same details reuse the same idempotency key, so a save whose reply was lost is replayed by the backend instead of creating the lead twice. Changing any detail makes a new key.
+- A duplicate is never refused — the backend flags it, and the success message says "Possible duplicate of POL/… (same mobile number) — flagged for review".
+- Field errors from the backend land on their field. A territory no office covers reads "No Polysil office covers this place yet. Choose the taluka or district around it." instead of the backend's developer wording.
+
+**Design system (DS-001)** — two restyled primitives, each with a story: **Combobox** (a Select you type into, for long lists) and **RadioGroup**. **SingleFilterPill** joins FilterPill for filters that take one value. Touch targets are 44px on touch screens; both themes use existing tokens only.
+
+#### Discussion
+
+- **Decided with Nakul (2026-09-21):** keep today's columns and show "—" where the backend has no data; keep the sort arrows and ask the backend for sorting; connect list, detail and the New lead form in one go, with the real lookups; keep working in `Loopify\Polysil-CRM`.
+- **Page tokens in the URL, not page numbers.** The backend pages by keyset cursor and never jumps to page N. Keeping the trail of tokens in the URL is what makes "page 3" survive a refresh and be shareable; the alternative, tokens in memory, loses the page on reload. Tokens are base64url, so they never contain the list's comma separator.
+- **Breaking:** the lead contract (`Lead` now carries `stage`, `territory`, `misSystem`, decimal-string money and more), the URL parameters (`status` → `stage`; `page` → `cursors`; `source` and `type` take one value), and `LeadStatusBadge` → `LeadStageBadge`. Old links with `?status=` or `?page=` simply open the unfiltered first page. `readFieldErrors` moved from the sign-in feature to `lib/api/errors.ts` for everyone.
+- **Money is a decimal string end to end.** Formatters accept it as it is; totals are added in whole paise with `sumRupees`, never with floating point (0.10 + 0.20 is 0.30, not 0.30000000000000004). Unreadable amounts show "—" and count as zero in a total rather than failing it.
+- **Lookups (MSTR-002)** are fetched once and shared by every cell, filter and form (ten minutes fresh). A code shows in readable form ("farmer_meeting" → "Farmer meeting") until its name arrives. The form offers active rows only; filters keep inactive ones, because old leads still carry them.
+- **Partial mode's one seam:** messages are still mocked but leads are real. The mock now accepts a real lead linked in a message and names it "Lead", instead of refusing every real lead.
+- **Mocks follow the backend:** seeded sources, irrigation systems and lost reasons from its migrations; the territory tree and partners shaped like its showcase seed; its search rules, default stage filter, 1,000 ceiling, cursor refusal, idempotency replay and 409, duplicate flagging, and `territory_without_org_unit` (Dang has no office in the mock, to preview it). The dashboard mock assumes a follow-up three days after the last activity, since the backend records none.
+- **The count comes from `GET /leads/stats`**, which the backend added after this branch was cut (backend PR #12), instead of asking `GET /leads` for one row with `include_total`. It is one count query with no rows, the same scope and filters as the list, and exact, so the badge no longer needs "1,000+". It is a bare object, not `{ data }`. Stage keys are read as open strings, so a stage the backend adds later cannot hide the badge.
+- **Asked of the backend** (Frontend-Scope §10, questions 14–18): sorting; a follow-up date; crops and acreage; win probability and weekly activity (or confirmation that the score and timeline replace them); which territory levels a lead may sit in.
+- **Not done:** honouring `must_change_password` (AUTH-002); the lead timeline, stage changes, assignment and merging (their endpoints exist); integration on staging.
+
+#### Files changed
+
+- `src/lib/env/client.ts` — `partial` mode, refused in staging and production
+- `src/mocks/handlers/index.ts`, `src/mocks/browser.ts` — the still-mocked list; leads and lookups leave it
+- `src/components/providers/mock-gate.tsx`, `src/components/layout/user-menu.tsx`, `src/lib/dev/mock-settings.ts` — mock controls by mode
+- `src/components/layout/app-sidebar.tsx` — environment card by mode; lead count from `GET /leads/stats`
+- `src/features/leads/api/` — the backend's lead contract, list, detail, stats and create with a reusable idempotency key
+- `src/features/leads/hooks/use-lead-list-params.ts` — URL state: page tokens, stage, single source and type
+- `src/features/leads/components/` — table (tokens, capped total, stale links), toolbar (single-choice pills, lookup sources), columns, lead page, New lead form, sales tab; `lead-status-badge.tsx` → `lead-stage-badge.tsx`
+- `src/features/leads/lib/lead-labels.ts`, `create-lead-errors.ts`, `lead-table-layout.ts` — nine stages, priorities, partner types, duplicate wording; 422 field mapping
+- `src/features/lookups/` — new: lookup lists and territory search (MSTR-002), `LookupName`, `LookupSelect`, `TerritoryPicker`
+- `src/components/ui/combobox.tsx`, `radio-group.tsx` (with stories) — new primitives
+- `src/components/patterns/filter-pill.tsx` (+ story), `data-table/data-table.tsx`, `nav-tabs.tsx` — single-choice pill; capped and unknown totals, cursor paging; capped tab counts
+- `src/lib/api/pagination.ts`, `src/lib/api/errors.ts` — the backend's page metadata; `readFieldErrors` shared
+- `src/lib/format/currency.ts`, `number.ts`, `index.ts` — decimal-string money, `sumRupees`, `formatCount`
+- `src/hooks/use-debounced-value.ts` — search as you type
+- `src/features/auth/` — imports `readFieldErrors` from its new home
+- `src/features/dashboard/` — stage labels and source names (mocked contract, RPT-001)
+- `src/mocks/` — leads, lookups and territories in the backend's format; lead (with `/leads/stats`, sharing the list's filters), lookup, dashboard and message handlers
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — LEAD-001…004 in progress on the dev API, LEAD-004 re-described, MSTR-002 registered
+- `Docs/Environments.md`, `Docs/Frontend-Scope.md`, `Docs/Design-System.md`, `.env.example` — the dev API, what leads cannot show yet, questions for the backend, new components
+- `eslint.config.mjs` — `RadioGroupItem` counts as a labelled control
+- `src/test/render.tsx` — tests can follow URL changes
+- `vitest.config.mts`, `playwright.config.ts` — tests pin the full mock backend, whatever `.env.local` says
+
+#### Tests
+
+- `src/features/leads/api/leads.test.ts` — `[LEAD-001]` first page and total, parameters sent, cursor paging to the last page, stages (merged only when asked), source and type, search by inquiry number and mobile, capped total, refused cursor; `[LEAD-003]` shape and duplicates, 404; `[LEAD-004]` stats match the list's scope (merged left out) by stage, priority and owner, the bare object is read, a broken body is a contract violation; `[LEAD-002]` create, duplicate flagged, retry replayed, key reused → 409, uncovered territory on its field; form schema; 422 field mapping
+- `src/features/leads/components/leads-ui.test.tsx` — `[LEAD-001]` skeleton → rows and total, source names, next and previous page with the URL, "1,000+", emptied later page, stale link, empty and filtered-empty, server error, contract violation; `[LEAD-002]` every required field explained
+- `src/features/lookups/` — `[MSTR-002]` lookup lists, inactive rows, territory search, labels, `TerritoryPicker` (districts on open, search and choose, nothing matches)
+- `src/components/patterns/filter-pill.test.tsx`, `data-table/data-table.test.tsx` — single-choice pill; range, capped total, cursor-decided next page
+- `src/lib/format/format.test.ts`, `src/lib/api/pagination.test.ts`, `url-and-errors.test.ts`, `src/hooks/use-debounced-value.test.ts`, `src/mocks/data/leads.test.ts`, `src/mocks/handlers/index.test.ts`, `src/lib/env/client.test.ts` — money strings and paise totals, page metadata, field errors, debounce, mock data against the contract, the mocked list, `partial` mode
+- By hand, with `.env.local` pointing at the dev API: sign in as `admin@`, `asha@` and `ravi@polysil.in` — the caption shows each one's own total (74, 34, 23); page forward, refresh, and land on the same page; filter by stage, source and type; open a lead; create one with a taluka from the picker; create another with the same mobile and see the duplicate warning. Check at 360px and on a wide screen, in light and dark.
+
+### One odd lead no longer blanks the page, and a source the administrators renamed still filters
+
+`fix` · `LEAD-001` `LEAD-002` `MSTR-002` `DS-001` · Nakul Srivastava · [entry](changelog/entries/2026-09-22--fix--LEAD-001--one-odd-lead-no-longer-blanks-the-page.md)
+
+#### Before
+
+Six things the leads screens got wrong once the dev API — rather than the mock backend — was answering:
+
+- **One malformed lead failed the whole page.** `GET /leads` was read as `z.array(leadSchema)`, so a single record the backend sent with an empty name, territory or system replaced twenty-four good leads with "We received data we couldn't read". The count endpoint already guarded against exactly this; the list did not.
+- **A source code outside `[a-z0-9_]` silently disappeared.** The URL parser only accepted lowercase words joined by underscores. The lists are edited by administrators, so the day someone adds `agri-fair`, choosing that source wrote it to the URL, the parser read it back as nothing, and the pill snapped to unset — a filter that looked like it did nothing at all.
+- **A chosen Source could not be un-chosen.** Source is optional on the New lead form, but `LookupSelect` offered no way back to "not set": once picked, it could only be swapped.
+- **The New lead dialog left a timer running.** After a save it waits 700 ms before closing. Nothing cancelled that timer, and `useAsyncAction` calls `onSuccess` whether or not the dialog is still mounted, so leaving the page inside that window reset a form that was gone and wrote to the next page's URL.
+- **"Loading sources…" was shown for a list that had loaded and was empty**, because the pill's message only told an error apart from everything else.
+- **"Previous page" stayed clickable while a page loaded** and silently did nothing. "Next page" disabled itself properly; the two behaved differently for the same reason.
+
+#### Now
+
+- **The list reads leads one at a time.** A lead that breaks the contract is left out, counted, and logged (`left out 1 lead(s) that did not match the contract`), and the rest of the page is shown. A page where _no_ lead matches is still a contract violation — that is a change of shape, not one bad record. The new `cursorPageSchema` in `lib/api/pagination.ts` does this for any cursor-paged list, so quotations and orders inherit it; `CursorPage` carries `skipped` alongside the rows.
+- **Lookup codes are checked for shape, not spelling:** letters, digits, `_`, `-` and `.`. `agri-fair` and `qr.code` filter as they should. A code the backend does not know is still the backend's to refuse.
+- **Optional lookup fields can be emptied.** `LookupSelect` takes `clearable`, which adds a "Not set" row; the field then shows its placeholder again. Fields that need a value — Irrigation system — do not get the row, and ignore a null.
+- **The dialog's close timer is cancelled** when the dialog unmounts and whenever the form resets.
+- **The Source pill says which of the three it is:** loading, failed, or nothing set up yet.
+- **Both paging buttons are disabled together** while a page change is in flight. `DataTable` takes `isPaging` instead of the caller folding it into `hasNextPage`.
+- **The search term is trimmed once**, in `useLeadListParams`, so a hand-edited `?q=%20` no longer counts as an active filter while sending nothing.
+
+#### Discussion
+
+The row-tolerance change is the one with a real trade-off: a backend that quietly drops a required field now shows a slightly short page instead of failing loudly. That is the right way round for a sales team working a list — but only because the drop is never silent for us: it is counted on the page and logged as a warning with the Data ID, and a page where nothing parses still fails hard. The alternative, relaxing `.min(1)` across the wire schema, would have bought the same resilience by giving up the contract itself.
+
+`clearable` is opt-in rather than the default because most lookups back a required field, and a "Not set" row on those is a way to make a form invalid by accident.
+
+The widened code pattern is deliberately a shape check, not an allow-list: the frontend cannot know what an administrator will type next, and the backend rejects codes it does not have. Worth confirming with the backend what its lookup codes actually allow (Frontend-Scope §10).
+
+#### Files changed
+
+- `src/lib/api/pagination.ts` — `cursorPageSchema`, `skipped` on `CursorPage`, `PageMetaWire`.
+- `src/features/leads/api/leads.schemas.ts`, `leads.api.ts` — the list uses it; `listLeads` logs what was left out.
+- `src/features/leads/hooks/use-lead-list-params.ts` — widened code pattern, search trimmed once.
+- `src/features/lookups/components/lookup-select.tsx` — `clearable`, placeholder helper.
+- `src/features/leads/components/new-lead-dialog.tsx` — cancelled timer, clearable Source.
+- `src/features/leads/components/leads-toolbar.tsx` — three messages for the Source pill.
+- `src/components/patterns/data-table/data-table.tsx`, `leads-table.tsx` — `isPaging`, with a `Paging` story.
+
+#### Tests
+
+11 new unit tests, 360 passing.
+
+- `lib/api/pagination.test.ts` — a clean page, a page with two bad rows, a page where nothing parses (and the message naming the first failure), an empty page.
+- `features/leads/api/leads.test.ts` — `listLeads` keeps the good lead and counts the bad one; a page where nothing matches still fails as `CONTRACT_VIOLATION`.
+- `features/leads/components/leads-ui.test.tsx` — `?source=agri-fair` reaches the request instead of being dropped.
+- `features/lookups/components/lookup-select.test.tsx` — the list's rows by name, emptying a clearable field, and no "Not set" row on a required one.
+- `components/patterns/data-table/data-table.test.tsx` — both paging buttons disabled while a page loads.
+
 ## 21 September 2026
 
 ### Small grey text and teal links meet WCAG AA contrast in light mode

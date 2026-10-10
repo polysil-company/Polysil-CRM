@@ -131,32 +131,78 @@ The registry file is the source of truth; this snapshot helps reading.
 | AUTH-004 | Keep signed in — rotate the access token with the refresh cookie (`POST /auth/refresh`) | shared | mocked |
 | AUTH-005 | Sign out (`POST /auth/logout`) | shared | mocked |
 | AUTH-006 | Signed-in routing — sign-in redirects, return path and session end | frontend | in-progress |
-| LEAD-001 | List leads with filters, sorting and pagination (`GET /leads`) | shared | mocked |
-| LEAD-002 | Create lead (`POST /leads`) | shared | mocked |
-| LEAD-003 | Lead detail (`GET /leads/{leadId}`) | shared | mocked |
-| LEAD-004 | Lead counts by status (`GET /leads/summary`) | shared | mocked |
-| RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | mocked |
+| LEAD-001 | List leads with filters, sorting and pagination (`GET /leads`, `GET /leads/areas`) | shared | in-progress |
+| LEAD-002 | Create lead (`POST /leads`) | shared | in-progress |
+| LEAD-003 | Lead detail (`GET /leads/{leadId}`) | shared | in-progress |
+| LEAD-004 | Lead stats — navigation badge and sales tab (`GET /leads/stats`) | shared | in-progress |
+| LEAD-005 | Lead timeline — the lead's history, newest first (`GET /leads/{leadId}/timeline`) | shared | in-progress |
+| LEAD-006 | Add a note to a lead (`POST /leads/{leadId}/notes`) | shared | in-progress |
+| LEAD-007 | Move a lead's stage — contact, qualify, mark lost, reopen (`POST /leads/{leadId}/transition`, `POST /leads/{leadId}/reopen`) | shared | in-progress |
+| LEAD-008 | Assign a lead — owner and channel partner (`POST /leads/{leadId}/assign`, `GET /leads/assignees`, `GET /lookups/partners`) | shared | in-progress |
+| LEAD-009 | Export the lead list to Excel (`GET /leads/export`) | shared | in-progress |
+| LEAD-010 | Edit a lead's own fields (`PATCH /leads/{leadId}`) | shared | in-progress |
+| LEAD-011 | Delete a lead (`DELETE /leads/{leadId}`) | shared | in-progress |
+| LEAD-012 | Duplicate review — dismiss a pair, or merge one lead into the other (`GET /leads/duplicates`, `POST /leads/duplicates/{linkId}/dismiss`, `POST /leads/{leadId}/merge`) | shared | in-progress |
+| LEAD-013 | Lead QR codes — make, print, rename or switch off (`GET /lead-qr-codes`, `POST /lead-qr-codes`, `PATCH /lead-qr-codes/{qrId}`) | shared | in-progress |
+| LEAD-014 | The public enquiry page — /enquiry, with or without a QR code (`GET /public/lead-form`, `GET /public/territories`, `POST /public/leads/verify`, `POST /public/leads`) | shared | in-progress |
+| RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
 | RPT-002 | Reports | shared | planned |
-| QUOT-001 | Quotations list | shared | planned |
-| SO-001 | Sales orders list | shared | planned |
-| APPR-001 | Approval inbox — amount-based escalation | shared | planned |
-| CMPL-001 | Complaints list and QA review | shared | planned |
-| TASK-001 | Tasks and daily planner | shared | planned |
+| QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
+| QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
+| QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
+| QUOT-004 | Quotation builder — create and edit a draft (`POST /quotations`, `PATCH /quotations/{quotationId}`, `PUT /quotations/{quotationId}/lines`) | shared | in-progress |
+| QUOT-005 | Live pricing — the quotation preview (`POST /pricing/quote-lines`) | shared | planned |
+| QUOT-006 | Send a quotation — number it, share the link, render the PDF (`POST /quotations/{quotationId}/send`) | shared | in-progress |
+| QUOT-007 | Ask a manager to approve a quotation's discount (`POST /quotations/{quotationId}/request-approval`) | shared | in-progress |
+| QUOT-008 | Record the customer's answer — accepted, rejected or negotiation (`POST /quotations/{quotationId}/transition`) | shared | in-progress |
+| QUOT-009 | Revise a quotation, and its versions (`POST /quotations/{quotationId}/revise`, `GET /quotations/{quotationId}/versions`) | shared | in-progress |
+| QUOT-010 | A quotation's history (`GET /quotations/{quotationId}/timeline`) | shared | in-progress |
+| QUOT-011 | Delete a draft quotation (`DELETE /quotations/{quotationId}`) | shared | in-progress |
+| QUOT-012 | The customer's quotation page — /q/{token} (`GET /public/q/{token}`, `GET /public/q/{token}/pdf`) | shared | in-progress |
+| QUOT-013 | Export the quotation list to Excel (`GET /quotations/export`) | shared | in-progress |
+| SO-001 | Sales orders list (`GET /orders`) | shared | in-progress |
+| SO-002 | A sales order — the document, its approval chain, PDF and history (`GET /orders/{orderId}`, `GET /orders/{orderId}/pdf`, `GET /orders/{orderId}/timeline`) | shared | in-progress |
+| SO-003 | New order from accepted quotations, and a draft's header (`POST /orders`, `PATCH /orders/{orderId}`, `DELETE /orders/{orderId}`) | shared | in-progress |
+| SO-004 | Submit an order for approval, and cancel it (`POST /orders/{orderId}/submit`, `POST /orders/{orderId}/cancel`) | shared | in-progress |
+| SO-005 | A direct order typed in line by line, and a draft's lines (`POST /orders`, `PUT /orders/{orderId}/lines`, `POST /pricing/quote-lines`) | shared | in-progress |
+| SO-006 | Export the order list to Excel (`GET /orders/export`) | shared | in-progress |
+| APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
+| APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
+| CMPL-001 | Complaints list — filters, waiting on me, counts (`GET /complaints`, `GET /complaints/stats`) | shared | in-progress |
+| CMPL-002 | Complaint detail and history (`GET /complaints/{id}`, `GET /complaints/{id}/timeline`) | shared | in-progress |
+| CMPL-003 | Raise a complaint — draft, edit, products, submit, cancel, delete (`POST /complaints`, `PATCH /complaints/{id}`, `PUT /complaints/{id}/lines`, `POST /complaints/{id}/submit`, `POST /complaints/{id}/cancel`, `DELETE /complaints/{id}`) | shared | in-progress |
+| CMPL-004 | Manager's check — approve or return, severity and owner (`POST /complaints/{id}/check`, `GET /complaints/{id}/assignees`) | shared | in-progress |
+| CMPL-005 | QC verdict (`POST /complaints/{id}/qc`) | shared | in-progress |
+| CMPL-006 | Complaint attachments — photos and documents (`POST /complaints/{id}/attachments`, `GET /complaints/{id}/attachments/{attachmentId}`, `DELETE /complaints/{id}/attachments/{attachmentId}`) | shared | in-progress |
+| CMPL-007 | Complaint remedy — refund, replacement or none; withdraw (`POST /complaints/{id}/remedy`, `POST /complaints/{id}/remedy/withdraw`) | shared | in-progress |
+| CMPL-008 | Complaint targets (SLA policies) and complaint types (`GET /complaint-sla-policies`, `POST /complaint-sla-policies`, `GET /lookups/complaint-types`, `POST /lookups/complaint-types`) | shared | in-progress |
+| CMPL-009 | Export complaints to Excel (`GET /complaints/export`) | shared | in-progress |
+| TASK-001 | My day — one person's tasks due that day and overdue (`GET /planner`) | shared | in-progress |
+| TASK-002 | Team day — due, done and overdue per person below a manager (`GET /planner/team`) | shared | in-progress |
+| TASK-003 | List tasks — a lead's tasks, and every task with filters (`GET /tasks`, `GET /tasks/{id}`) | shared | in-progress |
+| TASK-004 | Create a task — call, visit, meeting, follow-up (`POST /tasks`, `GET /tasks/assignees`, `GET /lookups/meeting-types`) | shared | in-progress |
+| TASK-005 | Complete, cancel or reopen a task (`POST /tasks/{id}/complete`, `/cancel`, `/reopen`) | shared | in-progress |
+| TASK-006 | Edit or reassign an open task (`PATCH /tasks/{id}`) | shared | in-progress |
+| TASK-007 | Meeting minutes with action items (`POST /minutes`, `GET /minutes`, `GET /minutes/{id}`) | shared | in-progress |
+| TASK-008 | Export the task list to Excel (`GET /tasks/export`) | shared | in-progress |
 | CHNL-001 | Channel partners list and detail | shared | planned |
 | MKT-001 | Marketing offers — set by Admin, visible to channel partners only | shared | planned |
 | SCHM-001 | Schemes — set by Admin, visible to everyone | shared | planned |
 | MSTR-001 | Masters — products, stock, price lists, territories | shared | planned |
+| MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
+| MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
 | SUBS-001 | Subsidy forms and case status | shared | planned |
 | ACCT-001 | Accounts work queue | shared | planned |
-| DISP-001 | Dispatch work queue | shared | planned |
+| DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |
+| DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |
 | ADMN-001 | Users, roles and approval thresholds | shared | planned |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |
-| NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | mocked |
-| NOTIF-002 | Mark notifications as read — one or all | shared | mocked |
-| MSG-001 | Conversation list with unread counts | shared | mocked |
-| MSG-002 | Messages in a conversation | shared | mocked |
-| MSG-003 | Send a message, optionally linking a CRM record | shared | mocked |
-| MSG-004 | Start a conversation — staff directory search | shared | mocked |
-| MSG-005 | Mark a conversation as read | shared | mocked |
+| NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | in-progress |
+| NOTIF-002 | Mark notifications as read — one or all | shared | in-progress |
+| MSG-001 | Conversation list with unread counts | shared | in-progress |
+| MSG-002 | Messages in a conversation | shared | in-progress |
+| MSG-003 | Send a message, optionally linking a CRM record | shared | in-progress |
+| MSG-004 | Start a conversation — staff directory search | shared | in-progress |
+| MSG-005 | Mark a conversation as read | shared | in-progress |
 | REPO-001 | Changelog system — one entry per change, generated CHANGELOG.md | frontend | in-progress |
 | REPO-002 | Quality gates — lint rules, git hooks, CI pipeline | frontend | in-progress |

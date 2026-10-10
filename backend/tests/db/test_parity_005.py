@@ -46,6 +46,21 @@ TABLES = {
     "lead": sa.table("lead", sa.column("id", _ID), sa.column("owner_user_id", _ID),
                      sa.column("owner_org_unit_id", _ID), sa.column("territory_id", _ID),
                      sa.column("assigned_partner_id", _ID), sa.column("deleted_at")),
+    "quotation": sa.table("quotation", sa.column("id", _ID), sa.column("owner_user_id", _ID),
+                          sa.column("owner_org_unit_id", _ID), sa.column("territory_id", _ID),
+                          sa.column("partner_id", _ID), sa.column("deleted_at")),
+    "sales_order": sa.table("sales_order", sa.column("id", _ID), sa.column("owner_user_id", _ID),
+                            sa.column("owner_org_unit_id", _ID), sa.column("territory_id", _ID),
+                            sa.column("partner_id", _ID), sa.column("deleted_at")),
+    "task": sa.table("task", sa.column("id", _ID), sa.column("assigned_to", _ID),
+                     sa.column("owner_org_unit_id", _ID)),
+    "complaint": sa.table("complaint", sa.column("id", _ID), sa.column("owner_user_id", _ID),
+                          sa.column("owner_org_unit_id", _ID), sa.column("partner_id", _ID),
+                          sa.column("deleted_at")),
+    "subsidy_application": sa.table("subsidy_application", sa.column("id", _ID),
+                                    sa.column("owner_user_id", _ID),
+                                    sa.column("owner_org_unit_id", _ID),
+                                    sa.column("territory_id", _ID)),
 }
 
 
@@ -134,6 +149,51 @@ async def _lead(db: AsyncSession, ids: Fixtures, *, owner_user_id: str | None = 
          "terr": territory_id or ids.territory_id, "ou": owner_user_id,
          "oou": owner_org_unit_id or ids.org_unit_id, "ap": assigned_partner_id,
          "del": deleted})).scalar_one())
+
+
+async def _quotation(db: AsyncSession, ids: Fixtures, *, owner_user_id: str | None = None,
+                     owner_org_unit_id: str | None = None, territory_id: str | None = None,
+                     partner_id: str | None = None, deleted: bool = False) -> str:
+    """A draft quotation built as the owner, on a lead with the same scope: the
+    scope columns mirror the lead's (FS-005 rule 11). The seller is the seeded
+    registration; the place of supply is the row's own territory."""
+    lead = await _lead(db, ids, owner_user_id=owner_user_id,
+                       owner_org_unit_id=owner_org_unit_id, territory_id=territory_id,
+                       assigned_partner_id=partner_id)
+    return str((await db.execute(text(
+        "INSERT INTO quotation (lead_id, sales_type, partner_id, owner_user_id, "
+        "owner_org_unit_id, territory_id, party_name, party_mobile, seller_gstin_id, "
+        "place_of_supply_territory_id, place_of_supply_state_id, intra_state, "
+        "price_effective_date, deleted_at) VALUES (:lead, 'commercial', :p, :ou, :oou, :terr, "
+        "'Farmer', '+919800000000', "
+        "(SELECT id FROM seller_gstin ORDER BY is_default DESC LIMIT 1), "
+        ":terr, :terr, true, CURRENT_DATE, CASE WHEN :del THEN now() END) RETURNING id"),
+        {"lead": lead, "p": partner_id, "ou": owner_user_id,
+         "oou": owner_org_unit_id or ids.org_unit_id, "terr": territory_id or ids.territory_id,
+         "del": deleted})).scalar_one())
+
+
+async def _order(db: AsyncSession, ids: Fixtures, *, owner_user_id: str | None = None,
+                 owner_org_unit_id: str | None = None, territory_id: str | None = None,
+                 partner_id: str | None = None, deleted: bool = False) -> str:
+    """A draft sales order with no lead: the scope columns are the order's own
+    (FS-011 rule 11), so a consolidated order with a null lead is covered too."""
+    order = str((await db.execute(text(
+        "INSERT INTO sales_order (order_type, partner_id, owner_user_id, owner_org_unit_id, "
+        "territory_id, party_name, party_mobile, seller_gstin_id, "
+        "place_of_supply_territory_id, place_of_supply_state_id, intra_state, "
+        "price_effective_date) VALUES ('commercial', :p, :ou, :oou, :terr, "
+        "'Farmer', '+919800000000', "
+        "(SELECT id FROM seller_gstin ORDER BY is_default DESC LIMIT 1), "
+        ":terr, :terr, true, CURRENT_DATE) RETURNING id"),
+        {"p": partner_id, "ou": owner_user_id,
+         "oou": owner_org_unit_id or ids.org_unit_id,
+         "terr": territory_id or ids.territory_id})).scalar_one())
+    if deleted:
+        # the insert trigger refuses anything but a fresh draft, so delete after
+        await db.execute(text("UPDATE sales_order SET deleted_at = now() WHERE id = :o"),
+                         {"o": order})
+    return order
 
 
 async def _visible(db: AsyncSession, table: str, ids_: list[str],
@@ -295,7 +355,330 @@ async def leads_global(db: AsyncSession, ids: Fixtures) -> Witness:
                    {a: True, b: True})
 
 
+# ── witnesses: quotations (FS-005), the lead's shape one table along ─────────
+
+async def quotations_own(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "fo")
+    await _grant(db, role, "quotations", ["view"], "own")
+    me = await _staff(db, ids, role, ids.org_unit_id)
+    other = await _staff(db, ids, role, ids.org_unit_id)
+    mine = await _quotation(db, ids, owner_user_id=me)
+    theirs = await _quotation(db, ids, owner_user_id=other)
+    return Witness(Caller(me, ids.org_unit_id, None, {"quotations": "own"}),
+                   {mine: True, theirs: False})
+
+
+async def quotations_org_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "dm")
+    await _grant(db, role, "quotations", ["view"], "org_subtree")
+    manager = await _staff(db, ids, role, ids.org_unit_id)
+    below = await _quotation(db, ids, owner_org_unit_id=await _org(db, ids, "child",
+                                                                   parent=ids.org_unit_id))
+    outside = await _quotation(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    return Witness(Caller(manager, ids.org_unit_id, None, {"quotations": "org_subtree"}),
+                   {below: True, outside: False})
+
+
+async def quotations_territory(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "sc")
+    await _grant(db, role, "quotations", ["view"], "territory")
+    coord = await _staff(db, ids, role, ids.org_unit_id)
+    await db.execute(text("INSERT INTO user_territory (user_id, territory_id) VALUES (:u, :t)"),
+                     {"u": coord, "t": ids.territory_id})
+    here = await _quotation(db, ids, territory_id=ids.territory_id)
+    there = await _quotation(db, ids, territory_id=await _territory(db, ids, "far"))
+    return Witness(Caller(coord, ids.org_unit_id, None, {"quotations": "territory"}),
+                   {here: True, there: False})
+
+
+async def quotations_partner_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    """A dealer sees the quotations routed through its subtree and not a direct
+    sale on a lead it is assigned to (FS-005 rule 17): partner_id, not the
+    lead's assigned partner, is the branch column."""
+    role = await _role(db, ids, "dist", portal=True, level=3)
+    await _grant(db, role, "quotations", ["view"], "partner_subtree")
+    me = await _partner_user(db, ids, role, ids.distributor_id)
+    mine = await _quotation(db, ids, partner_id=ids.dealer_id)        # dealer under distributor
+    other_tree = await _partner(db, ids, "OTHER", ids.territory_id)
+    theirs = await _quotation(db, ids, partner_id=other_tree)
+    direct = await _quotation(db, ids, partner_id=None)
+    return Witness(Caller(me, None, ids.distributor_id, {"quotations": "partner_subtree"}),
+                   {mine: True, theirs: False, direct: False})
+
+
+async def quotations_global(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "quotations", ["view"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    a = await _quotation(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    b = await _quotation(db, ids, partner_id=ids.dealer_id)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"quotations": "global"}),
+                   {a: True, b: True})
+
+
+# ── witnesses: sales orders (FS-011), the quotation's shape ───────────────────
+
+async def sales_orders_own(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "fo")
+    await _grant(db, role, "sales_orders", ["view"], "own")
+    me = await _staff(db, ids, role, ids.org_unit_id)
+    other = await _staff(db, ids, role, ids.org_unit_id)
+    mine = await _order(db, ids, owner_user_id=me)
+    theirs = await _order(db, ids, owner_user_id=other)
+    return Witness(Caller(me, ids.org_unit_id, None, {"sales_orders": "own"}),
+                   {mine: True, theirs: False})
+
+
+async def sales_orders_org_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "dm")
+    await _grant(db, role, "sales_orders", ["view"], "org_subtree")
+    manager = await _staff(db, ids, role, ids.org_unit_id)
+    below = await _order(db, ids, owner_org_unit_id=await _org(db, ids, "child",
+                                                               parent=ids.org_unit_id))
+    outside = await _order(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    return Witness(Caller(manager, ids.org_unit_id, None, {"sales_orders": "org_subtree"}),
+                   {below: True, outside: False})
+
+
+async def sales_orders_territory(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "sc")
+    await _grant(db, role, "sales_orders", ["view"], "territory")
+    coord = await _staff(db, ids, role, ids.org_unit_id)
+    await db.execute(text("INSERT INTO user_territory (user_id, territory_id) VALUES (:u, :t)"),
+                     {"u": coord, "t": ids.territory_id})
+    here = await _order(db, ids, territory_id=ids.territory_id)
+    there = await _order(db, ids, territory_id=await _territory(db, ids, "far"))
+    return Witness(Caller(coord, ids.org_unit_id, None, {"sales_orders": "territory"}),
+                   {here: True, there: False})
+
+
+async def sales_orders_partner_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    """A distributor sees orders placed by its subtree, not another tree's and
+    not a direct sale."""
+    role = await _role(db, ids, "dist", portal=True, level=3)
+    await _grant(db, role, "sales_orders", ["view"], "partner_subtree")
+    me = await _partner_user(db, ids, role, ids.distributor_id)
+    mine = await _order(db, ids, partner_id=ids.dealer_id)
+    other_tree = await _partner(db, ids, "OTHER", ids.territory_id)
+    theirs = await _order(db, ids, partner_id=other_tree)
+    direct = await _order(db, ids, partner_id=None)
+    return Witness(Caller(me, None, ids.distributor_id, {"sales_orders": "partner_subtree"}),
+                   {mine: True, theirs: False, direct: False})
+
+
+async def sales_orders_global(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "sales_orders", ["view"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    a = await _order(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    b = await _order(db, ids, partner_id=ids.dealer_id)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"sales_orders": "global"}),
+                   {a: True, b: True})
+
+
+# ── witnesses: tasks (FS-014), own on the assignee, org_subtree on the office ──
+
+async def _task(db: AsyncSession, ids: Fixtures, *, assigned_to: str,
+                owner_org_unit_id: str | None = None) -> str:
+    """A personal task as the owner: no link, given by its assignee."""
+    return str((await db.execute(text(
+        "INSERT INTO task (title, task_type, due_at, assigned_to, assigned_by, owner_org_unit_id) "
+        "VALUES ('Call', 'call', now(), CAST(:u AS uuid), CAST(:u AS uuid), CAST(:o AS uuid)) "
+        "RETURNING id"),
+        {"u": assigned_to, "o": owner_org_unit_id or ids.org_unit_id})).scalar_one())
+
+
+async def tasks_own(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "fo")
+    await _grant(db, role, "tasks", ["view"], "own")
+    me = await _staff(db, ids, role, ids.org_unit_id)
+    other = await _staff(db, ids, role, ids.org_unit_id)
+    mine = await _task(db, ids, assigned_to=me)
+    theirs = await _task(db, ids, assigned_to=other)
+    return Witness(Caller(me, ids.org_unit_id, None, {"tasks": "own"}),
+                   {mine: True, theirs: False})
+
+
+async def tasks_org_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "dm")
+    await _grant(db, role, "tasks", ["view"], "org_subtree")
+    manager = await _staff(db, ids, role, ids.org_unit_id)
+    child = await _org(db, ids, "child", parent=ids.org_unit_id)
+    elsewhere = await _org(db, ids, "elsewhere")
+    below = await _task(db, ids, assigned_to=await _staff(db, ids, role, child),
+                        owner_org_unit_id=child)
+    outside = await _task(db, ids, assigned_to=await _staff(db, ids, role, elsewhere),
+                          owner_org_unit_id=elsewhere)
+    return Witness(Caller(manager, ids.org_unit_id, None, {"tasks": "org_subtree"}),
+                   {below: True, outside: False})
+
+
+async def tasks_global(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "tasks", ["view"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    elsewhere = await _org(db, ids, "elsewhere")
+    a = await _task(db, ids, assigned_to=await _staff(db, ids, role, elsewhere),
+                    owner_org_unit_id=elsewhere)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"tasks": "global"}), {a: True})
+
+
+# ── witnesses: complaints (FS-015), own, office and the dealer's subtree ──────
+
+async def _complaint(db: AsyncSession, ids: Fixtures, *, owner_user_id: str | None = None,
+                     owner_org_unit_id: str | None = None, partner_id: str | None = None,
+                     deleted: bool = False) -> str:
+    """A draft as the table owner; the raiser is any staff row (the trigger holds
+    only app_role to the caller)."""
+    raiser = owner_user_id or str((await db.execute(text(
+        "SELECT id FROM app_user WHERE user_type = 'staff' LIMIT 1"))).scalar_one())
+    return str((await db.execute(text(
+        "INSERT INTO complaint (complaint_type_id, description, contact_name, contact_mobile, "
+        "territory_id, state_code, partner_id, owner_user_id, owner_org_unit_id, raised_by, "
+        "deleted_at) VALUES ((SELECT id FROM complaint_type WHERE code = 'dripline'), 'x', 'x', "
+        "'+919812345678', CAST(:t AS uuid), 'GJ', CAST(:p AS uuid), CAST(:u AS uuid), "
+        "CAST(:o AS uuid), CAST(:r AS uuid), CASE WHEN :d THEN now() END) RETURNING id"),
+        {"t": ids.territory_id, "p": partner_id, "u": owner_user_id,
+         "o": owner_org_unit_id or ids.org_unit_id, "r": raiser, "d": deleted})).scalar_one())
+
+
+async def complaints_own(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "fo")
+    await _grant(db, role, "complaints", ["view"], "own")
+    me = await _staff(db, ids, role, ids.org_unit_id)
+    other = await _staff(db, ids, role, ids.org_unit_id)
+    mine = await _complaint(db, ids, owner_user_id=me)
+    theirs = await _complaint(db, ids, owner_user_id=other)
+    return Witness(Caller(me, ids.org_unit_id, None, {"complaints": "own"}),
+                   {mine: True, theirs: False})
+
+
+async def complaints_org_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "dm")
+    await _grant(db, role, "complaints", ["view"], "org_subtree")
+    manager = await _staff(db, ids, role, ids.org_unit_id)
+    below = await _complaint(db, ids, owner_org_unit_id=await _org(db, ids, "child",
+                                                                   parent=ids.org_unit_id))
+    outside = await _complaint(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    return Witness(Caller(manager, ids.org_unit_id, None, {"complaints": "org_subtree"}),
+                   {below: True, outside: False})
+
+
+async def complaints_partner_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    """A distributor sees its subtree's complaints, not another tree's and not a
+    complaint with no dealer."""
+    role = await _role(db, ids, "dist", portal=True, level=3)
+    await _grant(db, role, "complaints", ["view"], "partner_subtree")
+    me = await _partner_user(db, ids, role, ids.distributor_id)
+    mine = await _complaint(db, ids, partner_id=ids.dealer_id)
+    other_tree = await _partner(db, ids, "OTHER", ids.territory_id)
+    theirs = await _complaint(db, ids, partner_id=other_tree)
+    direct = await _complaint(db, ids)
+    return Witness(Caller(me, None, ids.distributor_id, {"complaints": "partner_subtree"}),
+                   {mine: True, theirs: False, direct: False})
+
+
+async def complaints_global(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "complaints", ["view"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    a = await _complaint(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    b = await _complaint(db, ids, partner_id=ids.dealer_id)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"complaints": "global"}),
+                   {a: True, b: True})
+
+
+# ── witnesses: subsidy applications (FS-009), own, office, state, all ─────────
+
+async def _application(db: AsyncSession, ids: Fixtures, *, owner_user_id: str | None = None,
+                       owner_org_unit_id: str | None = None,
+                       territory_id: str | None = None) -> str:
+    """An application as the table owner, on a lead of its own."""
+    lead = await _lead(db, ids, owner_user_id=owner_user_id, owner_org_unit_id=owner_org_unit_id,
+                       territory_id=territory_id)
+    return str((await db.execute(text(
+        "INSERT INTO subsidy_application (application_no, scheme_id, system_type, category_code, "
+        "category_name, category_pct, lead_id, farmer_name, mobile, territory_id, total_area, "
+        "calculation_request, calculation, total_cost, subsidy, farmer_share, formula_version, "
+        "regular_matrix_id, seven_year_matrix_id, as_of, current_stage_id, current_since, "
+        "owner_user_id, owner_org_unit_id) "
+        "SELECT :no, s.id, 'drip', 'small_farmer', 'Small farmer', 80, CAST(:l AS uuid), 'Farmer', "
+        "'+919812345678', CAST(:t AS uuid), 1, '{}', '{}', 100, 80, 20, 'test', gen_random_uuid(), "
+        "gen_random_uuid(), DATE '2020-06-15', d.id, current_date, CAST(:u AS uuid), "
+        "CAST(:o AS uuid) "
+        "FROM subsidy_scheme s JOIN subsidy_stage_def d ON d.scheme_id = s.id AND d.seq = 4 "
+        "WHERE s.code = 'GGRC' RETURNING id"),
+        {"no": "SA/T/" + uuid.uuid4().hex[:12], "l": lead, "t": territory_id or ids.territory_id,
+         "u": owner_user_id, "o": owner_org_unit_id or ids.org_unit_id})).scalar_one())
+
+
+async def subsidy_own(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "fo")
+    await _grant(db, role, "subsidy", ["view"], "own")
+    me = await _staff(db, ids, role, ids.org_unit_id)
+    other = await _staff(db, ids, role, ids.org_unit_id)
+    mine = await _application(db, ids, owner_user_id=me)
+    theirs = await _application(db, ids, owner_user_id=other)
+    return Witness(Caller(me, ids.org_unit_id, None, {"subsidy": "own"}),
+                   {mine: True, theirs: False})
+
+
+async def subsidy_org_subtree(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "dm")
+    await _grant(db, role, "subsidy", ["view"], "org_subtree")
+    manager = await _staff(db, ids, role, ids.org_unit_id)
+    below = await _application(db, ids, owner_org_unit_id=await _org(db, ids, "child",
+                                                                     parent=ids.org_unit_id))
+    outside = await _application(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    return Witness(Caller(manager, ids.org_unit_id, None, {"subsidy": "org_subtree"}),
+                   {below: True, outside: False})
+
+
+async def subsidy_territory(db: AsyncSession, ids: Fixtures) -> Witness:
+    """The State Co-ordinator: the applications in its territories, whoever owns them."""
+    role = await _role(db, ids, "sc")
+    await _grant(db, role, "subsidy", ["view"], "territory")
+    coord = await _staff(db, ids, role, await _org(db, ids, "sc office"))
+    await db.execute(text("INSERT INTO user_territory (user_id, territory_id) VALUES (:u, :t)"),
+                     {"u": coord, "t": ids.territory_id})
+    here = await _application(db, ids, territory_id=ids.territory_id)
+    there = await _application(db, ids, territory_id=await _territory(db, ids, "far"))
+    return Witness(Caller(coord, ids.org_unit_id, None, {"subsidy": "territory"}),
+                   {here: True, there: False})
+
+
+async def subsidy_global(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "subsidy", ["view"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    a = await _application(db, ids, owner_org_unit_id=await _org(db, ids, "elsewhere"))
+    b = await _application(db, ids, territory_id=await _territory(db, ids, "far"))
+    return Witness(Caller(admin, ids.org_unit_id, None, {"subsidy": "global"}),
+                   {a: True, b: True})
+
+
 WITNESSES: dict[tuple[str, str], Builder] = {
+    ("subsidy", "own"): subsidy_own,
+    ("subsidy", "org_subtree"): subsidy_org_subtree,
+    ("subsidy", "territory"): subsidy_territory,
+    ("subsidy", "global"): subsidy_global,
+    ("complaints", "own"): complaints_own,
+    ("complaints", "org_subtree"): complaints_org_subtree,
+    ("complaints", "partner_subtree"): complaints_partner_subtree,
+    ("complaints", "global"): complaints_global,
+    ("tasks", "own"): tasks_own,
+    ("tasks", "org_subtree"): tasks_org_subtree,
+    ("tasks", "global"): tasks_global,
+    ("sales_orders", "own"): sales_orders_own,
+    ("sales_orders", "org_subtree"): sales_orders_org_subtree,
+    ("sales_orders", "territory"): sales_orders_territory,
+    ("sales_orders", "partner_subtree"): sales_orders_partner_subtree,
+    ("sales_orders", "global"): sales_orders_global,
+    ("quotations", "own"): quotations_own,
+    ("quotations", "org_subtree"): quotations_org_subtree,
+    ("quotations", "territory"): quotations_territory,
+    ("quotations", "partner_subtree"): quotations_partner_subtree,
+    ("quotations", "global"): quotations_global,
     ("users", "own"): users_own,
     ("users", "org_subtree"): users_org_subtree,
     ("users", "partner_subtree"): users_partner_subtree,
@@ -346,8 +729,40 @@ async def leads_deleted(db: AsyncSession, ids: Fixtures) -> Witness:
                    {live: True, gone: False})
 
 
+async def quotations_deleted(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "quotations", ["view", "edit"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    live = await _quotation(db, ids)
+    gone = await _quotation(db, ids, deleted=True)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"quotations": "global"}),
+                   {live: True, gone: False})
+
+
+async def sales_orders_deleted(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "sales_orders", ["view", "edit"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    live = await _order(db, ids)
+    gone = await _order(db, ids, deleted=True)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"sales_orders": "global"}),
+                   {live: True, gone: False})
+
+
+async def complaints_deleted(db: AsyncSession, ids: Fixtures) -> Witness:
+    role = await _role(db, ids, "admin")
+    await _grant(db, role, "complaints", ["view", "edit"], "global")
+    admin = await _staff(db, ids, role, ids.org_unit_id)
+    live = await _complaint(db, ids)
+    gone = await _complaint(db, ids, deleted=True)
+    return Witness(Caller(admin, ids.org_unit_id, None, {"complaints": "global"}),
+                   {live: True, gone: False})
+
+
 DELETED: dict[str, Builder] = {"users": users_deleted, "partners": partners_deleted,
-                               "leads": leads_deleted}
+                               "leads": leads_deleted, "quotations": quotations_deleted,
+                               "sales_orders": sales_orders_deleted,
+                               "complaints": complaints_deleted}
 
 
 def test_every_spec_with_a_soft_delete_column_has_a_deleted_witness() -> None:

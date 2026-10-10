@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useShiftWheelScroll } from "@/hooks/use-shift-wheel-scroll";
-import { formatNumber } from "@/lib/format";
+import { formatCount, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import {
@@ -55,8 +55,21 @@ export interface DataTableProps<TData extends RowData> {
   columns: TableOptions<DataTableFeatures, TData>["columns"];
   data: readonly TData[];
   getRowId: (row: TData) => string;
-  /** Total rows across all pages (server-side pagination). */
-  rowCount: number;
+  /** Total rows across all pages (server-side pagination); null when the API did not count them. */
+  rowCount: number | null;
+  /** The count stopped at a ceiling: there are at least `rowCount` rows, shown as "1,000+". */
+  rowCountCapped?: boolean;
+  /**
+   * For cursor-paged APIs, which say whether another page exists: decides whether "Next
+   * page" is enabled, instead of the count.
+   */
+  hasNextPage?: boolean;
+  /**
+   * A page change has not landed yet, so the rows on screen still belong to the previous
+   * page. Both paging buttons are disabled until it does: their next click would be read
+   * against the wrong page.
+   */
+  isPaging?: boolean;
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
   pagination: PaginationState;
@@ -82,6 +95,9 @@ export function DataTable<TData extends RowData>({
   data,
   getRowId,
   rowCount,
+  rowCountCapped = false,
+  hasNextPage,
+  isPaging = false,
   sorting,
   onSortingChange,
   pagination,
@@ -101,7 +117,7 @@ export function DataTable<TData extends RowData>({
     columns,
     data,
     getRowId,
-    rowCount,
+    ...(rowCount === null ? {} : { rowCount }),
     manualSorting: true,
     manualPagination: true,
     enableRowSelection: selectable,
@@ -119,6 +135,17 @@ export function DataTable<TData extends RowData>({
 
   const rows = table.getRowModel().rows;
   const firstRowIndex = pagination.pageIndex * pagination.pageSize;
+  const pageCount =
+    rowCount === null ? null : Math.max(1, Math.ceil(rowCount / pagination.pageSize));
+  // Without `hasNextPage`, the count decides — but a capped count is a lower bound, so it
+  // never ends the list: there may be more pages past it.
+  const canNext =
+    !isPaging &&
+    (hasNextPage ??
+      (pageCount !== null && (rowCountCapped || pagination.pageIndex + 1 < pageCount)));
+  const canPrevious = !isPaging && pagination.pageIndex > 0;
+  // -1 tells assistive tech the total is unknown, rather than announcing a wrong one.
+  const ariaRowCount = rowCount === null || rowCountCapped ? -1 : rowCount + 1;
 
   return (
     <div data-slot="data-table" className={cn("flex min-h-0 flex-col", className)}>
@@ -131,7 +158,7 @@ export function DataTable<TData extends RowData>({
         <div ref={scrollRef} className="h-full scrollbar-thin overflow-auto">
           <table
             aria-label={label}
-            aria-rowcount={rowCount + 1}
+            aria-rowcount={ariaRowCount}
             className="w-full border-separate border-spacing-0"
           >
             <thead>
@@ -180,17 +207,20 @@ export function DataTable<TData extends RowData>({
       </div>
       <Pagination
         pageIndex={pagination.pageIndex}
-        pageSize={pagination.pageSize}
-        pageCount={table.getPageCount()}
+        pageCount={rowCountCapped ? null : pageCount}
+        firstRow={firstRowIndex + 1}
+        lastRow={firstRowIndex + rows.length}
         rowCount={rowCount}
-        canPrevious={table.getCanPreviousPage()}
-        canNext={table.getCanNextPage()}
+        rowCountCapped={rowCountCapped}
+        canPrevious={canPrevious}
+        canNext={canNext}
         onPrevious={() => {
-          table.previousPage();
+          onPaginationChange({ ...pagination, pageIndex: pagination.pageIndex - 1 });
         }}
         onNext={() => {
-          table.nextPage();
+          onPaginationChange({ ...pagination, pageIndex: pagination.pageIndex + 1 });
         }}
+        pageSize={pagination.pageSize}
         onPageSizeChange={(pageSize) => {
           onPaginationChange({ pageIndex: 0, pageSize });
         }}
@@ -246,8 +276,13 @@ function HeaderContent<TData extends RowData>({
 interface PaginationProps {
   pageIndex: number;
   pageSize: number;
-  pageCount: number;
-  rowCount: number;
+  /** Null when unknown — the total was not counted, or stopped at a ceiling. */
+  pageCount: number | null;
+  /** 1-based positions of the first and last row on this page. */
+  firstRow: number;
+  lastRow: number;
+  rowCount: number | null;
+  rowCountCapped: boolean;
   canPrevious: boolean;
   canNext: boolean;
   onPrevious: () => void;
@@ -260,7 +295,10 @@ function Pagination({
   pageIndex,
   pageSize,
   pageCount,
+  firstRow,
+  lastRow,
   rowCount,
+  rowCountCapped,
   canPrevious,
   canNext,
   onPrevious,
@@ -268,13 +306,13 @@ function Pagination({
   onPageSizeChange,
   pageSizeOptions,
 }: PaginationProps): React.JSX.Element {
-  const from = rowCount === 0 ? 0 : pageIndex * pageSize + 1;
-  const to = Math.min(rowCount, (pageIndex + 1) * pageSize);
+  const range = lastRow < firstRow ? "0" : `${formatNumber(firstRow)}–${formatNumber(lastRow)}`;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-2.5">
       <p className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
-        {formatNumber(from)}–{formatNumber(to)} of {formatNumber(rowCount)}
+        {range}
+        {rowCount === null ? null : ` of ${formatCount(rowCount, { atLeast: rowCountCapped })}`}
       </p>
       <div className="flex items-center gap-1.5">
         <Select
@@ -306,7 +344,8 @@ function Pagination({
           <Icon icon={ArrowLeft01Icon} />
         </Button>
         <span className="min-w-20 text-center text-xs text-muted-foreground tabular-nums">
-          Page {formatNumber(pageIndex + 1)} of {formatNumber(Math.max(pageCount, 1))}
+          Page {formatNumber(pageIndex + 1)}
+          {pageCount === null ? null : ` of ${formatNumber(pageCount)}`}
         </span>
         <Button
           variant="ghost"

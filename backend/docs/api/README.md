@@ -7,16 +7,48 @@ any endpoint change, so it is always current rather than a snapshot.
 
 | Module | Endpoints | Doc |
 |---|---|---|
+| Approvals | 5 | [`approvals.md`](approvals.md) |
+| Assistant | 2 | [`assistant.md`](assistant.md) |
 | Auth | 7 | [`auth.md`](auth.md) |
-| Leads | 14 | [`leads.md`](leads.md) |
-| Lookups | 14 | [`lookups.md`](lookups.md) |
+| Campaigns | 5 | [`campaigns.md`](campaigns.md) |
+| Complaints | 22 | [`complaints.md`](complaints.md) |
+| Customers | 4 | [`customers.md`](customers.md) |
+| Dashboard | 1 | [`dashboard.md`](dashboard.md) |
+| Dealer Commission | 12 | [`dealer-commission.md`](dealer-commission.md) |
+| Dispatch | 2 | [`dispatch.md`](dispatch.md) |
+| Holidays | 3 | [`holidays.md`](holidays.md) |
+| Leads | 20 | [`leads.md`](leads.md) |
+| Lookups | 23 | [`lookups.md`](lookups.md) |
+| Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
+| Messages | 7 | [`messages.md`](messages.md) |
+| Notifications | 2 | [`notifications.md`](notifications.md) |
+| Orders | 17 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
-| Partners | 6 | [`partners.md`](partners.md) |
+| Partners | 7 | [`partners.md`](partners.md) |
+| Payments | 8 | [`payments.md`](payments.md) |
+| Portal | 6 | [`portal.md`](portal.md) |
 | Pricing | 8 | [`pricing.md`](pricing.md) |
 | Products | 8 | [`products.md`](products.md) |
+| Public | 6 | [`public.md`](public.md) |
+| Quotations | 14 | [`quotations.md`](quotations.md) |
+| Ratings | 4 | [`ratings.md`](ratings.md) |
+| Reports | 9 | [`reports.md`](reports.md) |
+| Rewards | 19 | [`rewards.md`](rewards.md) |
+| Schemes | 6 | [`schemes.md`](schemes.md) |
+| Seller Gstins | 3 | [`seller-gstins.md`](seller-gstins.md) |
+| Settings | 2 | [`settings.md`](settings.md) |
+| Stock | 7 | [`stock.md`](stock.md) |
 | Subsidy | 4 | [`subsidy.md`](subsidy.md) |
+| Subsidy Applications | 14 | [`subsidy-applications.md`](subsidy-applications.md) |
+| Subsidy Masters | 4 | [`subsidy-masters.md`](subsidy-masters.md) |
+| Subsidy Reports | 6 | [`subsidy-reports.md`](subsidy-reports.md) |
+| Subsidy Schemes | 6 | [`subsidy-schemes.md`](subsidy-schemes.md) |
+| Targets | 3 | [`targets.md`](targets.md) |
+| Tasks | 14 | [`tasks.md`](tasks.md) |
 | Territories | 4 | [`territories.md`](territories.md) |
-| Users | 9 | [`users.md`](users.md) |
+| Tracking | 16 | [`tracking.md`](tracking.md) |
+| Users | 10 | [`users.md`](users.md) |
+| Warranty | 3 | [`warranty.md`](warranty.md) |
 
 ---
 
@@ -31,7 +63,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Money | decimal **string** — `"1234.56"` |
 | Time | ISO-8601 UTC, rendered IST |
 | Idempotency | `Idempotency-Key` on every POST/PATCH, except the `/auth` mutations |
-| Pagination | `page`, `limit`, `sort`, `q` |
+| Pagination | by cursor, not page number: `limit`, then the previous page's `meta.next_cursor` as `cursor`; absent on the last page. `include_total=true` adds `meta.total` (capped, see `meta.total_capped`) where a list offers it |
 
 **Empty list versus 403.** Rows are scoped by permission in the database. An empty
 collection means nothing is in the caller's scope; `403` means the action itself is

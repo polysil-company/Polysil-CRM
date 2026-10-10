@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { can } from "@/lib/auth/permissions";
+import { can, canApprove } from "@/lib/auth/permissions";
 import { PARTNER_ROLES, ROLES, STAFF_ROLES } from "@/lib/auth/roles";
 
 import { mockPermissionsFor } from "./permissions";
@@ -30,13 +30,26 @@ describe("[AUTH-002] mock permission matrix", () => {
     }
   });
 
-  it("lets managers approve, but not employees or channel partners", () => {
-    expect(can(mockPermissionsFor("employee"), "approvals")).toBe(false);
-    for (const role of ["district_manager", "state_manager", "regional_manager"] as const) {
-      expect(can(mockPermissionsFor(role), "approvals", "approve")).toBe(true);
+  it("lets managers, Accounts and Dispatch approve, but not employees or channel partners", () => {
+    expect(canApprove(mockPermissionsFor("employee"))).toBe(false);
+    for (const role of [
+      "district_manager",
+      "state_manager",
+      "regional_manager",
+      "account_manager",
+      "dispatch_manager",
+    ] as const) {
+      expect(can(mockPermissionsFor(role), "sales_orders", "approve")).toBe(true);
     }
     for (const role of PARTNER_ROLES) {
-      expect(can(mockPermissionsFor(role), "approvals")).toBe(false);
+      expect(canApprove(mockPermissionsFor(role))).toBe(false);
+    }
+  });
+
+  it("gives each module one entry, as GET /auth/me does", () => {
+    for (const role of ["district_manager", "employee", "dealer"] as const) {
+      const modules = mockPermissionsFor(role).map((entry) => entry.module);
+      expect(new Set(modules).size).toBe(modules.length);
     }
   });
 

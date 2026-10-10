@@ -36,11 +36,11 @@ signed in. Keyset-paged: pass `meta.next_cursor` back as `cursor`.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `q` | query | string | null |  | Name substring. |
-| `parent_id` | query | string | null |  | Children of this office. |
-| `is_open` | query | boolean | null |  | true for open offices only, false for closed. |
+| `q` | query | string \| null |  | Name substring. |
+| `parent_id` | query | string \| null |  | Children of this office. |
+| `is_open` | query | boolean \| null |  | true for open offices only, false for closed. |
 | `limit` | query | integer |  |  |
-| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+| `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 
 **Responses**
 
@@ -64,7 +64,7 @@ among its siblings. **`Idempotency-Key` is required.**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -74,8 +74,8 @@ among its siblings. **`Idempotency-Key` is required.**
 |---|---|---|---|
 | `name` | string | yes | Unique among its siblings, case-insensitively. |
 | `role_level` | integer | yes |  |
-| `parent_id` | string | null |  | An open office, or null for a root. |
-| `territory_id` | string | null |  | The territory this office covers; leave null for an HQ unit. |
+| `parent_id` | string \| null |  | An open office, or null for a root. |
+| `territory_id` | string \| null |  | The territory this office covers; leave null for an HQ unit. |
 
 **Responses**
 
@@ -129,7 +129,7 @@ move under one of its own descendants is `422 fields.parent_id`.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -137,9 +137,9 @@ move under one of its own descendants is `422 fields.parent_id`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `name` | string | null |  |  |
-| `parent_id` | string | null |  |  |
-| `territory_id` | string | null |  |  |
+| `name` | string \| null |  |  |
+| `parent_id` | string \| null |  |  |
+| `territory_id` | string \| null |  |  |
 
 **Responses**
 
@@ -167,7 +167,7 @@ on it: move or deactivate them first. Closing again is a no-op.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Responses**
 
@@ -195,7 +195,7 @@ else is restored.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Responses**
 
@@ -225,7 +225,7 @@ else is restored.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -240,10 +240,10 @@ else is restored.
 | `id` | string | yes |  |
 | `name` | string | yes |  |
 | `role_level` | integer | yes | 1 field up to 5 head office; the level of the role that runs it. |
-| `parent` | OrgUnitParent | null | yes | Null at a root. |
-| `territory` | TerritoryRef | null | yes | The territory a sales-line office covers; null for an HQ unit. |
+| `parent` | OrgUnitParent \| null | yes | Null at a root. |
+| `territory` | TerritoryRef \| null | yes | The territory a sales-line office covers; null for an HQ unit. |
 | `is_open` | boolean | yes |  |
-| `closed_at` | string | null | yes |  |
+| `closed_at` | string \| null | yes |  |
 | `active_users` | integer | yes | Active, non-deleted people anchored here. An office with any cannot be closed. |
 | `created_at` | string | yes |  |
 
@@ -253,8 +253,8 @@ else is restored.
 |---|---|---|---|
 | `name` | string | yes | Unique among its siblings, case-insensitively. |
 | `role_level` | integer | yes |  |
-| `parent_id` | string | null |  | An open office, or null for a root. |
-| `territory_id` | string | null |  | The territory this office covers; leave null for an HQ unit. |
+| `parent_id` | string \| null |  | An open office, or null for a root. |
+| `territory_id` | string \| null |  | The territory this office covers; leave null for an HQ unit. |
 
 **`OrgUnitPage`**
 
@@ -274,16 +274,18 @@ else is restored.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `name` | string | null |  |  |
-| `parent_id` | string | null |  |  |
-| `territory_id` | string | null |  |  |
+| `name` | string \| null |  |  |
+| `parent_id` | string \| null |  |  |
+| `territory_id` | string \| null |  |  |
 
 **`PageMeta`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `limit` | integer | yes | The page size that was applied. |
-| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
+| `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
 
 **`TerritoryRef`**
 
@@ -291,4 +293,4 @@ else is restored.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `level` | string | yes | state, district or taluka. |
+| `level` | string | yes | state, district, taluka or village. |

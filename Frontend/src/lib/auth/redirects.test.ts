@@ -54,6 +54,21 @@ describe("[AUTH-006] decideAuthRedirect", () => {
     expect(decideAuthRedirect({ pathname: "/", search: "", hasSession: false })).toBe("/sign-in");
   });
 
+  it("lets anyone open a customer's quotation link and the enquiry page, signed in or not", () => {
+    expect(
+      decideAuthRedirect({ pathname: "/q/Xk2p9aQ", search: "", hasSession: false }),
+    ).toBeNull();
+    expect(decideAuthRedirect({ pathname: "/q/Xk2p9aQ", search: "", hasSession: true })).toBeNull();
+    expect(
+      decideAuthRedirect({ pathname: "/enquiry", search: "?qr=K7M2PX", hasSession: false }),
+    ).toBeNull();
+    expect(decideAuthRedirect({ pathname: "/enquiry", search: "", hasSession: true })).toBeNull();
+    // Only the link itself: "/q" and look-alikes still need a session.
+    expect(decideAuthRedirect({ pathname: "/quotations", search: "", hasSession: false })).toBe(
+      "/sign-in?next=%2Fquotations",
+    );
+  });
+
   it("lets a signed-out visitor open the sign-in page", () => {
     expect(decideAuthRedirect({ pathname: "/sign-in", search: "", hasSession: false })).toBeNull();
   });

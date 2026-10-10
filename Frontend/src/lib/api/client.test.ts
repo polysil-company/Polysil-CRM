@@ -10,7 +10,12 @@ import {
 } from "@/lib/logger";
 import { server } from "@/mocks/node";
 
-import { apiRequest, registerAccessTokenProvider, type AccessTokenProvider } from "./client";
+import {
+  apiDownload,
+  apiRequest,
+  registerAccessTokenProvider,
+  type AccessTokenProvider,
+} from "./client";
 import { ApiError } from "./errors";
 import { buildApiUrl } from "./url";
 
@@ -452,5 +457,71 @@ describe("[AUTH-004] apiRequest authentication", () => {
     expect(logged).not.toContain("482913");
     expect(logged).not.toContain("tok-9f2c");
     expect(logged).toContain("[REDACTED]");
+  });
+});
+
+describe("[OBS-002] apiDownload", () => {
+  afterEach(() => {
+    registerAccessTokenProvider(null);
+  });
+
+  const download = (): ReturnType<typeof apiDownload> =>
+    apiDownload({
+      dataId: "TASK-008",
+      logger: log,
+      fn: "exportTasks",
+      path: "/tasks/export",
+      query: { status: ["open"], lead_id: null },
+    });
+
+  it("returns the file and the name the backend gave it, with the token and the Data ID", async () => {
+    registerAccessTokenProvider({
+      getAccessToken: () => Promise.resolve("token-1"),
+      peekAccessToken: () => "token-1",
+      onSessionRejected: vi.fn(),
+    });
+    let headers: Headers | undefined;
+    let url: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/tasks/export"), ({ request }) => {
+        headers = request.headers;
+        url = new URL(request.url);
+        return new HttpResponse("PK-xlsx", {
+          headers: {
+            "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "content-disposition": 'attachment; filename="tasks-2026-10-04.xlsx"',
+          },
+        });
+      }),
+    );
+
+    const file = await download();
+
+    expect(file.filename).toBe("tasks-2026-10-04.xlsx");
+    expect(await file.blob.text()).toBe("PK-xlsx");
+    expect(headers?.get("authorization")).toBe("Bearer token-1");
+    expect(headers?.get("x-data-id")).toBe("TASK-008");
+    expect(url?.searchParams.getAll("status")).toEqual(["open"]);
+  });
+
+  it("has no name when the backend gives none", async () => {
+    server.use(http.get(buildApiUrl("/tasks/export"), () => new HttpResponse("x")));
+
+    await expect(download()).resolves.toMatchObject({ filename: null });
+  });
+
+  it("reads the error envelope of a refused export as an ApiError", async () => {
+    server.use(
+      http.get(buildApiUrl("/tasks/export"), () =>
+        HttpResponse.json(
+          { error: { code: "export_too_large", message: "More than 5000 rows." } },
+          { status: 422 },
+        ),
+      ),
+    );
+
+    const error = await expectApiError(download());
+
+    expect(error).toMatchObject({ status: 422, code: "export_too_large" });
   });
 });

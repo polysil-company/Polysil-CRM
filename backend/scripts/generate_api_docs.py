@@ -53,7 +53,8 @@ def type_of(prop: dict, schema: dict) -> str:
     if "$ref" in prop:
         return prop["$ref"].split("/")[-1]
     if "anyOf" in prop:
-        return " | ".join(type_of(p, schema) for p in prop["anyOf"])
+        # escaped: this text lands in a table cell, where a bare | starts a new column
+        return " \\| ".join(type_of(p, schema) for p in prop["anyOf"])
     t = prop.get("type", "any")
     if t == "array":
         return f"{type_of(prop.get('items', {}), schema)}[]"
@@ -61,7 +62,7 @@ def type_of(prop: dict, schema: dict) -> str:
     if fmt in ("date-time", "date", "uuid"):
         return fmt
     if prop.get("enum"):
-        return " | ".join(f"`{v}`" for v in prop["enum"])
+        return " \\| ".join(f"`{v}`" for v in prop["enum"])
     return t
 
 
@@ -244,7 +245,9 @@ def main() -> None:
         "| Money | decimal **string** — `\"1234.56\"` |",
         "| Time | ISO-8601 UTC, rendered IST |",
         "| Idempotency | `Idempotency-Key` on every POST/PATCH, except the `/auth` mutations |",
-        "| Pagination | `page`, `limit`, `sort`, `q` |",
+        "| Pagination | by cursor, not page number: `limit`, then the previous page's "
+        "`meta.next_cursor` as `cursor`; absent on the last page. `include_total=true` "
+        "adds `meta.total` (capped, see `meta.total_capped`) where a list offers it |",
         "",
         "**Empty list versus 403.** Rows are scoped by permission in the database. An empty",
         "collection means nothing is in the caller's scope; `403` means the action itself is",

@@ -9,6 +9,7 @@ import {
   conversationListQueryOptions,
   conversationMessagesQueryOptions,
   messageKeys,
+  startedConversationQueryOptions,
 } from "./messages.queries";
 import type {
   Conversation,
@@ -33,9 +34,14 @@ export function useSendMessage(
           ? page
           : { ...page, items: [...page.items, message] },
       );
-      queryClient.setQueryData(conversationListQueryOptions().queryKey, (list) =>
-        list === undefined ? list : withLastMessage(list, message),
-      );
+      const listKey = conversationListQueryOptions().queryKey;
+      const list = queryClient.getQueryData(listKey);
+      if (list?.items.some((item) => item.id === conversationId) === true) {
+        queryClient.setQueryData(listKey, withLastMessage(list, message));
+      } else {
+        // The first message lists a new conversation (backend/docs/api/messages.md).
+        void queryClient.invalidateQueries({ queryKey: listKey });
+      }
     },
   });
 }
@@ -48,25 +54,36 @@ export function useStartConversation(): UseMutationResult<Conversation, Error, s
     mutationKey: [...messageKeys.all, "start"],
     mutationFn: (participantId: string) => startConversation(participantId),
     meta: { dataId: "MSG-004" },
-    onSuccess: () => {
+    onSuccess: (conversation) => {
+      queryClient.setQueryData(
+        startedConversationQueryOptions(conversation.id).queryKey,
+        conversation,
+      );
       void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
     },
   });
+}
+
+/** What MSG-005 marks: the conversation, up to the newest message on screen (or null). */
+export interface MarkConversationReadVariables {
+  readonly conversationId: string;
+  readonly upTo: string | null;
 }
 
 /** MSG-005. Clears the conversation's unread badge and updates the total in the sidebar. */
 export function useMarkConversationRead(): UseMutationResult<
   MarkConversationReadResult,
   Error,
-  string
+  MarkConversationReadVariables
 > {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationKey: [...messageKeys.all, "read"],
-    mutationFn: (conversationId: string) => markConversationRead(conversationId),
+    mutationFn: ({ conversationId, upTo }: MarkConversationReadVariables) =>
+      markConversationRead(conversationId, upTo),
     meta: { dataId: "MSG-005" },
-    onSuccess: (result, conversationId) => {
+    onSuccess: (result, { conversationId }) => {
       queryClient.setQueryData(conversationListQueryOptions().queryKey, (list) =>
         list === undefined ? list : withConversationRead(list, conversationId, result.unreadTotal),
       );

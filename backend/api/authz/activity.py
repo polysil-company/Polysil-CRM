@@ -20,6 +20,9 @@ ENTITY_REFS: dict[str, str] = {
     "lead": "lead_id",
     "channel_partner": "partner_id",
     "customer": "customer_id",
+    # FS-005 5: a quotation event always carries its lead, so the lead timeline
+    # reads it; its visibility resolves through the quotation (ENTITY_BY_ID).
+    "quotation": "lead_id",
 }
 
 # entity_type -> the table whose policies decide visibility. Only tables that
@@ -29,6 +32,8 @@ ENTITY_REFS: dict[str, str] = {
 LIVE_TABLES: dict[str, str] = {
     "channel_partner": "channel_partner",
     "lead": "lead",
+    # FS-041: a customer's own events, through its row (see a lead, see its customer)
+    "customer": "customer",
 }
 
 # Entity types with no denormalised reference column: the row is visible when the
@@ -37,7 +42,37 @@ LIVE_TABLES: dict[str, str] = {
 # stays visible. Kept out of ENTITY_REFS on purpose: activity_event carries no
 # org_unit_id or territory_id column, and a CHECK requiring one would not compile
 # (FS-006 5, plan review round 2 B-5).
-ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory")
+# FS-011: an order event may carry no lead (a direct order, a consolidated one),
+# so sales_order resolves through entity_id and is not in ENTITY_REFS; approval
+# and dispatch events are written as sales_order events with their own kind.
+# FS-003a: a QR code's events resolve through the code's own policies.
+# FS-014: tasks and meeting minutes, and FS-015's complaints, never in ENTITY_REFS: a
+# task or a complaint may carry no lead,
+# and the CHECK would demand one (plan review B-4).
+# FS-021: a visit may carry no lead, and duty and consent never do; each resolves
+# through its own table's tracking policies.
+ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory", "quotation", "sales_order",
+                                 "lead_qr_code", "task", "meeting_minutes", "complaint",
+                                 "subsidy_application",
+                                 # FS-031: a scheme's events; its policy narrows partners
+                                 "scheme",
+                                 # FS-034: marketing orders; an office-use order has no partner
+                                 "marketing_order",
+                                 # FS-032: the reward masters (code review F-3)
+                                 "reward_rule", "gift", "reward_setting",
+                                 # FS-021: field tracking
+                                 "visit", "duty_session",
+                                 "tracking_consent",
+                                 # FS-040: campaigns; every staff user reads the list
+                                 "campaign")
+
+# A type in both LIVE_TABLES and ENTITY_BY_ID would emit two `WHEN` arms, the
+# first through its reference column's table and the second dead, and PostgreSQL
+# accepts that silently (FS-005 edge case 23). ENTITY_REFS and ENTITY_BY_ID may
+# overlap: the CHECK and the arm are different facts.
+if set(LIVE_TABLES) & set(ENTITY_BY_ID):
+    raise RuntimeError(f"an entity type is in both LIVE_TABLES and ENTITY_BY_ID: "
+                       f"{set(LIVE_TABLES) & set(ENTITY_BY_ID)}")
 
 
 def check_sql() -> str:

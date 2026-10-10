@@ -10,12 +10,33 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 InquiryType = Literal["commercial", "subsidised", "industrial"]
 Stage = Literal["new", "contacted", "qualified", "quoted", "negotiation",
                 "won", "lost", "merged", "dormant"]
 Priority = Literal["hot", "warm", "cold"]
+
+MAX_CROPS = 10   # GAP-157: ours, not the client's
+
+
+def _crop_codes(v: list[str]) -> list[str]:
+    """Lower case and trimmed; the same crop twice or an empty code is refused
+    here, the unknown ones by the service (FS-016 EC-8)."""
+    codes = [c.strip().lower() for c in v]
+    if any(not c for c in codes):
+        raise ValueError("a crop code cannot be empty")
+    if len(set(codes)) != len(codes):
+        raise ValueError("each crop once")
+    return codes
+
+
+CropCodes = Annotated[list[str], Field(max_length=MAX_CROPS,
+    description="Crop codes from GET /lookups/crops, at most 10. [] for none."),
+    AfterValidator(_crop_codes)]
+Acres = Annotated[Decimal, Field(gt=0, le=Decimal("99999.99"), decimal_places=2,
+    description="Land in acres, a decimal string with at most two decimals.",
+    examples=["4.50"])]
 
 # Every id the client sends is validated to this shape, so a malformed id is a
 # 422 with the envelope rather than a driver error and a 500 (cross-vendor P2).
@@ -34,7 +55,8 @@ class LeadCreate(BaseModel):
     email: Annotated[str | None, Field(default=None, max_length=254,
         description="Optional. Used for duplicate matching.")]
     territory_id: Annotated[str, Field(pattern=UUID_RE,
-        description="The taluka or district the farmer is in, from GET /lookups/territories.")]
+        description="The district, taluka or village the farmer is in, from "
+        "GET /lookups/territories?levels=district,taluka,village. A state is refused.")]
     village: Annotated[str | None, Field(default=None, max_length=200,
         description="Optional. Used for duplicate matching.")]
     inquiry_type: Annotated[InquiryType, Field(
@@ -50,6 +72,11 @@ class LeadCreate(BaseModel):
         examples=["125000.00"])]
     note: Annotated[str | None, Field(default=None, max_length=2000,
         description="Optional. Becomes the first entry on the lead's timeline.")]
+    crops: CropCodes = Field(default_factory=list)
+    land_acres: Acres | None = None
+    campaign_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
+        description="Optional. An active campaign from GET /campaigns?active=true. "
+        "Staff only. A lead from a QR code with a campaign gets it on its own.")]
 
 
 class UserRef(BaseModel):
@@ -60,7 +87,7 @@ class UserRef(BaseModel):
 class TerritoryRef(BaseModel):
     id: str
     name: str
-    level: str = Field(description="state, district or taluka.")
+    level: str = Field(description="state, district, taluka or village.")
 
 
 class OrgUnitRef(BaseModel):
@@ -78,6 +105,13 @@ class ReasonRef(BaseModel):
     id: str
     code: str
     name: str
+
+
+class CropRef(BaseModel):
+    code: str
+    name: str
+    is_active: bool = Field(description="False once the crop is switched off. It stays on "
+                            "the leads that have it; show it greyed.")
 
 
 class MergedRef(BaseModel):
@@ -114,11 +148,21 @@ class Lead(BaseModel):
     score: str | None = Field(description="Decimal string, or null before scoring.")
     priority: Priority | None
     estimated_value: str | None
+    crops: list[CropRef] = Field(description="In the order they were sent. [] for none.")
+    land_acres: str | None = Field(description="Land in acres, a decimal string.")
     lost_reason: ReasonRef | None
     lost_note: str | None
     reopen_count: int
+    dormant_from_stage: str | None = Field(
+        description="Set while the lead is dormant: the stage Reopen returns it to (FS-035).")
     merged_into: MergedRef | None = Field(
         description="Set on a merged lead; links to the survivor.")
+    campaign_id: str | None = Field(default=None,
+                                    description="The campaign that brought it (FS-040).")
+    campaign_name: str | None = Field(
+        default=None, description="Its name. Null for a dealer, who does not read campaigns.")
+    customer_id: str | None = Field(
+        default=None, description="The customer (FS-041), set when the lead reached qualified.")
     first_contacted_at: str | None
     last_activity_at: str
     created_at: str
@@ -142,6 +186,41 @@ class PageMeta(BaseModel):
     next_cursor: str | None = Field(
         default=None,
         description="Pass this back as ?cursor= for the next page. Absent on the last page.")
+    total: int | None = Field(
+        default=None,
+        description="How many rows match, across all pages. **Only present when you ask for "
+                    "it with `?include_total=true`**, because counting a scoped table costs a "
+                    "scan and most screens do not need it. Null otherwise.")
+    total_capped: bool = Field(
+        default=False,
+        description="True when there are more rows than `total` says. The count stops at a "
+                    "ceiling so one query can never run away on a large account, so render "
+                    "`total` as \"1000+\" rather than an exact figure when this is set.")
+
+
+class LeadStats(BaseModel):
+    """Counts over the same scope and filters as the list, for the pipeline board
+    and the dashboard tiles. Every stage and priority is present, 0 when empty."""
+
+    total: int = Field(description="Leads matching the filters.")
+    by_stage: dict[str, int] = Field(
+        description="Every stage. merged is 0 unless the stage filter asks for it, "
+                    "as on the list.")
+    by_priority: dict[str, int] = Field(description="hot, warm and cold.")
+    unassigned: int = Field(description="Leads with no owner: the assignment queue.")
+    by_source: dict[str, int] = Field(
+        description="Lead source code (GET /lookups/lead-sources) to count; every source, "
+                    "switched-off ones included, 0 when empty.")
+    by_inquiry_type: dict[str, int] = Field(
+        description="commercial, subsidised and industrial, 0 when empty.")
+    follow_ups_due_today: int | None = Field(
+        default=None,
+        description="Open tasks (calls, visits, meetings, follow-ups) on these leads, due today "
+                    "(IST), that you can see. Null when you hold no tasks permission (dealers).")
+    follow_ups_overdue: int | None = Field(
+        default=None,
+        description="Open tasks on these leads due before today (IST), up to 90 days back, as the "
+                    "planner counts them. Null when you hold no tasks permission.")
 
 
 class LeadPage(BaseModel):
@@ -168,6 +247,20 @@ class PartnerPick(BaseModel):
     name: str
     partner_type: str = Field(description="distributor, dealer or sub_dealer.")
     territory: TerritoryParent | None = None
+
+
+class LeadArea(BaseModel):
+    """A row of GET /leads/areas: an area holding some of your leads, for the
+    lead list's area filter (FS-020)."""
+
+    id: str
+    name: str
+    level: str = Field(description="state, district or taluka: the level you asked for.")
+    code: str | None = None
+    parent: TerritoryParent | None = None
+    lead_count: int = Field(description="Your leads in this area or under it, every stage "
+                                        "but merged. The list's other filters do not "
+                                        "change it.")
 
 
 class TerritoryPick(BaseModel):
@@ -224,7 +317,14 @@ class TimelineEvent(BaseModel):
     kind: str = Field(description="e.g. lead.created, lead.stage_changed, lead.note_added.")
     occurred_at: str
     actor: UserRef | None = Field(default=None, description="Who caused the event, if known.")
-    payload: dict[str, object] = Field(default_factory=dict)
+    payload: dict[str, object] = Field(
+        default_factory=dict,
+        description="The event's own detail. Added at read time: `lead.merged` carries "
+                    "`loser_inquiry_no` and `survivor_inquiry_no`; each of "
+                    "`lead.duplicate_flagged`'s `matches` carries `inquiry_no`; "
+                    "`lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. "
+                    "A number is null when you cannot see that lead. For a channel partner, "
+                    "staff notes, the lost reason and duplicate handling are left out.")
 
 
 class TimelinePage(BaseModel):
@@ -254,7 +354,7 @@ class Assignee(BaseModel):
 
 class LeadPatch(BaseModel):
     """Correct the lead's own fields. Send only what changes: a field left out is
-    unchanged. email, village and estimated_value may be sent null to clear them;
+    unchanged. email, village, estimated_value and land_acres may be sent null to clear them;
     the others are required on a lead and cannot be cleared. The stage, owner and
     partner have their own endpoints."""
 
@@ -272,6 +372,13 @@ class LeadPatch(BaseModel):
     source: Annotated[str | None, Field(default=None, description="A code from the lookup.")]
     estimated_value: Annotated[Decimal | None, Field(default=None, ge=0,
         description="Decimal string. Feeds the priority score.")]
+    crops: Annotated[CropCodes | None, Field(default=None,
+        description="Replaces the list. [] clears it; null is refused. A switched-off crop "
+        "already on the lead may be sent again.")]
+    land_acres: Acres | None = Field(default=None, description="null clears it.")
+    campaign_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
+        description="An active campaign; null clears it. The campaign already on the lead "
+        "may be re-sent even if it has been switched off.")]
 
 
 # ── duplicates ───────────────────────────────────────────────────────────────

@@ -25,6 +25,108 @@ Conventions for every endpoint in this file:
 
 ---
 
+## `GET /api/v1/lead-qr-codes`
+
+**List Qr**
+
+The codes in your scope, newest first, with how many leads each brought.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `active` | query | boolean \| null |  | true: only codes that are on; false: only codes switched off. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `QrCodeList` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No lead permission for QR codes. |
+| `422` | `ErrorResponse` | A field. |
+
+---
+
+## `POST /api/v1/lead-qr-codes`
+
+**Create Qr**
+
+Make a code to print. `url` is what the QR image encodes; draw it on the page
+and offer a download. Leads from it are credited to `partner_id` when set.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`QrCodeCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string | yes | What staff will recognise: the dealer, the stall, the leaflet. |
+| `campaign` | string \| null |  | A free-text label. |
+| `campaign_id` | string \| null |  | An active campaign (FS-040). Leads from this code take it. |
+| `partner_id` | string \| null |  | Leads from this code are assigned to this partner. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_QrCode_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No lead permission for QR codes. |
+| `422` | `ErrorResponse` | A field. |
+
+---
+
+## `PATCH /api/v1/lead-qr-codes/{qr_id}`
+
+**Patch Qr**
+
+Rename a code, change its campaign, dealer or territory, or switch it off. The
+code and its URL never change, so printed codes keep working. A new dealer gets
+new leads only. Send only the fields that change.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `qr_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`QrCodePatch`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string \| null |  |  |
+| `campaign` | string \| null |  |  |
+| `campaign_id` | string \| null |  | An active campaign; null clears it. New leads take it; earlier leads keep theirs. |
+| `partner_id` | string \| null |  | New leads from this code go to this partner; earlier leads keep theirs. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+| `is_active` | boolean \| null |  | false switches the code off: the form then makes a plain website enquiry. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_QrCode_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No lead permission for QR codes. |
+| `404` | `ErrorResponse` | Not yours. |
+| `422` | `ErrorResponse` | A field. |
+
+---
+
 ## `GET /api/v1/leads`
 
 **List Leads**
@@ -32,25 +134,44 @@ Conventions for every endpoint in this file:
 The lead list, filtered and in scope.
 
 Keyset pagination by `(created_at desc, id)`: pass the previous page's
-`meta.next_cursor` as `cursor`; it is absent on the last page. There is no
-total. An empty list means nothing in your scope, which is not an error.
+`meta.next_cursor` as `cursor`; it is absent on the last page. An empty list
+means nothing in your scope, which is not an error.
+
+**There are no numbered pages, and that is deliberate.** Leads arrive while
+you are reading, and they arrive at the top, because the list is newest
+first. Offset paging would show you the same lead twice on page 2 and skip
+another one entirely. A cursor names the row you got to, so the next page is
+the next page whatever has been created since.
+
+**`?include_total=true` gives you the count** in `meta.total`, for a caption
+like "1 to 25 of 137". It is off by default because it costs a scan of
+everything in your scope. The count stops at 1,000 and sets
+`meta.total_capped`, so render "1000+" rather than an exact figure when that
+is true: an unbounded count is a query that gets slower every month until one
+day it is the slowest thing on the screen.
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `stage` | query | string | null |  | Comma-separated stages. Defaults to every stage except `merged`; `?stage=merged` lists the merge losers for an audit. |
-| `priority` | query | string | null |  | hot, warm or cold. |
-| `owner_user_id` | query | string | null |  | Leads owned by this user. |
-| `owner` | query | string | null |  | `none` for the unassigned list a manager works from. |
-| `territory_id` | query | string | null |  |  |
-| `source` | query | string | null |  | A source code. |
-| `inquiry_type` | query | string | null |  |  |
-| `created_from` | query | string | null |  | ISO date, inclusive. |
-| `created_to` | query | string | null |  | ISO date, inclusive. |
-| `q` | query | string | null |  | Name, mobile or inquiry number. |
+| `stage` | query | string \| null |  | Comma-separated stages. Defaults to every stage except `merged`; `?stage=merged` lists the merge losers for an audit. |
+| `priority` | query | string \| null |  | hot, warm or cold. |
+| `owner_user_id` | query | string \| null |  | Leads owned by this user. |
+| `owner` | query | string \| null |  | `none` for the unassigned list a manager works from. |
+| `territory_id` | query | string \| null |  | Leads in these territories or anywhere under them, up to 20 ids comma-separated: a state selects its districts and talukas. |
+| `owner_org_unit_id` | query | string \| null |  | Leads owned by this office or any office under it (the hierarchy filter). |
+| `assigned_partner_id` | query | string \| null |  | Leads assigned to this partner or any partner under it: a distributor selects its dealers' leads too. |
+| `source` | query | string \| null |  | A source code. |
+| `inquiry_type` | query | string \| null |  |  |
+| `created_from` | query | string \| null |  | ISO date, inclusive. |
+| `created_to` | query | string \| null |  | ISO date, inclusive. |
+| `q` | query | string \| null |  | Name, mobile or inquiry number. |
+| `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
 | `limit` | query | integer |  |  |
-| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+| `cursor` | query | string \| null |  | From a previous page's next_cursor. |
+| `include_total` | query | boolean |  | Also count how many leads match, for a "1 to 25 of 137" caption. Off by default: it costs a second query over everything in your scope, and most screens do not need it. |
+| `sort` | query | `created_at` \| `farmer_name` \| `estimated_value` |  | The column to sort by. `farmer_name` ignores case; leads with no `estimated_value` come last in both orders. |
+| `order` | query | `asc` \| `desc` |  | asc or desc. |
 
 **Responses**
 
@@ -85,7 +206,7 @@ the stored `201` and creates nothing; the same key with a different body is
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -95,14 +216,17 @@ the stored `201` and creates nothing; the same key with a different body is
 |---|---|---|---|
 | `farmer_name` | string | yes | The enquirer's name. Shown on the lead and on generated documents. |
 | `mobile` | string | yes | Any Indian form: 10 digits, or with 0, 91 or +91. Spaces, dashes and brackets are fine. Stored as +91XXXXXXXXXX. |
-| `email` | string | null |  | Optional. Used for duplicate matching. |
-| `territory_id` | string | yes | The taluka or district the farmer is in, from GET /lookups/territories. |
-| `village` | string | null |  | Optional. Used for duplicate matching. |
-| `inquiry_type` | `commercial` | `subsidised` | `industrial` | yes | commercial, subsidised or industrial. |
+| `email` | string \| null |  | Optional. Used for duplicate matching. |
+| `territory_id` | string | yes | The district, taluka or village the farmer is in, from GET /lookups/territories?levels=district,taluka,village. A state is refused. |
+| `village` | string \| null |  | Optional. Used for duplicate matching. |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` | yes | commercial, subsidised or industrial. |
 | `mis_system` | string | yes | The micro-irrigation system, a code from GET /lookups/mis-systems. |
-| `source` | string | null |  | A code from GET /lookups/lead-sources. Defaults by who you are: employee for staff, dealer for a partner user. |
-| `estimated_value` | number | string | null |  | Optional rupee value, a decimal string. Feeds the priority score. |
-| `note` | string | null |  | Optional. Becomes the first entry on the lead's timeline. |
+| `source` | string \| null |  | A code from GET /lookups/lead-sources. Defaults by who you are: employee for staff, dealer for a partner user. |
+| `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
+| `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
+| `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
+| `land_acres` | number \| string \| null |  |  |
+| `campaign_id` | string \| null |  | Optional. An active campaign from GET /campaigns?active=true. Staff only. A lead from a QR code with a campaign gets it on its own. |
 
 **Responses**
 
@@ -113,6 +237,34 @@ the stored `201` and creates nothing; the same key with a different body is
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `409` | `ErrorResponse` | The key was used for a different body. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/leads/areas`
+
+**Lead Areas**
+
+The areas your leads are in, at one level, with a count each: the options for
+the lead list's area filter. Start at the highest level with more than one
+option (a one-state company starts at districts), then pass the picked area as
+`parent_id` for the level below. An area holding none of your leads is not
+listed. Send the picks to `GET /leads?territory_id=` as a comma list.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `level` | query | string | yes | state, district or taluka. |
+| `parent_id` | query | string \| null |  | Only areas under this territory. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_LeadArea__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
 
 ---
@@ -129,7 +281,7 @@ other scopes. Names and org units only, no contact details.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `Envelope_list_Assignee__` | Successful Response |
+| `200` | `api__schemas__auth__Envelope_list_Assignee____1` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
@@ -148,7 +300,7 @@ scope, newest first. From here, dismiss a pair or merge one lead into the other.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `limit` | query | integer |  |  |
-| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+| `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 
 **Responses**
 
@@ -173,7 +325,7 @@ pair leaves the queue and both timelines record the dismissal.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `link_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Responses**
 
@@ -185,6 +337,85 @@ pair leaves the queue and both timelines record the dismissal.
 | `403` | `ErrorResponse` | The action is not in your permissions. |
 | `404` | `ErrorResponse` | Not in your scope. |
 | `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/leads/export`
+
+**Export Leads**
+
+Download the lead list as an Excel file, with the same filters as the list.
+
+The file holds exactly the rows the list would show for these filters, across
+every page, and nothing outside your scope. Call it with `fetch` and the bearer
+token, then save the blob. More than 5,000 rows is `422 export_too_large`:
+narrow the filters. An empty list gives a file with the header row only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `stage` | query | string \| null |  | Comma-separated stages. Defaults to every stage except `merged`; `?stage=merged` lists the merge losers for an audit. |
+| `priority` | query | string \| null |  | hot, warm or cold. |
+| `owner_user_id` | query | string \| null |  | Leads owned by this user. |
+| `owner` | query | string \| null |  | `none` for the unassigned list a manager works from. |
+| `territory_id` | query | string \| null |  | Leads in these territories or anywhere under them, up to 20 ids comma-separated: a state selects its districts and talukas. |
+| `owner_org_unit_id` | query | string \| null |  | Leads owned by this office or any office under it (the hierarchy filter). |
+| `assigned_partner_id` | query | string \| null |  | Leads assigned to this partner or any partner under it: a distributor selects its dealers' leads too. |
+| `source` | query | string \| null |  | A source code. |
+| `inquiry_type` | query | string \| null |  |  |
+| `created_from` | query | string \| null |  | ISO date, inclusive. |
+| `created_to` | query | string \| null |  | ISO date, inclusive. |
+| `q` | query | string \| null |  | Name, mobile or inquiry number. |
+| `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
+| `sort` | query | `created_at` \| `farmer_name` \| `estimated_value` |  | The column to sort by. `farmer_name` ignores case; leads with no `estimated_value` come last in both orders. |
+| `order` | query | `asc` \| `desc` |  | asc or desc. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The workbook, as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/leads/stats`
+
+**Lead Stats**
+
+Counts for the pipeline board and the dashboard tiles: leads by stage, by
+priority, and unassigned. Same scope and same filters as the list, so a board
+column and its list always agree. Every stage is present, 0 when empty.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `stage` | query | string \| null |  | Comma-separated stages. |
+| `priority` | query | string \| null |  | hot, warm or cold. |
+| `owner_user_id` | query | string \| null |  |  |
+| `owner` | query | string \| null |  | `none` for unassigned leads. |
+| `territory_id` | query | string \| null |  | These territories and everything under them, up to 20 ids comma-separated. |
+| `owner_org_unit_id` | query | string \| null |  | This office and every office under it. |
+| `assigned_partner_id` | query | string \| null |  | This partner and every partner under it. |
+| `source` | query | string \| null |  | A source code. |
+| `inquiry_type` | query | string \| null |  |  |
+| `created_from` | query | string \| null |  | ISO date, inclusive. |
+| `created_to` | query | string \| null |  | ISO date, inclusive. |
+| `q` | query | string \| null |  | Name, mobile or inquiry number. |
+| `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `LeadStats` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
 
 ---
@@ -203,7 +434,7 @@ Always `204`, including on a repeat.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `lead_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Responses**
 
@@ -261,7 +492,7 @@ the change. A closed lead (won, lost, merged) is `422 stage_terminal`.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `lead_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -269,15 +500,18 @@ the change. A closed lead (won, lost, merged) is `422 stage_terminal`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `farmer_name` | string | null |  |  |
-| `mobile` | string | null |  | Any Indian form; stored as +91XXXXXXXXXX. |
-| `email` | string | null |  |  |
-| `territory_id` | string | null |  | Moving the lead re-routes its owning org unit; it must stay in your scope. |
-| `village` | string | null |  |  |
-| `inquiry_type` | `commercial` | `subsidised` | `industrial` | null |  |  |
-| `mis_system` | string | null |  | A code from the lookup. |
-| `source` | string | null |  | A code from the lookup. |
-| `estimated_value` | number | string | null |  | Decimal string. Feeds the priority score. |
+| `farmer_name` | string \| null |  |  |
+| `mobile` | string \| null |  | Any Indian form; stored as +91XXXXXXXXXX. |
+| `email` | string \| null |  |  |
+| `territory_id` | string \| null |  | Moving the lead re-routes its owning org unit; it must stay in your scope. |
+| `village` | string \| null |  |  |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` \| null |  |  |
+| `mis_system` | string \| null |  | A code from the lookup. |
+| `source` | string \| null |  | A code from the lookup. |
+| `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
+| `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
+| `land_acres` | number \| string \| null |  | null clears it. |
+| `campaign_id` | string \| null |  | An active campaign; null clears it. The campaign already on the lead may be re-sent even if it has been switched off. |
 
 **Responses**
 
@@ -309,7 +543,7 @@ Send a field as `null` to clear it; leave it out to keep it.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `lead_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -317,8 +551,8 @@ Send a field as `null` to clear it; leave it out to keep it.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `owner_user_id` | string | null |  | A staff user from GET /leads/assignees, or null to unassign. |
-| `assigned_partner_id` | string | null |  | A channel partner from GET /lookups/partners, or null to clear. |
+| `owner_user_id` | string \| null |  | A staff user from GET /leads/assignees, or null to unassign. |
+| `assigned_partner_id` | string \| null |  | A channel partner from GET /lookups/partners, or null to clear. |
 
 **Responses**
 
@@ -351,7 +585,7 @@ cannot merge into itself (`422 merge_self`).
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `lead_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -387,7 +621,7 @@ last-activity time. Returns the created event.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `lead_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -424,7 +658,7 @@ lead can be reopened; anything else is `422 stage_terminal`.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `lead_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -432,7 +666,7 @@ lead can be reopened; anything else is `422 stage_terminal`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `note` | string | null |  | Optional. Why the lead is being reopened; kept on the timeline. |
+| `note` | string \| null |  | Optional. Why the lead is being reopened; kept on the timeline. |
 
 **Responses**
 
@@ -461,7 +695,7 @@ it. Keyset-paged: pass the previous page's `meta.next_cursor` as `cursor`.
 |---|---|---|---|---|
 | `lead_id` | path | string | yes |  |
 | `limit` | query | integer |  |  |
-| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+| `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 
 **Responses**
 
@@ -484,8 +718,10 @@ it. Keyset-paged: pass the previous page's `meta.next_cursor` as `cursor`.
 Move a lead along its lifecycle: contact it, qualify it, or mark it lost.
 
 Only the moves the lifecycle allows are accepted. Marking a lead **lost** needs
-a `lost_reason_id`. Stages from **quoted** onward are refused with
-`quotation_required` until quotations ship. Pass `expected_stage` to act only if
+a `lost_reason_id`. **quoted** and **negotiation** are reached by sending a
+quotation and by recording a negotiation on it, never from here; **won** needs
+an accepted quotation on the lead, and accepting one moves the lead itself.
+All three answer `quotation_required` otherwise. Pass `expected_stage` to act only if
 the lead has not moved since you loaded it; if it has, you get `409 stage_changed`
 with the current stage in `fields.stage`.
 
@@ -494,7 +730,7 @@ with the current stage in `fields.stage`.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `lead_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -502,10 +738,10 @@ with the current stage in `fields.stage`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `to_stage` | `contacted` | `qualified` | `quoted` | `negotiation` | `won` | `lost` | yes | The stage to move to. Only the moves the lifecycle allows are accepted; anything else is 422 invalid_transition. |
-| `lost_reason_id` | string | null |  | Required when to_stage is lost: an active reason from GET /lookups/lost-reasons. |
-| `lost_note` | string | null |  | Optional free text kept with a lost lead and on its timeline. |
-| `expected_stage` | string | null |  | Optional. If given and the lead has already moved past it, the call is refused with 409 stage_changed rather than acting on a stale view. |
+| `to_stage` | `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` | yes | The stage to move to. Only the moves the lifecycle allows are accepted; anything else is 422 invalid_transition. |
+| `lost_reason_id` | string \| null |  | Required when to_stage is lost: an active reason from GET /lookups/lost-reasons. |
+| `lost_note` | string \| null |  | Optional free text kept with a lost lead and on its timeline. |
+| `expected_stage` | string \| null |  | Optional. If given and the lead has already moved past it, the call is refused with 409 stage_changed rather than acting on a stale view. |
 
 **Responses**
 
@@ -523,13 +759,13 @@ with the current stage in `fields.stage`.
 
 ## Models
 
-**`Assignee`**
+**`CropRef`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `id` | string | yes |  |
-| `full_name` | string | yes |  |
-| `org_unit` | OrgUnitRef | null |  |  |
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+| `is_active` | boolean | yes | False once the crop is switched off. It stays on the leads that have it; show it greyed. |
 
 **`DismissResult`**
 
@@ -550,9 +786,9 @@ with the current stage in `fields.stage`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `link_id` | string | yes |  |
-| `signal` | `mobile` | `email` | `name_geo` | yes | What matched: the mobile, the email, or name plus village nearby. |
-| `score` | string | null |  | Match strength, a decimal string. |
-| `state` | `pending` | `merged` | `dismissed` | yes |  |
+| `signal` | `mobile` \| `email` \| `name_geo` | yes | What matched: the mobile, the email, or name plus village nearby. |
+| `score` | string \| null |  | Match strength, a decimal string. |
+| `state` | `pending` \| `merged` \| `dismissed` | yes |  |
 | `created_at` | string | yes |  |
 | `lead_a` | Lead | yes |  |
 | `lead_b` | Lead | yes |  |
@@ -564,9 +800,9 @@ with the current stage in `fields.stage`.
 | `link_id` | string | yes |  |
 | `lead_id` | string | yes |  |
 | `inquiry_no` | string | yes |  |
-| `signal` | `mobile` | `email` | `name_geo` | yes |  |
-| `score` | string | null |  | Match strength, a decimal string. |
-| `state` | `pending` | `merged` | `dismissed` | yes |  |
+| `signal` | `mobile` \| `email` \| `name_geo` | yes |  |
+| `score` | string \| null |  | Match strength, a decimal string. |
+| `state` | `pending` \| `merged` \| `dismissed` | yes |  |
 
 **`Envelope_DismissResult_`**
 
@@ -580,17 +816,23 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `data` | Lead | yes |  |
 
+**`Envelope_QrCode_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | QrCode | yes |  |
+
 **`Envelope_TimelineEvent_`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | TimelineEvent | yes |  |
 
-**`Envelope_list_Assignee__`**
+**`Envelope_list_LeadArea__`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `data` | Assignee[] | yes |  |
+| `data` | LeadArea[] | yes |  |
 
 **`ErrorBody`**
 
@@ -598,7 +840,7 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -612,37 +854,54 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `inquiry_no` | string | yes |  |
-| `stage` | `new` | `contacted` | `qualified` | `quoted` | `negotiation` | `won` | `lost` | `merged` | `dormant` | yes |  |
-| `inquiry_type` | `commercial` | `subsidised` | `industrial` | yes |  |
+| `stage` | `new` \| `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` \| `merged` \| `dormant` | yes |  |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` | yes |  |
 | `mis_system` | string | yes | The code. |
 | `source` | string | yes | The code. |
 | `farmer_name` | string | yes |  |
 | `mobile` | string | yes | E.164, e.g. +919876543210. |
-| `email` | string | null | yes |  |
+| `email` | string \| null | yes |  |
 | `territory` | TerritoryRef | yes |  |
-| `village` | string | null | yes |  |
-| `owner` | UserRef | null | yes | The staff owner, or null if unassigned. |
+| `village` | string \| null | yes |  |
+| `owner` | UserRef \| null | yes | The staff owner, or null if unassigned. |
 | `owner_org_unit` | OrgUnitRef | yes |  |
-| `assigned_partner` | api__schemas__leads__PartnerRef | null | yes |  |
-| `score` | string | null | yes | Decimal string, or null before scoring. |
-| `priority` | `hot` | `warm` | `cold` | null | yes |  |
-| `estimated_value` | string | null | yes |  |
-| `lost_reason` | ReasonRef | null | yes |  |
-| `lost_note` | string | null | yes |  |
+| `assigned_partner` | api__schemas__leads__PartnerRef \| null | yes |  |
+| `score` | string \| null | yes | Decimal string, or null before scoring. |
+| `priority` | `hot` \| `warm` \| `cold` \| null | yes |  |
+| `estimated_value` | string \| null | yes |  |
+| `crops` | CropRef[] | yes | In the order they were sent. [] for none. |
+| `land_acres` | string \| null | yes | Land in acres, a decimal string. |
+| `lost_reason` | ReasonRef \| null | yes |  |
+| `lost_note` | string \| null | yes |  |
 | `reopen_count` | integer | yes |  |
-| `merged_into` | MergedRef | null | yes | Set on a merged lead; links to the survivor. |
-| `first_contacted_at` | string | null | yes |  |
+| `dormant_from_stage` | string \| null | yes | Set while the lead is dormant: the stage Reopen returns it to (FS-035). |
+| `merged_into` | MergedRef \| null | yes | Set on a merged lead; links to the survivor. |
+| `campaign_id` | string \| null |  | The campaign that brought it (FS-040). |
+| `campaign_name` | string \| null |  | Its name. Null for a dealer, who does not read campaigns. |
+| `customer_id` | string \| null |  | The customer (FS-041), set when the lead reached qualified. |
+| `first_contacted_at` | string \| null | yes |  |
 | `last_activity_at` | string | yes |  |
 | `created_at` | string | yes |  |
-| `created_by` | UserRef | null | yes |  |
+| `created_by` | UserRef \| null | yes |  |
 | `duplicates` | DuplicateRef[] |  | Pending duplicate links whose other lead you can also see. |
+
+**`LeadArea`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes | state, district or taluka: the level you asked for. |
+| `code` | string \| null |  |  |
+| `parent` | TerritoryParent \| null |  |  |
+| `lead_count` | integer | yes | Your leads in this area or under it, every stage but merged. The list's other filters do not change it. |
 
 **`LeadAssign`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `owner_user_id` | string | null |  | A staff user from GET /leads/assignees, or null to unassign. |
-| `assigned_partner_id` | string | null |  | A channel partner from GET /lookups/partners, or null to clear. |
+| `owner_user_id` | string \| null |  | A staff user from GET /leads/assignees, or null to unassign. |
+| `assigned_partner_id` | string \| null |  | A channel partner from GET /lookups/partners, or null to clear. |
 
 **`LeadCreate`**
 
@@ -650,14 +909,17 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `farmer_name` | string | yes | The enquirer's name. Shown on the lead and on generated documents. |
 | `mobile` | string | yes | Any Indian form: 10 digits, or with 0, 91 or +91. Spaces, dashes and brackets are fine. Stored as +91XXXXXXXXXX. |
-| `email` | string | null |  | Optional. Used for duplicate matching. |
-| `territory_id` | string | yes | The taluka or district the farmer is in, from GET /lookups/territories. |
-| `village` | string | null |  | Optional. Used for duplicate matching. |
-| `inquiry_type` | `commercial` | `subsidised` | `industrial` | yes | commercial, subsidised or industrial. |
+| `email` | string \| null |  | Optional. Used for duplicate matching. |
+| `territory_id` | string | yes | The district, taluka or village the farmer is in, from GET /lookups/territories?levels=district,taluka,village. A state is refused. |
+| `village` | string \| null |  | Optional. Used for duplicate matching. |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` | yes | commercial, subsidised or industrial. |
 | `mis_system` | string | yes | The micro-irrigation system, a code from GET /lookups/mis-systems. |
-| `source` | string | null |  | A code from GET /lookups/lead-sources. Defaults by who you are: employee for staff, dealer for a partner user. |
-| `estimated_value` | number | string | null |  | Optional rupee value, a decimal string. Feeds the priority score. |
-| `note` | string | null |  | Optional. Becomes the first entry on the lead's timeline. |
+| `source` | string \| null |  | A code from GET /lookups/lead-sources. Defaults by who you are: employee for staff, dealer for a partner user. |
+| `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
+| `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
+| `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
+| `land_acres` | number \| string \| null |  |  |
+| `campaign_id` | string \| null |  | Optional. An active campaign from GET /campaigns?active=true. Staff only. A lead from a QR code with a campaign gets it on its own. |
 
 **`LeadMerge`**
 
@@ -682,30 +944,46 @@ with the current stage in `fields.stage`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `farmer_name` | string | null |  |  |
-| `mobile` | string | null |  | Any Indian form; stored as +91XXXXXXXXXX. |
-| `email` | string | null |  |  |
-| `territory_id` | string | null |  | Moving the lead re-routes its owning org unit; it must stay in your scope. |
-| `village` | string | null |  |  |
-| `inquiry_type` | `commercial` | `subsidised` | `industrial` | null |  |  |
-| `mis_system` | string | null |  | A code from the lookup. |
-| `source` | string | null |  | A code from the lookup. |
-| `estimated_value` | number | string | null |  | Decimal string. Feeds the priority score. |
+| `farmer_name` | string \| null |  |  |
+| `mobile` | string \| null |  | Any Indian form; stored as +91XXXXXXXXXX. |
+| `email` | string \| null |  |  |
+| `territory_id` | string \| null |  | Moving the lead re-routes its owning org unit; it must stay in your scope. |
+| `village` | string \| null |  |  |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` \| null |  |  |
+| `mis_system` | string \| null |  | A code from the lookup. |
+| `source` | string \| null |  | A code from the lookup. |
+| `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
+| `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
+| `land_acres` | number \| string \| null |  | null clears it. |
+| `campaign_id` | string \| null |  | An active campaign; null clears it. The campaign already on the lead may be re-sent even if it has been switched off. |
 
 **`LeadReopen`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `note` | string | null |  | Optional. Why the lead is being reopened; kept on the timeline. |
+| `note` | string \| null |  | Optional. Why the lead is being reopened; kept on the timeline. |
+
+**`LeadStats`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `total` | integer | yes | Leads matching the filters. |
+| `by_stage` | object | yes | Every stage. merged is 0 unless the stage filter asks for it, as on the list. |
+| `by_priority` | object | yes | hot, warm and cold. |
+| `unassigned` | integer | yes | Leads with no owner: the assignment queue. |
+| `by_source` | object | yes | Lead source code (GET /lookups/lead-sources) to count; every source, switched-off ones included, 0 when empty. |
+| `by_inquiry_type` | object | yes | commercial, subsidised and industrial, 0 when empty. |
+| `follow_ups_due_today` | integer \| null |  | Open tasks (calls, visits, meetings, follow-ups) on these leads, due today (IST), that you can see. Null when you hold no tasks permission (dealers). |
+| `follow_ups_overdue` | integer \| null |  | Open tasks on these leads due before today (IST), up to 90 days back, as the planner counts them. Null when you hold no tasks permission. |
 
 **`LeadTransition`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `to_stage` | `contacted` | `qualified` | `quoted` | `negotiation` | `won` | `lost` | yes | The stage to move to. Only the moves the lifecycle allows are accepted; anything else is 422 invalid_transition. |
-| `lost_reason_id` | string | null |  | Required when to_stage is lost: an active reason from GET /lookups/lost-reasons. |
-| `lost_note` | string | null |  | Optional free text kept with a lost lead and on its timeline. |
-| `expected_stage` | string | null |  | Optional. If given and the lead has already moved past it, the call is refused with 409 stage_changed rather than acting on a stale view. |
+| `to_stage` | `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` | yes | The stage to move to. Only the moves the lifecycle allows are accepted; anything else is 422 invalid_transition. |
+| `lost_reason_id` | string \| null |  | Required when to_stage is lost: an active reason from GET /lookups/lost-reasons. |
+| `lost_note` | string \| null |  | Optional free text kept with a lost lead and on its timeline. |
+| `expected_stage` | string \| null |  | Optional. If given and the lead has already moved past it, the call is refused with 409 stage_changed rather than acting on a stale view. |
 
 **`MergedRef`**
 
@@ -726,7 +1004,53 @@ with the current stage in `fields.stage`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `limit` | integer | yes | The page size that was applied. |
-| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
+| `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
+
+**`QrCode`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `code` | string | yes | Six characters, no look-alikes. |
+| `url` | string | yes | What the printed QR encodes; the frontend draws it. |
+| `label` | string | yes |  |
+| `campaign` | string \| null | yes | The free-text label. |
+| `campaign_id` | string \| null |  | The linked campaign (FS-040). |
+| `campaign_name` | string \| null |  | Its name. |
+| `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
+| `territory` | TerritoryRef \| null | yes |  |
+| `is_active` | boolean | yes |  |
+| `lead_count` | integer | yes | Leads this code has brought, in your scope. |
+| `created_at` | string | yes |  |
+
+**`QrCodeCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string | yes | What staff will recognise: the dealer, the stall, the leaflet. |
+| `campaign` | string \| null |  | A free-text label. |
+| `campaign_id` | string \| null |  | An active campaign (FS-040). Leads from this code take it. |
+| `partner_id` | string \| null |  | Leads from this code are assigned to this partner. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+
+**`QrCodeList`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | QrCode[] | yes |  |
+
+**`QrCodePatch`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string \| null |  |  |
+| `campaign` | string \| null |  |  |
+| `campaign_id` | string \| null |  | An active campaign; null clears it. New leads take it; earlier leads keep theirs. |
+| `partner_id` | string \| null |  | New leads from this code go to this partner; earlier leads keep theirs. |
+| `territory_id` | string \| null |  | Preselected in the form's picker. |
+| `is_active` | boolean \| null |  | false switches the code off: the form then makes a plain website enquiry. |
 
 **`ReasonRef`**
 
@@ -736,13 +1060,21 @@ with the current stage in `fields.stage`.
 | `code` | string | yes |  |
 | `name` | string | yes |  |
 
+**`TerritoryParent`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `level` | string | yes |  |
+
 **`TerritoryRef`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `level` | string | yes | state, district or taluka. |
+| `level` | string | yes | state, district, taluka or village. |
 
 **`TimelineEvent`**
 
@@ -751,8 +1083,8 @@ with the current stage in `fields.stage`.
 | `id` | string | yes |  |
 | `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
 | `occurred_at` | string | yes |  |
-| `actor` | UserRef | null |  | Who caused the event, if known. |
-| `payload` | object |  |  |
+| `actor` | UserRef \| null |  | Who caused the event, if known. |
+| `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |
 
 **`TimelinePage`**
 
@@ -767,6 +1099,20 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
+
+**`api__schemas__auth__Envelope_list_Assignee____1`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | api__schemas__leads__Assignee[] | yes |  |
+
+**`api__schemas__leads__Assignee`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+| `org_unit` | OrgUnitRef \| null |  |  |
 
 **`api__schemas__leads__PartnerRef`**
 
