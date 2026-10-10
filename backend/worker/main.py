@@ -42,7 +42,11 @@ def _redis_settings() -> RedisSettings:
 
 async def on_startup(ctx: dict[str, Any]) -> None:
     settings = get_settings()
-    ctx["http"] = httpx.AsyncClient(timeout=httpx.Timeout(settings.whatsapp_send_timeout))
+    ctx["http"] = httpx.AsyncClient(timeout=httpx.Timeout(
+        settings.whatsapp_send_timeout, connect=settings.whatsapp_connect_timeout,
+        # a pool wait is an unsent request: it must fail before the 30 s total
+        # deadline, or the deadline wins and calls it uncertain (code review F-4)
+        pool=settings.whatsapp_connect_timeout))
     ctx["provider"] = get_provider(settings, ctx["http"])
     if settings.whatsapp_provider != "mock":
         try:

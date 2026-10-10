@@ -196,8 +196,12 @@ class Settings(BaseSettings):
     whatsapp_template_quotation_share: str | None = None
     whatsapp_template_language: str = "en"
     # A total deadline per send: httpx's timeout bounds each socket operation, not
-    # the request. Re-sized from the smoke's slowest sends.
-    whatsapp_send_timeout: float = 10.0
+    # the request. 11za took longer than 10 s on staging for the quotation and order
+    # messages (walk, 10 Oct), and each timeout was a duplicate (GAP-073).
+    whatsapp_send_timeout: float = 30.0
+    # Connecting is the only phase after which the request has surely not reached
+    # 11za, so a failure there is the only one every message may resend.
+    whatsapp_connect_timeout: float = 5.0
     # FS-038: the path secret on the webhook URLs 11za calls. 11za signs nothing,
     # so this is the credential; unset, the routes answer 404 (GAP-355).
     whatsapp_webhook_secret: SecretStr | None = None

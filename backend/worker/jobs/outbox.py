@@ -21,6 +21,9 @@ FS-007 shaped the drain around a real provider:
   minute out with `attempts` unchanged, and the third inside a window opens a
   shared breaker that every drain honours. Only the provider's refusal of a
   specific message spends one of its five attempts.
+* **an uncertain send is not repeated** (GAP-073): no answer after the request
+  left means 11za may have delivered it. A code is resent as a transient; any
+  other message is dead with a reason that says it may have arrived.
 * **every template has a maximum age** (rule 4), a code's row is retired when a
   newer code exists (rule 1a), an acknowledgement is withdrawn with its lead and
   sent once a day per number under a per-number lock (rules 10a, 10b), and a
@@ -66,6 +69,9 @@ MAX_ATTEMPTS = len(BACKOFF_SECONDS)
 
 # Rule 8: an uncharged reschedule, and the breaker's window is the same minute.
 TRANSIENT_DELAY = timedelta(seconds=60)
+# GAP-073: the error on a row whose send got no answer. Support reads it as
+# "ask the customer before resending".
+UNCERTAIN_PREFIX = "no answer in time, may have arrived, not resent: "
 # Rule 17: more dead rows than this in one drain is an error log.
 DEAD_BURST = 10
 # Rule 10b: the acknowledgement's per-number lock. 1 is the OTP by number, 2 a
@@ -170,10 +176,10 @@ async def outbox_drain(ctx: dict[str, Any], *, batch: int | None = None) -> int:
             outcome = "retry"
         if outcome is None:
             break
-        if outcome == "dead":
+        if outcome in ("dead", "uncertain"):
             dead += 1
         # After the commit only, so a Redis failure never loses a send result.
-        if outcome == "transient" and await cache.breaker_note_transient():
+        if outcome in ("transient", "uncertain") and await cache.breaker_note_transient():
             log.error("outbox.breaker_opened", handled=handled)
             break
 
@@ -256,7 +262,11 @@ async def _handle(session: AsyncSession, row: Any, provider: MessageProvider,
             {"p": result.provider_msg_id, "keep": keep, "i": row.id},
         )
         return "sent"
-    if result.outcome is Outcome.TRANSIENT:
+    if result.outcome is Outcome.UNCERTAIN and not TEMPLATES[key].resend_uncertain:
+        await _dead(session, row.id, f"{UNCERTAIN_PREFIX}{result.error}")
+        log.warning("outbox.uncertain_not_resent", template=key, row=str(row.id))
+        return "uncertain"
+    if result.outcome in (Outcome.TRANSIENT, Outcome.UNCERTAIN):
         # GAP-073: a timeout after the provider accepted is resent once the breaker
         # clears; at-least-once, as FS-001 chose for the code.
         await session.execute(

@@ -136,3 +136,26 @@ def score(
     else:
         band = "cold"
     return total, band
+
+# ── what a partner reads of a lead's history (ISS-107, GAP-284) ──────────────
+
+# GAP-284: client question 20.1 is open. The suggested answer is applied: duplicate
+# handling, staff notes and the lost reason are internal; the dealer's own words stay.
+PARTNER_HIDDEN_KINDS: frozenset[str] = frozenset(
+    {"lead.duplicate_flagged", "lead.duplicate_dismissed", "lead.merged"})
+# the stage change stays (the dealer sees the lead is lost); its staff words do not
+PARTNER_STRIPPED_KEYS: frozenset[str] = frozenset(
+    {"lost_reason_id", "lost_reason", "lost_note", "note"})
+
+
+def partner_timeline_entry(kind: str, payload: dict[str, object], *,
+                           own: bool) -> dict[str, object] | None:
+    """The entry as a partner caller reads it, or None when it is hidden. `own` is
+    true when the caller wrote it: a partner always reads its own words."""
+    if own:
+        return payload
+    if kind in PARTNER_HIDDEN_KINDS or kind == "lead.note_added":
+        return None
+    if kind in ("lead.stage_changed", "lead.reopened"):
+        return {k: v for k, v in payload.items() if k not in PARTNER_STRIPPED_KEYS}
+    return payload

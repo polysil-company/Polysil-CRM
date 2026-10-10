@@ -21,6 +21,8 @@ _DIGITS = re.compile(r"\D")
 class Outcome(StrEnum):
     ACCEPTED = "accepted"      # the body says success; provider_msg_id may be None
     TRANSIENT = "transient"    # transport, 429, 5xx, a token error: uncharged, the breaker
+    UNCERTAIN = "uncertain"    # the request may have reached the provider, no answer came:
+                               # resent only where the template allows it (GAP-073)
     REFUSED = "refused"        # the provider refused this message; charged
     PERMANENT = "permanent"    # refused, and retrying cannot help
 

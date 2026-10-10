@@ -166,18 +166,26 @@ async def test_responses_are_classified_on_the_body(response: httpx.Response,
     assert result.outcome is outcome, result
 
 
-@pytest.mark.parametrize("exc", [
-    httpx.ReadTimeout("read timed out"),
-    httpx.ConnectError("connection refused; body was authToken=" + TOKEN),
+@pytest.mark.parametrize(("exc", "outcome"), [
+    # before the request left: surely unsent, every message may resend
+    (httpx.ConnectError("connection refused; body was authToken=" + TOKEN), Outcome.TRANSIENT),
+    (httpx.ConnectTimeout("connect timed out"), Outcome.TRANSIENT),
+    (httpx.PoolTimeout("no free connection"), Outcome.TRANSIENT),
+    # after it left: 11za may have delivered (GAP-073, walk 10 Oct)
+    (httpx.ReadTimeout("read timed out"), Outcome.UNCERTAIN),
+    (httpx.RemoteProtocolError("server disconnected"), Outcome.UNCERTAIN),
+    (httpx.ReadError("connection reset"), Outcome.UNCERTAIN),
 ])
-async def test_transport_failures_are_transient_and_carry_only_the_class_name(
-        exc: Exception) -> None:
+async def test_transport_failures_carry_only_the_class_name(exc: Exception,
+                                                            outcome: Outcome) -> None:
     result, _ = await _send(lambda r: exc)
-    assert result.outcome is Outcome.TRANSIENT
+    assert result.outcome is outcome
     assert result.error == type(exc).__name__
 
 
-async def test_a_send_that_outlives_its_deadline_is_transient() -> None:
+async def test_a_send_that_outlives_its_deadline_is_uncertain() -> None:
+    """The total deadline fires while 11za is working on a request it already has:
+    the staging walk's three quotation messages were exactly this."""
     import asyncio
 
     async def _slow(request: httpx.Request) -> httpx.Response:
@@ -187,7 +195,7 @@ async def test_a_send_that_outlives_its_deadline_is_transient() -> None:
     async with httpx.AsyncClient(transport=httpx.MockTransport(_slow)) as client:
         provider = ElevenZaProvider(_settings(whatsapp_send_timeout=0.05), client)
         result = await provider.send(OTP)
-    assert result.outcome is Outcome.TRANSIENT and result.error == "TimeoutError"
+    assert result.outcome is Outcome.UNCERTAIN and result.error == "TimeoutError"
 
 
 # ── rule 5: the token and the code never leave ───────────────────────────────

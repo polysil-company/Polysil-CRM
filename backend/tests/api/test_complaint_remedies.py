@@ -683,3 +683,29 @@ async def test_the_replacement_definer_refuses_a_duplicated_or_unpriced_line(
     finally:
         await s.rollback()
         await s.close()
+
+
+async def test_a_refund_whose_district_manager_is_gone_says_stalled(
+        client: httpx.AsyncClient, remedies: Shop, sessions: Callable[[], AsyncSession]) -> None:
+    """Walk 10 Oct F-11, code review F-2: the complaint's refund chain goes through
+    the same view as an order's, so its waiting step says stalled too."""
+    shop = remedies
+    qc = await _as(client, shop, "qc_manager")
+    c = await _qc_approved(client, shop)
+    r = await _remedy(client, qc, c["id"], **_refund())
+    assert r.status_code == 200, r.text
+    assert [s["stalled"] for s in r.json()["data"]["remedy"]["refund"]["approval"]["steps"]] == [False, False]
+
+    async def _dm_active(on: bool) -> None:
+        s = sessions()
+        await s.execute(text("UPDATE app_user SET is_active = :on WHERE id = CAST(:u AS uuid)"),
+                        {"on": on, "u": shop.ids["district_manager"]})
+        await s.commit()
+        await s.close()
+
+    await _dm_active(False)
+    try:
+        steps = (await _get(client, qc, c["id"]))["remedy"]["refund"]["approval"]["steps"]
+        assert [s["stalled"] for s in steps] == [True, False], steps
+    finally:
+        await _dm_active(True)
