@@ -47,9 +47,12 @@ export interface SignInScreenProps {
 export function SignInScreen({ next, reason }: SignInScreenProps): React.JSX.Element {
   const router = useRouter();
   const queryClient = useQueryClient();
+  // After a password change only staff sign in again, so the email form opens first.
   const [method, setMethod] = useQueryState(
     "method",
-    parseAsStringLiteral(SIGN_IN_METHODS).withDefault("mobile"),
+    parseAsStringLiteral(SIGN_IN_METHODS).withDefault(
+      reason === "password-changed" || reason === "password-reset" ? "staff" : "mobile",
+    ),
   );
 
   const finishSignIn = (tokens: SessionTokens): void => {
@@ -107,8 +110,33 @@ export function SignInScreen({ next, reason }: SignInScreenProps): React.JSX.Ele
   );
 }
 
+const SESSION_END_COPY: Readonly<
+  Record<SessionEndReason, { title: string; body: string; done: boolean }>
+> = {
+  "signed-out": {
+    title: "You've signed out",
+    body: "Sign in again whenever you're ready.",
+    done: true,
+  },
+  "session-ended": {
+    title: "Your session has ended",
+    body: "Sign in again to pick up where you left off.",
+    done: false,
+  },
+  "password-changed": {
+    title: "Password changed",
+    body: "You were signed out everywhere. Sign in with your new password.",
+    done: true,
+  },
+  "password-reset": {
+    title: "Your administrator set a new password",
+    body: "It was set while you were changing yours. Sign in with the password they gave you.",
+    done: false,
+  },
+};
+
 function SessionEndNotice({ reason }: { reason: SessionEndReason }): React.JSX.Element {
-  const signedOut = reason === "signed-out";
+  const copy = SESSION_END_COPY[reason];
 
   return (
     <div
@@ -116,18 +144,12 @@ function SessionEndNotice({ reason }: { reason: SessionEndReason }): React.JSX.E
       className="flex items-start gap-2.5 rounded-lg border border-border bg-card p-3 text-sm shadow-xs"
     >
       <Icon
-        icon={signedOut ? CheckmarkCircle02Icon : Clock01Icon}
-        className={signedOut ? "mt-0.5 text-success" : "mt-0.5 text-info"}
+        icon={copy.done ? CheckmarkCircle02Icon : Clock01Icon}
+        className={copy.done ? "mt-0.5 text-success" : "mt-0.5 text-info"}
       />
       <div className="flex flex-col gap-0.5">
-        <p className="font-medium text-foreground">
-          {signedOut ? "You've signed out" : "Your session has ended"}
-        </p>
-        <p className="text-muted-foreground">
-          {signedOut
-            ? "Sign in again whenever you're ready."
-            : "Sign in again to pick up where you left off."}
-        </p>
+        <p className="font-medium text-foreground">{copy.title}</p>
+        <p className="text-muted-foreground">{copy.body}</p>
       </div>
     </div>
   );

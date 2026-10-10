@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type * as React from "react";
 
+import { BrandMark } from "@/components/patterns/brand-mark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -22,7 +23,6 @@ import { formatCount, formatNumber } from "@/lib/format";
 import { useSidebar } from "@/lib/sidebar/use-sidebar";
 import { cn } from "@/lib/utils";
 
-import { BrandMark } from "./brand-mark";
 import { useCommandMenu } from "./command-menu-context";
 import { isNavItemActive, visibleNavSections, type NavItem } from "./navigation";
 

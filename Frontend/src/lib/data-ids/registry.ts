@@ -166,6 +166,13 @@ export const DATA_IDS = {
     owner: "frontend",
     status: "in-progress",
   },
+  "AUTH-007": {
+    domain: "AUTH",
+    title: "Change your own password — forced while a temporary password is in force",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /auth/password"],
+  },
   "LEAD-001": {
     domain: "LEAD",
     title: "List leads with filters, sorting and pagination",

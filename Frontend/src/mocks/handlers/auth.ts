@@ -9,7 +9,11 @@ import {
   DEFAULT_MOCK_ROLE,
   MOCK_OTP_CODE,
   MOCK_STAFF_PASSWORD,
+  readMockChangedPassword,
+  readMockMustChangePassword,
   readMockRole,
+  writeMockChangedPassword,
+  writeMockMustChangePassword,
   writeMockRole,
 } from "@/lib/dev/mock-settings";
 import { mockMeFor } from "@/mocks/data/sessions";
@@ -26,6 +30,10 @@ import { applyScenario } from "./scenario";
  *  - POST /auth/refresh      rotates while the "refresh cookie" exists, else 401
  *  - POST /auth/logout       always 204
  *  - GET  /auth/me           needs a live Bearer token
+ *  - POST /auth/password     the current password (MOCK_STAFF_PASSWORD or the one changed to),
+ *                            a new one of 12 to 128 characters; signs every session out
+ *  - while the mock's "temporary password" switch is on, every other call answers 403
+ *    `password_change_required`, as the backend does (AUTH-007)
  *
  * The httpOnly refresh cookie cannot be imitated from a service worker, so its
  * stand-in lives in localStorage. Every auth endpoint ignores the "error" scenario,
@@ -131,10 +139,40 @@ function hasLiveAccessToken(request: Request): boolean {
 }
 
 const loginBodySchema = z.object({ email: z.string(), password: z.string() });
+const passwordBodySchema = z.object({ current_password: z.string(), new_password: z.string() });
+
+/** The backend's length rule (`identity.password_problem`). */
+const PASSWORD_MIN = 12;
+const PASSWORD_MAX = 128;
+
+function isStaffPassword(password: string): boolean {
+  return password === MOCK_STAFF_PASSWORD || password === readMockChangedPassword();
+}
+
+/** What answers while a temporary password is in force: these, and nothing else. */
+const OPEN_WHILE_TEMPORARY = /^\/(auth\/(me|password|login|logout|refresh|otp\/[a-z]+)|public\/)/;
+
+function apiPathOf(request: Request): string {
+  const { pathname } = new URL(request.url);
+  const base = new URL(buildApiUrl("/")).pathname.replace(/\/$/, "");
+  return pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
+}
 const otpRequestBodySchema = z.object({ mobile: z.string() });
 const otpVerifyBodySchema = z.object({ mobile: z.string(), code: z.string() });
 
 export const authHandlers = [
+  // First, so it answers before any module's handler while the switch is on.
+  http.all(buildApiUrl("/*"), ({ request }) => {
+    if (!readMockMustChangePassword() || OPEN_WHILE_TEMPORARY.test(apiPathOf(request))) {
+      return undefined;
+    }
+    return errorResponse(
+      403,
+      "password_change_required",
+      "Change your temporary password before doing anything else.",
+    );
+  }),
+
   http.post(buildApiUrl("/auth/login"), async ({ request }) => {
     await applyScenario({ allowFailure: false });
     const body = await readBody(request, loginBodySchema);
@@ -157,7 +195,7 @@ export const authHandlers = [
       return errorResponse(423, "account_locked", "Too many failed attempts. Try again later.");
     }
 
-    if (body.password !== MOCK_STAFF_PASSWORD) {
+    if (!isStaffPassword(body.password)) {
       const count = record.count + 1;
       failures[email] = {
         count,
@@ -256,6 +294,51 @@ export const authHandlers = [
     if (!hasLiveAccessToken(request)) {
       return errorResponse(401, "unauthenticated", "Not signed in.");
     }
-    return HttpResponse.json(mockMeFor(readMockRole()));
+    const me = mockMeFor(readMockRole());
+    return HttpResponse.json({
+      data: {
+        ...me.data,
+        must_change_password: me.data.user_type === "staff" && readMockMustChangePassword(),
+      },
+    });
+  }),
+
+  http.post(buildApiUrl("/auth/password"), async ({ request }) => {
+    await applyScenario({ allowFailure: false });
+    if (!hasLiveAccessToken(request)) {
+      return errorResponse(401, "unauthenticated", "Not signed in.");
+    }
+    if (request.headers.get("idempotency-key") === null) {
+      return errorResponse(400, "idempotency_key_required", "Send an Idempotency-Key.");
+    }
+    const body = await readBody(request, passwordBodySchema);
+    if (body === null) {
+      return errorResponse(422, "validation_error", "Request validation failed.", {
+        current_password: "Field required",
+      });
+    }
+    if (isPartnerRole(readMockRole())) {
+      return errorResponse(422, "validation_error", "Request validation failed.", {
+        current_password: "this account signs in by OTP and has no password",
+      });
+    }
+    if (!isStaffPassword(body.current_password)) {
+      return errorResponse(422, "validation_error", "Request validation failed.", {
+        current_password: "wrong",
+      });
+    }
+    if (body.new_password.length < PASSWORD_MIN || body.new_password.length > PASSWORD_MAX) {
+      return errorResponse(422, "validation_error", "Request validation failed.", {
+        new_password:
+          body.new_password.length < PASSWORD_MIN
+            ? `at least ${String(PASSWORD_MIN)} characters`
+            : `at most ${String(PASSWORD_MAX)} characters`,
+      });
+    }
+    writeMockChangedPassword(body.new_password);
+    writeMockMustChangePassword(false);
+    // Every session, this one included, is signed out.
+    writeStored(REFRESH_KEY, null);
+    return new HttpResponse(null, { status: 204 });
   }),
 ];
