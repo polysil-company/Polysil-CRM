@@ -51,6 +51,12 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-15--feature--A
 - **AUTH-001 · A channel partner signs in with a one-time code** sent to their mobile, typed any common way. The screen never claims a code was sent to an unknown number. 🧪 🌐
 - **AUTH-004 · Staying signed in.** The session renews itself before it expires, when the tab comes back and when the connection returns; a reload keeps you signed in. 🧪 🌐
 - **AUTH-005, AUTH-006 · Signing out, or a session the backend ends,** clears everything and opens sign-in in every tab; after an expiry you return to the page you were on. A signed-out visitor sent to a page lands back on it after signing in. 🧪 🌐
+- **AUTH-007 · Change your password** (PR #89; [changelog](../changelog/entries/2026-10-10--feature--AUTH-007--change-your-password-and-the-forced-change-after-a.md); screens: [dialog](screenshots/auth/change-password-dialog-desktop-light.jpg), [forced](screenshots/auth/forced-change-desktop-light.jpg), [wrong temporary password](screenshots/auth/forced-change-wrong-desktop-light.jpg), [signed out after](screenshots/auth/signed-out-after-change-desktop-light.jpg), [phone, dark](screenshots/auth/forced-change-phone-dark.jpg)):
+  - Staff open **Change password** from the account menu: current password, then the new one twice (12 to 128 characters). Partners don't see it.
+  - While a temporary password is in force, only **Choose your own password** shows, before anything else loads. Any `403 password_change_required` switches to it.
+  - A wrong current password is named on its field, cleared and focused.
+  - After the change every session ends, and sign-in opens on the email form saying "Password changed". A reset by an administrator meanwhile says to use theirs.
+  - 🧪 👀
 
 ## App shell
 

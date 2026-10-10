@@ -281,6 +281,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 
 | Area | Data IDs | Endpoints |
 |---|---|---|
+| Change your password; the forced change while a temporary password is in force (any `403 password_change_required` switches to it) | AUTH-007 | `POST /auth/password`, `must_change_password` on `GET /auth/me` |
 | Sign-in, session, refresh, sign-out | AUTH-001…006 | `/auth/login`, `/auth/otp/*`, `/auth/refresh`, `/auth/logout`, `/auth/me` |
 | Lead list — cursor paging in the URL, stage / source / type / area filters, search, sorting by customer or value (BE-001); the Area pill drills from districts to talukas, with lead counts | LEAD-001 | `GET /leads?territory_id=`, `GET /leads/areas` |
 | New lead — territory picker (district, taluka or village: BE-005), crops and land, admin lookups, safe retries, field errors | LEAD-002 | `POST /leads`, `GET /lookups/territories?levels=` |

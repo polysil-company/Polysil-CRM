@@ -71,8 +71,21 @@ export interface ApiRequest<TSchema extends z.ZodType> {
 const MUTATING_METHODS: ReadonlySet<HttpMethod> = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /** The /auth mutations are replay-safe on the backend and take no Idempotency-Key. */
+/**
+ * The /auth mutations that take no Idempotency-Key: login and OTP verify are replay-safe
+ * through their own windows, refresh is rotation, logout is always 204. Every other
+ * mutation needs one, `POST /auth/password` (AUTH-007) included.
+ */
+const KEYLESS_AUTH_PATHS: ReadonlySet<string> = new Set([
+  "/auth/login",
+  "/auth/otp/request",
+  "/auth/otp/verify",
+  "/auth/refresh",
+  "/auth/logout",
+]);
+
 function needsIdempotencyKey(method: HttpMethod, path: ApiPath): boolean {
-  return MUTATING_METHODS.has(method) && !path.startsWith("/auth/");
+  return MUTATING_METHODS.has(method) && !KEYLESS_AUTH_PATHS.has(path);
 }
 
 interface RequestContext {
