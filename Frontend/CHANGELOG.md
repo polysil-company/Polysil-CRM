@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-36 changes, newest first. Each title opens its entry.
+37 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-10 | [Demo 2: the new flows, click by click](changelog/entries/2026-10-10--docs--APP-001--demo-2-the-new-flows-click-by-click.md) | `docs` | `APP-001` |
 | 2026-10-09 | [Lead QR codes and the public enquiry page](changelog/entries/2026-10-09--feature--LEAD-013--lead-qr-codes-and-the-public-enquiry-page.md) | `feature` | `LEAD-013` `LEAD-014` |
 | 2026-10-05 | [Edit and delete a lead, and review duplicates](changelog/entries/2026-10-05--feature--LEAD-010--edit-and-delete-a-lead-and-review-duplicates.md) | `feature` | `LEAD-010` `LEAD-011` `LEAD-012` |
 | 2026-10-04 | [Complaints: raise, check and QC](changelog/entries/2026-10-04--feature--CMPL-001--complaints-raise-check-and-qc.md) | `feature` | `CMPL-001` `CMPL-002` `CMPL-003` `CMPL-004` `CMPL-005` |
@@ -47,6 +48,56 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 10 October 2026
+
+### Demo 2: the new flows, click by click
+
+`docs` · `APP-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-10--docs--APP-001--demo-2-the-new-flows-click-by-click.md)
+
+#### Before
+
+`Docs/Demo-Guide.md` described the app as it stood for the first client demo (2 October, up to PR #47). Many features have merged into `integration` since then, and the guide listed them under "not built yet":
+
+- lead QR codes and the enquiry page;
+- editing, deleting and merging leads;
+- tasks and meeting minutes;
+- direct orders;
+- the dispatch queue;
+- complaints with refunds.
+
+#### Now
+
+`Docs/Demo-Guide.md` covers everything on `integration` up to PR #84:
+
+- **Part 1** marks each new feature _(new)_ in the at-a-glance list.
+- **Part 2** explains lead capture, tidying leads, tasks and meetings, direct orders with the dispatch queue, and complaints.
+- **Part 3** adds a 25-minute order for Demo 2, its logins and what to prepare.
+- **Part 3b** is Flows 15–22, click by click:
+  - a QR code to a lead;
+  - finding and tidying leads;
+  - the officer's day and the manager's team;
+  - a direct order and the dispatch queue;
+  - a complaint to QC;
+  - the refund through approvals to Accounts.
+- **Part 3c** is Flows 23–26 for subsidy, marked to show only after PRs #77, #78, #79 and #86 merge.
+- **Part 4** lists only what is still to come.
+
+Flows 1–14 from Demo 1 are unchanged.
+
+#### Discussion
+
+- **The labels follow the app.** The buttons named in the steps were checked against the code on `integration` (and the subsidy branches for Part 3c), so the presenter clicks what the guide says.
+- **Subsidy is kept apart.** It isn't on `integration` yet, so it has its own part, with the pull requests it waits on.
+- **Real customers are never messaged.** The WhatsApp steps (the enquiry code, sending a quotation) use the presenter's own mobile, as in Demo 1.
+
+#### Files changed
+
+- `Docs/Demo-Guide.md`
+
+#### Tests
+
+None: documentation only. Each flow's tests are named in `Docs/Tested-Features.md`. Rehearse each flow once on the hosted app before the demo, because none has been checked on the dev API by hand yet.
 
 ## 9 October 2026
 
