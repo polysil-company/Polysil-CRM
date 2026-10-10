@@ -51,6 +51,12 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-15--feature--A
 - **AUTH-001 · A channel partner signs in with a one-time code** sent to their mobile, typed any common way. The screen never claims a code was sent to an unknown number. 🧪 🌐
 - **AUTH-004 · Staying signed in.** The session renews itself before it expires, when the tab comes back and when the connection returns; a reload keeps you signed in. 🧪 🌐
 - **AUTH-005, AUTH-006 · Signing out, or a session the backend ends,** clears everything and opens sign-in in every tab; after an expiry you return to the page you were on. A signed-out visitor sent to a page lands back on it after signing in. 🧪 🌐
+- **AUTH-007 · Change your password** (PR #89; [changelog](../changelog/entries/2026-10-10--feature--AUTH-007--change-your-password-and-the-forced-change-after-a.md); screens: [dialog](screenshots/auth/change-password-dialog-desktop-light.jpg), [forced](screenshots/auth/forced-change-desktop-light.jpg), [wrong temporary password](screenshots/auth/forced-change-wrong-desktop-light.jpg), [signed out after](screenshots/auth/signed-out-after-change-desktop-light.jpg), [phone, dark](screenshots/auth/forced-change-phone-dark.jpg)):
+  - Staff open **Change password** from the account menu: current password, then the new one twice (12 to 128 characters). Partners don't see it.
+  - While a temporary password is in force, only **Choose your own password** shows, before anything else loads. Any `403 password_change_required` switches to it.
+  - A wrong current password is named on its field, cleared and focused.
+  - After the change every session ends, and sign-in opens on the email form saying "Password changed". A reset by an administrator meanwhile says to use theirs.
+  - 🧪 👀
 
 ## App shell
 
@@ -193,6 +199,32 @@ The rest of complaints (PR #58, stacked on #57; [changelog](../changelog/entries
 - **CMPL-001 · A lead's and an order's complaints:** a Complaints card on the lead's page and on a submitted order's, newest first, with **Raise a complaint** about it (not on a merged lead). Hidden from those who can't see complaints. 🧪
 
 Complaint types are set with the other lookups, in the admin masters.
+
+---
+
+## Users and roles
+
+On the backend's contract (`backend/docs/api/users.md`, handover `administration-and-sign-in.md`) since PR #90 ([changelog](../changelog/entries/2026-10-10--feature--ADMN-001--users-and-roles-people-accounts-and-leavers.md)). Walked through in the mock as an Admin: the list; Ravi Joshi's page, a temporary password, a handover to Nirav Shah with deactivate; a new field officer, first with every field empty; on a 360 px phone in dark mode, the list, your own page and the partner-user form. axe found nothing. Not yet checked on the dev API. Screens: [list](screenshots/users/list-desktop-light.jpg), [list, phone dark](screenshots/users/list-phone-dark.jpg), [a person](screenshots/users/person-desktop-light.jpg), [actions](screenshots/users/person-actions-desktop-light.jpg), [temporary password](screenshots/users/temporary-password-set-desktop-light.jpg), [handover](screenshots/users/handover-desktop-light.jpg), [handed over](screenshots/users/handover-done-desktop-light.jpg), [deactivated](screenshots/users/person-deactivated-desktop-light.jpg), [new person, mistakes](screenshots/users/new-staff-errors-desktop-light.jpg), [filled](screenshots/users/new-staff-filled-desktop-light.jpg), [added](screenshots/users/new-staff-added-desktop-light.jpg), [your own page, phone](screenshots/users/person-self-phone-dark.jpg), [partner user, phone](screenshots/users/new-partner-user-phone-dark.jpg).
+
+- **ADMN-001 · People** (Admin → Users & roles, staff with `users`):
+  - newest first, with a count;
+  - how each signs in, their role, office or partner, last sign-in, open leads (staff), and "Deactivated" or "Temporary password";
+  - search by name, email or mobile; filter by type, role and status, in the URL;
+  - Download Excel; New person only for whoever may add people.
+  - 🧪 👀
+- **ADMN-002 · A person:** sign-in (email or mobile, last sign-in, password state, a live lockout, live sessions), role and place (role, office or partner, territories, open leads, added by). Your own row says "You" and offers no deactivate or delete. 🧪 👀
+- **ADMN-003 · New person:**
+  - **Staff:** name, work email, optional mobile, a staff role, an open office, territories, a suggested temporary password.
+  - **Partner user:** name, mobile, partner.
+  - Missing fields are named; a refused field (a taken email, a territory role without territories) is marked on its input.
+  - Once added, the temporary password shows once, with Copy.
+  - 🧪 👀
+- **ADMN-004 · Edit, deactivate, reactivate:** only what changed is sent; your own role, office and territories stay read-only; the last administrator is kept. 🧪 👀
+- **ADMN-005 · Account actions:** a temporary password (suggested or typed, shown once, sessions signed out), unlock while locked out, sign out everywhere. Partner users get no password or unlock. 🧪 👀
+- **ADMN-006 · A leaver:**
+  - Hand over leads and tasks to someone who can work leads, in batches of 500 until none remain, then optionally deactivate.
+  - Delete is disabled while open leads remain, and refused for your own row.
+  - 🧪 👀
 
 ---
 

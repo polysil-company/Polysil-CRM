@@ -131,6 +131,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | AUTH-004 | Keep signed in — rotate the access token with the refresh cookie (`POST /auth/refresh`) | shared | mocked |
 | AUTH-005 | Sign out (`POST /auth/logout`) | shared | mocked |
 | AUTH-006 | Signed-in routing — sign-in redirects, return path and session end | frontend | in-progress |
+| AUTH-007 | Change your own password — forced while a temporary password is in force (`POST /auth/password`) | shared | in-progress |
 | LEAD-001 | List leads with filters, sorting and pagination (`GET /leads`, `GET /leads/areas`) | shared | in-progress |
 | LEAD-002 | Create lead (`POST /leads`) | shared | in-progress |
 | LEAD-003 | Lead detail (`GET /leads/{leadId}`) | shared | in-progress |
@@ -195,7 +196,12 @@ The registry file is the source of truth; this snapshot helps reading.
 | ACCT-001 | Accounts work queue | shared | planned |
 | DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |
 | DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |
-| ADMN-001 | Users, roles and approval thresholds | shared | planned |
+| ADMN-001 | People — the list of staff and partner users, with filters and an Excel export (`GET /users`, `GET /users/export`) | shared | in-progress |
+| ADMN-002 | A person — identity, role, office or partner, territories, sign-in state (`GET /users/{id}`) | shared | in-progress |
+| ADMN-003 | Add a person — a staff member with a temporary password, or a partner user (`POST /users`, `GET /lookups/roles`, `GET /org-units`) | shared | in-progress |
+| ADMN-004 | Correct a person — details, role, office, territories; deactivate or reactivate (`PATCH /users/{id}`) | shared | in-progress |
+| ADMN-005 | Account actions — a new temporary password, sign out everywhere, unlock (`POST /users/{id}/password`, `/sessions/revoke`, `/unlock`) | shared | in-progress |
+| ADMN-006 | A leaver — hand over their open leads and tasks, then deactivate or delete (`POST /users/{id}/handover`, `DELETE /users/{id}`) | shared | in-progress |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |
 | NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | in-progress |
 | NOTIF-002 | Mark notifications as read — one or all | shared | in-progress |

@@ -12,6 +12,7 @@ import { notificationHandlers } from "./notifications";
 import { orderHandlers } from "./orders";
 import { quotationHandlers } from "./quotations";
 import { taskHandlers } from "./tasks";
+import { userHandlers } from "./users";
 
 /**
  * What the backend does not serve yet, so it stays mocked even against a real API
@@ -39,5 +40,6 @@ export const handlers: readonly HttpHandler[] = [
   ...messageHandlers,
   ...taskHandlers,
   ...complaintHandlers,
+  ...userHandlers,
   ...unbuiltHandlers,
 ];
