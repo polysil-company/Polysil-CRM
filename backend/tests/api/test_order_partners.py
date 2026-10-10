@@ -234,3 +234,60 @@ async def test_a_dealer_learns_the_order_pdf_failed_but_not_why(
         await s.rollback()
         await s.close()
     assert refused.value.code == "pdf_failed" and reason not in repr(vars(refused.value))
+
+
+async def test_a_draft_follows_the_leads_new_partner_and_the_dealer_then_sees_it(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """Walk F-4: the partner was set on the lead after the draft, so the quotation
+    stayed a direct sale and the dealer got 404 on it and on its order. The draft
+    now takes the lead's partner and is re-priced at the dealer tier (90.00); a
+    quotation already sent keeps what it was sent with."""
+    from tests.api.test_complaints import _dealer, _forget
+    ho = await endpoints._as(client, shop, "field_officer")
+    lead_id = (await client.post(f"{V1}/leads", headers={**ho, **_key()}, json={
+        "farmer_name": "Kiritbhai Shah", "mobile": "97" + f"{uuid.uuid4().int % 10**8:08d}",
+        "territory_id": shop.district, "inquiry_type": "commercial", "mis_system": "drip",
+        "village": "Vadod"})).json()["data"]["id"]
+    for stage in ("contacted", "qualified"):
+        r = await client.post(f"{V1}/leads/{lead_id}/transition", json={"to_stage": stage},
+                              headers={**ho, **_key()})
+        assert r.status_code == 200, r.text
+
+    async def drafted() -> dict:
+        r = await client.post(f"{V1}/quotations", headers={**ho, **_key()}, json={
+            "lead_id": lead_id, "sales_type": "commercial", "partner_id": None,
+            "place_of_supply_territory_id": shop.district, "seller_gstin_id": shop.seller,
+            "price_effective_date": endpoints.AS_OF,
+            "lines": [{"product_id": shop.product, "qty": "20", "discount_pct": "5"}]})
+        assert r.status_code == 201, r.text
+        return dict(r.json()["data"])
+
+    sent = await drafted()
+    r = await client.post(f"{V1}/quotations/{sent['id']}/send", json={"channel": "none"},
+                          headers={**ho, **_key()})
+    assert r.status_code == 200, r.text
+    draft = await drafted()
+    assert draft["partner"] is None and draft["lines"][0]["rate"] != "90.00"
+
+    hm = await endpoints._as(client, shop, "district_manager")
+    r = await client.post(f"{V1}/leads/{lead_id}/assign", headers={**hm, **_key()},
+                          json={"assigned_partner_id": shop.partner})
+    assert r.status_code == 200, r.text
+
+    got = (await client.get(f"{V1}/quotations/{draft['id']}", headers=ho)).json()["data"]
+    assert got["partner"]["id"] == shop.partner and got["lines"][0]["rate"] == "90.00"
+    kept = (await client.get(f"{V1}/quotations/{sent['id']}", headers=ho)).json()["data"]
+    assert kept["partner"] is None
+    s = sessions()
+    payload = (await s.execute(text(
+        "SELECT payload FROM activity_event WHERE lead_id = CAST(:l AS uuid) "
+        "AND kind = 'lead.assigned' ORDER BY occurred_at DESC LIMIT 1"),
+        {"l": lead_id})).scalar_one()
+    await s.close()
+    assert payload["quotations_followed"] == [draft["id"]] and payload["quotations_kept"] == []
+
+    hd, mobile = await _dealer(client, shop, sessions)
+    try:
+        assert (await client.get(f"{V1}/quotations/{draft['id']}", headers=hd)).status_code == 200
+    finally:
+        await _forget(sessions, mobile)

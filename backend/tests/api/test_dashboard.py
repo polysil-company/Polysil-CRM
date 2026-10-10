@@ -132,6 +132,27 @@ async def test_a_deleted_lead_leaves_the_figures(client: httpx.AsyncClient, shop
     assert before - after == Decimal("4321.00")
 
 
+async def test_the_lead_count_and_the_dashboard_agree_for_a_deleter(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """Walk F-7: the sidebar's count (GET /leads/stats) included deleted leads for a
+    caller who may read them, so it said 93 while the dashboard's stages said 90.
+    Both now leave deleted leads out; ?deleted=true lists only those."""
+    (lead,) = await _leads(sessions, shop, [(_at(1), "new", "17")])
+    h = await endpoints._as(client, shop, "admin_sales")
+    s = sessions()
+    await s.execute(text("UPDATE lead SET deleted_at = now() WHERE id = CAST(:l AS uuid)"), {"l": lead})
+    await s.commit()
+    await s.close()
+    stats = (await client.get(f"{V1}/leads/stats", headers=h)).json()
+    staged = sum(p["count"] for p in (await _overview(client, h))["pipeline"])
+    assert stats["total"] == staged
+    listed = (await client.get(f"{V1}/leads", headers=h, params={"limit": 100})).json()["data"]
+    assert lead not in [x["id"] for x in listed]
+    gone = (await client.get(f"{V1}/leads", headers=h, params={"deleted": "true", "limit": 100})).json()["data"]
+    assert lead in [x["id"] for x in gone]
+    assert (await client.get(f"{V1}/leads/stats", headers=h, params={"deleted": "true"})).json()["total"] >= 1
+
+
 @pytest.mark.parametrize("days", ["15", "0", "x"])
 async def test_only_7_30_or_90_days(client: httpx.AsyncClient, shop: Shop, days: str) -> None:
     h = await endpoints._as(client, shop, "field_officer")

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require, require_any
+from api.errors import ForbiddenError
 from api.idempotency import payload_digest, run_idempotent
 from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
@@ -421,7 +422,12 @@ async def pending(db: DbSession, caller: CallerDep,
 @approvals.get("/thresholds", response_model=Envelope[list[Threshold]], responses=_ERRORS)
 async def get_thresholds(db: DbSession, caller: CallerDep) -> dict[str, Any]:
     """The approval limits per manager role (and per territory where set), including
-    GST. The highest role with a row has no limit in effect."""
+    GST. The highest role with a row has no limit in effect. Staff only: a dealer or
+    a consumer gets `403`."""
+    if caller.user_type != "staff":
+        # the rows were already hidden from a dealer; an empty 200 read as "none set"
+        # on a screen he should never reach (walk F-8)
+        raise ForbiddenError("Approval limits are for staff.")
     return {"data": [t.model_dump(mode="json") for t in await approval_service.thresholds(db)]}
 
 

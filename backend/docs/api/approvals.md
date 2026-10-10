@@ -108,7 +108,8 @@ refund.
 **Get Thresholds**
 
 The approval limits per manager role (and per territory where set), including
-GST. The highest role with a row has no limit in effect.
+GST. The highest role with a row has no limit in effect. Staff only: a dealer or
+a consumer gets `403`.
 
 **Responses**
 

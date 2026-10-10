@@ -15,6 +15,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+from decimal import Decimal
 
 import httpx
 import pytest
@@ -416,6 +417,21 @@ async def test_reopen_a_lost_lead_returns_it_to_the_lost_stage(
     assert r.status_code == 200, r.text
     d = r.json()["data"]
     assert d["stage"] == "contacted" and d["reopen_count"] == 1 and d["lost_reason"] is None
+
+
+async def test_marking_a_lead_lost_keeps_its_whole_number_score(
+        client: httpx.AsyncClient, staff: Staff, env: Env) -> None:
+    """Walk R-12: the score rose when a lead was marked lost (27.5, 49.5, then 51.5).
+    A closed lead keeps the score it had; reopening scores it again."""
+    h = await _auth(client, staff)
+    lid = await _make(client, h, env)
+    contacted = (await _to(client, h, lid, to_stage="contacted")).json()["data"]["score"]
+    assert Decimal(contacted) == Decimal(contacted).to_integral_value()
+    lost = await _to(client, h, lid, to_stage="lost", lost_reason_id=await _lost_reason(client, h))
+    assert Decimal(lost.json()["data"]["score"]) == Decimal(contacted)
+    r = await client.post(f"{V1}/leads/{lid}/reopen", json={"note": "called back"},
+                          headers={**h, **_key()})
+    assert Decimal(r.json()["data"]["score"]) > Decimal(contacted)
 
 
 async def test_reopen_a_non_lost_lead_is_refused(
@@ -1010,7 +1026,7 @@ async def test_create_with_a_note_scores_the_engagement(
     """The create-time note is an event and counts toward engagement; the score
     used to be computed before it was written (cross-vendor P2). Distinct names and
     mobiles so no duplicate flag adds a second event."""
-    from decimal import Decimal
+
 
     h = await _auth(client, staff)
     cfg = {i["key"]: Decimal(i["value"]) for i in (await client.get(
