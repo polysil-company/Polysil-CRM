@@ -318,9 +318,11 @@ async def test_a_partner_reads_them_too_and_writes_none_of_them(
     """A dealer holds no `masters.edit`, so the INSERT policy refuses the row.
     Reading is deliberate: the masters are global and carry nobody's data."""
     partner = await make_partner_user(db, ids, mobile="919" + f"{uuid.uuid4().int % 10**9:09d}")
+    # every row the owner sees: 009's seed, and later revisions such as 069's
+    every = (await db.execute(text("SELECT count(*) FROM subsidy_parameter"))).scalar_one()
     await _as(db, partner)
     got = await db.execute(text("SELECT count(*) FROM subsidy_parameter"))
-    assert got.scalar_one() == 17
+    assert every >= 17 and got.scalar_one() == every
     with pytest.raises(DBAPIError) as err:
         await db.execute(text(
             "INSERT INTO crop_lateral_spacing (scheme_id, crop, standard_spacing, effective_from) "
