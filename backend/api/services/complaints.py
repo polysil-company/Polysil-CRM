@@ -38,7 +38,7 @@ from api.errors import (
 from api.schemas import complaints as sch
 from api.schemas.leads import PageMeta, TimelineEvent, TimelinePage
 from api.schemas.tasks import LeadLink, OrderLink, PartnerLink
-from api.services import approval_view, people, pricing
+from api.services import approval_view, people, pricing, warranty
 from api.services.clock import today_ist
 from api.services.leads import _covering_org_unit, _decode_cursor, _encode_cursor
 from api.storage import Storage
@@ -260,6 +260,7 @@ async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> 
         # whoever cancelled is the raiser or the owner, both names a dealer already sees
         user_ids |= {str(d.decided_by) for d in decisions if d.stage == "cancel"}
     names = await people.resolve_ids(db, user_ids)
+    cover = await warranty.complaint_lines(db, complaint_id)
 
     check = next((d for d in decisions if d.stage == "check" and d.submit_no == r.submit_count), None)
     quality = next((d for d in decisions if d.stage == "qc"), None)
@@ -276,7 +277,8 @@ async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> 
         sample_courier_date=_iso(r.sample_courier_date), sample_courier_detail=r.sample_courier_detail,
         lines=[sch.Line(id=str(x.id), product=sch.ProductRef(id=str(x.product_id), description=x.description),
                         uom=x.uom, supplied_qty=_qty(x.supplied_qty), defective_qty=_qty(x.defective_qty),
-                        failure_frequency=x.failure_frequency, remark=x.remark) for x in lines],
+                        failure_frequency=x.failure_frequency, remark=x.remark,
+                        warranty=cover.get(str(x.id))) for x in lines],
         attachments=[sch.Attachment(
             id=str(f.id), kind=f.kind, filename=f.filename, content_type=f.content_type,
             size_bytes=f.size_bytes, preview=f.content_type != "image/heic",
@@ -503,7 +505,8 @@ async def _from_dispatch(db: AsyncSession, order_id: str) -> tuple[str | None, d
         # the IST day: the session runs in UTC (PR 25 review)
         "SELECT dc_no, COALESCE(dc_date, (dispatched_at AT TIME ZONE 'Asia/Kolkata')::date) "
         "AS day FROM dispatch "
-        "WHERE sales_order_id = CAST(:o AS uuid) AND dc_no IS NOT NULL "
+        # live dispatches only (FS-046 edge EC-9): a void undoes the dispatch
+        "WHERE sales_order_id = CAST(:o AS uuid) AND dc_no IS NOT NULL AND voided_at IS NULL "
         "ORDER BY dispatched_at DESC NULLS LAST LIMIT 1"), {"o": order_id})).one_or_none()
     return (row.dc_no, row.day) if row else (None, None)
 

@@ -45,6 +45,11 @@ _LIMITS: list[tuple[re.Pattern[str], frozenset[str] | None, int, str]] = [
     # complaint attachments (FS-015), subsidy documents (FS-009) and visit photos (FS-021)
     (re.compile(r"^/api/v1/(complaints/[^/]+/attachments|subsidy-applications/[^/]+/documents"
                 r"|visits/[^/]+/photos)/?$"), frozenset({"POST"}), BODY_LIMIT, _UPLOAD_MESSAGE),
+    # FS-050: documents on records
+    (re.compile(r"^/api/v1/documents/?$"), frozenset({"POST"}), BODY_LIMIT, _UPLOAD_MESSAGE),
+    # FS-051: the applicant's documents, on both public mounts
+    (re.compile(r"^(/api/v1)?/public/dealer-apply/[^/]+/documents/?$"), frozenset({"POST"}),
+     BODY_LIMIT, _UPLOAD_MESSAGE),
     # FS-038 rule 4: 11za's webhook calls, on both public mounts
     (re.compile(r"^(/api/v1)?/public/webhooks/whatsapp/"), None, WEBHOOK_LIMIT, _WEBHOOK_MESSAGE),
 ]

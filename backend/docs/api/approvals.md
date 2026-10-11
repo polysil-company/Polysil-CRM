@@ -108,7 +108,8 @@ refund.
 **Get Thresholds**
 
 The approval limits per manager role (and per territory where set), including
-GST. The highest role with a row has no limit in effect.
+GST. The highest role with a row has no limit in effect. Staff only: a dealer or
+a consumer gets `403`.
 
 **Responses**
 
@@ -208,6 +209,7 @@ One approval chain.
 | `by` | UserRef \| null | yes | Null for a dealer, always. |
 | `remark` | string \| null | yes | Null for a dealer, always. |
 | `decided_at` | string \| null | yes |  |
+| `stalled` | boolean |  | True on the step waiting now when nobody of its own role can decide it (none covers the document, or the only one raised it). A higher manager decides it instead and sees it in their inbox. Show "No <role> to decide; with the next manager up" rather than "Waiting on <role>". Always false for a dealer. Default `False`. |
 
 **`Attachment`**
 
@@ -431,6 +433,7 @@ One approval chain.
 | `defective_qty` | string | yes |  |
 | `failure_frequency` | string \| null | yes |  |
 | `remark` | string \| null | yes |  |
+| `warranty` | LineWarranty \| null |  | FS-046: whether the product was in warranty on the day the complaint was raised. |
 
 **`LineStock`**
 
@@ -438,6 +441,16 @@ One approval chain.
 |---|---|---|---|
 | `available` | string | yes | At the order's warehouse, now. |
 | `short` | boolean | yes | True when available is below what this line still needs. |
+
+**`LineWarranty`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `status` | `in_warranty` \| `expired` \| `none` \| `unknown` | yes | On the day the complaint was raised (its first submit, or today for a draft). |
+| `start` | string \| null | yes |  |
+| `end` | string \| null | yes |  |
+| `months` | integer \| null | yes |  |
+| `basis` | `dispatch` \| `supply_date` \| null | yes | Where the start came from. |
 
 **`Order`**
 

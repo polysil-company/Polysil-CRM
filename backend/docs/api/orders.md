@@ -49,6 +49,8 @@ has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)
 | `cursor` | query | string \| null |  | From the previous page's next_cursor. |
 | `include_total` | query | boolean |  | Also count, up to 1,000. |
 | `waiting_on` | query | string \| null |  | A role code, such as `account_manager`: orders whose next approval step is that role's. The step's role, not everyone who may decide it. |
+| `territory_id` | query | string \| null |  | Orders in these territories or anywhere under them, up to 20 ids comma-separated: a state selects its districts and talukas. |
+| `owner_org_unit_id` | query | string \| null |  | Orders owned by this office or any office under it (the hierarchy filter). |
 
 **Responses**
 
@@ -149,6 +151,8 @@ narrow the filters. An empty list gives a file with the header row only.
 | `from` | query | string \| null |  | ISO date, IST. |
 | `to` | query | string \| null |  | ISO date, inclusive. |
 | `waiting_on` | query | string \| null |  | A role code, such as `account_manager`: orders whose next approval step is that role's. The step's role, not everyone who may decide it. |
+| `territory_id` | query | string \| null |  | Orders in these territories or anywhere under them, up to 20 ids comma-separated: a state selects its districts and talukas. |
+| `owner_org_unit_id` | query | string \| null |  | Orders owned by this office or any office under it (the hierarchy filter). |
 
 **Responses**
 
@@ -181,6 +185,8 @@ submitted orders by whose approval is next. Same scope and filters as the list.
 | `from` | query | string \| null |  | ISO date, IST. |
 | `to` | query | string \| null |  | ISO date, inclusive. |
 | `waiting_on` | query | string \| null |  | A role code, such as `account_manager`: orders whose next approval step is that role's. The step's role, not everyone who may decide it. |
+| `territory_id` | query | string \| null |  | Orders in these territories or anywhere under them, up to 20 ids comma-separated: a state selects its districts and talukas. |
+| `owner_org_unit_id` | query | string \| null |  | Orders owned by this office or any office under it (the hierarchy filter). |
 
 **Responses**
 
@@ -671,6 +677,7 @@ and only the outcome to a dealer.
 | `by` | UserRef \| null | yes | Null for a dealer, always. |
 | `remark` | string \| null | yes | Null for a dealer, always. |
 | `decided_at` | string \| null | yes |  |
+| `stalled` | boolean |  | True on the step waiting now when nobody of its own role can decide it (none covers the document, or the only one raised it). A higher manager decides it instead and sees it in their inbox. Show "No <role> to decide; with the next manager up" rather than "Waiting on <role>". Always false for a dealer. Default `False`. |
 
 **`Dispatch`**
 
@@ -1154,7 +1161,7 @@ and only the outcome to a dealer.
 | `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
 | `occurred_at` | string | yes |  |
 | `actor` | UserRef \| null |  | Who caused the event, if known. |
-| `payload` | object |  |  |
+| `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |
 
 **`TimelinePage`**
 

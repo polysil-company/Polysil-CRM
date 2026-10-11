@@ -59,7 +59,14 @@ from api.services import approval_view, people, pricing
 from api.services import payments as payments_service
 from api.services import stock as stock_service
 from api.services.clock import IST, today_ist
-from api.services.leads import _capped_total, _decode_cursor, _encode_cursor, _route
+from api.services.leads import (
+    _capped_total,
+    _decode_cursor,
+    _encode_cursor,
+    _id_list,
+    _route,
+    _under,
+)
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
 from api.services.quotations import _STORAGE_DOWN
 from api.storage import Storage
@@ -669,9 +676,17 @@ def _order_filters(caller: Caller, *, status: str | None = None,
                    order_type: str | None = None, partner_id: str | None = None,
                    lead_id: str | None = None, owner: str | None = None, q: str | None = None,
                    created_from: str | None = None, created_to: str | None = None,
-                   quotation_id: str | None = None, waiting_on: str | None = None) -> list[Any]:
+                   quotation_id: str | None = None, waiting_on: str | None = None,
+                   territory_id: str | None = None,
+                   owner_org_unit_id: str | None = None) -> list[Any]:
     """The scope and every filter of the order list, shared with the counts."""
     where: list[Any] = [scope_predicate(_ORDERS, caller, order_t)]
+    # FS-052, client sheet item 2: as the lead list, a state selects everything under it
+    if territory_id:
+        where.append(order_t.c.territory_id.in_(
+            _under("territory_closure", *_id_list(territory_id, "territory_id"))))
+    if owner_org_unit_id:
+        where.append(order_t.c.owner_org_unit_id.in_(_under("org_closure", owner_org_unit_id)))
     if status:
         # a comma list, like the lead list's stage: "open" is several statuses
         wanted = [x.strip() for x in status.split(",") if x.strip()]
@@ -770,12 +785,14 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
                       limit: int = 25, cursor: str | None = None,
                       include_total: bool = False,
                       quotation_id: str | None = None,
-                      waiting_on: str | None = None) -> sch.OrderPage:
+                      waiting_on: str | None = None, territory_id: str | None = None,
+                      owner_org_unit_id: str | None = None) -> sch.OrderPage:
     limit = max(1, min(limit, _MAX_LIMIT))
     where = _order_filters(caller, status=status, order_type=order_type,
                            partner_id=partner_id, lead_id=lead_id, owner=owner, q=q,
                            created_from=created_from, created_to=created_to,
-                           quotation_id=quotation_id, waiting_on=waiting_on)
+                           quotation_id=quotation_id, waiting_on=waiting_on,
+                           territory_id=territory_id, owner_org_unit_id=owner_org_unit_id)
     filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)

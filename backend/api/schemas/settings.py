@@ -6,14 +6,15 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-SettingValue = str | int | list[str]
+SettingValue = str | int | list[str] | list[int]
 
 
 class Setting(BaseModel):
     key: str
-    kind: Literal["choice", "int", "roles"] = Field(
+    kind: Literal["choice", "int", "roles", "bands"] = Field(
         description="choice: one of `allowed`; int: a whole number in `min`..`max`; "
-                    "roles: a list of role codes.")
+                    "roles: a list of role codes; bands: four whole numbers, zero or more, "
+                    "strictly rising (FS-043).")
     value: SettingValue
     allowed: list[str] | None = Field(description="The choices, for a choice setting.")
     min: int | None

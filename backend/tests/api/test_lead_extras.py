@@ -147,7 +147,9 @@ async def test_crops_and_land_on_create_patch_and_clear(client: httpx.AsyncClien
     assert r.json()["data"]["land_acres"] == "2.00"
     tl = (await client.get(f"{url}/timeline", headers=h)).json()["data"]
     changed = next(e for e in tl if e["kind"] == "lead.updated")["payload"]["changed"]
-    assert changed == {"crops": ["wheat"], "land_acres": "2"}, "strings in the payload (EC-5)"
+    # FS-052: 2 acres are stored as 0.81 ha and read back as 2.00 acres
+    assert changed == {"crops": ["wheat"], "land_hectares": "0.81", "land_acres": "2.00"}, \
+        "strings in the payload (EC-5)"
     r = await client.patch(url, headers={**h, **_key()}, json={"crops": [], "land_acres": None})
     assert r.status_code == 200 and r.json()["data"]["crops"] == [] and r.json()["data"]["land_acres"] is None
 

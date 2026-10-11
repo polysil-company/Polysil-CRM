@@ -400,8 +400,9 @@ def f_lead() -> None:
                "wrong code -> count the attempt, burn at five, 422 invalid_code", RED),
         ("p5", "code matched -> claim = the intake account, enter app_role\n"
                "same mobile already enquired today -> 200 created:false, same number", BLUE),
-        ("p6", "create_lead(intake=True): the territory's unit and auto-owner,\n"
-               "or unassigned; a QR code's dealer becomes the assigned partner", GREEN),
+        ("p6", "create_lead(intake=True): the territory's unit and auto-owner\n"
+               "(covering officer, else the least-loaded one inside a district-only\n"
+               "lead's district, 056); a QR code's dealer becomes the assigned partner", GREEN),
         ("p7", "LEAD + lead.created event + acknowledgement on the outbox\n"
                "returns {inquiry_no, created} and nothing else", GREEN),
     ]
@@ -1591,6 +1592,8 @@ def f_bell_and_messages() -> None:
                "created_at strictly increasing; the sender's own mark", VIOLET),
         ("m4", "POST /read {up_to}: up to what the screen showed\n"
                "unread = their messages after my mark", GREEN),
+        ("m5", "GROUPS (FS-048): POST /conversations/groups\n"
+               "up to 50; any member adds; the manager renames, removes", BLUE),
     ]
     prev = None
     for i, (eid, lbl, colour) in enumerate(side):
@@ -1618,9 +1621,16 @@ def f_bell_and_messages() -> None:
               "A message committing while the reader marks read would\n"
               "otherwise be counted read unseen. No UPDATE grant on\n"
               "conversation: one side cannot reset the other's mark.", w=420, colour=RED)
-    e += note("nYellow1", 1240, 780,
-              "Not yet: push, groups, attachments, a bell for a new\n"
-              "message, retention (GAP-160 to GAP-168).", w=420, colour=YELLOW)
+    e += note("nRed4", 1240, 780,
+              "GROUP POLICIES MUST NOT READ EACH OTHER\n\n"
+              "conversation_sel reads conversation_member; the member\n"
+              "policy reads own rows only, or Postgres raises infinite\n"
+              "recursion. A leave racing a send: the stamp re-checks\n"
+              "membership after the conversation's lock.", w=420, colour=RED)
+    e += note("nYellow1", 1240, 1040,
+              "Not yet: push, attachments, a bell for a new message,\n"
+              "retention (GAP-160 to GAP-168). Group rules are ours\n"
+              "(GAP-287 to GAP-289).", w=420, colour=YELLOW)
     write("16-bell-and-messages", e)
 
 
@@ -1703,7 +1713,7 @@ def f_complaints() -> None:
               "order would deadlock QC against Dispatch (delta B-8).", w=420, colour=RED)
     e += note("nYellow2", 1240, 1300,
               "Stand-ins: refund limits 25,000 / 1,00,000 / any;\n"
-              "Dispatch alone approves a replacement; QC chooses;\n"
+              "a replacement: State, Regional, MD, then Dispatch\n(a setting, FS-049); QC chooses;\n"
               "closing is automatic (GAP-179 to GAP-187).", w=420, colour=YELLOW)
     e += note("nRed5", 1240, 1500,
               "A RUN OF HOLIDAYS MUST END THE SCAN (FS-028, 048)\n\n"
@@ -2234,7 +2244,7 @@ def f_consumer_portal() -> None:
          ("d2", "a staff or dealer user on a farmer's number\nreleases the consumer account", GREY),
          ("d3", "PATCH /portal/me: consent, channel portal", GREY)],
         [("n1", "THE CONSUMER FLOOR\n\nOne restrictive policy on every RLS table.\n\"Not a partner\" is not staff: before it, a\nconsumer read about 50 tables. A new RLS table\nadds consumer_floor.policy_sql(t).", RED),
-         ("n2", "SWITCHING ON COSTS MONEY\n\nEvery customer number can be sent a paid\nWhatsApp code; no overall ceiling (GAP-269).", RED),
+         ("n2", "SWITCHING ON COSTS MONEY\n\nEvery customer number can be sent a paid\nWhatsApp code. At most portal_otp_hourly_cap\n(100) an hour to customers (FS-047, GAP-285);\nnobody is told when it is reached (GAP-286).", RED),
          ("n3", "Not yet: complaints, ratings, products from the\nportal (GAP-265, question 10.3).", YELLOW)])
 
 
@@ -2290,6 +2300,42 @@ def f_export_sample_orders() -> None:
          ("n3", "A FREE SAMPLE IS NOT A ZERO-RUPEE ORDER\n\nzero_total is skipped for it alone; its approval runs on\nthe gross, and the party gets no 0.00 confirmation.", RED),
          ("n4", "Ours: LUT by default, free samples up to 50,000 list,\nstaff only, rupees only, priced from the seller state's list\n(GAP-364 to GAP-371).", YELLOW)])
 
+
+def f_ratings() -> None:
+    _columns(
+        "56-ratings", "Ratings",
+        "Feedback entered on installations, service and products; a dealer rating derived from payments.",
+        "BUILT. FS-043: migration 051, /ratings, /partners/{id}/dealer-rating.",
+        [("s1", "POST /ratings: staff record the farmer's\n(customer); a dealer's user its own (dealer)", GREY),
+         ("s2", "rating_record(): user_type decides the rater;\nshipped / dispatched product / complaint closed", BLUE),
+         ("s3", "one per target per kind of rater, never edited;\nrating.recorded on the order or complaint", GREEN),
+         ("s4", "GET /partners/{id}/dealer-rating:\n047's gate, then one set-based query", BLUE),
+         ("s5", "payment days (IST, value-weighted) and order value,\neach scored by bands; rating = their mean", GREEN)],
+        [("d1", "GET /ratings ?max_score=2: the unhappy ones\nGET /ratings/summary by dealer, product, kind", VIOLET),
+         ("d2", "settings: window days, payment-day bands,\norder-value bands (a new 'bands' kind)", YELLOW)],
+        [("n1", "SAME FIGURES FOR EVERY READER\n\norder_paid_at() answers per caller: through it, a\nfield officer would see a worse rating than Accounts.\ndealer_rating() reads payments itself.", RED),
+         ("n2", "A DEALER SEES A SCORE, NOT A COMMENT\n\nA farmer's comment and the staff name never reach the\ndealer: null in the row, no actor on any timeline.", RED),
+         ("n3", "Left out of payment days: orders owing nothing,\nclosed-short orders, unpaid orders younger than the\nfirst band. Never below 0 days.", RED),
+         ("n4", "Ours: 1-5 stars, never edited, the formula and bands,\nscore-only for dealers (GAP-372 to GAP-377).", YELLOW)])
+
+def f_warranty() -> None:
+    _columns(
+        "57-warranty", "Warranty: a period per category, a warranty per dispatch",
+        "Shown on the order and on each complaint line; never enforced.",
+        "BUILT. FS-046: /warranty-terms, /orders/{id}/warranty, migration 053.",
+        [("s1", "admin: POST /warranty-terms\ncategory or default, months 0-120, from tomorrow", YELLOW),
+         ("s2", "a dispatch: start = DC date, else the IST dispatch day\nmonths = the term in force that day", BLUE),
+         ("s3", "end = start + months - 1 day\n(a clamped month end is the end)", GREEN),
+         ("s4", "GET /orders/{id}/warranty: each line's dispatches,\nits status, the complaints on the product", VIOLET),
+         ("s5", "GET /complaints/{id}: lines[].warranty on the day raised\ncomplaint_warranty() definer", VIOLET)],
+        [("d1", "voided dispatch: no warranty", GREY),
+         ("d2", "0 months: none; no term on the day: unknown", GREY),
+         ("d3", "replacement order: a new period,\nnames the complaint it replaces (GAP-279)", YELLOW)],
+        [("n1", "THE SQL END DATE IS AUTHORITATIVE\n\n(start - 1) + n loses 29 Feb in leap years.\nA test holds Python equal over 2020 to 2040.", RED),
+         ("n2", "THE QC MANAGER CANNOT READ THE ORDER\n\nThe complaint side is a definer gated on\ncomplaint_visible(), so everyone sees one answer.", RED),
+         ("n3", "Ours: 12 months everywhere, per dispatch,\nshown not enforced (GAP-275 to GAP-283).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2301,5 +2347,5 @@ if __name__ == "__main__":
     f_subsidy_follow_ups(); f_lead_small_gaps()
     f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
-    f_export_sample_orders()
+    f_export_sample_orders(); f_ratings(); f_warranty()
     print(f"\nwrote to {OUT}")

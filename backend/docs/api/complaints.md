@@ -800,6 +800,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `by` | UserRef \| null | yes | Null for a dealer, always. |
 | `remark` | string \| null | yes | Null for a dealer, always. |
 | `decided_at` | string \| null | yes |  |
+| `stalled` | boolean |  | True on the step waiting now when nobody of its own role can decide it (none covers the document, or the only one raised it). A higher manager decides it instead and sees it in their inbox. Show "No <role> to decide; with the next manager up" rather than "Waiting on <role>". Always false for a dealer. Default `False`. |
 
 **`Attachment`**
 
@@ -1043,6 +1044,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `defective_qty` | string | yes |  |
 | `failure_frequency` | string \| null | yes |  |
 | `remark` | string \| null | yes |  |
+| `warranty` | LineWarranty \| null |  | FS-046: whether the product was in warranty on the day the complaint was raised. |
 
 **`LineIn`**
 
@@ -1053,6 +1055,16 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `defective_qty` | number \| string | yes | Zero or more, not more than supplied. |
 | `failure_frequency` | string \| null |  |  |
 | `remark` | string \| null |  |  |
+
+**`LineWarranty`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `status` | `in_warranty` \| `expired` \| `none` \| `unknown` | yes | On the day the complaint was raised (its first submit, or today for a draft). |
+| `start` | string \| null | yes |  |
+| `end` | string \| null | yes |  |
+| `months` | integer \| null | yes |  |
+| `basis` | `dispatch` \| `supply_date` \| null | yes | Where the start came from. |
 
 **`OrderLink`**
 
@@ -1225,7 +1237,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
 | `occurred_at` | string | yes |  |
 | `actor` | UserRef \| null |  | Who caused the event, if known. |
-| `payload` | object |  |  |
+| `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |
 
 **`TimelinePage`**
 
