@@ -24,6 +24,7 @@ When a rule and the code disagree, fix the code — or change the rule here, in 
 | Decide what to build   | [Docs/Frontend-Scope.md](Docs/Frontend-Scope.md) — roles, modules, open questions                                      |
 | Try or demo a feature  | [Docs/Tested-Features.md](Docs/Tested-Features.md) — every user story, how far it is tested                            |
 | Commit                 | [changelog/README.md](changelog/README.md)                                                                             |
+| Continue the build     | [Docs/Frontend-Handover.md](Docs/Frontend-Handover.md) — how every feature was built, and what is left                 |
 
 ### The design system has two sources — only two
 
