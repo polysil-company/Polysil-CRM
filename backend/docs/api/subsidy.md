@@ -64,7 +64,13 @@ sum of the crops by a paisa of rounding.
 | `sump` | Sump \| null |  |  |
 | `group_total_area` | number \| string \| null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
 | `installation_rate_per_ha` | number \| string |  | The installation line's rate; its quantity is the area. Default `0`. |
-| `nozzle` | `plastic` \| `brass` \| null |  | Sprinkler only. The pipe size is not an input: it follows the area band and is returned. |
+| `nozzle` | `plastic` \| `brass` \| null |  | Sprinkler only. GGRC sets the pipe size by the area band; a state that asks for `pipe_size_mm` uses it. Optional where the scheme lists one nozzle. |
+| `pipe_size_mm` | `63` \| `75` \| `90` \| `110` \| null |  | Sprinkler set size, where the scheme asks for it (CG, RJ, UP). |
+| `spacing_label` | string \| null |  | One of the scheme's spacing labels (`spacing_labels` in the config): CG and RJ drip, RJ mini sprinkler. |
+| `hydrocyclone_m3` | number \| string \| null |  | RJ: hydrocyclone size in m³, 0 for none. |
+| `gravel_filter_m3` | number \| string \| null |  | RJ: gravel filter size in m³, 0 for none. |
+| `head_unit_existing` | boolean \| null |  | RJ: the farmer already has a head unit. |
+| `pvc_existing` | boolean \| null |  | RJ: the farmer already has the PVC main line. |
 
 **Responses**
 
@@ -187,6 +193,8 @@ treated as no crop at all.
 | `sgst_e` | string | yes |  |
 | `education` | string | yes |  |
 | `sump` | string | yes |  |
+| `fittings` | string |  | CG drip: the fittings add-on on the subtotal (FS-056). Default `0.00`. |
+| `flat_inspection` | string |  | CG: the inspection charge outside the cap, added to the farmer's share (FS-056). Default `0.00`. |
 | `cost_excl_gst` | string | yes |  |
 | `total_cgst` | string | yes |  |
 | `total_sgst` | string | yes |  |
@@ -205,7 +213,13 @@ treated as no crop at all.
 | `sump` | Sump \| null |  |  |
 | `group_total_area` | number \| string \| null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
 | `installation_rate_per_ha` | number \| string |  | The installation line's rate; its quantity is the area. Default `0`. |
-| `nozzle` | `plastic` \| `brass` \| null |  | Sprinkler only. The pipe size is not an input: it follows the area band and is returned. |
+| `nozzle` | `plastic` \| `brass` \| null |  | Sprinkler only. GGRC sets the pipe size by the area band; a state that asks for `pipe_size_mm` uses it. Optional where the scheme lists one nozzle. |
+| `pipe_size_mm` | `63` \| `75` \| `90` \| `110` \| null |  | Sprinkler set size, where the scheme asks for it (CG, RJ, UP). |
+| `spacing_label` | string \| null |  | One of the scheme's spacing labels (`spacing_labels` in the config): CG and RJ drip, RJ mini sprinkler. |
+| `hydrocyclone_m3` | number \| string \| null |  | RJ: hydrocyclone size in m³, 0 for none. |
+| `gravel_filter_m3` | number \| string \| null |  | RJ: gravel filter size in m³, 0 for none. |
+| `head_unit_existing` | boolean \| null |  | RJ: the farmer already has a head unit. |
+| `pvc_existing` | boolean \| null |  | RJ: the farmer already has the PVC main line. |
 
 **`CalculateResponse`**
 
@@ -338,6 +352,8 @@ treated as no crop at all.
 | `regular_with_sump` | string | yes | Plus the sump rate times the area (rule 9). |
 | `regular_for_cap` | string | yes | What the subsidy is actually capped on: the figure above, pro-rated for a Mini Sprinkler block below 0.2 Ha. Equal to `regular_with_sump` everywhere else. This is the unit cost the scheme's own sheet prints. |
 | `seven_year` | string \| null | yes | Null when the area is outside the window. |
+| `add_ons` | string |  | RJ: the filter add-ons on the unit cost. Default `0.00`. |
+| `deductions` | string |  | RJ: the existing head unit and PVC deductions. Default `0.00`. |
 
 **`Line-Input`**
 
@@ -345,7 +361,7 @@ treated as no crop at all.
 |---|---|---|---|
 | `description` | string | yes | The item, as it prints on the quotation. |
 | `uom` | string | yes | Unit of measure, for the document. |
-| `rate` | number \| string | yes | Rate per unit in rupees, at most two decimals. |
+| `rate` | number \| string | yes | Rate per unit in rupees, at most four decimals. |
 | `qty` | number \| string | yes | Quantity, at most three decimals. |
 | `product_id` | string \| null |  | The catalogue row this line is, when the designer picked it from the product list. Optional, and additive: the rate and description still come from this request, because a subsidy quotation is costed at the scheme's figures rather than at ours. What it buys is the two checks the catalogue makes possible - a head-unit item cannot appear in a crop block, and an item marked not subsidy-eligible cannot appear at all. |
 
@@ -398,6 +414,10 @@ treated as no crop at all.
 | `quantity_source` | string | yes |  |
 | `formula_version` | string | yes |  |
 | `sprinkler_areas` | string[] \| null | yes | The tabulated areas a Sprinkler quotation may use. Null for the other two systems, which accept any area. |
+| `pipeline` | string |  | The calculation model (FS-056). Default `full_abcdefg`. |
+| `cap_mode` | string |  | ggrc, incl_gst or unit_cost_only (FS-056). Default `ggrc`. |
+| `inputs` | string[] |  | The optional request fields this system needs. |
+| `spacing_labels` | string[] |  | The spacing labels a label-table system takes. |
 
 **`TotalOut`**
 

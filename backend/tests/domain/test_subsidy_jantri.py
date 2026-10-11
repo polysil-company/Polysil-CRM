@@ -14,6 +14,7 @@ from api.domain.subsidy.jantri import (
     Matrix2D,
     OutsideTable,
     area_bracket,
+    between_1d,
     bilinear,
     lookup_1d,
     spacing_bracket,
@@ -256,3 +257,19 @@ def test_interpolation_matches_exact_rational_arithmetic() -> None:
             else:
                 assert abs(F(got) - want) < F(1, 10**20), (area, spacing)
     assert terminating > 3000, terminating
+
+
+def test_between_1d_is_straight_line_and_none_outside() -> None:
+    """FS-055 rule 20."""
+    table = {Decimal("1.0"): Decimal("100"), Decimal("1.2"): Decimal("140")}
+    assert between_1d(table, Decimal("1.1")) == Decimal("120")
+    assert between_1d(table, Decimal("1.05")) == Decimal("110")
+    assert between_1d(table, Decimal("1.2")) == Decimal("140")
+    assert between_1d(table, Decimal("0.9")) is None
+    assert between_1d(table, Decimal("1.3")) is None
+
+
+def test_between_1d_rounds_to_the_paisa() -> None:
+    """FS-055 EC-5 and plan review B-2: the cap is stored with the application."""
+    table = {Decimal("1.0"): Decimal("100"), Decimal("1.3"): Decimal("200")}
+    assert between_1d(table, Decimal("1.1")) == Decimal("133.33")

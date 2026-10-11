@@ -94,6 +94,10 @@ class Application(BaseModel):
     documents: DocumentCount
     ageing: Ageing
     full_fp_received_on: str | None
+    dispatched_on: str | None = Field(
+        None, description="IST date of the first dispatch of a subsidised order that names "
+                          "this application's lead. Stage 7 takes it as the supply date when "
+                          "none is sent.")
     created_at: str
     cancellation: ApplicationCancellation | None
 
@@ -153,6 +157,12 @@ class StageRecord(BaseModel):
 class Cancel(BaseModel):
     model_config = ConfigDict(extra="forbid")
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class Reopen(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+                      Field(description="Why the closed file is opened again.")]
 
 
 class DocumentType(BaseModel):

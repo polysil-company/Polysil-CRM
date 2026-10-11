@@ -332,6 +332,45 @@ GGRC applications only: another scheme's is 422 `pims_not_for_scheme` (GAP-363).
 
 ---
 
+## `POST /api/v1/subsidy-applications/{app_id}/reopen`
+
+**Reopen**
+
+Open a closed application again to correct it, with a reason. Admin sales and the MD.
+Its stages and values stay; the next stage entry checks closure again.
+`409 application_not_closed` when it is open or cancelled (a cancelled lead gets a new
+application); `409 commission_settled` when the dealer's commission on it is approved or paid.
+An entry closes it again only when it writes a stage-16 amount or its stage-17 date.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `app_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`Reopen`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `reason` | string | yes | Why the closed file is opened again. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Application_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
+| `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
+| `409` | `ErrorResponse` | `status_changed`: the application is closed or cancelled. `idempotency_key_reused`: the same key was sent with a different body. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
 ## `GET /api/v1/subsidy-applications/{app_id}/stages`
 
 **List Stages**
@@ -479,6 +518,7 @@ Build "Record stage" from this; the stages are data, not code.
 | `documents` | DocumentCount | yes |  |
 | `ageing` | Ageing | yes |  |
 | `full_fp_received_on` | string \| null | yes |  |
+| `dispatched_on` | string \| null |  | IST date of the first dispatch of a subsidised order that names this application's lead. Stage 7 takes it as the supply date when none is sent. |
 | `created_at` | string | yes |  |
 | `cancellation` | ApplicationCancellation \| null | yes |  |
 
@@ -529,7 +569,13 @@ Build "Record stage" from this; the stages are data, not code.
 | `sump` | Sump \| null |  |  |
 | `group_total_area` | number \| string \| null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
 | `installation_rate_per_ha` | number \| string |  | The installation line's rate; its quantity is the area. Default `0`. |
-| `nozzle` | `plastic` \| `brass` \| null |  | Sprinkler only. The pipe size is not an input: it follows the area band and is returned. |
+| `nozzle` | `plastic` \| `brass` \| null |  | Sprinkler only. GGRC sets the pipe size by the area band; a state that asks for `pipe_size_mm` uses it. Optional where the scheme lists one nozzle. |
+| `pipe_size_mm` | `63` \| `75` \| `90` \| `110` \| null |  | Sprinkler set size, where the scheme asks for it (CG, RJ, UP). |
+| `spacing_label` | string \| null |  | One of the scheme's spacing labels (`spacing_labels` in the config): CG and RJ drip, RJ mini sprinkler. |
+| `hydrocyclone_m3` | number \| string \| null |  | RJ: hydrocyclone size in m³, 0 for none. |
+| `gravel_filter_m3` | number \| string \| null |  | RJ: gravel filter size in m³, 0 for none. |
+| `head_unit_existing` | boolean \| null |  | RJ: the farmer already has a head unit. |
+| `pvc_existing` | boolean \| null |  | RJ: the farmer already has the PVC main line. |
 
 **`Cancel`**
 
@@ -694,7 +740,7 @@ Build "Record stage" from this; the stages are data, not code.
 |---|---|---|---|
 | `description` | string | yes | The item, as it prints on the quotation. |
 | `uom` | string | yes | Unit of measure, for the document. |
-| `rate` | number \| string | yes | Rate per unit in rupees, at most two decimals. |
+| `rate` | number \| string | yes | Rate per unit in rupees, at most four decimals. |
 | `qty` | number \| string | yes | Quantity, at most three decimals. |
 | `product_id` | string \| null |  | The catalogue row this line is, when the designer picked it from the product list. Optional, and additive: the rate and description still come from this request, because a subsidy quotation is costed at the scheme's figures rather than at ours. What it buys is the two checks the catalogue makes possible - a head-unit item cannot appear in a crop block, and an item marked not subsidy-eligible cannot appear at all. |
 
@@ -704,6 +750,12 @@ Build "Record stage" from this; the stages are data, not code.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
+
+**`Reopen`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `reason` | string | yes | Why the closed file is opened again. |
 
 **`StageDef`**
 

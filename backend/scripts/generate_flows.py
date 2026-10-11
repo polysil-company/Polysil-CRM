@@ -2334,7 +2334,7 @@ def f_subsidised_orders() -> None:
          ("d3", "order_submit's dealer gate names subsidised\n(second enforcer, 045 swapped live)", VIOLET)],
         [("n1", "NULL MEANS THE TOTAL\n\nmaterial_amount left out is stored null and read as the\norder total at the time. A lines edit moves it. The read\nreturns the resolved number plus material_is_total.", RED),
          ("n2", "LEADS AFTER THE FIRST SEE LITTLE\n\nThey get order.subsidy_set, shown only to a reader who\nsees the order. Submit, approval and dispatch events go\nto the first lead (GAP-452).", RED),
-         ("n3", "THE FARMER SEES THE FULL TOTAL\n\nThe approval WhatsApp and payments use the order total,\nnot the farmer payable (GAP-450, GAP-451).", RED),
+         ("n3", "PAID BY THE FARMER'S SHARE (FS-055)\n\nPayments, the ledger, the confirmation and the portal use\nthe farmer's share; the approver sees the full total.", GREEN),
          ("n4", "Ours: chain on the total, caps at the material, any\ninquiry type may be named (GAP-299).", YELLOW)])
 
 
@@ -2356,6 +2356,66 @@ def f_warranty() -> None:
          ("n3", "Ours: 12 months everywhere, per dispatch,\nshown not enforced (GAP-275 to GAP-283).", YELLOW)])
 
 
+def f_subsidy_completion() -> None:
+    _columns(
+        "65-subsidy-completion", "Subsidy completion: the farmer's share, supply date, bells, reopen",
+        "Six small pieces that close subsidy gaps on public rules.",
+        "BUILT. FS-055: migration 069, POST /subsidy-applications/{id}/reopen.",
+        [("s1", "order_owed(order) = farmer total - scheme benefits\nin six definers, swapped on their live text", GREEN),
+         ("s2", "farmer total: farmer payable, else material - subsidy,\nelse total - subsidy; held within 0 and the total", BLUE),
+         ("s3", "order.confirmed WhatsApp and the portal show it;\nthe approver's WhatsApp keeps the full total", BLUE),
+         ("s4", "subsidy_dispatched_on(lead): first live dispatch of a\nlive subsidised order naming the lead (IST)", BLUE),
+         ("s5", "stage 7 without `supply` takes that date;\nreports read it when no supply date is held", GREEN),
+         ("s6", "stage event names its filled fields -> bell to the\nfile's owner and the lead's owner (staff, not the actor)", VIOLET)],
+        [("d1", "returned > query > trial run failed:\none bell per entry", GREY),
+         ("d2", "reopen: subsidy.approve, reason, closed only;\nrefused on an approved or paid commission", YELLOW),
+         ("d3", "sprinkler between steps: next step's quantities,\nunit cost pro rata to the paisa (flag 0 from 069)", YELLOW)],
+        [("n1", "OMIT THE KEY, DO NOT SEND NULL\n\nStage 7's supply default applies only when the key is\nabsent. null clears the date on purpose.", RED),
+         ("n2", "A FILE RE-CLOSES ONLY ON A PAYMENT ENTRY\n\nAfter a reopen, entries elsewhere leave it open. An entry\nthat writes a stage-16 amount or its date closes it again.", RED),
+         ("n3", "ONE FARMER TOTAL, THREE PLACES\n\nSQL (order_farmer_total), the ledger's inline SQL and the\nPython detail. A test holds them equal.", RED),
+         ("n4", "Ours: the pro rata area rule is PMKSY's (GAP-076);\nbell recipients and the DC date are assumptions.", YELLOW)])
+
+
+def f_state_formulas() -> None:
+    _columns(
+        "66-state-subsidy-formulas", "Subsidy formulas for CG, RJ and UP",
+        "Each state calculates as the client's own sheet does, to the paisa.",
+        "BUILT. FS-056: migration 071, scripts/load_state_masters.py, POST /subsidy/calculate.",
+        [("s1", "GET /subsidy/config: the scheme's systems,\neach with `inputs` and `spacing_labels`", BLUE),
+         ("s2", "subsidy_system picks the model:\npipeline + table shape + cap_mode", GREY),
+         ("s3", "UP drip/mini: GGRC blocks, no guards,\ncap MIN(unit cost, total incl GST)", GREEN),
+         ("s4", "UP/RJ sprinkler: set size from the input,\nsize x area table, blank cell = no subsidy", GREEN),
+         ("s5", "CG: rates incl GST, 4 % fittings (drip),\nflat inspection outside the cap, on the share", GREEN),
+         ("s6", "RJ drip/mini: % x unit cost (+ filters,\n- existing head unit, - PVC), floor 0", GREEN)],
+        [("d1", "label tables: anchors 0.2/0.4 to 5 Ha,\nstraight line; CG to the rupee", YELLOW),
+         ("d2", "one crop, no group, free crop name\noutside Gujarat", GREY),
+         ("d3", "loader reads states.json + states_samples.json;\nfinds the state's scheme, else creates it", VIOLET)],
+        [("n1", "THE SAMPLES FILE IS PRICING\n\nstates_samples.json holds the company's price lists.\nThe snapshot withholds it; its tests skip without it.", RED),
+         ("n2", "RJ SUBSIDY CAN EXCEED THE COST\n\nThe sheet has no cap at the cost. Kept, with a warning,\nuntil the client answers (GAP-458).", RED),
+         ("n3", "OVERLOADED COLUMNS\n\nA size table keeps the size in lateral_spacing; a filter's\nm3 sits in pipe_size_mm (stated limit).", RED),
+         ("n4", "Open: RJ sprinkler's template tables, the PVC\ndeduction, AP's format (GAP-459 to 461, GAP-359).", YELLOW)])
+
+
+def f_subsidised_quotations() -> None:
+    _columns(
+        "67-subsidised-quotations", "Subsidised quotations: the calculator's answer on the quotation",
+        "One category's subsidy and farmer's share, printed, carried into the order.",
+        "BUILT. FS-057: migration 072, PUT /quotations/{id}/subsidy.",
+        [("s1", "POST /quotations sales_type=subsidised\nlines from the price list, as today", GREY),
+         ("s2", "PUT /quotations/{id}/subsidy: category + calculator\nrequest; the lead's scheme and system", BLUE),
+         ("s3", "figures summed per crop (figures_for);\ncategory must apply on every crop", GREEN),
+         ("s4", "send / request approval need the block\non the lead's current scheme", GREEN),
+         ("s5", "PDF (render claim) and the farmer's link\nshow subsidy and farmer's share", VIOLET),
+         ("s6", "POST /orders subsidised from ONE accepted quotation:\norder_subsidy from the block", GREEN)],
+        [("d1", "revise: the block is copied by a definer,\nnot if the lead's scheme changed", YELLOW),
+         ("d2", "drift over 1 % between lines and\ncalculation: a warning (GAP-462)", YELLOW),
+         ("d3", "a type change is refused while\na block exists", GREY)],
+        [("n1", "LEAVE calculation.scheme OUT\n\nThe request model defaults to GGRC. Absent means the\nlead's scheme; an explicit other one is refused.", RED),
+         ("n2", "THE ORDER'S MATERIAL IS THE CALCULATION\n\nmaterial = total_cost + flat charge, so subsidy and share\nfit whatever the order's lines come to.", RED),
+         ("n3", "WRITES ARE DEFINERS ONLY\n\napp_role reads quotation_subsidy; set and copy go\nthrough quotation_subsidy_set / _copy.", RED),
+         ("n4", "Open: dealer pricing, a stale revision, the\napplication's own figures (GAP-463 to 465).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2368,5 +2428,5 @@ if __name__ == "__main__":
     f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
     f_export_sample_orders(); f_ratings(); f_warranty()
-    f_subsidised_orders()
+    f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
     print(f"\nwrote to {OUT}")

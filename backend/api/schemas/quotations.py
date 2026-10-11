@@ -25,6 +25,7 @@ from api.schemas.leads import (
     UserRef,
 )
 from api.schemas.products import MAX_LINES, TaxTreatment, _places
+from api.schemas.subsidy import CalculateRequest
 
 SalesType = Literal["commercial", "industrial", "export", "subsidised", "marketing", "sample"]
 Status = Literal["draft", "sent", "viewed", "accepted", "rejected", "negotiation", "expired"]
@@ -311,6 +312,39 @@ class ApprovalRequestIn(BaseModel):
         description="Why the discount is needed. Shown to the approver on the timeline.")]
 
 
+class SubsidyCategory(BaseModel):
+    code: str
+    name: str
+    pct: str = Field(description="Whole-number percent, as text: 70.")
+
+
+class QuotationSubsidy(BaseModel):
+    """FS-057: the calculator's answer for one category, stored with the quotation."""
+
+    scheme: str = Field(description="The lead's scheme the calculation ran on: GGRC, CG, RJ, UP.")
+    system_type: str
+    category: SubsidyCategory
+    total_cost: str = Field(description="The calculation's total incl GST, with any flat charge.")
+    flat_charge: str = Field(description="CG's inspection charge outside the cap; 0.00 elsewhere.")
+    subsidy: str
+    farmer_share: str = Field(description="What the farmer pays.")
+    as_of: str = Field(description="The masters' date.")
+    formula_version: str
+
+
+class QuotationSubsidyIn(BaseModel):
+    """FS-057: calculate and store the subsidy for one category."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category_code: Annotated[str, Field(min_length=1, max_length=40,
+                                        description="One of the calculation's categories; it "
+                                                    "must apply on every crop.")]
+    calculation: CalculateRequest = Field(
+        description="The subsidy calculator's request (POST /subsidy/calculate). Leave "
+                    "`scheme` out: the lead's scheme is used.")
+
+
 class Quotation(BaseModel):
     """The document. Every key is always present; null means not set."""
 
@@ -349,6 +383,9 @@ class Quotation(BaseModel):
     is_provisional: bool = Field(description="Any line carries a stand-in rate or slab. The "
                                              "PDF carries a banner; show the same.")
     warnings: list[str] = Field(description="Each is `code: sentence`.")
+    subsidy: QuotationSubsidy | None = Field(
+        default=None, description="FS-057: a subsidised quotation's calculation; null otherwise "
+                                  "or until it is calculated.")
     terms: str | None
     valid_until: str | None
     sent_at: str | None
@@ -415,6 +452,16 @@ class PublicSeller(BaseModel):
     gstin: str
 
 
+class PublicSubsidy(BaseModel):
+    """FS-057 rule 7: what the farmer's link shows of a subsidised quotation."""
+
+    scheme: str
+    category: str
+    total_cost: str
+    subsidy: str
+    farmer_share: str = Field(description="What the farmer pays.")
+
+
 class PublicQuotation(BaseModel):
     """What the farmer's link shows before the PDF: no name, no mobile, no
     address, no lines. The PDF has all of it, one request further."""
@@ -432,3 +479,6 @@ class PublicQuotation(BaseModel):
     line_count: int
     pdf_ready: bool
     pdf_url: str
+    subsidy: PublicSubsidy | None = Field(
+        default=None, description="FS-057: a subsidised quotation's subsidy and the farmer's "
+                                  "share; null otherwise.")

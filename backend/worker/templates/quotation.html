@@ -112,6 +112,13 @@
   <div class="terms">Supply meant for export under LUT without payment of IGST{% if q.lut_arn %} (ARN {{ q.lut_arn }}){% endif %}.</div>
   {% endif %}
 
+  {% if subsidy %}
+  <div class="terms"><strong>Subsidy</strong> ({{ subsidy.scheme_code }}, {{ subsidy.category_name }})<br>
+    Cost as calculated {{ subsidy.total_cost | rupees }}{% if subsidy_has_flat %} plus inspection {{ subsidy.flat_charge | rupees }}{% endif %}
+    &middot; Subsidy {{ subsidy.subsidy | rupees }}
+    &middot; <strong>Farmer's share {{ subsidy.farmer_share | rupees }}</strong></div>
+  {% endif %}
+
   {% if q.terms %}
   <div class="terms"><strong>Terms</strong><br>{{ q.terms }}</div>
   {% endif %}

@@ -28,6 +28,7 @@ from api.schemas.subsidy_applications import (
     DocumentLink,
     DocumentType,
     Entry,
+    Reopen,
     StageDef,
     StageRecord,
 )
@@ -191,6 +192,22 @@ async def cancel(app_id: Id, body: Cancel, db: DbSession, claims: Claims,
         return 200, await service.cancel(db, app_id, body)
     return await _idem(db, claims, idem,
                        f"POST /api/v1/subsidy-applications/{app_id}/cancel", body, work)
+
+
+@router.post("/{app_id}/reopen", response_model=Envelope[Application],
+             responses=_MUTATION_ERRORS,
+             dependencies=[Depends(require("subsidy", "approve"))])
+async def reopen(app_id: Id, body: Reopen, db: DbSession, claims: Claims,
+                 idem: IdemKey) -> JSONResponse:
+    """Open a closed application again to correct it, with a reason. Admin sales and the MD.
+    Its stages and values stay; the next stage entry checks closure again.
+    `409 application_not_closed` when it is open or cancelled (a cancelled lead gets a new
+    application); `409 commission_settled` when the dealer's commission on it is approved or paid.
+    An entry closes it again only when it writes a stage-16 amount or its stage-17 date."""
+    async def work() -> tuple[int, Any]:
+        return 200, await service.reopen(db, app_id, body)
+    return await _idem(db, claims, idem,
+                       f"POST /api/v1/subsidy-applications/{app_id}/reopen", body, work)
 
 
 @router.get("/{app_id}/documents", response_model=Envelope[list[ChecklistItem]],

@@ -283,3 +283,16 @@ def test_the_logo_is_embedded_and_needs_no_file_access() -> None:
 def test_the_mobile_filter(raw: str | None, shown: str) -> None:
     from worker.jobs.quotations import _mobile
     assert _mobile(raw) == shown
+
+
+def test_a_subsidised_quotation_prints_its_subsidy_and_the_farmers_share() -> None:
+    """FS-057 rule 7. A document without the key (claimed before 072) prints none."""
+    doc = _doc()
+    assert "Farmer's share" not in render_html(doc)
+    doc["subsidy"] = {"scheme_code": "CG", "category_name": "Small farmer (55%)",
+                      "total_cost": "66495.44", "flat_charge": 1003, "subsidy": "36204.85",
+                      "farmer_share": "31293.59"}
+    flat = _text(render_html(doc))
+    assert "Subsidy (CG, Small farmer (55%))" in flat
+    assert "Farmer's share ₹31,293.59" in flat or "Farmer's share ₹ 31,293.59" in flat, flat
+    assert "plus inspection" in flat

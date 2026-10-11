@@ -27,6 +27,7 @@ from api.schemas.quotations import (
     QuotationCreate,
     QuotationPage,
     QuotationPatch,
+    QuotationSubsidyIn,
     QuotationSummary,
     ReviseRequest,
     SendRequest,
@@ -204,6 +205,38 @@ async def replace_lines(
                                    route=f"PUT /api/v1/quotations/{quotation_id}/lines",
                                    payload_hash=payload_hash, work=work)
     return JSONResponse(outcome.body, status_code=outcome.status_code)
+
+
+@router.put("/{quotation_id}/subsidy", response_model=Envelope[Quotation],
+            responses=_MUTATION_ERRORS, dependencies=[Depends(require("quotations", "edit"))])
+async def set_subsidy(
+    quotation_id: QuotationId, body: QuotationSubsidyIn, db: DbSession, caller: CallerDep,
+    claims: Claims, idem: IdemKey,
+) -> JSONResponse:
+    """FS-057: calculate a subsidised draft's subsidy for one category and store it.
+    The calculation runs on the lead's scheme (leave `calculation.scheme` out). Again
+    to recalculate. `409 quotation_not_draft`; `422 not_subsidised`, `category_code`,
+    `calculation.<field>` from the calculator. Sending and requesting approval need it
+    (`422 subsidy_missing`)."""
+    payload_hash = payload_digest(body.model_dump(mode="json", exclude_unset=True))
+
+    async def work() -> tuple[int, dict]:
+        q = await service.set_subsidy(db, caller, quotation_id, body, get_settings())
+        return status.HTTP_200_OK, {"data": q.model_dump(mode="json")}
+
+    outcome = await run_idempotent(db, key=idem, user_id=claims.sub,
+                                   route=f"PUT /api/v1/quotations/{quotation_id}/subsidy",
+                                   payload_hash=payload_hash, work=work)
+    return JSONResponse(outcome.body, status_code=outcome.status_code)
+
+
+@router.get("/{quotation_id}/subsidy/calculation", response_model=Envelope[dict[str, Any]],
+            responses=_MUTATION_ERRORS, dependencies=[Depends(require("quotations", "view"))])
+async def subsidy_calculation(quotation_id: QuotationId, db: DbSession) -> Envelope[dict[str, Any]]:
+    """FS-057: the full calculator answer stored with the quotation."""
+    from api.services import quotation_subsidy
+    await service.get_quotation(db, quotation_id, get_settings())      # 404 out of scope
+    return Envelope(data=await quotation_subsidy.calculation(db, quotation_id))
 
 
 @router.post("/{quotation_id}/send", response_model=Envelope[Quotation],

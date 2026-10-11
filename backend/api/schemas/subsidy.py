@@ -55,7 +55,7 @@ class Line(BaseModel):
     description: str = Field(min_length=1, max_length=300,
                              description="The item, as it prints on the quotation.")
     uom: str = Field(min_length=1, max_length=20, description="Unit of measure, for the document.")
-    rate: Decimal = Field(ge=0, description="Rate per unit in rupees, at most two decimals.")
+    rate: Decimal = Field(ge=0, description="Rate per unit in rupees, at most four decimals.")
     qty: Decimal = Field(ge=0, description="Quantity, at most three decimals.")
     product_id: str | None = Field(
         default=None, pattern=UUID_RE,
@@ -69,7 +69,7 @@ class Line(BaseModel):
     @field_validator("rate")
     @classmethod
     def _rate_paise(cls, v: Decimal) -> Decimal:
-        return _places(v, 2, "rate")
+        return _places(v, 4, "rate")   # FS-056: state price lists carry per-metre paise
 
     @field_validator("qty")
     @classmethod
@@ -133,8 +133,24 @@ class CalculateRequest(BaseModel):
                                               description="The installation line's rate; its "
                                                           "quantity is the area.")
     nozzle: Nozzle | None = Field(default=None,
-                                  description="Sprinkler only. The pipe size is not an input: it "
-                                              "follows the area band and is returned.")
+                                  description="Sprinkler only. GGRC sets the pipe size by the area "
+                                              "band; a state that asks for `pipe_size_mm` uses it. "
+                                              "Optional where the scheme lists one nozzle.")
+    # FS-056: the inputs other states' sheets take; GET /subsidy/config lists which
+    pipe_size_mm: Literal[63, 75, 90, 110] | None = Field(
+        default=None, description="Sprinkler set size, where the scheme asks for it (CG, RJ, UP).")
+    spacing_label: str | None = Field(
+        default=None, max_length=60,
+        description="One of the scheme's spacing labels (`spacing_labels` in the config): CG and "
+                    "RJ drip, RJ mini sprinkler.")
+    hydrocyclone_m3: Decimal | None = Field(
+        default=None, ge=0, le=100, description="RJ: hydrocyclone size in m³, 0 for none.")
+    gravel_filter_m3: Decimal | None = Field(
+        default=None, ge=0, le=100, description="RJ: gravel filter size in m³, 0 for none.")
+    head_unit_existing: bool | None = Field(default=None,
+                                            description="RJ: the farmer already has a head unit.")
+    pvc_existing: bool | None = Field(default=None,
+                                      description="RJ: the farmer already has the PVC main line.")
 
     @field_validator("group_total_area")
     @classmethod
@@ -166,6 +182,11 @@ class Blocks(BaseModel):
     sgst_e: str
     education: str
     sump: str
+    fittings: str = Field(default="0.00",
+                          description="CG drip: the fittings add-on on the subtotal (FS-056).")
+    flat_inspection: str = Field(default="0.00",
+                                 description="CG: the inspection charge outside the cap, added "
+                                             "to the farmer's share (FS-056).")
     cost_excl_gst: str
     total_cgst: str
     total_sgst: str
@@ -181,6 +202,9 @@ class JantriOut(BaseModel):
                     "Mini Sprinkler block below 0.2 Ha. Equal to `regular_with_sump` everywhere "
                     "else. This is the unit cost the scheme's own sheet prints.")
     seven_year: str | None = Field(description="Null when the area is outside the window.")
+    add_ons: str = Field(default="0.00", description="RJ: the filter add-ons on the unit cost.")
+    deductions: str = Field(default="0.00",
+                            description="RJ: the existing head unit and PVC deductions.")
 
 
 class CategoryOut(BaseModel):
@@ -277,6 +301,12 @@ class SystemConfig(BaseModel):
     sprinkler_areas: list[str] | None = Field(
         description="The tabulated areas a Sprinkler quotation may use. Null for the other two "
                     "systems, which accept any area.")
+    pipeline: str = Field(default="full_abcdefg", description="The calculation model (FS-056).")
+    cap_mode: str = Field(default="ggrc", description="ggrc, incl_gst or unit_cost_only (FS-056).")
+    inputs: list[str] = Field(default_factory=list,
+                              description="The optional request fields this system needs.")
+    spacing_labels: list[str] = Field(default_factory=list,
+                                      description="The spacing labels a label-table system takes.")
 
 
 class ConfigOut(BaseModel):

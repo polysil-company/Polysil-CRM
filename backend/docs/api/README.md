@@ -32,7 +32,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Pricing | 8 | [`pricing.md`](pricing.md) |
 | Products | 8 | [`products.md`](products.md) |
 | Public | 6 | [`public.md`](public.md) |
-| Quotations | 14 | [`quotations.md`](quotations.md) |
+| Quotations | 16 | [`quotations.md`](quotations.md) |
 | Ratings | 4 | [`ratings.md`](ratings.md) |
 | Reports | 9 | [`reports.md`](reports.md) |
 | Rewards | 19 | [`rewards.md`](rewards.md) |
@@ -41,7 +41,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Settings | 2 | [`settings.md`](settings.md) |
 | Stock | 7 | [`stock.md`](stock.md) |
 | Subsidy | 4 | [`subsidy.md`](subsidy.md) |
-| Subsidy Applications | 14 | [`subsidy-applications.md`](subsidy-applications.md) |
+| Subsidy Applications | 15 | [`subsidy-applications.md`](subsidy-applications.md) |
 | Subsidy Masters | 4 | [`subsidy-masters.md`](subsidy-masters.md) |
 | Subsidy Reports | 6 | [`subsidy-reports.md`](subsidy-reports.md) |
 | Subsidy Schemes | 6 | [`subsidy-schemes.md`](subsidy-schemes.md) |
