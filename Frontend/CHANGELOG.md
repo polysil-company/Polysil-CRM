@@ -168,6 +168,7 @@ The mock also gave dealers and distributors `subsidy`, though the backend answer
   - which areas Sprinkler may use.
 
   Each tab keeps its own inputs while the designer moves between them.
+
 - **The inputs:**
   - per crop block: the crop and inter-crop, each showing its standard spacing; the area; the lateral spacing; the crop spacing as it prints; the field-unit items (item, unit, rate, quantity);
   - the head unit, once for the quotation;
@@ -183,6 +184,7 @@ The mock also gave dealers and distributors `subsidy`, though the backend answer
   - on Sprinkler, the derived items, the pipe size and the DBT farmer payable.
 
   Older figures stay, dimmed, while new ones load. Nothing is saved.
+
 - **Before anything is calculated,** the eight categories are listed with their percentages.
 - **Mistakes and refusals:**
   - A missing area or spacing just waits.
