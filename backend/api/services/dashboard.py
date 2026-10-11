@@ -24,13 +24,16 @@ from api.schemas.dashboard import (
     FollowUp,
     Kpi,
     Kpis,
+    MonthTarget,
     Period,
     PipelineStage,
     SourceCount,
+    SystemArea,
 )
 from api.schemas.leads import UserRef
 from api.services import leads as leads_service
 from api.services import people
+from api.services import targets as targets_service
 from api.services.clock import today_ist
 
 # rule 3 (GAP-158): the stages whose value is the pipeline
@@ -115,7 +118,44 @@ async def overview(db: AsyncSession, caller: Caller, days: int) -> DashboardOver
         period_label=f"Last {days} days",
         period=Period(start=start.isoformat(), end=today.isoformat()),
         kpis=kpis, pipeline=pipeline, sources=sources,
+        area_by_system=await _area_by_system(db, where),
+        targets_by_month=await _targets_by_month(db, caller, today),
         follow_ups=await _next_follow_ups(db, caller, where, today))
+
+
+async def _area_by_system(db: AsyncSession, where: list[Any]) -> list[SystemArea]:
+    """FS-052 item 1: open and won leads now, by irrigation system, with their land."""
+    stage = sa.cast(lead_t.c.stage, sa.Text)
+    rows = (await db.execute(
+        sa.select(lead_t.c.mis_system_id.label("sid"), sa.func.count().label("n"),
+                  sa.func.sum(lead_t.c.land_hectares).label("ha"))
+        .where(sa.and_(*where, stage.in_((*OPEN_STAGES, "won"))))
+        .group_by(lead_t.c.mis_system_id))).all()
+    if not rows:
+        return []
+    names = {str(r.id): r for r in (await db.execute(text(
+        "SELECT id, code::text AS code, name FROM mis_system "
+        "WHERE id = ANY(CAST(:ids AS uuid[]))"), {"ids": [str(r.sid) for r in rows]})).all()}
+    out = [SystemArea(system=names[str(r.sid)].code, name=names[str(r.sid)].name, leads=r.n,
+                      hectares=money(r.ha or Decimal(0)))
+           for r in rows if str(r.sid) in names]
+    return sorted(out, key=lambda a: a.name)
+
+
+async def _targets_by_month(db: AsyncSession, caller: Caller,
+                            today: dt.date) -> list[MonthTarget] | None:
+    """FS-052 item 16: six months of the order value target against achievement, from
+    GET /targets/achievement's own arithmetic, in one pass (ISS-131). Null without a
+    targets scope, which that call would refuse (plan review B-2)."""
+    if caller.scopes.get("targets") is None:
+        return None
+    months: list[str] = []
+    y, m = today.year, today.month
+    for _ in range(6):
+        months.append(f"{y:04d}-{m:02d}")
+        y, m = (y, m - 1) if m > 1 else (y - 1, 12)
+    series = await targets_service.order_value_by_month(db, caller, list(reversed(months)))
+    return [MonthTarget(**m) for m in series]
 
 
 async def _next_follow_ups(db: AsyncSession, caller: Caller, where: list[Any],

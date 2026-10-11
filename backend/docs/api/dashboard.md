@@ -64,6 +64,8 @@ figures, never a 403.
 | `kpis` | Kpis | yes |  |
 | `pipeline` | PipelineStage[] | yes | Every stage but merged, in lifecycle order. |
 | `sources` | SourceCount[] | yes |  |
+| `area_by_system` | SystemArea[] |  | Open and won leads now, by irrigation system (FS-052). Systems with none are left out. |
+| `targets_by_month` | MonthTarget[] \| null |  | This month and the five before it, oldest first: order value target against what was sold. Null without a targets permission (FS-052). |
 | `follow_ups` | FollowUp[] | yes | The 10 earliest-due open tasks on your leads. Empty without a task permission. |
 
 **`Envelope_DashboardOverview_`**
@@ -115,6 +117,14 @@ figures, never a 403.
 | `conversion_rate` | Kpi | yes | Of the period's new leads, the percentage won now. |
 | `overdue_follow_ups` | Kpi | yes | Open tasks on leads overdue now, the same figure as follow_ups_overdue on GET /leads/stats. |
 
+**`MonthTarget`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `month` | string | yes | YYYY-MM. |
+| `target` | string | yes | The order value target, summed over your team. "0.00" when nobody has one. |
+| `achieved` | string \| null | yes | Order value counted as sold that month. Null without a sales orders permission. |
+
 **`Period`**
 
 | Field | Type | Required | Notes |
@@ -137,6 +147,15 @@ figures, never a 403.
 | `source` | string | yes | The lead source code. |
 | `name` | string | yes |  |
 | `count` | integer | yes | Leads created in the period from this source. |
+
+**`SystemArea`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `system` | string | yes | The irrigation system's code. |
+| `name` | string | yes |  |
+| `leads` | integer | yes | Open and won leads now with this system. |
+| `hectares` | string | yes | Their land, summed, a decimal string. Leads without land add nothing. |
 
 **`UserRef`**
 

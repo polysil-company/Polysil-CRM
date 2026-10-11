@@ -58,12 +58,35 @@ class FollowUp(BaseModel):
     overdue: bool = Field(description="Due before today (IST).")
 
 
+class SystemArea(BaseModel):
+    system: str = Field(description="The irrigation system's code.")
+    name: str
+    leads: int = Field(description="Open and won leads now with this system.")
+    hectares: str = Field(description="Their land, summed, a decimal string. Leads without "
+                                      "land add nothing.")
+
+
+class MonthTarget(BaseModel):
+    month: str = Field(description="YYYY-MM.")
+    target: str = Field(description="The order value target, summed over your team. \"0.00\" "
+                                    "when nobody has one.")
+    achieved: str | None = Field(description="Order value counted as sold that month. Null "
+                                             "without a sales orders permission.")
+
+
 class DashboardOverview(BaseModel):
     period_label: str
     period: Period
     kpis: Kpis
     pipeline: list[PipelineStage] = Field(description="Every stage but merged, in lifecycle order.")
     sources: list[SourceCount]
+    area_by_system: list[SystemArea] = Field(
+        default_factory=list, description="Open and won leads now, by irrigation system "
+                                          "(FS-052). Systems with none are left out.")
+    targets_by_month: list[MonthTarget] | None = Field(
+        default=None, description="This month and the five before it, oldest first: order "
+                                  "value target against what was sold. Null without a targets "
+                                  "permission (FS-052).")
     follow_ups: list[FollowUp] = Field(
         description="The 10 earliest-due open tasks on your leads. Empty without a task "
         "permission.")

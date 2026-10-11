@@ -64,7 +64,9 @@ ENTITY_BY_ID: tuple[str, ...] = ("org_unit", "territory", "quotation", "sales_or
                                  "visit", "duty_session",
                                  "tracking_consent",
                                  # FS-040: campaigns; every staff user reads the list
-                                 "campaign")
+                                 "campaign",
+                                 # FS-051: dealer applications, staff in the partners scope
+                                 "dealer_application")
 
 # A type in both LIVE_TABLES and ENTITY_BY_ID would emit two `WHEN` arms, the
 # first through its reference column's table and the second dead, and PostgreSQL

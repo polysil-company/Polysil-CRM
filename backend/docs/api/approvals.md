@@ -108,7 +108,8 @@ refund.
 **Get Thresholds**
 
 The approval limits per manager role (and per territory where set), including
-GST. The highest role with a row has no limit in effect.
+GST. The highest role with a row has no limit in effect. Staff only: a dealer or
+a consumer gets `403`.
 
 **Responses**
 
@@ -208,6 +209,7 @@ One approval chain.
 | `by` | UserRef \| null | yes | Null for a dealer, always. |
 | `remark` | string \| null | yes | Null for a dealer, always. |
 | `decided_at` | string \| null | yes |  |
+| `stalled` | boolean |  | True on the step waiting now when nobody of its own role can decide it (none covers the document, or the only one raised it). A higher manager decides it instead and sees it in their inbox. Show "No <role> to decide; with the next manager up" rather than "Waiting on <role>". Always false for a dealer. Default `False`. |
 
 **`Attachment`**
 
@@ -431,6 +433,7 @@ One approval chain.
 | `defective_qty` | string | yes |  |
 | `failure_frequency` | string \| null | yes |  |
 | `remark` | string \| null | yes |  |
+| `warranty` | LineWarranty \| null |  | FS-046: whether the product was in warranty on the day the complaint was raised. |
 
 **`LineStock`**
 
@@ -438,6 +441,16 @@ One approval chain.
 |---|---|---|---|
 | `available` | string | yes | At the order's warehouse, now. |
 | `short` | boolean | yes | True when available is below what this line still needs. |
+
+**`LineWarranty`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `status` | `in_warranty` \| `expired` \| `none` \| `unknown` | yes | On the day the complaint was raised (its first submit, or today for a draft). |
+| `start` | string \| null | yes |  |
+| `end` | string \| null | yes |  |
+| `months` | integer \| null | yes |  |
+| `basis` | `dispatch` \| `supply_date` \| null | yes | Where the start came from. |
 
 **`Order`**
 
@@ -480,6 +493,7 @@ One approval chain.
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
 | `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
+| `subsidy` | SubsidyBlock \| null |  | A subsidised order's subsidy (FS-054); null on every other type. |
 | `warehouse` | WarehouseRef \| null |  | "Order to" (FS-023); null means the default. Always null for a dealer. |
 | `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
@@ -878,6 +892,24 @@ One approval chain.
 | `resolution_due_at` | string \| null | yes |  |
 | `resolved_at` | string \| null | yes |  |
 | `resolution_breached` | boolean | yes |  |
+
+**`SubsidyBlock`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `material_amount` | string | yes | The material amount, or the order total when `material_is_total`. |
+| `subsidy_amount` | string | yes |  |
+| `farmer_payable` | string | yes | The farmer's share, or material less subsidy when `farmer_payable_is_derived`. Not the order's `payable`, which is the total less scheme benefits. |
+| `material_is_total` | boolean | yes |  |
+| `farmer_payable_is_derived` | boolean | yes |  |
+| `leads` | SubsidyLeadRef[] | yes | In order; the first is the order's lead. |
+
+**`SubsidyLeadRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `inquiry_no` | string \| null | yes | Null for a lead you cannot see. |
 
 **`TerritoryRef`**
 

@@ -14,15 +14,17 @@ any endpoint change, so it is always current rather than a snapshot.
 | Complaints | 22 | [`complaints.md`](complaints.md) |
 | Customers | 4 | [`customers.md`](customers.md) |
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
+| Dealer Applications | 17 | [`dealer-applications.md`](dealer-applications.md) |
 | Dealer Commission | 12 | [`dealer-commission.md`](dealer-commission.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
+| Documents | 6 | [`documents.md`](documents.md) |
 | Holidays | 3 | [`holidays.md`](holidays.md) |
 | Leads | 20 | [`leads.md`](leads.md) |
 | Lookups | 23 | [`lookups.md`](lookups.md) |
 | Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
-| Messages | 7 | [`messages.md`](messages.md) |
+| Messages | 12 | [`messages.md`](messages.md) |
 | Notifications | 2 | [`notifications.md`](notifications.md) |
-| Orders | 17 | [`orders.md`](orders.md) |
+| Orders | 18 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 7 | [`partners.md`](partners.md) |
 | Payments | 8 | [`payments.md`](payments.md) |
@@ -48,6 +50,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Territories | 4 | [`territories.md`](territories.md) |
 | Tracking | 16 | [`tracking.md`](tracking.md) |
 | Users | 10 | [`users.md`](users.md) |
+| Warranty | 3 | [`warranty.md`](warranty.md) |
 
 ---
 

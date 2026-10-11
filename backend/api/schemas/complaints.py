@@ -12,6 +12,7 @@ from api.domain import complaints as domain
 from api.schemas.approvals import Approval
 from api.schemas.leads import UUID_RE, PageMeta, UserRef
 from api.schemas.tasks import LeadLink, OrderLink, PartnerLink
+from api.schemas.warranty import LineWarranty
 
 Severity = Literal["low", "medium", "high"]
 Status = Literal["draft", "submitted", "under_qc", "qc_approved", "qc_rejected", "cancelled",
@@ -163,6 +164,9 @@ class Line(BaseModel):
     defective_qty: str
     failure_frequency: str | None
     remark: str | None
+    warranty: LineWarranty | None = Field(
+        None, description="FS-046: whether the product was in warranty on the day the "
+                          "complaint was raised.")
 
 
 class Attachment(BaseModel):

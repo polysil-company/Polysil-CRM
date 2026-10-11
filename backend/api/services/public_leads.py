@@ -26,7 +26,7 @@ from api.config import get_settings
 from api.deps import intake_session
 from api.domain import leads as lead_domain
 from api.domain.auth import generate_otp, hash_otp
-from api.errors import NotFoundError, RateLimitedError, ValidationFailed
+from api.errors import ForbiddenError, NotFoundError, RateLimitedError, ValidationFailed
 from api.schemas import public_leads as sch
 from api.schemas.leads import LeadCreate, PartnerRef, TerritoryRef
 from api.services import leads as lead_service
@@ -210,7 +210,7 @@ def _qr_out(r: Any) -> sch.QrCode:
 async def create_qr(db: AsyncSession, caller: Caller, body: sch.QrCodeCreate) -> sch.QrCode:
     unit = caller.org_unit_id
     if unit is None:
-        raise ValidationFailed("Only staff create QR codes.", fields={"partner_id": "staff only"})
+        raise ForbiddenError("Only staff create QR codes.")
     if body.partner_id is not None:
         # read under the caller's own policies: the insert policy checks the owning
         # office only, and the foreign key sees every dealer. Without this a manager
@@ -277,7 +277,8 @@ async def patch_qr(db: AsyncSession, caller: Caller, qr_id: str,
     (FS-035). The checks are create's; the row is locked under the UPDATE policy,
     so a code outside the caller's scope is a 404."""
     if caller.org_unit_id is None:
-        raise ValidationFailed("Only staff edit QR codes.", fields={"body": "staff only"})
+        # GAP-380: a dealer reads its own codes and never changes them (walk F-8)
+        raise ForbiddenError("Only staff edit QR codes.")
     fields = body.model_fields_set
     if not fields:
         raise ValidationFailed(fields={"body": "nothing to change"})

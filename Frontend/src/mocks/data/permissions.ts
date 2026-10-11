@@ -68,11 +68,11 @@ function manager(scope: Scope): MockModulePermission[] {
   ];
 }
 
+/** No `subsidy`: the backend answers portal users 403 there (handover `subsidy-calculation.md`). */
 function channelPartner(): MockModulePermission[] {
   return [
     grant("leads", ["view", "edit"], "partner_subtree"),
     grant("sales_orders", ["view", "create", "edit"], "partner_subtree"),
-    grant("subsidy", ["view", "create"], "partner_subtree"),
     grant("complaints", ["view", "create"], "partner_subtree"),
     grant("marketing", ["view"], "global"),
     SCHEMES_VIEW,
@@ -87,7 +87,11 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
     case "state_manager":
       return manager("org_subtree");
     case "regional_manager":
-      return manager("territory");
+      // Regional Managers watch subsidy applications but don't change them (handover).
+      return [
+        ...manager("territory").filter((entry) => entry.module !== "subsidy"),
+        grant("subsidy", ["view"], "territory"),
+      ];
     case "admin":
       return MODULE_CODES.map((module) => grant(module, PERMISSION_ACTIONS, "global"));
     case "account_manager":
@@ -97,6 +101,8 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
         grant("complaints", ["view"], "global"),
         // Accounts decides the payment step of every order (RBAC.md §6.2).
         grant("sales_orders", ["view", "approve"], "global"),
+        // Accounts follows subsidy applications without changing them (handover).
+        grant("subsidy", ["view"], "global"),
         SCHEMES_VIEW,
       ];
     case "dispatch_manager":
