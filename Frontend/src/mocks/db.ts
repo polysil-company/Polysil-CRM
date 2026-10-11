@@ -5,6 +5,7 @@ import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/ap
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
+import type { HsnRowWire, TaxRateWire } from "@/features/products/api/products.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 import type {
   ApplicationDocumentWire,
@@ -21,6 +22,14 @@ import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
+import {
+  seedHsnHistory,
+  seedPriceLists,
+  seedProducts,
+  seedTaxRates,
+  type MockPriceList,
+  type MockProductRecord,
+} from "./data/products";
 import { generateQuotations } from "./data/quotations";
 import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
 import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
@@ -116,6 +125,14 @@ export interface MockDb {
   subsidySchemes: MockScheme[];
   /** How many events the mock has written, for their ids. */
   writtenEvents: number;
+  /** The catalogue (MSTR-004): the quotation mock's six priced products first. */
+  products: MockProductRecord[];
+  /** Each product's tariff headings over time, newest first (MSTR-005). */
+  hsnHistory: Map<string, HsnRowWire[]>;
+  /** GST slabs by tariff code over time (MSTR-005). */
+  taxRates: TaxRateWire[];
+  /** Price lists with their rates (MSTR-006). */
+  priceLists: MockPriceList[];
   /** Staff and partner users, deleted ones kept with `deleted_at` (ADMN-001…006). */
   users: MockUserRecord[];
   /** The offices a staff member is anchored on (`GET /org-units`). */
@@ -125,6 +142,7 @@ export interface MockDb {
 }
 
 function createMockDb(): MockDb {
+  const products = seedProducts();
   const leads = generateLeads();
   const { conversations, messages } = generateConversations(leads);
   const quotations = generateQuotations(leads);
@@ -185,6 +203,10 @@ function createMockDb(): MockDb {
     subsidyMasters: new Map([[MOCK_DEFAULT_SCHEME, seedSubsidyMasters()]]),
     subsidySchemes: seedSubsidySchemes(),
     writtenEvents: 1,
+    products,
+    hsnHistory: seedHsnHistory(products),
+    taxRates: seedTaxRates(),
+    priceLists: seedPriceLists(products),
     users: seedUsers(),
     offices: seedOffices(),
     userWrites: new Map(),

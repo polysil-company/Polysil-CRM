@@ -40,6 +40,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79 |
 | [Users and roles](#users-and-roles) | 6 | 🧪 👀 | PR #90 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
+| [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -360,6 +361,19 @@ The dashboard reads the backend's real shape since the demo-walk fixes ([changel
 
 ---
 
+## Products and prices
+
+Admin → **Products & prices** (`/products`), one tab each, the tab in the URL. Everyone on staff reads it; Admin-Sales and the MD (`products.edit`, `pricing.edit`) change it. Screens: [catalogue](screenshots/products/catalogue-desktop-light.jpg), [phone, dark](screenshots/products/catalogue-phone-dark.jpg), [a product with stand-ins](screenshots/products/product-edit-desktop-light.jpg), [no HSN yet, phone](screenshots/products/product-no-hsn-phone-dark.jpg), [what's missing](screenshots/products/product-new-errors-desktop-light.jpg), [a description in use](screenshots/products/product-new-duplicate-desktop-light.jpg), [tax rates](screenshots/products/tax-rates-desktop-light.jpg), [price lists](screenshots/products/price-lists-desktop-light.jpg), [a draft's rates](screenshots/products/draft-sheet-editing-desktop-light.jpg), [publish](screenshots/products/publish-desktop-light.jpg), [published](screenshots/products/published-sheet-desktop-light.jpg), [read-only for an employee](screenshots/products/published-sheet-read-only-desktop-light.jpg).
+
+- **MSTR-004 · Browse the catalogue** a page of 50 at a time with the total: description, item code, category, quotation block, unit, HSN and GST slab, MRP; "No HSN", "2 stand-ins" and "Switched off" chips. Search by description or item code; filter by category, block and status (active by default, switched off, all); filters and page in the URL. Empty, filtered-empty and past-the-end each say what to do. 🧪 👀
+- **MSTR-004 · Add a product**: description (no two alike: "Another product already has this description."), category and unit from those the catalogue uses (BE-024 asks for the full lists), quotation block, optional item code, MRP, pack multiple, eligible for subsidy. Missing fields are named before anything is sent. 🧪 👀
+- **MSTR-004 · Correct a product, or switch it off and on.** Only what changed is sent; "Nothing changed yet" until something does. A figure still a stand-in carries a "Stand-in" chip by its label, and setting it makes it the client's own. An employee sees the same dialog read-only. 🧪 👀
+- **MSTR-005 · A product's HSN code from a date**: the heading in force with its slab (or "No HSN code yet: quotations can't tax it"), its history once it has changed, and a new heading from a date. The day the current heading started is refused with what to do. 🧪 👀
+- **MSTR-005 · GST rates by HSN code**: the rates in force (or all, with "Starts later" and "Ended"), find a code, **Set a rate** (HSN, a slab from the Council's list, from a date) or **Change** one; every product under the code follows. 🧪 👀
+- **MSTR-006 · Price lists**: all, drafts or published, each with its phase (Draft, Published but starts later, In force, Ended), scope (state and tier, or every one), dates, how many rates and how many active products have none. **New price list** (name, start, optional state and tier, where the rates come from) opens the draft. On a draft, rates are typed in place and kept across pages and searches; a rate with more than two decimals or of 0 is named on its row and Save stays off; **Save rates** lays the edits over the list's own rates (it replaces them all, so they are read first). **Publish** asks to confirm a list missing rates. A published list is read-only, can be **closed from a date** (forward only) and corrected with **New list from this one**, which copies its scope and every rate. 🧪 👀
+
+In the mock, quotations still price only the six products they always had: a product added here lists and can be priced in a list, but the quotation builder's live pricing doesn't know it. Against the backend, both read the same catalogue.
+
 ## Not built yet
 
 The backend serves these, and the frontend has no screen for them — in the order of [Plan.md §9.3](Plan.md):
@@ -367,4 +381,4 @@ The backend serves these, and the frontend has no screen for them — in the ord
 1. A consolidated order from several quotations on leads of one dealer.
 2. Complaint types, with the other lookups in the admin masters. Everything else in complaints is in PR #57 and PR #58.
 3. The subsidy masters and their revisions (categories, parameters, rates, crop spacings, matrices).
-4. Admin masters: products, price lists, tax rates, offices, territories, partners. Users and roles are in PR #90.
+4. Admin masters: offices, territories, partners. Users and roles are in PR #90; products, price lists and tax rates in PR #95.

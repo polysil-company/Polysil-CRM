@@ -10,6 +10,7 @@ import { lookupHandlers } from "./lookups";
 import { messageHandlers } from "./messages";
 import { notificationHandlers } from "./notifications";
 import { orderHandlers } from "./orders";
+import { productHandlers } from "./products";
 import { quotationHandlers } from "./quotations";
 import { subsidyHandlers } from "./subsidy";
 import { subsidyApplicationHandlers } from "./subsidy-applications";
@@ -39,6 +40,7 @@ export const handlers: readonly HttpHandler[] = [
   ...leadCaptureHandlers,
   ...lookupHandlers,
   ...quotationHandlers,
+  ...productHandlers,
   ...orderHandlers,
   ...dashboardHandlers,
   ...notificationHandlers,

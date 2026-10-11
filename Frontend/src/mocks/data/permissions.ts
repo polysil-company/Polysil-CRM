@@ -36,6 +36,11 @@ function grant(
 }
 
 const SCHEMES_VIEW = grant("schemes", ["view"], "global");
+/** Everyone reads the catalogue and the prices of their tier; Admin alone edits (RBAC.md §6). */
+const CATALOGUE_VIEW = [
+  grant("products", ["view"], "global"),
+  grant("pricing", ["view"], "global"),
+];
 
 function fieldStaff(scope: Scope): MockModulePermission[] {
   return [
@@ -47,6 +52,7 @@ function fieldStaff(scope: Scope): MockModulePermission[] {
     grant("tasks", ["view", "create", "edit"], scope),
     grant("partners", ["view"], scope),
     SCHEMES_VIEW,
+    ...CATALOGUE_VIEW,
   ];
 }
 
@@ -76,6 +82,7 @@ function channelPartner(): MockModulePermission[] {
     grant("complaints", ["view", "create"], "partner_subtree"),
     grant("marketing", ["view"], "global"),
     SCHEMES_VIEW,
+    ...CATALOGUE_VIEW,
   ];
 }
 
@@ -104,6 +111,7 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
         // Accounts follows subsidy applications without changing them (handover).
         grant("subsidy", ["view"], "global"),
         SCHEMES_VIEW,
+        ...CATALOGUE_VIEW,
       ];
     case "dispatch_manager":
       return [
@@ -111,9 +119,14 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
         grant("dispatch", ["view", "create", "edit", "approve"], "global"),
         grant("sales_orders", ["view", "approve"], "global"),
         SCHEMES_VIEW,
+        ...CATALOGUE_VIEW,
       ];
     case "qa_manager":
-      return [grant("complaints", ["view", "edit", "approve"], "global"), SCHEMES_VIEW];
+      return [
+        grant("complaints", ["view", "edit", "approve"], "global"),
+        SCHEMES_VIEW,
+        ...CATALOGUE_VIEW,
+      ];
     case "distributor":
     case "dealer":
     case "sub_dealer":
