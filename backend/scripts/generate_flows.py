@@ -400,8 +400,9 @@ def f_lead() -> None:
                "wrong code -> count the attempt, burn at five, 422 invalid_code", RED),
         ("p5", "code matched -> claim = the intake account, enter app_role\n"
                "same mobile already enquired today -> 200 created:false, same number", BLUE),
-        ("p6", "create_lead(intake=True): the territory's unit and auto-owner,\n"
-               "or unassigned; a QR code's dealer becomes the assigned partner", GREEN),
+        ("p6", "create_lead(intake=True): the territory's unit and auto-owner\n"
+               "(covering officer, else the least-loaded one inside a district-only\n"
+               "lead's district, 056); a QR code's dealer becomes the assigned partner", GREEN),
         ("p7", "LEAD + lead.created event + acknowledgement on the outbox\n"
                "returns {inquiry_no, created} and nothing else", GREEN),
     ]
@@ -1591,6 +1592,8 @@ def f_bell_and_messages() -> None:
                "created_at strictly increasing; the sender's own mark", VIOLET),
         ("m4", "POST /read {up_to}: up to what the screen showed\n"
                "unread = their messages after my mark", GREEN),
+        ("m5", "GROUPS (FS-048): POST /conversations/groups\n"
+               "up to 50; any member adds; the manager renames, removes", BLUE),
     ]
     prev = None
     for i, (eid, lbl, colour) in enumerate(side):
@@ -1618,9 +1621,16 @@ def f_bell_and_messages() -> None:
               "A message committing while the reader marks read would\n"
               "otherwise be counted read unseen. No UPDATE grant on\n"
               "conversation: one side cannot reset the other's mark.", w=420, colour=RED)
-    e += note("nYellow1", 1240, 780,
-              "Not yet: push, groups, attachments, a bell for a new\n"
-              "message, retention (GAP-160 to GAP-168).", w=420, colour=YELLOW)
+    e += note("nRed4", 1240, 780,
+              "GROUP POLICIES MUST NOT READ EACH OTHER\n\n"
+              "conversation_sel reads conversation_member; the member\n"
+              "policy reads own rows only, or Postgres raises infinite\n"
+              "recursion. A leave racing a send: the stamp re-checks\n"
+              "membership after the conversation's lock.", w=420, colour=RED)
+    e += note("nYellow1", 1240, 1040,
+              "Not yet: push, attachments, a bell for a new message,\n"
+              "retention (GAP-160 to GAP-168). Group rules are ours\n"
+              "(GAP-287 to GAP-289).", w=420, colour=YELLOW)
     write("16-bell-and-messages", e)
 
 
@@ -1703,7 +1713,7 @@ def f_complaints() -> None:
               "order would deadlock QC against Dispatch (delta B-8).", w=420, colour=RED)
     e += note("nYellow2", 1240, 1300,
               "Stand-ins: refund limits 25,000 / 1,00,000 / any;\n"
-              "Dispatch alone approves a replacement; QC chooses;\n"
+              "a replacement: State, Regional, MD, then Dispatch\n(a setting, FS-049); QC chooses;\n"
               "closing is automatic (GAP-179 to GAP-187).", w=420, colour=YELLOW)
     e += note("nRed5", 1240, 1500,
               "A RUN OF HOLIDAYS MUST END THE SCAN (FS-028, 048)\n\n"
@@ -2234,7 +2244,7 @@ def f_consumer_portal() -> None:
          ("d2", "a staff or dealer user on a farmer's number\nreleases the consumer account", GREY),
          ("d3", "PATCH /portal/me: consent, channel portal", GREY)],
         [("n1", "THE CONSUMER FLOOR\n\nOne restrictive policy on every RLS table.\n\"Not a partner\" is not staff: before it, a\nconsumer read about 50 tables. A new RLS table\nadds consumer_floor.policy_sql(t).", RED),
-         ("n2", "SWITCHING ON COSTS MONEY\n\nEvery customer number can be sent a paid\nWhatsApp code; no overall ceiling (GAP-269).", RED),
+         ("n2", "SWITCHING ON COSTS MONEY\n\nEvery customer number can be sent a paid\nWhatsApp code. At most portal_otp_hourly_cap\n(100) an hour to customers (FS-047, GAP-285);\nnobody is told when it is reached (GAP-286).", RED),
          ("n3", "Not yet: complaints, ratings, products from the\nportal (GAP-265, question 10.3).", YELLOW)])
 
 
@@ -2308,6 +2318,44 @@ def f_ratings() -> None:
          ("n3", "Left out of payment days: orders owing nothing,\nclosed-short orders, unpaid orders younger than the\nfirst band. Never below 0 days.", RED),
          ("n4", "Ours: 1-5 stars, never edited, the formula and bands,\nscore-only for dealers (GAP-372 to GAP-377).", YELLOW)])
 
+def f_subsidised_orders() -> None:
+    _columns(
+        "64-subsidised-orders", "Subsidised orders: typed in, the subsidy entered by hand",
+        "A subsidy sale entered without a quotation, for one farmer's lead or several.",
+        "BUILT. FS-054: migration 067, POST /orders (subsidy), PUT /orders/{id}/subsidy.",
+        [("s1", "staff: POST /orders, type subsidised\nlines from the price list + subsidy block", GREY),
+         ("s2", "subsidy.lead_ids: 1 to 50, repeats dropped\nthe FIRST lead is the order's lead and routes it", BLUE),
+         ("s3", "amounts typed in: material (null = the total),\nsubsidy, farmer payable (null = material - subsidy)", BLUE),
+         ("s4", "the service checks leads and caps, names the field;\nthen order_subsidy_set() re-checks under the row lock", GREEN),
+         ("s5", "documents: POST /documents on the order\nquotation copy, payment slip (FS-050)", GREY),
+         ("s6", "submit: block exists, caps against the total NOW,\nevery named lead still open; chain on the total", GREEN)],
+        [("d1", "PUT /orders/{id}/subsidy while draft\n(also after an amend); first lead fixed", YELLOW),
+         ("d2", "type fixed both ways: PATCH to or from\nsubsidised is 422 order_type_fixed", GREEN),
+         ("d3", "order_submit's dealer gate names subsidised\n(second enforcer, 045 swapped live)", VIOLET)],
+        [("n1", "NULL MEANS THE TOTAL\n\nmaterial_amount left out is stored null and read as the\norder total at the time. A lines edit moves it. The read\nreturns the resolved number plus material_is_total.", RED),
+         ("n2", "LEADS AFTER THE FIRST SEE LITTLE\n\nThey get order.subsidy_set, shown only to a reader who\nsees the order. Submit, approval and dispatch events go\nto the first lead (GAP-452).", RED),
+         ("n3", "THE FARMER SEES THE FULL TOTAL\n\nThe approval WhatsApp and payments use the order total,\nnot the farmer payable (GAP-450, GAP-451).", RED),
+         ("n4", "Ours: chain on the total, caps at the material, any\ninquiry type may be named (GAP-299).", YELLOW)])
+
+
+def f_warranty() -> None:
+    _columns(
+        "57-warranty", "Warranty: a period per category, a warranty per dispatch",
+        "Shown on the order and on each complaint line; never enforced.",
+        "BUILT. FS-046: /warranty-terms, /orders/{id}/warranty, migration 053.",
+        [("s1", "admin: POST /warranty-terms\ncategory or default, months 0-120, from tomorrow", YELLOW),
+         ("s2", "a dispatch: start = DC date, else the IST dispatch day\nmonths = the term in force that day", BLUE),
+         ("s3", "end = start + months - 1 day\n(a clamped month end is the end)", GREEN),
+         ("s4", "GET /orders/{id}/warranty: each line's dispatches,\nits status, the complaints on the product", VIOLET),
+         ("s5", "GET /complaints/{id}: lines[].warranty on the day raised\ncomplaint_warranty() definer", VIOLET)],
+        [("d1", "voided dispatch: no warranty", GREY),
+         ("d2", "0 months: none; no term on the day: unknown", GREY),
+         ("d3", "replacement order: a new period,\nnames the complaint it replaces (GAP-279)", YELLOW)],
+        [("n1", "THE SQL END DATE IS AUTHORITATIVE\n\n(start - 1) + n loses 29 Feb in leap years.\nA test holds Python equal over 2020 to 2040.", RED),
+         ("n2", "THE QC MANAGER CANNOT READ THE ORDER\n\nThe complaint side is a definer gated on\ncomplaint_visible(), so everyone sees one answer.", RED),
+         ("n3", "Ours: 12 months everywhere, per dispatch,\nshown not enforced (GAP-275 to GAP-283).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2319,5 +2367,6 @@ if __name__ == "__main__":
     f_subsidy_follow_ups(); f_lead_small_gaps()
     f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
-    f_export_sample_orders(); f_ratings()
+    f_export_sample_orders(); f_ratings(); f_warranty()
+    f_subsidised_orders()
     print(f"\nwrote to {OUT}")

@@ -59,7 +59,14 @@ from api.services import approval_view, people, pricing
 from api.services import payments as payments_service
 from api.services import stock as stock_service
 from api.services.clock import IST, today_ist
-from api.services.leads import _capped_total, _decode_cursor, _encode_cursor, _route
+from api.services.leads import (
+    _capped_total,
+    _decode_cursor,
+    _encode_cursor,
+    _id_list,
+    _route,
+    _under,
+)
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
 from api.services.quotations import _STORAGE_DOWN
 from api.storage import Storage
@@ -613,8 +620,10 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
     from api.services import schemes as scheme_service  # schemes imports this module
     totals = _totals(r)
     benefits, payable = await scheme_service.order_benefits(db, order_id, Decimal(totals.total))
+    subsidy, subsidy_warnings = (await _subsidy_block(db, order_id, Decimal(totals.total))
+                                 if r.type_text == domain.SUBSIDISED else (None, []))
     return sch.Order(
-        benefits=benefits, payable=payable,
+        benefits=benefits, payable=payable, subsidy=subsidy,
         id=str(r.id), order_no=r.order_no, complaint=complaint, status=r.status_text,
         order_type=r.type_text,
         party=sch.OrderParty(name=r.party_name, mobile=r.party_mobile, address=r.party_address,
@@ -635,7 +644,8 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         price_effective_date=r.price_effective_date.isoformat(),
         tax_date=_iso(r.tax_date), is_provisional=r.is_provisional, lines=lines,
         totals=totals, approval=approval, last_rejection=last_rejection,
-        dispatches=await _dispatches(db, order_id, portal), warnings=_warnings(r, lines),
+        dispatches=await _dispatches(db, order_id, portal),
+        warnings=_warnings(r, lines) + subsidy_warnings,
         pdf_state=("pending" if r.pdf_state == "rendering" else r.pdf_state or "none"),
         pdf_error=None if portal else r.pdf_error,
         confirmation=(await db.execute(text(
@@ -669,9 +679,17 @@ def _order_filters(caller: Caller, *, status: str | None = None,
                    order_type: str | None = None, partner_id: str | None = None,
                    lead_id: str | None = None, owner: str | None = None, q: str | None = None,
                    created_from: str | None = None, created_to: str | None = None,
-                   quotation_id: str | None = None, waiting_on: str | None = None) -> list[Any]:
+                   quotation_id: str | None = None, waiting_on: str | None = None,
+                   territory_id: str | None = None,
+                   owner_org_unit_id: str | None = None) -> list[Any]:
     """The scope and every filter of the order list, shared with the counts."""
     where: list[Any] = [scope_predicate(_ORDERS, caller, order_t)]
+    # FS-052, client sheet item 2: as the lead list, a state selects everything under it
+    if territory_id:
+        where.append(order_t.c.territory_id.in_(
+            _under("territory_closure", *_id_list(territory_id, "territory_id"))))
+    if owner_org_unit_id:
+        where.append(order_t.c.owner_org_unit_id.in_(_under("org_closure", owner_org_unit_id)))
     if status:
         # a comma list, like the lead list's stage: "open" is several statuses
         wanted = [x.strip() for x in status.split(",") if x.strip()]
@@ -770,12 +788,14 @@ async def list_orders(db: AsyncSession, caller: Caller, *, status: str | None = 
                       limit: int = 25, cursor: str | None = None,
                       include_total: bool = False,
                       quotation_id: str | None = None,
-                      waiting_on: str | None = None) -> sch.OrderPage:
+                      waiting_on: str | None = None, territory_id: str | None = None,
+                      owner_org_unit_id: str | None = None) -> sch.OrderPage:
     limit = max(1, min(limit, _MAX_LIMIT))
     where = _order_filters(caller, status=status, order_type=order_type,
                            partner_id=partner_id, lead_id=lead_id, owner=owner, q=q,
                            created_from=created_from, created_to=created_to,
-                           quotation_id=quotation_id, waiting_on=waiting_on)
+                           quotation_id=quotation_id, waiting_on=waiting_on,
+                           territory_id=territory_id, owner_org_unit_id=owner_org_unit_id)
     filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)
@@ -1005,10 +1025,129 @@ def _repriced(source: list[Any], ctx: PricedContext) -> list[str]:
     return out
 
 
+# ── FS-054: the subsidy block ────────────────────────────────────────────────
+
+_LEAD_IDS = "subsidy.lead_ids"
+
+
+def _subsidy_leads(block: sch.SubsidyBlockIn) -> list[str]:
+    return list(dict.fromkeys(block.lead_ids))   # EC-5: repeats dropped, order kept
+
+
+async def _check_subsidy_leads(db: AsyncSession, ids: list[str]) -> None:
+    """Rule 3 and 5b: each lead seen by the caller (RLS), orderable and not merged. The
+    definer checks again; this names the lead in `fields`."""
+    rows = {str(r.id): r for r in (await db.execute(text(
+        "SELECT id, stage::text AS stage, merged_into_id FROM lead "
+        "WHERE id = ANY(CAST(:ids AS uuid[])) AND deleted_at IS NULL"), {"ids": ids})).all()}
+    for i in ids:
+        r = rows.get(i)
+        if r is None:
+            raise ValidationFailed("You cannot see that lead.", code="lead_not_visible",
+                                   fields={_LEAD_IDS: i})
+        if r.stage not in domain.LEAD_STAGES_ORDERABLE or r.merged_into_id:
+            raise ValidationFailed(f"A named lead is {r.stage}.", code="lead_not_open",
+                                   fields={_LEAD_IDS: i})
+
+
+def _check_subsidy_amounts(material: Decimal | None, subsidy: Decimal, payable: Decimal | None,
+                           total: Decimal) -> None:
+    """Rule 4, against the material given or the order total now (rule 3a)."""
+    resolved = total if material is None else material
+    if subsidy > resolved:
+        raise ValidationFailed("The subsidy is more than the material amount.",
+                               code="subsidy_above_material",
+                               fields={"subsidy.subsidy_amount": str(subsidy)})
+    if payable is not None and payable > resolved:
+        raise ValidationFailed("The farmer payable is more than the material amount.",
+                               code="payable_above_material",
+                               fields={"subsidy.farmer_payable": str(payable)})
+
+
+async def _write_subsidy(db: AsyncSession, order_id: str, block: sch.SubsidyBlockIn,
+                         ids: list[str]) -> None:
+    await _call(db, "SELECT order_subsidy_set(CAST(:o AS uuid), :m, :s, :p, CAST(:l AS uuid[]))",
+                {"o": order_id, "m": block.material_amount, "s": block.subsidy_amount,
+                 "p": block.farmer_payable, "l": ids})
+
+
+def _check_subsidy_shape(body: sch.OrderCreate) -> None:
+    if body.order_type != domain.SUBSIDISED:
+        if body.subsidy is not None:
+            raise ValidationFailed("Only a subsidised order takes a subsidy.",
+                                   code="subsidy_not_allowed", fields={"subsidy": "not allowed"})
+        return
+    if body.subsidy is None:
+        raise ValidationFailed("A subsidised order needs its subsidy and leads.",
+                               code="subsidy_missing", fields={"subsidy": "required"})
+    if body.quotation_ids:
+        raise ValidationFailed("A subsidised order is typed in, not made from quotations.",
+                               code="subsidised_from_quotation",
+                               fields={"quotation_ids": "not on a subsidised order"})
+    if body.lead_id is not None:
+        raise ValidationFailed("A subsidised order takes its leads from subsidy.lead_ids.",
+                               code="lead_from_subsidy", fields={"lead_id": "use subsidy.lead_ids"})
+
+
+async def set_subsidy(db: AsyncSession, caller: Caller, order_id: str,
+                      body: sch.SubsidyBlockIn) -> sch.Order:
+    """FS-054 rule 5: replace a draft's subsidy block; the first lead stays."""
+    row = await _lock(db, order_id)
+    _must_be_draft(row)
+    if row.order_type != domain.SUBSIDISED:
+        raise ValidationFailed("Only a subsidised order takes a subsidy.",
+                               code="order_type_not_subsidised",
+                               fields={"order_type": row.order_type})
+    _check_staff(caller, row.order_type)
+    ids = _subsidy_leads(body)
+    if row.lead_id is None or ids[0] != str(row.lead_id):
+        raise ValidationFailed("The first lead routes the order and cannot change.",
+                               code="first_lead_fixed",
+                               fields={_LEAD_IDS: str(row.lead_id) if row.lead_id else "none"})
+    await _check_subsidy_leads(db, ids)
+    _check_subsidy_amounts(body.material_amount, body.subsidy_amount, body.farmer_payable,
+                           Decimal(row.total))
+    await _write_subsidy(db, order_id, body, ids)
+    return await get_order(db, caller, order_id)
+
+
+async def _subsidy_block(db: AsyncSession, order_id: str,
+                         total: Decimal) -> tuple[sch.SubsidyBlock | None, list[str]]:
+    """The block with the defaults resolved (rule 3a), and its warnings (rule 4, EC-2)."""
+    b = (await db.execute(text(
+        "SELECT material_amount, subsidy_amount, farmer_payable FROM order_subsidy "
+        "WHERE sales_order_id = CAST(:o AS uuid)"), {"o": order_id})).one_or_none()
+    if b is None:
+        return None, []
+    links = (await db.execute(text(
+        "SELECT sl.lead_id, l.inquiry_no::text AS inquiry_no FROM order_subsidy_lead sl "
+        "LEFT JOIN lead l ON l.id = sl.lead_id "
+        "WHERE sl.sales_order_id = CAST(:o AS uuid) ORDER BY sl.position"), {"o": order_id})).all()
+    material = total if b.material_amount is None else Decimal(b.material_amount)
+    subsidy = Decimal(b.subsidy_amount)
+    derived = material - subsidy
+    payable = derived if b.farmer_payable is None else Decimal(b.farmer_payable)
+    warnings = []
+    if subsidy > material:
+        warnings.append("subsidy_above_material")
+    if b.farmer_payable is not None and payable != derived:
+        warnings.append("farmer_payable_not_material_less_subsidy")   # GAP-451
+    return sch.SubsidyBlock(
+        material_amount=_money(material), subsidy_amount=_money(subsidy),
+        farmer_payable=_money(payable), material_is_total=b.material_amount is None,
+        farmer_payable_is_derived=b.farmer_payable is None,
+        leads=[sch.SubsidyLeadRef(id=str(r.lead_id), inquiry_no=r.inquiry_no) for r in links],
+    ), warnings
+
+
 async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
                        settings: Settings) -> sch.Order:
     _check_type(body.order_type)
     _check_staff(caller, body.order_type)
+    _check_subsidy_shape(body)
+    subsidy_ids = _subsidy_leads(body.subsidy) if body.subsidy is not None else []
+    if subsidy_ids:
+        await _check_subsidy_leads(db, subsidy_ids)
     if body.quotation_ids and body.lines:
         raise ValidationFailed("Order from quotations or type lines in, not both.",
                                fields={"lines": "not with quotation_ids"})
@@ -1043,14 +1182,16 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
         if body.party is None:
             raise ValidationFailed("A direct order needs its party.", fields={"party": "required"})
         lead = None
-        if body.lead_id:
+        # FS-054 rule 6: a subsidised order's first named lead is its lead and routes it
+        lead_ref = subsidy_ids[0] if subsidy_ids else body.lead_id
+        if lead_ref:
             lead = (await db.execute(text(
                 "SELECT id, stage::text AS stage, territory_id, merged_into_id, owner_user_id "
                 "FROM lead WHERE id = CAST(:l AS uuid) AND deleted_at IS NULL"),
-                {"l": body.lead_id})).one_or_none()
+                {"l": lead_ref})).one_or_none()
             if lead is None:
                 raise ValidationFailed("You cannot see that lead.", code="lead_not_visible",
-                                       fields={"lead_id": body.lead_id})
+                                       fields={"lead_id": lead_ref})
             if lead.stage not in domain.LEAD_STAGES_ORDERABLE or lead.merged_into_id:
                 raise ValidationFailed(f"The lead is {lead.stage}.", code="lead_not_open",
                                        fields={"lead_stage": lead.stage})
@@ -1071,7 +1212,7 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
             owner = str(lead.owner_user_id)
         partner = (body.partner_id if body.partner_given else
                    (caller.partner_id if _is_portal(caller) else None))
-        lead_id = body.lead_id
+        lead_id = lead_ref
         party = _party_values(body.party)
         ctx = await _price(db, partner_id=partner, pos=pos, seller=body.seller_gstin_id,
                            as_of=body.price_effective_date,
@@ -1082,6 +1223,9 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
         _compare_preview(body.lines, ctx)
     await _check_sample(db, body.order_type, ctx)
     await _check_lut(db, mode.treatment, ctx.seller_gstin_id)
+    if body.subsidy is not None:
+        _check_subsidy_amounts(body.subsidy.material_amount, body.subsidy.subsidy_amount,
+                               body.subsidy.farmer_payable, ctx.document.totals.total)
     try:
         order_id = str((await db.execute(text("""
             INSERT INTO sales_order (order_type, lead_id, partner_id, party_name, party_mobile,
@@ -1108,6 +1252,9 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
         raise map_db_error(exc) from exc
     await _write_lines(db, order_id, ctx, snaps, sources)
     await _write_figures(db, order_id, ctx, caller)
+    if body.subsidy is not None:
+        # after the figures: a null material is capped against the stored total (S-1)
+        await _write_subsidy(db, order_id, body.subsidy, subsidy_ids)
     if body.quotation_ids:
         await _call(db, "SELECT order_quotations_claim(CAST(:o AS uuid), CAST(:ids AS uuid[]))",
                     {"o": order_id, "ids": list(dict.fromkeys(body.quotation_ids))})
@@ -1133,8 +1280,9 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
     _check_staff(caller, new_type)
     mode = _row_mode(row)
     if new_type != row.order_type:
-        # FS-042 rule 18: an amended order, or one made from quotations, keeps its type
-        if row.amend_count > 0 or linked:
+        # FS-042 rule 18: an amended order, or one made from quotations, keeps its type;
+        # FS-054 rule 5a: so does a subsidised one, either way
+        if row.amend_count > 0 or linked or domain.SUBSIDISED in (new_type, row.order_type):
             raise ValidationFailed("This order's type is fixed.", code="order_type_fixed",
                                    fields={"order_type": row.order_type})
         mode = await _new_mode(db, new_type)
@@ -1268,6 +1416,19 @@ async def submit_order(db: AsyncSession, caller: Caller, order_id: str,
     if ctx.document.totals.total <= 0 and row.sample_pricing != "free":
         raise ValidationFailed("An order worth nothing cannot be approved.", code="zero_total",
                                fields={"total": "0.00"})
+    if row.order_type == domain.SUBSIDISED:
+        # FS-054 rule 5b: the block, its caps against the total now, every named lead
+        block = (await db.execute(text(
+            "SELECT material_amount, subsidy_amount, farmer_payable FROM order_subsidy "
+            "WHERE sales_order_id = CAST(:o AS uuid)"), {"o": order_id})).one_or_none()
+        if block is None:
+            raise ValidationFailed("A subsidised order needs its subsidy.", code="subsidy_missing",
+                                   fields={"subsidy": "required"})
+        _check_subsidy_amounts(block.material_amount, block.subsidy_amount, block.farmer_payable,
+                               ctx.document.totals.total)
+        await _check_subsidy_leads(db, [str(i) for i in (await db.execute(text(
+            "SELECT lead_id FROM order_subsidy_lead WHERE sales_order_id = CAST(:o AS uuid) "
+            "ORDER BY position"), {"o": order_id})).scalars()])
     if row.lead_id:
         # read without a lock: a lead lost at this moment is a race the submit
         # accepts, because people still review the order (FS-011 4)

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require, require_any
+from api.errors import ForbiddenError
 from api.idempotency import payload_digest, run_idempotent
 from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
@@ -36,6 +37,7 @@ from api.schemas.orders import (
     QueuePage,
     RemarkRequest,
     SubmitRequest,
+    SubsidyBlockIn,
     Threshold,
     ThresholdPut,
 )
@@ -111,8 +113,12 @@ async def create_order(body: OrderCreate, db: DbSession, caller: CallerDep, clai
     lead must be qualified or later (`422 lead_not_open`). Pass the preview's
     `price_list_item_id` and `gst_rate_id`; `409 rate_changed` if either moved.
 
-    Only `commercial` and `industrial` are built (`422 order_type_unsupported`). The
-    draft has no number until it is submitted.
+    **Subsidised (FS-054):** staff only, typed in, with `subsidy`: the leads (the first
+    is the order's lead and routes it; `lead_id` is refused) and the amounts typed in.
+    Attach the quotation copy and the payment slip with `POST /documents`.
+
+    `marketing_material` and `replacement` are refused (`422 order_type_unsupported`).
+    The draft has no number until it is submitted.
     """
     async def work() -> tuple[int, dict[str, Any]]:
         return 201, _order(await service.create_order(db, caller, body, get_settings()))
@@ -144,6 +150,14 @@ async def list_orders(
     cursor: Cursor = None,
     include_total: Annotated[bool, Query(description="Also count, up to 1,000.")] = False,
     waiting_on: WaitingOn = None,
+    territory_id: Annotated[str | None, Query(
+        max_length=800,
+        description="Orders in these territories or anywhere under them, up to 20 ids "
+                    "comma-separated: a state selects its districts and talukas.")] = None,
+    owner_org_unit_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Orders owned by this office or any office under it (the hierarchy "
+                    "filter).")] = None,
 ) -> OrderPage:
     """The orders in your scope, newest first, keyset-paged. Each row carries how much
     has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)."""
@@ -151,7 +165,7 @@ async def list_orders(
         db, caller, status=status_, order_type=order_type, partner_id=partner_id,
         lead_id=lead_id, owner=owner, q=q, created_from=created_from, created_to=created_to,
         limit=limit, cursor=cursor, include_total=include_total, quotation_id=quotation_id,
-        waiting_on=waiting_on)
+        waiting_on=waiting_on, territory_id=territory_id, owner_org_unit_id=owner_org_unit_id)
 
 
 @router.get("/stats", response_model=OrderStats, responses=_ERRORS,
@@ -168,13 +182,21 @@ async def order_stats(
     created_from: Annotated[str | None, Query(alias="from", description="ISO date, IST.")] = None,
     created_to: ToDate = None,
     waiting_on: WaitingOn = None,
+    territory_id: Annotated[str | None, Query(
+        max_length=800,
+        description="Orders in these territories or anywhere under them, up to 20 ids "
+                    "comma-separated: a state selects its districts and talukas.")] = None,
+    owner_org_unit_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Orders owned by this office or any office under it (the hierarchy "
+                    "filter).")] = None,
 ) -> OrderStats:
     """Counts for the order board and the dashboard tiles: every status, and the
     submitted orders by whose approval is next. Same scope and filters as the list."""
     return await service.order_stats(
         db, caller, status=status_, order_type=order_type, partner_id=partner_id,
         lead_id=lead_id, owner=owner, created_from=created_from, created_to=created_to,
-        waiting_on=waiting_on)
+        waiting_on=waiting_on, territory_id=territory_id, owner_org_unit_id=owner_org_unit_id)
 
 
 @router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
@@ -250,6 +272,20 @@ async def replace_lines(order_id: Id, body: OrderLinesReplace, db: DbSession,
         return 200, _order(await service.replace_lines(db, caller, order_id, body,
                                                        get_settings()))
     return await _idem(db, claims, idem, f"PUT /api/v1/orders/{order_id}/lines", body, work)
+
+
+@router.put("/{order_id}/subsidy", response_model=Envelope[Order], responses=_MUTATION_ERRORS,
+            dependencies=[Depends(require("sales_orders", "edit"))])
+async def set_subsidy(order_id: Id, body: SubsidyBlockIn, db: DbSession,
+                      caller: CallerDep, claims: Claims, idem: IdemKey) -> Response:
+    """Replace a subsidised draft's subsidy block (FS-054), including a draft reopened
+    by an amend. The first lead cannot change (`422 first_lead_fixed`); the others may.
+    `409 order_not_draft` once submitted, `422 order_type_not_subsidised` on any other
+    type, `422 subsidy_above_material` or `payable_above_material` against the material
+    given or the order total."""
+    async def work() -> tuple[int, dict[str, Any]]:
+        return 200, _order(await service.set_subsidy(db, caller, order_id, body))
+    return await _idem(db, claims, idem, f"PUT /api/v1/orders/{order_id}/subsidy", body, work)
 
 
 @router.post("/{order_id}/submit", response_model=Envelope[Order], responses=_MUTATION_ERRORS,
@@ -421,7 +457,12 @@ async def pending(db: DbSession, caller: CallerDep,
 @approvals.get("/thresholds", response_model=Envelope[list[Threshold]], responses=_ERRORS)
 async def get_thresholds(db: DbSession, caller: CallerDep) -> dict[str, Any]:
     """The approval limits per manager role (and per territory where set), including
-    GST. The highest role with a row has no limit in effect."""
+    GST. The highest role with a row has no limit in effect. Staff only: a dealer or
+    a consumer gets `403`."""
+    if caller.user_type != "staff":
+        # the rows were already hidden from a dealer; an empty 200 read as "none set"
+        # on a screen he should never reach (walk F-8)
+        raise ForbiddenError("Approval limits are for staff.")
     return {"data": [t.model_dump(mode="json") for t in await approval_service.thresholds(db)]}
 
 

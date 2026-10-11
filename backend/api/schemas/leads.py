@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
-InquiryType = Literal["commercial", "subsidised", "industrial"]
+InquiryType = Literal["commercial", "subsidised", "industrial", "dealership"]
 Stage = Literal["new", "contacted", "qualified", "quoted", "negotiation",
                 "won", "lost", "merged", "dormant"]
 Priority = Literal["hot", "warm", "cold"]
@@ -35,8 +35,13 @@ CropCodes = Annotated[list[str], Field(max_length=MAX_CROPS,
     description="Crop codes from GET /lookups/crops, at most 10. [] for none."),
     AfterValidator(_crop_codes)]
 Acres = Annotated[Decimal, Field(gt=0, le=Decimal("99999.99"), decimal_places=2,
-    description="Land in acres, a decimal string with at most two decimals.",
+    description="Land in acres, a decimal string with at most two decimals. Converted to "
+                "hectares; send land_hectares instead where you can.",
     examples=["4.50"])]
+# FS-052: the client works in hectares; acres stay accepted and returned
+Hectares = Annotated[Decimal, Field(gt=0, le=Decimal("40468.56"), decimal_places=2,
+    description="Land in hectares, a decimal string with at most two decimals.",
+    examples=["1.82"])]
 
 # Every id the client sends is validated to this shape, so a malformed id is a
 # 422 with the envelope rather than a driver error and a 500 (cross-vendor P2).
@@ -73,7 +78,9 @@ class LeadCreate(BaseModel):
     note: Annotated[str | None, Field(default=None, max_length=2000,
         description="Optional. Becomes the first entry on the lead's timeline.")]
     crops: CropCodes = Field(default_factory=list)
-    land_acres: Acres | None = None
+    land_hectares: Hectares | None = None
+    land_acres: Acres | None = Field(default=None,
+                                     description="Instead of land_hectares, not with it.")
     campaign_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
         description="Optional. An active campaign from GET /campaigns?active=true. "
         "Staff only. A lead from a QR code with a campaign gets it on its own.")]
@@ -128,6 +135,14 @@ class DuplicateRef(BaseModel):
     state: Literal["pending", "merged", "dismissed"]
 
 
+class DealerApplicationStarted(BaseModel):
+    id: str | None = Field(description="Null when none was started; see `not_started`.")
+    apply_url: str | None = Field(description="The link to send the applicant. Shown only here.")
+    not_started: str | None = Field(
+        description="mobile_in_use, application_open or mobile_invalid: why winning started "
+                    "no application.")
+
+
 class Lead(BaseModel):
     """Every key is always present; null means 'not set', never 'hidden'."""
 
@@ -149,7 +164,11 @@ class Lead(BaseModel):
     priority: Priority | None
     estimated_value: str | None
     crops: list[CropRef] = Field(description="In the order they were sent. [] for none.")
-    land_acres: str | None = Field(description="Land in acres, a decimal string.")
+    land_hectares: str | None = Field(default=None,
+                                      description="Land in hectares, a decimal string.")
+    land_acres: str | None = Field(description="The same land in acres, from the hectares.")
+    state_name: str | None = Field(default=None,
+                                   description="The state above the lead's territory.")
     lost_reason: ReasonRef | None
     lost_note: str | None
     reopen_count: int
@@ -163,6 +182,10 @@ class Lead(BaseModel):
         default=None, description="Its name. Null for a dealer, who does not read campaigns.")
     customer_id: str | None = Field(
         default=None, description="The customer (FS-041), set when the lead reached qualified.")
+    dealer_application: DealerApplicationStarted | None = Field(
+        default=None, description="Only on the response that wins a dealership lead (FS-053): "
+                                  "the dealer application it started and its link, shown once, "
+                                  "or why none was started.")
     first_contacted_at: str | None
     last_activity_at: str
     created_at: str
@@ -317,7 +340,14 @@ class TimelineEvent(BaseModel):
     kind: str = Field(description="e.g. lead.created, lead.stage_changed, lead.note_added.")
     occurred_at: str
     actor: UserRef | None = Field(default=None, description="Who caused the event, if known.")
-    payload: dict[str, object] = Field(default_factory=dict)
+    payload: dict[str, object] = Field(
+        default_factory=dict,
+        description="The event's own detail. Added at read time: `lead.merged` carries "
+                    "`loser_inquiry_no` and `survivor_inquiry_no`; each of "
+                    "`lead.duplicate_flagged`'s `matches` carries `inquiry_no`; "
+                    "`lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. "
+                    "A number is null when you cannot see that lead. For a channel partner, "
+                    "staff notes, the lost reason and duplicate handling are left out.")
 
 
 class TimelinePage(BaseModel):
@@ -368,7 +398,9 @@ class LeadPatch(BaseModel):
     crops: Annotated[CropCodes | None, Field(default=None,
         description="Replaces the list. [] clears it; null is refused. A switched-off crop "
         "already on the lead may be sent again.")]
-    land_acres: Acres | None = Field(default=None, description="null clears it.")
+    land_hectares: Hectares | None = Field(default=None, description="null clears it.")
+    land_acres: Acres | None = Field(default=None, description="Instead of land_hectares, not with "
+                                                             "it; null clears it.")
     campaign_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
         description="An active campaign; null clears it. The campaign already on the lead "
         "may be re-sent even if it has been switched off.")]

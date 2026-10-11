@@ -257,3 +257,29 @@ def test_a_render_tick_stops_at_its_budget_and_never_overlaps(
     assert overlapped == 0, "a tick that finds one running does nothing"
     assert 1 <= handled <= 4, handled
     assert asyncio.run(job.quotation_render_due({"storage": object()})) >= 1, "the guard resets"
+
+
+def test_line_amounts_carry_the_rupee_sign_and_the_mobile_is_grouped() -> None:
+    """Walk F-15: only the grand total had a rupee sign, and the mobile printed as
+    +919876543210."""
+    doc = _doc()
+    flat = _text(render_html(doc))
+    line = doc["lines"][0]
+    for key in ("rate", "gross", "taxable", "total"):
+        assert "₹" + _money(line[key]) in flat, key
+    assert "+91 98765 43210" in flat and "+919876543210" not in flat
+
+
+def test_the_logo_is_embedded_and_needs_no_file_access() -> None:
+    """Client item 5: the logo prints on the page; a data URI, so the renderer
+    reads nothing from disk."""
+    html = render_html(_doc())
+    assert '<img class="logo" src="data:image/png;base64,' in html
+
+
+@pytest.mark.parametrize(("raw", "shown"), [
+    ("+919876543210", "+91 98765 43210"), ("919876543210", "+91 98765 43210"),
+    ("+14155550100", "+14155550100"), ("", ""), (None, "")])
+def test_the_mobile_filter(raw: str | None, shown: str) -> None:
+    from worker.jobs.quotations import _mobile
+    assert _mobile(raw) == shown

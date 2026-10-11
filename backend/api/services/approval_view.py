@@ -38,12 +38,22 @@ async def load(db: AsyncSession, doc_type: str, entity_id: str, portal: bool,
         "WHERE s.request_id = CAST(:r AS uuid) ORDER BY s.seq"), {"r": str(req.id)})).all()
     names = (people.Names() if portal
              else await people.resolve(db, steps, [("approver_user_id", "full_name")]))
+    # walk 10 Oct F-11: the step waiting now, when its own role has nobody to decide
+    # it, is with a higher manager; the order page said "Waiting on District Manager"
+    # for eight days while the State Manager had it in her inbox
+    waiting = next((s for s in steps if s.decision is None), None)
+    stalled_id = None
+    if waiting is not None and req.status == "pending" and not portal and (await db.execute(
+            text("SELECT approval_waiting_stalled(CAST(:r AS uuid))"),
+            {"r": str(req.id)})).scalar_one():
+        stalled_id = waiting.id
     out = []
     for s in steps:
         out.append(ApprovalStep(
             id=str(s.id), seq=s.seq, role=s.role,
             decided_role=s.decided_role if s.decided_role and s.decided_role != s.role else None,
             decision=s.decision, by=None if portal else names.user(s.approver_user_id, s.full_name),
-            remark=None if portal else s.remark, decided_at=_iso(s.decided_at)))
+            remark=None if portal else s.remark, decided_at=_iso(s.decided_at),
+            stalled=s.id == stalled_id))
     return Approval(request_id=str(req.id), status=req.status, steps=out,
                     request_remark=None if portal else req.remark), (req, steps)

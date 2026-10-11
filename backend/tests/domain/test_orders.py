@@ -33,8 +33,12 @@ def test_every_custom_sqlstate_the_migration_raises_has_an_api_error_and_no_othe
     later += (_VERSIONS / "047_dealer_credit_limit.py").read_text("utf-8")
     # FS-042: order_submit's export and sample gates (045)
     later += (_VERSIONS / "045_export_sample_orders.py").read_text("utf-8")
+    # ISS-122: order_amend's voided dispatch (064); FS-054: the subsidy definer (067)
+    later += (_VERSIONS / "064_amend_after_void.py").read_text("utf-8")
+    later += (_VERSIONS / "067_subsidised_orders.py").read_text("utf-8")
     through_orders = {"STKWI", "STKNW", "STKNF", "PAYPC", "ORDTF", "ORDPA", "CRDLM",
-                      "ORDXS", "ORDSF", "ORDSL", "ORDLT", "ORDLX"}
+                      "ORDXS", "ORDSF", "ORDSL", "ORDLT", "ORDLX", "ORDVD",
+                      "OSBTY", "OSBLD", "OSBFL", "OSBLV", "OSBLO", "OSBAM", "OSBPM"}
     assert through_orders <= set(re.findall(r"ERRCODE = '([A-Z0-9]{5})'", later))
     expected = raised | through_orders
     assert expected == set(domain.SQLSTATE_TO_ERROR), expected ^ set(domain.SQLSTATE_TO_ERROR)
@@ -120,4 +124,4 @@ def test_export_problems(order_type: str, country: str | None, gstin: str | None
 
 def test_a_free_sample_is_every_line_at_full_discount_on_tier_one() -> None:
     assert (Decimal(100), Decimal(0), Decimal(0)) == domain.FREE_DISCOUNTS
-    assert {"export", "sample"} == domain.STAFF_ONLY_TYPES
+    assert {"export", "sample", "subsidised"} == domain.STAFF_ONLY_TYPES
