@@ -5,6 +5,7 @@ record, and the users side."""
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from collections.abc import AsyncIterator, Callable
 
@@ -15,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.api import test_campaigns as camp
+from tests.api import test_complaints as complaints_t
 from tests.api import test_order_endpoints as endpoints
 from tests.api.conftest import V1, _key
 from tests.api.test_customers import _cleanup, _lead, _mobile, _move
@@ -233,5 +235,71 @@ async def test_a_dealers_document_shows_no_amount(
         quotes = (await client.get(f"{V1}/portal/quotations", headers=hc)).json()["data"]
         assert [(x["status"], x["total"], x["link"]) for x in quotes] == [("accepted", None, None)], quotes
     finally:
+        await _forget(sessions, [m])
+        await _cleanup(sessions, [m])
+
+
+async def test_complaints_merged_quotations_and_voided_dispatches(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions, portal_on: None) -> None:
+    """ISS-119: the three shapes the review reasoned about. A complaint on the
+    farmer's lead is listed; a quotation on a lead merged into another of theirs
+    stays; a voided dispatch is left out."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    lead, order = await camp._won_lead(client, shop, ho, None)  # type: ignore[arg-type]
+    m = lead["mobile"][3:]
+    try:
+        # two dispatches, the first voided
+        hd = await endpoints._as(client, shop, "dispatch_manager")
+        line = order["lines"][0]["id"]
+        sent = []
+        for dc in ("DC-VOID", "DC-KEEP"):
+            r = await client.post(f"{V1}/orders/{order['id']}/dispatches", headers={**hd, **_key()},
+                                  json={"dc_no": dc, "dispatched_at": dt.datetime.now(dt.UTC).isoformat(),
+                                        "lines": [{"order_line_id": line, "qty": "1"}]})
+            assert r.status_code == 201, r.text
+            sent.append(r.json()["data"]["id"])
+        r = await client.post(f"{V1}/dispatches/{sent[0]}/void", json={"remark": "Wrong DC"}, headers={**hd, **_key()})
+        assert r.status_code == 200, r.text
+
+        # a complaint on the farmer's lead, submitted
+        c = await complaints_t._create(client, shop, ho, lead_id=lead["id"])
+        r = await complaints_t._post(client, ho, f"/{c['id']}/submit")
+        assert r.status_code == 200, r.text
+        complaint_no = r.json()["data"]["complaint_no"]
+
+        # a sent quotation on a second lead of the farmer, merged into a third
+        loser = await _move(client, ho, (await _lead(client, ho, shop, m))["id"], "contacted", "qualified")
+        r = await client.post(f"{V1}/quotations", headers={**ho, **_key()}, json={
+            "lead_id": loser["id"], "sales_type": "commercial",
+            "place_of_supply_territory_id": shop.district, "seller_gstin_id": shop.seller,
+            "price_effective_date": endpoints.AS_OF,
+            "lines": [{"product_id": shop.product, "qty": "5", "discount_pct": "0"}]})
+        assert r.status_code == 201, r.text
+        qid = r.json()["data"]["id"]
+        r = await client.post(f"{V1}/quotations/{qid}/send", json={"channel": "none"}, headers={**ho, **_key()})
+        assert r.status_code == 200, r.text
+        quote_no = r.json()["data"]["quote_no"]
+        survivor = await _move(client, ho, (await _lead(client, ho, shop, m))["id"], "contacted", "qualified")
+        hdm = await endpoints._as(client, shop, "district_manager")
+        r = await client.post(f"{V1}/leads/{loser['id']}/merge", json={"into_lead_id": survivor["id"]},
+                              headers={**hdm, **_key()})
+        assert r.status_code == 200, r.text
+
+        hc = await _sign_in(client, sessions, m)
+        orders = (await client.get(f"{V1}/portal/orders", headers=hc)).json()["data"]
+        mine = next(o for o in orders if o["order_no"] == order["order_no"])
+        assert [x["dc_no"] for x in mine["dispatches"]] == ["DC-KEEP"], mine
+        complaints = (await client.get(f"{V1}/portal/complaints", headers=hc)).json()["data"]
+        assert [x["complaint_no"] for x in complaints] == [complaint_no], complaints
+        quotes = (await client.get(f"{V1}/portal/quotations", headers=hc)).json()["data"]
+        assert quote_no in [x["quote_no"] for x in quotes], quotes
+        enq = (await client.get(f"{V1}/portal/enquiries", headers=hc)).json()["data"]
+        assert loser["inquiry_no"] not in [e["inquiry_no"] for e in enq], "the merged loser is not an enquiry"
+    finally:
+        s = sessions()
+        await s.execute(text("DELETE FROM notification_outbox WHERE payload->>'order_no' = :o"),
+                        {"o": order["order_no"]})
+        await s.commit()
+        await s.close()
         await _forget(sessions, [m])
         await _cleanup(sessions, [m])

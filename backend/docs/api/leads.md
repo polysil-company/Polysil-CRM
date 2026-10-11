@@ -167,6 +167,7 @@ day it is the slowest thing on the screen.
 | `created_to` | query | string \| null |  | ISO date, inclusive. |
 | `q` | query | string \| null |  | Name, mobile or inquiry number. |
 | `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
+| `deleted` | query | boolean |  | true: only deleted leads, to restore one. Needs leads.delete to return anything. Deleted leads are never listed otherwise. |
 | `limit` | query | integer |  |  |
 | `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 | `include_total` | query | boolean |  | Also count how many leads match, for a "1 to 25 of 137" caption. Off by default: it costs a second query over everything in your scope, and most screens do not need it. |
@@ -225,7 +226,8 @@ the stored `201` and creates nothing; the same key with a different body is
 | `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
 | `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
 | `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
-| `land_acres` | number \| string \| null |  |  |
+| `land_hectares` | number \| string \| null |  |  |
+| `land_acres` | number \| string \| null |  | Instead of land_hectares, not with it. |
 | `campaign_id` | string \| null |  | Optional. An active campaign from GET /campaigns?active=true. Staff only. A lead from a QR code with a campaign gets it on its own. |
 
 **Responses**
@@ -369,6 +371,7 @@ narrow the filters. An empty list gives a file with the header row only.
 | `created_to` | query | string \| null |  | ISO date, inclusive. |
 | `q` | query | string \| null |  | Name, mobile or inquiry number. |
 | `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
+| `deleted` | query | boolean |  | true: only deleted leads, to restore one. Needs leads.delete to return anything. Deleted leads are never listed otherwise. |
 | `sort` | query | `created_at` \| `farmer_name` \| `estimated_value` |  | The column to sort by. `farmer_name` ignores case; leads with no `estimated_value` come last in both orders. |
 | `order` | query | `asc` \| `desc` |  | asc or desc. |
 
@@ -408,6 +411,7 @@ column and its list always agree. Every stage is present, 0 when empty.
 | `created_to` | query | string \| null |  | ISO date, inclusive. |
 | `q` | query | string \| null |  | Name, mobile or inquiry number. |
 | `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
+| `deleted` | query | boolean |  | true: count only deleted leads. |
 
 **Responses**
 
@@ -510,7 +514,8 @@ the change. A closed lead (won, lost, merged) is `422 stage_terminal`.
 | `source` | string \| null |  | A code from the lookup. |
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
 | `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
-| `land_acres` | number \| string \| null |  | null clears it. |
+| `land_hectares` | number \| string \| null |  | null clears it. |
+| `land_acres` | number \| string \| null |  | Instead of land_hectares, not with it; null clears it. |
 | `campaign_id` | string \| null |  | An active campaign; null clears it. The campaign already on the lead may be re-sent even if it has been switched off. |
 
 **Responses**
@@ -870,7 +875,9 @@ with the current stage in `fields.stage`.
 | `priority` | `hot` \| `warm` \| `cold` \| null | yes |  |
 | `estimated_value` | string \| null | yes |  |
 | `crops` | CropRef[] | yes | In the order they were sent. [] for none. |
-| `land_acres` | string \| null | yes | Land in acres, a decimal string. |
+| `land_hectares` | string \| null |  | Land in hectares, a decimal string. |
+| `land_acres` | string \| null | yes | The same land in acres, from the hectares. |
+| `state_name` | string \| null |  | The state above the lead's territory. |
 | `lost_reason` | ReasonRef \| null | yes |  |
 | `lost_note` | string \| null | yes |  |
 | `reopen_count` | integer | yes |  |
@@ -918,7 +925,8 @@ with the current stage in `fields.stage`.
 | `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
 | `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
 | `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
-| `land_acres` | number \| string \| null |  |  |
+| `land_hectares` | number \| string \| null |  |  |
+| `land_acres` | number \| string \| null |  | Instead of land_hectares, not with it. |
 | `campaign_id` | string \| null |  | Optional. An active campaign from GET /campaigns?active=true. Staff only. A lead from a QR code with a campaign gets it on its own. |
 
 **`LeadMerge`**
@@ -954,7 +962,8 @@ with the current stage in `fields.stage`.
 | `source` | string \| null |  | A code from the lookup. |
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
 | `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
-| `land_acres` | number \| string \| null |  | null clears it. |
+| `land_hectares` | number \| string \| null |  | null clears it. |
+| `land_acres` | number \| string \| null |  | Instead of land_hectares, not with it; null clears it. |
 | `campaign_id` | string \| null |  | An active campaign; null clears it. The campaign already on the lead may be re-sent even if it has been switched off. |
 
 **`LeadReopen`**
@@ -1084,7 +1093,7 @@ with the current stage in `fields.stage`.
 | `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
 | `occurred_at` | string | yes |  |
 | `actor` | UserRef \| null |  | Who caused the event, if known. |
-| `payload` | object |  |  |
+| `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |
 
 **`TimelinePage`**
 

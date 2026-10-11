@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require, require_any
+from api.errors import ForbiddenError
 from api.idempotency import payload_digest, run_idempotent
 from api.routers.exporting import XLSX_RESPONSE, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
@@ -144,6 +145,14 @@ async def list_orders(
     cursor: Cursor = None,
     include_total: Annotated[bool, Query(description="Also count, up to 1,000.")] = False,
     waiting_on: WaitingOn = None,
+    territory_id: Annotated[str | None, Query(
+        max_length=800,
+        description="Orders in these territories or anywhere under them, up to 20 ids "
+                    "comma-separated: a state selects its districts and talukas.")] = None,
+    owner_org_unit_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Orders owned by this office or any office under it (the hierarchy "
+                    "filter).")] = None,
 ) -> OrderPage:
     """The orders in your scope, newest first, keyset-paged. Each row carries how much
     has shipped (`dispatched_pct`) and whom it is waiting on (`approval_waiting_on`)."""
@@ -151,7 +160,7 @@ async def list_orders(
         db, caller, status=status_, order_type=order_type, partner_id=partner_id,
         lead_id=lead_id, owner=owner, q=q, created_from=created_from, created_to=created_to,
         limit=limit, cursor=cursor, include_total=include_total, quotation_id=quotation_id,
-        waiting_on=waiting_on)
+        waiting_on=waiting_on, territory_id=territory_id, owner_org_unit_id=owner_org_unit_id)
 
 
 @router.get("/stats", response_model=OrderStats, responses=_ERRORS,
@@ -168,13 +177,21 @@ async def order_stats(
     created_from: Annotated[str | None, Query(alias="from", description="ISO date, IST.")] = None,
     created_to: ToDate = None,
     waiting_on: WaitingOn = None,
+    territory_id: Annotated[str | None, Query(
+        max_length=800,
+        description="Orders in these territories or anywhere under them, up to 20 ids "
+                    "comma-separated: a state selects its districts and talukas.")] = None,
+    owner_org_unit_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Orders owned by this office or any office under it (the hierarchy "
+                    "filter).")] = None,
 ) -> OrderStats:
     """Counts for the order board and the dashboard tiles: every status, and the
     submitted orders by whose approval is next. Same scope and filters as the list."""
     return await service.order_stats(
         db, caller, status=status_, order_type=order_type, partner_id=partner_id,
         lead_id=lead_id, owner=owner, created_from=created_from, created_to=created_to,
-        waiting_on=waiting_on)
+        waiting_on=waiting_on, territory_id=territory_id, owner_org_unit_id=owner_org_unit_id)
 
 
 @router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
@@ -421,7 +438,12 @@ async def pending(db: DbSession, caller: CallerDep,
 @approvals.get("/thresholds", response_model=Envelope[list[Threshold]], responses=_ERRORS)
 async def get_thresholds(db: DbSession, caller: CallerDep) -> dict[str, Any]:
     """The approval limits per manager role (and per territory where set), including
-    GST. The highest role with a row has no limit in effect."""
+    GST. The highest role with a row has no limit in effect. Staff only: a dealer or
+    a consumer gets `403`."""
+    if caller.user_type != "staff":
+        # the rows were already hidden from a dealer; an empty 200 read as "none set"
+        # on a screen he should never reach (walk F-8)
+        raise ForbiddenError("Approval limits are for staff.")
     return {"data": [t.model_dump(mode="json") for t in await approval_service.thresholds(db)]}
 
 
