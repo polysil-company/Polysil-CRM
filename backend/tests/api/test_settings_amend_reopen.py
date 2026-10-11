@@ -120,6 +120,21 @@ async def test_a_direct_bad_value_is_refused_by_the_database(sessions: Sessions)
 
 
 
+async def test_a_whole_number_written_as_a_decimal_is_stored_whole(sessions: Sessions) -> None:
+    """ISS-129: '2.0' would break the readers that cast with ::int."""
+    c = sessions()
+    try:
+        stored = (await c.execute(text(
+            "UPDATE app_setting SET value = '2.0' WHERE key = 'complaint_reopen_max' "
+            "RETURNING value::text"))).scalar_one()
+        assert stored == "2"
+        assert (await c.execute(text(
+            "SELECT app_setting_text('complaint_reopen_max')::int"))).scalar_one() == 2
+    finally:
+        await c.rollback()
+        await c.close()
+
+
 async def test_an_unknown_role_code_is_refused_on_change(sessions: Sessions) -> None:
     """041 skips the role check on its own insert (roles are seeded after migrating);
     every change after that is checked."""
@@ -185,12 +200,19 @@ async def test_amend_is_refused_once_shipped_paid_or_a_replacement(
     fo = await endpoints._as(client, shop, "field_officer")
     shipped = await conc._approved(client, shop)
     dm = await endpoints._as(client, shop, "dispatch_manager")
-    r = await client.post(f"{V1}/orders/{shipped['id']}/dispatches", headers={**dm, **_key()}, json={
+    r = r_dispatch = await client.post(f"{V1}/orders/{shipped['id']}/dispatches", headers={**dm, **_key()}, json={
         "dc_no": "DC-1", "dispatched_at": dt.datetime.now(dt.UTC).isoformat(),
         "lines": [{"order_line_id": shipped["lines"][0]["id"], "qty": "1"}]})
     assert r.status_code in (200, 201), r.text
     r = await _amend(client, fo, shipped["id"])
     assert r.status_code == 409 and _code(r) == "order_dispatched", r.text
+    # ISS-122: voided, the dispatch still names the lines; the amend is a 409, not a later 500
+    dispatch_id = r_dispatch.json()["data"]["id"]
+    r = await client.post(f"{V1}/dispatches/{dispatch_id}/void", json={"remark": "Wrong DC"},
+                          headers={**dm, **_key()})
+    assert r.status_code == 200, r.text
+    r = await _amend(client, fo, shipped["id"])
+    assert r.status_code == 409 and _code(r) == "voided_dispatch_holds_lines", r.text
 
     paid = await conc._approved(client, shop)
     c = sessions()
@@ -401,3 +423,16 @@ async def test_complaint_reopen_refuses_a_caller_who_cannot_see_it(
     finally:
         await s.rollback()
         await s.close()
+
+
+async def test_order_amend_keeps_every_migrations_change(sessions: Sessions) -> None:
+    """Code review F-1: 064 once rebuilt order_amend from 041 and lost 045's
+    amended_from_gross. Each later migration edits the live text instead."""
+    c = sessions()
+    try:
+        body = (await c.execute(text(
+            "SELECT pg_get_functiondef('order_amend(uuid, text, text)'::regprocedure)"))).scalar_one()
+        assert "amended_from_gross = gross" in body, "045"
+        assert "ERRCODE = 'ORDVD'" in body, "064"
+    finally:
+        await c.close()

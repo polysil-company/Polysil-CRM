@@ -24,7 +24,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
 | Messages | 12 | [`messages.md`](messages.md) |
 | Notifications | 2 | [`notifications.md`](notifications.md) |
-| Orders | 17 | [`orders.md`](orders.md) |
+| Orders | 18 | [`orders.md`](orders.md) |
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 7 | [`partners.md`](partners.md) |
 | Payments | 8 | [`payments.md`](payments.md) |

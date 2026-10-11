@@ -38,6 +38,7 @@ import { formatTerritory } from "@/features/lookups/lib/lookup-labels";
 import { toShareParam } from "@/features/messages/lib/share-attachment";
 import { LeadQuotations } from "@/features/quotations/components/lead-quotations";
 import { useCan, useSession } from "@/features/session/hooks/use-session";
+import { LeadSubsidy } from "@/features/subsidy/components/lead-subsidy";
 import { LeadMinutes } from "@/features/tasks/components/lead-minutes";
 import { LeadTasks } from "@/features/tasks/components/lead-tasks";
 import { isApiError } from "@/lib/api/errors";
@@ -355,6 +356,9 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
 
         {/* QUOT-001 · The lead's quotations, for whoever may see quotations. */}
         {canSeeQuotations ? <LeadQuotations leadId={lead.id} leadStage={lead.stage} /> : null}
+
+        {/* SUBS-004, SUBS-005 · A subsidised lead's application, and starting one. */}
+        <LeadSubsidy lead={lead} />
 
         {/* CMPL-001 · Complaints about this lead, and raising one. */}
         <RelatedComplaints about={{ leadId: lead.id }} readOnly={lead.stage === "merged"} />

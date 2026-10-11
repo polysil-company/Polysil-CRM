@@ -26,7 +26,17 @@ export function isOpenPath(pathname: string): boolean {
   );
 }
 
-export const SESSION_END_REASONS = ["signed-out", "session-ended"] as const;
+/**
+ * - `password-changed`: the user changed their own password, which signs out every session
+ *   (AUTH-007);
+ * - `password-reset`: an administrator set a new password while the user was changing theirs.
+ */
+export const SESSION_END_REASONS = [
+  "signed-out",
+  "session-ended",
+  "password-changed",
+  "password-reset",
+] as const;
 
 export type SessionEndReason = (typeof SESSION_END_REASONS)[number];
 

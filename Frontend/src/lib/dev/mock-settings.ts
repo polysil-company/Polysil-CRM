@@ -37,6 +37,8 @@ export const MOCK_OTP_CODE = "123456";
 
 const SCENARIO_KEY = "polysil:mock-scenario";
 const ROLE_KEY = "polysil:mock-role";
+const MUST_CHANGE_PASSWORD_KEY = "polysil:mock-must-change-password";
+const STAFF_PASSWORD_KEY = "polysil:mock-staff-password";
 
 function readStorage(key: string): string | null {
   if (typeof window === "undefined") {
@@ -73,4 +75,29 @@ export function readMockRole(): Role {
 
 export function writeMockRole(role: Role): void {
   writeStorage(ROLE_KEY, role);
+}
+
+/**
+ * AUTH-007 · Whether the mock backend treats the signed-in staff member as holding a
+ * temporary password: `/auth/me` says so and every other call answers 403
+ * `password_change_required` until it is changed.
+ */
+export function readMockMustChangePassword(): boolean {
+  return readStorage(MUST_CHANGE_PASSWORD_KEY) === "1";
+}
+
+export function writeMockMustChangePassword(value: boolean): void {
+  writeStorage(MUST_CHANGE_PASSWORD_KEY, value ? "1" : "0");
+}
+
+/**
+ * The password a staff member changed to in the mock, or null. Sign-in accepts it as well as
+ * MOCK_STAFF_PASSWORD, so a demo can never lock itself out.
+ */
+export function readMockChangedPassword(): string | null {
+  return readStorage(STAFF_PASSWORD_KEY);
+}
+
+export function writeMockChangedPassword(password: string): void {
+  writeStorage(STAFF_PASSWORD_KEY, password);
 }

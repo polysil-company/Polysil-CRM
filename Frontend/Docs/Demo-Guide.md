@@ -1,6 +1,10 @@
 # Polysil CRM: what's ready, and how to demo it
 
-What works today on the `integration` branch (everything up to pull request #47), in plain words. Read Part 1 for the list, Part 2 for what each feature does, and Part 3 to rehearse and run the demo, click by click.
+What works today on the `integration` branch (everything up to pull request #84), in plain words. Read Part 1 for the list, Part 2 for what each feature does, and Part 3 to rehearse and run the demo, click by click.
+
+- **Demo 1** (2 October) showed Flows 1–14.
+- **Demo 2** adds Flows 15–22: lead capture with QR codes, tidying leads, tasks and meetings, direct orders, the dispatch queue and complaints. Part 3 opens with a suggested order for it.
+- **Subsidy** (Flows 23–26) is built and waiting for review (PRs #77, #78, #79, #86). Show it only once those are merged.
 
 > Everything here was built and tested against the backend's rules. Before showing a flow live, rehearse it once on the hosted app with the same logins. [Live-Test-Plan.md](Live-Test-Plan.md) is the full checklist if you want to test more widely.
 
@@ -36,6 +40,11 @@ What works today on the `integration` branch (everything up to pull request #47)
 - Add notes.
 - Move the lead through its stages. Each stage is explained in the app.
 - Assign an owner and a channel partner.
+- Filter by area: districts, then a district's talukas, with counts. *(new)*
+- Edit a lead; an admin can delete one. *(new)*
+- Possible duplicates: compare a pair side by side, merge or dismiss. *(new)*
+- QR codes for fairs, dealers and print, and a public enquiry page confirmed by a WhatsApp code. *(new)*
+- Download the list as Excel. *(new)*
 
 **Quotations**
 
@@ -57,6 +66,8 @@ What works today on the `integration` branch (everything up to pull request #47)
 **Sales orders**
 
 - Place an order from an accepted quotation.
+- A direct order typed in item by item, without a quotation. *(new)*
+- Download the list as Excel. *(new)*
 - An approval chain by value (managers → Accounts → Dispatch).
 - Return or cancel with a reason.
 - Order PDF.
@@ -67,6 +78,23 @@ What works today on the `integration` branch (everything up to pull request #47)
 - Record what left, item by item, with challan, invoice, transporter and vehicle.
 - Void a dispatch.
 - Close the rest of an order short.
+- The Dispatch queue: orders waiting to ship, and a log of what left. *(new)*
+
+**Tasks and meetings** *(new)*
+
+- My day: overdue first, then today's calls, visits and meetings.
+- Team: each person's due, done and overdue for a manager.
+- Tasks and meeting minutes on a lead, with action items that become tasks.
+- Edit, reassign, mark done, cancel, reopen.
+- All tasks, with filters and an Excel download.
+
+**Complaints** *(new)*
+
+- Raise a complaint (from a lead, an order or on its own) with products and photos.
+- The manager's check, then the QC verdict.
+- The remedy: a refund through the Approvals inbox (Accounts records the UTR), a replacement order, or no action.
+- Response and resolution targets, with a "Late" mark; set by an admin.
+- "Waiting on me" queues and an Excel download.
 
 **Notifications**
 
@@ -225,6 +253,68 @@ Clicking one opens that lead, quotation or order, and marks it read. **Mark all 
 
 **Messages** in the menu is one-to-one chat between staff. Choose a colleague and type; **Enter** sends. From any lead page, **Share with a colleague** sends that lead in a message, and the colleague clicks it to open the lead. Unread messages show a count in the menu. Partners don't have messages.
 
+### Lead capture and keeping leads tidy *(new)*
+
+**QR codes (Sales → QR codes).** A QR code per fair, dealer, poster or van. Each one shows:
+
+- its name and code;
+- how many leads it brought;
+- its campaign, dealer and area.
+
+**Download to print** saves a sharp image. **Copy link** gives the web address. The code never changes, so printed copies keep working even after the code is renamed, re-pointed or switched off.
+
+**The enquiry page (`/enquiry`, no login).** A farmer scans the code on their phone and fills in:
+
+- name, mobile, area (already set when the code names one), village, the system they want, how they'll buy, and a note.
+
+They confirm their mobile with a six-digit code sent on WhatsApp and get an inquiry number to keep. The lead lands in the CRM with its source, dealer and area.
+
+**Area filter.** The **Area** pill on Leads lists the districts that hold leads, each with its count. Open a district to pick its talukas.
+
+**Edit, delete, duplicates.**
+
+- **Edit** (beside Assign) changes any of the lead's own details; the history says what changed.
+- An admin can **Delete** a lead.
+- **Possible duplicates** (on the Leads toolbar) shows each suspect pair side by side, with what matched. **Keep** one merges the other into it, moving its history across. **Not a duplicate** clears the pair.
+
+### Tasks and meetings *(new)*
+
+**Service → Tasks** has three views.
+
+- **My day:** what's overdue on top, then today by time: calls, visits, meetings and follow-ups, each with its lead.
+  - **Done** asks what happened.
+  - **Cancel task** asks why.
+  - A done task can be **Reopened**.
+- **Team** (managers): one row per person with due, done and overdue. Click a row to see that person's day and give them a task.
+- **All tasks:** filters for status, kind, person and overdue, and **Download Excel**.
+
+**On a lead's page:**
+
+- its tasks and meetings;
+- **Record minutes:** who was there, what was discussed, and action items. Each action item becomes a task for whoever it names.
+
+### Direct orders and the dispatch queue *(new)*
+
+**New order** (on a qualified lead, or on Sales orders) types an order in item by item, priced live like a quotation. It then goes through the same approval chain.
+
+**Operations → Dispatch queue** has two lists:
+
+- **To ship:** every approved order still waiting to leave, with how much has gone. **Record a dispatch** opens the order with the form ready.
+- **Dispatched:** the log by day, including voided dispatches with their reason.
+
+### Complaints *(new)*
+
+1. **Raise.** A field officer or dealer clicks **New complaint**, or **Raise a complaint** on a lead or order. They give the type, severity, what went wrong, the contact, the challan and supply date, the defective products, and photos.
+2. **Submit.** The complaint gets its number (`Poly/Comp./2026-27/GJ/NN`) and its targets start.
+3. **Check (manager).** **Approve, send to QC** (optionally a new severity and an owner), or **Return to fix** with a remark the raiser reads.
+4. **QC verdict.** Defect or no defect, what QC found, and the sample's dates. No defect closes it.
+5. **Remedy (QC).**
+   - **Refund:** goes to the managers by amount, then Accounts, in the Approvals inbox. Accounts enters the UTR, which closes the complaint.
+   - **Replacement:** a replacement order.
+   - **No action.**
+
+"Late" marks a missed target. **Admin → Complaint targets** sets the first-response and resolution times per severity, in working hours or round the clock.
+
 ---
 
 ## Part 3: demo flows, click by click
@@ -245,6 +335,26 @@ Clicking one opens that lead, quotation or order, and marks it read. **Mark all 
 4. Send it; the customer opens it on a phone (Flows 7–8): 3 min.
 5. The customer accepts; place the order; approvals; dispatch (Flows 9–11): 5 min.
 6. Notifications and messages (Flows 12–13): 1 min.
+
+### Suggested order for Demo 2 (about 25 minutes)
+
+Start with a one-minute recap: the dashboard, then a lead with its quotation and order from Demo 1. Then show what's new:
+
+1. A farmer at a fair becomes a lead from a QR code (Flow 15): 4 min.
+2. Find and tidy leads: area filter, edit, duplicates (Flow 16): 3 min.
+3. The field officer's day and the manager's team view (Flows 17–18): 5 min.
+4. A direct order, then the dispatch queue (Flows 19–20): 4 min.
+5. A complaint from the farmer to QC (Flow 21): 5 min.
+6. The refund through approvals to Accounts (Flow 22): 3 min.
+
+**Logins for Demo 2:** Field Officer (Employee), District Manager, QA, Accounts, Dispatch and Admin. Keep two windows: officer and manager.
+
+**Extra preparation for Demo 2:**
+
+- Print one QR code, or keep it on a second screen, and have a phone ready to scan it.
+- Use your own mobile for the enquiry: the WhatsApp code goes to it.
+- Have one approved order with items still to ship, so the Dispatch queue isn't empty.
+- Have a small photo on the laptop to attach to the complaint.
 
 ---
 
@@ -399,15 +509,166 @@ Clicking one opens that lead, quotation or order, and marks it read. **Mark all 
 
 ---
 
+## Part 3b: Demo 2 flows, click by click
+
+### Flow 15: a farmer at a fair becomes a lead (QR code)
+
+**Who:** Field Officer (or a manager), then a farmer with no login on a phone.
+
+1. **Sales → QR codes** → **New QR code**.
+2. Name it `Demo — Rajkot Agri Fair`. Optionally choose a campaign, a **dealer** and an **area** (e.g. Rajkot) → save.
+3. The code appears with its QR. Click **Download to print** (it saves a PNG), or **Copy link**.
+4. *(Phone)* Scan the QR. The **enquiry page** opens, saying "Enquiry through <dealer>" when a dealer was chosen, with the area already set.
+5. Fill in the name (`Demo — Kiran Patel`), **your own mobile**, village, system and a note.
+6. Tap **Send me a code on WhatsApp**, then type the six digits from WhatsApp → **Send my enquiry**.
+7. The page shows the **inquiry number** to keep.
+8. *(Laptop)* **Sales → Leads**: the new lead is at the top, with its source, dealer and area. Back on **QR codes**, the code's lead count went up by one.
+
+*Say:* "Every scan is a lead, tagged with where it came from. Nobody types it in, and the mobile is confirmed."
+
+*Show also:* a switched-off code still opens the plain form, so printed posters never break.
+
+### Flow 16: find and tidy leads
+
+**Who:** District Manager (and Admin for delete).
+
+1. **Sales → Leads** → the **Area** pill. The districts are listed with their lead counts. Open **Rajkot** and tick two talukas: the list narrows, and the pill names the area.
+2. Open a lead → **Edit** (beside Assign). Change the land or a crop → save. **Activity** says which fields changed.
+3. Back on **Leads** → **Possible duplicates**. Each pair is side by side, with what matched (e.g. the same mobile).
+4. On one pair, click **Keep POL/GJ/…** under the better lead → confirm. The other is merged into it, with its history.
+5. On another pair, click **Not a duplicate**: the pair is cleared.
+6. **Download Excel**: the leads the filters show, as a spreadsheet.
+7. *(Admin, optional)* On a demo lead, **Delete** → confirm. It goes back to the list.
+
+### Flow 17: the field officer's day
+
+**Who:** Field Officer.
+
+1. **Service → Tasks** → **My day**. Overdue tasks are on top, then today's by time.
+2. **New task** → *Visit* `Survey the field for drip`, today at 15:00, for yourself, on the lead `Demo — Kiran Patel` → **Add task**.
+3. On a task's menu → **Done** → write what happened (`Farmer agreed; quotation next week`) → save. It moves to done.
+4. On another task → **Cancel task** → give a reason.
+5. Open the lead `Demo — Kiran Patel`: the **Tasks** card lists the visit.
+6. On the lead, **Record minutes**: who was there (one per line), what was discussed, and an action item (`Send quotation`, due Friday, for yourself) → save. The action item appears as a task, marked "From meeting minutes".
+
+### Flow 18: the manager's team view
+
+**Who:** District Manager.
+
+1. **Service → Tasks** → **Team**. Each person's due, done and overdue for today.
+2. Click a person: their day opens. **New task** there gives them a task. **Back to team** returns.
+3. On one of their open tasks → **Edit or reassign** → choose another person → save. "Given to …" confirms it.
+4. **All tasks** → tick **Overdue only** → **Download Excel**.
+
+### Flow 19: a direct order without a quotation
+
+**Who:** Field Officer.
+
+1. **Sales → Sales orders** → **New order** (or **New order** on a qualified lead's page).
+2. If typing afresh, choose the **place of supply** first. From a lead, the party and place come from the lead.
+3. Add items by typing a product name, with quantities. They are priced live, with GST.
+4. Choose the order type, delivery address and payment → save. The draft order opens.
+5. *(Optional)* **Edit items** to change a quantity.
+6. **Submit for approval**. The order follows the same chain as Flow 10.
+
+### Flow 20: the dispatch queue
+
+**Who:** Dispatch.
+
+1. **Operations → Dispatch queue** → **To ship**. Each approved order still waiting to leave, partly sent ones with how much has gone (e.g. "46% sent").
+2. **Record a dispatch** on one. The order opens with the form ready. Enter the quantities, challan, invoice, transporter and vehicle → save.
+3. **Dispatched**: the log for today, newest first. The new dispatch is there with its order and challan.
+
+### Flow 21: a complaint, from the farmer to QC
+
+**Who:** Field Officer (or a dealer), then District Manager, then QA.
+
+1. *(Officer)* Open the order (or lead) the complaint is about → **Raise a complaint**. Or use **Service → Complaints** → **New complaint**.
+2. Fill in:
+   - **Type** and **severity**;
+   - what went wrong;
+   - the contact and mobile;
+   - the challan and supply date;
+   - the defective products (`2` of `10` supplied).
+
+   Save the draft.
+3. **Add files** → choose *Photo* → pick the photo. It shows as a thumbnail.
+4. **Submit**. It gets its number (`Poly/Comp./2026-27/GJ/…`), and its targets start.
+5. *(Manager)* **Service → Complaints** → **Waiting on me** → open it → **Check** → **Approve, send to QC**. Optionally raise the severity and set an owner → save.
+   - *Show also:* **Return to fix** with a remark. The officer sees it on the draft, fixes it and clicks **Submit again**.
+6. *(QA)* **Waiting on me** → open it → **Give the QC verdict** → *Approved* (a defect), what QC found, and the sample's received and tested dates → save.
+
+### Flow 22: the refund, through approvals to Accounts
+
+**Who:** QA, then District Manager, then Accounts.
+
+1. *(QA)* On the QC-approved complaint → **Choose the remedy** → *Refund*: amount `1500`, who is paid, why → save. The Remedy card shows its approval steps.
+2. *(Manager)* **Approvals**: a "Complaint refund" row with the amount and payee → **Approve**.
+3. *(Accounts)* **Approvals** → the refund → **Approve** → enter the **payment reference** (UTR) → confirm.
+4. Back on the complaint: **Closed**, with the UTR and every step in its history.
+5. *(Admin)* **Admin → Complaint targets**: the first-response and resolution targets per severity. Point out the "Late" mark on the complaints list when one is missed.
+6. **Service → Complaints** → **Download Excel**.
+
+*Say:* "The same approval chain as orders, the same inbox. Accounts can't approve a refund without the UTR."
+
+---
+
+## Part 3c: subsidy (after PRs #77, #78, #79 and #86 are merged)
+
+Rehearse these on the hosted app once the four pull requests are on `integration`.
+
+### Flow 23: the subsidy calculator
+
+**Who:** Field Officer.
+
+1. **Sales → Subsidy** → **Calculator** → **Drip**.
+2. Pick a crop, then type the **area** and **lateral spacing**. Add a field-unit item or two and the head unit.
+3. Pause: the figures appear. Point out the unit cost, the eight farmer categories with the subsidy and the farmer's share, and the summary per block.
+4. Switch to **Sprinkler**: choose the area from the scheme's steps. The derived items and the DBT farmer payable appear.
+
+### Flow 24: a subsidy application from a lead
+
+**Who:** Field Officer, then the subsidy desk.
+
+1. On a qualified, subsidised lead → **Start subsidy application**. The calculator opens with the lead's scheme (from its state).
+2. Enter the design, then choose the farmer's **category** → **Start application**.
+3. The application opens with its stored figures. **Record stage** → choose the stage, the date and its fields (e.g. App. Inward Date) → save.
+4. **Documents**: **Add** a file against a checklist item.
+5. *(GGRC only)* Download the **PIMS sheet**.
+6. **Subsidy → Applications**: the worklist with status, stage, search and Excel.
+
+### Flow 25: subsidy reports
+
+**Who:** State Manager.
+
+**Subsidy → Reports** has three tabs:
+
+- **Stages:** money and count by stage.
+- **Supply:** supplied and not supplied by district.
+- **Ageing:** the six ageing figures per application.
+
+Each has **Download Excel**.
+
+### Flow 26: masters, and a new state's scheme
+
+**Who:** Admin.
+
+1. **Admin → Subsidy masters**. The **Overview** shows GGRC as Ready on all three systems, with its stages.
+2. **New scheme** → code `UPMIS`, name, state **Uttar Pradesh**, start from GGRC, systems Drip and Sprinkler → **Set up the scheme**.
+3. The overview says **Not ready** and lists what each system lacks. Click **Open** beside "The regular unit-cost matrix": it goes to **Unit costs**.
+4. On **Crop spacings** → **Add rows from a date** → add one crop → **Save the revision**.
+
+*Say:* "Rates change from a date; applications already started keep their figures. A new state is set up here, without a developer."
+
+---
+
 ## Part 4: not built yet (good answers for the client's questions)
 
 These are planned. The backend already supports most of them, and the app shows them as **Soon** in the menu.
 
-- **Tasks and follow-ups:** daily calls and visits, the planner, meeting minutes. A lead's follow-up date comes with this.
-- **Complaints:** registering a complaint, the quality check, refunds and replacements. (The refund approval limits already show.)
-- **Subsidy applications.**
-- **Direct orders:** an order typed in item by item without a quotation, and one combined order for a dealer.
-- **Editing or deleting a lead,** the duplicates queue, and merging duplicates.
-- **Lead QR codes and the public enquiry form.**
-- **Channel partners, schemes, marketing and reports** screens.
-- **Admin masters:** products, price lists, tax rates, users and roles, offices, territories.
+- **Accounts queue:** the backend finished it; the screen is next. Meanwhile, Accounts works from the Approvals inbox.
+- **Admin masters:** products, price lists, tax rates, users and roles, offices, territories, partners, and lookups such as complaint types.
+- **Channel partners, schemes, rewards and dealer commission, marketing material and reports** screens.
+- **The dealer's own portal** views.
+- **Campaigns, the customer record, and export and sample orders:** the backend has them; the screens come later.
+- **One combined order** from several quotations of one dealer.

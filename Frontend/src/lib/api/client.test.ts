@@ -401,15 +401,19 @@ describe("[AUTH-004] apiRequest authentication", () => {
     expect(provider.getAccessToken).not.toHaveBeenCalled();
   });
 
-  it("sends an Idempotency-Key on mutations, except to /auth", async () => {
+  it("sends an Idempotency-Key on mutations, except the keyless /auth ones", async () => {
     const keys: Record<string, string | null> = {};
     server.use(
       http.post(buildApiUrl("/test/item"), ({ request }) => {
         keys.item = request.headers.get("idempotency-key");
         return HttpResponse.json({ id: "a", total: 1 });
       }),
-      http.post(buildApiUrl("/auth/test"), ({ request }) => {
-        keys.auth = request.headers.get("idempotency-key");
+      http.post(buildApiUrl("/auth/login"), ({ request }) => {
+        keys.login = request.headers.get("idempotency-key");
+        return HttpResponse.json({ id: "a", total: 1 });
+      }),
+      http.post(buildApiUrl("/auth/password"), ({ request }) => {
+        keys.password = request.headers.get("idempotency-key");
         return HttpResponse.json({ id: "a", total: 1 });
       }),
       http.get(buildApiUrl("/test/item"), ({ request }) => {
@@ -418,7 +422,7 @@ describe("[AUTH-004] apiRequest authentication", () => {
       }),
     );
 
-    const post = (path: "/test/item" | "/auth/test"): Promise<unknown> =>
+    const post = (path: "/test/item" | "/auth/login" | "/auth/password"): Promise<unknown> =>
       apiRequest({
         dataId: "AUTH-002",
         logger: log,
@@ -428,11 +432,14 @@ describe("[AUTH-004] apiRequest authentication", () => {
         schema: itemSchema,
       });
     await post("/test/item");
-    await post("/auth/test");
+    await post("/auth/login");
+    await post("/auth/password");
     await getItem("none");
 
     expect(keys.item).toMatch(UUID);
-    expect(keys.auth).toBeNull();
+    // Login, OTP, refresh and logout take no key; changing a password needs one (AUTH-007).
+    expect(keys.login).toBeNull();
+    expect(keys.password).toMatch(UUID);
     expect(keys.read).toBeNull();
   });
 

@@ -13,6 +13,8 @@ import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.authz.predicate import Caller
+from api.services import targets as targets_service
 from api.services.clock import today_ist
 from tests.api import test_order_endpoints as endpoints
 from tests.api.conftest import V1, _key
@@ -100,3 +102,38 @@ async def test_global_sets_only_people_who_carry_targets(client: httpx.AsyncClie
         r = await _put(client, admin, shop.ids[who])
         assert r.status_code == 422 and r.json()["error"]["code"] == "no_targets", (who, r.text)
     assert (await _put(client, admin, shop.ids["district_manager"])).status_code == 200
+
+
+async def test_the_dashboard_series_agrees_with_achievement_month_by_month(client: httpx.AsyncClient, shop: Shop) -> None:
+    """ISS-131: the dashboard's six months come from one pass; each must equal what
+    GET /targets/achievement totals for that month."""
+    dm = await endpoints._as(client, shop, "district_manager")
+    assert (await _put(client, dm, shop.ids["field_officer"], order_value="300000")).status_code == 200
+    fo = await endpoints._as(client, shop, "field_officer")
+    order = await endpoints._submit(client, fo, (await endpoints._create(client, fo, endpoints._direct(shop)))["id"])
+    await endpoints._approve_all(client, shop, order)
+    r = await client.get(f"{V1}/dashboard/overview", headers=dm)
+    assert r.status_code == 200, r.text
+    series = r.json()["data"]["targets_by_month"]
+    assert len(series) == 6 and series[-1]["month"] == _month()
+    for m in series:
+        totals = (await client.get(f"{V1}/targets/achievement", headers=dm,
+                                   params={"month": m["month"]})).json()["data"]["totals"]["order_value"]
+        assert (m["target"], m["achieved"]) == (totals["target"], totals["achieved"]), m["month"]
+    assert float(series[-1]["target"]) >= 300000 and float(series[-1]["achieved"]) > 0
+
+
+async def test_the_series_with_nobody_in_scope_says_zero_as_achievement_does(
+        shop: Shop, sessions: Callable[[], AsyncSession]) -> None:
+    """Code review F-5: no people and no sales_orders scope is 0.00 in both, not null."""
+    caller = Caller(shop.ids["dealer"], None, None, scopes={"targets": "own"})
+    s = sessions()
+    try:
+        month = _month()
+        series = await targets_service.order_value_by_month(s, caller, [month])
+        report = await targets_service.achievement(s, caller, month, None)
+        ov = report["totals"]["order_value"]
+        assert (series[0]["target"], series[0]["achieved"]) == (ov["target"], ov["achieved"]) == ("0.00", "0.00")
+    finally:
+        await s.rollback()
+        await s.close()

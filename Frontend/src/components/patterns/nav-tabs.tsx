@@ -36,8 +36,14 @@ export interface NavTabsProps {
  */
 export function NavTabs({ tabs, label, indicatorId, className }: NavTabsProps): React.JSX.Element {
   const pathname = usePathname();
-  const activeIndex = tabs.findIndex(
-    (tab) => pathname === tab.href || pathname.startsWith(`${tab.href}/`),
+  // The longest matching href wins, so a tab at "/subsidy" stays off on "/subsidy/calculator".
+  const activeIndex = tabs.reduce(
+    (best, tab, index) =>
+      (pathname === tab.href || pathname.startsWith(`${tab.href}/`)) &&
+      (best === -1 || tab.href.length > (tabs[best]?.href.length ?? 0))
+        ? index
+        : best,
+    -1,
   );
 
   return (

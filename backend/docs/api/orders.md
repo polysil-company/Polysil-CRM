@@ -82,8 +82,12 @@ quotation are listed in `warnings` as `repriced`.
 lead must be qualified or later (`422 lead_not_open`). Pass the preview's
 `price_list_item_id` and `gst_rate_id`; `409 rate_changed` if either moved.
 
-Only `commercial` and `industrial` are built (`422 order_type_unsupported`). The
-draft has no number until it is submitted.
+**Subsidised (FS-054):** staff only, typed in, with `subsidy`: the leads (the first
+is the order's lead and routes it; `lead_id` is refused) and the amounts typed in.
+Attach the quotation copy and the payment slip with `POST /documents`.
+
+`marketing_material` and `replacement` are refused (`422 order_type_unsupported`).
+The draft has no number until it is submitted.
 
 **Parameters**
 
@@ -97,7 +101,7 @@ draft has no number until it is submitted.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial, industrial, export or sample. export and sample are staff only (403 type_staff_only); a sample is typed in, never from quotations. The other three are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial, industrial, export, sample or subsidised. export, sample and subsidised are staff only (403 type_staff_only); a sample or a subsidised order is typed in, never from quotations. marketing_material and replacement are refused with 422 order_type_unsupported, naming what each waits on. Default `commercial`. |
 | `quotation_ids` | string[] |  | Accepted quotations that agree on partner, place of supply, seller, price date, office and territory. Their lines are imported. |
 | `lead_id` | string \| null |  | A direct order's lead, qualified or later. Leave out when ordering from quotations: the lead comes from them. |
 | `partner_id` | string \| null |  | OMIT for your own partner (a dealer) or none (staff). Null is a direct sale, refused from a dealer. |
@@ -111,6 +115,7 @@ draft has no number until it is submitted.
 | `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
+| `subsidy` | SubsidyBlockIn \| null |  | Required on a subsidised order (FS-054), refused on any other. Its lead_ids replace lead_id, which is refused here. |
 
 **Responses**
 
@@ -627,6 +632,48 @@ chain needs.
 
 ---
 
+## `PUT /api/v1/orders/{order_id}/subsidy`
+
+**Set Subsidy**
+
+Replace a subsidised draft's subsidy block (FS-054), including a draft reopened
+by an amend. The first lead cannot change (`422 first_lead_fixed`); the others may.
+`409 order_not_draft` once submitted, `422 order_type_not_subsidised` on any other
+type, `422 subsidy_above_material` or `payable_above_material` against the material
+given or the order total.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `order_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`SubsidyBlockIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `lead_ids` | string[] | yes | The leads the order covers, 1 to 50, each one you can see and qualified or later. Repeats are dropped. The first is the order's lead: it routes the order and cannot change later (422 first_lead_fixed). |
+| `material_amount` | number \| string \| null |  | Leave out to use the order total, read at the time: a lines edit moves it. |
+| `subsidy_amount` | number \| string | yes | At most the material amount. |
+| `farmer_payable` | number \| string \| null |  | Leave out for material less subsidy. A different value is kept, with a warning. At most the material amount. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Order_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not in your permissions, or not your step. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, the status moved on, prices changed (`rate_changed`), or the order is not in a state that allows it. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `GET /api/v1/orders/{order_id}/timeline`
 
 **Order Timeline**
@@ -847,6 +894,7 @@ and only the outcome to a dealer.
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
 | `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
+| `subsidy` | SubsidyBlock \| null |  | A subsidised order's subsidy (FS-054); null on every other type. |
 | `warehouse` | WarehouseRef \| null |  | "Order to" (FS-023); null means the default. Always null for a dealer. |
 | `payments` | OrderPayments \| null |  | Payable, received, balance, instalments and receipts (FS-022). Null for a caller who may not see payments. |
 | `submitted_at` | string \| null | yes |  |
@@ -884,7 +932,7 @@ and only the outcome to a dealer.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial, industrial, export or sample. export and sample are staff only (403 type_staff_only); a sample is typed in, never from quotations. The other three are refused with 422 order_type_unsupported, naming the question each waits on. Default `commercial`. |
+| `order_type` | `commercial` \| `industrial` \| `export` \| `sample` \| `marketing_material` \| `subsidised` \| `replacement` |  | commercial, industrial, export, sample or subsidised. export, sample and subsidised are staff only (403 type_staff_only); a sample or a subsidised order is typed in, never from quotations. marketing_material and replacement are refused with 422 order_type_unsupported, naming what each waits on. Default `commercial`. |
 | `quotation_ids` | string[] |  | Accepted quotations that agree on partner, place of supply, seller, price date, office and territory. Their lines are imported. |
 | `lead_id` | string \| null |  | A direct order's lead, qualified or later. Leave out when ordering from quotations: the lead comes from them. |
 | `partner_id` | string \| null |  | OMIT for your own partner (a dealer) or none (staff). Null is a direct sale, refused from a dealer. |
@@ -898,6 +946,7 @@ and only the outcome to a dealer.
 | `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
+| `subsidy` | SubsidyBlockIn \| null |  | Required on a subsidised order (FS-054), refused on any other. Its lead_ids replace lead_id, which is refused here. |
 
 **`OrderLeadRef`**
 
@@ -1144,6 +1193,33 @@ and only the outcome to a dealer.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
+
+**`SubsidyBlock`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `material_amount` | string | yes | The material amount, or the order total when `material_is_total`. |
+| `subsidy_amount` | string | yes |  |
+| `farmer_payable` | string | yes | The farmer's share, or material less subsidy when `farmer_payable_is_derived`. Not the order's `payable`, which is the total less scheme benefits. |
+| `material_is_total` | boolean | yes |  |
+| `farmer_payable_is_derived` | boolean | yes |  |
+| `leads` | SubsidyLeadRef[] | yes | In order; the first is the order's lead. |
+
+**`SubsidyBlockIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `lead_ids` | string[] | yes | The leads the order covers, 1 to 50, each one you can see and qualified or later. Repeats are dropped. The first is the order's lead: it routes the order and cannot change later (422 first_lead_fixed). |
+| `material_amount` | number \| string \| null |  | Leave out to use the order total, read at the time: a lines edit moves it. |
+| `subsidy_amount` | number \| string | yes | At most the material amount. |
+| `farmer_payable` | number \| string \| null |  | Leave out for material less subsidy. A different value is kept, with a warning. At most the material amount. |
+
+**`SubsidyLeadRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `inquiry_no` | string \| null | yes | Null for a lead you cannot see. |
 
 **`TerritoryRef`**
 

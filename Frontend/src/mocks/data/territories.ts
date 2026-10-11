@@ -4,6 +4,7 @@ import {
   MOCK_DISTRICT_OFFICES,
   MOCK_DISTRICTS,
   MOCK_ID_SPACE,
+  MOCK_OTHER_STATE,
   MOCK_STATE,
   MOCK_STATE_OFFICE,
   MOCK_TALUKAS,
@@ -65,10 +66,23 @@ function buildTerritories(): MockTerritory[] {
     }
   }
 
+  // Last, so every id above stays as it was.
+  territories.push({
+    id: nextId(),
+    name: MOCK_OTHER_STATE.name,
+    level: "state",
+    code: MOCK_OTHER_STATE.code,
+    parent: null,
+    district: null,
+  });
+
   return territories;
 }
 
-/** Gujarat, its 33 districts, and talukas and villages for the three worked districts. */
+/**
+ * Gujarat, its 33 districts, and talukas and villages for the three worked districts; and
+ * Uttar Pradesh on its own, for a second state's subsidy scheme.
+ */
 export const MOCK_TERRITORIES: readonly MockTerritory[] = buildTerritories();
 
 export function findMockTerritory(id: string): MockTerritory | undefined {

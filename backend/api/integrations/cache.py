@@ -186,6 +186,37 @@ async def breaker_note_transient() -> bool:
     return False
 
 
+# ── one drain at a time (ISS-127) ────────────────────────────────────────────
+#
+# A send may take 30 s and the cron fires every 10 s, so drains could stack up,
+# each holding a pooled connection. The lock expires on its own, so a worker that
+# dies holding it costs one minute of sends, never all of them. Fails open, as the
+# breaker does: with Redis down, overlapping drains are still correct (SKIP LOCKED).
+
+DRAIN_LOCK = "wa:drain:lock"
+_RELEASE = ("if redis.call('get', KEYS[1]) == ARGV[1] then "
+            "return redis.call('del', KEYS[1]) else return 0 end")
+
+
+async def drain_lock_take(token: str, ttl: timedelta) -> bool:
+    """True when this drain may run: it took the lock, or Redis is unreachable."""
+    try:
+        return bool(await get_redis().set(DRAIN_LOCK, token, nx=True,
+                                          ex=int(ttl.total_seconds())))
+    except Exception as exc:
+        log.warning("outbox.drain_lock_unavailable", kind=type(exc).__name__)
+        return True
+
+
+async def drain_lock_release(token: str) -> None:
+    """Only the holder's own token is released: a drain that outlived its lock
+    must not free the next drain's."""
+    try:
+        await get_redis().eval(_RELEASE, 1, DRAIN_LOCK, token)
+    except Exception as exc:
+        log.warning("outbox.drain_lock_unavailable", kind=type(exc).__name__)
+
+
 async def breaker_reset() -> None:
     try:
         await get_redis().delete(BREAKER_COUNT, BREAKER_OPEN)
