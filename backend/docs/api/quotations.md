@@ -474,6 +474,72 @@ its PDF carries an "INDICATIVE PRICING" banner and `is_provisional` is true.
 
 ---
 
+## `PUT /api/v1/quotations/{quotation_id}/subsidy`
+
+**Set Subsidy**
+
+FS-057: calculate a subsidised draft's subsidy for one category and store it.
+The calculation runs on the lead's scheme (leave `calculation.scheme` out). Again
+to recalculate. `409 quotation_not_draft`; `422 not_subsidised`, `category_code`,
+`calculation.<field>` from the calculator. Sending and requesting approval need it
+(`422 subsidy_missing`).
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `quotation_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`QuotationSubsidyIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `category_code` | string | yes | One of the calculation's categories; it must apply on every crop. |
+| `calculation` | CalculateRequest | yes | The subsidy calculator's request (POST /subsidy/calculate). Leave `scheme` out: the lead's scheme is used. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Quotation_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, the status moved on, prices changed since the preview (`rate_changed`), or the quotation is not a draft. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/quotations/{quotation_id}/subsidy/calculation`
+
+**Subsidy Calculation**
+
+FS-057: the full calculator answer stored with the quotation.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `quotation_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_dict_str__Any__` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, the status moved on, prices changed since the preview (`rate_changed`), or the quotation is not a draft. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/quotations/{quotation_id}/timeline`
 
 **Quotation Timeline**
@@ -602,6 +668,37 @@ Every version of the number, oldest first. Any version's id works.
 | `decided_at` | string \| null | yes |  |
 | `stalled` | boolean |  | True on the step waiting now when nobody of its own role can decide it (none covers the document, or the only one raised it). A higher manager decides it instead and sees it in their inbox. Show "No <role> to decide; with the next manager up" rather than "Waiting on <role>". Always false for a dealer. Default `False`. |
 
+**`CalculateRequest`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `scheme` | string |  | Subsidy scheme code. Default `GGRC`. |
+| `system_type` | `drip` \| `mini_sprinkler` \| `sprinkler` | yes | Which of the three calculation models to run. |
+| `as_of` | date \| null |  | The masters in force on this date. Today in India by default; a future date is refused. |
+| `crops` | CropRequest[] | yes |  |
+| `head_lines` | Line-Input[] |  | The head unit, sent once for the whole quotation and shared across crops by area. |
+| `sump` | Sump \| null |  |  |
+| `group_total_area` | number \| string \| null |  | Every member's area sharing the water source. At least the sum of the crop areas. Absent means a single farmer. |
+| `installation_rate_per_ha` | number \| string |  | The installation line's rate; its quantity is the area. Default `0`. |
+| `nozzle` | `plastic` \| `brass` \| null |  | Sprinkler only. GGRC sets the pipe size by the area band; a state that asks for `pipe_size_mm` uses it. Optional where the scheme lists one nozzle. |
+| `pipe_size_mm` | `63` \| `75` \| `90` \| `110` \| null |  | Sprinkler set size, where the scheme asks for it (CG, RJ, UP). |
+| `spacing_label` | string \| null |  | One of the scheme's spacing labels (`spacing_labels` in the config): CG and RJ drip, RJ mini sprinkler. |
+| `hydrocyclone_m3` | number \| string \| null |  | RJ: hydrocyclone size in m³, 0 for none. |
+| `gravel_filter_m3` | number \| string \| null |  | RJ: gravel filter size in m³, 0 for none. |
+| `head_unit_existing` | boolean \| null |  | RJ: the farmer already has a head unit. |
+| `pvc_existing` | boolean \| null |  | RJ: the farmer already has the PVC main line. |
+
+**`CropRequest`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `crop` | string \| null |  | From GET /subsidy/crops. Null means no crop chosen, which the workbook writes as 'Select Crop here' and which gives a standard spacing of zero. |
+| `inter_crop` | string \| null |  | The second crop of the same block. When present it, not the main crop, sets the standard spacing. |
+| `area` | number \| string | yes | Hectares, at most three decimals. |
+| `crop_spacing` | string |  | Free text such as '1.37 x 0.50'. Echoed on the document; the calculation does not read it. Default ``. |
+| `lateral_spacing` | number \| string | yes | The designed lateral spacing in metres. |
+| `lines` | Line-Input[] |  | Field-unit lines only. Empty for Sprinkler, which derives its own. |
+
 **`DeleteRequest`**
 
 | Field | Type | Required | Notes |
@@ -628,6 +725,12 @@ Every version of the number, oldest first. Any version's id works.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | Quotation | yes |  |
+
+**`Envelope_dict_str__Any__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | object | yes |  |
 
 **`Envelope_list_QuotationSummary__`**
 
@@ -656,6 +759,16 @@ Every version of the number, oldest first. Any version's id works.
 | `id` | string | yes |  |
 | `inquiry_no` | string | yes |  |
 | `stage` | `new` \| `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` \| `merged` \| `dormant` | yes |  |
+
+**`Line-Input`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `description` | string | yes | The item, as it prints on the quotation. |
+| `uom` | string | yes | Unit of measure, for the document. |
+| `rate` | number \| string | yes | Rate per unit in rupees, at most four decimals. |
+| `qty` | number \| string | yes | Quantity, at most three decimals. |
+| `product_id` | string \| null |  | The catalogue row this line is, when the designer picked it from the product list. Optional, and additive: the rate and description still come from this request, because a subsidy quotation is costed at the scheme's figures rather than at ours. What it buys is the two checks the catalogue makes possible - a head-unit item cannot appear in a crop block, and an item marked not subsidy-eligible cannot appear at all. |
 
 **`OrgUnitRef`**
 
@@ -734,6 +847,7 @@ Every version of the number, oldest first. Any version's id works.
 | `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
 | `warnings` | string[] | yes | Each is `code: sentence`. |
+| `subsidy` | QuotationSubsidy \| null |  | FS-057: a subsidised quotation's calculation; null otherwise or until it is calculated. |
 | `terms` | string \| null | yes |  |
 | `valid_until` | string \| null | yes |  |
 | `sent_at` | string \| null | yes |  |
@@ -837,6 +951,27 @@ Every version of the number, oldest first. Any version's id works.
 | `terms` | string \| null |  |  |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
 
+**`QuotationSubsidy`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `scheme` | string | yes | The lead's scheme the calculation ran on: GGRC, CG, RJ, UP. |
+| `system_type` | string | yes |  |
+| `category` | SubsidyCategory | yes |  |
+| `total_cost` | string | yes | The calculation's total incl GST, with any flat charge. |
+| `flat_charge` | string | yes | CG's inspection charge outside the cap; 0.00 elsewhere. |
+| `subsidy` | string | yes |  |
+| `farmer_share` | string | yes | What the farmer pays. |
+| `as_of` | string | yes | The masters' date. |
+| `formula_version` | string | yes |  |
+
+**`QuotationSubsidyIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `category_code` | string | yes | One of the calculation's categories; it must apply on every crop. |
+| `calculation` | CalculateRequest | yes | The subsidy calculator's request (POST /subsidy/calculate). Leave `scheme` out: the lead's scheme is used. |
+
 **`QuotationSummary`**
 
 | Field | Type | Required | Notes |
@@ -884,6 +1019,20 @@ Every version of the number, oldest first. Any version's id works.
 |---|---|---|---|
 | `channel` | `whatsapp` \| `none` |  | whatsapp: the link goes to the party's mobile once the PDF is ready. none: no message; share the link yourself. Default `whatsapp`. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
+
+**`SubsidyCategory`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+| `pct` | string | yes | Whole-number percent, as text: 70. |
+
+**`Sump`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `rate_per_ha` | number \| string |  | Zero or absent means no sump. Default `0`. |
 
 **`TerritoryRef`**
 

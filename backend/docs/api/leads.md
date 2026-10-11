@@ -778,7 +778,7 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `id` | string \| null | yes | Null when none was started; see `not_started`. |
 | `apply_url` | string \| null | yes | The link to send the applicant. Shown only here. |
-| `not_started` | string \| null | yes | mobile_in_use or application_open: why winning started no application. |
+| `not_started` | string \| null | yes | mobile_in_use, application_open or mobile_invalid: why winning started no application. |
 
 **`DismissResult`**
 

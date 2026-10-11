@@ -266,10 +266,15 @@ async def test_a_crop_name_is_matched_after_trimming(
 
 async def test_an_off_step_sprinkler_area_names_the_steps(
         client: httpx.AsyncClient, viewer: Admin) -> None:
-    """Rule 18, SUB-4: the workbook returns `#N/A`; the API says which areas exist."""
+    """Rule 18, SUB-4, as FS-055 rule 20 changed it (069): an area between steps is
+    calculated with a warning; outside the table the API says which areas exist."""
     h = await _auth(client, viewer.user)
     body = _body("sprinkler")
     body["crops"][0]["area"] = "1.100"
+    r = await client.post(f"{V1}/subsidy/calculate", json=body, headers=h)
+    assert r.status_code == 200, r.text
+    assert any(w.startswith("area_between_steps") for w in r.json()["data"]["warnings"])
+    body["crops"][0]["area"] = "5.200"
     r = await client.post(f"{V1}/subsidy/calculate", json=body, headers=h)
     assert r.status_code == 422, r.text
     message = r.json()["error"]["fields"]["area"]

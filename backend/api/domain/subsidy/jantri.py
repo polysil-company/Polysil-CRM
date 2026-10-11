@@ -35,6 +35,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
+from api.domain.subsidy.money import round2
+
 ZERO = Decimal(0)
 ONE = Decimal(1)
 ONE_METRE = Decimal("1")
@@ -146,17 +148,22 @@ def _lerp(lo: Decimal, hi: Decimal, num: Decimal, den: Decimal) -> Decimal:
 
 
 def bilinear(matrix: Matrix2D, *, area: Decimal, spacing: Decimal,
-             outside: OutsideTable = OutsideTable.CLAMP, scale_above_max: bool = True) -> Jantri:
+             outside: OutsideTable = OutsideTable.CLAMP, scale_above_max: bool = True,
+             guards: bool = True) -> Jantri:
     """Rule 6, with the guards of rules 7 and 8. `scale_above_max` is the regular
     table's `* area / 5`; the 7-year tables are only ever called inside their
-    window, so their callers pass False."""
+    window, so their callers pass False. `guards` off (UP, FS-056 rules 5 and 6):
+    below the first column the line of the first two continues, and below 1 m
+    the spacing interpolates like any other."""
     num, den, used_spacing, used_area, warnings = _ratio(
-        matrix, area=area, spacing=spacing, outside=outside, scale_above_max=scale_above_max)
+        matrix, area=area, spacing=spacing, outside=outside, scale_above_max=scale_above_max,
+        guards=guards)
     return Jantri(num / den, used_spacing, used_area, warnings)
 
 
 def _ratio(matrix: Matrix2D, *, area: Decimal, spacing: Decimal, outside: OutsideTable,
-           scale_above_max: bool) -> tuple[Decimal, Decimal, Decimal, Decimal, tuple[str, ...]]:
+           scale_above_max: bool,
+           guards: bool = True) -> tuple[Decimal, Decimal, Decimal, Decimal, tuple[str, ...]]:
     """The unit cost as an exact numerator over an exact denominator.
 
     Every path returns a pair rather than a quotient, so `bilinear` divides once
@@ -165,7 +172,7 @@ def _ratio(matrix: Matrix2D, *, area: Decimal, spacing: Decimal, outside: Outsid
     if scale_above_max and area > matrix.max_area:
         num, den, used_spacing, _, so_far = _ratio(
             matrix, area=matrix.max_area, spacing=spacing, outside=outside,
-            scale_above_max=False)
+            scale_above_max=False, guards=guards)
         note = (f"area_above_table: {area} Ha is above the largest tabulated "
                 f"{matrix.max_area} Ha; the unit cost was scaled by area / {matrix.max_area}")
         return num * area, den * matrix.max_area, used_spacing, area, (*so_far, note)
@@ -180,12 +187,13 @@ def _ratio(matrix: Matrix2D, *, area: Decimal, spacing: Decimal, outside: Outsid
     below_area = area < matrix.min_area
     if below_area:
         warnings.append(f"area_below_table: {area} Ha is below the smallest tabulated "
-                        f"{matrix.min_area} Ha; that column was used")
+                        f"{matrix.min_area} Ha; " + ("that column was used" if guards else
+                                                     "the first two columns' line continues"))
 
     # The workbook's guards: no interpolation at all, the row's upper bracket at
     # the lower column. Below 1 m the row is the smallest one. Both guards can
     # fire at once, and both are reported (code review F-10).
-    if spacing < ONE_METRE or below_area:
+    if guards and (spacing < ONE_METRE or below_area):
         return matrix.at(s_hi, a_lo), ONE, s_hi, a_lo, tuple(warnings)
 
     # The area weight along each of the two rows, still over its denominator.
@@ -232,6 +240,68 @@ def lookup_1d(table: Mapping[Decimal, Decimal], area: Decimal) -> Decimal | None
         if key == area:
             return cost
     return None
+
+
+def between_1d(table: Mapping[Decimal, Decimal], area: Decimal) -> Decimal | None:
+    """FS-055 rule 20: straight-line between the two tabulated areas around this
+    one, rounded to the paisa: it is stored with the application (plan review B-2).
+    An exact step returns its cell as tabulated; outside the table, None."""
+    exact = lookup_1d(table, area)
+    if exact is not None:
+        return exact
+    below = [a for a in table if a < area]
+    above = [a for a in table if a > area]
+    if not below or not above:
+        return None
+    lo, hi = max(below), min(above)
+    return round2(table[lo] + (table[hi] - table[lo]) * (area - lo) / (hi - lo))
+
+
+@dataclass(frozen=True)
+class RowTable:
+    """FS-056: a unit cost table keyed by a row name and an area. The row is a
+    spacing label (CG and RJ drip: '1.2 x 0.60') or a set size ('75'). Rows may
+    hold different areas, and a missing row is a missing value, not a fault."""
+
+    rows: Mapping[str, Mapping[Decimal, Decimal]]
+
+    @staticmethod
+    def key(name: str) -> str:
+        """Labels are matched without case or spaces: the workbooks write
+        '1.2X0.30', '1.2x0.30' and '1.2 x 0.30' for one row."""
+        return "".join(name.split()).lower()
+
+    def row(self, name: str) -> Mapping[Decimal, Decimal] | None:
+        return self.rows.get(self.key(name))
+
+    def labels(self) -> tuple[str, ...]:
+        return tuple(self.rows)
+
+    def stepped(self, name: str, area: Decimal) -> Decimal | None:
+        """A size table (rule 8): exact on a step, straight line between steps,
+        None outside the row or for a row with no cells."""
+        row = self.row(name)
+        return None if not row else between_1d(row, area)
+
+    def anchored(self, name: str, area: Decimal, *, prorate_below: bool,
+                 zero_above: bool) -> Decimal | None:
+        """A label table (rules 11 and 14): straight line between the anchors;
+        below the first anchor pro rata from it, or None; above the last 0, or
+        None. Unrounded."""
+        row = self.row(name)
+        if not row:
+            return None
+        anchors = sorted(row)
+        if area < anchors[0]:
+            return row[anchors[0]] * area / anchors[0] if prorate_below else None
+        if area > anchors[-1]:
+            return ZERO if zero_above else None
+        exact = row.get(area)
+        if exact is not None:
+            return exact
+        lo = max(a for a in anchors if a < area)
+        hi = min(a for a in anchors if a > area)
+        return row[lo] + (row[hi] - row[lo]) * (area - lo) / (hi - lo)
 
 
 def table_1d(rows: Iterable[tuple[object, object]]) -> dict[Decimal, Decimal]:

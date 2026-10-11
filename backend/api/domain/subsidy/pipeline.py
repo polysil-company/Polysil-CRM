@@ -16,6 +16,7 @@ differ by rounding the response says so.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 
 from api.domain.subsidy.categories import category_rows
@@ -43,7 +44,10 @@ RESIDUAL_KEYS: tuple[str, ...] = (
 def seven_block(q: QuotationInput, masters: Masters, policy: SystemPolicy) -> QuotationResult:
     if not q.crops:
         raise SubsidyError("no_crops", "at least one crop", "crops")
-    if not isinstance(masters.regular, Matrix2D) or not isinstance(masters.seven_year, Matrix2D):
+    if not isinstance(masters.regular, Matrix2D) or not (
+            isinstance(masters.seven_year, Matrix2D)
+            or (masters.seven_year is None and policy.cap_mode != "ggrc")):
+        # FS-056: a state workbook may have no 7-year table
         raise SubsidyError("matrix_shape", f"{policy.system_type} needs two-dimensional matrices")
     rounding = policy.rounding
     areas_total = sum((c.area for c in q.crops), ZERO)
@@ -90,7 +94,8 @@ def _crop(c: CropInput, q: QuotationInput, masters: Masters, policy: SystemPolic
     categories = category_rows(masters.categories, cost=blocks.cost_excl_gst,
                                total_gst=blocks.total_gst, sump=blocks.sump, area=c.area,
                                jantri=jantri, seven_year_applicable=seven_year_ok,
-                               gsdma_max_area=policy.gsdma_max_area)
+                               gsdma_max_area=policy.gsdma_max_area, cap_mode=policy.cap_mode,
+                               share_floor_zero=policy.share_floor_zero)
     return CropResult(c.crop, c.inter_crop, c.area, c.lateral_spacing, jantri, blocks, categories,
                       jantri.warnings)
 
@@ -128,7 +133,7 @@ def _blocks(policy: SystemPolicy, *, head_share: Decimal, field: Decimal, instal
 
 def _jantri(c: CropInput, q: QuotationInput, masters: Masters, policy: SystemPolicy, *,
             seven_year_ok: bool) -> JantriFigures:
-    assert isinstance(masters.regular, Matrix2D) and isinstance(masters.seven_year, Matrix2D)
+    assert isinstance(masters.regular, Matrix2D)
     # Rule 6: the inter-crop's standard when there is one, else the crop's; then the larger of
     # that and the designed spacing ('New Subsidy Calculation C1'!C55:C56).
     standard = masters.standard_spacing(c.inter_crop if c.inter_crop else c.crop)
@@ -138,17 +143,23 @@ def _jantri(c: CropInput, q: QuotationInput, masters: Masters, policy: SystemPol
         spacing = c.lateral_spacing
     regular = bilinear(masters.regular, area=c.area, spacing=spacing,
                        outside=policy.spacing_outside_table,
-                       scale_above_max=policy.max_area_scaling)
+                       scale_above_max=policy.max_area_scaling, guards=policy.jantri_guards)
     warnings = list(regular.warnings)
-    # Rule 9: C32 = C30 + sump rate * area, the raw product, not the rounded block G
-    with_sump = regular.unit_cost + q.sump_rate_per_ha * c.area
+    if regular.unit_cost < 0:
+        # FS-056 EC-11: an extrapolation far past the table goes below zero
+        warnings.append("unit_cost_below_zero: the table's line runs below zero here; 0 used")
+        regular = replace(regular, unit_cost=ZERO)
+    # Rule 9: C32 = C30 + sump rate * area, the raw product, not the rounded block G.
+    # FS-056 rule 2: no sump joins the unit cost outside GGRC.
+    sump_term = q.sump_rate_per_ha * c.area if policy.cap_mode == "ggrc" else ZERO
+    with_sump = regular.unit_cost + sump_term
     for_cap = with_sump
     if policy.min_area_prorate and c.area < masters.regular.min_area:
         # Rule 8: Mini 'Quo Summary'!M31 = (G32/20)*area*100, the value times area / 0.2
         for_cap = with_sump * c.area / masters.regular.min_area
 
     seven_year = seven_year_spacing = None
-    if seven_year_ok:
+    if seven_year_ok and isinstance(masters.seven_year, Matrix2D):
         # Rules 14, 15: the designed spacing floored, the crop's own area, no scaling
         seven_year_spacing = c.lateral_spacing
         if policy.seven_year_spacing_floor is not None:

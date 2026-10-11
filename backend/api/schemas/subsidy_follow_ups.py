@@ -96,7 +96,7 @@ class ParameterRow(BaseModel):
 
     system_type: SystemType | None = None
     key: str = Field(min_length=1, max_length=80)
-    value: Decimal = Field(max_digits=18, decimal_places=4)
+    value: Decimal = Field(max_digits=16, decimal_places=6)   # 071 widened the column
     unit: str = Field(min_length=1, max_length=20, description="One of the units migration 009 knows.")
 
 

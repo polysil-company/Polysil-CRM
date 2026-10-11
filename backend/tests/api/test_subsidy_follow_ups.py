@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import AsyncIterator, Callable
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -97,8 +98,9 @@ async def test_a_parameter_revision_starts_on_its_date_and_leaves_today_alone(
         return next((x["value"] for x in rows if x["key"] == param_key), None)
 
     assert await value_on(today_ist()) is None, "nothing in force today"
-    assert await value_on(tomorrow) == "200.0000"
-    assert await value_on(later) == "300.0000"
+    # six places from 071 (UP's 0.169 % insurance needs them)
+    assert Decimal(await value_on(tomorrow)) == Decimal("200")
+    assert Decimal(await value_on(later)) == Decimal("300")
 
 
 @pytest.mark.usefixtures("fake_engine")

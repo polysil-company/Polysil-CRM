@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from api.domain.subsidy.jantri import Matrix2D, OutsideTable
+from api.domain.subsidy.jantri import Matrix2D, OutsideTable, RowTable
 from api.domain.subsidy.money import ZERO, RoundingPolicy
 
 
@@ -52,6 +52,13 @@ class QuotationInput:
     group_total_area: Decimal | None = None
     installation_rate_per_ha: Decimal = ZERO
     nozzle: str | None = None
+    # FS-056: inputs the CG, RJ and UP workbooks take
+    pipe_size_mm: int | None = None
+    spacing_label: str | None = None
+    hydrocyclone_m3: Decimal = ZERO
+    gravel_filter_m3: Decimal = ZERO
+    head_unit_existing: bool = False
+    pvc_existing: bool = False
 
 
 # ── masters ──────────────────────────────────────────────────────────────────
@@ -112,6 +119,18 @@ class SystemPolicy:
     # GAP-076's lever: the parameter names itself as the place the client's
     # answer lands, so the refusal reads it rather than being hard-coded.
     exact_area_match_required: bool = True
+    # FS-056
+    cap_mode: str = "ggrc"                    # ggrc | incl_gst | unit_cost_only
+    share_floor_zero: bool = False
+    jantri_guards: bool = True                # the 1 m and below-the-first-column guards
+    pipe_size_from_input: bool = False
+    fittings_rate: Decimal = ZERO
+    flat_inspection: Decimal = ZERO
+    unit_cost_round_rupee: bool = False
+    zero_above_max_area: bool = False
+    head_unit_deduction: Decimal = ZERO
+    gst_inclusive_rate: Decimal = Decimal("0.05")
+    rates_include_gst: bool = False           # CG sprinkler: the pipeline is gst_inclusive
 
 
 def rate_matches(row: ComponentRate, code: str, pipe_size_mm: int | None,
@@ -124,8 +143,8 @@ def rate_matches(row: ComponentRate, code: str, pipe_size_mm: int | None,
 
 @dataclass(frozen=True)
 class Masters:
-    regular: Matrix2D | Mapping[Decimal, Decimal]
-    seven_year: Matrix2D | Mapping[Decimal, Decimal]
+    regular: Matrix2D | Mapping[Decimal, Decimal] | RowTable
+    seven_year: Matrix2D | Mapping[Decimal, Decimal] | RowTable | None
     categories: tuple[Category, ...]
     # keyed on the trimmed, lower-cased crop name
     standard_spacings: Mapping[str, Decimal] = field(default_factory=dict)
@@ -178,6 +197,8 @@ class Blocks:
     sgst_e: Decimal = ZERO
     education: Decimal = ZERO
     sump: Decimal = ZERO
+    fittings: Decimal = ZERO          # FS-056: CG drip's % add-on
+    flat_inspection: Decimal = ZERO   # FS-056: CG's charge outside the cap, on the share
     cost_excl_gst: Decimal = ZERO
     total_cgst: Decimal = ZERO
     total_sgst: Decimal = ZERO
@@ -195,6 +216,8 @@ class JantriFigures:
     spacing_for_subsidy: Decimal
     seven_year_spacing: Decimal | None
     warnings: tuple[str, ...] = ()
+    add_ons: Decimal = ZERO           # FS-056 rule 15
+    deductions: Decimal = ZERO        # FS-056 rule 16
 
 
 @dataclass(frozen=True)
@@ -245,6 +268,7 @@ class SprinklerFigures:
     lines: tuple[SprinklerLine, ...]
     field_unit_before_transport: Decimal
     dbt_farmer_payable: Decimal
+    nozzle: str | None = None          # FS-056: the one quoted when the request sent none
 
 
 @dataclass(frozen=True)

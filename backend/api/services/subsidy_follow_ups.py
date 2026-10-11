@@ -53,7 +53,7 @@ async def ageing(db: AsyncSession, *, status: str | None = None, stage: str | No
         params.update(at=at, aid=aid)
     rows = (await db.execute(text(
         "SELECT a.id, a.application_no::text AS no, a.reg_no::text AS reg, a.farmer_name, a.status::text AS status, "
-        "a.full_fp_received_on, a.created_at, d.name AS stage, "
+        "a.full_fp_received_on, a.created_at, d.name AS stage, subsidy_dispatched_on(a.lead_id) AS shipped, "
         # the day it was cancelled, in IST, from its own event: updated_at moves on any later write
         "(SELECT (max(ev.occurred_at) AT TIME ZONE 'Asia/Kolkata')::date FROM activity_event ev "
         "  WHERE ev.entity_type = 'subsidy_application' AND ev.entity_id = a.id AND ev.kind = 'subsidy.cancelled') "
@@ -82,7 +82,10 @@ async def ageing(db: AsyncSession, *, status: str | None = None, stage: str | No
     out = []
     for r in rows:
         stopped = r.cancelled_on if r.status == "cancelled" else None
-        figures = domain.ageing(dates.get(str(r.id), {}), r.full_fp_received_on, stopped, today)
+        held = dict(dates.get(str(r.id), {}))
+        if held.get("supply") is None and r.shipped is not None:
+            held["supply"] = r.shipped        # FS-055 EC-1
+        figures = domain.ageing(held, r.full_fp_received_on, stopped, today)
         out.append(sch.AgeRow(
             application=sch.AgeRef(id=str(r.id), application_no=r.no, reg_no=r.reg, farmer_name=r.farmer_name,
                                    status=r.status, stage=r.stage, district=r.district),
@@ -111,7 +114,9 @@ async def stage_report(db: AsyncSession, status: str | None = "open") -> sch.Sta
 
 async def supply_report(db: AsyncSession, status: str | None = None) -> sch.SupplyPage:
     rows = (await db.execute(text(
-        "WITH x AS (SELECT a.total_cost, subsidy_value_date(a.id, 'supply') IS NOT NULL AS supplied, "
+        # FS-055 EC-1: a dispatch counts as the supply when stage 7 was recorded before it shipped
+        "WITH x AS (SELECT a.total_cost, COALESCE(subsidy_value_date(a.id, 'supply'), "
+        "subsidy_dispatched_on(a.lead_id)) IS NOT NULL AS supplied, "
         "  coalesce((SELECT t.name FROM territory_closure tc JOIN territory t ON t.id = tc.ancestor_id "
         "    WHERE tc.descendant_id = a.territory_id AND t.level = 'district' LIMIT 1), '(no district)') AS district "
         "  FROM subsidy_application a WHERE (CAST(:st AS text) IS NULL AND a.status <> 'cancelled' "

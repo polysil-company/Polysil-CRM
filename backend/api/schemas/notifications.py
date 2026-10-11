@@ -10,7 +10,8 @@ from api.schemas.leads import UUID_RE, UserRef
 
 
 class ResourceRef(BaseModel):
-    type: str = Field(description="lead, task, sales_order, quotation or complaint.")
+    type: str = Field(description="lead, task, sales_order, quotation, complaint or "
+                                  "subsidy_application.")
     id: str
     label: str = Field(description="The record's number or title, for the link text.")
 

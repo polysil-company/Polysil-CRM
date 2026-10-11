@@ -744,6 +744,7 @@ One approval chain.
 | `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
 | `warnings` | string[] | yes | Each is `code: sentence`. |
+| `subsidy` | QuotationSubsidy \| null |  | FS-057: a subsidised quotation's calculation; null otherwise or until it is calculated. |
 | `terms` | string \| null | yes |  |
 | `valid_until` | string \| null | yes |  |
 | `sent_at` | string \| null | yes |  |
@@ -806,6 +807,20 @@ One approval chain.
 | `id` | string | yes |  |
 | `quote_no` | string \| null | yes |  |
 | `version` | integer | yes |  |
+
+**`QuotationSubsidy`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `scheme` | string | yes | The lead's scheme the calculation ran on: GGRC, CG, RJ, UP. |
+| `system_type` | string | yes |  |
+| `category` | SubsidyCategory | yes |  |
+| `total_cost` | string | yes | The calculation's total incl GST, with any flat charge. |
+| `flat_charge` | string | yes | CG's inspection charge outside the cap; 0.00 elsewhere. |
+| `subsidy` | string | yes |  |
+| `farmer_share` | string | yes | What the farmer pays. |
+| `as_of` | string | yes | The masters' date. |
+| `formula_version` | string | yes |  |
 
 **`ReceiptOut`**
 
@@ -903,6 +918,14 @@ One approval chain.
 | `material_is_total` | boolean | yes |  |
 | `farmer_payable_is_derived` | boolean | yes |  |
 | `leads` | SubsidyLeadRef[] | yes | In order; the first is the order's lead. |
+
+**`SubsidyCategory`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes |  |
+| `name` | string | yes |  |
+| `pct` | string | yes | Whole-number percent, as text: 70. |
 
 **`SubsidyLeadRef`**
 

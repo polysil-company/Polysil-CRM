@@ -268,8 +268,13 @@ async def ledger(db: AsyncSession, caller: Caller, partner_id: str, *, start: dt
     if partner.name is None or not (await db.execute(text("SELECT app_has_permission('payments', 'view')"))).scalar_one():
         raise NotFoundError("No such dealer.")
     orders = (await db.execute(text(
-        "SELECT o.id::text AS id, o.order_no::text AS order_no, o.total, "
+        # FS-055 rule 1, as order_farmer_total() has it: a subsidised order is owed its farmer's share
+        "SELECT o.id::text AS id, o.order_no::text AS order_no, "
+        "CASE WHEN o.order_type::text = 'subsidised' AND s.sales_order_id IS NOT NULL "
+        "THEN GREATEST(0, LEAST(o.total, COALESCE(s.farmer_payable, COALESCE(s.material_amount, o.total) "
+        "- s.subsidy_amount))) ELSE o.total END AS total, "
         "(o.approved_at AT TIME ZONE 'Asia/Kolkata')::date AS on_day FROM sales_order o "
+        "LEFT JOIN order_subsidy s ON s.sales_order_id = o.id "
         "WHERE o.partner_id = CAST(:p AS uuid) AND o.approved_at IS NOT NULL AND o.status::text <> 'cancelled' "
         "AND o.deleted_at IS NULL"), {"p": partner_id})).all()
     benefits = (await db.execute(text(
