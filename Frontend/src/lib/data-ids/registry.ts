@@ -762,6 +762,36 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /subsidy-reports/supply", "GET /subsidy-reports/supply/export"],
   },
+  "SUBS-012": {
+    domain: "SUBS",
+    title:
+      "Subsidy masters — categories, parameters, component rates and crop spacings, revised from a date",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-masters/{kind}", "POST /subsidy-masters/{kind}/revisions"],
+  },
+  "SUBS-013": {
+    domain: "SUBS",
+    title:
+      "Subsidy matrices — the unit-cost and quantity matrices in force, and a new one from a date",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-masters/{kind}/matrices", "POST /subsidy-masters/{kind}/matrices"],
+  },
+  "SUBS-014": {
+    domain: "SUBS",
+    title:
+      "Subsidy schemes — a state's scheme set up, its readiness, stage names and switching off",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /subsidy-schemes",
+      "POST /subsidy-schemes",
+      "GET /subsidy-schemes/{code}",
+      "PATCH /subsidy-schemes/{code}",
+      "PATCH /subsidy-schemes/{code}/stages/{stageCode}",
+    ],
+  },
 
   "REPO-001": {
     domain: "REPO",

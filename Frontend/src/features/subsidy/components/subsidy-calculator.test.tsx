@@ -1,12 +1,15 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createScheme } from "@/features/subsidy/api/subsidy-schemes.api";
 import { buildApiUrl } from "@/lib/api/url";
 import type { Role } from "@/lib/auth/roles";
 import { writeMockRole } from "@/lib/dev/mock-settings";
 import { mockMeFor } from "@/mocks/data/sessions";
+import { mockStateTerritoryId } from "@/mocks/data/subsidy-schemes";
+import { resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 import { renderWithProviders } from "@/test/render";
 
@@ -144,5 +147,45 @@ describe("[SUBS-002] SubsidyCalculator", () => {
     show();
     expect(await screen.findByText("You don't have access to this")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Drip" })).not.toBeInTheDocument();
+  });
+});
+
+describe("[SUBS-014] SubsidyCalculator · scheme", () => {
+  afterEach(() => {
+    resetMockDb();
+    writeMockRole("admin");
+  });
+
+  it("shows no scheme picker while only one scheme is active", async () => {
+    signInAs("employee");
+    show();
+    expect(await screen.findByRole("tab", { name: "Drip" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Scheme" })).not.toBeInTheDocument();
+  });
+
+  it("calculates under another state's scheme, with only its systems", async () => {
+    writeMockRole("admin");
+    const state = mockStateTerritoryId("UP");
+    if (state === null) throw new Error("No Uttar Pradesh in the mock");
+    await createScheme({
+      body: {
+        code: "UPMIS",
+        name: "UP Micro Irrigation",
+        state_territory_id: state,
+        template: "GGRC",
+        systems: ["drip", "sprinkler"],
+      },
+      idempotencyKey: "calc-up",
+    });
+    signInAs("employee");
+    const user = show();
+    await user.click(await screen.findByRole("combobox", { name: "Scheme" }));
+    await user.click(await screen.findByRole("option", { name: /UPMIS/ }));
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Mini Sprinkler" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    });
   });
 });

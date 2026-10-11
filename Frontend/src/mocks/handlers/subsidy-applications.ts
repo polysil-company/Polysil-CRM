@@ -24,12 +24,15 @@ import {
   MOCK_STAGE_DEFS,
   type MockStageDef,
 } from "@/mocks/data/subsidy-applications";
+import { MOCK_DEFAULT_SCHEME, type MockScheme } from "@/mocks/data/subsidy-schemes";
+import { mockTerritoryLineage } from "@/mocks/data/territories";
 import { mockDb } from "@/mocks/db";
 
 import { recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
 import { calculate, checkCalculation, type CalculateBody } from "./subsidy";
+import { mockScheme, schemeReady } from "./subsidy-readiness";
 
 /**
  * SUBS-004 … SUBS-008 · Subsidy applications, with the backend's rules: who may start one, the
@@ -380,12 +383,28 @@ const stageSchema = z.object({
 
 const cancelSchema = z.object({ reason: z.string().trim().min(1).max(500) });
 
-/** The mock's one scheme: every lead's state runs GGRC. */
-const MOCK_SCHEME = {
-  code: "GGRC",
-  name: "Gujarat Green Revolution Company",
-  ready: true,
-} as const;
+/**
+ * The scheme an application on this lead uses, as `subsidy_scheme_for_lead` finds it: the active
+ * scheme of the lead's state; in legacy mode (no active scheme names a state) the one active
+ * scheme. A Response is the backend's 422.
+ */
+function schemeForLead(territoryId: string): MockScheme | Response {
+  const state = mockTerritoryLineage(territoryId).find((territory) => territory.level === "state");
+  if (state === undefined) {
+    return errorResponse(
+      422,
+      "territory_without_state_code",
+      "The lead's territory sits under no state.",
+    );
+  }
+  const active = mockDb.subsidySchemes.filter((scheme) => scheme.is_active);
+  const own = active.find((scheme) => scheme.state_territory_id === state.id);
+  if (own !== undefined) return own;
+  const legacy = active.every((scheme) => scheme.state_territory_id === null) ? active : [];
+  const [only] = legacy;
+  if (only !== undefined && legacy.length === 1) return only;
+  return errorResponse(422, "no_scheme_for_state", "No active subsidy scheme covers this state.");
+}
 
 /** The backend's per-type checks on a stage's values. */
 function valueProblems(
@@ -424,15 +443,25 @@ export const subsidyApplicationHandlers = [
     if (!caller().view) return forbidden();
     const lead = mockDb.leads.find((item) => item.id === params.leadId);
     if (lead === undefined) return errorResponse(404, "not_found", "No such visible lead.");
-    return HttpResponse.json({ data: MOCK_SCHEME });
+    const scheme = schemeForLead(lead.territory.id);
+    if (scheme instanceof Response) return scheme;
+    return HttpResponse.json({
+      data: { code: scheme.code, name: scheme.name, ready: schemeReady(scheme, todayInIndia()) },
+    });
   }),
 
-  http.get(buildApiUrl("/subsidy-stages"), async () => {
+  http.get(buildApiUrl("/subsidy-stages"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     if (!caller().view) return forbidden();
+    const scheme = mockScheme(new URL(request.url).searchParams.get("scheme"));
+    if (scheme === undefined) return errorResponse(404, "not_found", "No such scheme.");
     return HttpResponse.json({
-      data: MOCK_STAGE_DEFS.map((stage) => ({
+      data: MOCK_STAGE_DEFS.flatMap((stage) => {
+        // The scheme's own names: an administrator may have renamed a stage (SUBS-014).
+        const own = scheme.stages.find((item) => item.code === stage.code);
+        return own === undefined || !own.is_active ? [] : [{ ...stage, name: own.name }];
+      }).map((stage) => ({
         seq: stage.seq,
         code: stage.code,
         name: stage.name,
@@ -555,7 +584,9 @@ export const subsidyApplicationHandlers = [
         ),
       );
     }
-    if ((checked.body.scheme ?? MOCK_SCHEME.code) !== MOCK_SCHEME.code) {
+    const scheme = schemeForLead(lead.territory.id);
+    if (scheme instanceof Response) return scheme;
+    if ((checked.body.scheme ?? MOCK_DEFAULT_SCHEME).toUpperCase() !== scheme.code) {
       return invalid({ "calculation.scheme": "not the lead's scheme" });
     }
     if (checked.body.system_type !== system) {

@@ -33,9 +33,13 @@ export const MOCK_ID_SPACE = {
   subsidyApplication: 0x5a,
   subsidyEntry: 0x5e,
   subsidyDocument: 0x5d,
+  subsidyMaster: 0x5b,
 } as const;
 
 export const MOCK_STATE = { name: "Gujarat", code: "GJ" } as const;
+
+/** A second state with no scheme yet, so a new state's subsidy scheme can be set up (SUBS-014). */
+export const MOCK_OTHER_STATE = { name: "Uttar Pradesh", code: "UP" } as const;
 
 /** The 33 districts with the abbreviations the client's sheets use. */
 export const MOCK_DISTRICTS: readonly (readonly [name: string, code: string])[] = [

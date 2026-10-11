@@ -202,6 +202,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | SUBS-009 | Subsidy ageing — the client's six ageing figures per application, with its export (`GET /subsidy-reports/ageing`, `GET /subsidy-reports/ageing/export`) | shared | in-progress |
 | SUBS-010 | Subsidy stage report — applications and money in each stage, with its export (`GET /subsidy-reports/stages`, `GET /subsidy-reports/stages/export`) | shared | in-progress |
 | SUBS-011 | Subsidy supply report — supplied and not supplied by district, with its export (`GET /subsidy-reports/supply`, `GET /subsidy-reports/supply/export`) | shared | in-progress |
+| SUBS-012 | Subsidy masters — categories, parameters, component rates and crop spacings, revised from a date (`GET /subsidy-masters/{kind}`, `POST /subsidy-masters/{kind}/revisions`) | shared | in-progress |
+| SUBS-013 | Subsidy matrices — the unit-cost and quantity matrices in force, and a new one from a date (`GET /subsidy-masters/{kind}/matrices`, `POST /subsidy-masters/{kind}/matrices`) | shared | in-progress |
+| SUBS-014 | Subsidy schemes — a state's scheme set up, its readiness, stage names and switching off (`GET /subsidy-schemes`, `POST /subsidy-schemes`, `GET /subsidy-schemes/{code}`, `PATCH /subsidy-schemes/{code}`, `PATCH /subsidy-schemes/{code}/stages/{stageCode}`) | shared | in-progress |
 | ACCT-001 | Accounts work queue | shared | planned |
 | DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |
 | DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |

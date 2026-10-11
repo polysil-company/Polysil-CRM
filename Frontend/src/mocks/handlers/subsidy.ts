@@ -11,6 +11,7 @@ import {
 } from "@/features/subsidy/api/subsidy.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { readMockRole } from "@/lib/dev/mock-settings";
+import { todayInIndia } from "@/lib/format";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import {
   MOCK_FORMULA_VERSION,
@@ -25,12 +26,21 @@ import {
 
 import { applyScenario } from "./scenario";
 import { errorResponse } from "./shared";
+import { missingFor, mockMasters, readActiveScheme } from "./subsidy-readiness";
 
 /**
  * SUBS-002, SUBS-003 · The subsidy calculation and its lookups. The mock's arithmetic is a
  * plausible stand-in with the same shape — blocks, unit cost, eight categories, warnings — and
- * the backend's refusals; the real figures come only from the backend's engine.
+ * the backend's refusals; the real figures come only from the backend's engine. Another state's
+ * scheme (SUBS-014) reads its own masters, and refuses to calculate until they are complete.
  */
+
+const DEFAULT_SCHEME = "GGRC";
+
+function inForceToday(row: { effective_from: string; effective_to: string | null }): boolean {
+  const today = todayInIndia();
+  return row.effective_from <= today && (row.effective_to === null || row.effective_to > today);
+}
 
 const SEVEN_YEAR_MIN = 0.2;
 const SEVEN_YEAR_MAX = 5;
@@ -389,7 +399,7 @@ export function calculate(body: CalculateBody): CalculateResponseWire["data"] {
 
   return {
     system_type: system,
-    scheme: "GGRC",
+    scheme: body.scheme?.toUpperCase() ?? DEFAULT_SCHEME,
     masters: {
       as_of: MOCK_SUBSIDY_AS_OF,
       formula_version: MOCK_FORMULA_VERSION,
@@ -428,33 +438,56 @@ export function checkCalculation(
 }
 
 export const subsidyHandlers = [
-  http.get(buildApiUrl("/subsidy/config"), async () => {
+  http.get(buildApiUrl("/subsidy/config"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     if (!mayView()) return errorResponse(403, "forbidden", "You may not see subsidy.");
+    const scheme = readActiveScheme(new URL(request.url).searchParams.get("scheme"));
+    if (scheme instanceof Response) return scheme;
+    const own = scheme.code !== DEFAULT_SCHEME;
     const data: SubsidyConfigWire["data"] = {
-      scheme: "GGRC",
+      scheme: scheme.code,
       as_of: MOCK_SUBSIDY_AS_OF,
-      systems: SYSTEMS.map((system) => ({
-        system_type: system.systemType,
-        has_head_unit: system.hasHeadUnit,
-        supports_group: system.supportsGroup,
-        crop_count_max: system.cropCountMax,
-        spacing_rule: "max_of_designed_and_standard",
-        seven_year_spacing_floor: SEVEN_YEAR_SPACING_FLOOR.toFixed(2),
-        quantity_source: system.systemType === "sprinkler" ? "matrix" : "design",
-        formula_version: MOCK_FORMULA_VERSION,
-        sprinkler_areas: system.systemType === "sprinkler" ? [...MOCK_SPRINKLER_AREAS] : null,
-      })),
-      parameters: { ...MOCK_SUBSIDY_PARAMETERS },
+      systems: SYSTEMS.filter((system) => scheme.systems.includes(system.systemType)).map(
+        (system) => ({
+          system_type: system.systemType,
+          has_head_unit: system.hasHeadUnit,
+          supports_group: system.supportsGroup,
+          crop_count_max: system.cropCountMax,
+          spacing_rule: "max_of_designed_and_standard",
+          seven_year_spacing_floor: SEVEN_YEAR_SPACING_FLOOR.toFixed(2),
+          quantity_source: system.systemType === "sprinkler" ? "matrix" : "design",
+          formula_version: MOCK_FORMULA_VERSION,
+          sprinkler_areas: system.systemType === "sprinkler" ? [...MOCK_SPRINKLER_AREAS] : null,
+        }),
+      ),
+      parameters: own
+        ? Object.fromEntries(
+            mockMasters(scheme.code)
+              .parameters.filter(inForceToday)
+              .map((row) => [
+                row.system_type === null ? row.key : `${row.system_type}.${row.key}`,
+                row.value,
+              ]),
+          )
+        : { ...MOCK_SUBSIDY_PARAMETERS },
     };
     return HttpResponse.json({ data });
   }),
 
-  http.get(buildApiUrl("/subsidy/crops"), async () => {
+  http.get(buildApiUrl("/subsidy/crops"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     if (!mayView()) return errorResponse(403, "forbidden", "You may not see subsidy.");
+    const scheme = readActiveScheme(new URL(request.url).searchParams.get("scheme"));
+    if (scheme instanceof Response) return scheme;
+    if (scheme.code !== DEFAULT_SCHEME) {
+      return HttpResponse.json({
+        data: mockMasters(scheme.code)
+          ["crop-spacings"].filter(inForceToday)
+          .map((row) => ({ crop: row.crop, standard_spacing: row.standard_spacing })),
+      });
+    }
     return HttpResponse.json({
       data: MOCK_SUBSIDY_CROPS.map((row) => ({
         crop: row.crop,
@@ -467,10 +500,30 @@ export const subsidyHandlers = [
     const { failure } = await applyScenario();
     if (failure) return failure;
     if (!mayView()) return errorResponse(403, "forbidden", "You may not see subsidy.");
-    const system = systemTypeSchema.safeParse(new URL(request.url).searchParams.get("system_type"));
+    const url = new URL(request.url);
+    const system = systemTypeSchema.safeParse(url.searchParams.get("system_type"));
     if (!system.success) {
       return errorResponse(422, "validation_error", "Some fields need correcting.", {
         system_type: "drip, mini_sprinkler or sprinkler",
+      });
+    }
+    const scheme = readActiveScheme(url.searchParams.get("scheme"));
+    if (scheme instanceof Response) return scheme;
+    if (scheme.code !== DEFAULT_SCHEME) {
+      const rows = mockMasters(scheme.code).categories.filter(
+        (row) => row.system_type === system.data && inForceToday(row),
+      );
+      if (rows.length === 0) {
+        return errorResponse(404, "not_found", `No ${system.data} categories are in force.`);
+      }
+      return HttpResponse.json({
+        data: rows.map((row) => ({
+          code: row.code,
+          name: row.name,
+          pct: row.pct,
+          variant: row.variant,
+          gsdma_pct: row.gsdma_pct,
+        })),
       });
     }
     return HttpResponse.json({
@@ -491,6 +544,16 @@ export const subsidyHandlers = [
     const checked = checkCalculation(await request.json());
     if ("fields" in checked) {
       return errorResponse(422, "validation_error", "Some fields need correcting.", checked.fields);
+    }
+    const scheme = readActiveScheme(checked.body.scheme);
+    if (scheme instanceof Response) return scheme;
+    const missing = missingFor(scheme.code, checked.body.system_type, todayInIndia());
+    if (!scheme.systems.includes(checked.body.system_type) || missing.length > 0) {
+      return errorResponse(
+        404,
+        "not_found",
+        `${scheme.code} can't calculate ${checked.body.system_type} yet: ${missing[0] ?? "not one of its systems"}.`,
+      );
     }
     return HttpResponse.json({ data: calculate(checked.body) });
   }),
