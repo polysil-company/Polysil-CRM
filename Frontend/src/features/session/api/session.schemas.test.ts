@@ -23,6 +23,7 @@ describe("[AUTH-002] GET /auth/me contract", () => {
       orgUnit: { id: "ou-1", name: "Vadodara District" },
       partner: null,
       permissions: [{ module: "leads", actions: ["view", "create"], scope: "org_subtree" }],
+      mustChangePassword: false,
     });
   });
 
@@ -41,6 +42,19 @@ describe("[AUTH-002] GET /auth/me contract", () => {
     expect(session.orgUnit).toBeNull();
     expect(session.partner).toEqual({ id: "prt-1", name: null });
     expect(session.permissions).toEqual([{ module: "schemes", actions: ["view"], scope: null }]);
+    expect(session.mustChangePassword).toBe(false);
+  });
+
+  it("[AUTH-007] reads a temporary password in force", () => {
+    const session = meResponseSchema.parse({
+      data: {
+        id: "u-1",
+        full_name: "Asha Patel",
+        user_type: "staff",
+        must_change_password: true,
+      },
+    });
+    expect(session.mustChangePassword).toBe(true);
   });
 
   it("rejects a response without the envelope or with an unknown user type", () => {

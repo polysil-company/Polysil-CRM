@@ -6,6 +6,7 @@ import { createLogger } from "@/lib/logger";
 
 import {
   otpChallengeResponseSchema,
+  type ChangePasswordRequest,
   type OtpChallengeResponse,
   type OtpVerifyRequest,
   type StaffSignInRequest,
@@ -71,5 +72,32 @@ export function signOut(): Promise<undefined> {
     path: "/auth/logout",
     schema: z.undefined(),
     auth: "optional",
+  });
+}
+
+/**
+ * AUTH-007 · POST /auth/password: change your own password (staff only). 204, after which
+ * every session, this one included, is signed out. 422 `fields.current_password` when the
+ * current one is wrong, `fields.new_password` when the new one is refused; 409
+ * `password_changed_meanwhile` when an administrator reset it in between. The one call,
+ * besides `GET /auth/me`, that works while a temporary password is in force.
+ */
+export function changeOwnPassword({
+  body,
+  idempotencyKey,
+}: {
+  body: ChangePasswordRequest;
+  idempotencyKey: string;
+}): Promise<undefined> {
+  return apiRequest({
+    dataId: "AUTH-007",
+    logger: log,
+    fn: "changeOwnPassword",
+    method: "POST",
+    path: "/auth/password",
+    body,
+    idempotencyKey,
+    schema: z.undefined(),
+    sensitive: true,
   });
 }

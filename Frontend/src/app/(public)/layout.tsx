@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type * as React from "react";
 
-import { BrandMark } from "@/components/layout/brand-mark";
+import { BrandMark } from "@/components/patterns/brand-mark";
 
 export const metadata: Metadata = {
   // A customer link carries its secret in the path; never pass it on to another site.

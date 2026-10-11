@@ -131,6 +131,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | AUTH-004 | Keep signed in — rotate the access token with the refresh cookie (`POST /auth/refresh`) | shared | mocked |
 | AUTH-005 | Sign out (`POST /auth/logout`) | shared | mocked |
 | AUTH-006 | Signed-in routing — sign-in redirects, return path and session end | frontend | in-progress |
+| AUTH-007 | Change your own password — forced while a temporary password is in force (`POST /auth/password`) | shared | in-progress |
 | LEAD-001 | List leads with filters, sorting and pagination (`GET /leads`, `GET /leads/areas`) | shared | in-progress |
 | LEAD-002 | Create lead (`POST /leads`) | shared | in-progress |
 | LEAD-003 | Lead detail (`GET /leads/{leadId}`) | shared | in-progress |

@@ -22,6 +22,38 @@ export const staffSignInFormSchema = z.object({
 export type StaffSignInFormInput = z.input<typeof staffSignInFormSchema>;
 export type StaffSignInRequest = z.output<typeof staffSignInFormSchema>;
 
+/** The backend's length rule for a password (`identity.password_problem`): nothing else. */
+export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_MAX_LENGTH = 128;
+
+/**
+ * AUTH-007 · changing your own password. Both passwords are sent exactly as typed; the
+ * new one is typed twice so a slip doesn't lock the person out.
+ */
+export const changePasswordFormSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password."),
+    newPassword: z
+      .string()
+      .min(1, "Choose a new password.")
+      .min(PASSWORD_MIN_LENGTH, `At least ${String(PASSWORD_MIN_LENGTH)} characters.`)
+      .max(PASSWORD_MAX_LENGTH, `At most ${String(PASSWORD_MAX_LENGTH)} characters.`),
+    confirmPassword: z.string().min(1, "Type the new password again."),
+  })
+  .refine((values) => values.confirmPassword === values.newPassword, {
+    path: ["confirmPassword"],
+    message: "The two new passwords don't match.",
+  });
+
+export type ChangePasswordFormInput = z.input<typeof changePasswordFormSchema>;
+export type ChangePasswordFormValues = z.output<typeof changePasswordFormSchema>;
+
+/** POST /auth/password */
+export interface ChangePasswordRequest {
+  readonly current_password: string;
+  readonly new_password: string;
+}
+
 /** AUTH-001 · an Indian mobile, typed any common way, sent as E.164 without the plus. */
 export const mobileNumberFormSchema = z.object({
   mobile: z
