@@ -17,14 +17,14 @@ from api.domain import complaints as files
 from api.idempotency import payload_digest, run_idempotent
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.dealer_applications import (
-    ApplicantSession,
-    Application,
-    ApplicationCreate,
-    ApplicationFields,
-    ApplicationRow,
-    Decision,
-    GstLookup,
-    Remark,
+    DealerApplicantSession,
+    DealerApplication,
+    DealerApplicationCreate,
+    DealerApplicationDecision,
+    DealerApplicationFields,
+    DealerApplicationRemark,
+    DealerApplicationRow,
+    DealerGstLookup,
 )
 from api.schemas.leads import UUID_RE
 from api.services import dealer_applications as service
@@ -63,8 +63,8 @@ async def _idem(db: DbSession, claims: Claims, idem: IdemKey, route: str, body: 
     return JSONResponse(outcome.body, status_code=outcome.status_code)
 
 
-@router.post("", status_code=201, response_model=Envelope[Application], responses=_ERRORS)
-async def create(body: ApplicationCreate, db: DbSession, caller: CallerDep, claims: Claims,
+@router.post("", status_code=201, response_model=Envelope[DealerApplication], responses=_ERRORS)
+async def create(body: DealerApplicationCreate, db: DbSession, caller: CallerDep, claims: Claims,
                  idem: IdemKey) -> JSONResponse:
     """Start an application for a prospective dealer. Answers `apply_url`, the link to
     send them (shown once). Needs `partners.view`. `409 mobile_in_use` when the
@@ -73,23 +73,23 @@ async def create(body: ApplicationCreate, db: DbSession, caller: CallerDep, clai
                        lambda: service.create(db, caller, body), 201)
 
 
-@router.get("", response_model=Envelope[list[ApplicationRow]], responses=_ERRORS)
+@router.get("", response_model=Envelope[list[DealerApplicationRow]], responses=_ERRORS)
 async def list_applications(db: DbSession, caller: CallerDep,
                             status: Annotated[str | None, Query(description="Comma-separated statuses.")] = None,
-                            q: Annotated[str | None, Query(max_length=100)] = None) -> Envelope[list[ApplicationRow]]:
+                            q: Annotated[str | None, Query(max_length=100)] = None) -> Envelope[list[DealerApplicationRow]]:
     """The applications in your partners scope, newest first (at most 200)."""
     return Envelope(data=await service.list_(db, caller, status=status, q=q))
 
 
-@router.get("/{app_id}", response_model=Envelope[Application], responses=_ERRORS)
-async def get_application(app_id: Id, db: DbSession, caller: CallerDep) -> Envelope[Application]:
+@router.get("/{app_id}", response_model=Envelope[DealerApplication], responses=_ERRORS)
+async def get_application(app_id: Id, db: DbSession, caller: CallerDep) -> Envelope[DealerApplication]:
     """One application: every field, what is missing, and what you can do (`can`).
     Documents: `GET /documents?record_type=dealer_application&record_id=`."""
     return Envelope(data=await service.get(db, caller, app_id))
 
 
-@router.patch("/{app_id}", response_model=Envelope[Application], responses=_ERRORS)
-async def patch_application(app_id: Id, body: ApplicationFields, db: DbSession, caller: CallerDep,
+@router.patch("/{app_id}", response_model=Envelope[DealerApplication], responses=_ERRORS)
+async def patch_application(app_id: Id, body: DealerApplicationFields, db: DbSession, caller: CallerDep,
                             claims: Claims, idem: IdemKey) -> JSONResponse:
     """Fill or correct fields for the applicant, while draft, returned or submitted."""
     fields = service._clean_fields(body)
@@ -97,15 +97,15 @@ async def patch_application(app_id: Id, body: ApplicationFields, db: DbSession, 
                        lambda: service.staff_action(db, caller, app_id, "patch", fields=fields))
 
 
-@router.post("/{app_id}/submit", response_model=Envelope[Application], responses=_ERRORS)
+@router.post("/{app_id}/submit", response_model=Envelope[DealerApplication], responses=_ERRORS)
 async def submit(app_id: Id, db: DbSession, caller: CallerDep, claims: Claims, idem: IdemKey) -> JSONResponse:
     """Submit for the applicant. `422 application_incomplete` lists what is missing."""
     return await _idem(db, claims, idem, f"POST /api/v1/dealer-applications/{app_id}/submit", {},
                        lambda: service.staff_action(db, caller, app_id, "submit"))
 
 
-@router.post("/{app_id}/decision", response_model=Envelope[Application], responses=_ERRORS)
-async def decision(app_id: Id, body: Decision, db: DbSession, caller: CallerDep, claims: Claims,
+@router.post("/{app_id}/decision", response_model=Envelope[DealerApplication], responses=_ERRORS)
+async def decision(app_id: Id, body: DealerApplicationDecision, db: DbSession, caller: CallerDep, claims: Claims,
                    idem: IdemKey) -> JSONResponse:
     """Approve, reject or return a submitted application. Approving creates the dealer
     (under `parent_id`, or directly under Polysil) and a login on the applicant's
@@ -115,8 +115,8 @@ async def decision(app_id: Id, body: Decision, db: DbSession, caller: CallerDep,
                        body.model_dump(mode="json"), lambda: service.decide(db, caller, app_id, body))
 
 
-@router.post("/{app_id}/withdraw", response_model=Envelope[Application], responses=_ERRORS)
-async def withdraw(app_id: Id, body: Remark, db: DbSession, caller: CallerDep, claims: Claims,
+@router.post("/{app_id}/withdraw", response_model=Envelope[DealerApplication], responses=_ERRORS)
+async def withdraw(app_id: Id, body: DealerApplicationRemark, db: DbSession, caller: CallerDep, claims: Claims,
                    idem: IdemKey) -> JSONResponse:
     """Close an open application. The link stops working."""
     return await _idem(db, claims, idem, f"POST /api/v1/dealer-applications/{app_id}/withdraw",
@@ -124,7 +124,7 @@ async def withdraw(app_id: Id, body: Remark, db: DbSession, caller: CallerDep, c
                        lambda: service.staff_action(db, caller, app_id, "withdraw", remark=body.remark))
 
 
-@router.post("/{app_id}/link", response_model=Envelope[Application], responses=_ERRORS)
+@router.post("/{app_id}/link", response_model=Envelope[DealerApplication], responses=_ERRORS)
 async def renew_link(app_id: Id, db: DbSession, caller: CallerDep, claims: Claims, idem: IdemKey) -> JSONResponse:
     """A new link for 30 days (`apply_url`). The old link and any open applicant
     session stop working."""
@@ -132,8 +132,8 @@ async def renew_link(app_id: Id, db: DbSession, caller: CallerDep, claims: Claim
                        lambda: service.staff_action(db, caller, app_id, "renew"))
 
 
-@gstin_router.get("/gstin/{gstin}", response_model=Envelope[GstLookup], responses=_ERRORS)
-async def gstin_lookup(gstin: Annotated[str, Path(max_length=20)], caller: CallerDep) -> Envelope[GstLookup]:
+@gstin_router.get("/gstin/{gstin}", response_model=Envelope[DealerGstLookup], responses=_ERRORS)
+async def gstin_lookup(gstin: Annotated[str, Path(max_length=20)], caller: CallerDep) -> Envelope[DealerGstLookup]:
     """What a GSTIN says about itself: valid, its state code and PAN. Firm details need
     a GST data provider, not configured yet (`lookup: unavailable`)."""
     return Envelope(data=service.lookup(gstin))
@@ -159,7 +159,7 @@ async def applicant_send_code(token: Token, db: AnonSession) -> dict[str, Any]:
     return {"data": {"sent": True}}
 
 
-@public.post("/{token}/verify/check", response_model=Envelope[ApplicantSession], responses=_PUBLIC_ERRORS)
+@public.post("/{token}/verify/check", response_model=Envelope[DealerApplicantSession], responses=_PUBLIC_ERRORS)
 async def applicant_check_code(token: Token, body: _Code, db: AnonSession) -> Response:
     """Check the code. Answers a session for 2 hours: send it as `X-Apply-Session`.
     Five wrong tries burn the code; ask for a new one."""
@@ -173,7 +173,7 @@ async def applicant_check_code(token: Token, body: _Code, db: AnonSession) -> Re
 
 
 @public.patch("/{token}", responses=_PUBLIC_ERRORS)
-async def applicant_patch(token: Token, body: ApplicationFields, db: AnonSession,
+async def applicant_patch(token: Token, body: DealerApplicationFields, db: AnonSession,
                           session: Session = None) -> dict[str, Any]:
     """Save fields, while the application is a draft or returned."""
     await service.applicant_write(db, token, session, "patch", service._clean_fields(body))
@@ -187,9 +187,9 @@ async def applicant_submit(token: Token, db: AnonSession, session: Session = Non
     return {"data": {"submitted": True}}
 
 
-@public.get("/{token}/gstin/{gstin}", response_model=Envelope[GstLookup], responses=_PUBLIC_ERRORS)
+@public.get("/{token}/gstin/{gstin}", response_model=Envelope[DealerGstLookup], responses=_PUBLIC_ERRORS)
 async def applicant_gstin(token: Token, gstin: Annotated[str, Path(max_length=20)], db: AnonSession,
-                          session: Session = None) -> Envelope[GstLookup]:
+                          session: Session = None) -> Envelope[DealerGstLookup]:
     """The GSTIN read from itself, for the form's "Fetch details" button."""
     await service.view(db, token, session)
     return Envelope(data=service.lookup(gstin))

@@ -272,7 +272,7 @@ The District Manager over the order's office (or above it, or an admin) approves
 
 **Request body**
 
-**`api__schemas__marketing__Decision`**
+**`Decision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -307,7 +307,7 @@ The requester cancels while submitted; the marketing team cancels an approved on
 
 **Request body**
 
-**`api__schemas__marketing__Decision`**
+**`Decision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -378,7 +378,7 @@ Reject with a remark (required).
 
 **Request body**
 
-**`api__schemas__marketing__Decision`**
+**`Decision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -399,6 +399,12 @@ Reject with a remark (required).
 ---
 
 ## Models
+
+**`Decision`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string \| null |  |  |
 
 **`DecisionOut`**
 
@@ -603,9 +609,3 @@ Reject with a remark (required).
 | `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
 | `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
 | `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
-
-**`api__schemas__marketing__Decision`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `remark` | string \| null |  |  |

@@ -18,7 +18,7 @@ _Text200 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 _Text = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000), AfterValidator(_no_nul)]
 
 
-class ApplicationCreate(BaseModel):
+class DealerApplicationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     firm_name: _Text200
     contact_name: _Text200
@@ -27,7 +27,7 @@ class ApplicationCreate(BaseModel):
     lead_id: Annotated[str | None, Field(default=None, pattern=UUID_RE)] = None
 
 
-class ApplicationFields(BaseModel):
+class DealerApplicationFields(BaseModel):
     """The applicant's fields. Send only what changes; an empty string clears."""
     model_config = ConfigDict(extra="forbid")
     firm_name: _Text200 | None = None
@@ -48,7 +48,7 @@ class ApplicationFields(BaseModel):
     bank_ifsc: Annotated[str | None, Field(default=None, max_length=11)]
 
 
-class Decision(BaseModel):
+class DealerApplicationDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
     decision: Literal["approve", "reject", "return"]
     remark: Annotated[str | None, Field(default=None, max_length=1000, description="Required to reject or return.")]
@@ -56,12 +56,12 @@ class Decision(BaseModel):
     code: Annotated[str | None, Field(default=None, max_length=32, description="The partner code; null: the next DLR-<state>-0001.")]
 
 
-class Remark(BaseModel):
+class DealerApplicationRemark(BaseModel):
     model_config = ConfigDict(extra="forbid")
     remark: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
 
 
-class GstLookup(BaseModel):
+class DealerGstLookup(BaseModel):
     gstin: str
     valid: bool
     reason: str | None = Field(description="Why it is not valid.")
@@ -75,7 +75,7 @@ class GstLookup(BaseModel):
     status: str | None = None
 
 
-class Application(BaseModel):
+class DealerApplication(BaseModel):
     id: str
     status: Status
     firm_name: str
@@ -112,7 +112,7 @@ class Application(BaseModel):
     can: dict[str, bool] = Field(description="edit, decide, withdraw, renew.")
 
 
-class ApplicationRow(BaseModel):
+class DealerApplicationRow(BaseModel):
     id: str
     status: Status
     firm_name: str
@@ -122,5 +122,5 @@ class ApplicationRow(BaseModel):
     submitted_at: str | None
 
 
-class ApplicantSession(BaseModel):
+class DealerApplicantSession(BaseModel):
     session: str = Field(description="Send as X-Apply-Session on every later call, for 2 hours.")

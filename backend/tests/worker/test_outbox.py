@@ -236,7 +236,8 @@ ORDER_PAYLOAD = ('{"_template": "polysil_order_confirmed", "party_name": "P", '
 
 
 def test_only_the_codes_resend_an_uncertain_send() -> None:
-    assert {k for k, v in TEMPLATES.items() if v.resend_uncertain} == {"auth.otp", "lead.verify"}
+    assert {k for k, v in TEMPLATES.items() if v.resend_uncertain} == {"auth.otp", "lead.verify",
+                                                                       "dealer.verify"}
 
 
 async def test_an_uncertain_order_message_is_sent_once_and_never_again(

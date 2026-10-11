@@ -94,7 +94,7 @@ def _raise_for(exc: DBAPIError) -> None:
         raise mapping[code] from exc
 
 
-def _clean_fields(body: sch.ApplicationFields) -> dict[str, Any]:
+def _clean_fields(body: sch.DealerApplicationFields) -> dict[str, Any]:
     """The fields sent, upper-cased and checked against channel_partner's own shapes, so
     approval never fails on a CHECK weeks later (edge E-7)."""
     out: dict[str, Any] = {}
@@ -126,10 +126,10 @@ def _clean_fields(body: sch.ApplicationFields) -> dict[str, Any]:
     return out
 
 
-def lookup(raw: str) -> sch.GstLookup:
+def lookup(raw: str) -> sch.DealerGstLookup:
     """The GSTIN read from itself; details wait on a provider (GAP-292)."""
     facts = gst.read(raw)
-    return sch.GstLookup(gstin=facts.gstin, valid=facts.valid, reason=facts.reason,
+    return sch.DealerGstLookup(gstin=facts.gstin, valid=facts.valid, reason=facts.reason,
                          state_code=facts.state_code, pan=facts.pan, lookup="unavailable")
 
 
@@ -151,7 +151,7 @@ async def _can_decide(db: AsyncSession, caller: Caller, row: Any) -> bool:
     return bool(r)
 
 
-async def get(db: AsyncSession, caller: Caller, app_id: str, *, apply_url: str | None = None) -> sch.Application:
+async def get(db: AsyncSession, caller: Caller, app_id: str, *, apply_url: str | None = None) -> sch.DealerApplication:
     row = (await db.execute(text(_SELECT + "WHERE a.id = CAST(:i AS uuid)"), {"i": app_id})).one_or_none()
     if row is None:
         raise NotFoundError("No such application.")
@@ -161,7 +161,7 @@ async def get(db: AsyncSession, caller: Caller, app_id: str, *, apply_url: str |
         text("SELECT app_has_permission('partners', 'edit')"))).scalar_one()
     acct = row.bank_account_no
     open_ = row.status in ("draft", "returned", "submitted")
-    return sch.Application(
+    return sch.DealerApplication(
         id=str(row.id), status=row.status, firm_name=row.firm_name, contact_name=row.contact_name,
         mobile=row.mobile, territory={"id": str(row.territory_id), "name": row.territory_name},
         lead_id=str(row.lead_id) if row.lead_id else None, firm_type=row.firm_type,
@@ -181,7 +181,7 @@ async def get(db: AsyncSession, caller: Caller, app_id: str, *, apply_url: str |
         can={"edit": open_, "decide": decide, "withdraw": open_, "renew": row.status in ("draft", "returned")})
 
 
-async def list_(db: AsyncSession, caller: Caller, *, status: str | None, q: str | None) -> list[sch.ApplicationRow]:
+async def list_(db: AsyncSession, caller: Caller, *, status: str | None, q: str | None) -> list[sch.DealerApplicationRow]:
     if caller.partner_id is not None:
         raise ForbiddenError("Dealer applications are for staff.")
     where: list[str] = ["TRUE"]
@@ -196,12 +196,12 @@ async def list_(db: AsyncSession, caller: Caller, *, status: str | None, q: str 
         "SELECT a.id, a.status, a.firm_name, a.contact_name, t.name AS territory_name, a.created_at, a.submitted_at "
         "FROM dealer_application a JOIN territory t ON t.id = a.territory_id WHERE " + " AND ".join(where) +
         " ORDER BY a.created_at DESC LIMIT 200"), params)).all()
-    return [sch.ApplicationRow(id=str(r.id), status=r.status, firm_name=r.firm_name, contact_name=r.contact_name,
+    return [sch.DealerApplicationRow(id=str(r.id), status=r.status, firm_name=r.firm_name, contact_name=r.contact_name,
                                territory_name=r.territory_name, created_at=r.created_at.isoformat(),
                                submitted_at=r.submitted_at.isoformat() if r.submitted_at else None) for r in rows]
 
 
-async def create(db: AsyncSession, caller: Caller, body: sch.ApplicationCreate) -> sch.Application:
+async def create(db: AsyncSession, caller: Caller, body: sch.DealerApplicationCreate) -> sch.DealerApplication:
     if caller.partner_id is not None:
         raise ForbiddenError("Dealer applications are for staff.")
     try:
@@ -223,7 +223,7 @@ async def create(db: AsyncSession, caller: Caller, body: sch.ApplicationCreate) 
 
 
 async def staff_action(db: AsyncSession, caller: Caller, app_id: str, action: str, *,
-                       fields: dict[str, Any] | None = None, remark: str | None = None) -> sch.Application:
+                       fields: dict[str, Any] | None = None, remark: str | None = None) -> sch.DealerApplication:
     if caller.partner_id is not None:
         raise ForbiddenError("Dealer applications are for staff.")
     token = expires = None
@@ -242,7 +242,7 @@ async def staff_action(db: AsyncSession, caller: Caller, app_id: str, action: st
     return await get(db, caller, app_id, apply_url=_apply_url(token) if token else None)
 
 
-async def decide(db: AsyncSession, caller: Caller, app_id: str, body: sch.Decision) -> sch.Application:
+async def decide(db: AsyncSession, caller: Caller, app_id: str, body: sch.DealerApplicationDecision) -> sch.DealerApplication:
     if caller.partner_id is not None:
         raise ForbiddenError("Dealer applications are for staff.")
     try:
@@ -280,7 +280,7 @@ async def send_code(db: AsyncSession, token: str) -> None:
                                code="rate_limited")
 
 
-async def check_code(db: AsyncSession, token: str, code: str) -> sch.ApplicantSession | None:
+async def check_code(db: AsyncSession, token: str, code: str) -> sch.DealerApplicantSession | None:
     """None for a wrong code. The router answers 422 without raising, so the attempt
     count written by the definer commits: raising rolls the transaction back, and the
     five-try burn would never happen (code review, critical)."""
@@ -289,7 +289,7 @@ async def check_code(db: AsyncSession, token: str, code: str) -> sch.ApplicantSe
     outcome = (await db.execute(text("SELECT dealer_apply_check_code(:t, :h, :s, :ttl)"),
                                 {"t": th, "h": _code_hash(th, code.strip()), "s": _hash(session),
                                  "ttl": SESSION_SECONDS})).scalar_one()
-    return sch.ApplicantSession(session=session) if outcome == "ok" else None
+    return sch.DealerApplicantSession(session=session) if outcome == "ok" else None
 
 
 async def applicant_write(db: AsyncSession, token: str, session: str | None, action: str,

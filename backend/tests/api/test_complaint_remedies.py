@@ -643,6 +643,7 @@ async def test_a_dealer_never_learns_who_cancelled_its_replacement(
     qc = await _as(client, shop, "qc_manager")
     dm = await _as(client, shop, "district_manager")
     dispatch = await _as(client, shop, "dispatch_manager")
+    sm = await _as(client, shop, "state_manager")
     dealer, mobile = await complaints_t._dealer(client, shop, sessions)
     try:
         c = await complaints_t._create(client, shop, dealer)
@@ -652,7 +653,8 @@ async def test_a_dealer_never_learns_who_cancelled_its_replacement(
         c = (await _remedy(client, qc, c["id"], kind="replacement", remark="Replace")).json()["data"]
         order_id = c["remedy"]["replacement"]["order"]["id"]
         order = (await client.get(f"{V1}/orders/{order_id}", headers=dispatch)).json()["data"]
-        r = await _decide(client, dispatch, order["approval"]["steps"][-1]["id"], "reject", "Out of stock")
+        # FS-049: the first step is the State Manager's; a rejection anywhere cancels
+        r = await _decide(client, sm, order["approval"]["steps"][0]["id"], "reject", "Out of stock")
         assert r.status_code == 200, r.text
         r = await client.get(f"{V1}/orders/{order_id}/timeline", headers=dealer)
         assert r.status_code == 200, r.text
@@ -660,7 +662,7 @@ async def test_a_dealer_never_learns_who_cancelled_its_replacement(
         assert event["actor"] is None and "actor_name" not in event["payload"], event
         staff = (await client.get(f"{V1}/orders/{order_id}/timeline", headers=dispatch)).json()["data"]
         mine = next(e for e in staff if e["kind"] == "order.replacement_cancelled")
-        assert mine["actor"]["id"] == shop.ids["dispatch_manager"], "staff still see who"
+        assert mine["actor"]["id"] == shop.ids["state_manager"], "staff still see who"
     finally:
         await complaints_t._forget(sessions, mobile)
 

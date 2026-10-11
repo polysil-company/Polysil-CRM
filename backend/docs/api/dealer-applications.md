@@ -42,7 +42,7 @@ The applications in your partners scope, newest first (at most 200).
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `Envelope_list_ApplicationRow__` | Successful Response |
+| `200` | `Envelope_list_DealerApplicationRow__` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
@@ -67,7 +67,7 @@ mobile already signs in staff or a partner user.
 
 **Request body**
 
-**`api__schemas__dealer_applications__ApplicationCreate`**
+**`DealerApplicationCreate`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -81,7 +81,7 @@ mobile already signs in staff or a partner user.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `201` | `api__schemas__auth__Envelope_Application___2` | Successful Response |
+| `201` | `Envelope_DealerApplication_` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
@@ -107,7 +107,7 @@ Documents: `GET /documents?record_type=dealer_application&record_id=`.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `api__schemas__auth__Envelope_Application___2` | Successful Response |
+| `200` | `Envelope_DealerApplication_` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
@@ -131,7 +131,7 @@ Fill or correct fields for the applicant, while draft, returned or submitted.
 
 **Request body**
 
-**`ApplicationFields`**
+**`DealerApplicationFields`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -156,7 +156,7 @@ Fill or correct fields for the applicant, while draft, returned or submitted.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `api__schemas__auth__Envelope_Application___2` | Successful Response |
+| `200` | `Envelope_DealerApplication_` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
@@ -183,7 +183,7 @@ never whoever started it.
 
 **Request body**
 
-**`api__schemas__dealer_applications__Decision`**
+**`DealerApplicationDecision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -196,7 +196,7 @@ never whoever started it.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `api__schemas__auth__Envelope_Application___2` | Successful Response |
+| `200` | `Envelope_DealerApplication_` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
@@ -223,7 +223,7 @@ session stop working.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `api__schemas__auth__Envelope_Application___2` | Successful Response |
+| `200` | `Envelope_DealerApplication_` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
@@ -249,7 +249,7 @@ Submit for the applicant. `422 application_incomplete` lists what is missing.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `api__schemas__auth__Envelope_Application___2` | Successful Response |
+| `200` | `Envelope_DealerApplication_` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
@@ -273,7 +273,7 @@ Close an open application. The link stops working.
 
 **Request body**
 
-**`Remark`**
+**`DealerApplicationRemark`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -283,7 +283,7 @@ Close an open application. The link stops working.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `api__schemas__auth__Envelope_Application___2` | Successful Response |
+| `200` | `Envelope_DealerApplication_` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
@@ -309,7 +309,7 @@ a GST data provider, not configured yet (`lookup: unavailable`).
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `Envelope_GstLookup_` | Successful Response |
+| `200` | `Envelope_DealerGstLookup_` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
@@ -358,7 +358,7 @@ Save fields, while the application is a draft or returned.
 
 **Request body**
 
-**`ApplicationFields`**
+**`DealerApplicationFields`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -457,7 +457,7 @@ The GSTIN read from itself, for the form's "Fetch details" button.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `Envelope_GstLookup_` | Successful Response |
+| `200` | `Envelope_DealerGstLookup_` | Successful Response |
 | `403` | `ErrorResponse` | `no_session`: verify the mobile first, or again. |
 | `404` | `ErrorResponse` | The link is unknown, expired or closed. |
 | `422` | `ErrorResponse` | `invalid_code`, `rate_limited`, `application_incomplete`, or a field. |
@@ -516,6 +516,7 @@ Send a WhatsApp code to the application's mobile. One a minute, ten a day.
 **Applicant Check Code**
 
 Check the code. Answers a session for 2 hours: send it as `X-Apply-Session`.
+Five wrong tries burn the code; ask for a new one.
 
 **Parameters**
 
@@ -535,7 +536,7 @@ Check the code. Answers a session for 2 hours: send it as `X-Apply-Session`.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `Envelope_ApplicantSession_` | Successful Response |
+| `200` | `Envelope_DealerApplicantSession_` | Successful Response |
 | `403` | `ErrorResponse` | `no_session`: verify the mobile first, or again. |
 | `404` | `ErrorResponse` | The link is unknown, expired or closed. |
 | `422` | `ErrorResponse` | `invalid_code`, `rate_limited`, `application_incomplete`, or a field. |
@@ -544,118 +545,13 @@ Check the code. Answers a session for 2 hours: send it as `X-Apply-Session`.
 
 ## Models
 
-**`ApplicantSession`**
+**`DealerApplicantSession`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `session` | string | yes | Send as X-Apply-Session on every later call, for 2 hours. |
 
-**`ApplicationFields`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `firm_name` | string \| null |  |  |
-| `contact_name` | string \| null |  |  |
-| `firm_type` | `proprietorship` \| `partnership` \| `llp` \| `company` \| null |  |  |
-| `gst_registered` | boolean \| null |  |  |
-| `gstin` | string \| null |  | Checked for shape and check character. |
-| `pan` | string \| null |  |  |
-| `address` | string \| null |  |  |
-| `pincode` | string \| null |  |  |
-| `email` | string \| null |  |  |
-| `godown_address` | string \| null |  |  |
-| `years_in_business` | integer \| null |  |  |
-| `current_brands` | string \| null |  |  |
-| `notes` | string \| null |  |  |
-| `bank_account_name` | string \| null |  |  |
-| `bank_account_no` | string \| null |  |  |
-| `bank_ifsc` | string \| null |  |  |
-
-**`ApplicationRow`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `status` | `draft` \| `submitted` \| `returned` \| `approved` \| `rejected` \| `withdrawn` | yes |  |
-| `firm_name` | string | yes |  |
-| `contact_name` | string | yes |  |
-| `territory_name` | string | yes |  |
-| `created_at` | string | yes |  |
-| `submitted_at` | string \| null | yes |  |
-
-**`Envelope_ApplicantSession_`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `data` | ApplicantSession | yes |  |
-
-**`Envelope_GstLookup_`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `data` | GstLookup | yes |  |
-
-**`Envelope_list_ApplicationRow__`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `data` | ApplicationRow[] | yes |  |
-
-**`ErrorBody`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
-| `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
-
-**`ErrorResponse`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `error` | ErrorBody | yes |  |
-
-**`GstLookup`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `gstin` | string | yes |  |
-| `valid` | boolean | yes |  |
-| `reason` | string \| null | yes | Why it is not valid. |
-| `state_code` | string \| null | yes |  |
-| `pan` | string \| null | yes |  |
-| `lookup` | `found` \| `not_found` \| `unavailable` | yes | unavailable until a GST data provider is configured (GAP-292): then type the names. |
-| `legal_name` | string \| null |  |  |
-| `trade_name` | string \| null |  |  |
-| `address` | string \| null |  |  |
-| `status` | string \| null |  |  |
-
-**`Remark`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `remark` | string | yes |  |
-
-**`UserRef`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `full_name` | string | yes |  |
-
-**`_Code`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `code` | string | yes |  |
-
-**`api__schemas__auth__Envelope_Application___2`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `data` | api__schemas__dealer_applications__Application | yes |  |
-
-**`api__schemas__dealer_applications__Application`**
+**`DealerApplication`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -694,7 +590,7 @@ Check the code. Answers a session for 2 hours: send it as `X-Apply-Session`.
 | `created_at` | string | yes |  |
 | `can` | object | yes | edit, decide, withdraw, renew. |
 
-**`api__schemas__dealer_applications__ApplicationCreate`**
+**`DealerApplicationCreate`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -704,7 +600,7 @@ Check the code. Answers a session for 2 hours: send it as `X-Apply-Session`.
 | `territory_id` | string | yes |  |
 | `lead_id` | string \| null |  |  |
 
-**`api__schemas__dealer_applications__Decision`**
+**`DealerApplicationDecision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -712,3 +608,108 @@ Check the code. Answers a session for 2 hours: send it as `X-Apply-Session`.
 | `remark` | string \| null |  | Required to reject or return. |
 | `parent_id` | string \| null |  | An active distributor; null: directly under Polysil. |
 | `code` | string \| null |  | The partner code; null: the next DLR-<state>-0001. |
+
+**`DealerApplicationFields`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `firm_name` | string \| null |  |  |
+| `contact_name` | string \| null |  |  |
+| `firm_type` | `proprietorship` \| `partnership` \| `llp` \| `company` \| null |  |  |
+| `gst_registered` | boolean \| null |  |  |
+| `gstin` | string \| null |  | Checked for shape and check character. |
+| `pan` | string \| null |  |  |
+| `address` | string \| null |  |  |
+| `pincode` | string \| null |  |  |
+| `email` | string \| null |  |  |
+| `godown_address` | string \| null |  |  |
+| `years_in_business` | integer \| null |  |  |
+| `current_brands` | string \| null |  |  |
+| `notes` | string \| null |  |  |
+| `bank_account_name` | string \| null |  |  |
+| `bank_account_no` | string \| null |  |  |
+| `bank_ifsc` | string \| null |  |  |
+
+**`DealerApplicationRemark`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string | yes |  |
+
+**`DealerApplicationRow`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `status` | `draft` \| `submitted` \| `returned` \| `approved` \| `rejected` \| `withdrawn` | yes |  |
+| `firm_name` | string | yes |  |
+| `contact_name` | string | yes |  |
+| `territory_name` | string | yes |  |
+| `created_at` | string | yes |  |
+| `submitted_at` | string \| null | yes |  |
+
+**`DealerGstLookup`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `gstin` | string | yes |  |
+| `valid` | boolean | yes |  |
+| `reason` | string \| null | yes | Why it is not valid. |
+| `state_code` | string \| null | yes |  |
+| `pan` | string \| null | yes |  |
+| `lookup` | `found` \| `not_found` \| `unavailable` | yes | unavailable until a GST data provider is configured (GAP-292): then type the names. |
+| `legal_name` | string \| null |  |  |
+| `trade_name` | string \| null |  |  |
+| `address` | string \| null |  |  |
+| `status` | string \| null |  |  |
+
+**`Envelope_DealerApplicantSession_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | DealerApplicantSession | yes |  |
+
+**`Envelope_DealerApplication_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | DealerApplication | yes |  |
+
+**`Envelope_DealerGstLookup_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | DealerGstLookup | yes |  |
+
+**`Envelope_list_DealerApplicationRow__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | DealerApplicationRow[] | yes |  |
+
+**`ErrorBody`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
+| `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+
+**`ErrorResponse`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `error` | ErrorBody | yes |  |
+
+**`UserRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+
+**`_Code`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes |  |

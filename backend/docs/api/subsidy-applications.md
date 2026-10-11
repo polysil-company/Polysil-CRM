@@ -73,7 +73,7 @@ the category's subsidy and farmer share, and moves the lead to won. `422` on
 
 **Request body**
 
-**`api__schemas__subsidy_applications__ApplicationCreate`**
+**`ApplicationCreate`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -86,7 +86,7 @@ the category's subsidy and farmer share, and moves the lead to won. `422` on
 
 | Status | Body | Meaning |
 |---|---|---|
-| `201` | `api__schemas__auth__Envelope_Application___1` | Successful Response |
+| `201` | `Envelope_Application_` | Successful Response |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
@@ -144,7 +144,7 @@ The application, with its current stage, figures, document count and ageing.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `api__schemas__auth__Envelope_Application___1` | Successful Response |
+| `200` | `Envelope_Application_` | Successful Response |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
@@ -204,7 +204,7 @@ Withdraw the application, with a reason. The lead can be forwarded again.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `api__schemas__auth__Envelope_Application___1` | Successful Response |
+| `200` | `Envelope_Application_` | Successful Response |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
@@ -388,7 +388,7 @@ itself once every stage-16 amount has its stage-17 received date. `422` on
 
 | Status | Body | Meaning |
 |---|---|---|
-| `201` | `api__schemas__auth__Envelope_Application___1` | Successful Response |
+| `201` | `Envelope_Application_` | Successful Response |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
@@ -452,11 +452,50 @@ Build "Record stage" from this; the stages are data, not code.
 | `days_in_stage` | integer | yes | Today (IST) less the current stage's business date. |
 | `days_since_inward` | integer \| null | yes | Today less the App. Inward Date, or the first stage-4 entry's date without it. |
 
+**`Application`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `application_no` | string | yes |  |
+| `reg_no` | string \| null | yes | The department's registration number: the latest Reg. No. entered at stage 4. |
+| `status` | `open` \| `full_fp_received` \| `cancelled` | yes |  |
+| `current_stage` | StageRef | yes |  |
+| `scheme` | string | yes |  |
+| `system_type` | string | yes |  |
+| `category` | Category | yes |  |
+| `lead` | ApplicationLeadRef | yes |  |
+| `farmer_name` | string | yes |  |
+| `mobile` | string | yes |  |
+| `village` | string \| null | yes |  |
+| `survey_no` | string \| null | yes |  |
+| `territory` | TerritoryRef | yes |  |
+| `partner` | Ref \| null | yes |  |
+| `total_area` | string | yes |  |
+| `group_total_area` | string \| null | yes |  |
+| `figures` | Figures | yes |  |
+| `owner` | UserRef \| null | yes |  |
+| `owner_org_unit` | Ref | yes |  |
+| `documents` | DocumentCount | yes |  |
+| `ageing` | Ageing | yes |  |
+| `full_fp_received_on` | string \| null | yes |  |
+| `created_at` | string | yes |  |
+| `cancellation` | ApplicationCancellation \| null | yes |  |
+
 **`ApplicationCancellation`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `reason` | string | yes |  |
+
+**`ApplicationCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `lead_id` | string | yes | A subsidised lead that is qualified, quoted, in negotiation or won. |
+| `category_code` | string | yes | The farmer's category, from the calculation's `categories[].code`, for example `small_farmer`. It must apply on every crop. |
+| `calculation` | CalculateRequest | yes | The FS-008 request, as for POST /subsidy/calculate. Run again here and stored. |
+| `survey_no` | string \| null |  |  |
 
 **`ApplicationLeadRef`**
 
@@ -469,7 +508,7 @@ Build "Record stage" from this; the stages are data, not code.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `data` | api__schemas__subsidy_applications__Application[] | yes |  |
+| `data` | Application[] | yes |  |
 | `meta` | ApplicationPageMeta | yes |  |
 
 **`ApplicationPageMeta`**
@@ -569,6 +608,12 @@ Build "Record stage" from this; the stages are data, not code.
 | `remark` | string \| null | yes |  |
 | `entered_by` | UserRef \| null | yes |  |
 | `entered_at` | string | yes |  |
+
+**`Envelope_Application_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | Application | yes |  |
 
 **`Envelope_DocumentLink_`**
 
@@ -707,48 +752,3 @@ Build "Record stage" from this; the stages are data, not code.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
-
-**`api__schemas__auth__Envelope_Application___1`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `data` | api__schemas__subsidy_applications__Application | yes |  |
-
-**`api__schemas__subsidy_applications__Application`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes |  |
-| `application_no` | string | yes |  |
-| `reg_no` | string \| null | yes | The department's registration number: the latest Reg. No. entered at stage 4. |
-| `status` | `open` \| `full_fp_received` \| `cancelled` | yes |  |
-| `current_stage` | StageRef | yes |  |
-| `scheme` | string | yes |  |
-| `system_type` | string | yes |  |
-| `category` | Category | yes |  |
-| `lead` | ApplicationLeadRef | yes |  |
-| `farmer_name` | string | yes |  |
-| `mobile` | string | yes |  |
-| `village` | string \| null | yes |  |
-| `survey_no` | string \| null | yes |  |
-| `territory` | TerritoryRef | yes |  |
-| `partner` | Ref \| null | yes |  |
-| `total_area` | string | yes |  |
-| `group_total_area` | string \| null | yes |  |
-| `figures` | Figures | yes |  |
-| `owner` | UserRef \| null | yes |  |
-| `owner_org_unit` | Ref | yes |  |
-| `documents` | DocumentCount | yes |  |
-| `ageing` | Ageing | yes |  |
-| `full_fp_received_on` | string \| null | yes |  |
-| `created_at` | string | yes |  |
-| `cancellation` | ApplicationCancellation \| null | yes |  |
-
-**`api__schemas__subsidy_applications__ApplicationCreate`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `lead_id` | string | yes | A subsidised lead that is qualified, quoted, in negotiation or won. |
-| `category_code` | string | yes | The farmer's category, from the calculation's `categories[].code`, for example `small_farmer`. It must apply on every crop. |
-| `calculation` | CalculateRequest | yes | The FS-008 request, as for POST /subsidy/calculate. Run again here and stored. |
-| `survey_no` | string \| null |  |  |
