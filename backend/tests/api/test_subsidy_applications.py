@@ -77,6 +77,12 @@ async def office(shop: Shop, sessions: Sessions) -> AsyncIterator[Office]:
     item_code = f"IT{tag}".upper()
     await s.execute(text("UPDATE product SET item_code = :c WHERE id = CAST(:p AS uuid)"),
                     {"c": item_code, "p": shop.product})
+    # FS-039: an application takes the scheme of the lead's state. GGRC moves to the
+    # shop's state for the test and back after, whether it was on Gujarat or nowhere
+    ggrc_state, ggrc_by = (await s.execute(text(
+        "SELECT state_territory_id, updated_by FROM subsidy_scheme WHERE code = 'GGRC'"))).one()
+    await s.execute(text("UPDATE subsidy_scheme SET state_territory_id = CAST(:s AS uuid) WHERE code = 'GGRC'"),
+                    {"s": shop.state})
     await s.commit()
     await s.close()
     try:
@@ -84,6 +90,9 @@ async def office(shop: Shop, sessions: Sessions) -> AsyncIterator[Office]:
                      ids["stranger"], item_code)
     finally:
         c = sessions()
+        # updated_by too: a test that links GGRC through the API stamps its own admin
+        await c.execute(text("UPDATE subsidy_scheme SET state_territory_id = :s, updated_by = :u WHERE code = 'GGRC'"),
+                        {"s": ggrc_state, "u": ggrc_by})
         apps = "(SELECT id FROM subsidy_application WHERE territory_id = CAST(:d AS uuid))"
         people = [ids["sc"], ids["stranger"]]
         for stmt in (

@@ -21,6 +21,8 @@ from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from api.redact import redact_path
+
 
 class ApiError(Exception):
     """Base for anything that should reach the client as an error envelope."""
@@ -243,7 +245,7 @@ async def internal_error_handler(request: Request, exc: Exception) -> JSONRespon
     """
     import structlog
 
-    structlog.get_logger().error("unhandled error", path=request.url.path,
+    structlog.get_logger().error("unhandled error", path=redact_path(request.url.path),
                                  error=type(exc).__name__)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

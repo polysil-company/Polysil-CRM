@@ -65,7 +65,10 @@ def test_the_state_coordinator_is_territory_scoped(grants: list[Grant]) -> None:
 
 def test_portal_roles_are_partner_scoped_and_redeem_maps_to_create(grants: list[Grant]) -> None:
     portal = {g for g in grants if g.role in ("distributor", "dealer", "sub_dealer")}
-    assert {g.scope for g in portal} == {"partner_subtree"}
+    # FS-037: tasks is the one own-scope row, a dealer's own tasks behind a setting
+    assert {g.scope for g in portal if g.module != "tasks"} == {"partner_subtree"}
+    tasks = {(g.action, g.scope) for g in portal if g.module == "tasks"}
+    assert tasks == {("view", "own"), ("edit", "own")}
     assert Grant("dealer", "rewards", "create", "partner_subtree") in portal  # GAP-043
     assert Grant("sub_dealer", "partners", "view", "partner_subtree") not in portal
 

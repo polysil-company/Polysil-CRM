@@ -44,6 +44,7 @@ system, then the scheme.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_Rate__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -83,6 +84,7 @@ Add a rate from a date. Rates are never edited; a later one supersedes, a 0% one
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Rate_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -115,6 +117,7 @@ queue to pay.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `CommissionPage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -143,6 +146,7 @@ The commission report as Excel, with the same filters (FS-030).
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | - | The workbook, as an attachment. |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -168,6 +172,7 @@ One commission.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Commission_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -202,6 +207,7 @@ Accounts approves a calculated commission. Not by anyone who recorded it: `403 o
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Commission_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -236,6 +242,7 @@ Cancel with a remark: the co-ordinator while calculated or returned, Accounts on
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Commission_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -272,6 +279,7 @@ Final. Only company-wide payments roles (Accounts, admin).
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Commission_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -306,6 +314,7 @@ Accounts sends it back with a remark; the co-ordinator records it again.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Commission_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -331,6 +340,7 @@ The application's live commission, or `404` if none is recorded.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Commission_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -372,6 +382,7 @@ clears the previous decision. `409 commission_exists` once approved or paid.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Commission_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
@@ -400,6 +411,7 @@ the stored calculation, and the rate in force on the full-FP date.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_Preview_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |

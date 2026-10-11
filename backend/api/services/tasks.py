@@ -23,7 +23,7 @@ from api.authz.predicate import Caller
 from api.domain import tasks as domain
 from api.errors import ConflictError, ForbiddenError, NotFoundError, ValidationFailed
 from api.schemas import tasks as sch
-from api.schemas.leads import UUID_RE, PageMeta, UserRef
+from api.schemas.leads import UUID_RE, PageMeta, PartnerRef, UserRef
 from api.services import people
 from api.services.clock import today_ist
 from api.services.leads import _decode_cursor, _encode_cursor
@@ -144,10 +144,14 @@ async def list_tasks(db: AsyncSession, caller: Caller, *, assigned_to: str | Non
     if status:
         where.append("t.status::text = ANY(:status)")
         params["status"] = status
-    for col, val in (("task_type", task_type), ("lead_id", lead_id),
-                     ("partner_id", partner_id), ("sales_order_id", sales_order_id)):
+    if task_type:
+        where.append("t.task_type::text = :task_type")
+        params["task_type"] = task_type
+    # as uuids, not text: an upper-case id is the same id (ISS-113)
+    for col, val in (("lead_id", lead_id), ("partner_id", partner_id),
+                     ("sales_order_id", sales_order_id)):
         if val:
-            where.append(f"t.{col}::text = :{col}")
+            where.append(f"t.{col} = CAST(:{col} AS uuid)")
             params[col] = val
     if due_from:
         where.append("t.due_at >= :df")
@@ -210,11 +214,17 @@ async def _assignee_office(db: AsyncSession, caller: Caller, user_id: str,
     row = (await db.execute(text(
         "SELECT org_unit_id FROM staff_directory('tasks') WHERE id = CAST(:u AS uuid)"),
         {"u": user_id})).one_or_none()
-    ok = row is not None and bool((await db.execute(text(
+    ok = bool((await db.execute(text(
         "SELECT authz_user_assignable('tasks', CAST(:u AS uuid))"), {"u": user_id})).scalar_one())
-    if not ok or row is None:
+    if not ok:
         raise ValidationFailed("You can assign only to yourself or someone below you.",
                                code="not_assignable", fields={field: "not assignable by you"})
+    if row is None:
+        # FS-037: a dealer's user has no directory row; the task stays in the
+        # assigner's office (ADR-034 as amended)
+        if caller.org_unit_id is None:
+            raise ForbiddenError("Tasks are for Polysil staff.")
+        return caller.org_unit_id
     return str(row.org_unit_id)
 
 
@@ -357,6 +367,9 @@ def _must_be(row: Any, status: str) -> None:
 
 async def patch_task(db: AsyncSession, caller: Caller, task_id: str,
                      body: sch.TaskPatch) -> sch.Task:
+    if caller.partner_id is not None:
+        # FS-037: a dealer completes its own task and does nothing else with it
+        raise ForbiddenError("A dealer can only complete its task.")
     row = await _lock(db, task_id)
     if body.expected_status and body.expected_status != row.status:
         raise ConflictError(f"The task is now {row.status}.", code="status_changed")
@@ -400,11 +413,19 @@ async def complete_task(db: AsyncSession, caller: Caller, task_id: str,
     _must_be(row, "open")
     if body.gift_shown is not None and row.task_type != "meeting":
         raise ValidationFailed(fields={"gift_shown": "meetings only"})
-    await db.execute(text(
-        "UPDATE task SET status = 'done', outcome = :outcome, gift_shown = :gift, "
-        "completed_at = now(), completed_by = CAST(:me AS uuid), updated_by = CAST(:me AS uuid) "
-        "WHERE id = CAST(:id AS uuid)"),
-        {"outcome": body.outcome, "gift": body.gift_shown, "me": caller.user_id, "id": task_id})
+    try:
+        async with db.begin_nested():
+            await db.execute(text(
+                "UPDATE task SET status = 'done', outcome = :outcome, gift_shown = :gift, "
+                "completed_at = now(), completed_by = CAST(:me AS uuid), "
+                "updated_by = CAST(:me AS uuid) WHERE id = CAST(:id AS uuid)"),
+                {"outcome": body.outcome, "gift": body.gift_shown, "me": caller.user_id,
+                 "id": task_id})
+    except DBAPIError as exc:
+        # task_partner_guard (042): the database's half of the dealer rule
+        if str(getattr(exc.orig, "sqlstate", "")) == "42501":
+            raise ForbiddenError("A dealer can only complete its own task.") from exc
+        raise
     await _emit(db, entity_type="task", entity_id=task_id, lead_id=row.lead_id,
                 kind="task.completed", actor_id=caller.user_id, task_type=row.task_type)
     return await get_task(db, task_id)
@@ -412,6 +433,9 @@ async def complete_task(db: AsyncSession, caller: Caller, task_id: str,
 
 async def cancel_task(db: AsyncSession, caller: Caller, task_id: str,
                       body: sch.TaskCancel) -> sch.Task:
+    if caller.partner_id is not None:
+        # FS-037: a dealer completes its own task and does nothing else with it
+        raise ForbiddenError("A dealer can only complete its task.")
     row = await _lock(db, task_id)
     _must_be(row, "open")
     # §3: the assigner or someone above the assignee cancels. An assignee is never
@@ -428,6 +452,9 @@ async def cancel_task(db: AsyncSession, caller: Caller, task_id: str,
 
 
 async def reopen_task(db: AsyncSession, caller: Caller, task_id: str) -> sch.Task:
+    if caller.partner_id is not None:
+        # FS-037: a dealer completes its own task and does nothing else with it
+        raise ForbiddenError("A dealer can only complete its task.")
     row = await _lock(db, task_id)
     _must_be(row, "done")
     if caller.user_id not in (str(row.assigned_to), str(row.assigned_by)):
@@ -443,7 +470,10 @@ async def reopen_task(db: AsyncSession, caller: Caller, task_id: str) -> sch.Tas
         office = (await db.execute(text(
             "SELECT org_unit_id FROM staff_directory('tasks') WHERE id = CAST(:u AS uuid)"),
             {"u": str(row.assigned_to)})).scalar_one_or_none()
-        if office is None:
+        # FS-037: a dealer's user has no directory row; the task keeps its office
+        if office is None and not bool((await db.execute(text(
+                "SELECT authz_user_assignable('tasks', CAST(:u AS uuid))"),
+                {"u": str(row.assigned_to)})).scalar_one()):
             raise ConflictError("The assignee is no longer active or no longer in your team.",
                                 code="assignee_inactive")
     # the office-move trigger moves open tasks only, so a done task kept the old
@@ -458,15 +488,26 @@ async def reopen_task(db: AsyncSession, caller: Caller, task_id: str) -> sch.Tas
     return await get_task(db, task_id)
 
 
-async def assignees(db: AsyncSession, caller: Caller) -> list[UserRef]:
+async def assignees(db: AsyncSession, caller: Caller,
+                    include_partners: bool = False) -> list[sch.TaskAssignee]:
     me = (await db.execute(text(
         "SELECT full_name FROM app_user WHERE id = CAST(:u AS uuid)"),
         {"u": caller.user_id})).scalar_one_or_none()
     others = (await db.execute(text(
         "SELECT id, full_name FROM staff_directory('tasks') WHERE id <> CAST(:u AS uuid) "
         "ORDER BY full_name, id"), {"u": caller.user_id})).all()
-    return [UserRef(id=caller.user_id, full_name=me or "")] + [
-        UserRef(id=str(r.id), full_name=r.full_name) for r in others]
+    out = [sch.TaskAssignee(id=caller.user_id, full_name=me or "")] + [
+        sch.TaskAssignee(id=str(r.id), full_name=r.full_name) for r in others]
+    if include_partners:
+        # FS-037: empty unless the setting is on and the caller assigns downwards
+        rows = (await db.execute(text(
+            "SELECT id, full_name, partner_id, partner_name, partner_type "
+            "FROM task_partner_assignees()"))).all()
+        out += [sch.TaskAssignee(id=str(r.id), full_name=r.full_name, kind="partner",
+                                 partner=PartnerRef(id=str(r.partner_id), name=r.partner_name,
+                                                    partner_type=r.partner_type))
+                for r in rows]
+    return out
 
 
 # ── the planner ──────────────────────────────────────────────────────────────
@@ -613,8 +654,10 @@ async def _record_meeting(db: AsyncSession, caller: Caller, body: sch.MinutesCre
     not cancelled; if open, it is completed as 'Minutes recorded'."""
     assert body.task_id is not None
     row = await _lock(db, body.task_id)
-    same = (str(row.lead_id) if row.lead_id else None) == body.lead_id and \
-           (str(row.partner_id) if row.partner_id else None) == body.partner_id
+    lead = body.lead_id.lower() if body.lead_id else None
+    partner = body.partner_id.lower() if body.partner_id else None
+    same = (str(row.lead_id) if row.lead_id else None) == lead and \
+           (str(row.partner_id) if row.partner_id else None) == partner
     if not same:
         raise ValidationFailed("That task is on something else.", code="task_link_mismatch",
                                fields={"task_id": "not on this lead or dealer"})

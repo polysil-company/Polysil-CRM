@@ -48,6 +48,8 @@ order_points = APIRouter(prefix="/orders", tags=["rewards"])
 Id = Annotated[str, Path(pattern=UUID_RE)]
 
 _ERRORS: dict[int | str, dict[str, object]] = {
+    400: {"model": ErrorResponse,
+          "description": "`idempotency_key_required`: a write sent without an Idempotency-Key."},
     401: {"model": ErrorResponse, "description": "Not signed in."},
     403: {"model": ErrorResponse, "description": "The action is not in your permissions."},
     404: {"model": ErrorResponse, "description": "Not found in your scope."},

@@ -246,15 +246,26 @@ async def test_a_visit_needs_somewhere_and_a_task_of_ones_own(client: httpx.Asyn
 async def test_the_manager_sees_the_team_and_every_look_is_logged(client: httpx.AsyncClient, shop: Shop) -> None:
     fo = await endpoints._as(client, shop, "field_officer")
     duty = await _on_duty(client, fo)
+    # A route is one IST day. In the first half hour after IST midnight the drive
+    # would straddle two days, so it ends a minute before midnight instead (the
+    # duty started an hour ago, so it still covers every point).
+    end = dt.datetime.now(domain.IST)
+    if end.hour == 0 and end.minute < 30:
+        end = end.replace(hour=0, minute=0, second=0, microsecond=0) - dt.timedelta(minutes=1)
+
+    def at(minutes_before_end: int) -> str:
+        return (end - dt.timedelta(minutes=minutes_before_end)).isoformat()
+
     # a ten-minute dwell, then a drive: one stop
-    pts = [_pt(duty, 25 - m, lat=23.0300, lng=72.5800) for m in range(0, 12)]
-    pts += [_pt(duty, 12 - m, lat=23.0300 + 0.01 * (m + 1), lng=72.5800) for m in range(5)]
+    pts = [_pt(duty, 0, recorded_at=at(25 - m), lat=23.0300, lng=72.5800) for m in range(0, 12)]
+    pts += [_pt(duty, 0, recorded_at=at(12 - m), lat=23.0300 + 0.01 * (m + 1), lng=72.5800) for m in range(5)]
     assert (await _batch(client, fo, pts)).json()["data"]["accepted"] == len(pts)
+    assert (await _batch(client, fo, [_pt(duty, 0)])).json()["data"]["accepted"] == 1   # fresh for the map
     dm = await endpoints._as(client, shop, "district_manager")
     team = (await client.get(f"{V1}/tracking/team/latest", headers=dm)).json()["data"]
     me = next(m for m in team if m["user"]["id"] == shop.ids["field_officer"])
     assert me["on_duty"] and me["lat"] is not None and me["stale"] is False
-    today = dt.datetime.now(domain.IST).date().isoformat()
+    today = end.date().isoformat()          # the drive's IST day
     r = await client.get(f"{V1}/tracking/users/{shop.ids['field_officer']}/route", headers=dm, params={"date": today})
     assert r.status_code == 200, r.text
     route = r.json()["data"]

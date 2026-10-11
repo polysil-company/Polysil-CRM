@@ -42,6 +42,36 @@ def size_for(area: Decimal, band_ha: Decimal) -> int:
     return 75 if area <= band_ha else 90
 
 
+def required_rates(areas: tuple[Decimal, ...],
+                   band_ha: Decimal) -> tuple[tuple[str, int | None, str | None], ...]:
+    """Every `rate_for` lookup `field_inspection` can make over these tabulated
+    areas, as (code, pipe size, nozzle). The readiness panel checks a new scheme
+    against this list, so it names the rate a calculation would refuse on
+    (FS-039 §4). A test holds it equal to what `field_inspection` asks for."""
+    sizes = sorted({size_for(a, band_ha) for a in areas})
+    out: list[tuple[str, int | None, str | None]] = []
+    for code in SPRINKLER_COMPONENT_ORDER:
+        if code == "nozzle":
+            out.extend(("nozzle", None, n) for n in NOZZLES)
+        else:
+            out.extend((code, s, None) for s in sizes)
+    out.append(("transport", None, None))
+    return tuple(out)
+
+
+def missing_quantity_rows(matrix: QuantityMatrix) -> tuple[str, ...]:
+    """The rows `field_inspection` reads that the table lacks, or holds without
+    every tabulated area: each one would be a KeyError mid-calculation (FS-039
+    code review F-1). Transport is optional: the area stands in for it. Any row
+    present must hold every area, since `quantities_for` reads every row."""
+    wanted = [c for c in SPRINKLER_COMPONENT_ORDER if c != "nozzle"]
+    wanted += [f"nozzle_{n}" for n in NOZZLES]
+    wanted += sorted(c for c in matrix.rows if c not in wanted)
+    rows = matrix.rows
+    return tuple(code for code in wanted
+                 if code not in rows or any(a not in rows[code] for a in matrix.areas))
+
+
 def quantities_for(matrix: QuantityMatrix, area: Decimal, *,
                    required: bool = True) -> Mapping[str, Decimal]:
     """Rule 18: exact match on the tabulated area, as `MATCH(..., 0)` matches.

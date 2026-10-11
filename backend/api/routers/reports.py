@@ -41,9 +41,10 @@ Owner = Annotated[str | None, Query(pattern=UUID_RE, description="One person.")]
 Format = Annotated[Literal["json", "xlsx"], Query(alias="format", description="`xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell.")]
 
 
-def _filters(start: dt.date | None, end: dt.date | None, territory_id: str | None,
-             owner_id: str | None) -> service.Filters:
-    return service.Filters(start=start, end=end, territory_id=territory_id, owner_id=owner_id)
+async def _filters(db: DbSession, start: dt.date | None, end: dt.date | None, territory_id: str | None,
+                   owner_id: str | None) -> service.Filters:
+    return await service.Filters(start=start, end=end, territory_id=territory_id,
+                                 owner_id=owner_id).load_sale_mode(db)
 
 
 async def _answer(data: dict[str, Any], fmt: str, report: str, caller: Caller) -> Response:
@@ -64,7 +65,7 @@ async def lead_conversion(db: DbSession, caller: CallerDep, from_: From = None, 
                           group_by: Literal["source", "owner", "territory"] = "source") -> Response:
     """Leads created in the window, per source, owner or territory: how many reached
     each stage, won, lost and are open, and the conversion rate."""
-    return await _answer(await service.lead_conversion(db, caller, _filters(from_, to, territory_id, owner_id), group_by), fmt, "lead-conversion", caller)
+    return await _answer(await service.lead_conversion(db, caller, await _filters(db, from_, to, territory_id, owner_id), group_by), fmt, "lead-conversion", caller)
 
 
 @router.get("/salesperson-performance", responses=_ERRORS)
@@ -73,7 +74,7 @@ async def salesperson_performance(db: DbSession, caller: CallerDep, from_: From 
                                   fmt: Format = "json") -> Response:
     """Per person: leads created and won, quotations sent, orders, visits, tasks done
     and overdue. A figure you may not see is null. Staff only."""
-    return await _answer(await service.salesperson_performance(db, caller, _filters(from_, to, territory_id, owner_id)), fmt, "salesperson-performance", caller)
+    return await _answer(await service.salesperson_performance(db, caller, await _filters(db, from_, to, territory_id, owner_id)), fmt, "salesperson-performance", caller)
 
 
 @router.get("/lost-leads", responses=_ERRORS)
@@ -82,13 +83,13 @@ async def lost_leads(db: DbSession, caller: CallerDep, from_: From = None, to: T
                      group_by: Literal["reason", "owner"] = "reason") -> Response:
     """Leads lost in the window, per reason or owner, with the days to loss and the
     stage they dropped off at."""
-    return await _answer(await service.lost_leads(db, caller, _filters(from_, to, territory_id, owner_id), group_by), fmt, "lost-leads", caller)
+    return await _answer(await service.lost_leads(db, caller, await _filters(db, from_, to, territory_id, owner_id), group_by), fmt, "lost-leads", caller)
 
 
 @router.get("/follow-ups", responses=_ERRORS)
 async def follow_ups(db: DbSession, caller: CallerDep, owner_id: Owner = None, fmt: Format = "json") -> Response:
     """Open tasks per person, as of now: due today and overdue by age. Staff only."""
-    return await _answer(await service.follow_ups(db, caller, _filters(None, None, None, owner_id)), fmt, "follow-ups", caller)
+    return await _answer(await service.follow_ups(db, caller, await _filters(db, None, None, None, owner_id)), fmt, "follow-ups", caller)
 
 
 @router.get("/dealer-performance", responses=_ERRORS)
@@ -96,7 +97,19 @@ async def dealer_performance(db: DbSession, caller: CallerDep, from_: From = Non
                              territory_id: Territory = None, fmt: Format = "json") -> Response:
     """Per dealer: orders and value in the window, value shipped, leads assigned, and
     the all-time received and balance."""
-    return await _answer(await service.dealer_performance(db, caller, _filters(from_, to, territory_id, None)), fmt, "dealer-performance", caller)
+    return await _answer(await service.dealer_performance(db, caller, await _filters(db, from_, to, territory_id, None)), fmt, "dealer-performance", caller)
+
+
+@router.get("/campaign-performance", responses=_ERRORS)
+async def campaign_performance(db: DbSession, caller: CallerDep, from_: From = None, to: To = None,
+                               territory_id: Territory = None, owner_id: Owner = None,
+                               fmt: Format = "json") -> Response:
+    """Per campaign: the leads you can see created in the window that name it, how far
+    they got, their sales (whenever sold, under the company's sale setting), and cost
+    per lead and per win. A campaign whose dates overlap the window shows with zeros
+    (no end date is one day); with `owner_id`, only campaigns with leads show.
+    Cost figures need campaigns.view; sales need sales_orders. Staff only."""
+    return await _answer(await service.campaign_performance(db, caller, await _filters(db, from_, to, territory_id, owner_id)), fmt, "campaign-performance", caller)
 
 
 @router.get("/territory-performance", responses=_ERRORS)
@@ -104,7 +117,7 @@ async def territory_performance(db: DbSession, caller: CallerDep, from_: From = 
                                 territory_id: Territory = None, fmt: Format = "json",
                                 level: Literal["district", "taluka"] = "district") -> Response:
     """Per district or taluka: leads, won, conversion, orders and value. Staff only."""
-    return await _answer(await service.territory_performance(db, caller, _filters(from_, to, territory_id, None), level), fmt, "territory-performance", caller)
+    return await _answer(await service.territory_performance(db, caller, await _filters(db, from_, to, territory_id, None), level), fmt, "territory-performance", caller)
 
 
 @router.get("/complaints", responses=_ERRORS)
@@ -113,7 +126,7 @@ async def complaints(db: DbSession, caller: CallerDep, from_: From = None, to: T
                      group_by: Literal["type", "status", "severity"] = "type") -> Response:
     """Complaints first submitted in the window: resolved, within SLA, response
     breaches, and refunds paid."""
-    return await _answer(await service.complaints(db, caller, _filters(from_, to, territory_id, owner_id), group_by), fmt, "complaints", caller)
+    return await _answer(await service.complaints(db, caller, await _filters(db, from_, to, territory_id, owner_id), group_by), fmt, "complaints", caller)
 
 
 @leads.get("/{lead_id}/360", responses=_ERRORS,

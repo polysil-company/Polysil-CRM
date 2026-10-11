@@ -50,7 +50,7 @@ in the same shape. Never renumber or reuse a number.
 - [x] **BE-011** · Merge the tasks (FS-014) and complaints (FS-015) contracts into `integration` · TASK-001, CMPL-001 · normal
 - [x] **BE-012** · Keep the dev API on the latest `integration`, and share the test password · OBS-002 · high
 - [x] **BE-013** · Fix the pagination row in the API docs' conventions · OBS-002 · low
-- [ ] **BE-014** · Approval threshold amounts per role · APPR-001 · normal
+- [x] **BE-014** · Approval threshold amounts per role · APPR-001 · normal
 
 **Quotations** — added as the quotation screens are built (QUOT-001…).
 
@@ -65,15 +65,15 @@ in the same shape. Never renumber or reuse a number.
 **Sales orders** — added as the order screens are built (SO-001…, DISP-002).
 
 - [x] **BE-019** · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders` · SO-003 · low
-- [ ] **BE-020** · Name the order on its events in the lead's timeline · SO-002, LEAD-005 · normal
+- [x] **BE-020** · Name the order on its events in the lead's timeline · SO-002, LEAD-005 · normal
 
 **Messages** — added as the message screens are connected (MSG-001…).
 
-- [ ] **BE-021** · Read one conversation: `GET /conversations/{id}` · MSG-002, MSG-004 · low
+- [x] **BE-021** · Read one conversation: `GET /conversations/{id}` · MSG-002, MSG-004 · low
 
 **Operations queues** — added as the Dispatch and Accounts screens are built (DISP-001, ACCT-001).
 
-- [ ] **BE-022** · An Accounts queue: orders waiting on the payment check, and what Accounts records · ACCT-001 · normal
+- [x] **BE-022** · An Accounts queue: orders waiting on the payment check, and what Accounts records · ACCT-001 · normal
 
 ---
 
@@ -297,14 +297,14 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-014 · Approval threshold amounts per role
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 21 Sep 2026 · APPR-001 · Frontend-Scope §10 question 7
 - **What:** the real discount and order-value limits per role — the seed has stand-in thresholds.
 - **Why:** quotation discount approval and order approval depend on them; the screens show the
   backend's answer, but the demo should use the client's numbers.
 - **Done when:** the client's figures are in the seed or configured, or the notes say who owes them.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #75
+- **Backend notes:** Nothing to build: `GET /approvals/thresholds` and `PUT` (Admin) already set the order and discount limits per role (`backend/docs/api/approvals.md`). The seed figures are stand-ins (1,00,000 and 5,00,000); the client owes the real ones, question 15.1, GAP-122. Handover: `backend/docs/handover/accounts-queue-order-names.md`.
 
 ### BE-015 · Point quotation share links at the app: set `PUBLIC_WEB_URL`
 
@@ -390,7 +390,7 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-020 · Name the order on its events in the lead's timeline
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 2 Oct 2026 · SO-002, LEAD-005 (demo walk, D-6)
 - **What:** on every `order.*` and `dispatch.*` event that `GET /leads/{id}/timeline` returns, add
   `order_id` and `order_no` (null on a never-submitted draft) to the payload, as BE-017 did for
@@ -401,12 +401,12 @@ in the same shape. Never renumber or reuse a number.
   are there (`timeline-entries.ts`), so nothing else changes on its side.
 - **Done when:** the order events on a lead's timeline carry both fields, added when read so old
   events have them too.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #75
+- **Backend notes:** Every event about an order on the lead timeline (`order.*`, `dispatch.*`, `approval.decided`, `payment.*`) carries `order_id` and `order_no`, added when read so old events have them too. `order_no` is null until submitted.
 
 ### BE-021 · Read one conversation: `GET /conversations/{id}`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 2 Oct 2026 · MSG-002, MSG-004
 - **What:** `GET /conversations/{conversation_id}` answering the `Conversation` (participant,
   last message, unread count), `404` when it is not the caller's. Or: list a conversation the
@@ -417,12 +417,12 @@ in the same shape. Never renumber or reuse a number.
   cannot say whom it writes to.
 - **Done when:** the thread can name the colleague of any conversation the caller is in, written
   in or not.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #75
+- **Backend notes:** `GET /conversations/{conversation_id}` answers the `Conversation`, written in or not. `404` when it is not yours, `422` for a bad id, `403` for a dealer.
 
 ### BE-022 · An Accounts queue: orders waiting on the payment check, and what Accounts records
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 4 Oct 2026 · ACCT-001
 - **What:** two things, in this order:
   1. A filter on `GET /orders` (and `/orders/stats`, `/orders/export`) for **whose approval is
@@ -440,5 +440,5 @@ in the same shape. Never renumber or reuse a number.
 - **Done when:** `GET /orders?waiting_on=account_manager` returns only the orders whose next
   step is Accounts, with `include_total`. And there is a decision on payments: either a
   contract, or "none planned".
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #75
+- **Backend notes:** `waiting_on=<role code>` on `GET /orders`, `/orders/stats` and `/orders/export`: same rule as the row's `approval_waiting_on`. An unknown code is an empty page; a malformed one is `422`. For the badge, call stats without it and read `waiting_on.account_manager`. Part 2: payments are built (FS-022, handover `payments-contract.md`): `GET/POST /payments`, and `payments` on `GET /orders/{id}`. No new contract.

@@ -68,6 +68,17 @@ def _statements() -> dict[str, str]:
         match = _HEAD.search(stmt)
         assert match and match.group(1) in out, stmt[:80]
         out[match.group(1)] = stmt
+    # 042 patches authz_user_assignable from its live text (FS-037): the same swap
+    m42 = _load("042_dealer_tasks")
+    if m42 is not None:
+        body = out["authz_user_assignable"]
+        assert body.count(m42._ASSIGNABLE_OLD) == 1
+        out["authz_user_assignable"] = body.replace(m42._ASSIGNABLE_OLD, m42._ASSIGNABLE_NEW)
+    # 056 replaces lead_auto_owner: an officer inside a district-only lead's territory (walk F-6)
+    m56 = _load("056_walk_fixes")
+    if m56 is not None:
+        stmt = next(s for s in m56.FUNCTIONS if "FUNCTION lead_auto_owner" in s)
+        out["lead_auto_owner"] = stmt.replace("CREATE OR REPLACE FUNCTION", "CREATE FUNCTION", 1)
     return out
 
 

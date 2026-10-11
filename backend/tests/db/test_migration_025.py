@@ -49,6 +49,10 @@ async def _world(db: AsyncSession) -> World:
     officer = await m13._user(db, "field_officer", a, tag + "a")
     officer_b = await m13._user(db, "field_officer", b, tag + "b")
     coordinator = await m13._user(db, "state_coordinator", b, tag + "c")
+    # FS-039: an application takes the scheme of the lead's state; GGRC is put on
+    # this one for the test (rolled back), whether the database has it on Gujarat or nowhere
+    await db.execute(text("UPDATE subsidy_scheme SET state_territory_id = CAST(:s AS uuid) WHERE code = 'GGRC'"),
+                     {"s": state})
     await db.execute(text("INSERT INTO user_territory (user_id, territory_id) VALUES (:u, :t)"),
                      {"u": coordinator, "t": state})
     return World(code, district, officer, officer_b, coordinator)
@@ -232,7 +236,7 @@ async def test_a_field_key_is_unique_across_its_scheme(db: AsyncSession) -> None
                            "WHERE d.code = 'farmer_share'", {}, "23505")
     # a real second scheme, so only the composite key can refuse it
     other = (await db.execute(text("INSERT INTO subsidy_scheme (code, name) VALUES (:c, 'Other') RETURNING id"),
-                              {"c": "T" + uuid.uuid4().hex[:8]})).scalar_one()
+                              {"c": "T" + uuid.uuid4().hex[:8].upper()})).scalar_one()
     await m13._refused(db, "INSERT INTO subsidy_stage_field (scheme_id, stage_def_id, field_key, label, type) "
                            "SELECT CAST(:s AS uuid), d.id, 'new_key', 'Elsewhere', 'date' FROM subsidy_stage_def d "
                            "JOIN subsidy_scheme g ON g.id = d.scheme_id AND g.code = 'GGRC' "

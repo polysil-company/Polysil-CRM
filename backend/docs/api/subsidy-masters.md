@@ -44,6 +44,7 @@ The rows of one subsidy master in force on a date.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_dict_str__Any___` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
@@ -71,6 +72,7 @@ so the admin sees what a new matrix replaces.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_dict_str__Any___` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
@@ -112,6 +114,7 @@ matrix in force ends that day; a matrix's cells are never changed.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_RevisionResult_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
@@ -150,6 +153,7 @@ dated before the revision keep using the old rows.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_RevisionResult_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |

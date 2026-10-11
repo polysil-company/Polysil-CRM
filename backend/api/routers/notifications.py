@@ -16,6 +16,8 @@ from api.services import notifications as service
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 _ERRORS: dict[int | str, dict[str, object]] = {
+    400: {"model": ErrorResponse,
+          "description": "`idempotency_key_required`: a write sent without an Idempotency-Key."},
     401: {"model": ErrorResponse, "description": "Not signed in."},
     422: {"model": ErrorResponse, "description": "A bad cursor, or both or neither of "
                                                  "`ids` and `all`."},

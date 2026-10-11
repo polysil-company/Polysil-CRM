@@ -15,7 +15,8 @@ from api.services.exports import Column
 
 # the report name in the URL is the file stem's tail and the key here
 NAMES: Final = ("lead-conversion", "salesperson-performance", "lost-leads", "follow-ups",
-                "dealer-performance", "territory-performance", "complaints")
+                "dealer-performance", "territory-performance", "complaints",
+                "campaign-performance")
 
 _GROUP: Final = {"source": "Source", "owner": "Owner", "territory": "Territory",
                  "reason": "Lost reason", "type": "Complaint type", "status": "Status",
@@ -71,6 +72,19 @@ def columns(report: str, data: dict[str, Any]) -> tuple[Column, ...]:
                 Column("Resolved", "resolved", "int"),
                 Column("Resolved within SLA %", "resolved_within_sla_pct", "decimal"),
                 Column("Response breaches", "response_breaches", "int"))
+    if report == "campaign-performance":
+        return (Column("Campaign", "campaign.name"), Column("Type", "campaign.type"),
+                Column("Starts", "campaign.start_date", "date"),
+                Column("Ends", "campaign.end_date", "date"),
+                Column("Leads", "leads", "int"), Column("Qualified", "qualified", "int"),
+                Column("Won", "won", "int"), Column("Lost", "lost", "int"),
+                Column("Open", "open", "int"), Column("Conversion %", "conversion_pct", "decimal"),
+                Column("Sales", "sales_count", "int"),
+                Column("Sales value", "sales_value", "money"),
+                Column("Planned cost", "cost_planned", "money"),
+                Column("Actual cost", "cost_actual", "money"), Column("Cost", "cost", "money"),
+                Column("Cost per lead", "cost_per_lead", "money"),
+                Column("Cost per win", "cost_per_won", "money"))
     raise ValueError(f"no columns for report {report!r}")
 
 

@@ -246,13 +246,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/pyproject.toml
 
-      # FS-005: WeasyPrint's native libraries and the Indic fonts the quotation
-      # PDF needs; the PDF tests skip without them and run with them.
-      - name: Install the PDF renderer's native libraries
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends             libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 libfontconfig1 libcairo2             libgdk-pixbuf-2.0-0 fonts-noto-core shared-mime-info
-
+      # No PDF libraries here: ruff and mypy never load them (ISS-113). The tests
+      # job installs them and fails if the renderer does not import.
       - name: Install the backend with its development tools
         run: python -m pip install -e ".[dev]"
 
@@ -362,7 +357,9 @@ jobs:
       - name: Install the PDF renderer's native libraries
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends             libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 libfontconfig1 libcairo2             libgdk-pixbuf-2.0-0 fonts-noto-core shared-mime-info
+          sudo apt-get install -y -qq --no-install-recommends \
+            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 libfontconfig1 fontconfig \
+            libcairo2 libgdk-pixbuf-2.0-0 fonts-noto-core shared-mime-info
 
       - name: Install the backend with its development tools
         run: python -m pip install -e ".[dev]"

@@ -99,6 +99,9 @@ lead_t = sa.table(
     sa.column("farmer_name"),
     sa.column("mobile"),
     sa.column("inquiry_no"),
+    sa.column("campaign_id", _UUID),
+    sa.column("mis_system_id", _UUID),
+    sa.column("land_hectares", sa.Numeric()),
 )
 
 # Every field the Lead shape needs that is not a person. The masters (territory,
@@ -116,7 +119,10 @@ SELECT l.id, l.inquiry_no, l.stage, l.inquiry_type,
        l.owner_user_id, ow.full_name AS owner_name,
        l.owner_org_unit_id, ou.name AS owner_org_unit_name,
        l.assigned_partner_id, cp.name AS partner_name, cp.partner_type AS partner_type,
-       l.score, l.priority, l.estimated_value, l.land_acres,
+       l.score, l.priority, l.estimated_value, l.land_acres, l.land_hectares,
+       (SELECT st.name FROM territory_closure stc JOIN territory st ON st.id = stc.ancestor_id
+         WHERE stc.descendant_id = l.territory_id AND st.level = 'state'
+         ORDER BY stc.depth LIMIT 1) AS state_name,
        COALESCE((SELECT json_agg(json_build_object('code', c.code, 'name', c.name,
                                                    'is_active', c.is_active) ORDER BY x.ord)
                    FROM unnest(l.crops) WITH ORDINALITY AS x(code, ord)
@@ -125,7 +131,9 @@ SELECT l.id, l.inquiry_no, l.stage, l.inquiry_type,
        l.lost_note, l.reopen_count, l.dormant_from_stage::text AS dormant_from_stage,
        l.merged_into_id, mi.inquiry_no AS merged_into_no,
        l.first_contacted_at, l.last_activity_at, l.created_at,
-       l.created_by, cb.full_name AS created_by_name
+       l.created_by, cb.full_name AS created_by_name,
+       CASE WHEN (SELECT app_current_partner()) IS NULL THEN l.campaign_id END AS campaign_id,
+       cmp.name::text AS campaign_name, l.customer_id
   FROM lead l
   JOIN mis_system ms ON ms.id = l.mis_system_id
   JOIN lead_source src ON src.id = l.lead_source_id
@@ -136,6 +144,7 @@ SELECT l.id, l.inquiry_no, l.stage, l.inquiry_type,
   LEFT JOIN won_lost_reason wlr ON wlr.id = l.lost_reason_id
   LEFT JOIN lead mi ON mi.id = l.merged_into_id
   LEFT JOIN app_user cb ON cb.id = l.created_by
+  LEFT JOIN campaign cmp ON cmp.id = l.campaign_id
 """
 
 
@@ -192,16 +201,27 @@ async def _load_config(db: AsyncSession) -> dict[str, Decimal]:
         text("SELECT key, value FROM lead_score_rule"))).all()}
 
 
+# the stages whose score no longer moves; the open stages are the rest
+_CLOSED_STAGES = frozenset({"won", "lost", "merged", "dormant"})
+
+
 async def _rescore(db: AsyncSession, lead_id: Any) -> None:
     """Recompute score and priority from the lead's current factors and its events
     (rule 7). Called after any mutation that changes a factor: contact, note, reopen.
-    Runs under the leads UPDATE policy, which the caller already satisfies."""
+    Runs under the leads UPDATE policy, which the caller already satisfies. A closed
+    lead keeps its score: marking it lost is an event, and the score rose on it
+    (walk R-12). Reopening scores it again."""
     row = (await db.execute(text(
-        "SELECT l.estimated_value, l.created_at, l.first_contacted_at, src.quality, "
+        "SELECT l.stage::text AS stage, l.estimated_value, l.created_at, "
+        "l.first_contacted_at, src.quality, "
         "(SELECT count(*) FROM activity_event ae WHERE ae.lead_id = l.id "
         " AND ae.kind <> 'lead.created') AS events "
         "FROM lead l JOIN lead_source src ON src.id = l.lead_source_id WHERE l.id = :id"),
         {"id": lead_id})).one()
+    if row.stage in _CLOSED_STAGES:
+        await db.execute(text("UPDATE lead SET last_activity_at = now() WHERE id = :id"),
+                         {"id": lead_id})
+        return
     score, priority = domain.score(
         source_quality=Decimal(row.quality), estimated_value=row.estimated_value,
         created_at=row.created_at, first_contacted_at=row.first_contacted_at,
@@ -251,6 +271,9 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate, *,
     # cross-vendor P2-3).
     await check_lead_territory(db, str(body.territory_id))
     crops = await _crop_codes(db, body.crops)
+    if body.campaign_id is not None and caller.partner_id is not None:
+        raise ValidationFailed(fields={"campaign_id": "staff only"})
+    await check_campaign(db, body.campaign_id)
     state_code = (await db.execute(text("SELECT lead_state_code(CAST(:tid AS uuid))"),
                                    {"tid": str(body.territory_id)})).scalar_one_or_none()
     if not state_code:
@@ -298,17 +321,18 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate, *,
         INSERT INTO lead (inquiry_no, stage, inquiry_type, mis_system_id, lead_source_id,
             farmer_name, mobile, email, territory_id, village, owner_user_id,
             owner_org_unit_id, assigned_partner_id, score, priority, estimated_value,
-            created_by, qr_code_id, crops, land_acres)
+            created_by, qr_code_id, crops, land_hectares, campaign_id)
         VALUES (:no, 'new', CAST(:it AS inquiry_type), :mis, :src, :name, :mob, :email,
             :tid, :village, :owner, :oou, :ap, :score, CAST(:prio AS lead_priority),
-            :est, :me, :qr, CAST(:crops AS citext[]), :acres)
+            :est, :me, :qr, CAST(:crops AS citext[]), :acres, CAST(:cmp AS uuid))
         RETURNING id"""), {
         "no": inquiry_no, "it": body.inquiry_type, "mis": mis.id, "src": src.id,
         "name": body.farmer_name, "mob": mobile, "email": body.email,
         "tid": str(body.territory_id), "village": body.village, "owner": owner_user_id,
         "oou": owner_org_unit_id, "ap": assigned_partner_id, "score": score,
         "prio": priority, "est": body.estimated_value, "me": caller.user_id, "qr": qr_code_id,
-        "crops": crops, "acres": body.land_acres,
+        "crops": crops, "acres": _hectares(body.land_hectares, body.land_acres),
+        "cmp": body.campaign_id,
     })).scalar_one()
 
     # 8. the event (CLAUDE.md rule 7, FS-003 rule 14). actor_id must be the caller:
@@ -448,7 +472,10 @@ async def get_lead(db: AsyncSession, caller: Caller, lead_id: str) -> Lead:
     if row is None:
         raise NotFoundError("No such lead.")
 
-    lead = _row_to_lead(row, duplicates=await _duplicates(db, lead_id))
+    if caller.partner_id is not None:
+        lead = _partner_view(_row_to_lead(row, duplicates=[]))
+    else:
+        lead = _row_to_lead(row, duplicates=await _duplicates(db, lead_id))
 
     # The people, authoritatively. lead_people() is a definer read that answers for
     # a visible lead, so a manager who can see the lead but not the owner's user row
@@ -465,6 +492,17 @@ async def get_lead(db: AsyncSession, caller: Caller, lead_id: str) -> Lead:
                 id=str(p.id), name=p.name, partner_type=p.detail)
         elif p.kind == "merged_into":
             lead.merged_into = MergedRef(id=str(p.id), inquiry_no=p.detail)
+    return lead
+
+
+def _partner_view(lead: Lead) -> Lead:
+    """GAP-284: what a partner does not read on a lead. The priority score and the
+    duplicate check are staff tools; the lost reason and note are staff words, the
+    same ones the timeline strips (walk F-1, code review F-1)."""
+    lead.score = None
+    lead.duplicates = []
+    lead.lost_reason = None
+    lead.lost_note = None
     return lead
 
 
@@ -513,6 +551,19 @@ async def _crop_codes(db: AsyncSession, codes: list[str], *, keep: frozenset[str
     return [str(rows[c].code) for c in codes]
 
 
+async def check_campaign(db: AsyncSession, campaign_id: str | None) -> None:
+    """FS-040 rule 3: a campaign is put on a lead or QR code only while active. The
+    caller skips this when the value is unchanged, so one already there may be
+    re-sent. A partner user reads no campaign (campaign_sel), so theirs is refused."""
+    if campaign_id is None:
+        return
+    ok = (await db.execute(text(
+        "SELECT 1 FROM campaign WHERE id = CAST(:c AS uuid) AND is_active"),
+        {"c": campaign_id})).first()
+    if ok is None:
+        raise ValidationFailed(fields={"campaign_id": "not an active campaign"})
+
+
 async def check_lead_territory(db: AsyncSession, territory_id: str,
                            field: str = "territory_id") -> None:
     """A lead sits in a district, taluka or village: a state is too coarse to route
@@ -522,6 +573,19 @@ async def check_lead_territory(db: AsyncSession, territory_id: str,
         {"t": territory_id})).scalar_one_or_none()
     if level == "state":
         raise ValidationFailed(fields={field: "a district, taluka or village"})
+
+
+def _hectares(hectares: Decimal | None, acres: Decimal | None) -> Decimal | None:
+    """FS-052: the land to store, in hectares. Acres are converted; both at once is a
+    422, and acres too small to make a hundredth of a hectare too (plan review B-1)."""
+    if hectares is not None and acres is not None:
+        raise ValidationFailed(fields={"land_acres": "send land_hectares or land_acres, not both"})
+    if acres is None:
+        return hectares
+    ha = domain.acres_to_hectares(acres)
+    if ha <= 0:
+        raise ValidationFailed(fields={"land_acres": "less than 0.01 hectare"})
+    return ha
 
 
 def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
@@ -544,7 +608,8 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
                                        row.partner_type),
         score=_dec(row.score), priority=row.priority, estimated_value=_dec(row.estimated_value),
         crops=[CropRef(**c) for c in _json_list(row.crops_json)],
-        land_acres=_dec(row.land_acres),
+        land_acres=_dec(row.land_acres), land_hectares=_dec(row.land_hectares),
+        state_name=row.state_name,
         lost_reason=ReasonRef(id=str(row.lost_reason_id), code=row.lost_reason_code,
                               name=row.lost_reason_name) if row.lost_reason_id else None,
         lost_note=row.lost_note, reopen_count=row.reopen_count,
@@ -554,6 +619,9 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
         first_contacted_at=_iso(row.first_contacted_at),
         last_activity_at=_iso_req(row.last_activity_at), created_at=_iso_req(row.created_at),
         created_by=names.user(row.created_by, row.created_by_name),
+        campaign_id=str(row.campaign_id) if row.campaign_id else None,
+        campaign_name=row.campaign_name,
+        customer_id=str(row.customer_id) if row.customer_id else None,
         duplicates=duplicates)
 
 
@@ -567,7 +635,7 @@ async def _lock(db: AsyncSession, lead_id: str) -> Any:
         "SELECT stage::text AS stage, first_contacted_at, lost_from_stage::text AS lost_from, "
         "dormant_from_stage::text AS dormant_from, "
         "lost_reason_id, lost_note, territory_id, owner_user_id, owner_org_unit_id, "
-        "assigned_partner_id, deleted_at, crops::text[] AS crops "
+        "assigned_partner_id, deleted_at, crops::text[] AS crops, campaign_id "
         "FROM lead WHERE id = :id FOR UPDATE"),
         {"id": lead_id})).one_or_none()
 
@@ -699,9 +767,9 @@ def _as_dict(payload: Any) -> dict[str, Any]:
 
 
 async def _timeline_refs(db: AsyncSession, lead_id: str, rows: Any,
-                         ) -> tuple[dict[str, str], dict[str, Any]]:
-    """The names an assignment event refers to and the quotations the page's
-    quotation events are about, one query each and only when the page needs them.
+                         ) -> tuple[dict[str, str], dict[str, Any], dict[str, Any]]:
+    """The names an assignment event refers to, and the quotations and orders the
+    page's events are about, one query each and only when the page needs them.
     Names through lead_event_people(): whoever sees the lead sees the people its
     history names, which people_names() cannot answer for a past owner (plan
     review B-2). Quotations under the reader's own policies: lead_timeline() has
@@ -720,11 +788,70 @@ async def _timeline_refs(db: AsyncSession, lead_id: str, rows: Any,
         quotes = {str(q.id): q for q in (await db.execute(text(
             "SELECT id, quote_no, version FROM quotation WHERE id = ANY(CAST(:ids AS uuid[]))"),
             {"ids": quote_ids})).all()}
-    return people_on, quotes
+    # BE-020: lead_timeline() already dropped the events of orders the reader cannot
+    # see, so a miss here is a delete race (FS-029 review E-1)
+    order_ids = sorted({str(r.entity_id) for r in rows
+                        if r.entity_type == "sales_order" and r.entity_id})
+    orders: dict[str, Any] = {}
+    if order_ids:
+        orders = {str(o.id): o for o in (await db.execute(text(
+            "SELECT id, order_no::text AS order_no FROM sales_order "
+            "WHERE id = ANY(CAST(:ids AS uuid[]))"), {"ids": order_ids})).all()}
+    return people_on, quotes, orders
+
+
+async def _lead_refs(db: AsyncSession, rows: Any) -> dict[str, str | None]:
+    """lead id -> inquiry_no for the other leads that merge, dismissal and flag
+    events name (walk F-16), read under the caller's own policies: a lead the
+    reader cannot see stays unnamed. A dismissal names its link, so the link's two
+    leads are read too."""
+    ids: set[str] = set()
+    links: set[str] = set()
+    for r in rows:
+        p = _as_dict(r.payload)
+        if r.kind == "lead.merged":
+            ids.update(str(p[k]) for k in ("loser", "survivor") if p.get(k))
+        elif r.kind == "lead.duplicate_flagged":
+            ids.update(str(m["lead_id"]) for m in p.get("matches") or [] if m.get("lead_id"))
+        elif r.kind == "lead.duplicate_dismissed" and p.get("link_id"):
+            links.add(str(p["link_id"]))
+    out: dict[str, str | None] = {}
+    if links:
+        for lk in (await db.execute(text(
+                "SELECT id, lead_a_id, lead_b_id FROM lead_duplicate_link "
+                "WHERE id = ANY(CAST(:ids AS uuid[]))"), {"ids": sorted(links)})).all():
+            out["link:" + str(lk.id)] = f"{lk.lead_a_id} {lk.lead_b_id}"
+            ids.update((str(lk.lead_a_id), str(lk.lead_b_id)))
+    if ids:
+        for ld in (await db.execute(text(
+                "SELECT id, inquiry_no::text AS inquiry_no FROM lead "
+                "WHERE id = ANY(CAST(:ids AS uuid[]))"), {"ids": sorted(ids)})).all():
+            out[str(ld.id)] = ld.inquiry_no
+    return out
+
+
+def _enrich_leads(r: Any, lead_id: str, payload: dict[str, Any],
+                  refs: dict[str, str | None]) -> dict[str, Any]:
+    """The inquiry numbers of the leads an event names. `other_*` is the lead that
+    is not the one whose timeline this is."""
+    if r.kind == "lead.merged":
+        return {**payload,
+                "loser_inquiry_no": refs.get(str(payload.get("loser"))),
+                "survivor_inquiry_no": refs.get(str(payload.get("survivor")))}
+    if r.kind == "lead.duplicate_flagged":
+        return {**payload, "matches": [{**m, "inquiry_no": refs.get(str(m.get("lead_id")))}
+                                       for m in payload.get("matches") or []]}
+    if r.kind == "lead.duplicate_dismissed":
+        pair = (refs.get("link:" + str(payload.get("link_id"))) or "").split()
+        own = str(r.entity_id) if r.entity_id else lead_id
+        other = next((x for x in pair if x != own), None)
+        return {**payload, "other_lead_id": other,
+                "other_inquiry_no": refs.get(other) if other else None}
+    return payload
 
 
 def _enrich(r: Any, payload: dict[str, Any], people_on: dict[str, str],
-            quotes: dict[str, Any]) -> dict[str, Any]:
+            quotes: dict[str, Any], orders: dict[str, Any]) -> dict[str, Any]:
     """Read-time additions, so old events carry them too. A name key is present
     whenever its id key is, null when the id is null (EC-6)."""
     if r.kind == "lead.assigned":
@@ -738,6 +865,12 @@ def _enrich(r: Any, payload: dict[str, Any], people_on: dict[str, str],
         payload = {**payload, "quotation_id": str(r.entity_id),
                    "quote_no": q.quote_no if q else None,
                    "version": q.version if q else None}
+    elif r.entity_type == "sales_order" and r.entity_id:
+        # every kind on an order, approvals and payments included (FS-029 review E-3);
+        # null until submitted, since a draft has no number
+        o = orders.get(str(r.entity_id))
+        payload = {**payload, "order_id": str(r.entity_id),
+                   "order_no": o.order_no if o else None}
     return payload
 
 
@@ -762,13 +895,30 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
         last = rows[limit - 1]
         next_cursor = _encode_cursor(last.occurred_at, str(last.id))
         rows = rows[:limit]
-    people_on, quotes = await _timeline_refs(db, lead_id, rows)
+    people_on, quotes, orders = await _timeline_refs(db, lead_id, rows)
+    lead_refs = await _lead_refs(db, rows)
 
     events: list[TimelineEvent] = []
+    merges: set[tuple[str, str]] = set()
     for r in rows:
         payload = r.payload
         if isinstance(payload, str):
             payload = json.loads(payload)
+        if r.kind == "lead.merged" and isinstance(payload, dict):
+            # 006 writes the merge on both leads, and the survivor's timeline folds in
+            # the loser's: one line per merge (walk F-16)
+            pair = (str(payload.get("loser")), str(payload.get("survivor")))
+            if pair in merges:
+                continue
+            merges.add(pair)
+        if caller.partner_id is not None and isinstance(payload, dict):
+            # ISS-107: staff notes, the lost reason and duplicate handling are internal
+            # (GAP-284). A short page keeps its cursor: the cursor is the raw row's.
+            own = r.actor_id is not None and str(r.actor_id) == caller.user_id
+            kept = domain.partner_timeline_entry(r.kind, payload, own=own)
+            if kept is None:
+                continue
+            payload = kept
         actor = None
         # question 15.14: a partner never learns which approver decided an order
         hidden = caller.partner_id is not None and actor_hidden_from_partner(r.kind)
@@ -782,7 +932,8 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
             actor = UserRef(id=str(r.actor_id), full_name=payload.get("actor_name")
                             or people_on.get(str(r.actor_id)) or "")
         if isinstance(payload, dict):
-            payload = _enrich(r, payload, people_on, quotes)
+            payload = _enrich(r, payload, people_on, quotes, orders)
+            payload = _enrich_leads(r, lead_id, payload, lead_refs)
         events.append(TimelineEvent(id=str(r.id), kind=r.kind, occurred_at=_iso_req(r.occurred_at),
                                     actor=actor, payload=payload or {}))
     return TimelinePage(data=events, meta=PageMeta(limit=limit, next_cursor=next_cursor))
@@ -847,6 +998,17 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
         sets.append("assigned_partner_id = CAST(:partner AS uuid)")
         params["partner"] = body.assigned_partner_id
         payload["assigned_partner_id"] = body.assigned_partner_id
+        if body.assigned_partner_id != (
+                str(row.assigned_partner_id) if row.assigned_partner_id else None):
+            # GAP-378: the drafts follow, or the dealer could never see them (walk F-4).
+            # The ids go on the event, so a draft that kept its partner is on the record
+            # (code review F-3). quotations imports this module, so the import is here.
+            from api.services import quotations
+            followed, kept = await quotations.follow_lead_partner(
+                db, caller, lead_id, body.assigned_partner_id, get_settings())
+            if followed or kept:
+                payload["quotations_followed"] = followed
+                payload["quotations_kept"] = kept
 
     await _emit(db, lead_id=lead_id, kind="lead.assigned", actor_id=caller.user_id,
                 actor_name=await _actor_name(db), **payload)
@@ -975,10 +1137,26 @@ async def patch_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadP
         sets.append("crops = CAST(:crops AS citext[])")
         params["crops"] = codes
         changed["crops"] = codes
-    if "land_acres" in fields:
-        sets.append("land_acres = :acres")
-        params["acres"] = body.land_acres
-        changed["land_acres"] = _dec(body.land_acres)   # a string: the payload is JSON (EC-5)
+    if {"land_hectares", "land_acres"} & fields:
+        ha = _hectares(body.land_hectares if "land_hectares" in fields else None,
+                       body.land_acres if "land_acres" in fields else None)
+        sets.append("land_hectares = :acres")
+        params["acres"] = ha
+        # strings: the payload is JSON (EC-5)
+        changed["land_hectares"] = _dec(ha)
+        changed["land_acres"] = _dec(domain.hectares_to_acres(ha))
+    if "campaign_id" in fields:
+        if caller.partner_id is not None:   # null included: Marketing's attribution stays
+            raise ValidationFailed(fields={"campaign_id": "staff only"})
+        current = str(row.campaign_id) if row.campaign_id else None
+        if body.campaign_id != current:
+            await check_campaign(db, body.campaign_id)
+            sets.append("campaign_id = CAST(:cmp AS uuid)")
+            params["cmp"] = body.campaign_id
+            changed["campaign_id"] = body.campaign_id
+            changed["campaign_name"] = (await db.execute(text(
+                "SELECT name::text FROM campaign WHERE id = CAST(:c AS uuid)"),
+                {"c": body.campaign_id})).scalar_one_or_none() if body.campaign_id else None
 
     territory_id = body.territory_id  # None only when unsent: it is in _PATCH_REQUIRED
     if territory_id is not None and territory_id != str(row.territory_id):
@@ -1083,26 +1261,36 @@ async def _detect_duplicates(db: AsyncSession, caller: Caller, lead_id: str, *, 
             matches.setdefault(str(r.id), ("name_geo", Decimal(str(round(float(r.sim), 2)))))
     if not matches:
         return
+    new: dict[str, tuple[str, Decimal]] = {}
     for other, (signal, score) in matches.items():
-        await db.execute(text(
+        inserted = (await db.execute(text(
             "INSERT INTO lead_duplicate_link "
             "(lead_a_id, lead_b_id, signal, score, state, created_by) "
             "VALUES (least(CAST(:x AS uuid), CAST(:y AS uuid)), "
             "        greatest(CAST(:x AS uuid), CAST(:y AS uuid)), "
             "        CAST(:s AS lead_dup_signal), :sc, 'pending', CAST(:me AS uuid)) "
-            "ON CONFLICT (lead_a_id, lead_b_id) DO NOTHING"),
-            {"x": lead_id, "y": other, "s": signal, "sc": score, "me": caller.user_id})
+            "ON CONFLICT (lead_a_id, lead_b_id) DO NOTHING RETURNING id"),
+            {"x": lead_id, "y": other, "s": signal, "sc": score, "me": caller.user_id})).first()
+        if inserted is not None:
+            new[other] = (signal, score)
+    # Only pairs found now are news. An edit that re-finds known pairs, or pairs
+    # already dismissed, writes no line (walk 10 Oct F-16).
+    if not new:
+        return
     await _emit(db, lead_id=lead_id, kind="lead.duplicate_flagged", actor_id=caller.user_id,
                 actor_name=await _actor_name(db),
                 matches=[{"lead_id": o, "signal": s, "score": str(sc)}
-                         for o, (s, sc) in matches.items()])
+                         for o, (s, sc) in new.items()])
 
 
 async def duplicates(db: AsyncSession, caller: Caller, *, limit: int = 50,
                      cursor: str | None = None) -> DuplicatePage:
     """The review queue: pending pairs where both leads are in scope (the link
-    policy), newest first, keyset-paged by (created_at, id)."""
+    policy), newest first, keyset-paged by (created_at, id). Empty for a partner:
+    duplicate handling is staff work (GAP-284), as merging already is."""
     limit = max(1, min(limit, _MAX_LIMIT))
+    if caller.partner_id is not None:
+        return DuplicatePage(data=[], meta=PageMeta(limit=limit, next_cursor=None))
     where = ["dl.state = 'pending'"]
     params: dict[str, Any] = {"lim": limit + 1}
     if cursor:
@@ -1133,7 +1321,9 @@ async def duplicates(db: AsyncSession, caller: Caller, *, limit: int = 50,
 
 async def dismiss_duplicate(db: AsyncSession, caller: Caller, link_id: str) -> DismissResult:
     """Mark a pending pair as not a duplicate. The link's UPDATE policy needs both
-    leads visible and leads.edit; zero rows is 404."""
+    leads visible and leads.edit; zero rows is 404. Staff only, as merging is."""
+    if caller.partner_id is not None:
+        raise ForbiddenError("Only staff can review duplicates.")
     row = (await db.execute(text(
         "UPDATE lead_duplicate_link SET state = 'dismissed', resolved_by = CAST(:me AS uuid), "
         "resolved_at = now() WHERE id = CAST(:id AS uuid) AND state = 'pending' "
@@ -1172,6 +1362,30 @@ async def merge_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadM
         if code == "LEADM":
             raise ValidationFailed("A lead cannot merge into itself.", code="merge_self") from exc
         raise
+    # FS-040 edge case 10: a survivor with no campaign takes the loser's, so a QR
+    # lead merged into a hand-entered one keeps its attribution
+    took: dict[str, Any] = {}
+    campaign = (await db.execute(text(
+        "UPDATE lead s SET campaign_id = l.campaign_id FROM lead l "
+        "WHERE s.id = CAST(:surv AS uuid) AND l.id = CAST(:loser AS uuid) "
+        "AND s.campaign_id IS NULL AND l.campaign_id IS NOT NULL "
+        "RETURNING s.campaign_id::text AS id, "
+        "(SELECT name::text FROM campaign WHERE id = s.campaign_id) AS name"),
+        {"surv": body.into_lead_id, "loser": lead_id})).one_or_none()
+    if campaign is not None:
+        took |= {"campaign_id": campaign.id, "campaign_name": campaign.name}
+    # FS-041 edge case 5: the same for the customer, so a later qualification of the
+    # survivor joins it rather than making a second one
+    customer = (await db.execute(text(
+        "UPDATE lead s SET customer_id = l.customer_id FROM lead l "
+        "WHERE s.id = CAST(:surv AS uuid) AND l.id = CAST(:loser AS uuid) "
+        "AND s.customer_id IS NULL AND l.customer_id IS NOT NULL RETURNING s.customer_id::text"),
+        {"surv": body.into_lead_id, "loser": lead_id})).scalar_one_or_none()
+    if customer is not None:
+        took["customer_id"] = customer
+    if took:   # CLAUDE.md rule 7: the survivor's own timeline names what it took
+        await _emit(db, lead_id=body.into_lead_id, kind="lead.updated", actor_id=caller.user_id,
+                    actor_name=await _actor_name(db), changed=took)
     return await get_lead(db, caller, body.into_lead_id)
 
 
@@ -1315,10 +1529,14 @@ async def _lead_filters(db: AsyncSession, caller: Caller, *, stage: str | None =
                         assigned_partner_id: str | None = None,
                         source: str | None = None, inquiry_type: str | None = None,
                         created_from: str | None = None, created_to: str | None = None,
-                        q: str | None = None) -> list[Any]:
+                        q: str | None = None, campaign_id: str | None = None,
+                        deleted: bool = False) -> list[Any]:
     """The scope and every filter of the lead list, shared with the counts so the
-    two can never disagree about which leads a filter means."""
-    where = [scope_predicate(_LEADS, caller, lead_t)]
+    two can never disagree about which leads a filter means. Deleted leads are left
+    out unless `deleted` asks for them alone: a deleter could read them, so the list
+    and its count once disagreed with the dashboard (walk F-7)."""
+    where = [scope_predicate(_LEADS, caller, lead_t),
+             lead_t.c.deleted_at.is_not(None) if deleted else lead_t.c.deleted_at.is_(None)]
 
     if stage:
         wanted = [s.strip() for s in stage.split(",") if s.strip()]
@@ -1366,6 +1584,10 @@ async def _lead_filters(db: AsyncSession, caller: Caller, *, stage: str | None =
             where.append(lead_t.c.created_at <= _parse_ts(created_to, "created_to"))
     if q:
         where.append(_search_clause(q))
+    if campaign_id == "none":
+        where.append(lead_t.c.campaign_id.is_(None))
+    elif campaign_id:
+        where.append(lead_t.c.campaign_id == campaign_id)
     # Everything above narrows the set the caller asked for. The cursor below
     # narrows it to one page, so the total is counted from `filters` and not from
     # `where`: a total that shrank as the user paged would be worse than none.
@@ -1447,7 +1669,9 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
                      assigned_partner_id: str | None = None,
                      source: str | None = None, inquiry_type: str | None = None,
                      created_from: str | None = None, created_to: str | None = None,
-                     q: str | None = None, limit: int = 50,
+                     q: str | None = None, campaign_id: str | None = None,
+                     deleted: bool = False,
+                     limit: int = 50,
                      cursor: str | None = None,
                      include_total: bool = False,
                      sort: SortKey = "created_at", order: SortOrder = "desc") -> LeadPage:
@@ -1463,7 +1687,8 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
         db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id, owner=owner,
         territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
         assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
-        created_from=created_from, created_to=created_to, q=q)
+        created_from=created_from, created_to=created_to, q=q, campaign_id=campaign_id,
+        deleted=deleted)
     filters = list(where)
     legacy = (sort, order) == ("created_at", "desc")
     if cursor:
@@ -1500,6 +1725,9 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
     by_id = {str(r.id): r for r in rows}
     names = await people.resolve(db, rows, _LEAD_PEOPLE, _LEAD_PARTNERS)
     data = [_row_to_lead(by_id[i], duplicates=[], names=names) for i in ids if i in by_id]
+    if caller.partner_id is not None:
+        # the export reads through here too, so its lost columns are empty for a partner
+        data = [_partner_view(lead) for lead in data]
     return LeadPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
                                             total=total, total_capped=total_capped))
 
@@ -1507,10 +1735,11 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
 _PRIORITIES = ("hot", "warm", "cold")
 
 
-async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) -> LeadStats:
+async def lead_stats(db: AsyncSession, caller: Caller, *, deleted: bool = False,
+                     **filters: str | None) -> LeadStats:
     """Counts under the list's own scope and filters (API review B2). One pass
     over the matching rows; no ceiling, because a count per stage is the point."""
-    where = await _lead_filters(db, caller, **filters)
+    where = await _lead_filters(db, caller, deleted=deleted, **filters)
     stage = sa.cast(lead_t.c.stage, sa.Text)
     priority = sa.cast(lead_t.c.priority, sa.Text)
     inquiry = sa.cast(lead_t.c.inquiry_type, sa.Text)
@@ -1750,8 +1979,10 @@ async def list_partners(db: AsyncSession, *, q: str | None = None,
                         limit: int = 50) -> list[PartnerPick]:
     """The partner picker for assignment (FS-003 4). channel_partner's own policies
     scope it: a dealer sees its subtree, a manager the partners in its territories,
-    an admin all. q matches the name, the code or the contact person, since staff
-    know a dealer by its owner as often as by its firm."""
+    an admin all. q matches the name, the code, the contact person or one of the
+    partner's users, since staff know a dealer by its owner as often as by its firm
+    (walk F-9). The user match is a definer function returning ids only; the join
+    stays under channel_partner's policies, so it widens nothing (056)."""
     limit = max(1, min(limit, _MAX_LIMIT))
     like = _contains(q) if q else None
     rows = (await db.execute(text("""
@@ -1762,7 +1993,8 @@ async def list_partners(db: AsyncSession, *, q: str | None = None,
          WHERE cp.is_active AND cp.deleted_at IS NULL
            AND (CAST(:like AS text) IS NULL
                 OR cp.name ILIKE CAST(:like AS text) OR cp.code ILIKE CAST(:like AS text)
-                OR cp.contact_name ILIKE CAST(:like AS text))
+                OR cp.contact_name ILIKE CAST(:like AS text)
+                OR cp.id IN (SELECT partner_ids_by_user_name(CAST(:like AS text))))
          ORDER BY cp.name LIMIT :lim"""), {"like": like, "lim": limit})).all()
     return [PartnerPick(
         id=str(r.id), code=r.code, name=r.name, partner_type=r.ptype,

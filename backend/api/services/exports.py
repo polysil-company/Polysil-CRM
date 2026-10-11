@@ -207,13 +207,15 @@ LEADS: Final = (
     Column("Mobile", "mobile"), Column("Email", "email"), Column("Village", "village"),
     Column("Territory", "territory.name"), Column("Inquiry type", "inquiry_type"),
     Column("Source", "source"), Column("MIS system", "mis_system"),
-    Column("Crops", "crops", "names"), Column("Land (acres)", "land_acres", "decimal"),
+    Column("Crops", "crops", "names"), Column("Land (ha)", "land_hectares", "decimal"),
+    Column("Land (acres)", "land_acres", "decimal"), Column("State", "state_name"),
     Column("Estimated value", "estimated_value", "money"), Column("Owner", "owner.full_name"),
     Column("Office", "owner_org_unit.name"), Column("Partner", "assigned_partner.name"),
     Column("Lost reason", "lost_reason.name"), Column("Lost note", "lost_note"),
     Column("First contacted", "first_contacted_at", "datetime"),
     Column("Last activity", "last_activity_at", "datetime"),
     Column("Created", "created_at", "datetime"), Column("Created by", "created_by.full_name"),
+    Column("Campaign", "campaign_name"),
 )
 
 _TOTALS: Final = (

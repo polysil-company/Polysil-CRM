@@ -31,6 +31,9 @@ TEMPLATE_QUOTATION_SHARE: Final = "quotation_share"
 # sign-in code, but the same approved authentication template: Meta fixes the
 # body of an authentication template, so a second one would say the same words.
 TEMPLATE_LEAD_VERIFY: Final = "lead.verify"
+# FS-051: the dealer applicant's code; its own key, so it never retires a sign-in or
+# enquiry code, on the same approved authentication template
+TEMPLATE_DEALER_VERIFY: Final = "dealer.verify"
 # FS-012: the order's messages. Their provider names live in the message_template
 # table, and the definer that writes the row copies the name into the payload as
 # `_template`, so the table is the one switch (EC-5, plan review B-2).
@@ -60,13 +63,20 @@ class TemplateSpec:
     params: tuple[str, ...]      # payload keys, in the template's positional order
     button: str | None           # the payload key sent as the copy-code button's value
     max_age: timedelta | None    # None: derived from settings (the OTP's TTL less a minute)
+    # GAP-073: after an uncertain send (no answer in time), send again? Yes for a code:
+    # a duplicate code is a nuisance, a lost one locks the person out (FS-001). No for
+    # the rest: a duplicate order message is a fee and looks broken to the customer.
+    resend_uncertain: bool = False
 
 
 TEMPLATES: Final[dict[str, TemplateSpec]] = {
-    TEMPLATE_AUTH_OTP: TemplateSpec("whatsapp_template_otp", ("code",), "code", None),
+    TEMPLATE_AUTH_OTP: TemplateSpec("whatsapp_template_otp", ("code",), "code", None,
+                                    resend_uncertain=True),
     # the challenge lives ten minutes; a code older than nine is not worth sending
     TEMPLATE_LEAD_VERIFY: TemplateSpec("whatsapp_template_otp", ("code",), "code",
-                                       timedelta(minutes=9)),
+                                       timedelta(minutes=9), resend_uncertain=True),
+    TEMPLATE_DEALER_VERIFY: TemplateSpec("whatsapp_template_otp", ("code",), "code",
+                                         timedelta(minutes=9), resend_uncertain=True),
     # GAP-072: farmer_name is an officer-typed value on Polysil's number, bounded by
     # normalise_value and by rule 10b (once a day per number) until the client decides.
     TEMPLATE_LEAD_ACK: TemplateSpec("whatsapp_template_lead_ack",
@@ -96,6 +106,10 @@ _BODIES: Final[dict[str, str]] = {
         "It is valid for 5 minutes. Do not share it with anyone."
     ),
     TEMPLATE_LEAD_VERIFY: (
+        "{code} is your Polysil verification code. "
+        "It is valid for 10 minutes. Do not share it with anyone."
+    ),
+    TEMPLATE_DEALER_VERIFY: (
         "{code} is your Polysil verification code. "
         "It is valid for 10 minutes. Do not share it with anyone."
     ),

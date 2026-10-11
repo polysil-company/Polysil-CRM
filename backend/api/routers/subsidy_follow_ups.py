@@ -32,6 +32,8 @@ reports = APIRouter(prefix="/subsidy-reports", tags=["subsidy reports"])
 masters = APIRouter(prefix="/subsidy-masters", tags=["subsidy masters"])
 
 _ERRORS: dict[int | str, dict[str, object]] = {
+    400: {"model": ErrorResponse,
+          "description": "`idempotency_key_required`: a write sent without an Idempotency-Key."},
     401: {"model": ErrorResponse, "description": "Not signed in."},
     403: {"model": ErrorResponse, "description": "Not permitted."},
     409: {"model": ErrorResponse, "description": "`revision_on_start_date`, `later_revision_exists`."},

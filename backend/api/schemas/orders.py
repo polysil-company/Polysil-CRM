@@ -20,7 +20,7 @@ from api.schemas.approvals import Decision
 from api.schemas.complaints import Complaint
 from api.schemas.leads import UUID_RE, OrgUnitRef, PageMeta, PartnerRef, TerritoryRef, UserRef
 from api.schemas.payments import OrderPayments
-from api.schemas.products import MAX_LINES, _places
+from api.schemas.products import MAX_LINES, TaxTreatment, _places
 from api.schemas.quotations import Quotation, QuotationLineIn, Totals
 from api.schemas.schemes import OrderBenefit
 from api.schemas.stock import LineStock, WarehouseRef
@@ -56,8 +56,10 @@ class OrderCreate(BaseModel):
 
     order_type: OrderType = Field(
         default="commercial",
-        description="commercial or industrial. The other five are refused with 422 "
-                    "order_type_unsupported, naming the question each waits on.")
+        description="commercial, industrial, export or sample. export and sample are staff "
+                    "only (403 type_staff_only); a sample is typed in, never from quotations. "
+                    "The other three are refused with 422 order_type_unsupported, naming the "
+                    "question each waits on.")
     quotation_ids: Annotated[list[Annotated[str, Field(pattern=UUID_RE)]], Field(
         default_factory=list, max_length=20,
         description="Accepted quotations that agree on partner, place of supply, seller, "
@@ -87,6 +89,9 @@ class OrderCreate(BaseModel):
         default=None, pattern=UUID_RE,
         description="\"Order to\" (FS-023): staff only. Null means the default "
                     "warehouse.")]
+    export_country: Annotated[str | None, Field(
+        default=None, min_length=2, max_length=60,
+        description="The buyer's country. Required on an export, refused on any other type.")]
     remarks: Annotated[str | None, Field(default=None, max_length=2000)]
     lines: Annotated[list[QuotationLineIn], Field(
         default_factory=list, max_length=MAX_LINES,
@@ -103,10 +108,16 @@ class OrderPatch(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    order_type: OrderType | None = None
+    order_type: OrderType | None = Field(default=None, description=(
+        "Fixed once the order is amended or made from quotations (422 order_type_fixed). "
+        "A change re-reads the export and sample settings and re-prices the lines."))
     partner_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE,
         description="Omit to keep. Null makes it a direct sale, which a dealer cannot do.")]
+    export_country: Annotated[str | None, Field(
+        default=None, min_length=2, max_length=60,
+        description="The buyer's country. Omit to keep. Required on an export.")]
+
     party: OrderParty | None = None
     delivery_address: Annotated[str | None, Field(default=None, max_length=500)]
     place_of_supply_territory_id: Annotated[str | None, Field(default=None, pattern=UUID_RE)]
@@ -317,6 +328,11 @@ class OrderComplaintRef(BaseModel):
     complaint_no: str | None
 
 
+_CREDIT_FLAG = ("Over the dealer's credit limit at submit (FS-027): true or false when "
+                "checked, null when unchecked. Null for field officers and dealers, who "
+                "may not read credit standing.")
+
+
 class Order(BaseModel):
     doc_type: Literal["sales_order"] = Field(
         default="sales_order", description="Always sales_order. Tells an order from a "
@@ -343,6 +359,15 @@ class Order(BaseModel):
     seller: OrderSeller | None = Field(description="The selling registration at the tax date.")
     place_of_supply: TerritoryRef
     intra_state: bool
+    tax_treatment: TaxTreatment = Field(description=(
+        "domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or "
+        "export_igst. Fixed when the order is created."))
+    export_country: str | None
+    lut_arn: str | None = Field(description="The LUT an export_lut order is zero-rated under. "
+                                            "Taken at submit; null on a draft.")
+    sample_pricing: Literal["free", "charged"] | None = Field(description=(
+        "On a sample only. free: every line 100 % off, total 0, and the approval runs on "
+        "the gross."))
     price_effective_date: str
     tax_date: str | None = Field(description="The date GST was taken at: today on a draft, "
                                              "the submit date after.")
@@ -381,6 +406,16 @@ class Order(BaseModel):
                                   "Null for a caller who may not see payments.")
     submitted_at: str | None
     approved_at: str | None
+    fully_dispatched_at: str | None = Field(
+        default=None, description="When the last line shipped (dispatched, or closed short after "
+                                  "a dispatch); null otherwise (FS-026).")
+    over_credit_limit: bool | None = Field(default=None, description=_CREDIT_FLAG)
+    amend_count: int = Field(
+        default=0, description="How many times this order was amended after approval (FS-036).")
+    amended_from_total: str | None = Field(
+        default=None, description="The approved total the last amend started from.")
+    amend_reason: str | None = Field(
+        default=None, description="Why it was last amended. Staff only.")
     cancelled_at: str | None
     cancel_remark: str | None
     closed_at: str | None
@@ -400,6 +435,8 @@ class OrderSummary(BaseModel):
     is_provisional: bool
     dispatched_pct: int = Field(description="Share of the ordered quantity sent, 0 to 100.")
     approval_waiting_on: str | None = Field(description="The role of the next undecided step.")
+    amend_count: int = 0
+    over_credit_limit: bool | None = Field(default=None, description=_CREDIT_FLAG)
     submitted_at: str | None
     created_at: str
 
@@ -434,6 +471,9 @@ class QueueDocument(BaseModel):
     payment_status: str | None = Field(
         default=None, description="An order row: not_applicable, unpaid, part_paid, paid or "
                                   "overpaid (FS-022), for the Accounts step. Null otherwise.")
+    over_credit_limit: bool | None = Field(
+        default=None, description="An order row: over the dealer's credit limit at submit "
+                                  "(FS-027); null when unchecked or not an order.")
     request_remark: str | None = Field(
         default=None, description="Why the approval was asked, as the person asking wrote "
                                   "it. Show it beside the figures. Null when none was given.")

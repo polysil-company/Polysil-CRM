@@ -683,6 +683,45 @@ raiser or owner; `422` on `remark`.
 
 ---
 
+## `POST /api/v1/complaints/{complaint_id}/reopen`
+
+**Reopen**
+
+Reopen a closed or QC-rejected complaint, with a reason. It goes through the
+check, QC and a remedy again. The raiser may reopen a closed one; others need a
+role in the `complaint_reopen_roles` setting, and a rejection only those roles.
+`422 reopen_window_closed` after `complaint_reopen_days` or `complaint_reopen_max`.
+`can.reopen` on the detail says whether the button applies.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `complaint_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`ReopenIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `reason` | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Complaint_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not yours to do. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | `status_changed`: someone acted first, reload. `complaint_not_draft`: it was submitted. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `POST /api/v1/complaints/{complaint_id}/submit`
 
 **Submit**
@@ -761,6 +800,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `by` | UserRef \| null | yes | Null for a dealer, always. |
 | `remark` | string \| null | yes | Null for a dealer, always. |
 | `decided_at` | string \| null | yes |  |
+| `stalled` | boolean |  | True on the step waiting now when nobody of its own role can decide it (none covers the document, or the only one raised it). A higher manager decides it instead and sees it in their inbox. Show "No <role> to decide; with the next manager up" rather than "Waiting on <role>". Always false for a dealer. Default `False`. |
 
 **`Attachment`**
 
@@ -795,6 +835,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `upload` | boolean | yes |  |
 | `remedy` | boolean | yes | Choose a remedy (FS-015b). |
 | `withdraw` | boolean | yes | Withdraw the pending remedy. |
+| `reopen` | boolean |  | Reopen a closed or rejected complaint (FS-036). Default `False`. |
 
 **`CancelIn`**
 
@@ -865,6 +906,11 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `raised_by` | UserRef \| null | yes |  |
 | `remedy` | Remedy \| null |  | The live or the last remedy. |
 | `closed_at` | string \| null |  |  |
+| `reopen_count` | integer |  | Times reopened (FS-036). Default `0`. |
+| `reopened_at` | string \| null |  |  |
+| `reopen_reason` | string \| null |  | Why it was last reopened. Staff only. |
+| `response_escalated_at` | string \| null |  | When the missed response target was escalated (FS-028); null otherwise. Staff only. |
+| `resolution_escalated_at` | string \| null |  | When the missed resolution target was escalated (FS-028); null otherwise. Staff only. |
 | `can` | Can | yes |  |
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
@@ -998,6 +1044,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `defective_qty` | string | yes |  |
 | `failure_frequency` | string \| null | yes |  |
 | `remark` | string \| null | yes |  |
+| `warranty` | LineWarranty \| null |  | FS-046: whether the product was in warranty on the day the complaint was raised. |
 
 **`LineIn`**
 
@@ -1008,6 +1055,16 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `defective_qty` | number \| string | yes | Zero or more, not more than supplied. |
 | `failure_frequency` | string \| null |  |  |
 | `remark` | string \| null |  |  |
+
+**`LineWarranty`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `status` | `in_warranty` \| `expired` \| `none` \| `unknown` | yes | On the day the complaint was raised (its first submit, or today for a draft). |
+| `start` | string \| null | yes |  |
+| `end` | string \| null | yes |  |
+| `months` | integer \| null | yes |  |
+| `basis` | `dispatch` \| `supply_date` \| null | yes | Where the start came from. |
 
 **`OrderLink`**
 
@@ -1115,6 +1172,12 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `order_no` | string \| null | yes |  |
 | `status` | string | yes |  |
 
+**`ReopenIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `reason` | string | yes |  |
+
 **`Replacement`**
 
 | Field | Type | Required | Notes |
@@ -1174,7 +1237,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
 | `occurred_at` | string | yes |  |
 | `actor` | UserRef \| null |  | Who caused the event, if known. |
-| `payload` | object |  |  |
+| `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |
 
 **`TimelinePage`**
 

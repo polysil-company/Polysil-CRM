@@ -38,6 +38,8 @@ router = APIRouter(prefix="/marketing-orders", tags=["marketing material"])
 Id = Annotated[str, Path(pattern=UUID_RE)]
 
 _ERRORS: dict[int | str, dict[str, object]] = {
+    400: {"model": ErrorResponse,
+          "description": "`idempotency_key_required`: a write sent without an Idempotency-Key."},
     401: {"model": ErrorResponse, "description": "Not signed in."},
     403: {"model": ErrorResponse, "description": "Not permitted; `own_order`, `not_your_approval`."},
     404: {"model": ErrorResponse, "description": "Not found in your scope."},

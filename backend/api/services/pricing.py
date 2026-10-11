@@ -64,6 +64,9 @@ from api.schemas import products as sch
 from api.services.clock import today_ist
 from api.services.users import _pg_text, _sqlstate
 
+# FS-042: how a document is taxed. Stored on it, never re-read from the setting.
+TAX_TREATMENTS = ("domestic", "export_lut", "export_igst")
+
 MAX_LINES = 200
 MAX_FUTURE = dt.timedelta(days=365)
 GST_SLABS = (Decimal("0"), Decimal("0.25"), Decimal("3"), Decimal("5"),
@@ -299,7 +302,8 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
                          place_of_supply_territory_id: str, seller_gstin_id: str | None,
                          as_of: dt.date | None, lines: Sequence[LineSpec],
                          existing: bool = False,
-                         tax_as_of: dt.date | None = None) -> PricedContext:
+                         tax_as_of: dt.date | None = None,
+                         tax_treatment: str = "domestic") -> PricedContext:
     """Resolve and price a set of lines against the masters in force on a date.
     Stores nothing and locks nothing (rule 14).
 
@@ -318,7 +322,15 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
     `as_of`, the HSN, the GST slab and the seller registration at `tax_as_of`,
     because tax is charged on the date of supply. It defaults to `as_of`, which is
     what a quotation and the preview do.
+
+    `tax_treatment` is the document's stored treatment, never the setting
+    (FS-042 rule 5). An export is never intra-state, whatever the stored place of
+    supply says (IGST Act s.7(5)(a)); under a LUT each line is priced at slab 0
+    but keeps its product's slab and rate id, so the figures can be rebuilt if
+    the client turns out to pay IGST and claim a refund (rule 2a).
     """
+    if tax_treatment not in TAX_TREATMENTS:
+        raise ValidationFailed(fields={"tax_treatment": f"One of {', '.join(TAX_TREATMENTS)}."})
     day = as_of or today_ist()
     tax_day = tax_as_of or day
     if day > today_ist() + MAX_FUTURE:
@@ -330,7 +342,7 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
         db, partner_id=partner_id, place_of_supply_territory_id=place_of_supply_territory_id)
     gstin_id, seller, seller_code = await seller_state(db, gstin_id=seller_gstin_id,
                                                        as_of=tax_day)
-    intra_state = seller == pos_state
+    intra_state = seller == pos_state and tax_treatment == "domestic"
     pos_code = (await db.execute(
         text("SELECT code::text FROM territory WHERE id = CAST(:t AS uuid)"),
         {"t": pos_state})).scalar_one_or_none() or ""
@@ -386,7 +398,8 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
         tiers = tuple(ln.discounts) or (ZERO,)
         try:
             money = compute_line(rate=rate.rate, qty=ln.qty, discounts=tiers,
-                                 slab=tax.slab, intra_state=intra_state)
+                                 slab=ZERO if tax_treatment == "export_lut" else tax.slab,
+                                 intra_state=intra_state)
         except PricingError as exc:
             raise ValidationFailed(
                 exc.message, code=exc.code,
@@ -431,7 +444,8 @@ async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.Quot
         place_of_supply_territory_id=body.place_of_supply_territory_id,
         seller_gstin_id=body.seller_gstin_id, as_of=body.as_of,
         lines=[LineSpec(product_id=ln.product_id, qty=ln.qty, discounts=ln.discounts)
-               for ln in body.lines])
+               for ln in body.lines],
+        tax_treatment=body.tax_treatment)
     return _quote_response(ctx.document, as_of=ctx.as_of, gstin_id=ctx.seller_gstin_id,
                            seller_code=ctx.seller_code, pos_code=ctx.place_of_supply_code)
 

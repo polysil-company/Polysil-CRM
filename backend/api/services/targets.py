@@ -143,7 +143,9 @@ async def achievement(db: AsyncSession, caller: Caller, month_raw: str, user_id:
                 "WHERE user_id = ANY(CAST(:i AS uuid[])) AND month = :m ORDER BY user_id, metric, effective_from DESC, id DESC"),
                 {"i": ids, "m": month})).all():
             targets[r.u][r.metric] = Decimal(r.value)
-    achieved = await _achieved(db, caller, month, ids)
+    f = await reports.Filters(start=month, end=domain.month_end(month), territory_id=None,
+                              owner_id=None).load_sale_mode(db)
+    achieved = await _achieved(db, caller, f, ids)
     rows, totals_t, totals_a = [], dict.fromkeys(domain.METRICS, Decimal(0)), dict.fromkeys(domain.METRICS, Decimal(0))
     null_metrics: set[str] = set()
     for p in people:
@@ -164,18 +166,19 @@ async def achievement(db: AsyncSession, caller: Caller, month_raw: str, user_id:
                   "achieved": None if m in null_metrics else _fmt(m, totals_a[m]),
                   "pct": None if m in null_metrics or not totals_t[m] else str(report_domain.pct(totals_a[m], totals_t[m]))}
               for m in domain.METRICS}
-    return {"month": month_raw, "as_of": dt.datetime.now(dt.UTC).isoformat(), "rows": rows, "totals": totals}
+    return {"month": month_raw, "as_of": dt.datetime.now(dt.UTC).isoformat(), "rows": rows, "totals": totals,
+            "filters": {"sale_counted_at": f.sale_mode}}
 
 
-async def _achieved(db: AsyncSession, caller: Caller, month: dt.date, ids: list[str]) -> dict[str, dict[str, Decimal] | None]:
-    """The reports' counting for the month, per person; None for a module the caller lacks."""
-    f = reports.Filters(start=month, end=domain.month_end(month), territory_id=None, owner_id=None)
+async def _achieved(db: AsyncSession, caller: Caller, f: reports.Filters,
+                    ids: list[str]) -> dict[str, dict[str, Decimal] | None]:
+    """The reports' counting for the month (`f`), per person; None for a module the caller lacks."""
     out: dict[str, dict[str, Decimal] | None] = dict.fromkeys(domain.METRICS)
     if not ids:
         return {m: {} for m in domain.METRICS}
     if "sales_orders" in caller.scopes:
         rows = (await db.execute(sa.select(reports.ORD.c.owner_user_id, sa.func.count(), sa.func.sum(reports.ORD.c.total))
-                                 .where(*reports._orders(caller, f), *f.window(reports.ORD.c.submitted_at),
+                                 .where(*reports._sales(caller, f),
                                         reports.ORD.c.owner_user_id.in_(ids))
                                  .group_by(reports.ORD.c.owner_user_id))).all()
         out["orders"] = {str(r[0]): Decimal(r[1]) for r in rows}

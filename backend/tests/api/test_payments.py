@@ -17,6 +17,7 @@ import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.services.clock import today_ist
 from tests.api import test_order_endpoints as endpoints
 from tests.api.conftest import V1, _key
 
@@ -25,7 +26,14 @@ pytestmark = pytest.mark.db
 shop = endpoints.shop
 Shop = endpoints.Shop
 Sessions = Callable[[], AsyncSession]
-TODAY = dt.date.today().isoformat()
+# the IST day, as the service books orders: the UTC date is a day behind between
+# 18:30 and 24:00 UTC, and CI once ran there (PR 70)
+
+
+def _today() -> str:
+    """The IST day when called: a constant taken at import goes stale when a run
+    crosses midnight (a 17-minute suite did, 7 Oct)."""
+    return today_ist().isoformat()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -54,7 +62,7 @@ async def _approved(client: httpx.AsyncClient, shop: Shop, **over: Any) -> dict:
 
 
 async def _pay(client: httpx.AsyncClient, h: dict[str, str], body: dict[str, Any]) -> httpx.Response:
-    base = {"mode": "neft", "ref_no": "UTR" + uuid.uuid4().hex[:10], "received_on": TODAY}
+    base = {"mode": "neft", "ref_no": "UTR" + uuid.uuid4().hex[:10], "received_on": _today()}
     return await client.post(f"{V1}/payments", headers={**h, **_key()}, json={**base, **body})
 
 
@@ -121,8 +129,8 @@ async def test_instalments_cover_and_go_overdue(client: httpx.AsyncClient, shop:
     order = await _approved(client, shop)
     total = Decimal(order["totals"]["total"])
     accounts = await endpoints._as(client, shop, "account_manager")
-    past = (dt.date.today() - dt.timedelta(days=5)).isoformat()
-    later = (dt.date.today() + dt.timedelta(days=30)).isoformat()
+    past = (today_ist() - dt.timedelta(days=5)).isoformat()
+    later = (today_ist() + dt.timedelta(days=30)).isoformat()
     first = (total / 4).quantize(Decimal("0.01"))
     r = await client.put(f"{V1}/orders/{order['id']}/payment-schedule", headers={**accounts, **_key()},
                          json={"instalments": [{"due_on": past, "amount": str(first), "note": "Advance"},
@@ -143,7 +151,7 @@ async def test_a_retried_receipt_counts_once(client: httpx.AsyncClient, shop: Sh
     order = await _approved(client, shop)
     accounts = await endpoints._as(client, shop, "account_manager")
     key = _key()
-    body = {"mode": "cash", "received_on": TODAY, "amount": "50.00",
+    body = {"mode": "cash", "received_on": _today(), "amount": "50.00",
             "allocations": [{"sales_order_id": order["id"], "amount": "50.00"}]}
     for _ in range(2):
         r = await client.post(f"{V1}/payments", headers={**accounts, **key}, json=body)
@@ -179,7 +187,7 @@ async def test_a_dealer_ledger_runs_a_balance(client: httpx.AsyncClient, shop: S
     assert mine[0]["kind"] == "order"
     assert Decimal(led["closing_balance"]) <= -extra, "the dealer is in credit by at least the advance"
     assert Decimal(led["unallocated"]) >= extra
-    tomorrow = (dt.date.today() + dt.timedelta(days=1)).isoformat()
+    tomorrow = (today_ist() + dt.timedelta(days=1)).isoformat()
     later = (await client.get(f"{V1}/partners/{shop.partner}/ledger", headers=accounts, params={"from": tomorrow})).json()["data"]
     assert later["rows"] == [] and later["opening_balance"] == led["closing_balance"]
 

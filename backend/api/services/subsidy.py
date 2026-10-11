@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.domain.subsidy.jantri import Matrix2D, OutsideTable
 from api.domain.subsidy.money import RoundingPolicy, round2
 from api.domain.subsidy.pipeline import seven_block
-from api.domain.subsidy.sprinkler import field_inspection
+from api.domain.subsidy.sprinkler import field_inspection, missing_quantity_rows, required_rates
 from api.domain.subsidy.types import (
     Category,
     ComponentRate,
@@ -39,6 +39,7 @@ from api.domain.subsidy.types import (
     QuotationResult,
     SubsidyError,
     SystemPolicy,
+    rate_matches,
 )
 from api.errors import NotFoundError, ValidationFailed
 from api.schemas.subsidy import (
@@ -111,8 +112,9 @@ async def _system_row(db: AsyncSession, scheme: str, system: str) -> Any:
         "y.spacing_outside_table::text, y.formula_version, y.quantity_source::text, "
         "y.jantri_variant::text, s.id "
         "FROM subsidy_system y JOIN subsidy_scheme s ON s.id = y.scheme_id "
-        "WHERE s.code = :c AND s.is_active AND y.system_type = CAST(:t AS subsidy_system_type) "
-        "AND y.is_active"), {"c": scheme, "t": system})
+        "WHERE s.code = upper(:c) AND s.is_active "
+        "AND y.system_type = CAST(:t AS subsidy_system_type) AND y.is_active"),
+        {"c": scheme, "t": system})
     row = got.one_or_none()
     if row is None:
         # Section 4 lists an unknown or inactive scheme in the validation list and
@@ -120,7 +122,7 @@ async def _system_row(db: AsyncSession, scheme: str, system: str) -> Any:
         # two were one answer here; the scheme is the caller's field (code review
         # F-12), and a scheme that exists without this system is not.
         known = await db.execute(text(
-            "SELECT 1 FROM subsidy_scheme WHERE code = :c AND is_active"), {"c": scheme})
+            "SELECT 1 FROM subsidy_scheme WHERE code = upper(:c) AND is_active"), {"c": scheme})
         if known.one_or_none() is None:
             raise ValidationFailed(fields={"scheme": f"{scheme!r} is not an active scheme."})
         raise NotFoundError(f"No active {system} configuration for scheme {scheme}.")
@@ -141,7 +143,19 @@ async def _matrix(db: AsyncSession, scheme_id: str, system: str, variant: str,
         "SELECT lateral_spacing, area_breakpoint, unit_cost FROM unit_cost_cell "
         "WHERE matrix_id = :m ORDER BY lateral_spacing DESC NULLS LAST, area_breakpoint"),
         {"m": row.id})).all()
+    if not cells:
+        raise NotFoundError(
+            f"The {system} {variant} unit cost table in force on {as_of} has no cells.")
     return str(row.id), row.dimensionality, [tuple(c) for c in cells]
+
+
+def _ragged(cells: list[tuple[Any, Any, Any]]) -> bool:
+    """A 2-D table whose spacings do not all hold the same areas: `_as_matrix_2d`
+    would raise a KeyError on it (FS-039 code review F-1)."""
+    by_spacing: dict[Any, set[Any]] = {}
+    for spacing, area, _cost in cells:
+        by_spacing.setdefault(spacing, set()).add(_dec(area))
+    return len({frozenset(a) for a in by_spacing.values()}) > 1
 
 
 def _as_matrix_2d(cells: list[tuple[Any, Any, Any]]) -> Matrix2D:
@@ -155,6 +169,51 @@ def _as_matrix_2d(cells: list[tuple[Any, Any, Any]]) -> Matrix2D:
 
 def _as_table_1d(cells: list[tuple[Any, Any, Any]]) -> dict[Decimal, Decimal]:
     return {_dec(area): _dec(cost) for _spacing, area, cost in cells}
+
+
+async def _categories(db: AsyncSession, scheme_id: str, system: str,
+                      as_of: dt.date) -> tuple[Category, ...]:
+    cats = (await db.execute(text(
+        "SELECT code::text, name, pct, variant::text, per_ha_cap, gsdma_pct, sort_order "
+        "FROM subsidy_category WHERE scheme_id = :s "
+        "AND system_type = CAST(:t AS subsidy_system_type) " + _IN_FORCE + " ORDER BY sort_order"),
+        {"s": scheme_id, "t": system, "d": as_of})).all()
+    if not cats:
+        raise NotFoundError(f"No {system} categories are in force on {as_of}.")
+    return tuple(Category(c[0], c[1], _dec(c[2]), c[3],
+                          _dec(c[4]) if c[4] is not None else None,
+                          _dec(c[5]) if c[5] is not None else None, c[6]) for c in cats)
+
+
+async def _crop_spacings(db: AsyncSession, scheme_id: str, as_of: dt.date) -> dict[str, Decimal]:
+    crops = (await db.execute(text(
+        "SELECT crop::text, standard_spacing FROM crop_lateral_spacing WHERE scheme_id = :s "
+        + _IN_FORCE), {"s": scheme_id, "d": as_of})).all()
+    if not crops:
+        # Without this the engine would give every crop a standard spacing of 0 and
+        # answer 200 with a Jantri read off the wrong row, or blame the caller for
+        # a crop name that is missing because the master is (code review F-7).
+        raise NotFoundError(f"No crop spacings are in force on {as_of}.")
+    return {" ".join(c[0].split()).lower(): _dec(c[1]) for c in crops}
+
+
+async def _parameters(db: AsyncSession, scheme_id: str, system: str,
+                      as_of: dt.date) -> dict[str, tuple[Decimal, str]]:
+    """The system's row wins over the scheme-wide one: NULLS FIRST, later keys overwrite."""
+    return {p[0]: (_dec(p[1]), p[2]) for p in (await db.execute(text(
+        "SELECT key::text, value, unit::text FROM subsidy_parameter WHERE scheme_id = :s "
+        "AND (system_type IS NULL OR system_type = CAST(:t AS subsidy_system_type)) " + _IN_FORCE
+        + " ORDER BY system_type NULLS FIRST"), {"s": scheme_id, "t": system, "d": as_of})).all()}
+
+
+async def _rates(db: AsyncSession, scheme_id: str, system: str,
+                 as_of: dt.date) -> tuple[ComponentRate, ...]:
+    return tuple(ComponentRate(r[0], r[1], r[2], _dec(r[3]), r[4], r[5])
+                 for r in (await db.execute(text(
+                     "SELECT component_code::text, description, uom, rate, pipe_size_mm, "
+                     "nozzle::text FROM subsidy_component_rate WHERE scheme_id = :s "
+                     "AND system_type = CAST(:t AS subsidy_system_type) " + _IN_FORCE),
+                     {"s": scheme_id, "t": system, "d": as_of})).all())
 
 
 async def _resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) -> ResolvedMasters:
@@ -173,46 +232,27 @@ async def _resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) -
         raise NotFoundError(
             f"The {system} tables in force on {as_of} are {reg_dim}-D and {sy_dim}-D, but the "
             f"system is configured as {row.jantri_variant}.")
+    for variant, dim, cells in (("regular", reg_dim, reg_cells), ("seven_year", sy_dim, sy_cells)):
+        if dim == 2 and _ragged(cells):
+            raise NotFoundError(
+                f"The {system} {variant} unit cost table in force on {as_of} is missing cells.")
     regular: Any = _as_matrix_2d(reg_cells) if reg_dim == 2 else _as_table_1d(reg_cells)
     seven_year: Any = _as_matrix_2d(sy_cells) if sy_dim == 2 else _as_table_1d(sy_cells)
 
-    cats = (await db.execute(text(
-        "SELECT code::text, name, pct, variant::text, per_ha_cap, gsdma_pct, sort_order "
-        "FROM subsidy_category WHERE scheme_id = :s "
-        "AND system_type = CAST(:t AS subsidy_system_type) " + _IN_FORCE + " ORDER BY sort_order"),
-        {"s": scheme_id, "t": system, "d": as_of})).all()
-    if not cats:
-        raise NotFoundError(f"No {system} categories are in force on {as_of}.")
-    categories = tuple(Category(c[0], c[1], _dec(c[2]), c[3],
-                                _dec(c[4]) if c[4] is not None else None,
-                                _dec(c[5]) if c[5] is not None else None, c[6]) for c in cats)
-
-    crops = (await db.execute(text(
-        "SELECT crop::text, standard_spacing FROM crop_lateral_spacing WHERE scheme_id = :s "
-        + _IN_FORCE), {"s": scheme_id, "d": as_of})).all()
-    if not crops:
-        # Without this the engine would give every crop a standard spacing of 0 and
-        # answer 200 with a Jantri read off the wrong row, or blame the caller for
-        # a crop name that is missing because the master is (code review F-7).
-        raise NotFoundError(f"No crop spacings are in force on {as_of}.")
-    spacings = {" ".join(c[0].split()).lower(): _dec(c[1]) for c in crops}
-
-    params = {p[0]: (_dec(p[1]), p[2]) for p in (await db.execute(text(
-        "SELECT key::text, value, unit::text FROM subsidy_parameter WHERE scheme_id = :s "
-        "AND (system_type IS NULL OR system_type = CAST(:t AS subsidy_system_type)) " + _IN_FORCE
-        + " ORDER BY system_type NULLS FIRST"), {"s": scheme_id, "t": system, "d": as_of})).all()}
+    categories = await _categories(db, scheme_id, system, as_of)
+    spacings = await _crop_spacings(db, scheme_id, as_of)
+    params = await _parameters(db, scheme_id, system, as_of)
 
     quantities = qty_id = None
     rates: tuple[ComponentRate, ...] = ()
     areas: tuple[Decimal, ...] | None = None
     if row.quantity_source == "area_matrix":
         quantities, qty_id, areas = await _quantities(db, scheme_id, system, as_of)
-        rates = tuple(ComponentRate(r[0], r[1], r[2], _dec(r[3]), r[4], r[5])
-                      for r in (await db.execute(text(
-                          "SELECT component_code::text, description, uom, rate, pipe_size_mm, "
-                          "nozzle::text FROM subsidy_component_rate WHERE scheme_id = :s "
-                          "AND system_type = CAST(:t AS subsidy_system_type) " + _IN_FORCE),
-                          {"s": scheme_id, "t": system, "d": as_of})).all())
+        gaps = missing_quantity_rows(quantities)
+        if gaps:
+            raise NotFoundError(f"The {system} quantity table in force on {as_of} lacks a full "
+                                f"row for: {', '.join(gaps)}.")
+        rates = await _rates(db, scheme_id, system, as_of)
 
     masters = Masters(regular, seven_year, categories, spacings, quantities, rates,
                       row.formula_version)
@@ -233,6 +273,8 @@ async def _quantities(db: AsyncSession, scheme_id: str, system: str,
     cells = (await db.execute(text(
         "SELECT component_code::text, area_breakpoint, qty FROM quantity_matrix_cell "
         "WHERE matrix_id = :m ORDER BY area_breakpoint"), {"m": row.id})).all()
+    if not cells:
+        raise NotFoundError(f"The {system} quantity table in force on {as_of} has no cells.")
     rows: dict[str, dict[Decimal, Decimal]] = {}
     for code, area, qty in cells:
         rows.setdefault(code, {})[_dec(area)] = _dec(qty)
@@ -281,6 +323,55 @@ async def resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) ->
     resolved = await _resolve(db, scheme, system, as_of)
     _CACHE[key] = (now, resolved)
     return resolved
+
+
+# The keys `_policy` reads with no default: a scheme lacking one cannot calculate.
+REQUIRED_PARAMETERS: tuple[str, ...] = (
+    "inspection_floor", "min_area_prorate", "max_area_scaling", "education_amount",
+    "insurance_rate", "inspection_rate", "gst_material_half", "gst_service_half",
+    "seven_year_area_min", "seven_year_area_max")
+
+
+async def readiness(db: AsyncSession, scheme_id: str, system: str, jantri_variant: str,
+                    quantity_source: str, as_of: dt.date) -> list[str]:
+    """What a calculation on this system would refuse on, in `_resolve`'s order, read
+    through `_resolve`'s own helpers and never through the cache (FS-039 rule 7).
+    Component rates are not a `_resolve` refusal; `required_rates` lists the ones
+    `field_inspection` will ask for."""
+    missing: list[str] = []
+    wanted = 2 if jantri_variant == "bilinear_2d" else 1
+    for variant in ("regular", "seven_year"):
+        try:
+            _id, dim, cells = await _matrix(db, scheme_id, system, variant, as_of)
+        except NotFoundError:
+            missing.append(f"unit_cost_matrix:{variant}")
+            continue
+        if dim != wanted or (dim == 2 and _ragged(cells)):
+            missing.append(f"unit_cost_matrix:{variant}")
+    for name, read in (("categories", _categories(db, scheme_id, system, as_of)),
+                       ("crop_spacings", _crop_spacings(db, scheme_id, as_of))):
+        try:
+            await read
+        except NotFoundError:
+            missing.append(name)
+    params = await _parameters(db, scheme_id, system, as_of)
+    areas: tuple[Decimal, ...] | None = None
+    if quantity_source == "area_matrix":
+        try:
+            quantities, _qid, areas = await _quantities(db, scheme_id, system, as_of)
+        except NotFoundError:
+            missing.append("quantity_matrix")
+        else:
+            missing += [f"quantity_matrix:{code}" for code in missing_quantity_rows(quantities)]
+    missing += [f"parameters:{k}" for k in REQUIRED_PARAMETERS if k not in params]
+    if areas:
+        rates = await _rates(db, scheme_id, system, as_of)
+        band = params["pipe_size_band_ha"][0] if "pipe_size_band_ha" in params else Decimal("2.0")
+        for code, size, nozzle in required_rates(areas, band):
+            if not any(rate_matches(r, code, size, nozzle) for r in rates):
+                tail = size if size is not None else nozzle
+                missing.append(f"component_rate:{code}" + (f":{tail}" if tail is not None else ""))
+    return missing
 
 
 # ── the endpoint's work ──────────────────────────────────────────────────────

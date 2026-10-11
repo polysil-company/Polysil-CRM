@@ -24,7 +24,7 @@ from api.schemas.leads import (
     TerritoryRef,
     UserRef,
 )
-from api.schemas.products import MAX_LINES, _places
+from api.schemas.products import MAX_LINES, TaxTreatment, _places
 
 SalesType = Literal["commercial", "industrial", "export", "subsidised", "marketing", "sample"]
 Status = Literal["draft", "sent", "viewed", "accepted", "rejected", "negotiation", "expired"]
@@ -101,9 +101,10 @@ class QuotationCreate(BaseModel):
     lead_id: Annotated[str, Field(pattern=UUID_RE)]
     sales_type: Annotated[SalesType | None, Field(
         default=None,
-        description="Defaults to the lead's inquiry type. commercial and industrial are "
-                    "priced today; the others are refused with sales_type_unsupported "
-                    "naming the question that blocks them.")]
+        description="Defaults to the lead's inquiry type. commercial, industrial and export "
+                    "are priced today; the others are refused with sales_type_unsupported "
+                    "naming the question that blocks them. An export is taxed by the "
+                    "export_tax_treatment setting and needs export_country.")]
     partner_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE,
         description="OMIT the field for the lead's assigned partner. Send null for a direct "
@@ -118,6 +119,9 @@ class QuotationCreate(BaseModel):
         default=None,
         description="Price against the masters in force on this date. Today in India by "
                     "default; a future date is allowed and warns.")]
+    export_country: Annotated[str | None, Field(
+        default=None, min_length=2, max_length=60,
+        description="The buyer's country. Required on an export, refused on any other type.")]
     party: Party | None = Field(default=None, description="Defaults from the lead.")
     terms: Annotated[str | None, Field(default=None, max_length=2000,
                                         description="Free text printed at the foot.")]
@@ -142,6 +146,9 @@ class QuotationPatch(BaseModel):
     place_of_supply_territory_id: Annotated[str | None, Field(default=None, pattern=UUID_RE)]
     seller_gstin_id: Annotated[str | None, Field(default=None, pattern=UUID_RE)]
     price_effective_date: dt.date | None = None
+    export_country: Annotated[str | None, Field(
+        default=None, min_length=2, max_length=60,
+        description="The buyer's country. Omit to keep. Required on an export.")]
     party: Party | None = None
     terms: Annotated[str | None, Field(default=None, max_length=2000)]
     expected_status: Annotated[Status | None, Field(
@@ -327,6 +334,12 @@ class Quotation(BaseModel):
     seller_gstin: SellerRef
     place_of_supply: PlaceOfSupply
     intra_state: bool
+    tax_treatment: TaxTreatment = Field(description=(
+        "domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or "
+        "export_igst. Fixed when the quotation is created; a revision keeps it."))
+    export_country: str | None
+    lut_arn: str | None = Field(description="The LUT an export_lut quotation is zero-rated "
+                                            "under, as of its price date.")
     price_effective_date: str
     price_list: PriceListRef | None = Field(description="Null when the lines drew from more "
                                                         "than one list.")

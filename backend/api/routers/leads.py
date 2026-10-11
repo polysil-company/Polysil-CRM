@@ -136,6 +136,12 @@ async def list_leads(
     created_from: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
     created_to: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
     q: Annotated[str | None, Query(description="Name, mobile or inquiry number.")] = None,
+    campaign_id: Annotated[str | None, Query(
+        pattern=r"^(none|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+        description="Leads from this campaign, or `none` for leads with no campaign.")] = None,
+    deleted: Annotated[bool, Query(
+        description="true: only deleted leads, to restore one. Needs leads.delete to "
+                    "return anything. Deleted leads are never listed otherwise.")] = False,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: Annotated[str | None, Query(description="From a previous page's next_cursor.")] = None,
     include_total: Annotated[bool, Query(
@@ -170,7 +176,8 @@ async def list_leads(
         db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id,
         owner=owner, territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
         assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
-        created_from=created_from, created_to=created_to, q=q, limit=limit, cursor=cursor,
+        created_from=created_from, created_to=created_to, q=q, campaign_id=campaign_id,
+        deleted=deleted, limit=limit, cursor=cursor,
         include_total=include_total, sort=sort, order=order)
 
 
@@ -199,6 +206,10 @@ async def lead_stats(
     created_from: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
     created_to: Annotated[str | None, Query(description="ISO date, inclusive.")] = None,
     q: Annotated[str | None, Query(description="Name, mobile or inquiry number.")] = None,
+    campaign_id: Annotated[str | None, Query(
+        pattern=r"^(none|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+        description="Leads from this campaign, or `none` for leads with no campaign.")] = None,
+    deleted: Annotated[bool, Query(description="true: count only deleted leads.")] = False,
 ) -> LeadStats:
     """Counts for the pipeline board and the dashboard tiles: leads by stage, by
     priority, and unassigned. Same scope and same filters as the list, so a board
@@ -207,7 +218,8 @@ async def lead_stats(
         db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id, owner=owner,
         territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
         assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
-        created_from=created_from, created_to=created_to, q=q)
+        created_from=created_from, created_to=created_to, q=q, campaign_id=campaign_id,
+        deleted=deleted)
 
 
 # Declared before the /{lead_id} routes so the literal path wins the match.
@@ -544,7 +556,8 @@ async def territories(
 async def partners(
     db: DbSession,
     _: Claims,
-    q: Annotated[str | None, Query(description="Name, code or contact person substring.")] = None,
+    q: Annotated[str | None, Query(
+        description="Name, code, contact person or partner user name substring.")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> Envelope[list[PartnerPick]]:
     """The partner picker for assigning a lead to a channel partner. You see only

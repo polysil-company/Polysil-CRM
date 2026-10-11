@@ -32,6 +32,7 @@ from api.schemas.complaints import (
     LinesReplace,
     QcIn,
     RemedyIn,
+    ReopenIn,
     Severity,
     SlaPolicy,
     SlaPolicyIn,
@@ -264,6 +265,19 @@ async def cancel(complaint_id: Id, body: CancelIn, db: DbSession, caller: Caller
     or someone who may delete complaints."""
     return await _idem(db, claims, idem, f"POST /api/v1/complaints/{complaint_id}/cancel", body,
                        lambda: service.cancel(db, caller, complaint_id, body))
+
+
+@router.post("/{complaint_id}/reopen", response_model=Envelope[Complaint], responses=_MUTATION_ERRORS,
+             dependencies=[Depends(require("complaints", "view"))])
+async def reopen(complaint_id: Id, body: ReopenIn, db: DbSession, caller: CallerDep, claims: Claims,
+                 idem: IdemKey) -> Response:
+    """Reopen a closed or QC-rejected complaint, with a reason. It goes through the
+    check, QC and a remedy again. The raiser may reopen a closed one; others need a
+    role in the `complaint_reopen_roles` setting, and a rejection only those roles.
+    `422 reopen_window_closed` after `complaint_reopen_days` or `complaint_reopen_max`.
+    `can.reopen` on the detail says whether the button applies."""
+    return await _idem(db, claims, idem, f"POST /api/v1/complaints/{complaint_id}/reopen", body,
+                       lambda: service.reopen(db, caller, complaint_id, body))
 
 
 @router.get("/{complaint_id}/assignees", response_model=Envelope[list[Assignee]], responses=_ERRORS,

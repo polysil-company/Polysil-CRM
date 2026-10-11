@@ -152,6 +152,20 @@ class LedgerRowOut(BaseModel):
     balance: str = Field(description="Positive: the dealer owes. Negative: the dealer's credit.")
 
 
+class PartnerCredit(BaseModel):
+    """A dealer's credit position now (FS-027). For Accounts, and for staff who edit
+    dealers and can see this one; never for a dealer or a distributor."""
+
+    partner_id: str
+    credit_limit: str | None = Field(description="The dealer's limit; null when none is set, "
+                                                 "and then the dealer is never checked.")
+    exposure: str = Field(description="Owed on the dealer's open orders less its live receipts. "
+                                      "Negative: the dealer is in credit.")
+    available: str | None = Field(description="Limit less exposure; null when there is no limit. "
+                                              "Negative: over the limit.")
+    check: str = Field(description="The company setting dealer_credit_check: off, warn or block.")
+
+
 class Ledger(BaseModel):
     partner: PartnerName
     from_: str | None = Field(alias="from")

@@ -38,7 +38,7 @@ from api.errors import (
 from api.schemas import complaints as sch
 from api.schemas.leads import PageMeta, TimelineEvent, TimelinePage
 from api.schemas.tasks import LeadLink, OrderLink, PartnerLink
-from api.services import approval_view, people, pricing
+from api.services import approval_view, people, pricing, warranty
 from api.services.clock import today_ist
 from api.services.leads import _covering_org_unit, _decode_cursor, _encode_cursor
 from api.storage import Storage
@@ -114,6 +114,11 @@ def _refusal(exc: DBAPIError) -> Exception | None:
         return ValidationFailed("The complaint's territory has no coded state.",
                                 code="territory_without_state_code",
                                 fields={"territory_id": "no coded state above it"})
+    if state == "CMPRW":
+        return ValidationFailed("The time to reopen this complaint has passed, or it was "
+                                "reopened as often as allowed.", code="reopen_window_closed")
+    if state == "CMPRK":
+        return ValidationFailed(code="remark_required", fields={"reason": "required"})
     if state == "CMPPD":
         return ValidationFailed("A target cannot start in the past.", code="target_in_the_past",
                                 fields={"effective_from": "today or later"})
@@ -204,7 +209,8 @@ async def _can(db: AsyncSession, caller: Caller, r: Any) -> sch.Can:
         "complaint_refusal(CAST(:c AS uuid), 'qc') AS qc, "
         "complaint_refusal(CAST(:c AS uuid), 'cancel') AS cancel, "
         "complaint_refusal(CAST(:c AS uuid), 'remedy') AS remedy, "
-        "complaint_refusal(CAST(:c AS uuid), 'withdraw') AS withdraw"), {"c": str(r.id)})).one()
+        "complaint_refusal(CAST(:c AS uuid), 'withdraw') AS withdraw, "
+        "complaint_reopen_refusal(CAST(:c AS uuid)) AS reopen"), {"c": str(r.id)})).one()
     perms = await _perms(db)
     draft = r.status_text == "draft"
     mine = caller.user_id in (str(r.raised_by), str(r.owner_user_id) if r.owner_user_id else "")
@@ -214,7 +220,8 @@ async def _can(db: AsyncSession, caller: Caller, r: Any) -> sch.Can:
     return sch.Can(edit=edit, submit=refusals.submit is None, check=refusals.check_ is None,
                    qc=refusals.qc is None, cancel=refusals.cancel is None,
                    delete=draft and r.submit_count == 0 and perms["delete"], upload=upload,
-                   remedy=refusals.remedy is None, withdraw=refusals.withdraw is None)
+                   remedy=refusals.remedy is None, withdraw=refusals.withdraw is None,
+                   reopen=refusals.reopen is None)
 
 
 async def _rows(db: AsyncSession, where: str, params: dict[str, Any]) -> list[Any]:
@@ -253,6 +260,7 @@ async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> 
         # whoever cancelled is the raiser or the owner, both names a dealer already sees
         user_ids |= {str(d.decided_by) for d in decisions if d.stage == "cancel"}
     names = await people.resolve_ids(db, user_ids)
+    cover = await warranty.complaint_lines(db, complaint_id)
 
     check = next((d for d in decisions if d.stage == "check" and d.submit_no == r.submit_count), None)
     quality = next((d for d in decisions if d.stage == "qc"), None)
@@ -269,7 +277,8 @@ async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> 
         sample_courier_date=_iso(r.sample_courier_date), sample_courier_detail=r.sample_courier_detail,
         lines=[sch.Line(id=str(x.id), product=sch.ProductRef(id=str(x.product_id), description=x.description),
                         uom=x.uom, supplied_qty=_qty(x.supplied_qty), defective_qty=_qty(x.defective_qty),
-                        failure_frequency=x.failure_frequency, remark=x.remark) for x in lines],
+                        failure_frequency=x.failure_frequency, remark=x.remark,
+                        warranty=cover.get(str(x.id))) for x in lines],
         attachments=[sch.Attachment(
             id=str(f.id), kind=f.kind, filename=f.filename, content_type=f.content_type,
             size_bytes=f.size_bytes, preview=f.content_type != "image/heic",
@@ -297,6 +306,12 @@ async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> 
         raised_by=names.user(r.raised_by, r.raiser_name),
         remedy=await _remedy(db, complaint_id, portal),
         closed_at=_iso(r.closed_at),
+        reopen_count=r.reopen_count, reopened_at=_iso(r.reopened_at),
+        reopen_reason=None if portal else r.reopen_reason,
+        response_escalated_at=None if portal or r.response_escalated_at is None
+        else r.response_escalated_at.isoformat(),
+        resolution_escalated_at=None if portal or r.resolution_escalated_at is None
+        else r.resolution_escalated_at.isoformat(),
         can=await _can(db, caller, r),
         created_at=r.created_at.isoformat(), updated_at=r.updated_at.isoformat(),
         submitted_at=_iso(r.submitted_at))
@@ -490,7 +505,8 @@ async def _from_dispatch(db: AsyncSession, order_id: str) -> tuple[str | None, d
         # the IST day: the session runs in UTC (PR 25 review)
         "SELECT dc_no, COALESCE(dc_date, (dispatched_at AT TIME ZONE 'Asia/Kolkata')::date) "
         "AS day FROM dispatch "
-        "WHERE sales_order_id = CAST(:o AS uuid) AND dc_no IS NOT NULL "
+        # live dispatches only (FS-046 edge EC-9): a void undoes the dispatch
+        "WHERE sales_order_id = CAST(:o AS uuid) AND dc_no IS NOT NULL AND voided_at IS NULL "
         "ORDER BY dispatched_at DESC NULLS LAST LIMIT 1"), {"o": order_id})).one_or_none()
     return (row.dc_no, row.day) if row else (None, None)
 
@@ -812,6 +828,13 @@ async def withdraw_remedy(db: AsyncSession, caller: Caller, complaint_id: str,
 
 async def cancel(db: AsyncSession, caller: Caller, complaint_id: str, body: sch.CancelIn) -> sch.Complaint:
     await _definer(db, "SELECT complaint_cancel(CAST(:c AS uuid), :r)", {"c": complaint_id, "r": body.reason})
+    return await get_complaint(db, caller, complaint_id)
+
+
+async def reopen(db: AsyncSession, caller: Caller, complaint_id: str, body: sch.ReopenIn) -> sch.Complaint:
+    """FS-036: a closed or rejected complaint starts a new round. The rules are
+    complaint_reopen_refusal()'s, in migration 041."""
+    await _definer(db, "SELECT complaint_reopen(CAST(:c AS uuid), :r)", {"c": complaint_id, "r": body.reason})
     return await get_complaint(db, caller, complaint_id)
 
 

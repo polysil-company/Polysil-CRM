@@ -96,11 +96,12 @@ that blocks them.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `lead_id` | string | yes |  |
-| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` \| null |  | Defaults to the lead's inquiry type. commercial and industrial are priced today; the others are refused with sales_type_unsupported naming the question that blocks them. |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` \| null |  | Defaults to the lead's inquiry type. commercial, industrial and export are priced today; the others are refused with sales_type_unsupported naming the question that blocks them. An export is taxed by the export_tax_treatment setting and needs export_country. |
 | `partner_id` | string \| null |  | OMIT the field for the lead's assigned partner. Send null for a direct sale at the farmer tier. Decides the price tier and who sees the row. |
 | `place_of_supply_territory_id` | string \| null |  | Where the goods are delivered. Defaults to the lead's territory. |
 | `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
 | `price_effective_date` | date \| null |  | Price against the masters in force on this date. Today in India by default; a future date is allowed and warns. |
+| `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `party` | Party \| null |  | Defaults from the lead. |
 | `terms` | string \| null |  | Free text printed at the foot. |
 | `lines` | QuotationLineIn[] |  | Zero to 200. A draft may be saved empty; sending needs at least one. |
@@ -247,6 +248,7 @@ anything but a draft with `409 quotation_not_draft`.
 | `place_of_supply_territory_id` | string \| null |  |  |
 | `seller_gstin_id` | string \| null |  |  |
 | `price_effective_date` | date \| null |  |  |
+| `export_country` | string \| null |  | The buyer's country. Omit to keep. Required on an export. |
 | `party` | Party \| null |  |  |
 | `terms` | string \| null |  |  |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
@@ -598,6 +600,7 @@ Every version of the number, oldest first. Any version's id works.
 | `by` | UserRef \| null | yes | Null for a dealer, always. |
 | `remark` | string \| null | yes | Null for a dealer, always. |
 | `decided_at` | string \| null | yes |  |
+| `stalled` | boolean |  | True on the step waiting now when nobody of its own role can decide it (none covers the document, or the only one raised it). A higher manager decides it instead and sees it in their inbox. Show "No <role> to decide; with the next manager up" rather than "Waiting on <role>". Always false for a dealer. Default `False`. |
 
 **`DeleteRequest`**
 
@@ -721,6 +724,9 @@ Every version of the number, oldest first. Any version's id works.
 | `seller_gstin` | SellerRef | yes |  |
 | `place_of_supply` | PlaceOfSupply | yes |  |
 | `intra_state` | boolean | yes |  |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` | yes | domestic, export_lut (every line at 0 % IGST under the LUT in lut_arn) or export_igst. Fixed when the quotation is created; a revision keeps it. |
+| `export_country` | string \| null | yes |  |
+| `lut_arn` | string \| null | yes | The LUT an export_lut quotation is zero-rated under, as of its price date. |
 | `price_effective_date` | string | yes |  |
 | `price_list` | PriceListRef \| null | yes | Null when the lines drew from more than one list. |
 | `price_list_ids` | string[] | yes |  |
@@ -753,11 +759,12 @@ Every version of the number, oldest first. Any version's id works.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `lead_id` | string | yes |  |
-| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` \| null |  | Defaults to the lead's inquiry type. commercial and industrial are priced today; the others are refused with sales_type_unsupported naming the question that blocks them. |
+| `sales_type` | `commercial` \| `industrial` \| `export` \| `subsidised` \| `marketing` \| `sample` \| null |  | Defaults to the lead's inquiry type. commercial, industrial and export are priced today; the others are refused with sales_type_unsupported naming the question that blocks them. An export is taxed by the export_tax_treatment setting and needs export_country. |
 | `partner_id` | string \| null |  | OMIT the field for the lead's assigned partner. Send null for a direct sale at the farmer tier. Decides the price tier and who sees the row. |
 | `place_of_supply_territory_id` | string \| null |  | Where the goods are delivered. Defaults to the lead's territory. |
 | `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
 | `price_effective_date` | date \| null |  | Price against the masters in force on this date. Today in India by default; a future date is allowed and warns. |
+| `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `party` | Party \| null |  | Defaults from the lead. |
 | `terms` | string \| null |  | Free text printed at the foot. |
 | `lines` | QuotationLineIn[] |  | Zero to 200. A draft may be saved empty; sending needs at least one. |
@@ -825,6 +832,7 @@ Every version of the number, oldest first. Any version's id works.
 | `place_of_supply_territory_id` | string \| null |  |  |
 | `seller_gstin_id` | string \| null |  |  |
 | `price_effective_date` | date \| null |  |  |
+| `export_country` | string \| null |  | The buyer's country. Omit to keep. Required on an export. |
 | `party` | Party \| null |  |  |
 | `terms` | string \| null |  |  |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
@@ -893,7 +901,7 @@ Every version of the number, oldest first. Any version's id works.
 | `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
 | `occurred_at` | string | yes |  |
 | `actor` | UserRef \| null |  | Who caused the event, if known. |
-| `payload` | object |  |  |
+| `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |
 
 **`TimelinePage`**
 

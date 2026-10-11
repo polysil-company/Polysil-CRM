@@ -33,7 +33,7 @@ from api.errors import (
 from api.schemas import subsidy_applications as sch
 from api.schemas.leads import UserRef
 from api.schemas.subsidy import CalculateResponse
-from api.services import people
+from api.services import people, subsidy_schemes
 from api.services import subsidy as engine
 from api.services.clock import today_ist
 from api.services.leads import _decode_cursor, _encode_cursor
@@ -101,6 +101,8 @@ _CREATE_ERRORS = {
     "SAPSY": ("lead_system_not_subsidised", "the lead's system has no subsidy calculation"),
     "SAPDU": ("already_forwarded", "the lead has an application"),
     "SAPSC": ("territory_without_state_code", "the lead's territory has no coded state"),
+    "SAPSN": ("no_scheme_for_state", "no subsidy scheme covers the lead's state"),
+    "SAPNG": ("scheme_not_ready", "the scheme has no active stage"),
 }
 
 
@@ -112,6 +114,13 @@ async def create(db: AsyncSession, caller: Caller, body: sch.ApplicationCreate) 
         raise NotFoundError("No such lead.")
     if body.calculation.system_type != lead.mis:
         raise ValidationFailed(fields={"calculation.system_type": f"the lead's system is {lead.mis}"})
+    # FS-039: the lead's state's scheme. The definer resolves it again under its lock
+    # and refuses figures from another scheme (SAPSX); this is the readable refusal.
+    scheme_id = await subsidy_schemes.scheme_id_for_lead(db, body.lead_id)
+    scheme: str = (await db.execute(text("SELECT code::text FROM subsidy_scheme WHERE id = :i"),
+                               {"i": scheme_id})).scalar_one()
+    if body.calculation.scheme.upper() != scheme.upper():
+        raise ValidationFailed(fields={"calculation.scheme": f"This lead's scheme is {scheme}."})
     try:
         calc = await engine.calculate(db, body.calculation)
     except ValidationFailed as exc:
@@ -145,6 +154,9 @@ async def create(db: AsyncSession, caller: Caller, body: sch.ApplicationCreate) 
         if state == "23505" and _constraint(exc) == "uq_subsidy_application_live_lead":
             code, why = _CREATE_ERRORS["SAPDU"]
             raise ValidationFailed(code=code, fields={"lead_id": why}) from exc
+        if state == "SAPSX":
+            raise ConflictError("The lead's subsidy scheme changed. Calculate again.",
+                                code="scheme_changed") from exc
         if state == "42501":
             raise ForbiddenError("You may not start subsidy applications.") from exc
         raise
@@ -537,10 +549,15 @@ PIMS_COLUMNS = ("CostType", "Crop", "ItemCode", "Item", "Size", "Unit", "Rate", 
 
 async def pims_rows(db: AsyncSession, app_id: str) -> list[tuple[Any, ...]]:
     row = (await db.execute(text(
-        "SELECT calculation_request, calculation FROM subsidy_application WHERE id = CAST(:a AS uuid)"),
+        "SELECT a.calculation_request, a.calculation, s.code::text AS scheme FROM subsidy_application a "
+        "JOIN subsidy_scheme s ON s.id = a.scheme_id WHERE a.id = CAST(:a AS uuid)"),
         {"a": app_id})).one_or_none()
     if row is None:
         raise NotFoundError("No such application.")
+    if row.scheme.upper() != "GGRC":
+        # GAP-363: the sheet is GGRC's portal format; no other state's is known
+        raise ValidationFailed("The PIMS sheet is GGRC's format only.", code="pims_not_for_scheme",
+                               fields={"app_id": f"the application is on {row.scheme}"})
     req = row.calculation_request if isinstance(row.calculation_request, dict) else json.loads(row.calculation_request)
     calc = row.calculation if isinstance(row.calculation, dict) else json.loads(row.calculation)
     ids = {line["product_id"].lower() for c in req.get("crops", []) for line in c.get("lines", []) if line.get("product_id")}

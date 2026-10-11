@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from arq import cron
 
+from worker.jobs.complaints import complaint_escalation
 from worker.jobs.leads import lead_dormancy
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
@@ -46,4 +47,7 @@ CRON_JOBS: list = [
     # FS-035: 00:30 IST is 19:00 UTC, after the quotation expiry, so a quotation that
     # expired tonight no longer keeps its lead open.
     cron(lead_dormancy, hour=19, minute=0),
+    # FS-028: a missed complaint target rings within five minutes; minutes 0 and 1
+    # are tracking's, so this takes 2
+    cron(complaint_escalation, minute=set(range(2, 60, 5))),
 ]

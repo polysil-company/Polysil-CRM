@@ -29,6 +29,7 @@ from api.schemas.leads import UUID_RE
 
 QuotationCategory = Literal["head", "field", "both"]
 PriceListStatus = Literal["draft", "published"]
+TaxTreatment = Literal["domestic", "export_lut", "export_igst"]
 Tier = Literal["distributor", "dealer", "sub_dealer", "farmer"]
 ProvisionalField = Literal["hsn_code", "gst_slab", "mrp", "pack_multiple"]
 
@@ -332,6 +333,11 @@ class QuoteLinesRequest(BaseModel):
     seller_gstin_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE,
         description="Which of our registrations supplies. Defaults to the one in force.")]
+    tax_treatment: TaxTreatment = Field(
+        default="domestic",
+        description="An export document's stored treatment, so the preview shows the tax it "
+                    "will store: export_lut prices every line at 0 % IGST, export_igst at its "
+                    "slab, and neither is ever intra-state.")
 
 
 class QuoteLine(BaseModel):

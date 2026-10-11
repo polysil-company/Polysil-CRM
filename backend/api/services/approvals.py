@@ -72,6 +72,7 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
     docs = {str(d.id): d for d in (await db.execute(text(
         "SELECT o.id, o.order_no::text AS order_no, o.party_name, o.total, o.is_provisional, "
         "o.created_by, u.full_name, o.submitted_at, o.created_at, NULL::numeric AS pct, "
+        "o.over_credit_limit, "
         # the queue row is an approver's, so the asker's reason is theirs to read
         "(SELECT r.remark FROM approval_request r WHERE r.doc_type = 'sales_order' "
         "AND r.entity_id = o.id ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS ask_remark "
@@ -81,7 +82,7 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
         # a draft quotation has no number (FS-013 4); the raise time is the request's
         "SELECT q.id, NULL, q.party_name, q.total, q.is_provisional, ar.requested_by, "
         "u.full_name, ar.created_at, q.created_at, quotation_effective_pct(q.gross, q.discount), "
-        "ar.remark "
+        "NULL::boolean, ar.remark "
         "FROM quotation q "
         # who asked, not who drafted: anyone who edits the draft may ask (OCR review)
         "LEFT JOIN LATERAL (SELECT r.requested_by, r.created_at, r.remark "
@@ -93,7 +94,7 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
         "UNION ALL "
         # FS-015b: a refund; the party is the complaint's contact, the total the amount
         "SELECT c.id, c.complaint_no::text, c.contact_name, ar.amount, false, ar.requested_by, "
-        "u.full_name, ar.created_at, c.created_at, NULL::numeric, ar.remark "
+        "u.full_name, ar.created_at, c.created_at, NULL::numeric, NULL::boolean, ar.remark "
         "FROM complaint c "
         "JOIN LATERAL (SELECT r.amount, r.requested_by, r.created_at, r.remark "
         "FROM approval_request r "
@@ -120,6 +121,7 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
                 raised_at=(d.submitted_at or d.created_at).isoformat(),
                 discount_pct=None if d.pct is None else f"{d.pct:.2f}",
                 payment_status=paid.get(str(d.id)),
+                over_credit_limit=d.over_credit_limit,      # an approver's queue (FS-027 rule 8)
                 request_remark=d.ask_remark),
             waiting_since=r.waiting_since.isoformat()))
     return sch.QueuePage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,

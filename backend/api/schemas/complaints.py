@@ -12,6 +12,7 @@ from api.domain import complaints as domain
 from api.schemas.approvals import Approval
 from api.schemas.leads import UUID_RE, PageMeta, UserRef
 from api.schemas.tasks import LeadLink, OrderLink, PartnerLink
+from api.schemas.warranty import LineWarranty
 
 Severity = Literal["low", "medium", "high"]
 Status = Literal["draft", "submitted", "under_qc", "qc_approved", "qc_rejected", "cancelled",
@@ -107,6 +108,13 @@ class CancelIn(BaseModel):
     reason: _Text
 
 
+class ReopenIn(BaseModel):
+    """FS-036: why it is being reopened. Kept on the complaint."""
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    reason: _Text
+
+
 _Remark = Annotated[str, Field(min_length=1, max_length=1000)]
 
 
@@ -156,6 +164,9 @@ class Line(BaseModel):
     defective_qty: str
     failure_frequency: str | None
     remark: str | None
+    warranty: LineWarranty | None = Field(
+        None, description="FS-046: whether the product was in warranty on the day the "
+                          "complaint was raised.")
 
 
 class Attachment(BaseModel):
@@ -221,6 +232,8 @@ class Can(BaseModel):
     upload: bool
     remedy: bool = Field(description="Choose a remedy (FS-015b).")
     withdraw: bool = Field(description="Withdraw the pending remedy.")
+    reopen: bool = Field(
+        default=False, description="Reopen a closed or rejected complaint (FS-036).")
 
 
 class RemedyOrder(BaseModel):
@@ -288,6 +301,16 @@ class Complaint(BaseModel):
     raised_by: UserRef | None
     remedy: Remedy | None = Field(default=None, description="The live or the last remedy.")
     closed_at: str | None = None
+    reopen_count: int = Field(default=0, description="Times reopened (FS-036).")
+    reopened_at: str | None = None
+    reopen_reason: str | None = Field(
+        default=None, description="Why it was last reopened. Staff only.")
+    response_escalated_at: str | None = Field(
+        default=None, description="When the missed response target was escalated (FS-028); null "
+                                  "otherwise. Staff only.")
+    resolution_escalated_at: str | None = Field(
+        default=None, description="When the missed resolution target was escalated (FS-028); null "
+                                  "otherwise. Staff only.")
     can: Can
     created_at: str
     updated_at: str

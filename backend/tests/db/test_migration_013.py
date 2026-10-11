@@ -694,6 +694,10 @@ async def test_the_list_and_the_open_steps_read_through_their_indexes(db: AsyncS
     """Spec 10's EXPLAIN row, under app_role so the policy's predicates are in the plan."""
     w = await _world(db)
     await db.execute(text("SET LOCAL enable_seqscan = off"))
+    # ISS-112: with few live rows a bitmap scan plus a sort is cheaper, so on an
+    # analysed copy the planner skipped the list index; forbid the sort so the plan
+    # shows the index can serve the order, whatever the table's statistics say
+    await db.execute(text("SET LOCAL enable_sort = off"))
     await _as(db, w.admin)
     plan = (await db.execute(text(
         "EXPLAIN SELECT id FROM sales_order WHERE deleted_at IS NULL "

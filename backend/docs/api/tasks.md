@@ -262,13 +262,20 @@ was merged into.
 
 **Task Assignees**
 
-The assignee picker: you first, then the active staff below you.
+The assignee picker: you first, then the active staff below you, then, when
+asked and allowed, dealers' users (`kind: partner`).
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `include_partners` | query | boolean |  | Add the users of dealers you can see, when the `tasks_for_dealers` setting is on (FS-037). |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `Envelope_list_UserRef__` | Successful Response |
+| `200` | `Envelope_list_TaskAssignee__` | Successful Response |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not in your permissions. |
 | `404` | `ErrorResponse` | Not in your scope. |
@@ -511,11 +518,11 @@ Reopen a done task, within 7 days, by its assignee or whoever gave it.
 |---|---|---|---|
 | `data` | Minutes[] | yes |  |
 
-**`Envelope_list_UserRef__`**
+**`Envelope_list_TaskAssignee__`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `data` | UserRef[] | yes |  |
+| `data` | TaskAssignee[] | yes |  |
 
 **`ErrorBody`**
 
@@ -636,6 +643,15 @@ Reopen a done task, within 7 days, by its assignee or whoever gave it.
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
 
+**`TaskAssignee`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+| `kind` | `staff` \| `partner` |  | Default `staff`. |
+| `partner` | api__schemas__leads__PartnerRef \| null |  | The dealer, for a partner user. |
+
 **`TaskCancel`**
 
 | Field | Type | Required | Notes |
@@ -703,3 +719,11 @@ Reopen a done task, within 7 days, by its assignee or whoever gave it.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
+
+**`api__schemas__leads__PartnerRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `name` | string | yes |  |
+| `partner_type` | string | yes | distributor, dealer or sub_dealer. |

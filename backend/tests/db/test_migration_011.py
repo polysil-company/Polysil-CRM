@@ -145,7 +145,7 @@ async def test_two_crops_differing_only_in_case_cannot_overlap(db: AsyncSession)
     last. A subsidy figure decided by row order."""
     scheme = str((await db.execute(text(
         "INSERT INTO subsidy_scheme (code, name) VALUES (:c, 'test scheme') RETURNING id"),
-        {"c": f"T{uuid.uuid4().hex[:12]}"})).scalar_one())
+        {"c": f"T{uuid.uuid4().hex[:12].upper()}"})).scalar_one())
     insert = text("INSERT INTO crop_lateral_spacing (scheme_id, crop, standard_spacing, "
                   "effective_from) VALUES (CAST(:s AS uuid), :c, :sp, :f)")
     await db.execute(insert, {"s": scheme, "c": "Mango", "sp": "1.2",
@@ -163,7 +163,7 @@ async def test_the_same_crop_in_another_case_may_still_follow_in_time(
     A revision typed in a different case is still a revision."""
     scheme = str((await db.execute(text(
         "INSERT INTO subsidy_scheme (code, name) VALUES (:c, 'test scheme') RETURNING id"),
-        {"c": f"T{uuid.uuid4().hex[:12]}"})).scalar_one())
+        {"c": f"T{uuid.uuid4().hex[:12].upper()}"})).scalar_one())
     await db.execute(text(
         "INSERT INTO crop_lateral_spacing (scheme_id, crop, standard_spacing, effective_from, "
         "effective_to) VALUES (CAST(:s AS uuid), 'Mango', 1.2, :f, :t)"),
@@ -180,7 +180,7 @@ async def test_two_parameters_differing_only_in_case_cannot_overlap(
     """The same correction, on the key the calculation looks parameters up by."""
     scheme = str((await db.execute(text(
         "INSERT INTO subsidy_scheme (code, name) VALUES (:c, 'test scheme') RETURNING id"),
-        {"c": f"T{uuid.uuid4().hex[:12]}"})).scalar_one())
+        {"c": f"T{uuid.uuid4().hex[:12].upper()}"})).scalar_one())
     insert = text("INSERT INTO subsidy_parameter (scheme_id, key, value, unit, "
                   "effective_from) VALUES (CAST(:s AS uuid), :k, :v, 'ratio', :f)")
     await db.execute(insert, {"s": scheme, "k": "insurance_pct", "v": "0.28",

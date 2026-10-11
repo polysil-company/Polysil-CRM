@@ -14,7 +14,7 @@ from datetime import timedelta
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Path, Query, Request, Response
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from api.config import get_settings
@@ -36,6 +36,7 @@ from api.schemas.public_leads import (
 from api.schemas.quotations import PublicQuotation
 from api.services import public_leads as lead_capture
 from api.services import quotations as service
+from api.services import whatsapp_webhook as webhook
 from api.storage import LocalStorage, filename_from_query, get_storage
 
 log = structlog.get_logger(__name__)
@@ -167,3 +168,33 @@ async def public_lead(body: PublicLeadCreate) -> Response:
     or used-up code: offer to send a new one."""
     status, result = await lead_capture.submit(body)
     return JSONResponse(status_code=status, content={"data": result.model_dump(mode="json")})
+
+
+# ── 11za's webhook calls (FS-038, step one) ──────────────────────────────────
+
+
+async def _webhook_secret(secret: str) -> None:
+    """Before the session opens, so a wrong secret never reaches the database.
+    A plain `str` with no constraints: any probe gets the same 404, never a 422
+    naming the parameter (EC-4)."""
+    if not webhook.secret_matches(get_settings(), secret):
+        raise NotFoundError()
+
+
+@router.api_route("/webhooks/whatsapp/{secret}/{kind}", methods=["GET", "HEAD", "POST"],
+                  include_in_schema=False, dependencies=[Depends(_webhook_secret)])
+async def whatsapp_webhook(kind: str, request: Request, db: AnonSession) -> Response:
+    """Keep the call as it arrived and answer 200. Nothing else happens with it in
+    this step; FS-038b reads the rows. GET and HEAD are kept too, because a
+    provider may probe a URL when it is registered (EC-7)."""
+    if kind not in ("inbound", "status"):
+        raise NotFoundError()
+    raw = await request.body()
+    try:
+        await webhook.record(db, kind=kind, method=request.method, ip=_client_ip(request),
+                             headers=list(request.scope.get("headers") or []), raw=raw)
+    except webhook.WebhookStoreError:
+        # answered here, not raised: see WebhookStoreError
+        return JSONResponse(status_code=500, content={"error": {
+            "code": "internal_error", "message": "Something went wrong. Try again shortly."}})
+    return JSONResponse({"ok": True})

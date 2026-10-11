@@ -45,6 +45,7 @@ poll `?limit=1` for the count; there is no push.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `NotificationPage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `422` | `ErrorResponse` | A bad cursor, or both or neither of `ids` and `all`. |
 
@@ -77,6 +78,7 @@ are not yours, or already read, are ignored. Answers the new unread count.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_UnreadCount_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `422` | `ErrorResponse` | A bad cursor, or both or neither of `ids` and `all`. |
 

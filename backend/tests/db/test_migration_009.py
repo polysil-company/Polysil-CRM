@@ -48,7 +48,7 @@ async def _own_scheme(db: AsyncSession) -> str:
     session like everything else here."""
     got = await db.execute(text(
         "INSERT INTO subsidy_scheme (code, name) VALUES (:c, 'test scheme') RETURNING id"),
-        {"c": f"T{uuid.uuid4().hex[:12]}"})
+        {"c": f"T{uuid.uuid4().hex[:12].upper()}"})
     return str(got.scalar_one())
 
 

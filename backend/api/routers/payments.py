@@ -110,6 +110,15 @@ async def set_schedule(order_id: Id, body: sch.ScheduleIn, db: DbSession, caller
                        lambda: service.set_schedule(db, caller, order_id, body))
 
 
+@partners.get("/{partner_id}/credit", response_model=Envelope[sch.PartnerCredit], responses=_ERRORS)
+async def partner_credit(partner_id: Id, db: DbSession, caller: CallerDep) -> Envelope[sch.PartnerCredit]:
+    """A dealer's credit limit, what it owes on open orders less its receipts, and
+    what is left (FS-027). For Accounts, and for staff who manage dealers and can
+    see this one. A dealer, a distributor or a field officer gets 403: credit terms
+    are never shown to them."""
+    return Envelope(data=await service.credit(db, caller, partner_id))
+
+
 @partners.get("/{partner_id}/ledger", response_model=Envelope[sch.Ledger], responses=_ERRORS,
               dependencies=[Depends(require("payments", "view"))])
 async def partner_ledger(partner_id: Id, db: DbSession, caller: CallerDep,

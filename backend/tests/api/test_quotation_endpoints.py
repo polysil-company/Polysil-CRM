@@ -277,10 +277,10 @@ async def test_an_unbuilt_sales_type_names_its_question(
     h = await _auth(client, quoter)
     lead = await _qualified_lead(client, h, qenv)
     r = await client.post(f"{V1}/quotations", headers={**h, **_key()},
-                          json=_create_body(lead["id"], catalogue, sales_type="export"))
+                          json=_create_body(lead["id"], catalogue, sales_type="marketing"))
     assert r.status_code == 422
     assert r.json()["error"]["code"] == "sales_type_unsupported"
-    assert "14.5" in r.json()["error"]["message"]
+    assert "6.11" in r.json()["error"]["message"]
 
 
 async def test_a_stale_preview_id_is_refused_with_the_new_figures(

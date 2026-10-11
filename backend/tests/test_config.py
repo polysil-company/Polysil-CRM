@@ -181,7 +181,8 @@ def test_the_public_origin_is_required_outside_local(monkeypatch: pytest.MonkeyP
     to localhost would reach a farmer's phone once the template is approved.
     Locally the default stands; anywhere else the value must be a real origin."""
     assert _settings(monkeypatch, PUBLIC_WEB_URL="").public_web_url == "http://localhost:3000"
-    for origin in ("", "http://localhost:3000", "http://127.0.0.1:3000"):
+    # ISS-113: no scheme, or a scheme with no host, is not an origin either
+    for origin in ("", "http://localhost:3000", "http://127.0.0.1:3000", "crm.polysil.in", "https://"):
         with pytest.raises(ValueError, match="real origin"):
             _settings(monkeypatch, ENVIRONMENT="staging", WHATSAPP_PROVIDER="11za",
                       WHATSAPP_AUTH_TOKEN="x", PUBLIC_WEB_URL=origin)

@@ -335,6 +335,9 @@ async def test_minutes_complete_their_meeting_and_raise_the_action_items(
     assert item["minutes_id"] == minutes["id"] and item["lead"]["id"] == lead
     done = (await client.get(f"{V1}/tasks/{meeting['id']}", headers=h)).json()["data"]
     assert done["status"] == "done" and done["outcome"] == domain.MINUTES_OUTCOME
+    # ISS-113: the filter compares uuids, so an upper-case id is the same lead
+    upper = (await client.get(f"{V1}/tasks", headers=h, params={"lead_id": lead.upper()})).json()["data"]
+    assert item["id"] in [t["id"] for t in upper], "an upper-case lead id finds its tasks"
     other = await _lead(client, shop, h)
     r = await client.post(f"{V1}/minutes", headers={**h, **_key()}, json={
         "lead_id": other, "task_id": meeting["id"], "held_at": dt.datetime.now(domain.IST).isoformat(),

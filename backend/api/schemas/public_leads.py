@@ -87,7 +87,11 @@ class QrCodeCreate(BaseModel):
     label: Annotated[str, Field(min_length=1, max_length=120,
                                 description="What staff will recognise: the dealer, the "
                                             "stall, the leaflet.")]
-    campaign: Annotated[str | None, Field(default=None, max_length=120)]
+    campaign: Annotated[str | None, Field(default=None, max_length=120,
+                                          description="A free-text label.")]
+    campaign_id: Annotated[str | None, Field(
+        default=None, pattern=UUID_RE,
+        description="An active campaign (FS-040). Leads from this code take it.")]
     partner_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE,
         description="Leads from this code are assigned to this partner.")]
@@ -102,6 +106,10 @@ class QrCodePatch(BaseModel):
 
     label: Annotated[str | None, Field(default=None, min_length=1, max_length=120)]
     campaign: Annotated[str | None, Field(default=None, max_length=120)]
+    campaign_id: Annotated[str | None, Field(
+        default=None, pattern=UUID_RE,
+        description="An active campaign; null clears it. New leads take it; earlier leads "
+                    "keep theirs.")]
     partner_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE,
         description="New leads from this code go to this partner; earlier leads keep theirs.")]
@@ -117,7 +125,9 @@ class QrCode(BaseModel):
     code: str = Field(description="Six characters, no look-alikes.")
     url: str = Field(description="What the printed QR encodes; the frontend draws it.")
     label: str
-    campaign: str | None
+    campaign: str | None = Field(description="The free-text label.")
+    campaign_id: str | None = Field(default=None, description="The linked campaign (FS-040).")
+    campaign_name: str | None = Field(default=None, description="Its name.")
     partner: PartnerRef | None
     territory: TerritoryRef | None
     is_active: bool

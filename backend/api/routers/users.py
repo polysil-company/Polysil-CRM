@@ -65,7 +65,9 @@ async def list_users(
     db: DbSession,
     caller: CallerDep,
     q: Annotated[str | None, Query(description="Name, email or mobile substring.")] = None,
-    user_type: Annotated[str | None, Query(description="staff or partner_user.")] = None,
+    user_type: Annotated[str | None, Query(
+        description="staff, partner_user or consumer. Left out, the list is staff and "
+                    "partner users: farmers' portal accounts (FS-044) only when asked.")] = None,
     role: Annotated[str | None, Query(description="A role code.")] = None,
     org_unit_id: Annotated[str | None, Query(pattern=UUID_RE,
                                               description="Staff anchored on this office.")] = None,

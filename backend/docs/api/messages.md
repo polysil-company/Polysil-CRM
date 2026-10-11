@@ -29,15 +29,17 @@ Conventions for every endpoint in this file:
 
 **List Conversations**
 
-Your conversations, most recent first (at most 100), with each one's unread
-count and the total. A conversation opened but never written in is not listed.
-Poll for new messages; there is no push.
+Your conversations, one to one and groups, most recent first (at most 100),
+with each one's unread count and the total. A one-to-one conversation opened but
+never written in is not listed; a group is listed from its creation. Poll for new
+messages; there is no push.
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `ConversationList` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -72,6 +74,197 @@ someone who is not active staff.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Conversation_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
+| `404` | `ErrorResponse` | Not a conversation you are in. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
+## `POST /api/v1/conversations/groups`
+
+**Create Group**
+
+Start a group: a name and 1 to 49 colleagues. You are added and manage it.
+`422` on `member_ids` for anyone who is not active staff. Two calls make two
+groups; the Idempotency-Key covers a retry.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`CreateGroup`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes |  |
+| `member_ids` | string[] | yes | 1 to 49 colleagues; you are added yourself and manage the group. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_Conversation_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
+| `404` | `ErrorResponse` | Not a conversation you are in. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
+## `GET /api/v1/conversations/{conversation_id}`
+
+**Get Conversation**
+
+One of your conversations: the colleague, the last message and your unread
+count. Works before anyone has written in it, so a thread opened from a link or
+after a reload can name whom it writes to. `404` when it is not yours.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `conversation_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Conversation_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
+| `404` | `ErrorResponse` | Not a conversation you are in. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
+## `PATCH /api/v1/conversations/{conversation_id}`
+
+**Rename Group**
+
+Rename a group. The manager only (`403`); `422 not_a_group` for a one-to-one
+conversation; `404` when you are not in it.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `conversation_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`RenameGroup`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Conversation_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
+| `404` | `ErrorResponse` | Not a conversation you are in. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
+## `GET /api/v1/conversations/{conversation_id}/members`
+
+**List Members**
+
+Everyone who has been in the group, current members first. Use it to name
+each message's sender. `404` for a group you are not in, or a one-to-one
+conversation.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `conversation_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_Member__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
+| `404` | `ErrorResponse` | Not a conversation you are in. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
+## `POST /api/v1/conversations/{conversation_id}/members`
+
+**Add Members**
+
+Add colleagues; any member may. Someone already in is ignored; someone who left
+comes back and sees the whole history. `422 group_full` past 50, and then nobody
+is added. Answers the member list.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `conversation_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`AddMembers`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `user_ids` | string[] | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_Member__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
+| `404` | `ErrorResponse` | Not a conversation you are in. |
+| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+
+---
+
+## `DELETE /api/v1/conversations/{conversation_id}/members/{user_id}`
+
+**Remove Member**
+
+Your own id: leave the group; it disappears for you, history included. Someone
+else's: the manager removes them (`403` otherwise). When the manager leaves, the
+longest-standing active member takes over. `404` when either of you is not in.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `conversation_id` | path | string | yes |  |
+| `user_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `204` | - | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -99,6 +292,7 @@ A page of the thread, oldest first. The first page is the newest; follow
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `MessagePage` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -135,6 +329,7 @@ marks the conversation read for you.
 | Status | Body | Meaning |
 |---|---|---|
 | `201` | `Envelope_Message_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -172,6 +367,7 @@ backwards. Answers your new unread total.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_UnreadTotal_` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -197,6 +393,7 @@ Colleagues you can message: every active staff member but you, by name.
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `Envelope_list_Person__` | Successful Response |
+| `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Messages are for staff: every dealer, distributor and sub-dealer gets this. |
 | `404` | `ErrorResponse` | Not a conversation you are in. |
@@ -206,12 +403,20 @@ Colleagues you can message: every active staff member but you, by name.
 
 ## Models
 
+**`AddMembers`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `user_ids` | string[] | yes |  |
+
 **`Conversation`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `participant` | Person | yes | The other person. Conversations are one-to-one. |
+| `kind` | `direct` \| `group` |  | direct: one to one. group: a named group (FS-048). Default `direct`. |
+| `participant` | Person \| null | yes | The other person, for a direct conversation. Null for a group. |
+| `group` | GroupInfo \| null |  | For a group; null for a direct one. |
 | `last_message` | Message \| null | yes |  |
 | `unread_count` | integer | yes | Their messages after you last read. |
 | `updated_at` | string | yes |  |
@@ -228,6 +433,13 @@ Colleagues you can message: every active staff member but you, by name.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `unread_total` | integer | yes | Across all your conversations, not only those listed. |
+
+**`CreateGroup`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes |  |
+| `member_ids` | string[] | yes | 1 to 49 colleagues; you are added yourself and manage the group. |
 
 **`Envelope_Conversation_`**
 
@@ -246,6 +458,12 @@ Colleagues you can message: every active staff member but you, by name.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | UnreadTotal | yes |  |
+
+**`Envelope_list_Member__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | Member[] | yes |  |
 
 **`Envelope_list_Person__`**
 
@@ -266,6 +484,24 @@ Colleagues you can message: every active staff member but you, by name.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
+
+**`GroupInfo`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes |  |
+| `member_count` | integer | yes | Members in the group now. |
+| `manager_id` | string \| null | yes | Who manages it: renames and removes. Null only when nobody active is left to manage it. |
+| `i_manage` | boolean | yes |  |
+
+**`Member`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `person` | Person | yes |  |
+| `added_at` | string | yes |  |
+| `left_at` | string \| null | yes | Set for someone who has left the group. |
+| `is_manager` | boolean | yes |  |
 
 **`Message`**
 
@@ -300,6 +536,12 @@ Colleagues you can message: every active staff member but you, by name.
 | `role_name` | string \| null | yes |  |
 | `org_unit_name` | string \| null | yes |  |
 | `is_active` | boolean |  | False for a colleague who has left: the history stays readable, a new message is refused. Default `True`. |
+
+**`RenameGroup`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes |  |
 
 **`ResourceIn`**
 
