@@ -38,7 +38,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
-| [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #PRNUM |
+| [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -239,4 +239,4 @@ The backend serves these, and the frontend has no screen for them — in the ord
 
 1. A consolidated order from several quotations on leads of one dealer.
 2. Complaint types, with the other lookups in the admin masters. Everything else in complaints is in PR #57 and PR #58.
-3. Admin masters: subsidy, users, offices, territories, partners. Products, price lists and tax rates are in PR #PRNUM.
+3. Admin masters: subsidy, users, offices, territories, partners. Products, price lists and tax rates are in PR #95.
