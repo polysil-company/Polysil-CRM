@@ -36,9 +36,21 @@ class Message(BaseModel):
     created_at: str
 
 
+class GroupInfo(BaseModel):
+    name: str
+    member_count: int = Field(description="Members in the group now.")
+    manager_id: str | None = Field(description="Who manages it: renames and removes. Null only "
+                                               "when nobody active is left to manage it.")
+    i_manage: bool
+
+
 class Conversation(BaseModel):
     id: str
-    participant: Person = Field(description="The other person. Conversations are one-to-one.")
+    kind: Literal["direct", "group"] = Field(default="direct", description="direct: one to one. "
+                                             "group: a named group (FS-048).")
+    participant: Person | None = Field(description="The other person, for a direct conversation. "
+                                                   "Null for a group.")
+    group: GroupInfo | None = Field(default=None, description="For a group; null for a direct one.")
     last_message: Message | None
     unread_count: int = Field(description="Their messages after you last read.")
     updated_at: str
@@ -95,3 +107,34 @@ class MarkRead(BaseModel):
 
 class UnreadTotal(BaseModel):
     unread_total: int
+
+
+GROUP_NAME_MAX = 80
+_UserId = Annotated[str, Field(pattern=UUID_RE)]
+_UserIds = Annotated[list[_UserId], Field(min_length=1, max_length=49)]
+_GroupName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
+                                              max_length=GROUP_NAME_MAX), AfterValidator(_no_nul)]
+
+
+class CreateGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: _GroupName
+    member_ids: _UserIds = Field(description="1 to 49 colleagues; you are added yourself and "
+                                             "manage the group.")
+
+
+class AddMembers(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    user_ids: _UserIds
+
+
+class RenameGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: _GroupName
+
+
+class Member(BaseModel):
+    person: Person
+    added_at: str
+    left_at: str | None = Field(description="Set for someone who has left the group.")
+    is_manager: bool

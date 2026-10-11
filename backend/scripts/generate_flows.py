@@ -1592,6 +1592,8 @@ def f_bell_and_messages() -> None:
                "created_at strictly increasing; the sender's own mark", VIOLET),
         ("m4", "POST /read {up_to}: up to what the screen showed\n"
                "unread = their messages after my mark", GREEN),
+        ("m5", "GROUPS (FS-048): POST /conversations/groups\n"
+               "up to 50; any member adds; the manager renames, removes", BLUE),
     ]
     prev = None
     for i, (eid, lbl, colour) in enumerate(side):
@@ -1619,9 +1621,16 @@ def f_bell_and_messages() -> None:
               "A message committing while the reader marks read would\n"
               "otherwise be counted read unseen. No UPDATE grant on\n"
               "conversation: one side cannot reset the other's mark.", w=420, colour=RED)
-    e += note("nYellow1", 1240, 780,
-              "Not yet: push, groups, attachments, a bell for a new\n"
-              "message, retention (GAP-160 to GAP-168).", w=420, colour=YELLOW)
+    e += note("nRed4", 1240, 780,
+              "GROUP POLICIES MUST NOT READ EACH OTHER\n\n"
+              "conversation_sel reads conversation_member; the member\n"
+              "policy reads own rows only, or Postgres raises infinite\n"
+              "recursion. A leave racing a send: the stamp re-checks\n"
+              "membership after the conversation's lock.", w=420, colour=RED)
+    e += note("nYellow1", 1240, 1040,
+              "Not yet: push, attachments, a bell for a new message,\n"
+              "retention (GAP-160 to GAP-168). Group rules are ours\n"
+              "(GAP-287 to GAP-289).", w=420, colour=YELLOW)
     write("16-bell-and-messages", e)
 
 
@@ -1704,7 +1713,7 @@ def f_complaints() -> None:
               "order would deadlock QC against Dispatch (delta B-8).", w=420, colour=RED)
     e += note("nYellow2", 1240, 1300,
               "Stand-ins: refund limits 25,000 / 1,00,000 / any;\n"
-              "Dispatch alone approves a replacement; QC chooses;\n"
+              "a replacement: State, Regional, MD, then Dispatch\n(a setting, FS-049); QC chooses;\n"
               "closing is automatic (GAP-179 to GAP-187).", w=420, colour=YELLOW)
     e += note("nRed5", 1240, 1500,
               "A RUN OF HOLIDAYS MUST END THE SCAN (FS-028, 048)\n\n"
@@ -2235,7 +2244,7 @@ def f_consumer_portal() -> None:
          ("d2", "a staff or dealer user on a farmer's number\nreleases the consumer account", GREY),
          ("d3", "PATCH /portal/me: consent, channel portal", GREY)],
         [("n1", "THE CONSUMER FLOOR\n\nOne restrictive policy on every RLS table.\n\"Not a partner\" is not staff: before it, a\nconsumer read about 50 tables. A new RLS table\nadds consumer_floor.policy_sql(t).", RED),
-         ("n2", "SWITCHING ON COSTS MONEY\n\nEvery customer number can be sent a paid\nWhatsApp code; no overall ceiling (GAP-269).", RED),
+         ("n2", "SWITCHING ON COSTS MONEY\n\nEvery customer number can be sent a paid\nWhatsApp code. At most portal_otp_hourly_cap\n(100) an hour to customers (FS-047, GAP-285);\nnobody is told when it is reached (GAP-286).", RED),
          ("n3", "Not yet: complaints, ratings, products from the\nportal (GAP-265, question 10.3).", YELLOW)])
 
 

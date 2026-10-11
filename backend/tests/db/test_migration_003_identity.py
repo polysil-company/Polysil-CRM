@@ -56,6 +56,18 @@ PRE_AUTH = {
     # FS-038: 11za's webhook calls, kept as they arrived
     "whatsapp_webhook_record": ("p_kind text, p_method text, p_ip inet, p_headers jsonb, "
                                 "p_body_raw bytea, p_body_text text, p_body jsonb"),
+    # FS-051: the dealer applicant's link, seven more; each needs the token's hash,
+    # and every write or full read a live session stored on the row
+    "dealer_apply_view": "p_token_hash text, p_session_hash text",
+    "dealer_apply_issue_code": "p_token_hash text, p_code text, p_code_hash text, p_ttl integer",
+    "dealer_apply_check_code": ("p_token_hash text, p_code_hash text, p_session_hash text, "
+                                "p_ttl integer"),
+    "dealer_apply_session": "p_token_hash text, p_session_hash text",
+    "dealer_apply_write": "p_token_hash text, p_session_hash text, p_action text, p_fields jsonb",
+    "dealer_apply_document": ("p_token_hash text, p_session_hash text, p_doc_type text, "
+                              "p_name text, p_key text, p_filename text, p_content_type text, "
+                              "p_size integer, p_sha text"),
+    "dealer_apply_document_remove": "p_token_hash text, p_session_hash text, p_doc uuid",
 }
 
 

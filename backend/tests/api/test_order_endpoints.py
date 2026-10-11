@@ -36,7 +36,7 @@ pytestmark = pytest.mark.db
 
 AS_OF = "2020-06-15"
 ROLES = ("field_officer", "district_manager", "state_manager", "regional_manager",
-         "account_manager", "dispatch_manager", "admin_sales", "qc_manager")
+         "account_manager", "dispatch_manager", "admin_sales", "qc_manager", "md_ceo")
 
 
 @dataclass

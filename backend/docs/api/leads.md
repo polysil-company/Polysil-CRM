@@ -226,7 +226,8 @@ the stored `201` and creates nothing; the same key with a different body is
 | `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
 | `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
 | `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
-| `land_acres` | number \| string \| null |  |  |
+| `land_hectares` | number \| string \| null |  |  |
+| `land_acres` | number \| string \| null |  | Instead of land_hectares, not with it. |
 | `campaign_id` | string \| null |  | Optional. An active campaign from GET /campaigns?active=true. Staff only. A lead from a QR code with a campaign gets it on its own. |
 
 **Responses**
@@ -513,7 +514,8 @@ the change. A closed lead (won, lost, merged) is `422 stage_terminal`.
 | `source` | string \| null |  | A code from the lookup. |
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
 | `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
-| `land_acres` | number \| string \| null |  | null clears it. |
+| `land_hectares` | number \| string \| null |  | null clears it. |
+| `land_acres` | number \| string \| null |  | Instead of land_hectares, not with it; null clears it. |
 | `campaign_id` | string \| null |  | An active campaign; null clears it. The campaign already on the lead may be re-sent even if it has been switched off. |
 
 **Responses**
@@ -873,7 +875,9 @@ with the current stage in `fields.stage`.
 | `priority` | `hot` \| `warm` \| `cold` \| null | yes |  |
 | `estimated_value` | string \| null | yes |  |
 | `crops` | CropRef[] | yes | In the order they were sent. [] for none. |
-| `land_acres` | string \| null | yes | Land in acres, a decimal string. |
+| `land_hectares` | string \| null |  | Land in hectares, a decimal string. |
+| `land_acres` | string \| null | yes | The same land in acres, from the hectares. |
+| `state_name` | string \| null |  | The state above the lead's territory. |
 | `lost_reason` | ReasonRef \| null | yes |  |
 | `lost_note` | string \| null | yes |  |
 | `reopen_count` | integer | yes |  |
@@ -921,7 +925,8 @@ with the current stage in `fields.stage`.
 | `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
 | `note` | string \| null |  | Optional. Becomes the first entry on the lead's timeline. |
 | `crops` | string[] |  | Crop codes from GET /lookups/crops, at most 10. [] for none. |
-| `land_acres` | number \| string \| null |  |  |
+| `land_hectares` | number \| string \| null |  |  |
+| `land_acres` | number \| string \| null |  | Instead of land_hectares, not with it. |
 | `campaign_id` | string \| null |  | Optional. An active campaign from GET /campaigns?active=true. Staff only. A lead from a QR code with a campaign gets it on its own. |
 
 **`LeadMerge`**
@@ -957,7 +962,8 @@ with the current stage in `fields.stage`.
 | `source` | string \| null |  | A code from the lookup. |
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
 | `crops` | string[] \| null |  | Replaces the list. [] clears it; null is refused. A switched-off crop already on the lead may be sent again. |
-| `land_acres` | number \| string \| null |  | null clears it. |
+| `land_hectares` | number \| string \| null |  | null clears it. |
+| `land_acres` | number \| string \| null |  | Instead of land_hectares, not with it; null clears it. |
 | `campaign_id` | string \| null |  | An active campaign; null clears it. The campaign already on the lead may be re-sent even if it has been switched off. |
 
 **`LeadReopen`**

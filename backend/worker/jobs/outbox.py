@@ -48,6 +48,7 @@ from api.db.session import async_session_factory, enter_role
 from api.integrations import cache
 from api.integrations.messages import (
     TEMPLATE_AUTH_OTP,
+    TEMPLATE_DEALER_VERIFY,
     TEMPLATE_LEAD_ACK,
     TEMPLATE_LEAD_VERIFY,
     TEMPLATES,
@@ -215,7 +216,7 @@ async def _handle(session: AsyncSession, row: Any, provider: MessageProvider,
         await _dead(session, row.id, "too old to send")
         return "dead"
 
-    if key in (TEMPLATE_AUTH_OTP, TEMPLATE_LEAD_VERIFY):
+    if key in (TEMPLATE_AUTH_OTP, TEMPLATE_LEAD_VERIFY, TEMPLATE_DEALER_VERIFY):
         # only the newest code of its kind can arrive (FS-007 rule 1a, FS-003a EC-5)
         newer = (await session.execute(text(
             "SELECT EXISTS (SELECT 1 FROM notification_outbox o WHERE o.template_key = :k "

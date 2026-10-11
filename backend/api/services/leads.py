@@ -100,6 +100,8 @@ lead_t = sa.table(
     sa.column("mobile"),
     sa.column("inquiry_no"),
     sa.column("campaign_id", _UUID),
+    sa.column("mis_system_id", _UUID),
+    sa.column("land_hectares", sa.Numeric()),
 )
 
 # Every field the Lead shape needs that is not a person. The masters (territory,
@@ -117,7 +119,10 @@ SELECT l.id, l.inquiry_no, l.stage, l.inquiry_type,
        l.owner_user_id, ow.full_name AS owner_name,
        l.owner_org_unit_id, ou.name AS owner_org_unit_name,
        l.assigned_partner_id, cp.name AS partner_name, cp.partner_type AS partner_type,
-       l.score, l.priority, l.estimated_value, l.land_acres,
+       l.score, l.priority, l.estimated_value, l.land_acres, l.land_hectares,
+       (SELECT st.name FROM territory_closure stc JOIN territory st ON st.id = stc.ancestor_id
+         WHERE stc.descendant_id = l.territory_id AND st.level = 'state'
+         ORDER BY stc.depth LIMIT 1) AS state_name,
        COALESCE((SELECT json_agg(json_build_object('code', c.code, 'name', c.name,
                                                    'is_active', c.is_active) ORDER BY x.ord)
                    FROM unnest(l.crops) WITH ORDINALITY AS x(code, ord)
@@ -316,7 +321,7 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate, *,
         INSERT INTO lead (inquiry_no, stage, inquiry_type, mis_system_id, lead_source_id,
             farmer_name, mobile, email, territory_id, village, owner_user_id,
             owner_org_unit_id, assigned_partner_id, score, priority, estimated_value,
-            created_by, qr_code_id, crops, land_acres, campaign_id)
+            created_by, qr_code_id, crops, land_hectares, campaign_id)
         VALUES (:no, 'new', CAST(:it AS inquiry_type), :mis, :src, :name, :mob, :email,
             :tid, :village, :owner, :oou, :ap, :score, CAST(:prio AS lead_priority),
             :est, :me, :qr, CAST(:crops AS citext[]), :acres, CAST(:cmp AS uuid))
@@ -326,7 +331,8 @@ async def create_lead(db: AsyncSession, caller: Caller, body: LeadCreate, *,
         "tid": str(body.territory_id), "village": body.village, "owner": owner_user_id,
         "oou": owner_org_unit_id, "ap": assigned_partner_id, "score": score,
         "prio": priority, "est": body.estimated_value, "me": caller.user_id, "qr": qr_code_id,
-        "crops": crops, "acres": body.land_acres, "cmp": body.campaign_id,
+        "crops": crops, "acres": _hectares(body.land_hectares, body.land_acres),
+        "cmp": body.campaign_id,
     })).scalar_one()
 
     # 8. the event (CLAUDE.md rule 7, FS-003 rule 14). actor_id must be the caller:
@@ -569,6 +575,19 @@ async def check_lead_territory(db: AsyncSession, territory_id: str,
         raise ValidationFailed(fields={field: "a district, taluka or village"})
 
 
+def _hectares(hectares: Decimal | None, acres: Decimal | None) -> Decimal | None:
+    """FS-052: the land to store, in hectares. Acres are converted; both at once is a
+    422, and acres too small to make a hundredth of a hectare too (plan review B-1)."""
+    if hectares is not None and acres is not None:
+        raise ValidationFailed(fields={"land_acres": "send land_hectares or land_acres, not both"})
+    if acres is None:
+        return hectares
+    ha = domain.acres_to_hectares(acres)
+    if ha <= 0:
+        raise ValidationFailed(fields={"land_acres": "less than 0.01 hectare"})
+    return ha
+
+
 def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
                  names: people.Names | None = None) -> Lead:
     """The non-person fields, plus the people: from the RLS-filtered joins, and
@@ -589,7 +608,8 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
                                        row.partner_type),
         score=_dec(row.score), priority=row.priority, estimated_value=_dec(row.estimated_value),
         crops=[CropRef(**c) for c in _json_list(row.crops_json)],
-        land_acres=_dec(row.land_acres),
+        land_acres=_dec(row.land_acres), land_hectares=_dec(row.land_hectares),
+        state_name=row.state_name,
         lost_reason=ReasonRef(id=str(row.lost_reason_id), code=row.lost_reason_code,
                               name=row.lost_reason_name) if row.lost_reason_id else None,
         lost_note=row.lost_note, reopen_count=row.reopen_count,
@@ -1117,10 +1137,14 @@ async def patch_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadP
         sets.append("crops = CAST(:crops AS citext[])")
         params["crops"] = codes
         changed["crops"] = codes
-    if "land_acres" in fields:
-        sets.append("land_acres = :acres")
-        params["acres"] = body.land_acres
-        changed["land_acres"] = _dec(body.land_acres)   # a string: the payload is JSON (EC-5)
+    if {"land_hectares", "land_acres"} & fields:
+        ha = _hectares(body.land_hectares if "land_hectares" in fields else None,
+                       body.land_acres if "land_acres" in fields else None)
+        sets.append("land_hectares = :acres")
+        params["acres"] = ha
+        # strings: the payload is JSON (EC-5)
+        changed["land_hectares"] = _dec(ha)
+        changed["land_acres"] = _dec(domain.hectares_to_acres(ha))
     if "campaign_id" in fields:
         if caller.partner_id is not None:   # null included: Marketing's attribution stays
             raise ValidationFailed(fields={"campaign_id": "staff only"})
