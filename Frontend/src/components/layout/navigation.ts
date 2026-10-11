@@ -142,9 +142,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "subsidy",
         label: "Subsidy",
+        description: "What the scheme pays for a design, for every farmer category.",
         icon: LegalDocument01Icon,
         module: "subsidy",
-        dataId: "SUBS-001",
+        // Portal users get 403 on every subsidy endpoint (handover subsidy-calculation.md).
+        audience: "staff",
+        dataId: "SUBS-002",
+        href: "/subsidy/calculator",
       },
     ],
   },

@@ -68,11 +68,11 @@ function manager(scope: Scope): MockModulePermission[] {
   ];
 }
 
+/** No `subsidy`: the backend answers portal users 403 there (handover `subsidy-calculation.md`). */
 function channelPartner(): MockModulePermission[] {
   return [
     grant("leads", ["view", "edit"], "partner_subtree"),
     grant("sales_orders", ["view", "create", "edit"], "partner_subtree"),
-    grant("subsidy", ["view", "create"], "partner_subtree"),
     grant("complaints", ["view", "create"], "partner_subtree"),
     grant("marketing", ["view"], "global"),
     SCHEMES_VIEW,
