@@ -114,7 +114,7 @@
 
   {% if subsidy %}
   <div class="terms"><strong>Subsidy</strong> ({{ subsidy.scheme_code }}, {{ subsidy.category_name }})<br>
-    Cost as calculated {{ subsidy.total_cost | rupees }}{% if subsidy.flat_charge | float > 0 %} plus inspection {{ subsidy.flat_charge | rupees }}{% endif %}
+    Cost as calculated {{ subsidy.total_cost | rupees }}{% if subsidy_has_flat %} plus inspection {{ subsidy.flat_charge | rupees }}{% endif %}
     &middot; Subsidy {{ subsidy.subsidy | rupees }}
     &middot; <strong>Farmer's share {{ subsidy.farmer_share | rupees }}</strong></div>
   {% endif %}

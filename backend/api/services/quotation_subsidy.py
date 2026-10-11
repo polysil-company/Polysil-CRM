@@ -130,15 +130,33 @@ async def block(db: AsyncSession, quotation_id: str,
     return out, warnings
 
 
+async def _lead_system(db: AsyncSession, lead_id: str) -> str | None:
+    got: str | None = (await db.execute(text(
+        "SELECT ms.code FROM lead l JOIN mis_system ms ON ms.id = l.mis_system_id "
+        "WHERE l.id = CAST(:l AS uuid)"), {"l": lead_id})).scalar_one_or_none()
+    return got
+
+
+async def _same_system(db: AsyncSession, lead_id: str, held: str, field: str) -> None:
+    """Code review F-3: the lead's system can be corrected after the calculation."""
+    now = await _lead_system(db, lead_id)
+    if now is not None and now != held:
+        raise ValidationFailed(f"The lead's system is now {now}. Calculate the subsidy again.",
+                               code="subsidy_system_changed", fields={field: "recalculate"})
+
+
 async def check_ready(db: AsyncSession, quotation_id: str, lead_id: str) -> None:
     """Rule 5 and EC-2: a subsidised quotation is sent with a block on the lead's
     current scheme."""
-    scheme = (await db.execute(text(
-        "SELECT scheme_code FROM quotation_subsidy WHERE quotation_id = CAST(:q AS uuid)"),
-        {"q": quotation_id})).scalar_one_or_none()
-    if scheme is None:
+    held = (await db.execute(text(
+        "SELECT scheme_code, system_type FROM quotation_subsidy "
+        "WHERE quotation_id = CAST(:q AS uuid)"),
+        {"q": quotation_id})).one_or_none()
+    if held is None:
         raise ValidationFailed("Calculate the subsidy before sending.", code="subsidy_missing",
                                fields={"subsidy": "required"})
+    scheme = held.scheme_code
+    await _same_system(db, lead_id, held.system_type, "subsidy")
     now = await lead_scheme(db, lead_id)
     if now.upper() != scheme.upper():
         raise ValidationFailed(f"The lead's scheme is now {now}. Calculate the subsidy again.",
@@ -178,12 +196,14 @@ async def for_order(db: AsyncSession, quotation_id: str, lead_id: str) -> dict[s
     calculation's total with any flat charge, so subsidy and share stay within it
     whatever the order's lines come to (plan review S-3)."""
     r = (await db.execute(text(
-        "SELECT scheme_code, total_cost, flat_charge, subsidy, farmer_share FROM quotation_subsidy "
-        "WHERE quotation_id = CAST(:q AS uuid)"), {"q": quotation_id})).one_or_none()
+        "SELECT scheme_code, system_type, total_cost, flat_charge, subsidy, farmer_share "
+        "FROM quotation_subsidy WHERE quotation_id = CAST(:q AS uuid)"),
+        {"q": quotation_id})).one_or_none()
     if r is None:
         raise ValidationFailed("The quotation has no subsidy calculation.",
                                code="quotation_subsidy_missing",
                                fields={"quotation_ids": quotation_id})
+    await _same_system(db, lead_id, r.system_type, "quotation_ids")
     now = await lead_scheme(db, lead_id)
     if now.upper() != r.scheme_code.upper():
         raise ValidationFailed(f"The lead's scheme is now {now}. Revise the quotation.",

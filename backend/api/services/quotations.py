@@ -1360,7 +1360,16 @@ def _public(doc: dict[str, Any], token: str) -> sch.PublicQuotation:
         totals=sch.Totals(**{k: _s(Decimal(str(t[k]))) for k in
                              ("gross", "discount", "taxable", "cgst", "sgst", "igst", "total")}),
         line_count=int(doc["line_count"]), pdf_ready=doc.get("pdf_state") == "ready",
-        pdf_url=f"/api/v1/public/q/{token}/pdf")
+        pdf_url=f"/api/v1/public/q/{token}/pdf", subsidy=_public_subsidy(doc.get("subsidy")))
+
+
+def _public_subsidy(s: dict[str, Any] | None) -> sch.PublicSubsidy | None:
+    if not s:
+        return None
+    return sch.PublicSubsidy(scheme=s["scheme"], category=s["category"],
+                             total_cost=_s(Decimal(str(s["total_cost"]))),
+                             subsidy=_s(Decimal(str(s["subsidy"]))),
+                             farmer_share=_s(Decimal(str(s["farmer_share"]))))
 
 
 async def public_view(db: AsyncSession, token: str) -> sch.PublicQuotation:

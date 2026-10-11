@@ -5,11 +5,16 @@ becomes a subsidised order with the subsidy filled in."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import httpx
 import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.db.session import enter_role
 from api.schemas.subsidy import CalculateRequest
 from tests.api import test_order_endpoints as endpoints
 from tests.api import test_subsidy_applications as apps_t
@@ -22,6 +27,7 @@ shop = endpoints.shop
 office = apps_t.office
 fake_engine = apps_t.fake_engine
 Q = f"{V1}/quotations"
+Sessions = Callable[[], AsyncSession]
 
 
 async def _quotation(client: httpx.AsyncClient, o: Office, h: dict[str, str]) -> dict[str, Any]:
@@ -120,3 +126,85 @@ async def test_a_commercial_quotation_takes_no_subsidy(
     assert r.status_code == 200, r.text
     r = await _put(client, fo, q["id"], office)
     assert r.status_code == 422 and _code(r) == "not_subsidised", r.text
+
+
+async def _sent_with_block(client: httpx.AsyncClient, o: Office, h: dict[str, str]) -> dict[str, Any]:
+    q = await _quotation(client, o, h)
+    assert (await _put(client, h, q["id"], o)).status_code == 200
+    r = await client.post(f"{Q}/{q['id']}/send", headers={**h, **_key()}, json={"channel": "none"})
+    assert r.status_code == 200, r.text
+    data: dict[str, Any] = r.json()["data"]
+    return data
+
+
+async def test_the_farmers_link_shows_the_subsidy(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest],
+        sessions: Sessions) -> None:
+    """Code review F-1, rule 7: the public view's subsidy reaches the link."""
+    fo = await _as(client, office, "field_officer")
+    q = await _sent_with_block(client, office, fo)
+    s = sessions()
+    try:
+        token = (await s.execute(text("SELECT share_token FROM quotation WHERE id = CAST(:q AS uuid)"),
+                                 {"q": q["id"]})).scalar_one()
+    finally:
+        await s.close()
+    body = (await client.get(f"{V1}/public/q/{token}")).json()["data"]
+    assert body["subsidy"] == {"scheme": "GGRC", "category": "Small Farmer", "total_cost": "95000.75",
+                               "subsidy": "70000.50", "farmer_share": "17500.25"}, body["subsidy"]
+
+
+def test_the_public_fields_are_the_schemas() -> None:
+    """Code review F-1: PUBLIC_FIELDS is what the link may carry; the schema is what it does."""
+    from api.domain.quotations import PARTY_COLUMNS, PUBLIC_FIELDS
+    from api.schemas.quotations import PublicQuotation
+    assert set(PublicQuotation.model_fields) == set(PUBLIC_FIELDS)
+    assert not set(PUBLIC_FIELDS) & PARTY_COLUMNS
+
+
+async def test_the_block_is_staff_and_scope_bound(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest],
+        sessions: Sessions) -> None:
+    """Code review F-2: a role without quotations.edit is refused; a caller outside the
+    quotation's scope cannot read the calculation; the definer refuses on its own."""
+    fo = await _as(client, office, "field_officer")
+    q = await _sent_with_block(client, office, fo)
+    stranger = await _as(client, office, "stranger")       # quotations.view, no territory
+    r = await _put(client, stranger, q["id"], office)
+    assert r.status_code == 403, r.text
+    r = await client.get(f"{Q}/{q['id']}/subsidy/calculation", headers=stranger)
+    assert r.status_code == 404, "the parent-scoped policy hides it"
+
+    draft = await _quotation(client, office, fo)
+    r = await client.patch(f"{Q}/{draft['id']}", headers={**fo, **_key()}, json={"sales_type": "commercial"})
+    assert r.status_code == 200, r.text
+    s = sessions()
+    try:
+        await s.execute(text("SELECT set_config('app.current_user_id', :u, true)"),
+                        {"u": office.shop.ids["field_officer"]})
+        await enter_role(s, "app_role")
+        for target, code in ((q["id"], "QSBND"), (draft["id"], "QSBTY")):
+            await s.execute(text("SAVEPOINT p"))
+            with pytest.raises(DBAPIError) as err:
+                await s.execute(text(
+                    "SELECT quotation_subsidy_set(CAST(:q AS uuid), 'GGRC', 'drip', 'x', 'x', 1, "
+                    "'{}'::jsonb, '{}'::jsonb, 1, 0, 0, 1, 'v', DATE '2020-06-15')"), {"q": target})
+            assert getattr(err.value.orig, "sqlstate", None) == code or code in str(err.value)
+            await s.execute(text("ROLLBACK TO SAVEPOINT p"))
+    finally:
+        await s.rollback()
+        await s.close()
+
+
+async def test_a_changed_lead_system_stops_the_send(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest],
+        sessions: Sessions) -> None:
+    """Code review F-3: the block was calculated for drip; the lead is now sprinkler."""
+    fo = await _as(client, office, "field_officer")
+    q = await _quotation(client, office, fo)
+    assert (await _put(client, fo, q["id"], office)).status_code == 200
+    r = await client.patch(f"{V1}/leads/{q['lead']['id']}", headers={**fo, **_key()},
+                           json={"mis_system": "sprinkler"})
+    assert r.status_code == 200, r.text
+    r = await client.post(f"{Q}/{q['id']}/send", headers={**fo, **_key()}, json={"channel": "none"})
+    assert r.status_code == 422 and _code(r) == "subsidy_system_changed", r.text

@@ -452,6 +452,16 @@ class PublicSeller(BaseModel):
     gstin: str
 
 
+class PublicSubsidy(BaseModel):
+    """FS-057 rule 7: what the farmer's link shows of a subsidised quotation."""
+
+    scheme: str
+    category: str
+    total_cost: str
+    subsidy: str
+    farmer_share: str = Field(description="What the farmer pays.")
+
+
 class PublicQuotation(BaseModel):
     """What the farmer's link shows before the PDF: no name, no mobile, no
     address, no lines. The PDF has all of it, one request further."""
@@ -469,3 +479,6 @@ class PublicQuotation(BaseModel):
     line_count: int
     pdf_ready: bool
     pdf_url: str
+    subsidy: PublicSubsidy | None = Field(
+        default=None, description="FS-057: a subsidised quotation's subsidy and the farmer's "
+                                  "share; null otherwise.")

@@ -127,6 +127,8 @@ def render_html(doc: dict[str, Any]) -> str:
     return _env.get_template("quotation.html").render(
         q=q, lines=lines, tiers=tiers, discount_cols=discount_columns(tiers),
         subsidy=doc.get("subsidy"),   # FS-057 rule 7; absent on a document claimed before 072
+        subsidy_has_flat=bool(doc.get("subsidy"))
+        and Decimal(str(doc["subsidy"].get("flat_charge") or 0)) > 0,
         is_provisional=bool(q.get("is_provisional")),
         intra_state=bool(q.get("intra_state")), rendered_on=today_ist().strftime("%d %b %Y"))
 
