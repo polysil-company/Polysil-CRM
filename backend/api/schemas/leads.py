@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
-InquiryType = Literal["commercial", "subsidised", "industrial"]
+InquiryType = Literal["commercial", "subsidised", "industrial", "dealership"]
 Stage = Literal["new", "contacted", "qualified", "quoted", "negotiation",
                 "won", "lost", "merged", "dormant"]
 Priority = Literal["hot", "warm", "cold"]
@@ -135,6 +135,14 @@ class DuplicateRef(BaseModel):
     state: Literal["pending", "merged", "dismissed"]
 
 
+class DealerApplicationStarted(BaseModel):
+    id: str | None = Field(description="Null when none was started; see `not_started`.")
+    apply_url: str | None = Field(description="The link to send the applicant. Shown only here.")
+    not_started: str | None = Field(
+        description="mobile_in_use, application_open or mobile_invalid: why winning started "
+                    "no application.")
+
+
 class Lead(BaseModel):
     """Every key is always present; null means 'not set', never 'hidden'."""
 
@@ -174,6 +182,10 @@ class Lead(BaseModel):
         default=None, description="Its name. Null for a dealer, who does not read campaigns.")
     customer_id: str | None = Field(
         default=None, description="The customer (FS-041), set when the lead reached qualified.")
+    dealer_application: DealerApplicationStarted | None = Field(
+        default=None, description="Only on the response that wins a dealership lead (FS-053): "
+                                  "the dealer application it started and its link, shown once, "
+                                  "or why none was started.")
     first_contacted_at: str | None
     last_activity_at: str
     created_at: str

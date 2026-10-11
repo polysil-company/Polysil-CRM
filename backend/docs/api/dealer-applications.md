@@ -296,8 +296,9 @@ Close an open application. The link stops working.
 
 **Gstin Lookup**
 
-What a GSTIN says about itself: valid, its state code and PAN. Firm details need
-a GST data provider, not configured yet (`lookup: unavailable`).
+What a GSTIN says about itself (valid, its state code and PAN), and its legal
+name, trade name, address and status from the GST data provider when one is
+configured (`lookup: found`); `unavailable` without one.
 
 **Parameters**
 

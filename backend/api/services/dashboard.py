@@ -145,8 +145,8 @@ async def _area_by_system(db: AsyncSession, where: list[Any]) -> list[SystemArea
 async def _targets_by_month(db: AsyncSession, caller: Caller,
                             today: dt.date) -> list[MonthTarget] | None:
     """FS-052 item 16: six months of the order value target against achievement, from
-    GET /targets/achievement's own arithmetic. Null without a targets scope, which
-    that call would refuse (plan review B-2). Six calls: ISS-131."""
+    GET /targets/achievement's own arithmetic, in one pass (ISS-131). Null without a
+    targets scope, which that call would refuse (plan review B-2)."""
     if caller.scopes.get("targets") is None:
         return None
     months: list[str] = []
@@ -154,12 +154,8 @@ async def _targets_by_month(db: AsyncSession, caller: Caller,
     for _ in range(6):
         months.append(f"{y:04d}-{m:02d}")
         y, m = (y, m - 1) if m > 1 else (y - 1, 12)
-    out = []
-    for month in reversed(months):
-        got = await targets_service.achievement(db, caller, month, None)
-        ov = got["totals"]["order_value"]
-        out.append(MonthTarget(month=month, target=ov["target"], achieved=ov["achieved"]))
-    return out
+    series = await targets_service.order_value_by_month(db, caller, list(reversed(months)))
+    return [MonthTarget(**m) for m in series]
 
 
 async def _next_follow_ups(db: AsyncSession, caller: Caller, where: list[Any],

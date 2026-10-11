@@ -37,6 +37,7 @@ from api.schemas.orders import (
     QueuePage,
     RemarkRequest,
     SubmitRequest,
+    SubsidyBlockIn,
     Threshold,
     ThresholdPut,
 )
@@ -112,8 +113,12 @@ async def create_order(body: OrderCreate, db: DbSession, caller: CallerDep, clai
     lead must be qualified or later (`422 lead_not_open`). Pass the preview's
     `price_list_item_id` and `gst_rate_id`; `409 rate_changed` if either moved.
 
-    Only `commercial` and `industrial` are built (`422 order_type_unsupported`). The
-    draft has no number until it is submitted.
+    **Subsidised (FS-054):** staff only, typed in, with `subsidy`: the leads (the first
+    is the order's lead and routes it; `lead_id` is refused) and the amounts typed in.
+    Attach the quotation copy and the payment slip with `POST /documents`.
+
+    `marketing_material` and `replacement` are refused (`422 order_type_unsupported`).
+    The draft has no number until it is submitted.
     """
     async def work() -> tuple[int, dict[str, Any]]:
         return 201, _order(await service.create_order(db, caller, body, get_settings()))
@@ -267,6 +272,20 @@ async def replace_lines(order_id: Id, body: OrderLinesReplace, db: DbSession,
         return 200, _order(await service.replace_lines(db, caller, order_id, body,
                                                        get_settings()))
     return await _idem(db, claims, idem, f"PUT /api/v1/orders/{order_id}/lines", body, work)
+
+
+@router.put("/{order_id}/subsidy", response_model=Envelope[Order], responses=_MUTATION_ERRORS,
+            dependencies=[Depends(require("sales_orders", "edit"))])
+async def set_subsidy(order_id: Id, body: SubsidyBlockIn, db: DbSession,
+                      caller: CallerDep, claims: Claims, idem: IdemKey) -> Response:
+    """Replace a subsidised draft's subsidy block (FS-054), including a draft reopened
+    by an amend. The first lead cannot change (`422 first_lead_fixed`); the others may.
+    `409 order_not_draft` once submitted, `422 order_type_not_subsidised` on any other
+    type, `422 subsidy_above_material` or `payable_above_material` against the material
+    given or the order total."""
+    async def work() -> tuple[int, dict[str, Any]]:
+        return 200, _order(await service.set_subsidy(db, caller, order_id, body))
+    return await _idem(db, claims, idem, f"PUT /api/v1/orders/{order_id}/subsidy", body, work)
 
 
 @router.post("/{order_id}/submit", response_model=Envelope[Order], responses=_MUTATION_ERRORS,

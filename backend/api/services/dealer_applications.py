@@ -34,6 +34,7 @@ from api.errors import (
     ServiceUnavailableError,
     ValidationFailed,
 )
+from api.integrations import gst as gst_provider
 from api.schemas import dealer_applications as sch
 from api.services import people
 from api.services.complaints import _safe_filename
@@ -126,11 +127,18 @@ def _clean_fields(body: sch.DealerApplicationFields) -> dict[str, Any]:
     return out
 
 
-def lookup(raw: str) -> sch.DealerGstLookup:
-    """The GSTIN read from itself; details wait on a provider (GAP-292)."""
+async def lookup(raw: str) -> sch.DealerGstLookup:
+    """The GSTIN read from itself, then its details from the provider when one is
+    configured (FS-053). An invalid GSTIN never spends a provider lookup."""
     facts = gst.read(raw)
+    found: str = "unavailable"
+    details: dict[str, Any] = {}
+    if facts.valid:
+        found, details = await gst_provider.fetch(facts.gstin, get_settings())
     return sch.DealerGstLookup(gstin=facts.gstin, valid=facts.valid, reason=facts.reason,
-                         state_code=facts.state_code, pan=facts.pan, lookup="unavailable")
+                               state_code=facts.state_code, pan=facts.pan, lookup=found,  # type: ignore[arg-type]
+                               legal_name=details.get("legal_name"), trade_name=details.get("trade_name"),
+                               address=details.get("address"), status=details.get("status"))
 
 
 # ── staff ────────────────────────────────────────────────────────────────────
@@ -220,6 +228,31 @@ async def create(db: AsyncSession, caller: Caller, body: sch.DealerApplicationCr
         _raise_for(exc)
         raise
     return await get(db, caller, str(app_id), apply_url=_apply_url(token))
+
+
+async def start_from_lead(db: AsyncSession, caller: Caller, *, lead_id: str, firm: str,
+                          mobile: str, territory_id: str) -> Any:
+    """FS-053: a dealership lead won starts its dealer application. The lead stays won
+    when it cannot (the mobile signs someone in, or an application is open): the
+    answer says why."""
+    from api.schemas.leads import DealerApplicationStarted
+    try:
+        mobile_db = mobile_for_user(mobile)
+    except MobileError:
+        return DealerApplicationStarted(id=None, apply_url=None, not_started="mobile_invalid")
+    token = secrets.token_urlsafe(32)
+    try:
+        async with db.begin_nested():
+            app_id = (await db.execute(text(
+                "SELECT dealer_application_create(:f, :c, :m, CAST(:t AS uuid), CAST(:l AS uuid), :h, :e)"),
+                {"f": firm, "c": firm, "m": mobile_db, "t": territory_id, "l": lead_id,
+                 "h": _hash(token), "e": datetime.now(UTC) + timedelta(days=LINK_DAYS)})).scalar_one()
+    except DBAPIError as exc:
+        reason = {"DAPMU": "mobile_in_use", "DAPOP": "application_open"}.get(_state(exc) or "")
+        if reason is None:
+            raise
+        return DealerApplicationStarted(id=None, apply_url=None, not_started=reason)
+    return DealerApplicationStarted(id=str(app_id), apply_url=_apply_url(token), not_started=None)
 
 
 async def staff_action(db: AsyncSession, caller: Caller, app_id: str, action: str, *,

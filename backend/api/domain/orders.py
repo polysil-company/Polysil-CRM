@@ -14,15 +14,18 @@ from typing import Final
 
 # rule 18 / GAP-121: the order types priced today; the rest name their question.
 # FS-042 added export and sample, each on a setting standing in for its question.
-TYPES_ACCEPTED: Final = frozenset({"commercial", "industrial", "export", "sample"})
+# FS-054 added subsidised, with the subsidy typed in by hand (GAP-299).
+TYPES_ACCEPTED: Final = frozenset({"commercial", "industrial", "export", "sample", "subsidised"})
 TYPE_BLOCKED_ON: Final[dict[str, str]] = {
     "marketing_material": "the marketing material split and limits (question 6.11)",
-    "subsidised": "the subsidy stages (Milestone 3)",
     "replacement": "complaints (W5)",
 }
 
-# FS-042: the types only staff raise (GAP-370)
-STAFF_ONLY_TYPES: Final = frozenset({"export", "sample"})
+# FS-042: the types only staff raise (GAP-370); FS-054 rule 1
+STAFF_ONLY_TYPES: Final = frozenset({"export", "sample", "subsidised"})
+# FS-054: a subsidised order names 1 to 50 leads; its type never changes (rule 5a)
+SUBSIDISED: Final = "subsidised"
+MAX_SUBSIDY_LEADS: Final = 50
 # the setting's value, as the treatment stored on the document (rule 2)
 EXPORT_TREATMENT: Final[dict[str, str]] = {"lut": "export_lut", "igst": "export_igst"}
 # a free sample is every line at 100 % off, tier one (rule 11; FS-015b's free order)
@@ -93,6 +96,15 @@ SQLSTATE_TO_ERROR: Final[dict[str, tuple[int, str]]] = {
     "ORDNA": (422, "no_approver"),
     "ORDST": (422, "territory_without_state_code"),
     "ORDDS": (409, "order_dispatched"),
+    "ORDVD": (409, "voided_dispatch_holds_lines"),   # ISS-122
+    # FS-054: the service checks first and names the field; these are the second enforcer
+    "OSBTY": (422, "order_type_not_subsidised"),
+    "OSBLD": (422, "subsidy_leads_invalid"),
+    "OSBFL": (422, "first_lead_fixed"),
+    "OSBLV": (422, "lead_not_visible"),
+    "OSBLO": (422, "lead_not_open"),
+    "OSBAM": (422, "subsidy_above_material"),
+    "OSBPM": (422, "payable_above_material"),
     "ORDCN": (409, "order_not_cancellable"),
     "ORDSB": (409, "order_was_submitted"),
     "ORDND": (409, "order_not_dispatchable"),

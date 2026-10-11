@@ -89,7 +89,8 @@ async def _no_backlog(sessions: Callable[[], AsyncSession]) -> None:
     draining after sent the test's own rows and hung the gated wait for three
     hours."""
     for _ in range(60):
-        if await outbox_drain({"provider": FakeProvider(ACCEPTED)}) == 0:
+        # bounded, so a drain lock held elsewhere (ISS-127) cannot read as an empty queue
+        if await outbox_drain({"provider": FakeProvider(ACCEPTED)}, batch=1000) == 0:
             return
 
 
@@ -388,6 +389,30 @@ async def test_three_transient_failures_open_the_breaker_and_charge_nothing(
     finally:
         await _drop(sessions(), *rows)
         await cache.breaker_reset()
+
+
+async def test_a_cron_drain_skips_while_another_holds_the_lock(
+        sessions: Callable[[], AsyncSession]) -> None:
+    """ISS-127: one unbounded drain at a time. A second one sends nothing and
+    leaves the holder's lock alone; the holder's own release frees it."""
+    row_id = await _queue(sessions(), recipient=_mobile())
+    provider = FakeProvider(ACCEPTED)
+    try:
+        assert await cache.drain_lock_take("other-worker", timedelta(seconds=60))
+        assert await outbox_drain({"provider": provider}) == 0
+        assert provider.calls == []
+        state, *_ = await _state(sessions(), row_id)
+        assert state == "pending"
+        await cache.drain_lock_release("not-the-holder")
+        assert await cache.get_redis().get(cache.DRAIN_LOCK) == "other-worker"
+        await cache.drain_lock_release("other-worker")
+        state, *_ = await _drain_until(sessions, row_id, provider)
+        assert state == "sent"
+        # the drain freed its own lock
+        assert await cache.get_redis().get(cache.DRAIN_LOCK) is None
+    finally:
+        await cache.drain_lock_release("other-worker")
+        await _drop(sessions(), row_id)
 
 
 async def test_with_redis_unreachable_the_drain_still_sends(

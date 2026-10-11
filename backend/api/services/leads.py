@@ -635,7 +635,8 @@ async def _lock(db: AsyncSession, lead_id: str) -> Any:
         "SELECT stage::text AS stage, first_contacted_at, lost_from_stage::text AS lost_from, "
         "dormant_from_stage::text AS dormant_from, "
         "lost_reason_id, lost_note, territory_id, owner_user_id, owner_org_unit_id, "
-        "assigned_partner_id, deleted_at, crops::text[] AS crops, campaign_id "
+        "assigned_partner_id, deleted_at, crops::text[] AS crops, campaign_id, "
+        "inquiry_type::text AS inquiry_type, farmer_name, mobile "
         "FROM lead WHERE id = :id FOR UPDATE"),
         {"id": lead_id})).one_or_none()
 
@@ -653,14 +654,15 @@ async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
     if current in domain.TERMINAL:
         raise ValidationFailed("This lead is closed and cannot change stage.",
                                code="stage_terminal", fields={"stage": current})
-    if not domain.can_transition(current, body.to_stage):
+    if not domain.can_transition(current, body.to_stage, row.inquiry_type):
         raise ValidationFailed(f"A {current} lead cannot move to {body.to_stage}.",
                                code="invalid_transition", fields={"to_stage": body.to_stage})
+    dealership_win = row.inquiry_type == domain.DEALERSHIP and body.to_stage == "won"
     if body.to_stage in domain.VIA_QUOTATION:
         raise ValidationFailed(
             "This stage is reached by sending a quotation, not from here.",
             code="quotation_required", fields={"to_stage": body.to_stage})
-    if body.to_stage in domain.REQUIRES_QUOTATION:
+    if body.to_stage in domain.REQUIRES_QUOTATION and not dealership_win:
         # Counted as the owner: an EXISTS under the caller's quotation policies would
         # say no to an officer whose colleague raised the accepted quotation
         # (FS-005 edge case 9).
@@ -700,7 +702,14 @@ async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
         {"to": body.to_stage, "lr": body.lost_reason_id, "ln": body.lost_note,
          "frm": current, "id": lead_id})
     await _rescore(db, lead_id)
-    return await get_lead(db, caller, lead_id)
+    lead = await get_lead(db, caller, lead_id)
+    if dealership_win:
+        # FS-053: imported here, as dealer applications import complaints, which import this
+        from api.services import dealer_applications
+        lead.dealer_application = await dealer_applications.start_from_lead(
+            db, caller, lead_id=lead_id, firm=row.farmer_name, mobile=row.mobile,
+            territory_id=str(row.territory_id))
+    return lead
 
 
 async def reopen_lead(db: AsyncSession, caller: Caller, lead_id: str,
@@ -830,6 +839,22 @@ async def _lead_refs(db: AsyncSession, rows: Any) -> dict[str, str | None]:
     return out
 
 
+def _folded_copy(r: Any, lead_id: str, payload: dict[str, Any],
+                 refs: dict[str, str | None]) -> bool:
+    """A merge, and a dismissal of the pair, are written on both leads, and the
+    survivor's timeline folds in the loser's rows: one line each (walk F-16). The
+    copy on a folded-in lead is skipped when this lead holds its own. Decided per
+    row, so a page break between the two cannot show both (ISS-128)."""
+    own = str(r.entity_id) if r.entity_id else lead_id
+    if own == lead_id:
+        return False
+    if r.kind == "lead.merged":
+        return lead_id in (str(payload.get("loser")), str(payload.get("survivor")))
+    if r.kind == "lead.duplicate_dismissed":
+        return lead_id in (refs.get("link:" + str(payload.get("link_id"))) or "").split()
+    return False
+
+
 def _enrich_leads(r: Any, lead_id: str, payload: dict[str, Any],
                   refs: dict[str, str | None]) -> dict[str, Any]:
     """The inquiry numbers of the leads an event names. `other_*` is the lead that
@@ -899,18 +924,12 @@ async def timeline(db: AsyncSession, caller: Caller, lead_id: str, *, limit: int
     lead_refs = await _lead_refs(db, rows)
 
     events: list[TimelineEvent] = []
-    merges: set[tuple[str, str]] = set()
     for r in rows:
         payload = r.payload
         if isinstance(payload, str):
             payload = json.loads(payload)
-        if r.kind == "lead.merged" and isinstance(payload, dict):
-            # 006 writes the merge on both leads, and the survivor's timeline folds in
-            # the loser's: one line per merge (walk F-16)
-            pair = (str(payload.get("loser")), str(payload.get("survivor")))
-            if pair in merges:
-                continue
-            merges.add(pair)
+        if isinstance(payload, dict) and _folded_copy(r, lead_id, payload, lead_refs):
+            continue
         if caller.partner_id is not None and isinstance(payload, dict):
             # ISS-107: staff notes, the lost reason and duplicate handling are internal
             # (GAP-284). A short page keeps its cursor: the cursor is the raw row's.

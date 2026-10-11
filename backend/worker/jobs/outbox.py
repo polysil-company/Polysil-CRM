@@ -35,6 +35,7 @@ FS-007 shaped the drain around a real provider:
 
 from __future__ import annotations
 
+import secrets
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -137,8 +138,26 @@ async def outbox_drain(ctx: dict[str, Any], *, batch: int | None = None) -> int:
     runs out. Returns how many rows were handled.
 
     `batch` bounds the rows for a caller that wants fewer (tests); the budget is
-    the bound in production.
+    the bound in production. The unbounded (cron) call runs one at a time across
+    workers (ISS-127); a bounded call skips the lock.
     """
+    if batch is not None:
+        return await _drain(ctx, batch=batch)
+    settings = get_settings()
+    # the longest a drain can run: its budget plus one send that started at the edge
+    ttl = timedelta(seconds=settings.outbox_drain_budget + settings.whatsapp_connect_timeout
+                    + settings.whatsapp_send_timeout + 15)
+    token = secrets.token_hex(8)
+    if not await cache.drain_lock_take(token, ttl):
+        log.info("outbox.drain_skipped")
+        return 0
+    try:
+        return await _drain(ctx, batch=None)
+    finally:
+        await cache.drain_lock_release(token)
+
+
+async def _drain(ctx: dict[str, Any], *, batch: int | None) -> int:
     settings = get_settings()
     provider: MessageProvider = ctx.get("provider") or get_provider(settings, ctx.get("http"))
 

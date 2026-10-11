@@ -117,8 +117,7 @@ async def set_targets(db: AsyncSession, caller: Caller, user_id: str, month_raw:
     return await get_targets(db, caller, user_id, month_raw)
 
 
-async def achievement(db: AsyncSession, caller: Caller, month_raw: str, user_id: str | None) -> dict[str, Any]:
-    month = _month(month_raw)
+async def _people(db: AsyncSession, caller: Caller, user_id: str | None) -> list[Any]:
     scope = caller.scopes.get("targets")
     if scope is None:
         raise ForbiddenError("No targets permission.")
@@ -135,6 +134,12 @@ async def achievement(db: AsyncSession, caller: Caller, month_raw: str, user_id:
         "AND rp.action = 'view' AND rp.deleted_at IS NULL AND rp.scope <> 'global') "
         "AND (CAST(:only AS uuid) IS NULL OR u.id = CAST(:only AS uuid)) ORDER BY u.full_name LIMIT 500"),
         {"me": caller.user_id, "only": user_id})).all()
+    return list(people)
+
+
+async def achievement(db: AsyncSession, caller: Caller, month_raw: str, user_id: str | None) -> dict[str, Any]:
+    month = _month(month_raw)
+    people = await _people(db, caller, user_id)
     ids = [p.id for p in people]
     targets: dict[str, dict[str, Decimal]] = {i: {} for i in ids}
     if ids:
@@ -168,6 +173,41 @@ async def achievement(db: AsyncSession, caller: Caller, month_raw: str, user_id:
               for m in domain.METRICS}
     return {"month": month_raw, "as_of": dt.datetime.now(dt.UTC).isoformat(), "rows": rows, "totals": totals,
             "filters": {"sale_counted_at": f.sale_mode}}
+
+
+async def order_value_by_month(db: AsyncSession, caller: Caller,
+                               months: list[str]) -> list[dict[str, Any]]:
+    """The team's order value target and achievement for each month (oldest first),
+    as `achievement()` totals them, in three queries rather than seven a month
+    (ISS-131): the people, their targets over the months, their sales by month."""
+    days = [_month(m) for m in months]
+    ids = [p.id for p in await _people(db, caller, None)]
+    target = dict.fromkeys(days, Decimal(0))
+    sold: dict[dt.date, Decimal] | None = dict.fromkeys(days, Decimal(0))
+    if ids:
+        for r in (await db.execute(text(
+                "SELECT DISTINCT ON (user_id, month) month, value FROM sales_target "
+                "WHERE user_id = ANY(CAST(:i AS uuid[])) AND month = ANY(CAST(:m AS date[])) "
+                "AND metric = 'order_value' ORDER BY user_id, month, effective_from DESC, id DESC"),
+                {"i": ids, "m": days})).all():
+            target[r.month] += Decimal(r.value)
+    if ids and "sales_orders" not in caller.scopes:
+        sold = None   # achievement() answers 0.00, not null, when nobody is in scope
+    elif ids:
+        f = await reports.Filters(start=min(days), end=domain.month_end(max(days)), territory_id=None,
+                                  owner_id=None).load_sale_mode(db)
+        month_of = sa.func.date_trunc("month", sa.func.timezone("Asia/Kolkata", reports._sold_on(f)))
+        rows = (await db.execute(sa.select(month_of, sa.func.sum(reports.ORD.c.total))
+                                 .where(*reports._sales(caller, f), reports.ORD.c.owner_user_id.in_(ids))
+                                 .group_by(month_of))).all()
+        assert sold is not None
+        for r in rows:
+            day = r[0].date()
+            if day in sold:
+                sold[day] += Decimal(r[1] or 0)
+    return [{"month": m, "target": _fmt("order_value", target[d]),
+             "achieved": None if sold is None else _fmt("order_value", sold[d])}
+            for m, d in zip(months, days, strict=True)]
 
 
 async def _achieved(db: AsyncSession, caller: Caller, f: reports.Filters,
