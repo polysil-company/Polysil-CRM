@@ -68,11 +68,14 @@ async def order_warranty(db: AsyncSession, order_id: str) -> sch.OrderWarranty:
     """Four statements whatever the line count (edge EC-15), each under the
     caller's RLS, as GET /orders/{id}."""
     order = (await db.execute(text(
-        # GAP-279: a replacement's dispatch starts a full period; the tab names what it replaces
+        # GAP-279: a replacement's dispatch starts a full period; the tab names what it
+        # replaces through order_complaint(), the definer GET /orders/{id} uses, so a
+        # reader of the order who cannot read complaints still sees which (ISS-123)
         "SELECT o.id, o.order_no::text AS order_no, o.order_type::text AS order_type, "
-        "  (SELECT c.id FROM complaint_remedy r JOIN complaint c ON c.id = r.complaint_id "
-        "    WHERE r.sales_order_id = o.id AND r.kind = 'replacement' ORDER BY r.chosen_at LIMIT 1) AS rc_id "
-        "FROM sales_order o WHERE o.id = CAST(:o AS uuid) AND o.deleted_at IS NULL"),
+        "  rc.id AS rc_id, rc.complaint_no AS rc_no "
+        "FROM sales_order o LEFT JOIN LATERAL (SELECT * FROM order_complaint(o.id) LIMIT 1) rc "
+        "  ON o.order_type = 'replacement' "
+        "WHERE o.id = CAST(:o AS uuid) AND o.deleted_at IS NULL"),
         {"o": order_id})).one_or_none()
     if order is None:
         raise NotFoundError("No such order.")
@@ -133,8 +136,7 @@ async def order_warranty(db: AsyncSession, order_id: str) -> sch.OrderWarranty:
                 for c in claims if c.product_id == ln.product_id]))
     return sch.OrderWarranty(
         order_id=str(order.id), order_no=order.order_no, order_type=order.order_type,
-        replacement_for=(next((sch.ComplaintRef(complaint_id=str(c.id), complaint_no=c.complaint_no)
-                               for c in claims if c.id == order.rc_id), None)
+        replacement_for=(sch.ComplaintRef(complaint_id=str(order.rc_id), complaint_no=order.rc_no)
                          if order.rc_id else None),
         lines=out)
 

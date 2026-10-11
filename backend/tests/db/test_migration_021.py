@@ -103,7 +103,10 @@ async def test_the_crop_array_refuses_null_empty_and_eleven(db: AsyncSession) ->
     for value in ([None], [""], [f"c{i}" for i in range(11)]):
         await m13._refused(db, "UPDATE lead SET crops = CAST(:v AS citext[]) WHERE id = CAST(:l AS uuid)",
                            {"v": value, "l": lead}, "23514")
+    # FS-052 (063): acres are generated from hectares, which carry the limit now
     await m13._refused(db, "UPDATE lead SET land_acres = 100000 WHERE id = CAST(:l AS uuid)",
+                       {"l": lead}, "428C9")
+    await m13._refused(db, "UPDATE lead SET land_hectares = 40468.57 WHERE id = CAST(:l AS uuid)",
                        {"l": lead}, "23514")
 
 

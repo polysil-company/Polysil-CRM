@@ -35,8 +35,13 @@ CropCodes = Annotated[list[str], Field(max_length=MAX_CROPS,
     description="Crop codes from GET /lookups/crops, at most 10. [] for none."),
     AfterValidator(_crop_codes)]
 Acres = Annotated[Decimal, Field(gt=0, le=Decimal("99999.99"), decimal_places=2,
-    description="Land in acres, a decimal string with at most two decimals.",
+    description="Land in acres, a decimal string with at most two decimals. Converted to "
+                "hectares; send land_hectares instead where you can.",
     examples=["4.50"])]
+# FS-052: the client works in hectares; acres stay accepted and returned
+Hectares = Annotated[Decimal, Field(gt=0, le=Decimal("40468.56"), decimal_places=2,
+    description="Land in hectares, a decimal string with at most two decimals.",
+    examples=["1.82"])]
 
 # Every id the client sends is validated to this shape, so a malformed id is a
 # 422 with the envelope rather than a driver error and a 500 (cross-vendor P2).
@@ -73,7 +78,9 @@ class LeadCreate(BaseModel):
     note: Annotated[str | None, Field(default=None, max_length=2000,
         description="Optional. Becomes the first entry on the lead's timeline.")]
     crops: CropCodes = Field(default_factory=list)
-    land_acres: Acres | None = None
+    land_hectares: Hectares | None = None
+    land_acres: Acres | None = Field(default=None,
+                                     description="Instead of land_hectares, not with it.")
     campaign_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
         description="Optional. An active campaign from GET /campaigns?active=true. "
         "Staff only. A lead from a QR code with a campaign gets it on its own.")]
@@ -149,7 +156,11 @@ class Lead(BaseModel):
     priority: Priority | None
     estimated_value: str | None
     crops: list[CropRef] = Field(description="In the order they were sent. [] for none.")
-    land_acres: str | None = Field(description="Land in acres, a decimal string.")
+    land_hectares: str | None = Field(default=None,
+                                      description="Land in hectares, a decimal string.")
+    land_acres: str | None = Field(description="The same land in acres, from the hectares.")
+    state_name: str | None = Field(default=None,
+                                   description="The state above the lead's territory.")
     lost_reason: ReasonRef | None
     lost_note: str | None
     reopen_count: int
@@ -375,7 +386,9 @@ class LeadPatch(BaseModel):
     crops: Annotated[CropCodes | None, Field(default=None,
         description="Replaces the list. [] clears it; null is refused. A switched-off crop "
         "already on the lead may be sent again.")]
-    land_acres: Acres | None = Field(default=None, description="null clears it.")
+    land_hectares: Hectares | None = Field(default=None, description="null clears it.")
+    land_acres: Acres | None = Field(default=None, description="Instead of land_hectares, not with "
+                                                             "it; null clears it.")
     campaign_id: Annotated[str | None, Field(default=None, pattern=UUID_RE,
         description="An active campaign; null clears it. The campaign already on the lead "
         "may be re-sent even if it has been switched off.")]

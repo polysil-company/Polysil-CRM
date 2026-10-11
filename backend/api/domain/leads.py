@@ -159,3 +159,22 @@ def partner_timeline_entry(kind: str, payload: dict[str, object], *,
     if kind in ("lead.stage_changed", "lead.reopened"):
         return {k: v for k, v in payload.items() if k not in PARTNER_STRIPPED_KEYS}
     return payload
+
+
+# ── land (FS-052) ────────────────────────────────────────────────────────────
+
+ACRES_PER_HECTARE: Decimal = Decimal("2.4710538")
+_CENT = Decimal("0.01")
+
+
+def acres_to_hectares(acres: Decimal) -> Decimal:
+    """The stored hectares for acres typed in: two places, half up, as migration 063."""
+    return (acres / ACRES_PER_HECTARE).quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+def hectares_to_acres(hectares: Decimal | None) -> Decimal | None:
+    """What the generated `land_acres` column holds: round(hectares * 2.4710538, 2)."""
+    if hectares is None:
+        return None
+    return (hectares * ACRES_PER_HECTARE).quantize(_CENT, rounding=ROUND_HALF_UP)
+

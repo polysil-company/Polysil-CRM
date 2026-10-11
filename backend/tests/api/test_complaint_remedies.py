@@ -230,7 +230,8 @@ async def _dispatch(client: httpx.AsyncClient, h: dict[str, str], order: dict[st
         "lines": [{"order_line_id": line["id"], "qty": qty or line["qty"]}]})
 
 
-async def _replacement(client: httpx.AsyncClient, shop: Shop) -> tuple[dict[str, Any], dict[str, Any]]:
+async def _replacement(client: httpx.AsyncClient, shop: Shop, *,
+                       managers: bool = True) -> tuple[dict[str, Any], dict[str, Any]]:
     qc = await _as(client, shop, "qc_manager")
     dispatch = await _as(client, shop, "dispatch_manager")
     c = await _qc_approved(client, shop)
@@ -240,7 +241,14 @@ async def _replacement(client: httpx.AsyncClient, shop: Shop) -> tuple[dict[str,
     link = c["remedy"]["replacement"]["order"]
     r = await client.get(f"{V1}/orders/{link['id']}", headers=dispatch)
     assert r.status_code == 200, r.text
-    return c, r.json()["data"]
+    order = r.json()["data"]
+    if managers:
+        # FS-049: the managers before Dispatch approve, so the order waits on Dispatch
+        for step in order["approval"]["steps"][:-1]:
+            d = await _decide(client, await _as(client, shop, step["role"]), step["id"])
+            assert d.status_code == 200, d.text
+        order = (await client.get(f"{V1}/orders/{link['id']}", headers=dispatch)).json()["data"]
+    return c, order
 
 
 async def test_a_replacement_is_a_free_order_that_closes_the_complaint_when_shipped(
@@ -253,8 +261,9 @@ async def test_a_replacement_is_a_free_order_that_closes_the_complaint_when_ship
     assert order["totals"]["total"] == "0.00" and order["lines"][0]["qty"] == "340.000"
     assert order["complaint"] == {"id": c["id"], "complaint_no": c["complaint_no"]}
     steps = order["approval"]["steps"]
-    assert [s["role"] for s in steps] == ["dispatch_manager"], "Dispatch alone (D3)"
-    r = await _decide(client, dispatch, steps[0]["id"])
+    assert [s["role"] for s in steps] == ["state_manager", "regional_manager", "md_ceo", "dispatch_manager"], "FS-049"
+    assert [s["decision"] for s in steps] == ["approve", "approve", "approve", None], "the managers first"
+    r = await _decide(client, dispatch, steps[-1]["id"])
     assert r.status_code == 200 and r.json()["data"]["status"] == "approved", r.text
     s = sessions()
     try:
@@ -285,7 +294,7 @@ async def test_a_rejected_replacement_is_cancelled_and_returns_the_complaint(
                     {"m": owner_mobile, "u": shop.ids["field_officer"]})
     await s.commit()
     await s.close()
-    r = await _decide(client, dispatch, order["approval"]["steps"][0]["id"], "reject", "Out of stock")
+    r = await _decide(client, dispatch, order["approval"]["steps"][-1]["id"], "reject", "Out of stock")
     assert r.status_code == 200, r.text
     assert r.json()["data"]["status"] == "cancelled", "cancelled, never an editable draft (B4)"
     c = await _get(client, await _as(client, shop, "qc_manager"), c["id"])
@@ -316,7 +325,7 @@ async def test_a_replacement_is_withdrawn_until_it_ships(client: httpx.AsyncClie
     qc = await _as(client, shop, "qc_manager")
     dispatch = await _as(client, shop, "dispatch_manager")
     c, order = await _replacement(client, shop)
-    await _decide(client, dispatch, order["approval"]["steps"][0]["id"])
+    await _decide(client, dispatch, order["approval"]["steps"][-1]["id"])
     order = (await client.get(f"{V1}/orders/{order['id']}", headers=dispatch)).json()["data"]
     assert (await _dispatch(client, dispatch, order, "10")).status_code == 201
     r = await complaints_t._post(client, qc, f"/{c['id']}/remedy/withdraw", {"remark": "Refund instead"})
@@ -335,7 +344,7 @@ async def test_a_replacement_cancelled_or_closed_short_empty_reopens_the_choice(
     dispatch = await _as(client, shop, "dispatch_manager")
     sm = await _as(client, shop, "state_manager")
     c, order = await _replacement(client, shop)
-    await _decide(client, dispatch, order["approval"]["steps"][0]["id"])
+    await _decide(client, dispatch, order["approval"]["steps"][-1]["id"])
     r = await client.post(f"{V1}/orders/{order['id']}/close-short", headers={**dispatch, **_key()},
                           json={"remark": "Product discontinued"})
     assert r.status_code == 200, r.text
@@ -512,7 +521,7 @@ async def test_a_withdraw_racing_a_dispatch_queues_on_the_order_not_a_deadlock(
     shop = remedies
     dispatch = await _as(client, shop, "dispatch_manager")
     c, order = await _replacement(client, shop)
-    await _decide(client, dispatch, order["approval"]["steps"][0]["id"])
+    await _decide(client, dispatch, order["approval"]["steps"][-1]["id"])
     order = (await client.get(f"{V1}/orders/{order['id']}", headers=dispatch)).json()["data"]
     body = order_sch.DispatchCreate.model_validate({
         "dispatched_at": dt.datetime.now(dt.UTC).isoformat(),
@@ -643,7 +652,7 @@ async def test_a_dealer_never_learns_who_cancelled_its_replacement(
         c = (await _remedy(client, qc, c["id"], kind="replacement", remark="Replace")).json()["data"]
         order_id = c["remedy"]["replacement"]["order"]["id"]
         order = (await client.get(f"{V1}/orders/{order_id}", headers=dispatch)).json()["data"]
-        r = await _decide(client, dispatch, order["approval"]["steps"][0]["id"], "reject", "Out of stock")
+        r = await _decide(client, dispatch, order["approval"]["steps"][-1]["id"], "reject", "Out of stock")
         assert r.status_code == 200, r.text
         r = await client.get(f"{V1}/orders/{order_id}/timeline", headers=dealer)
         assert r.status_code == 200, r.text
@@ -709,3 +718,87 @@ async def test_a_refund_whose_district_manager_is_gone_says_stalled(
         assert [s["stalled"] for s in steps] == [True, False], steps
     finally:
         await _dm_active(True)
+
+
+async def test_a_replacement_orders_warranty_names_its_complaint(
+        client: httpx.AsyncClient, remedies: Shop) -> None:
+    """ISS-123 (FS-046 code review F-4): the order tab of a replacement names the
+    complaint it replaces and lists that complaint as a claim on the line."""
+    shop = remedies
+    dispatch = await _as(client, shop, "dispatch_manager")
+    c, order = await _replacement(client, shop)
+    r = await _decide(client, dispatch, order["approval"]["steps"][-1]["id"])
+    assert r.status_code == 200, r.text
+    assert (await _dispatch(client, dispatch, order, "140")).status_code == 201
+    r = await client.get(f"{V1}/orders/{order['id']}/warranty", headers=dispatch)
+    assert r.status_code == 200, r.text
+    tab = r.json()["data"]
+    assert tab["order_type"] == "replacement"
+    assert tab["replacement_for"] == {"complaint_id": c["id"], "complaint_no": c["complaint_no"]}, tab
+    assert tab["lines"][0]["claims"] == [], "Dispatch cannot read complaints: the claim stays hidden"
+    admin = await _as(client, shop, "admin_sales")
+    tab = (await client.get(f"{V1}/orders/{order['id']}/warranty", headers=admin)).json()["data"]
+    assert tab["replacement_for"]["complaint_id"] == c["id"], tab
+    claims = tab["lines"][0]["claims"]
+    assert [x["complaint_id"] for x in claims] == [c["id"]], claims
+    assert claims[0]["warranty_status"] == "in_warranty", claims
+
+
+# ── FS-049: the replacement chain ────────────────────────────────────────────
+
+async def _chain(client: httpx.AsyncClient, shop: Shop, sessions: Sessions, roles: list[str]) -> None:
+    admin = await _as(client, shop, "admin_sales")
+    r = await client.patch(f"{V1}/settings", headers={**admin, **_key()},
+                           json={"values": {"replacement_approval_roles": roles}})
+    assert r.status_code == 200, r.text
+    s = sessions()   # the row names the shop's admin, whom the teardown deletes
+    await s.execute(text("UPDATE app_setting SET updated_by = NULL WHERE key = 'replacement_approval_roles'"))
+    await s.commit()
+    await s.close()
+
+
+async def test_a_replacement_rejected_by_the_regional_manager_returns_to_qc(
+        client: httpx.AsyncClient, remedies: Shop) -> None:
+    shop = remedies
+    c, order = await _replacement(client, shop, managers=False)
+    steps = order["approval"]["steps"]
+    assert (await _decide(client, await _as(client, shop, "state_manager"), steps[0]["id"])).status_code == 200
+    r = await _decide(client, await _as(client, shop, "regional_manager"), steps[1]["id"], "reject", "Repair instead")
+    assert r.status_code == 200 and r.json()["data"]["status"] == "cancelled", r.text
+    c = await _get(client, await _as(client, shop, "qc_manager"), c["id"])
+    assert c["status"] == "qc_approved" and c["can"]["remedy"], "back to QC for a new choice"
+
+
+async def test_the_chain_is_a_setting_and_refuses_a_role_that_cannot_approve(
+        client: httpx.AsyncClient, remedies: Shop, sessions: Sessions) -> None:
+    shop = remedies
+    qc = await _as(client, shop, "qc_manager")
+    try:
+        await _chain(client, shop, sessions, ["dispatch_manager", "state_manager", "state_manager"])
+        _, order = await _replacement(client, shop, managers=False)
+        assert [s["role"] for s in order["approval"]["steps"]] == ["state_manager", "dispatch_manager"], "deduped, Dispatch last"
+        await _chain(client, shop, sessions, [])
+        _, order = await _replacement(client, shop, managers=False)
+        assert [s["role"] for s in order["approval"]["steps"]] == ["dispatch_manager"], "empty: Dispatch alone"
+        for bad in (["account_manager"], ["dealer"]):
+            await _chain(client, shop, sessions, bad)
+            c = await _qc_approved(client, shop)
+            r = await _remedy(client, qc, c["id"], kind="replacement", remark="Replace")
+            assert r.status_code == 422 and _code(r) == "no_approver", (bad, r.text)
+        await _chain(client, shop, sessions, ["state_manager", "regional_manager", "md_ceo"])
+        # code review 2: a listed role with nobody active refuses too
+        s = sessions()
+        await s.execute(text("UPDATE app_user SET is_active = false WHERE id = CAST(:u AS uuid)"),
+                        {"u": shop.ids["md_ceo"]})
+        await s.commit()
+        await s.close()
+        c = await _qc_approved(client, shop)
+        r = await _remedy(client, qc, c["id"], kind="replacement", remark="Replace")
+        assert r.status_code == 422 and _code(r) == "no_approver", r.text
+    finally:
+        s = sessions()
+        await s.execute(text("UPDATE app_user SET is_active = true WHERE id = CAST(:u AS uuid)"),
+                        {"u": shop.ids["md_ceo"]})
+        await s.commit()
+        await s.close()
+        await _chain(client, shop, sessions, ["state_manager", "regional_manager", "md_ceo"])

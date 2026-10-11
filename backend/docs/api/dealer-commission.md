@@ -196,7 +196,7 @@ Accounts approves a calculated commission. Not by anyone who recorded it: `403 o
 
 **Request body**
 
-**`Decision`**
+**`api__schemas__commission__Decision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -231,7 +231,7 @@ Cancel with a remark: the co-ordinator while calculated or returned, Accounts on
 
 **Request body**
 
-**`Decision`**
+**`api__schemas__commission__Decision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -303,7 +303,7 @@ Accounts sends it back with a remark; the co-ordinator records it again.
 
 **Request body**
 
-**`Decision`**
+**`api__schemas__commission__Decision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -483,12 +483,6 @@ the stored calculation, and the rate in force on the full-FP date.
 | `id` | string | yes |  |
 | `name` | string \| null | yes |  |
 
-**`Decision`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `remark` | string \| null |  |  |
-
 **`Envelope_Commission_`**
 
 | Field | Type | Required | Notes |
@@ -579,3 +573,9 @@ the stored calculation, and the rate in force on the full-FP date.
 | `commission_pct` | number \| string | yes |  |
 | `tod_pct` | number \| string | yes |  |
 | `effective_from` | date | yes |  |
+
+**`api__schemas__commission__Decision`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string \| null |  |  |

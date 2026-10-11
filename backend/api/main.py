@@ -61,6 +61,8 @@ from api.routers import (
 )
 from api.routers import campaigns as campaign_routes
 from api.routers import customers as customer_routes
+from api.routers import dealer_applications as dealer_app_routes
+from api.routers import documents as document_routes
 from api.routers import holidays as holiday_routes
 from api.routers import portal as portal_routes
 from api.routers import settings as settings_routes
@@ -250,6 +252,12 @@ def create_app() -> FastAPI:
     app.include_router(campaign_routes.router, prefix=API_PREFIX)
     app.include_router(warranty_routes.terms, prefix=API_PREFIX)
     app.include_router(warranty_routes.orders, prefix=API_PREFIX)
+    app.include_router(document_routes.router, prefix=API_PREFIX)
+    app.include_router(document_routes.leads, prefix=API_PREFIX)
+    app.include_router(dealer_app_routes.router, prefix=API_PREFIX)
+    app.include_router(dealer_app_routes.gstin_router, prefix=API_PREFIX)
+    app.include_router(dealer_app_routes.public, prefix=API_PREFIX)
+    app.include_router(dealer_app_routes.public, include_in_schema=False)
     app.include_router(customer_routes.router, prefix=API_PREFIX)
     app.include_router(portal_routes.router, prefix=API_PREFIX)
     app.include_router(assistant_routes.router, prefix=API_PREFIX)

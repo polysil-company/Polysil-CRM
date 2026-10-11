@@ -525,7 +525,7 @@ The gift was handed over. Not by the person who asked.
 
 **Request body**
 
-**`Decision`**
+**`api__schemas__rewards__Decision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -560,7 +560,7 @@ Refuse the request, with a remark; the points go back.
 
 **Request body**
 
-**`Decision`**
+**`api__schemas__rewards__Decision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -595,7 +595,7 @@ The requester takes it back while pending; the points go back.
 
 **Request body**
 
-**`Decision`**
+**`api__schemas__rewards__Decision`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -663,12 +663,6 @@ released, reversed, expired, adjusted.
 | `holder` | Holder | yes |  |
 | `balance` | integer | yes | Every earned point, minus what is spent, held, reversed or expired. May be negative after a reversal. |
 | `point_value` | string | yes |  |
-
-**`Decision`**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `remark` | string \| null |  |  |
 
 **`Envelope_Balance_`**
 
@@ -886,3 +880,9 @@ released, reversed, expired, adjusted.
 | `point_value` | string | yes |  |
 | `max_redeem_pct` | string | yes |  |
 | `effective_from` | string | yes |  |
+
+**`api__schemas__rewards__Decision`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `remark` | string \| null |  |  |
