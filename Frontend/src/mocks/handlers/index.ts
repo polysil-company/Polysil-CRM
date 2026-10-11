@@ -13,6 +13,7 @@ import { orderHandlers } from "./orders";
 import { quotationHandlers } from "./quotations";
 import { subsidyHandlers } from "./subsidy";
 import { subsidyApplicationHandlers } from "./subsidy-applications";
+import { subsidyReportHandlers } from "./subsidy-reports";
 import { taskHandlers } from "./tasks";
 
 /**
@@ -43,5 +44,6 @@ export const handlers: readonly HttpHandler[] = [
   ...complaintHandlers,
   ...subsidyHandlers,
   ...subsidyApplicationHandlers,
+  ...subsidyReportHandlers,
   ...unbuiltHandlers,
 ];
