@@ -220,7 +220,7 @@ the stored `201` and creates nothing; the same key with a different body is
 | `email` | string \| null |  | Optional. Used for duplicate matching. |
 | `territory_id` | string | yes | The district, taluka or village the farmer is in, from GET /lookups/territories?levels=district,taluka,village. A state is refused. |
 | `village` | string \| null |  | Optional. Used for duplicate matching. |
-| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` | yes | commercial, subsidised or industrial. |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` \| `dealership` | yes | commercial, subsidised or industrial. |
 | `mis_system` | string | yes | The micro-irrigation system, a code from GET /lookups/mis-systems. |
 | `source` | string \| null |  | A code from GET /lookups/lead-sources. Defaults by who you are: employee for staff, dealer for a partner user. |
 | `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
@@ -509,7 +509,7 @@ the change. A closed lead (won, lost, merged) is `422 stage_terminal`.
 | `email` | string \| null |  |  |
 | `territory_id` | string \| null |  | Moving the lead re-routes its owning org unit; it must stay in your scope. |
 | `village` | string \| null |  |  |
-| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` \| null |  |  |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` \| `dealership` \| null |  |  |
 | `mis_system` | string \| null |  | A code from the lookup. |
 | `source` | string \| null |  | A code from the lookup. |
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |
@@ -772,6 +772,14 @@ with the current stage in `fields.stage`.
 | `name` | string | yes |  |
 | `is_active` | boolean | yes | False once the crop is switched off. It stays on the leads that have it; show it greyed. |
 
+**`DealerApplicationStarted`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string \| null | yes | Null when none was started; see `not_started`. |
+| `apply_url` | string \| null | yes | The link to send the applicant. Shown only here. |
+| `not_started` | string \| null | yes | mobile_in_use or application_open: why winning started no application. |
+
 **`DismissResult`**
 
 | Field | Type | Required | Notes |
@@ -860,7 +868,7 @@ with the current stage in `fields.stage`.
 | `id` | string | yes |  |
 | `inquiry_no` | string | yes |  |
 | `stage` | `new` \| `contacted` \| `qualified` \| `quoted` \| `negotiation` \| `won` \| `lost` \| `merged` \| `dormant` | yes |  |
-| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` | yes |  |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` \| `dealership` | yes |  |
 | `mis_system` | string | yes | The code. |
 | `source` | string | yes | The code. |
 | `farmer_name` | string | yes |  |
@@ -886,6 +894,7 @@ with the current stage in `fields.stage`.
 | `campaign_id` | string \| null |  | The campaign that brought it (FS-040). |
 | `campaign_name` | string \| null |  | Its name. Null for a dealer, who does not read campaigns. |
 | `customer_id` | string \| null |  | The customer (FS-041), set when the lead reached qualified. |
+| `dealer_application` | DealerApplicationStarted \| null |  | Only on the response that wins a dealership lead (FS-053): the dealer application it started and its link, shown once, or why none was started. |
 | `first_contacted_at` | string \| null | yes |  |
 | `last_activity_at` | string | yes |  |
 | `created_at` | string | yes |  |
@@ -919,7 +928,7 @@ with the current stage in `fields.stage`.
 | `email` | string \| null |  | Optional. Used for duplicate matching. |
 | `territory_id` | string | yes | The district, taluka or village the farmer is in, from GET /lookups/territories?levels=district,taluka,village. A state is refused. |
 | `village` | string \| null |  | Optional. Used for duplicate matching. |
-| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` | yes | commercial, subsidised or industrial. |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` \| `dealership` | yes | commercial, subsidised or industrial. |
 | `mis_system` | string | yes | The micro-irrigation system, a code from GET /lookups/mis-systems. |
 | `source` | string \| null |  | A code from GET /lookups/lead-sources. Defaults by who you are: employee for staff, dealer for a partner user. |
 | `estimated_value` | number \| string \| null |  | Optional rupee value, a decimal string. Feeds the priority score. |
@@ -957,7 +966,7 @@ with the current stage in `fields.stage`.
 | `email` | string \| null |  |  |
 | `territory_id` | string \| null |  | Moving the lead re-routes its owning org unit; it must stay in your scope. |
 | `village` | string \| null |  |  |
-| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` \| null |  |  |
+| `inquiry_type` | `commercial` \| `subsidised` \| `industrial` \| `dealership` \| null |  |  |
 | `mis_system` | string \| null |  | A code from the lookup. |
 | `source` | string \| null |  | A code from the lookup. |
 | `estimated_value` | number \| string \| null |  | Decimal string. Feeds the priority score. |

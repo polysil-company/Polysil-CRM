@@ -70,3 +70,33 @@ async def test_a_term_is_in_force_up_to_the_day_before_its_end(db: AsyncSession)
                                 {"p": product, "d": dt.date.fromisoformat(d)})).scalar_one()
            for d in ("2031-05-31", "2031-06-01", "2019-12-31", "2020-01-01")}
     assert got == {"2031-05-31": 12, "2031-06-01": 24, "2019-12-31": None, "2020-01-01": 12}, got
+
+
+async def test_a_recategorised_product_keeps_its_past_warranty(db: AsyncSession) -> None:
+    """ISS-120 (068): the category is dated from the next IST day, so moving a product
+    from a 24-month to a 12-month category restates nothing shipped before."""
+    cats = {}
+    for code, months in (("WTY24", 24), ("WTY12", 12)):
+        cats[code] = str((await db.execute(text(
+            "INSERT INTO product_category (code, name) VALUES (:c, :n) RETURNING id"), {"c": code, "n": code})).scalar_one())
+        await db.execute(text("INSERT INTO warranty_term (product_category_id, months, effective_from) "
+                              "VALUES (CAST(:c AS uuid), :m, DATE '2020-01-01')"), {"c": cats[code], "m": months})
+    product = str((await db.execute(text(
+        "INSERT INTO product (description, product_category_id, quotation_category, uom_id) "
+        "SELECT CAST('WTY TEST PIPE' AS citext), CAST(:c AS uuid), 'field', "
+        "(SELECT id FROM uom WHERE decimals = 0 LIMIT 1) RETURNING id"), {"c": cats["WTY24"]})).scalar_one())
+    await db.execute(text("UPDATE product SET product_category_id = CAST(:c AS uuid) WHERE id = CAST(:p AS uuid)"),
+                     {"c": cats["WTY12"], "p": product})
+    today = (await db.execute(text("SELECT (now() AT TIME ZONE 'Asia/Kolkata')::date"))).scalar_one()
+
+    async def months(day: dt.date) -> int:
+        return int((await db.execute(text("SELECT warranty_months(CAST(:p AS uuid), :d)"),
+                                     {"p": product, "d": day})).scalar_one())
+
+    assert await months(today - dt.timedelta(days=30)) == 24, "shipped under the first category"
+    assert await months(today) == 24, "today's dispatches keep the category they shipped under"
+    assert await months(today + dt.timedelta(days=1)) == 12, "the new category from tomorrow"
+    await db.execute(text("UPDATE product SET description = 'WTY TEST PIPE 2' WHERE id = CAST(:p AS uuid)"), {"p": product})
+    n = (await db.execute(text("SELECT count(*) FROM product_category_history WHERE product_id = CAST(:p AS uuid)"),
+                          {"p": product})).scalar_one()
+    assert n == 2, "one row on insert, one on the change; an unrelated update adds none"

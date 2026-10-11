@@ -49,6 +49,35 @@ class OrderParty(BaseModel):
     gstin: Annotated[str | None, Field(default=None, pattern=_GSTIN_RE)]
 
 
+_Rupees = Annotated[Decimal, Field(
+    ge=0, max_digits=14,
+    description="Rupees, at most two decimal places, as a string.")]
+
+
+class SubsidyBlockIn(BaseModel):
+    """FS-054: the subsidy on a subsidised order, typed in by hand."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    lead_ids: Annotated[list[Annotated[str, Field(pattern=UUID_RE)]], Field(
+        min_length=1, max_length=50,
+        description="The leads the order covers, 1 to 50, each one you can see and qualified "
+                    "or later. Repeats are dropped. The first is the order's lead: it routes "
+                    "the order and cannot change later (422 first_lead_fixed).")]
+    material_amount: _Rupees | None = Field(
+        default=None, description="Leave out to use the order total, read at the time: a "
+                                  "lines edit moves it.")
+    subsidy_amount: _Rupees = Field(description="At most the material amount.")
+    farmer_payable: _Rupees | None = Field(
+        default=None, description="Leave out for material less subsidy. A different value is "
+                                  "kept, with a warning. At most the material amount.")
+
+    @field_validator("material_amount", "subsidy_amount", "farmer_payable")
+    @classmethod
+    def _paise(cls, v: Decimal | None) -> Decimal | None:
+        return None if v is None else _places(v, 2, "an amount")
+
+
 class OrderCreate(BaseModel):
     """A draft, from accepted quotations or from lines typed in; not both."""
 
@@ -56,10 +85,11 @@ class OrderCreate(BaseModel):
 
     order_type: OrderType = Field(
         default="commercial",
-        description="commercial, industrial, export or sample. export and sample are staff "
-                    "only (403 type_staff_only); a sample is typed in, never from quotations. "
-                    "The other three are refused with 422 order_type_unsupported, naming the "
-                    "question each waits on.")
+        description="commercial, industrial, export, sample or subsidised. export, sample "
+                    "and subsidised are staff only (403 type_staff_only); a sample or a "
+                    "subsidised order is typed in, never from quotations. marketing_material "
+                    "and replacement are refused with 422 order_type_unsupported, naming what "
+                    "each waits on.")
     quotation_ids: Annotated[list[Annotated[str, Field(pattern=UUID_RE)]], Field(
         default_factory=list, max_length=20,
         description="Accepted quotations that agree on partner, place of supply, seller, "
@@ -96,6 +126,9 @@ class OrderCreate(BaseModel):
     lines: Annotated[list[QuotationLineIn], Field(
         default_factory=list, max_length=MAX_LINES,
         description="A direct order's lines, as on a quotation.")]
+    subsidy: SubsidyBlockIn | None = Field(
+        default=None, description="Required on a subsidised order (FS-054), refused on any "
+                                  "other. Its lead_ids replace lead_id, which is refused here.")
 
     @property
     def partner_given(self) -> bool:
@@ -226,6 +259,25 @@ class ThresholdPut(BaseModel):
 class OrderLeadRef(BaseModel):
     id: str
     inquiry_no: str
+
+
+class SubsidyLeadRef(BaseModel):
+    id: str
+    inquiry_no: str | None = Field(description="Null for a lead you cannot see.")
+
+
+class SubsidyBlock(BaseModel):
+    """FS-054: the amounts resolved; the flags say which were left to default."""
+
+    material_amount: str = Field(description="The material amount, or the order total when "
+                                             "`material_is_total`.")
+    subsidy_amount: str
+    farmer_payable: str = Field(description="The farmer's share, or material less subsidy when "
+                                            "`farmer_payable_is_derived`. Not the order's "
+                                            "`payable`, which is the total less scheme benefits.")
+    material_is_total: bool
+    farmer_payable_is_derived: bool
+    leads: list[SubsidyLeadRef] = Field(description="In order; the first is the order's lead.")
 
 
 class QuotationRef(BaseModel):
@@ -398,6 +450,9 @@ class Order(BaseModel):
     payable: str | None = Field(
         default=None, description="What the buyer owes: the total minus the applied "
                                   "benefits. Payments count against this.")
+    subsidy: SubsidyBlock | None = Field(
+        default=None, description="A subsidised order's subsidy (FS-054); null on every other "
+                                  "type.")
     warehouse: WarehouseRef | None = Field(
         default=None, description="\"Order to\" (FS-023); null means the default. "
                                   "Always null for a dealer.")

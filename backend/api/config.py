@@ -207,6 +207,11 @@ class Settings(BaseSettings):
     whatsapp_webhook_secret: SecretStr | None = None
     # FS-038 rule 6: raw calls hold farmers' numbers and words (GAP-356)
     whatsapp_webhook_retention: timedelta = timedelta(days=30)
+    # FS-053: GSTIN details for dealer applications. "none" checks the GSTIN from
+    # itself only; "gstinapi" fetches from gstinapi.in (100 free lookups a month)
+    gst_provider: Literal["none", "gstinapi"] = "none"
+    gstinapi_key: SecretStr | None = None
+    gst_lookup_timeout: float = 6.0
     # FS-007 rule 7: how long one drain keeps claiming rows. Under the ten-second
     # tick, eight seconds lets at most two drains overlap.
     outbox_drain_budget: float = 8.0

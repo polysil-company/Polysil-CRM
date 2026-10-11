@@ -222,6 +222,58 @@ async def test_a_member_reads_no_conversation_events(client: httpx.AsyncClient, 
         await s.close()
 
 
+async def test_two_adds_racing_at_49_cannot_pass_the_cap(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """ISS-130: group_add counts under the conversation's row lock. Two adds at 49
+    members: the first fills the group, the second waits, then counts 50 and is refused."""
+    fo, _, _, _ = await _team(client, shop)
+    fo_id = shop.ids["field_officer"]
+    cid = (await _create(client, fo, "Cap race", [shop.ids["district_manager"]])).json()["data"]["id"]
+    owner = sessions()
+    users = [str(u) for u in (await owner.execute(text(
+        "INSERT INTO app_user (user_type, email, full_name, role_id, org_unit_id, is_active) "
+        "SELECT 'staff', 'cap-' || gen_random_uuid() || '@test.invalid', 'Cap ' || n, u.role_id, u.org_unit_id, true "
+        "FROM generate_series(1, 49) n, app_user u WHERE u.id = CAST(:fo AS uuid) RETURNING id"),
+        {"fo": fo_id})).scalars()]
+    await owner.execute(text("INSERT INTO conversation_member (conversation_id, user_id, added_by) "
+                             "SELECT CAST(:c AS uuid), x, CAST(:fo AS uuid) FROM unnest(CAST(:u AS uuid[])) x"),
+                        {"c": cid, "fo": fo_id, "u": users[:47]})   # 2 + 47 = 49
+    await owner.commit()
+
+    async def _as_fo(s: AsyncSession) -> None:
+        await s.execute(text("SELECT set_config('app.current_user_id', :u, true)"), {"u": fo_id})
+        await s.execute(text("SELECT set_config('role', 'app_role', true)"))
+
+    first, second = sessions(), sessions()
+    try:
+        await _as_fo(first)
+        await first.execute(text("SELECT group_add(CAST(:c AS uuid), CAST(:u AS uuid[]))"), {"c": cid, "u": [users[47]]})
+        await _as_fo(second)
+
+        async def _add_now() -> None:
+            await second.execute(text("SELECT group_add(CAST(:c AS uuid), CAST(:u AS uuid[]))"), {"c": cid, "u": [users[48]]})
+
+        task = asyncio.create_task(_add_now())
+        await asyncio.sleep(1.0)            # the second add now waits on the conversation's lock
+        await first.commit()
+        with pytest.raises(DBAPIError, match="at most 50"):
+            await task
+        await second.rollback()
+        count = (await owner.execute(text("SELECT count(*) FROM conversation_member WHERE conversation_id = CAST(:c AS uuid) "
+                                          "AND left_at IS NULL"), {"c": cid})).scalar_one()
+        assert count == 50
+    finally:
+        await second.rollback()
+        await second.close()
+        await first.close()
+        await owner.rollback()
+        await owner.execute(text("DELETE FROM activity_event WHERE entity_type = 'conversation' AND entity_id = CAST(:c AS uuid)"), {"c": cid})
+        await owner.execute(text("DELETE FROM conversation WHERE id = CAST(:c AS uuid)"), {"c": cid})
+        await owner.execute(text("DELETE FROM app_user WHERE id = ANY(CAST(:u AS uuid[]))"), {"u": users})
+        await owner.commit()
+        await owner.close()
+
+
 async def test_a_send_racing_a_leave_is_refused_not_slipped_in(
         client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
     """Plan review R-3: the insert policy's snapshot predates the stamp's lock. A

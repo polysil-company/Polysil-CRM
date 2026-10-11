@@ -143,6 +143,37 @@ async def test_the_history_names_the_other_lead_once_and_an_edit_is_no_new_flag(
         == (c["inquiry_no"], a["inquiry_no"]), merged
 
 
+async def test_a_merge_and_a_dismissal_show_once_across_page_breaks(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    """ISS-128: the two copies share occurred_at. Paged one row at a time, the
+    survivor still shows one merge and one dismissal."""
+    dm = await complaints_t._as(client, shop, "district_manager")
+    mobile = "97" + f"{uuid.uuid4().int % 10**8:08d}"
+    a = await _new_lead(client, shop, dm, mobile)
+    b = await _new_lead(client, shop, dm, mobile)
+    link = (await client.get(f"{V1}/leads/{b['id']}", headers=dm)).json()["data"]["duplicates"][0]["link_id"]
+    r = await client.post(f"{V1}/leads/duplicates/{link}/dismiss", headers={**dm, **_key()})
+    assert r.status_code == 200, r.text
+    r = await _post(client, dm, f"/{b['id']}/merge", {"into_lead_id": a["id"]})
+    assert r.status_code == 200, r.text
+
+    kinds: list[str] = []
+    cursor = None
+    for _ in range(100):
+        params = {"limit": 1, **({"cursor": cursor} if cursor else {})}
+        r = await client.get(f"{V1}/leads/{a['id']}/timeline", headers=dm, params=params)
+        assert r.status_code == 200, r.text
+        kinds += [e["kind"] for e in r.json()["data"]]
+        cursor = r.json()["meta"].get("next_cursor")
+        if not cursor:
+            break
+    assert kinds.count("lead.merged") == 1, kinds
+    assert kinds.count("lead.duplicate_dismissed") == 1, kinds
+    # the loser's own history keeps its copy
+    r = await client.get(f"{V1}/leads/{b['id']}/timeline", headers=dm)
+    assert [e["kind"] for e in r.json()["data"]].count("lead.merged") == 1
+
+
 # ── walk F-11: the step waiting now, when its own role cannot decide it ──────
 
 async def test_a_step_whose_role_has_nobody_says_stalled(

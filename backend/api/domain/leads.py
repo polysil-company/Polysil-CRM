@@ -53,8 +53,16 @@ QUALIFICATION_FIELDS: tuple[str, ...] = (
     "farmer_name", "mobile", "territory_id", "mis_system_id", "inquiry_type")
 
 
-def can_transition(frm: str, to: str) -> bool:
-    """True if `frm -> to` is a move the stage machine allows."""
+# FS-053 (GAP-294): a prospective dealer is won without a quotation; winning starts
+# the dealer application
+DEALERSHIP: str = "dealership"
+
+
+def can_transition(frm: str, to: str, inquiry_type: str | None = None) -> bool:
+    """True if `frm -> to` is a move the stage machine allows. A dealership lead may
+    also go from qualified straight to won."""
+    if inquiry_type == DEALERSHIP and frm == "qualified" and to == "won":
+        return True
     return to in TRANSITIONS.get(frm, frozenset())
 
 
