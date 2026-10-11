@@ -147,7 +147,12 @@ function lineProblems(
  * The request for a draft, or why there isn't one yet. Keys a system doesn't take are left
  * out: Sprinkler sends no lines, no head unit and no group; the others send no nozzle.
  */
-export function planCalculation(draft: CalculatorDraft, system: SystemConfig): CalculationPlan {
+export function planCalculation(
+  draft: CalculatorDraft,
+  system: SystemConfig,
+  /** The lead's scheme for an application; null leaves the backend's default (GGRC). */
+  scheme: string | null = null,
+): CalculationPlan {
   const problems: Record<string, string> = {};
   const missing: string[] = [];
   const isSprinkler = draft.systemType === "sprinkler";
@@ -205,6 +210,7 @@ export function planCalculation(draft: CalculatorDraft, system: SystemConfig): C
   }
 
   const request: CalculateRequest = {
+    ...(scheme === null ? {} : { scheme }),
     system_type: draft.systemType,
     crops,
     ...(system.hasHeadUnit ? { head_lines: headLines } : {}),

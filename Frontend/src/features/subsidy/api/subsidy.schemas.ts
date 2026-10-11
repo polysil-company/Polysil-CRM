@@ -128,6 +128,8 @@ export interface SubsidyCropRequest {
 
 /** POST /subsidy/calculate. Keys a system doesn't take are left out, not sent empty. */
 export interface CalculateRequest {
+  /** The scheme's code; left out, the backend uses GGRC. An application sends its lead's. */
+  readonly scheme?: string;
   readonly system_type: SystemType;
   readonly crops: readonly SubsidyCropRequest[];
   readonly head_lines?: readonly SubsidyLineRequest[];

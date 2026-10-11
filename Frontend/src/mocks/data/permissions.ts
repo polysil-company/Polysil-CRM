@@ -87,7 +87,11 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
     case "state_manager":
       return manager("org_subtree");
     case "regional_manager":
-      return manager("territory");
+      // Regional Managers watch subsidy applications but don't change them (handover).
+      return [
+        ...manager("territory").filter((entry) => entry.module !== "subsidy"),
+        grant("subsidy", ["view"], "territory"),
+      ];
     case "admin":
       return MODULE_CODES.map((module) => grant(module, PERMISSION_ACTIONS, "global"));
     case "account_manager":
@@ -97,6 +101,8 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
         grant("complaints", ["view"], "global"),
         // Accounts decides the payment step of every order (RBAC.md §6.2).
         grant("sales_orders", ["view", "approve"], "global"),
+        // Accounts follows subsidy applications without changing them (handover).
+        grant("subsidy", ["view"], "global"),
         SCHEMES_VIEW,
       ];
     case "dispatch_manager":

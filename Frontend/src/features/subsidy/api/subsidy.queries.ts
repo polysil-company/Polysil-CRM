@@ -13,37 +13,44 @@ const MASTERS_STALE_MS = 10 * 60_000;
 
 export const subsidyKeys = {
   all: ["subsidy"] as const,
-  config: () => [...subsidyKeys.all, "config"] as const,
-  crops: () => [...subsidyKeys.all, "crops"] as const,
-  categories: (systemType: SystemType) => [...subsidyKeys.all, "categories", systemType] as const,
+  config: (scheme: string | null) => [...subsidyKeys.all, "config", scheme] as const,
+  crops: (scheme: string | null) => [...subsidyKeys.all, "crops", scheme] as const,
+  categories: (systemType: SystemType, scheme: string | null) =>
+    [...subsidyKeys.all, "categories", systemType, scheme] as const,
   calculation: (request: CalculateRequest) => [...subsidyKeys.all, "calculation", request] as const,
 };
 
-/** SUBS-003 · What each system accepts. Read once when the calculator opens. */
-export function subsidyConfigQueryOptions() {
+/**
+ * SUBS-003 · What each system accepts, for a scheme (null: the backend's default, GGRC). Read
+ * once when the calculator opens.
+ */
+export function subsidyConfigQueryOptions(scheme: string | null = null) {
   return queryOptions({
-    queryKey: subsidyKeys.config(),
-    queryFn: ({ signal }) => getSubsidyConfig(signal),
+    queryKey: subsidyKeys.config(scheme),
+    queryFn: ({ signal }) => getSubsidyConfig(scheme, signal),
     staleTime: MASTERS_STALE_MS,
     meta: { dataId: "SUBS-003" },
   });
 }
 
 /** SUBS-003 · The crop picker's rows. */
-export function subsidyCropsQueryOptions() {
+export function subsidyCropsQueryOptions(scheme: string | null = null) {
   return queryOptions({
-    queryKey: subsidyKeys.crops(),
-    queryFn: ({ signal }) => listSubsidyCrops(signal),
+    queryKey: subsidyKeys.crops(scheme),
+    queryFn: ({ signal }) => listSubsidyCrops(scheme, signal),
     staleTime: MASTERS_STALE_MS,
     meta: { dataId: "SUBS-003" },
   });
 }
 
 /** SUBS-003 · A system's categories, shown before anything is calculated. */
-export function subsidyCategoriesQueryOptions(systemType: SystemType) {
+export function subsidyCategoriesQueryOptions(
+  systemType: SystemType,
+  scheme: string | null = null,
+) {
   return queryOptions({
-    queryKey: subsidyKeys.categories(systemType),
-    queryFn: ({ signal }) => listSubsidyCategories(systemType, signal),
+    queryKey: subsidyKeys.categories(systemType, scheme),
+    queryFn: ({ signal }) => listSubsidyCategories(systemType, scheme, signal),
     staleTime: MASTERS_STALE_MS,
     meta: { dataId: "SUBS-003" },
   });
