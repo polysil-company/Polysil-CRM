@@ -19,9 +19,9 @@ import {
   type MobileNumberFormValues,
   type OtpChallengeResponse,
 } from "@/features/auth/api/auth.schemas";
-import { readFieldErrors } from "@/features/auth/lib/sign-in-errors";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useSecondsUntil } from "@/hooks/use-seconds-until";
+import { readFieldErrors } from "@/lib/api/errors";
 import type { SessionTokens } from "@/lib/auth/tokens";
 import { describeCountdown, formatCountdown, formatIndianPhone } from "@/lib/format";
 import { createLogger } from "@/lib/logger";

@@ -1,14 +1,57 @@
+import type { HttpHandler } from "msw";
+
+import { approvalHandlers } from "./approvals";
 import { authHandlers } from "./auth";
+import { complaintHandlers } from "./complaints";
 import { dashboardHandlers } from "./dashboard";
+import { leadCaptureHandlers } from "./lead-capture";
 import { leadHandlers } from "./leads";
+import { lookupHandlers } from "./lookups";
 import { messageHandlers } from "./messages";
 import { notificationHandlers } from "./notifications";
+import { orderHandlers } from "./orders";
+import { productHandlers } from "./products";
+import { quotationHandlers } from "./quotations";
+import { subsidyHandlers } from "./subsidy";
+import { subsidyApplicationHandlers } from "./subsidy-applications";
+import { subsidyMasterHandlers } from "./subsidy-masters";
+import { subsidyReportHandlers } from "./subsidy-reports";
+import { subsidySchemeHandlers } from "./subsidy-schemes";
+import { taskHandlers } from "./tasks";
+import { userHandlers } from "./users";
 
-/** Every mock endpoint. A new API integration adds its handlers here first. */
-export const handlers = [
+/**
+ * What the backend does not serve yet, so it stays mocked even against a real API
+ * (NEXT_PUBLIC_API_MOCKING=partial). A module built before its endpoints exist goes here;
+ * remove it the moment its screens are connected. Empty since notifications and messages
+ * were connected: every screen talks to the real backend in partial mode.
+ */
+export const unbuiltHandlers: readonly HttpHandler[] = [];
+
+/**
+ * Every mock endpoint: the full mock backend (NEXT_PUBLIC_API_MOCKING=enabled) and the
+ * unit tests. A new API integration adds its handlers here first. Everything here is served
+ * by the backend, so in partial mode it goes to the real API.
+ */
+export const handlers: readonly HttpHandler[] = [
   ...authHandlers,
+  ...approvalHandlers,
   ...leadHandlers,
+  ...leadCaptureHandlers,
+  ...lookupHandlers,
+  ...quotationHandlers,
+  ...productHandlers,
+  ...orderHandlers,
   ...dashboardHandlers,
   ...notificationHandlers,
   ...messageHandlers,
+  ...taskHandlers,
+  ...complaintHandlers,
+  ...userHandlers,
+  ...subsidyHandlers,
+  ...subsidyApplicationHandlers,
+  ...subsidyReportHandlers,
+  ...subsidyMasterHandlers,
+  ...subsidySchemeHandlers,
+  ...unbuiltHandlers,
 ];

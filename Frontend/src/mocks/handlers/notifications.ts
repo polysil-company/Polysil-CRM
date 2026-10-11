@@ -12,6 +12,7 @@ import { readMockRole } from "@/lib/dev/mock-settings";
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
+import { errorResponse } from "./shared";
 
 function positiveInt(raw: string | null, fallback: number): number {
   const parsed = Number(raw);
@@ -37,16 +38,19 @@ export const notificationHandlers = [
       return HttpResponse.json({ data: [{ id: 7, title: null }], meta: {} });
     }
 
+    const url = new URL(request.url);
     const items =
       scenario === "empty"
         ? []
         : [...visibleNotifications()].sort(
             (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
           );
-    const limit = Math.min(50, positiveInt(new URL(request.url).searchParams.get("limit"), 20));
+    const limit = Math.min(100, positiveInt(url.searchParams.get("limit"), 20));
+    const shown = url.searchParams.get("unread") === "true" ? items.filter(isUnread) : items;
 
     const body: NotificationListResponse = {
-      data: items.slice(0, limit),
+      data: shown.slice(0, limit),
+      // All the unread ones, not only this page, as the backend counts them.
       meta: { unread_count: items.filter(isUnread).length, next_cursor: null },
     };
     return HttpResponse.json(body);
@@ -59,12 +63,10 @@ export const notificationHandlers = [
     const payload: unknown = await request.json();
     const parsed = markNotificationsReadRequestSchema.safeParse(payload);
     if (!parsed.success) {
-      return HttpResponse.json(
-        {
-          error: { code: "VALIDATION_FAILED", message: "Say which notifications to mark as read." },
-        },
-        { status: 422 },
-      );
+      // The backend's 422 for both or neither of `ids` and `all`.
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        ids: "send either ids or all",
+      });
     }
 
     const readAt = new Date().toISOString();

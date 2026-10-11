@@ -38,7 +38,30 @@ const timeOnly = new Intl.DateTimeFormat("en-IN", {
 
 const yearOnly = new Intl.DateTimeFormat("en-IN", { timeZone: APP_TIME_ZONE, year: "numeric" });
 
+/** en-CA writes dates as YYYY-MM-DD, the API's calendar-date format. */
+const isoDay = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 const relative = new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" });
+
+/** 24-hour "HH:MM", the value an `<input type="time">` holds. */
+const clock24 = new Intl.DateTimeFormat("en-GB", {
+  timeZone: APP_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+const weekdayDayMonth = new Intl.DateTimeFormat("en-IN", {
+  timeZone: APP_TIME_ZONE,
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
 
 export type DateInput = string | Date | null | undefined;
 
@@ -77,6 +100,39 @@ export function formatDateTime(value: DateInput): string {
 export function formatTime(value: DateInput): string {
   const date = toDate(value);
   return date ? timeOnly.format(date) : EMPTY_VALUE;
+}
+
+/**
+ * Today's calendar date in India as "YYYY-MM-DD" — the form the API uses for dates such as a
+ * quotation's `valid_until`, so the two compare as strings.
+ */
+export function todayInIndia(now: Date = new Date()): string {
+  return isoDay.format(now);
+}
+
+/** The calendar day in India of an instant, "YYYY-MM-DD" — for an `<input type="date">`. */
+export function calendarDayOf(value: DateInput): string {
+  const date = toDate(value);
+  return date ? isoDay.format(date) : "";
+}
+
+/** The time of day in India of an instant, 24-hour "HH:MM" — for an `<input type="time">`. */
+export function timeOfDayOf(value: DateInput): string {
+  const date = toDate(value);
+  return date ? clock24.format(date) : "";
+}
+
+/** A calendar day ("YYYY-MM-DD") moved by a number of days: 2026-10-31 + 1 → 2026-11-01. */
+export function shiftCalendarDay(day: string, days: number): string {
+  const noon = Date.parse(`${day}T12:00:00Z`);
+  return new Date(noon + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** A calendar day ("YYYY-MM-DD") as a heading: "Friday, 3 October". */
+export function formatCalendarDay(day: string): string {
+  // Midday in India keeps the day the same whatever the browser's own time zone.
+  const date = toDate(`${day}T12:00:00+05:30`);
+  return date ? weekdayDayMonth.format(date) : EMPTY_VALUE;
 }
 
 /** True when both fall on the same calendar day in India. */

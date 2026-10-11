@@ -109,6 +109,20 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError;
 }
 
+const fieldErrorsSchema = z.object({ fields: z.record(z.string(), z.string()) });
+
+/**
+ * Field errors from a 422, keyed by the backend's field path (`mobile`, `territory_id`,
+ * `estimated_value.float`), or null when the error is not a field validation failure.
+ */
+export function readFieldErrors(error: unknown): Readonly<Record<string, string>> | null {
+  if (!isApiError(error) || error.status !== 422) {
+    return null;
+  }
+  const parsed = fieldErrorsSchema.safeParse(error.details);
+  return parsed.success ? parsed.data.fields : null;
+}
+
 /**
  * RFC 9457 "problem details" — the error format we propose to the backend.
  * `{ type, title, status, detail, instance, code?, errors? }`

@@ -15,6 +15,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+from decimal import Decimal
 
 import httpx
 import pytest
@@ -416,6 +417,21 @@ async def test_reopen_a_lost_lead_returns_it_to_the_lost_stage(
     assert r.status_code == 200, r.text
     d = r.json()["data"]
     assert d["stage"] == "contacted" and d["reopen_count"] == 1 and d["lost_reason"] is None
+
+
+async def test_marking_a_lead_lost_keeps_its_whole_number_score(
+        client: httpx.AsyncClient, staff: Staff, env: Env) -> None:
+    """Walk R-12: the score rose when a lead was marked lost (27.5, 49.5, then 51.5).
+    A closed lead keeps the score it had; reopening scores it again."""
+    h = await _auth(client, staff)
+    lid = await _make(client, h, env)
+    contacted = (await _to(client, h, lid, to_stage="contacted")).json()["data"]["score"]
+    assert Decimal(contacted) == Decimal(contacted).to_integral_value()
+    lost = await _to(client, h, lid, to_stage="lost", lost_reason_id=await _lost_reason(client, h))
+    assert Decimal(lost.json()["data"]["score"]) == Decimal(contacted)
+    r = await client.post(f"{V1}/leads/{lid}/reopen", json={"note": "called back"},
+                          headers={**h, **_key()})
+    assert Decimal(r.json()["data"]["score"]) > Decimal(contacted)
 
 
 async def test_reopen_a_non_lost_lead_is_refused(
@@ -1010,7 +1026,7 @@ async def test_create_with_a_note_scores_the_engagement(
     """The create-time note is an event and counts toward engagement; the score
     used to be computed before it was written (cross-vendor P2). Distinct names and
     mobiles so no duplicate flag adds a second event."""
-    from decimal import Decimal
+
 
     h = await _auth(client, staff)
     cfg = {i["key"]: Decimal(i["value"]) for i in (await client.get(
@@ -1037,3 +1053,82 @@ async def test_merge_names_the_actor_on_the_timeline(
     ev = next(e for e in (await client.get(f"{V1}/leads/{surv}/timeline", headers=h)).json()["data"]
               if e["kind"] == "lead.merged")
     assert ev["actor"]["full_name"] == "Asha Patel"
+
+
+# ── the optional total (the frontend asked for "1 to 25 of 137") ─────────────
+
+async def test_the_total_is_absent_unless_it_is_asked_for(
+        client: httpx.AsyncClient, staff: Staff, env: Env) -> None:
+    """Off by default. It costs a scan of everything in the caller's scope, and a
+    screen that does not show a count should not pay for one."""
+    h = await _auth(client, staff)
+    body = (await client.get(f"{V1}/leads?limit=5", headers=h)).json()
+    assert body["meta"]["total"] is None
+    assert body["meta"]["total_capped"] is False
+
+
+async def test_the_total_counts_the_whole_filtered_set_not_the_page(
+        client: httpx.AsyncClient, staff: Staff, env: Env) -> None:
+    h = await _auth(client, staff)
+    for _ in range(3):
+        r = await client.post(f"{V1}/leads", json=_body(env), headers={**h, **_key()})
+        assert r.status_code == 201, r.text
+
+    body = (await client.get(f"{V1}/leads?limit=2&include_total=true", headers=h)).json()
+    assert len(body["data"]) == 2, "the page is the page"
+    assert body["meta"]["total"] >= 3, "and the total is the set"
+    assert body["meta"]["total_capped"] is False
+
+
+async def test_the_total_does_not_shrink_as_you_page(
+        client: httpx.AsyncClient, staff: Staff, env: Env) -> None:
+    """The cursor narrows the page; it must not narrow the count.
+
+    Counted with the cursor applied, the total would fall on every page - 137,
+    then 112, then 87 - which is worse than showing no total at all, because it
+    looks like an answer.
+    """
+    h = await _auth(client, staff)
+    for _ in range(3):
+        await client.post(f"{V1}/leads", json=_body(env), headers={**h, **_key()})
+
+    first = (await client.get(f"{V1}/leads?limit=1&include_total=true", headers=h)).json()
+    cursor = first["meta"]["next_cursor"]
+    assert cursor, "three leads and a page of one leaves a cursor"
+
+    second = (await client.get(
+        f"{V1}/leads?limit=1&include_total=true&cursor={cursor}", headers=h)).json()
+    assert second["meta"]["total"] == first["meta"]["total"]
+
+
+async def test_the_total_respects_the_filters(
+        client: httpx.AsyncClient, staff: Staff, env: Env) -> None:
+    """A count that ignored the filters would contradict the list beside it."""
+    h = await _auth(client, staff)
+    await client.post(f"{V1}/leads", json=_body(env), headers={**h, **_key()})
+
+    everything = (await client.get(f"{V1}/leads?include_total=true", headers=h)).json()
+    narrowed = (await client.get(
+        f"{V1}/leads?include_total=true&q=no-such-farmer-anywhere", headers=h)).json()
+    assert everything["meta"]["total"] >= 1
+    assert narrowed["meta"]["total"] == 0
+    assert narrowed["data"] == []
+
+
+async def test_the_count_stops_at_the_ceiling_and_says_so(
+        client: httpx.AsyncClient, staff: Staff, env: Env,
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unbounded count gets slower every month until it is the slowest thing on
+    the screen. The ceiling is lowered here rather than creating a thousand leads:
+    what is being proved is the reporting, not the arithmetic of a scan.
+    """
+    import api.services.leads as leads_service
+
+    h = await _auth(client, staff)
+    for _ in range(3):
+        await client.post(f"{V1}/leads", json=_body(env), headers={**h, **_key()})
+
+    monkeypatch.setattr(leads_service, "TOTAL_CEILING", 2)
+    body = (await client.get(f"{V1}/leads?include_total=true", headers=h)).json()
+    assert body["meta"]["total"] == 2, "the count stops at the ceiling"
+    assert body["meta"]["total_capped"] is True, "and admits that it stopped"

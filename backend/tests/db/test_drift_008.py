@@ -45,6 +45,10 @@ def _statements() -> dict[str, str]:
         match = _HEAD.search(stmt)
         assert match, stmt[:80]
         out[match.group(1)] = stmt
+    # 055 (FS-047) rebuilt the code issuer from 008's text; the live body is its own
+    later = _load("055_portal_code_ceiling")
+    assert later is not None
+    out["auth_issue_otp_challenge"] = later.AUTH_ISSUE_OTP_055
     return out
 
 

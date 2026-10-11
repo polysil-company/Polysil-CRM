@@ -11,7 +11,32 @@ export const HOME_PATH = "/dashboard";
 /** Paths a signed-out visitor may open. Every other page needs a session. */
 const PUBLIC_PATHS: readonly string[] = [SIGN_IN_PATH];
 
-export const SESSION_END_REASONS = ["signed-out", "session-ended"] as const;
+/**
+ * Pages anyone may open, signed in or not, and never redirected: the link a customer gets
+ * with their quotation (QUOT-012), and the enquiry page a printed QR code opens (LEAD-014).
+ * They call only the backend's `/public` endpoints.
+ */
+const OPEN_PATH_PREFIXES: readonly string[] = ["/q/"];
+const OPEN_PATHS: readonly string[] = ["/enquiry"];
+
+export function isOpenPath(pathname: string): boolean {
+  return (
+    OPEN_PATHS.includes(pathname) ||
+    OPEN_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  );
+}
+
+/**
+ * - `password-changed`: the user changed their own password, which signs out every session
+ *   (AUTH-007);
+ * - `password-reset`: an administrator set a new password while the user was changing theirs.
+ */
+export const SESSION_END_REASONS = [
+  "signed-out",
+  "session-ended",
+  "password-changed",
+  "password-reset",
+] as const;
 
 export type SessionEndReason = (typeof SESSION_END_REASONS)[number];
 
@@ -90,6 +115,9 @@ export function decideAuthRedirect({
   search,
   hasSession,
 }: AuthRedirectInput): string | null {
+  if (isOpenPath(pathname)) {
+    return null;
+  }
   if (!hasSession && !PUBLIC_PATHS.includes(pathname)) {
     return signInPath({ next: `${pathname}${search}` });
   }

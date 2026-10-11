@@ -29,3 +29,22 @@ export function markReadLocally(
     unreadCount: targets === null ? 0 : Math.max(0, list.unreadCount - newlyRead),
   };
 }
+
+/**
+ * The badge's count once `request` is marked read: zero for "all", otherwise less the
+ * unread ones among the ids that the list on screen knows about.
+ */
+export function unreadAfterMarking(
+  count: number,
+  list: NotificationList | undefined,
+  request: MarkNotificationsReadRequest,
+): number {
+  if ("all" in request) {
+    return 0;
+  }
+  const targets = new Set(request.ids);
+  const newlyRead = (list?.items ?? []).filter(
+    (item) => item.readAt === null && targets.has(item.id),
+  ).length;
+  return Math.max(0, count - newlyRead);
+}

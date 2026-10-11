@@ -55,7 +55,7 @@ _USERS = SPECS["users"]
 _MAX_LIMIT = 100
 HANDOVER_BATCH = 500
 
-PRINCIPAL_REFUSED = "the system principal is not administrable"
+PRINCIPAL_REFUSED = "system accounts are not administrable"
 LAST_ADMIN = "the last administrator cannot be deactivated, deleted or demoted"
 
 # The columns the scope predicate, the list filters and the keyset order read.
@@ -101,13 +101,16 @@ def _iso(v: datetime | None) -> str | None:
     return None if v is None else v.isoformat()
 
 
-def _principal() -> str:
-    return get_settings().system_user_id
+def _principals() -> tuple[str, str]:
+    """The system principal and the website's intake account (FS-003a §5): neither
+    is a person, and neither is ever listed or administered (code review F-3)."""
+    settings = get_settings()
+    return settings.system_user_id, settings.intake_user_id
 
 
 def _refuse_principal(user_id: str, field: str = "id") -> None:
-    """Rule 19: the principal is never administered. The database refuses it too."""
-    if user_id == _principal():
+    """Rule 19: the principals are never administered. The database refuses them too."""
+    if user_id in _principals():
         raise ValidationFailed(fields={field: PRINCIPAL_REFUSED})
 
 
@@ -189,6 +192,14 @@ async def _force_admin_floor(db: AsyncSession) -> None:
         raise
 
 
+async def _open_tasks(db: AsyncSession, user_id: str) -> int:
+    """FS-014 rule 9b: counted by a definer, since the caller's own tasks scope
+    need not reach the person."""
+    n: int = (await db.execute(text("SELECT user_open_tasks(CAST(:u AS uuid))"),
+                               {"u": user_id})).scalar_one()
+    return n
+
+
 async def _open_leads(db: AsyncSession, ids: list[str]) -> dict[str, int]:
     """Unscoped counts through the definer (rule 12); users.view is its guard."""
     if not ids:
@@ -224,9 +235,13 @@ async def list_users(db: AsyncSession, caller: Caller, *, q: str | None = None,
     limit = max(1, min(limit, _MAX_LIMIT))
     where = [scope_predicate(_USERS, caller, user_t),
              user_t.c.deleted_at.is_(None),
-             user_t.c.id != _principal()]
+             user_t.c.id.notin_(_principals())]
     if user_type:
         where.append(sa.cast(user_t.c.user_type, sa.Text) == user_type)
+    else:
+        # FS-044: every customer has a portal account; the people list is staff and
+        # dealers unless consumers are asked for (edge case 18)
+        where.append(sa.cast(user_t.c.user_type, sa.Text) != "consumer")
     if role:
         where.append(user_t.c.role_id.in_(
             sa.select(sa.column("id", _UUID)).select_from(sa.table("role"))
@@ -278,7 +293,7 @@ async def list_users(db: AsyncSession, caller: Caller, *, q: str | None = None,
 async def _visible(db: AsyncSession, caller: Caller, user_id: str) -> bool:
     """Enforcer 1 for one row: the predicate over the caller's claim. The principal
     is never visible here."""
-    if user_id == _principal():
+    if user_id in _principals():
         return False
     return (await db.execute(
         sa.select(user_t.c.id).where(sa.and_(scope_predicate(_USERS, caller, user_t),
@@ -367,7 +382,7 @@ async def _territories_exist(db: AsyncSession, ids: list[str]) -> None:
         return
     if len(set(ids)) != len(ids):
         raise ValidationFailed(fields={"territory_ids": "repeated"})
-    n = (await db.execute(text(
+    n: int = (await db.execute(text(
         "SELECT count(*) FROM territory WHERE id = ANY(CAST(:ids AS uuid[])) "
         "AND deleted_at IS NULL"), {"ids": ids})).scalar_one()
     if int(n) != len(ids):
@@ -405,7 +420,13 @@ async def _assert_anchor_in_scope(db: AsyncSession, caller: Caller, *,
 
 async def _identifier_free(db: AsyncSession, column: str, value: str) -> None:
     """The pre-check among live rows; the partial unique index is the enforcer, and
-    a 23505 the caller's scope hid from this read is mapped to the same field."""
+    a 23505 the caller's scope hid from this read is mapped to the same field.
+
+    FS-044: a farmer's portal account never blocks a staff or dealer user. It is
+    released first, in this transaction, by a definer (a consumer row has no anchor
+    a scoped admin could reach), and the farmer loses portal access (GAP-266)."""
+    if column == "mobile":
+        await db.execute(text("SELECT consumer_release_mobile(:v)"), {"v": value})
     taken = (await db.execute(text(
         f"SELECT 1 FROM app_user WHERE {column} = :v AND deleted_at IS NULL"),
         {"v": value})).first()
@@ -651,7 +672,7 @@ async def patch_user(db: AsyncSession, caller: Caller, user_id: str,
 
     if (role_changed and "territory_ids" not in fields and staff and role_id
             and await _role_needs_territory(db, role_id)):
-        held = (await db.execute(text(
+        held: int = (await db.execute(text(
             "SELECT count(*) FROM user_territory WHERE user_id = CAST(:u AS uuid)"),
             {"u": user_id})).scalar_one()
         if not held:
@@ -661,6 +682,10 @@ async def patch_user(db: AsyncSession, caller: Caller, user_id: str,
     active_change: str | None = None
     if "is_active" in fields and body.is_active is not None and body.is_active != row.is_active:
         if not body.is_active:
+            # FS-037: a dealer's user may hold tasks too
+            if await _open_tasks(db, user_id):
+                raise ValidationFailed(
+                    fields={"is_active": "hand over their open tasks first"})
             changed["sessions_revoked"] = revoked_early   # revoked above, before the lock
             active_change = "user.deactivated"
         else:
@@ -741,7 +766,7 @@ async def unlock(db: AsyncSession, caller: Caller, user_id: str) -> UnlockResult
     if row.user_type != "staff":
         raise ValidationFailed(fields={"user_type": "OTP sign-in has no lockout to clear"})
     settings = get_settings()
-    was_locked = (await db.execute(text(
+    was_locked: Any = (await db.execute(text(
         "SELECT auth_unlock_user(CAST(:id AS uuid), :n, :l)"),
         {"id": user_id, "n": settings.login_max_failures,
          "l": settings.login_lockout})).scalar_one()
@@ -751,8 +776,9 @@ async def unlock(db: AsyncSession, caller: Caller, user_id: str) -> UnlockResult
 async def handover(db: AsyncSession, caller: Caller, user_id: str,
                    body: HandoverRequest) -> HandoverResult:
     """Move the leaver's open leads to someone who can work them (rule 11), at most
-    500 per call, one `lead.assigned` event each; optionally deactivate the leaver
-    once nothing remains. Both people are locked first, in id order (rule 20)."""
+    500 per call, one `lead.assigned` event each, and all their open tasks (FS-014
+    rule 9b); optionally deactivate the leaver once nothing remains. Both people are
+    locked first, in id order (rule 20)."""
     _refuse_principal(user_id)
     _refuse_principal(body.to_user_id, "to_user_id")
     if body.to_user_id == user_id:
@@ -781,7 +807,7 @@ async def handover(db: AsyncSession, caller: Caller, user_id: str,
     leaver = by_id.get(user_id)
     if leaver is None or leaver.deleted_at is not None or body.to_user_id not in by_id:
         raise NotFoundError("No such person.")
-    ok = (await db.execute(text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
+    ok: bool = (await db.execute(text("SELECT authz_user_assignable('leads', CAST(:u AS uuid))"),
                            {"u": body.to_user_id})).scalar_one()
     if not ok:
         raise ValidationFailed(fields={"to_user_id": "not assignable by you"})
@@ -801,6 +827,13 @@ async def handover(db: AsyncSession, caller: Caller, user_id: str,
                                   previous_owner_user_id=user_id, handover=True)
         await leads_service._rescore(db, lid)
 
+    # FS-014 rule 9b: every open task goes with this call, one task.reassigned each
+    tasks_moved = 0
+    if leaver.user_type == "staff":
+        tasks_moved = (await db.execute(text(
+            "SELECT user_tasks_handover(CAST(:f AS uuid), CAST(:t AS uuid))"),
+            {"f": user_id, "t": body.to_user_id})).scalar_one()
+
     remaining = (await _open_leads(db, [user_id])).get(user_id, 0)
     deactivated = False
     if body.deactivate:
@@ -816,13 +849,16 @@ async def handover(db: AsyncSession, caller: Caller, user_id: str,
             await _force_admin_floor(db)
         deactivated = True
     await _emit(db, user_id=user_id, kind="user.handover", actor_id=caller.user_id,
-                to_user_id=body.to_user_id, leads_moved=len(lead_ids), remaining=remaining)
-    return HandoverResult(leads_moved=len(lead_ids), remaining=remaining, deactivated=deactivated)
+                to_user_id=body.to_user_id, leads_moved=len(lead_ids), remaining=remaining,
+                tasks_moved=tasks_moved)
+    return HandoverResult(leads_moved=len(lead_ids), remaining=remaining,
+                          tasks_moved=tasks_moved, deactivated=deactivated)
 
 
 async def delete_user(db: AsyncSession, caller: Caller, user_id: str) -> None:
-    """Soft delete (users.delete). Refused while they own an open lead, for the
-    caller's own row, the last administrator and the principal. A repeat is a no-op."""
+    """Soft delete (users.delete). Refused while they own an open lead or hold an
+    open task, for the caller's own row, the last administrator and the principal.
+    A repeat is a no-op."""
     _refuse_principal(user_id)
     if user_id == caller.user_id:
         raise ValidationFailed(fields={"id": "you cannot delete yourself"})
@@ -846,6 +882,8 @@ async def delete_user(db: AsyncSession, caller: Caller, user_id: str) -> None:
         if row.user_type == "staff" else 0
     if open_leads > 0:
         raise ValidationFailed(fields={"open_leads": "hand over their open leads first"})
+    if await _open_tasks(db, user_id):
+        raise ValidationFailed(fields={"open_tasks": "hand over their open tasks first"})
     await _execute_mapped(db, text(
         "UPDATE app_user SET deleted_at = now(), is_active = false, "
         "updated_by = CAST(:me AS uuid) WHERE id = CAST(:id AS uuid)"),

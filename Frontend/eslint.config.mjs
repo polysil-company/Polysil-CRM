@@ -244,7 +244,7 @@ export default defineConfig([
         {
           assert: "either",
           depth: 3,
-          controlComponents: ["Checkbox", "Input", "Textarea", "InputGroupInput"],
+          controlComponents: ["Checkbox", "RadioGroupItem", "Input", "Textarea", "InputGroupInput"],
         },
       ],
       "react/forbid-dom-props": [

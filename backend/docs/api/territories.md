@@ -36,11 +36,11 @@ using `GET /lookups/territories`; this list carries `code_locked`.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `level` | query | string | null |  | state, district, taluka or village. |
-| `parent_id` | query | string | null |  | Children of this territory. |
-| `q` | query | string | null |  | Name or code substring. |
+| `level` | query | string \| null |  | state, district, taluka or village. |
+| `parent_id` | query | string \| null |  | Children of this territory. |
+| `q` | query | string \| null |  | Name or code substring. |
 | `limit` | query | integer |  |  |
-| `cursor` | query | string | null |  | From a previous page's next_cursor. |
+| `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 
 **Responses**
 
@@ -65,7 +65,7 @@ without a code cannot number leads. **`Idempotency-Key` is required.**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -74,9 +74,9 @@ without a code cannot number leads. **`Idempotency-Key` is required.**
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `name` | string | yes | Unique among its siblings, case-insensitively. |
-| `level` | `state` | `district` | `taluka` | `village` | yes |  |
-| `parent_id` | string | null |  | The territory one level up: a district under a state, a taluka under a district, a village under a taluka. Null for a state. |
-| `code` | string | null |  | Unique per level. Stored upper-case. A state needs one before leads can be numbered under it. |
+| `level` | `state` \| `district` \| `taluka` \| `village` | yes |  |
+| `parent_id` | string \| null |  | The territory one level up: a district under a state, a taluka under a district, a village under a taluka. Null for a state. |
+| `code` | string \| null |  | Unique per level. Stored upper-case. A state needs one before leads can be numbered under it. |
 
 **Responses**
 
@@ -129,7 +129,7 @@ already carry it.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `item_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -137,8 +137,8 @@ already carry it.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `name` | string | null |  |  |
-| `code` | string | null |  | Refused on a state once a lead has been numbered under it. |
+| `name` | string \| null |  |  |
+| `code` | string \| null |  | Refused on a state once a lead has been numbered under it. |
 
 **Responses**
 
@@ -168,7 +168,7 @@ already carry it.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -181,7 +181,9 @@ already carry it.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `limit` | integer | yes | The page size that was applied. |
-| `next_cursor` | string | null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `next_cursor` | string \| null |  | Pass this back as ?cursor= for the next page. Absent on the last page. |
+| `total` | integer \| null |  | How many rows match, across all pages. **Only present when you ask for it with `?include_total=true`**, because counting a scoped table costs a scan and most screens do not need it. Null otherwise. |
+| `total_capped` | boolean |  | True when there are more rows than `total` says. The count stops at a ceiling so one query can never run away on a large account, so render `total` as "1000+" rather than an exact figure when this is set. Default `False`. |
 
 **`Territory`**
 
@@ -189,9 +191,9 @@ already carry it.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `level` | `state` | `district` | `taluka` | `village` | yes |  |
-| `code` | string | null | yes | A state's code numbers its leads (POL/<code>/<FY>/<n>); optional elsewhere. |
-| `parent` | TerritoryRef | null | yes | Null for a state. |
+| `level` | `state` \| `district` \| `taluka` \| `village` | yes |  |
+| `code` | string \| null | yes | A state's code numbers its leads (POL/<code>/<FY>/<n>); optional elsewhere. |
+| `parent` | TerritoryRef \| null | yes | Null for a state. |
 | `code_locked` | boolean | yes | True once a lead has been numbered under this state: the code can no longer change. |
 | `created_at` | string | yes |  |
 
@@ -200,9 +202,9 @@ already carry it.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `name` | string | yes | Unique among its siblings, case-insensitively. |
-| `level` | `state` | `district` | `taluka` | `village` | yes |  |
-| `parent_id` | string | null |  | The territory one level up: a district under a state, a taluka under a district, a village under a taluka. Null for a state. |
-| `code` | string | null |  | Unique per level. Stored upper-case. A state needs one before leads can be numbered under it. |
+| `level` | `state` \| `district` \| `taluka` \| `village` | yes |  |
+| `parent_id` | string \| null |  | The territory one level up: a district under a state, a taluka under a district, a village under a taluka. Null for a state. |
+| `code` | string \| null |  | Unique per level. Stored upper-case. A state needs one before leads can be numbered under it. |
 
 **`TerritoryPage`**
 
@@ -215,8 +217,8 @@ already carry it.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `name` | string | null |  |  |
-| `code` | string | null |  | Refused on a state once a lead has been numbered under it. |
+| `name` | string \| null |  |  |
+| `code` | string \| null |  | Refused on a state once a lead has been numbered under it. |
 
 **`TerritoryRef`**
 
@@ -224,4 +226,4 @@ already carry it.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `level` | string | yes | state, district or taluka. |
+| `level` | string | yes | state, district, taluka or village. |

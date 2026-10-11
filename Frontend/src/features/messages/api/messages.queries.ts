@@ -1,6 +1,7 @@
 import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
 import { listConversations, listMessages, searchStaffDirectory } from "./messages.api";
+import type { Conversation } from "./messages.schemas";
 
 /**
  * How often new messages are checked for. Polling pauses while the tab is hidden and
@@ -20,6 +21,7 @@ export const messageKeys = {
   all: ["messages"] as const,
   conversations: () => [...messageKeys.all, "conversations"] as const,
   thread: (conversationId: string) => [...messageKeys.all, "thread", conversationId] as const,
+  started: (conversationId: string) => [...messageKeys.all, "started", conversationId] as const,
   directory: (q: string) => [...messageKeys.all, "directory", q] as const,
 };
 
@@ -39,6 +41,23 @@ export function conversationMessagesQueryOptions(conversationId: string) {
     queryFn: ({ signal }) => listMessages(conversationId, signal),
     refetchInterval: OPEN_CONVERSATION_POLL_MS,
     meta: { dataId: "MSG-002" },
+  });
+}
+
+/**
+ * A conversation just opened from the directory. The backend lists a conversation only once
+ * someone writes in it, and has no endpoint to read one, so the answer to "start" is kept
+ * here for the thread's header until the first message lists it. Nothing is fetched: after a
+ * reload it is null and the header reads "Conversation" until then.
+ * TODO(MSG-004): read it from `GET /conversations/{id}` once the backend has it (BE-021).
+ */
+export function startedConversationQueryOptions(conversationId: string) {
+  return queryOptions({
+    queryKey: messageKeys.started(conversationId),
+    queryFn: () => Promise.resolve<Conversation | null>(null),
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+    meta: { dataId: "MSG-004" },
   });
 }
 

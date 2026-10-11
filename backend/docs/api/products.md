@@ -47,11 +47,11 @@ row is theirs.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `q` | query | string | null |  | Matches anywhere in the description, ignoring case. |
-| `category` | query | string | null |  | A product category code. |
-| `quotation_category` | query | string | null |  | head, field or both. Filter the picker to the block being filled. |
-| `active` | query | boolean | null |  | Leave unset to list both. |
-| `as_of` | query | date | null |  | Resolve the classification and slab as they were on this date. Today in India by default. |
+| `q` | query | string \| null |  | Matches anywhere in the description, ignoring case. |
+| `category` | query | string \| null |  | A product category code. |
+| `quotation_category` | query | string \| null |  | head, field or both. Filter the picker to the block being filled. |
+| `active` | query | boolean \| null |  | Leave unset to list both. |
+| `as_of` | query | date \| null |  | Resolve the classification and slab as they were on this date. Today in India by default. |
 | `page` | query | integer |  |  |
 | `limit` | query | integer |  |  |
 
@@ -87,7 +87,7 @@ client's own, which is exactly what `provisional_fields` marks the absence of.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -97,11 +97,11 @@ client's own, which is exactly what `provisional_fields` marks the absence of.
 |---|---|---|---|
 | `description` | string | yes | Unique, matched case-insensitively. |
 | `product_category` | string | yes | An existing category code. |
-| `quotation_category` | `head` | `field` | `both` | yes |  |
+| `quotation_category` | `head` \| `field` \| `both` | yes |  |
 | `uom` | string | yes | An existing unit code. |
-| `item_code` | string | null |  |  |
-| `mrp` | number | string | null |  |  |
-| `pack_multiple` | number | string | null |  |  |
+| `item_code` | string \| null |  |  |
+| `mrp` | number \| string \| null |  |  |
+| `pack_multiple` | number \| string \| null |  |  |
 | `is_subsidy_eligible` | boolean |  | Default `True`. |
 
 **Responses**
@@ -127,7 +127,7 @@ One catalogue row, in the same shape the list returns.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `product_id` | path | string | yes |  |
-| `as_of` | query | date | null |  | Resolve the classification and slab as they were on this date. Today in India by default. |
+| `as_of` | query | date \| null |  | Resolve the classification and slab as they were on this date. Today in India by default. |
 
 **Responses**
 
@@ -158,7 +158,7 @@ with their own endpoints, because they change for their own reasons.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `product_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -166,15 +166,15 @@ with their own endpoints, because they change for their own reasons.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `description` | string | null |  |  |
-| `product_category` | string | null |  |  |
-| `quotation_category` | `head` | `field` | `both` | null |  |  |
-| `uom` | string | null |  |  |
-| `item_code` | string | null |  |  |
-| `mrp` | number | string | null |  |  |
-| `pack_multiple` | number | string | null |  |  |
-| `is_subsidy_eligible` | boolean | null |  |  |
-| `is_active` | boolean | null |  |  |
+| `description` | string \| null |  |  |
+| `product_category` | string \| null |  |  |
+| `quotation_category` | `head` \| `field` \| `both` \| null |  |  |
+| `uom` | string \| null |  |  |
+| `item_code` | string \| null |  |  |
+| `mrp` | number \| string \| null |  |  |
+| `pack_multiple` | number \| string \| null |  |  |
+| `is_subsidy_eligible` | boolean \| null |  |  |
+| `is_active` | boolean \| null |  |  |
 
 **Responses**
 
@@ -236,7 +236,7 @@ This also removes `hsn_code` from the product's `provisional_fields`, and
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `product_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -274,7 +274,7 @@ change is one write rather than 1,092.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `hsn_code` | query | string | null |  |  |
+| `hsn_code` | query | string \| null |  |  |
 | `in_force` | query | boolean |  | Only the rate applying today. |
 | `page` | query | integer |  |  |
 | `limit` | query | integer |  |  |
@@ -310,7 +310,7 @@ Every product classified under this code stops marking its slab provisional.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `hsn_code` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -318,7 +318,7 @@ Every product classified under this code stops marking its slab provisional.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `rate` | number | string | yes | One of 0, 0.25, 3, 5, 12, 18, 28. Anything else is refused. |
+| `rate` | number \| string | yes | One of 0, 0.25, 3, 5, 12, 18, 28. Anything else is refused. |
 | `effective_from` | date | yes |  |
 
 **Responses**
@@ -353,7 +353,7 @@ Every product classified under this code stops marking its slab provisional.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -381,7 +381,7 @@ Every product classified under this code stops marking its slab provisional.
 | `id` | string | yes |  |
 | `hsn_code` | string | yes |  |
 | `effective_from` | date | yes |  |
-| `effective_to` | date | null | yes | Exclusive. Null while in force. |
+| `effective_to` | date \| null | yes | Exclusive. Null while in force. |
 
 **`OffsetMeta`**
 
@@ -396,19 +396,19 @@ Every product classified under this code stops marking its slab provisional.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `item_code` | string | null | yes | The client's own code, once they send one. |
+| `item_code` | string \| null | yes | The client's own code, once they send one. |
 | `description` | string | yes | As it prints on a quotation. |
 | `product_category` | string | yes | The category code, for grouping the picker. |
-| `quotation_category` | `head` | `field` | `both` | yes | Which block of a subsidised quotation this may appear in: the head unit, the field, or either. |
+| `quotation_category` | `head` \| `field` \| `both` | yes | Which block of a subsidised quotation this may appear in: the head unit, the field, or either. |
 | `uom` | string | yes |  |
 | `uom_decimals` | integer | yes | Decimal places this unit admits. A quantity with more is refused, so a NOS. item cannot be ordered 1.5 of. |
-| `hsn_code` | string | null | yes |  |
-| `gst_slab` | string | null | yes | A percentage as a decimal string, 5.00. |
-| `mrp` | string | null | yes |  |
-| `pack_multiple` | string | null | yes | Quantities must be a multiple of this when it is set. |
+| `hsn_code` | string \| null | yes |  |
+| `gst_slab` | string \| null | yes | A percentage as a decimal string, 5.00. |
+| `mrp` | string \| null | yes |  |
+| `pack_multiple` | string \| null | yes | Quantities must be a multiple of this when it is set. |
 | `is_subsidy_eligible` | boolean | yes |  |
 | `is_active` | boolean | yes |  |
-| `provisional_fields` | `hsn_code` | `gst_slab` | `mrp` | `pack_multiple`[] | yes | Which of these figures are still our stand-ins rather than the client's. Show it per field. An empty list means everything is theirs. |
+| `provisional_fields` | `hsn_code` \| `gst_slab` \| `mrp` \| `pack_multiple`[] | yes | Which of these figures are still our stand-ins rather than the client's. Show it per field. An empty list means everything is theirs. |
 
 **`ProductCreate`**
 
@@ -416,11 +416,11 @@ Every product classified under this code stops marking its slab provisional.
 |---|---|---|---|
 | `description` | string | yes | Unique, matched case-insensitively. |
 | `product_category` | string | yes | An existing category code. |
-| `quotation_category` | `head` | `field` | `both` | yes |  |
+| `quotation_category` | `head` \| `field` \| `both` | yes |  |
 | `uom` | string | yes | An existing unit code. |
-| `item_code` | string | null |  |  |
-| `mrp` | number | string | null |  |  |
-| `pack_multiple` | number | string | null |  |  |
+| `item_code` | string \| null |  |  |
+| `mrp` | number \| string \| null |  |  |
+| `pack_multiple` | number \| string \| null |  |  |
 | `is_subsidy_eligible` | boolean |  | Default `True`. |
 
 **`ProductPage`**
@@ -434,15 +434,15 @@ Every product classified under this code stops marking its slab provisional.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `description` | string | null |  |  |
-| `product_category` | string | null |  |  |
-| `quotation_category` | `head` | `field` | `both` | null |  |  |
-| `uom` | string | null |  |  |
-| `item_code` | string | null |  |  |
-| `mrp` | number | string | null |  |  |
-| `pack_multiple` | number | string | null |  |  |
-| `is_subsidy_eligible` | boolean | null |  |  |
-| `is_active` | boolean | null |  |  |
+| `description` | string \| null |  |  |
+| `product_category` | string \| null |  |  |
+| `quotation_category` | `head` \| `field` \| `both` \| null |  |  |
+| `uom` | string \| null |  |  |
+| `item_code` | string \| null |  |  |
+| `mrp` | number \| string \| null |  |  |
+| `pack_multiple` | number \| string \| null |  |  |
+| `is_subsidy_eligible` | boolean \| null |  |  |
+| `is_active` | boolean \| null |  |  |
 
 **`TaxRate`**
 
@@ -452,7 +452,7 @@ Every product classified under this code stops marking its slab provisional.
 | `hsn_code` | string | yes |  |
 | `rate` | string | yes | A percentage as a decimal string, 5.000. |
 | `effective_from` | date | yes |  |
-| `effective_to` | date | null | yes | Exclusive. Null while in force. |
+| `effective_to` | date \| null | yes | Exclusive. Null while in force. |
 | `is_active` | boolean | yes |  |
 
 **`TaxRatePage`**
@@ -466,14 +466,14 @@ Every product classified under this code stops marking its slab provisional.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `rate` | number | string | yes | One of 0, 0.25, 3, 5, 12, 18, 28. Anything else is refused. |
+| `rate` | number \| string | yes | One of 0, 0.25, 3, 5, 12, 18, 28. Anything else is refused. |
 | `effective_from` | date | yes |  |
 
 **`ValidationError`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `loc` | string | integer[] | yes |  |
+| `loc` | string \| integer[] | yes |  |
 | `msg` | string | yes |  |
 | `type` | string | yes |  |
 | `input` | any |  |  |

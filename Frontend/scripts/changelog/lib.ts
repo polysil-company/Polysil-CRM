@@ -338,6 +338,34 @@ function renderEntry(entry: ChangelogEntry): string[] {
   return lines;
 }
 
+/** A title as a table cell: a literal `|` would end the cell. */
+function tableCell(text: string): string {
+  return text.replace(/\|/g, "\\|");
+}
+
+/**
+ * One line per change, newest first: the date, the title linking to its entry, the type and
+ * its Data IDs. The full entries follow, so this stays readable however long the file grows.
+ */
+function renderIndex(entries: readonly ChangelogEntry[]): string[] {
+  const rows = entries.map((entry) => {
+    const { meta } = entry;
+    const dataIds = meta.dataIds.map((id) => `\`${id}\``).join(" ");
+    const breaking = meta.breaking ? " **(breaking)**" : "";
+    return `| ${meta.date} | [${tableCell(meta.title)}](${ENTRIES_DIR}/${entry.file})${breaking} | \`${meta.type}\` | ${dataIds} |`;
+  });
+  return [
+    "## Index",
+    "",
+    `${String(entries.length)} ${entries.length === 1 ? "change" : "changes"}, newest first. Each title opens its entry.`,
+    "",
+    "| Date | Change | Type | Data IDs |",
+    "| --- | --- | --- | --- |",
+    ...rows,
+    "",
+  ];
+}
+
 /** Renders CHANGELOG.md. Deterministic: the same entries always produce the same bytes. */
 export function renderChangelog(entries: readonly ChangelogEntry[]): string {
   const lines = [...CHANGELOG_HEADER];
@@ -346,8 +374,13 @@ export function renderChangelog(entries: readonly ChangelogEntry[]): string {
     lines.push("_No entries yet._");
   }
 
+  const sorted = sortEntries(entries);
+  if (sorted.length > 0) {
+    lines.push(...renderIndex(sorted));
+  }
+
   let currentDate: string | null = null;
-  for (const entry of sortEntries(entries)) {
+  for (const entry of sorted) {
     if (entry.meta.date !== currentDate) {
       currentDate = entry.meta.date;
       lines.push(`## ${formatEntryDate(currentDate)}`, "");

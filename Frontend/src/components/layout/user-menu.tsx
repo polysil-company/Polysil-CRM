@@ -4,6 +4,7 @@ import {
   Alert02Icon,
   Bug01Icon,
   FlaskConicalIcon,
+  LockPasswordIcon,
   Logout03Icon,
   UserMultiple02Icon,
 } from "@hugeicons/core-free-icons";
@@ -13,8 +14,10 @@ import type * as React from "react";
 
 import { Avatar, AvatarFallback, getInitials } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -28,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChangePasswordDialogContent } from "@/features/auth/components/change-password-dialog";
 import { useSignOut } from "@/features/auth/hooks/use-sign-out";
 import type { Session } from "@/features/session/api/session.schemas";
 import { useSession } from "@/features/session/hooks/use-session";
@@ -35,8 +39,10 @@ import { ROLE_LABELS, ROLES, USER_TYPE_LABELS, type Role } from "@/lib/auth/role
 import {
   MOCK_SCENARIO_LABELS,
   MOCK_SCENARIOS,
+  readMockMustChangePassword,
   readMockRole,
   readMockScenario,
+  writeMockMustChangePassword,
   writeMockRole,
   writeMockScenario,
   type MockScenario,
@@ -60,6 +66,7 @@ function describeAccount(session: Session): string {
 export function UserMenu(): React.JSX.Element {
   const session = useSession();
   const { signOut, isSigningOut } = useSignOut();
+  const [changingPassword, setChangingPassword] = useState(false);
 
   if (session.status === "pending") {
     return <Skeleton className="size-8 rounded-full" />;
@@ -80,93 +87,116 @@ export function UserMenu(): React.JSX.Element {
     );
   }
 
-  const { user } = session.data;
+  const { user, userType } = session.data;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-md"
-            className="rounded-full"
-            aria-label={`Account menu for ${user.name}`}
-          />
-        }
-      >
-        <Avatar size="sm">
-          <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-        </Avatar>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <div className="flex flex-col px-2 py-1.5">
-          <span className="truncate text-sm font-medium text-foreground">{user.name}</span>
-          <span className="truncate text-xs text-muted-foreground">
-            {describeAccount(session.data)}
-          </span>
-        </div>
-        <DropdownMenuSeparator />
-        {clientEnv.apiMocking === "enabled" ? (
-          <>
-            <MockControls />
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
-        {clientEnv.appEnv === "production" ? null : (
-          <>
-            <LogLevelControl />
-            <DropdownMenuSeparator />
-          </>
-        )}
-        <DropdownMenuItem
-          disabled={isSigningOut}
-          onClick={() => {
-            void signOut();
-          }}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-md"
+              className="rounded-full"
+              aria-label={`Account menu for ${user.name}`}
+            />
+          }
         >
-          <Icon icon={Logout03Icon} />
-          {isSigningOut ? "Signing out…" : "Sign out"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <Avatar size="sm">
+            <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+          </Avatar>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <div className="flex flex-col px-2 py-1.5">
+            <span className="truncate text-sm font-medium text-foreground">{user.name}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {describeAccount(session.data)}
+            </span>
+          </div>
+          <DropdownMenuSeparator />
+          {clientEnv.apiMocking === "disabled" ? null : (
+            <>
+              {/* Against a real API (`partial`) the session decides the role, so only scenarios remain. */}
+              <MockControls canPreviewRoles={clientEnv.apiMocking === "enabled"} />
+              <DropdownMenuSeparator />
+            </>
+          )}
+          {clientEnv.appEnv === "production" ? null : (
+            <>
+              <LogLevelControl />
+              <DropdownMenuSeparator />
+            </>
+          )}
+          {/* Partners sign in with a code and have no password (AUTH-007). */}
+          {userType === "staff" ? (
+            <DropdownMenuItem
+              onClick={() => {
+                setChangingPassword(true);
+              }}
+            >
+              <Icon icon={LockPasswordIcon} />
+              Change password
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem
+            disabled={isSigningOut}
+            onClick={() => {
+              void signOut();
+            }}
+          >
+            <Icon icon={Logout03Icon} />
+            {isSigningOut ? "Signing out…" : "Sign out"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Dialog open={changingPassword} onOpenChange={setChangingPassword}>
+        {changingPassword ? <ChangePasswordDialogContent /> : null}
+      </Dialog>
+    </>
   );
 }
 
-/** Developer controls for the mock backend: preview any role or any data state. */
-function MockControls(): React.JSX.Element {
+/**
+ * Developer controls for the mock backend: preview any role (full mock backend only) or
+ * any data state. In `partial` mode the scenarios apply to the modules still mocked.
+ */
+function MockControls({ canPreviewRoles }: { canPreviewRoles: boolean }): React.JSX.Element {
   const queryClient = useQueryClient();
   const [role, setRole] = useState<Role>(readMockRole);
   const [scenario, setScenario] = useState<MockScenario>(readMockScenario);
+  const [temporaryPassword, setTemporaryPassword] = useState(readMockMustChangePassword);
 
   return (
     <DropdownMenuGroup>
-      <DropdownMenuLabel>Mock backend</DropdownMenuLabel>
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>
-          <Icon icon={UserMultiple02Icon} />
-          Preview as role
-        </DropdownMenuSubTrigger>
-        <DropdownMenuContent side="right" align="start" sideOffset={4} className="w-56">
-          <DropdownMenuRadioGroup
-            value={role}
-            onValueChange={(value: unknown) => {
-              const next = ROLES.find((candidate) => candidate === value);
-              if (next === undefined) {
-                return;
-              }
-              writeMockRole(next);
-              setRole(next);
-              void queryClient.invalidateQueries();
-            }}
-          >
-            {ROLES.map((item) => (
-              <DropdownMenuRadioItem key={item} value={item}>
-                {ROLE_LABELS[item]}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenuSub>
+      <DropdownMenuLabel>{canPreviewRoles ? "Mock backend" : "Mocked modules"}</DropdownMenuLabel>
+      {canPreviewRoles ? (
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Icon icon={UserMultiple02Icon} />
+            Preview as role
+          </DropdownMenuSubTrigger>
+          <DropdownMenuContent side="right" align="start" sideOffset={4} className="w-56">
+            <DropdownMenuRadioGroup
+              value={role}
+              onValueChange={(value: unknown) => {
+                const next = ROLES.find((candidate) => candidate === value);
+                if (next === undefined) {
+                  return;
+                }
+                writeMockRole(next);
+                setRole(next);
+                void queryClient.invalidateQueries();
+              }}
+            >
+              {ROLES.map((item) => (
+                <DropdownMenuRadioItem key={item} value={item}>
+                  {ROLE_LABELS[item]}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenuSub>
+      ) : null}
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>
           <Icon icon={FlaskConicalIcon} />
@@ -194,6 +224,19 @@ function MockControls(): React.JSX.Element {
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenuSub>
+      {canPreviewRoles ? (
+        <DropdownMenuCheckboxItem
+          checked={temporaryPassword}
+          onCheckedChange={(checked: boolean) => {
+            writeMockMustChangePassword(checked);
+            setTemporaryPassword(checked);
+            // The session says it at once; every other call is refused until it is changed.
+            void queryClient.invalidateQueries();
+          }}
+        >
+          Temporary password
+        </DropdownMenuCheckboxItem>
+      ) : null}
     </DropdownMenuGroup>
   );
 }
@@ -201,7 +244,7 @@ function MockControls(): React.JSX.Element {
 const FOLLOW_SERVER = "server";
 
 const LOG_LEVEL_LABELS: Readonly<Record<LogLevel, string>> = {
-  debug: "Debug — everything",
+  debug: "Debug: everything",
   info: "Info",
   warn: "Warnings and errors",
   error: "Errors only",

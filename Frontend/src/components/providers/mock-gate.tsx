@@ -61,9 +61,9 @@ function notReadyOnServer(): boolean {
 }
 
 /**
- * APP-004 · When NEXT_PUBLIC_API_MOCKING=enabled, shows a boot screen until the mock
- * service worker is ready, so no request escapes to the network first. Does nothing in
- * staging and production (mocking cannot be enabled there).
+ * APP-004 · When NEXT_PUBLIC_API_MOCKING is `enabled` or `partial`, shows a boot screen
+ * until the mock service worker is ready, so no request escapes to the network first.
+ * Does nothing in staging and production (mocking cannot be turned on there).
  *
  * The server renders the boot screen too, never the page. A server-rendered form looks
  * ready while the worker is still starting and the page is not yet hydrated, and a click
@@ -71,7 +71,7 @@ function notReadyOnServer(): boolean {
  * smoke tests hit exactly this.
  */
 export function MockGate({ children }: { children: React.ReactNode }): React.JSX.Element {
-  if (clientEnv.apiMocking !== "enabled") {
+  if (clientEnv.apiMocking === "disabled") {
     return <>{children}</>;
   }
   return <WaitForMocks>{children}</WaitForMocks>;

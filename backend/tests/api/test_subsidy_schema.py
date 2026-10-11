@@ -26,16 +26,15 @@ def test_a_crop_may_not_carry_head_lines() -> None:
     assert err.value.errors()[0]["loc"] == ("head_lines",)
 
 
-def test_a_sprinkler_request_may_not_choose_its_own_pipe_size() -> None:
-    """The engine derives the pipe size from the area band. Sending one used to be
-    dropped, and a request naming 90 mm calculated 75 mm and said nothing."""
+def test_a_sprinkler_request_names_a_set_size_only_from_the_list() -> None:
+    """FS-056 rule 7: CG, RJ and UP take the set size from the request; GGRC sets it
+    by the area band and says so (`pipe_size_ignored`). A size off the list is refused."""
+    crops = [{"crop": "POTATO", "area": "1.0", "lateral_spacing": "1.2", "lines": []}]
+    ok = CalculateRequest(system_type="sprinkler", crops=crops, nozzle="plastic", pipe_size_mm=90)
+    assert ok.pipe_size_mm == 90
     with pytest.raises(ValidationError) as err:
-        CalculateRequest(system_type="sprinkler", crops=[
-            {"crop": "POTATO", "area": "1.0", "lateral_spacing": "1.2", "lines": []}],
-            nozzle="plastic", pipe_size_mm=90)
-    problems = err.value.errors()
-    assert [e["loc"] for e in problems] == [("pipe_size_mm",)]
-    assert problems[0]["type"] == "extra_forbidden"
+        CalculateRequest(system_type="sprinkler", crops=crops, nozzle="plastic", pipe_size_mm=80)
+    assert [e["loc"] for e in err.value.errors()] == [("pipe_size_mm",)]
 
 
 @pytest.mark.parametrize("model, field, kwargs", [

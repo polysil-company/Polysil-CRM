@@ -15,12 +15,12 @@ import {
   MESSAGE_MAX_LENGTH,
   type SendMessageRequest,
 } from "@/features/messages/api/messages.schemas";
+import { sendRefusal } from "@/features/messages/lib/send-refusal";
 import {
   parseShareParam,
   SHARE_PARAM,
   type ShareAttachment,
 } from "@/features/messages/lib/share-attachment";
-import { toUserFacingError } from "@/lib/api/error-messages";
 import { formatNumber } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,13 @@ export interface MessageComposerProps {
   /** Names the field for screen readers: "Message Priya Nair". */
   recipientName: string | null;
   disabled?: boolean;
+  /**
+   * Why nothing more can be sent here (the colleague has left), or null. The box turns
+   * read-only rather than disabled, so a draft written before can still be copied.
+   */
+  closedNotice?: string | null;
+  /** The backend said the colleague has left: the conversation should show it. */
+  onParticipantLeft?: () => void;
 }
 
 /**
@@ -46,6 +53,8 @@ export function MessageComposer({
   conversationId,
   recipientName,
   disabled = false,
+  closedNotice = null,
+  onParticipantLeft,
 }: MessageComposerProps): React.JSX.Element {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +65,8 @@ export function MessageComposer({
 
   const body = draft.trim();
   const overBy = draft.length - MESSAGE_MAX_LENGTH;
-  const canSend = !disabled && body !== "" && overBy <= 0;
+  const closed = closedNotice !== null;
+  const canSend = !disabled && !closed && body !== "" && overBy <= 0;
 
   const handleSend = (): void => {
     if (!canSend) {
@@ -75,9 +85,14 @@ export function MessageComposer({
         }
       },
       onError: (sendError) => {
+        const refusal = sendRefusal(sendError, recipientName);
         setDraft((current) => (current === "" ? request.body : current));
-        setError(toUserFacingError(sendError).title);
-        textareaRef.current?.focus();
+        setError(refusal.message);
+        if (refusal.participantLeft) {
+          onParticipantLeft?.();
+        } else {
+          textareaRef.current?.focus();
+        }
       },
     });
   };
@@ -91,7 +106,7 @@ export function MessageComposer({
         handleSend();
       }}
     >
-      {attachment === null ? null : (
+      {attachment === null || closed ? null : (
         <AttachmentChip
           attachment={attachment}
           onRemove={() => {
@@ -99,49 +114,59 @@ export function MessageComposer({
           }}
         />
       )}
-      {error === null ? null : (
+      {closed ? (
+        <p role="status" className="mb-2 text-xs text-muted-foreground">
+          {closedNotice}
+        </p>
+      ) : error === null ? null : (
         <p role="alert" className="mb-2 text-xs text-danger">
-          {error} Your message is back in the box — try sending it again.
+          {error}
         </p>
       )}
-      <div className="flex items-end gap-2">
-        <Textarea
-          ref={textareaRef}
-          value={draft}
-          rows={1}
-          disabled={disabled}
-          aria-label={recipientName === null ? "Message" : `Message ${recipientName}`}
-          aria-invalid={overBy > 0 ? true : undefined}
-          placeholder="Write a message…"
-          className="max-h-40 min-h-10 resize-none"
-          onChange={(event) => {
-            setDraft(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            const touch = window.matchMedia("(pointer: coarse)").matches;
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing &&
-              !touch
-            ) {
-              event.preventDefault();
-              handleSend();
-            }
-          }}
-        />
-        <Button type="submit" size="icon-lg" aria-label="Send message" disabled={!canSend}>
-          <Icon icon={SentIcon} />
-        </Button>
-      </div>
-      {overBy > 0 ? (
-        <p className="mt-1.5 text-2xs text-danger">
-          {formatNumber(overBy)} characters over the {formatNumber(MESSAGE_MAX_LENGTH)} limit
-        </p>
-      ) : (
-        <p className="mt-1.5 text-2xs text-subtle-foreground pointer-coarse:hidden">
-          Enter to send · Shift + Enter for a new line
-        </p>
+      {/* Closed: the box stays only while it holds a draft to copy. */}
+      {closed && draft === "" ? null : (
+        <>
+          <div className="flex items-end gap-2">
+            <Textarea
+              ref={textareaRef}
+              value={draft}
+              rows={1}
+              disabled={disabled}
+              readOnly={closed}
+              aria-label={recipientName === null ? "Message" : `Message ${recipientName}`}
+              aria-invalid={overBy > 0 ? true : undefined}
+              placeholder="Write a message…"
+              className="max-h-40 min-h-10 resize-none"
+              onChange={(event) => {
+                setDraft(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                const touch = window.matchMedia("(pointer: coarse)").matches;
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing &&
+                  !touch
+                ) {
+                  event.preventDefault();
+                  handleSend();
+                }
+              }}
+            />
+            <Button type="submit" size="icon-lg" aria-label="Send message" disabled={!canSend}>
+              <Icon icon={SentIcon} />
+            </Button>
+          </div>
+          {overBy > 0 ? (
+            <p className="mt-1.5 text-2xs text-danger">
+              {formatNumber(overBy)} characters over the {formatNumber(MESSAGE_MAX_LENGTH)} limit
+            </p>
+          ) : closed ? null : (
+            <p className="mt-1.5 text-2xs text-subtle-foreground pointer-coarse:hidden">
+              Enter to send · Shift + Enter for a new line
+            </p>
+          )}
+        </>
       )}
     </form>
   );

@@ -48,7 +48,7 @@ fifteen minutes. A successful sign-in clears the count.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `user-agent` | header | string | null |  |  |
+| `user-agent` | header | string \| null |  |  |
 
 **Request body**
 
@@ -93,7 +93,7 @@ is not exposed here.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `polysil_refresh` | cookie | string | null |  |  |
+| `polysil_refresh` | cookie | string \| null |  |  |
 
 **Responses**
 
@@ -186,7 +186,7 @@ would be told a correct code was wrong, and the code would already be spent.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `user-agent` | header | string | null |  |  |
+| `user-agent` | header | string \| null |  |  |
 
 **Request body**
 
@@ -226,7 +226,7 @@ while you were changing it; sign in with the password they gave you.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -279,8 +279,8 @@ response on a slow connection does not sign the user out of everything.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `user-agent` | header | string | null |  |  |
-| `polysil_refresh` | cookie | string | null |  |  |
+| `user-agent` | header | string \| null |  |  |
+| `polysil_refresh` | cookie | string \| null |  |  |
 
 **Responses**
 
@@ -318,7 +318,7 @@ response on a slow connection does not sign the user out of everything.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -345,10 +345,10 @@ response on a slow connection does not sign the user out of everything.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
-| `user_type` | `staff` | `partner_user` | `consumer` | yes |  |
-| `role` | RoleRef | null |  | Null for a consumer, which holds no role. |
-| `org_unit` | OrgUnitRef | null |  | Staff only. Never set together with `partner`. |
-| `partner` | api__schemas__auth__PartnerRef | null |  | Portal users only. Never set together with `org_unit`. |
+| `user_type` | `staff` \| `partner_user` \| `consumer` | yes |  |
+| `role` | RoleRef \| null |  | Null for a consumer, which holds no role. |
+| `org_unit` | OrgUnitRef \| null |  | Staff only. Never set together with `partner`. |
+| `partner` | api__schemas__auth__PartnerRef \| null |  | Portal users only. Never set together with `org_unit`. |
 | `must_change_password` | boolean |  | True while a temporary password set by an administrator is in force. Until the person changes it, every route except this one and POST /auth/password answers 403 `password_change_required`; show the change-password screen. Default `False`. |
 | `permissions` | ModulePermission[] |  |  |
 
@@ -358,7 +358,7 @@ response on a slow connection does not sign the user out of everything.
 |---|---|---|---|
 | `module` | string | yes | e.g. leads, orders, subsidy. |
 | `actions` | string[] | yes | Any of view, create, edit, approve, delete. |
-| `scope` | string | null |  | One of own, org_subtree, territory, partner_subtree, global. Taken from the module's `view` row, which the others inherit. |
+| `scope` | string \| null |  | One of own, org_subtree, territory, partner_subtree, global. Taken from the module's `view` row, which the others inherit. |
 
 **`OrgUnitRef`**
 
@@ -378,7 +378,7 @@ response on a slow connection does not sign the user out of everything.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `sent` | boolean |  | Default `True`. |
-| `channel` | `whatsapp` | `sms` |  | Where the code arrives. A deployment-wide constant, never a per-number value: render it in the wording, do not branch on it. Default `whatsapp`. |
+| `channel` | `whatsapp` \| `sms` |  | Where the code arrives. A deployment-wide constant, never a per-number value: render it in the wording, do not branch on it. Default `whatsapp`. |
 | `expires_in` | integer | yes | Seconds the code remains valid, for the countdown on the verify screen. |
 | `resend_after` | integer | yes | Seconds before offering a resend. Deliberately longer than `expires_in` would suggest: three resends a minute apart exhaust the per-phone burst limit, after which the UI would claim 'code sent' for another eleven minutes with nothing being sent. |
 
@@ -415,7 +415,7 @@ response on a slow connection does not sign the user out of everything.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `loc` | string | integer[] | yes |  |
+| `loc` | string \| integer[] | yes |  |
 | `msg` | string | yes |  |
 | `type` | string | yes |  |
 | `input` | any |  |  |
@@ -426,4 +426,5 @@ response on a slow connection does not sign the user out of everything.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `name` | string | null |  | Null until the channel module lands; the id is stable now. |
+| `name` | string \| null |  | The partner firm, for the portal header. |
+| `partner_type` | string \| null |  | distributor, dealer or sub_dealer. |

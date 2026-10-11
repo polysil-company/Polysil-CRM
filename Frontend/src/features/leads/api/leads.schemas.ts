@@ -1,16 +1,21 @@
 import { z } from "zod";
 
+import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 import { normalizeIndianMobile } from "@/lib/format";
 
 /**
- * Leads contract (LEAD-001 … LEAD-004). Mock data and MSW handlers are
- * validated against these same schemas, so mocks cannot drift from the contract.
+ * Leads contract (LEAD-001 … LEAD-004), from the backend's OpenAPI (`Lead`, `LeadPage`,
+ * `LeadCreate`) and backend/docs/api/leads.md.
  *
- * TODO(LEAD-001): confirm field names, money unit and pagination shape with the
- * backend developer; update here first, then the mocks follow automatically.
+ * The wire format is snake_case inside a `{ data }` envelope; the transforms below turn it
+ * into the camelCase shape screens use. The mock backend writes the wire format and is read
+ * through these same schemas, so it cannot drift from the contract.
+ *
+ * Money and the score are decimal strings ("125000.00"). Format them with lib/format and add
+ * them with `sumRupees` — never with `+`.
  */
 
-export const LEAD_STATUSES = [
+export const LEAD_STAGES = [
   "new",
   "contacted",
   "qualified",
@@ -18,161 +23,614 @@ export const LEAD_STATUSES = [
   "negotiation",
   "won",
   "lost",
+  "merged",
+  "dormant",
 ] as const;
-export type LeadStatus = (typeof LEAD_STATUSES)[number];
+export type LeadStage = (typeof LEAD_STAGES)[number];
 
-/** The six capture sources agreed with the client. */
-export const LEAD_SOURCES = [
-  "whatsapp",
-  "website",
-  "employee",
-  "qr_code",
-  "phone_email",
-  "offline",
-] as const;
-export type LeadSource = (typeof LEAD_SOURCES)[number];
+export const LEAD_INQUIRY_TYPES = ["commercial", "subsidised", "industrial"] as const;
+export type LeadInquiryType = (typeof LEAD_INQUIRY_TYPES)[number];
 
-export const ORDER_TYPES = [
-  "subsidised",
-  "commercial",
-  "industrial",
-  "export",
-  "complaint",
-] as const;
-export type OrderType = (typeof ORDER_TYPES)[number];
+export const LEAD_PRIORITIES = ["hot", "warm", "cold"] as const;
+export type LeadPriority = (typeof LEAD_PRIORITIES)[number];
+
+/** What made the backend suspect two leads are the same enquiry. */
+export const DUPLICATE_SIGNALS = ["mobile", "email", "name_geo"] as const;
+export type DuplicateSignal = (typeof DUPLICATE_SIGNALS)[number];
+
+const DUPLICATE_STATES = ["pending", "merged", "dismissed"] as const;
 
 const isoDateTime = z.iso.datetime({ offset: true });
+const refSchema = z.object({ id: z.string().min(1), name: z.string().min(1) });
+const userRefSchema = z.object({ id: z.string().min(1), full_name: z.string().min(1) });
 
-export const leadSchema = z.object({
+/** Every key is always present; null means "not set", never "hidden". */
+export const leadWireSchema = z.object({
   id: z.string().min(1),
-  /** Human reference, e.g. "LD-26-10042". */
-  code: z.string().min(1),
-  customerName: z.string().min(1),
-  phone: z.string().min(1),
+  /** Human reference, e.g. "POL/GJ/2026-27/00123". */
+  inquiry_no: z.string().min(1),
+  stage: z.enum(LEAD_STAGES),
+  inquiry_type: z.enum(LEAD_INQUIRY_TYPES),
+  /** A code from GET /lookups/mis-systems. */
+  mis_system: z.string().min(1),
+  /** A code from GET /lookups/lead-sources. */
+  source: z.string().min(1),
+  farmer_name: z.string().min(1),
+  /** E.164, e.g. "+919876543210". */
+  mobile: z.string().min(1),
+  email: z.string().nullable(),
+  territory: refSchema.extend({ level: z.string().min(1) }),
   village: z.string().nullable(),
-  district: z.string().min(1),
-  state: z.string().min(1),
-  source: z.enum(LEAD_SOURCES),
-  type: z.enum(ORDER_TYPES),
-  status: z.enum(LEAD_STATUSES),
-  /** Rupees. */
-  estimatedValue: z.number().nonnegative().nullable(),
-  winProbability: z.number().int().min(0).max(100),
-  crops: z.array(z.string().min(1)),
-  acreage: z.number().nonnegative().nullable(),
-  owner: z.object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    avatarUrl: z.url().nullable(),
-  }),
-  /** The channel partner who brought the lead — receives it if the owner leaves. */
-  channelPartner: z.object({ id: z.string().min(1), name: z.string().min(1) }).nullable(),
-  /** Interactions per week, oldest first. */
-  engagement: z.array(z.number().int().nonnegative()),
-  followUpAt: isoDateTime.nullable(),
-  lastActivityAt: isoDateTime.nullable(),
-  lostReason: z.string().nullable(),
-  createdAt: isoDateTime,
-  updatedAt: isoDateTime,
+  /** The staff owner; null while the lead waits in the unassigned list. */
+  owner: userRefSchema.nullable(),
+  owner_org_unit: refSchema,
+  assigned_partner: refSchema.extend({ partner_type: z.string().min(1) }).nullable(),
+  /** Decimal string; null before the lead is scored. */
+  score: z.string().nullable(),
+  priority: z.enum(LEAD_PRIORITIES).nullable(),
+  /** Rupees, as a decimal string. */
+  estimated_value: z.string().nullable(),
+  /** BE-003 · In the order sent; a crop switched off later stays, `is_active: false`. */
+  crops: z
+    .array(z.object({ code: z.string().min(1), name: z.string(), is_active: z.boolean() }))
+    .optional(),
+  /** BE-003 · Acres, a decimal string at two places. */
+  land_acres: z.string().nullish(),
+  lost_reason: refSchema.extend({ code: z.string().min(1) }).nullable(),
+  lost_note: z.string().nullable(),
+  reopen_count: z.number().int().nonnegative(),
+  /** Set on a merged lead; points at the lead that absorbed it. */
+  merged_into: z.object({ id: z.string().min(1), inquiry_no: z.string().min(1) }).nullable(),
+  first_contacted_at: isoDateTime.nullable(),
+  last_activity_at: isoDateTime,
+  created_at: isoDateTime,
+  created_by: userRefSchema.nullable(),
+  /** Pending duplicate links whose other lead the caller can also see. */
+  duplicates: z
+    .array(
+      z.object({
+        link_id: z.string().min(1),
+        lead_id: z.string().min(1),
+        inquiry_no: z.string().min(1),
+        signal: z.enum(DUPLICATE_SIGNALS),
+        score: z.string().nullish(),
+        state: z.enum(DUPLICATE_STATES),
+      }),
+    )
+    .optional(),
 });
 
-export type Lead = z.infer<typeof leadSchema>;
+/** The backend's JSON for one lead, as the mock backend must produce it. */
+export type LeadWire = z.input<typeof leadWireSchema>;
 
-export const LEAD_SORT_FIELDS = [
-  "createdAt",
-  "customerName",
-  "estimatedValue",
-  "followUpAt",
-  "winProbability",
+/** One lead, as screens read it. The domain type is inferred from this mapping. */
+export const leadSchema = leadWireSchema.transform((wire) => ({
+  id: wire.id,
+  code: wire.inquiry_no,
+  stage: wire.stage,
+  type: wire.inquiry_type,
+  misSystem: wire.mis_system,
+  source: wire.source,
+  customerName: wire.farmer_name,
+  phone: wire.mobile,
+  email: wire.email,
+  territory: wire.territory,
+  village: wire.village,
+  owner: wire.owner ? { id: wire.owner.id, name: wire.owner.full_name } : null,
+  ownerOrgUnit: wire.owner_org_unit,
+  channelPartner: wire.assigned_partner
+    ? {
+        id: wire.assigned_partner.id,
+        name: wire.assigned_partner.name,
+        partnerType: wire.assigned_partner.partner_type,
+      }
+    : null,
+  score: wire.score,
+  priority: wire.priority,
+  estimatedValue: wire.estimated_value,
+  crops: (wire.crops ?? []).map((crop) => ({
+    code: crop.code,
+    name: crop.name.trim() || crop.code,
+    isActive: crop.is_active,
+  })),
+  landAcres: wire.land_acres ?? null,
+  lostReason: wire.lost_reason,
+  lostNote: wire.lost_note,
+  reopenCount: wire.reopen_count,
+  mergedInto: wire.merged_into
+    ? { id: wire.merged_into.id, code: wire.merged_into.inquiry_no }
+    : null,
+  firstContactedAt: wire.first_contacted_at,
+  lastActivityAt: wire.last_activity_at,
+  createdAt: wire.created_at,
+  createdBy: wire.created_by ? { id: wire.created_by.id, name: wire.created_by.full_name } : null,
+  duplicates: (wire.duplicates ?? []).map((duplicate) => ({
+    linkId: duplicate.link_id,
+    leadId: duplicate.lead_id,
+    code: duplicate.inquiry_no,
+    signal: duplicate.signal,
+    score: duplicate.score ?? null,
+    state: duplicate.state,
+  })),
+}));
+
+export type Lead = z.output<typeof leadSchema>;
+
+// ── edit, delete, duplicates and merge (LEAD-010 … LEAD-012) ─────────────────────
+
+/**
+ * LEAD-010 · PATCH /leads/{id} — only what changes. email, village, estimated_value and
+ * land_acres may be sent null to clear them; the rest can't be cleared.
+ */
+export type PatchLeadRequest = Partial<Omit<CreateLeadRequest, "note">>;
+
+/** LEAD-012 · One pending pair in the review queue: both leads are in the caller's scope. */
+const duplicatePairSchema = z
+  .object({
+    link_id: z.string().min(1),
+    signal: z.enum(DUPLICATE_SIGNALS),
+    score: z.string().nullish(),
+    state: z.enum(DUPLICATE_STATES),
+    created_at: isoDateTime,
+    lead_a: leadSchema,
+    lead_b: leadSchema,
+  })
+  .transform((wire) => ({
+    linkId: wire.link_id,
+    signal: wire.signal,
+    score: wire.score ?? null,
+    createdAt: wire.created_at,
+    leadA: wire.lead_a,
+    leadB: wire.lead_b,
+  }));
+
+export type DuplicatePair = z.output<typeof duplicatePairSchema>;
+export type DuplicatePairWire = z.input<typeof duplicatePairSchema>;
+
+export const DUPLICATE_PAGE_SIZE = 20;
+
+/** GET /leads/duplicates — a cursor page, newest first. */
+export const duplicatePageSchema = cursorPageSchema(duplicatePairSchema);
+export type DuplicatePage = CursorPage<DuplicatePair>;
+export type DuplicatePageWire = { data: DuplicatePairWire[]; meta: PageMetaWire };
+
+/** POST /leads/duplicates/{linkId}/dismiss */
+export const dismissResultSchema = z
+  .object({ data: z.object({ link_id: z.string().min(1), state: z.literal("dismissed") }) })
+  .transform(({ data }) => ({ linkId: data.link_id }));
+
+/** POST /leads/{id}/merge — this lead (the loser) into the survivor. */
+export interface MergeLeadRequest {
+  readonly into_lead_id: string;
+}
+
+/** GET /leads/{id} and POST /leads: `{ data: Lead }`. */
+export const leadResponseSchema = z.object({ data: leadSchema }).transform(({ data }) => data);
+
+export type LeadResponseWire = z.input<typeof leadResponseSchema>;
+
+export type LeadPage = CursorPage<Lead>;
+
+/**
+ * GET /leads: `{ data: Lead[], meta: PageMeta }`, read one lead at a time. A lead the
+ * backend sends wrong is left out and counted rather than failing the whole page — see
+ * `cursorPageSchema`. A page where no lead matches is still a contract violation.
+ */
+export const leadPageSchema = cursorPageSchema(leadSchema);
+
+/** The backend's JSON for one page, as the mock backend must produce it. */
+export type LeadPageWire = { data: LeadWire[]; meta: PageMetaWire };
+
+// ── timeline and notes (LEAD-005, LEAD-006) ───────────────────────────────────
+
+/** The backend's limit on a note (`LeadNote.note`, 1–2,000 characters after trimming). */
+export const LEAD_NOTE_MAX_LENGTH = 2000;
+
+/** The backend allows up to 100 events a page; 20 keeps the first paint short. */
+export const TIMELINE_PAGE_SIZE = 20;
+
+/**
+ * One timeline entry. `kind` stays an open string (`lead.created`, `quotation.sent`, …) so
+ * an event the backend adds later still shows; `payload` is read per kind by
+ * `lib/timeline-entries.ts`. `actor` is null when unknown or hidden from a partner, and
+ * its name can be empty, so it is read leniently rather than dropping the event.
+ */
+const timelineEventWireSchema = z.object({
+  id: z.string().min(1),
+  kind: z.string().min(1),
+  occurred_at: isoDateTime,
+  actor: z.object({ id: z.string().min(1), full_name: z.string() }).nullish(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type TimelineEventWire = z.input<typeof timelineEventWireSchema>;
+
+export const timelineEventSchema = timelineEventWireSchema.transform((wire) => ({
+  id: wire.id,
+  kind: wire.kind,
+  occurredAt: wire.occurred_at,
+  actor: wire.actor ? { id: wire.actor.id, name: wire.actor.full_name.trim() || null } : null,
+  payload: wire.payload ?? {},
+}));
+
+export type TimelineEvent = z.output<typeof timelineEventSchema>;
+
+/** GET /leads/{id}/timeline — newest first, read one event at a time (`cursorPageSchema`). */
+export const timelinePageSchema = cursorPageSchema(timelineEventSchema);
+
+export type TimelinePage = CursorPage<TimelineEvent>;
+
+/** The backend's JSON for one timeline page, as the mock backend must produce it. */
+export type TimelinePageWire = { data: TimelineEventWire[]; meta: PageMetaWire };
+
+/** POST /leads/{id}/notes answers `{ data: TimelineEvent }`. */
+export const timelineEventResponseSchema = z
+  .object({ data: timelineEventSchema })
+  .transform(({ data }) => data);
+
+/** POST /leads/{id}/notes request body. */
+export const addLeadNoteRequestSchema = z.object({
+  note: z.string().trim().min(1).max(LEAD_NOTE_MAX_LENGTH),
+});
+
+export type AddLeadNoteRequest = z.infer<typeof addLeadNoteRequestSchema>;
+
+// ── stage change and reopen (LEAD-007) ─────────────────────────────────────────
+
+/** Where POST /leads/{id}/transition may send a lead. quoted and negotiation come from a quotation. */
+export const LEAD_TRANSITION_TARGETS = [
+  "contacted",
+  "qualified",
+  "quoted",
+  "negotiation",
+  "won",
+  "lost",
 ] as const;
+
+/** The backend's limit on a lost note and on a reopening note. */
+export const LEAD_STAGE_NOTE_MAX_LENGTH = 2000;
+
+/**
+ * POST /leads/{id}/transition. `expected_stage` is the stage on screen: if the lead has
+ * moved since, the backend answers 409 `stage_changed` instead of acting on a stale view.
+ */
+export const transitionLeadRequestSchema = z.object({
+  to_stage: z.enum(LEAD_TRANSITION_TARGETS),
+  lost_reason_id: z.string().min(1).nullable(),
+  lost_note: z.string().trim().max(LEAD_STAGE_NOTE_MAX_LENGTH).nullable(),
+  expected_stage: z.enum(LEAD_STAGES),
+});
+
+export type TransitionLeadRequest = z.infer<typeof transitionLeadRequestSchema>;
+
+/** POST /leads/{id}/reopen — a lost lead goes back to the stage it was lost from. */
+export const reopenLeadRequestSchema = z.object({
+  note: z.string().trim().max(LEAD_STAGE_NOTE_MAX_LENGTH).nullable(),
+});
+
+export type ReopenLeadRequest = z.infer<typeof reopenLeadRequestSchema>;
+
+/** The Mark lost form: a reason from the admin list (by code) and an optional note. */
+export const markLostFormSchema = z.object({
+  reasonCode: z
+    .string()
+    .nullable()
+    .refine((value) => value !== null && value !== "", { message: "Choose why the lead was lost" }),
+  note: z
+    .string()
+    .trim()
+    .max(LEAD_STAGE_NOTE_MAX_LENGTH, {
+      message: `Keep the note under ${String(LEAD_STAGE_NOTE_MAX_LENGTH)} characters`,
+    }),
+});
+
+export type MarkLostFormValues = z.input<typeof markLostFormSchema>;
+
+// ── assignment (LEAD-008) ──────────────────────────────────────────────────────
+
+/**
+ * GET /leads/assignees — the staff the caller may make a lead's owner: everyone for a
+ * global assigner, their own office tree for a district manager, nobody for other scopes.
+ */
+export const assigneeListResponseSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        id: z.string().min(1),
+        full_name: z.string().min(1),
+        org_unit: refSchema.nullish(),
+      }),
+    ),
+  })
+  .transform(({ data }) =>
+    data.map((wire) => ({
+      id: wire.id,
+      name: wire.full_name,
+      officeName: wire.org_unit?.name ?? null,
+    })),
+  );
+
+export type Assignee = z.output<typeof assigneeListResponseSchema>[number];
+export type AssigneeListWire = z.input<typeof assigneeListResponseSchema>;
+
+/** GET /lookups/partners — the channel partners in the caller's scope, searchable. */
+export const partnerPickListResponseSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        id: z.string().min(1),
+        code: z.string().min(1),
+        name: z.string().min(1),
+        partner_type: z.string().min(1),
+        territory: refSchema.extend({ level: z.string().min(1) }).nullish(),
+      }),
+    ),
+  })
+  .transform(({ data }) =>
+    data.map((wire) => ({
+      id: wire.id,
+      code: wire.code,
+      name: wire.name,
+      partnerType: wire.partner_type,
+      territoryName: wire.territory?.name ?? null,
+    })),
+  );
+
+export type PartnerPick = z.output<typeof partnerPickListResponseSchema>[number];
+export type PartnerPickListWire = z.input<typeof partnerPickListResponseSchema>;
+
+/**
+ * POST /leads/{id}/assign. A field left out is unchanged; a field sent as null is cleared.
+ * At least one must be sent.
+ */
+export const assignLeadRequestSchema = z
+  .object({
+    owner_user_id: z.string().min(1).nullable().optional(),
+    assigned_partner_id: z.string().min(1).nullable().optional(),
+  })
+  .refine((body) => "owner_user_id" in body || "assigned_partner_id" in body, {
+    path: ["owner_user_id"],
+    message: "provide an owner or a partner",
+  });
+
+export type AssignLeadRequest = z.infer<typeof assignLeadRequestSchema>;
+
+const countSchema = z.number().int().nonnegative();
+
+/**
+ * LEAD-004 · GET /leads/stats — counts over the caller's scope, with the list's default
+ * filter (merged leads left out). A bare object, not `{ data }`, and never capped.
+ * Stage keys stay open strings so a stage the backend adds never hides the counts.
+ */
+export const leadStatsSchema = z
+  .object({
+    total: countSchema,
+    by_stage: z.record(z.string(), countSchema),
+    by_priority: z.record(z.enum(LEAD_PRIORITIES), countSchema),
+    unassigned: countSchema,
+  })
+  .transform((wire) => ({
+    total: wire.total,
+    byStage: wire.by_stage,
+    byPriority: wire.by_priority,
+    unassigned: wire.unassigned,
+  }));
+
+export type LeadStats = z.output<typeof leadStatsSchema>;
+
+/** The backend's JSON for the stats, as the mock backend must produce it. */
+export type LeadStatsWire = z.input<typeof leadStatsSchema>;
+
+/**
+ * Sort columns (BE-001, backend/docs/api/leads.md). The cursor carries its sort: a cursor sent
+ * with a different `sort` or `order` is `422` on `cursor`, so changing the sort starts again
+ * from the first page.
+ */
+export const LEAD_SORT_FIELDS = ["createdAt", "customerName", "estimatedValue"] as const;
 export type LeadSortField = (typeof LEAD_SORT_FIELDS)[number];
+
+/** The backend's name for each sort field, sent as `?sort=`. */
+export const LEAD_SORT_WIRE_FIELDS: Readonly<Record<LeadSortField, string>> = {
+  createdAt: "created_at",
+  customerName: "farmer_name",
+  estimatedValue: "estimated_value",
+};
 
 export const SORT_ORDERS = ["asc", "desc"] as const;
 export type SortOrder = (typeof SORT_ORDERS)[number];
 
+/** The backend allows up to 100 rows a page. */
 export const LEAD_PAGE_SIZES = [25, 50, 100] as const;
 
 export interface LeadListParams {
-  readonly page: number;
+  /** From the previous page's `nextCursor`; null for the first page. */
+  readonly cursor: string | null;
   readonly pageSize: number;
   readonly sort: LeadSortField;
   readonly order: SortOrder;
+  /** Name, mobile or inquiry number. Already trimmed; empty means no search. */
   readonly q: string;
-  readonly status: readonly LeadStatus[];
-  readonly source: readonly LeadSource[];
-  readonly type: readonly OrderType[];
+  /** Empty means the backend's default: every stage except merged. */
+  readonly stage: readonly LeadStage[];
+  /** A lead-source code from GET /lookups/lead-sources. The backend takes one. */
+  readonly source: string | null;
+  readonly type: LeadInquiryType | null;
+  /** Territory ids from GET /leads/areas: leads in any of them or under them. At most 20. */
+  readonly areas: readonly string[];
 }
 
-export const leadListResponseSchema = z.object({
-  items: z.array(leadSchema),
-  page: z.number().int().min(1),
-  pageSize: z.number().int().min(1),
-  total: z.number().int().nonnegative(),
+// ── the area filter (LEAD-001, backend #50) ──────────────────────────────────────
+
+/** The levels the area filter drills through, top first. */
+export const LEAD_AREA_LEVELS = ["state", "district", "taluka"] as const;
+export type LeadAreaLevel = (typeof LEAD_AREA_LEVELS)[number];
+
+/** `GET /leads?territory_id=` takes at most this many areas. */
+export const MAX_LEAD_AREAS = 20;
+
+const leadAreaWireSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  level: z.enum(LEAD_AREA_LEVELS),
+  code: z.string().nullish(),
+  parent: z.object({ id: z.string().min(1), name: z.string(), level: z.string() }).nullish(),
+  /** The user's leads in this area or under it, every stage but merged. */
+  lead_count: z.number().int().nonnegative(),
 });
 
-export type LeadListResponse = z.infer<typeof leadListResponseSchema>;
+export type LeadAreaWire = z.input<typeof leadAreaWireSchema>;
 
-const countSchema = z.number().int().nonnegative();
+/** GET /leads/areas — the areas the user's leads are in, at one level, with a count each. */
+export const leadAreasResponseSchema = z
+  .object({ data: z.array(leadAreaWireSchema) })
+  .transform(({ data }) =>
+    data.map((area) => ({
+      id: area.id,
+      name: area.name,
+      level: area.level,
+      leadCount: area.lead_count,
+    })),
+  );
 
-export const leadSummarySchema = z.object({
-  total: countSchema,
-  byStatus: z.record(z.enum(LEAD_STATUSES), countSchema),
-  bySource: z.record(z.enum(LEAD_SOURCES), countSchema),
-  byType: z.record(z.enum(ORDER_TYPES), countSchema),
-  followUpsDueToday: countSchema,
-});
+export type LeadArea = z.output<typeof leadAreasResponseSchema>[number];
 
-export type LeadSummary = z.infer<typeof leadSummarySchema>;
+export interface LeadAreasParams {
+  readonly level: LeadAreaLevel;
+  /** Only areas under this territory; null at the top. */
+  readonly parentId: string | null;
+}
 
-/** POST /leads request body — what the backend receives. */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const INDIAN_MOBILE_E164 = /^\+91[6-9]\d{9}$/;
+/** Whole rupees or rupees and paise, no grouping: "125000", "125000.50". */
+const AMOUNT_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
+/** Acres: above 0, at most 99999.99, two decimals (BE-003). */
+const ACRES_PATTERN = /^\d{1,5}(\.\d{1,2})?$/;
+/** The backend takes at most this many crops on a lead. */
+export const MAX_LEAD_CROPS = 10;
+
+/** A lead sits in a district, a taluka or a village; a state is refused (BE-005). */
+export const LEAD_TERRITORY_LEVELS = ["district", "taluka", "village"] as const;
+
+/** POST /leads request body (`LeadCreate`) — what the backend receives. */
 export const createLeadRequestSchema = z.object({
-  customerName: z.string().min(2).max(120),
-  phone: z.string().regex(/^\+91[6-9]\d{9}$/),
-  village: z.string().max(80),
-  district: z.string().min(2).max(80),
-  state: z.string().min(2).max(80),
-  source: z.enum(LEAD_SOURCES),
-  type: z.enum(ORDER_TYPES),
-  estimatedValue: z.number().nonnegative().nullable(),
-  notes: z.string().max(500),
+  farmer_name: z.string().min(1).max(200),
+  mobile: z.string().regex(INDIAN_MOBILE_E164),
+  email: z.email().max(254).nullable(),
+  /** From GET /lookups/territories. The backend routes the lead to an office from it. */
+  territory_id: z.string().regex(UUID_PATTERN),
+  village: z.string().min(1).max(200).nullable(),
+  inquiry_type: z.enum(LEAD_INQUIRY_TYPES),
+  mis_system: z.string().min(1),
+  /** Null lets the backend decide from who is asking: employee for staff, dealer for partners. */
+  source: z.string().min(1).nullable(),
+  estimated_value: z.string().regex(AMOUNT_PATTERN).nullable(),
+  /** Codes from GET /lookups/crops, at most 10; [] for none. */
+  crops: z.array(z.string().min(1)).max(MAX_LEAD_CROPS),
+  /** Acres as a decimal string; null when not known. */
+  land_acres: z.string().regex(ACRES_PATTERN).nullable(),
+  /** Becomes the first entry on the lead's timeline. */
+  note: z.string().min(1).max(2000).nullable(),
 });
 
 export type CreateLeadRequest = z.infer<typeof createLeadRequestSchema>;
 
-const AMOUNT_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
+/** Empty optional text is "not set": the backend stores null, not "". */
+function emptyToNull(value: string): string | null {
+  return value === "" ? null : value;
+}
+
+/** The territory a form keeps: enough to send its id and to name it in the field. */
+const territoryChoiceSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    level: z.string().min(1),
+    parent: z.object({ name: z.string() }).nullish(),
+  })
+  .nullable()
+  .transform((territory, ctx) => {
+    if (territory === null) {
+      ctx.addIssue({ code: "custom", message: "Choose where the farmer is." });
+      return z.NEVER;
+    }
+    return territory;
+  });
 
 /**
- * The New Lead form: what the user types (strings) → the request body.
- * Error messages are user-facing copy.
+ * The New lead form: what people type → the request body. Error messages are user-facing
+ * copy. Limits mirror `LeadCreate`, so the backend refuses nothing the form accepted.
  */
-export const createLeadFormSchema = z.object({
-  customerName: z
-    .string()
-    .trim()
-    .min(2, "Enter the customer's full name.")
-    .max(120, "Keep the name under 120 characters."),
-  phone: z
-    .string()
-    .trim()
-    .refine(
-      (value) => normalizeIndianMobile(value) !== null,
-      "Enter a 10-digit Indian mobile number.",
-    )
-    .transform((value) => normalizeIndianMobile(value) ?? value),
-  village: z.string().trim().max(80, "Keep the village under 80 characters."),
-  district: z.string().trim().min(2, "Enter the district."),
-  state: z.string().trim().min(2, "Enter the state."),
-  source: z.enum(LEAD_SOURCES, "Choose where this lead came from."),
-  type: z.enum(ORDER_TYPES, "Choose the order type."),
-  estimatedValue: z
-    .string()
-    .trim()
-    .refine(
-      (value) => value === "" || AMOUNT_PATTERN.test(value),
-      "Enter an amount in rupees, e.g. 125000.",
-    )
-    .transform((value) => (value === "" ? null : Number(value))),
-  notes: z.string().trim().max(500, "Keep notes under 500 characters."),
-});
+export const createLeadFormSchema = z
+  .object({
+    customerName: z
+      .string()
+      .trim()
+      .min(1, "Enter the farmer's name.")
+      .max(200, "Keep the name under 200 characters."),
+    phone: z
+      .string()
+      .trim()
+      .refine(
+        (value) => normalizeIndianMobile(value) !== null,
+        "Enter a 10-digit Indian mobile number.",
+      )
+      .transform((value) => normalizeIndianMobile(value) ?? value),
+    email: z
+      .string()
+      .trim()
+      .max(254, "Keep the email under 254 characters.")
+      .refine(
+        (value) => value === "" || z.email().safeParse(value).success,
+        "Enter an email like name@example.com, or leave it empty.",
+      )
+      .transform(emptyToNull),
+    territory: territoryChoiceSchema,
+    village: z
+      .string()
+      .trim()
+      .max(200, "Keep the village under 200 characters.")
+      .transform(emptyToNull),
+    type: z.enum(LEAD_INQUIRY_TYPES, "Choose the inquiry type."),
+    misSystem: z.string("Choose the irrigation system.").min(1, "Choose the irrigation system."),
+    source: z.string().nullish(),
+    estimatedValue: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value === "" || AMOUNT_PATTERN.test(value),
+        "Enter an amount in rupees, e.g. 125000.",
+      )
+      .transform(emptyToNull),
+    crops: z.array(z.string()).max(MAX_LEAD_CROPS, "Choose at most 10 crops."),
+    landAcres: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value === "" || (ACRES_PATTERN.test(value) && Number(value) > 0),
+        "Enter the land in acres, e.g. 4.5.",
+      )
+      .transform(emptyToNull),
+    note: z
+      .string()
+      .trim()
+      .max(2000, "Keep the note under 2,000 characters.")
+      .transform(emptyToNull),
+  })
+  .transform((values): CreateLeadRequest => ({
+    farmer_name: values.customerName,
+    mobile: values.phone,
+    email: values.email,
+    territory_id: values.territory.id,
+    village: values.village,
+    inquiry_type: values.type,
+    mis_system: values.misSystem,
+    source: values.source ?? null,
+    estimated_value: values.estimatedValue,
+    crops: values.crops,
+    land_acres: values.landAcres,
+    note: values.note,
+  }));
 
 export type CreateLeadFormValues = z.input<typeof createLeadFormSchema>;
+export type CreateLeadFormField = keyof CreateLeadFormValues;

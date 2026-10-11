@@ -2,10 +2,14 @@
 
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 
-import { markReadLocally } from "@/features/notifications/lib/mark-read";
+import { markReadLocally, unreadAfterMarking } from "@/features/notifications/lib/mark-read";
 
 import { markNotificationsRead } from "./notifications.api";
-import { notificationKeys, notificationListQueryOptions } from "./notifications.queries";
+import {
+  notificationCountQueryOptions,
+  notificationKeys,
+  notificationListQueryOptions,
+} from "./notifications.queries";
 import type {
   MarkNotificationsReadRequest,
   MarkNotificationsReadResult,
@@ -13,12 +17,13 @@ import type {
 } from "./notifications.schemas";
 
 interface MarkReadContext {
-  readonly previous: NotificationList | undefined;
+  readonly previousList: NotificationList | undefined;
+  readonly previousCount: number | undefined;
 }
 
 /**
- * NOTIF-002. Updates the bell at once (optimistically), restores it if the request
- * fails, and refetches afterwards so the count matches the server.
+ * NOTIF-002. Updates the list and the badge at once (optimistically), restores both if the
+ * request fails, takes the backend's new count when it answers, and refetches afterwards.
  */
 export function useMarkNotificationsRead(): UseMutationResult<
   MarkNotificationsReadResult,
@@ -27,26 +32,40 @@ export function useMarkNotificationsRead(): UseMutationResult<
   MarkReadContext
 > {
   const queryClient = useQueryClient();
-  const { queryKey } = notificationListQueryOptions();
+  const listKey = notificationListQueryOptions().queryKey;
+  const countKey = notificationCountQueryOptions().queryKey;
 
   return useMutation({
     mutationKey: [...notificationKeys.all, "read"],
     mutationFn: (request: MarkNotificationsReadRequest) => markNotificationsRead(request),
     meta: { dataId: "NOTIF-002" },
     onMutate: async (request): Promise<MarkReadContext> => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData(queryKey);
-      if (previous !== undefined) {
+      await queryClient.cancelQueries({ queryKey: notificationKeys.all });
+      const previousList = queryClient.getQueryData(listKey);
+      const previousCount = queryClient.getQueryData(countKey);
+      if (previousList !== undefined) {
         queryClient.setQueryData(
-          queryKey,
-          markReadLocally(previous, request, new Date().toISOString()),
+          listKey,
+          markReadLocally(previousList, request, new Date().toISOString()),
         );
       }
-      return { previous };
+      if (previousCount !== undefined) {
+        queryClient.setQueryData(
+          countKey,
+          unreadAfterMarking(previousCount, previousList, request),
+        );
+      }
+      return { previousList, previousCount };
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData(countKey, result.unreadCount);
     },
     onError: (_error, _request, context) => {
-      if (context?.previous !== undefined) {
-        queryClient.setQueryData(queryKey, context.previous);
+      if (context?.previousList !== undefined) {
+        queryClient.setQueryData(listKey, context.previousList);
+      }
+      if (context?.previousCount !== undefined) {
+        queryClient.setQueryData(countKey, context.previousCount);
       }
     },
     onSettled: () => {

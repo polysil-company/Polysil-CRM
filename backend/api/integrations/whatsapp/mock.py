@@ -44,9 +44,10 @@ class MockProvider:
 
         settings = get_settings()
         return [
-            {"name": getattr(settings, spec.name_setting), "status": "APPROVED",
+            {"name": getattr(settings, spec.name_setting) if spec.name_setting else key,
+             "status": "APPROVED",
              "language": settings.whatsapp_template_language,
              "category": "AUTHENTICATION" if spec.button else "UTILITY",
              "placeholders": len(spec.params)}
-            for spec in TEMPLATES.values()
+            for key, spec in TEMPLATES.items()
         ]

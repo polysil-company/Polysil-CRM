@@ -192,6 +192,17 @@ describe("[REPO-001] CHANGELOG.md rendering", () => {
     expect(renderChangelog([newer])).toContain("\n##### Validation\n");
   });
 
+  it("opens with an index, one row per change, newest first, each linking to its entry", () => {
+    const output = renderChangelog([older, newer]);
+
+    expect(output).toContain("## Index\n\n2 changes, newest first.");
+    expect(output).toContain(
+      `| 2026-09-14 | [New lead dialog](changelog/entries/${FILE}) **(breaking)** | \`feature\` | \`LEAD-002\` |`,
+    );
+    expect(output.indexOf("| 2026-09-14 |")).toBeLessThan(output.indexOf("| 2026-09-13 |"));
+    expect(output.indexOf("## Index")).toBeLessThan(output.indexOf("## 14 September 2026"));
+  });
+
   it("says so when there are no entries", () => {
     expect(renderChangelog([])).toContain("_No entries yet._");
   });

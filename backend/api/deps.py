@@ -8,7 +8,7 @@ Sessions are created here and in `worker/` and nowhere else (CLAUDE.md 4.1 rule 
 `tests/test_scaffold.py` greps for violations and fails the build on one, because
 the claim propagation below only works if exactly one place owns the boundary.
 
-There are two dependencies and there will not be a third:
+There are two dependencies, and one context manager for the public form:
 
   * `get_db` - a request that carries an access token. Verifies it, opens one
     transaction, sets the claim inside that transaction, then switches into
@@ -17,6 +17,10 @@ There are two dependencies and there will not be a third:
     refresh and cookie-only logout (rule 25). Sets no claim at all, switches into
     `app_anon`, and reaches the database only through the eight `SECURITY DEFINER`
     functions.
+  * `intake_session` - the public lead form (FS-003a). Enters `app_anon`, consumes
+    the WhatsApp code, and only when it matched sets the intake principal's claim
+    and switches into `app_role`. The order of those two steps is the whole of its
+    security: anyone can call it, and only a verified code reaches the claim.
 
 The order inside `get_db` is load-bearing (FS-002 5.1): the claims lookup runs
 first, as the owner, because under `app_role` a self-only policy on `app_user` would
@@ -27,6 +31,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import AsyncIterator, Callable, Coroutine
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Annotated, Any
 
 import structlog
@@ -59,7 +65,7 @@ log = structlog.get_logger()
 # held.
 _CLAIMS_QUERY = text(
     """
-    SELECT u.is_active, u.token_version, u.must_change_password
+    SELECT u.is_active, u.token_version, u.must_change_password, u.user_type::text AS user_type
       FROM app_user u
       JOIN session s ON s.id = :sid AND s.user_id = u.id
      WHERE u.id = :sub
@@ -86,6 +92,18 @@ def _password_change_allowed(request: Request) -> bool:
     path = getattr(route, "path", None) or request.url.path
     path = _API_PREFIX_RE.sub("", path)
     return (request.method.upper(), path) in _PASSWORD_CHANGE_ALLOWED
+
+
+# FS-044: a consumer reaches the auth routes and the portal, nothing else. Checked
+# here, on the matched route, so a new router can never forget it (plan review B-1);
+# the consumer floor in the database is the second belt.
+_CONSUMER_PREFIXES = ("/auth", "/portal")
+
+
+def _consumer_allowed(request: Request) -> bool:
+    route = request.scope.get("route")
+    path = _API_PREFIX_RE.sub("", getattr(route, "path", None) or request.url.path)
+    return any(path == p or path.startswith(p + "/") for p in _CONSUMER_PREFIXES)
 
 
 def bearer_token(request: Request) -> str | None:
@@ -132,6 +150,8 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
         # answer is password_change_required rather than insufficient_permission.
         if row.must_change_password and not _password_change_allowed(request):
             raise PasswordChangeRequiredError()
+        if row.user_type == "consumer" and not _consumer_allowed(request):
+            raise ForbiddenError("This is for staff and dealers.", code="consumer_not_allowed")
 
         # TRANSACTION-LOCAL. The third argument is the whole point: a plain SET
         # here leaks this user's identity onto whichever request next borrows this
@@ -156,7 +176,8 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
 
 
 async def get_db_anon() -> AsyncIterator[AsyncSession]:
-    """A transaction with no claim at all, for the four pre-auth endpoints.
+    """A transaction with no claim at all, for the pre-auth endpoints: the four
+    auth doors and the two public quotation reads (FS-005).
 
     A connection with no claim must not be able to read `app_user` freely: it holds
     every password hash, and once `app_user` acquires RLS in FS-002 a NULL claim
@@ -175,6 +196,38 @@ async def get_db_anon() -> AsyncIterator[AsyncSession]:
     async with async_session_factory() as session, session.begin():
         await enter_role(session, settings.db_anon_role)
         yield session
+
+
+@dataclass
+class Intake:
+    """What the code check found. `session` is set only when it matched."""
+
+    outcome: str                       # ok, replay or invalid
+    session: AsyncSession | None = None
+    challenge_id: str | None = None
+    inquiry_no: str | None = None      # the earlier lead's, on a replay
+
+
+@asynccontextmanager
+async def intake_session(mobile: str, code_hash: str) -> AsyncIterator[Intake]:
+    """FS-003a §5, plan review B-1. One transaction: consume the code as `app_anon`;
+    on a match, the intake claim and `app_role`, and the caller creates the lead in
+    the same transaction. A wrong code is returned, not raised, so its attempt
+    count commits; an error inside the block rolls the consumption back, so the
+    farmer's code is still good after a 422 elsewhere (EC-3)."""
+    settings = get_settings()
+    async with async_session_factory() as session, session.begin():
+        await enter_role(session, settings.db_anon_role)
+        row = (await session.execute(
+            text("SELECT outcome, challenge_id, inquiry_no FROM lead_intake_consume(:m, :h)"),
+            {"m": mobile, "h": code_hash})).one()
+        if row.outcome != "ok":
+            yield Intake(row.outcome, inquiry_no=row.inquiry_no)
+            return
+        await session.execute(text("SELECT set_config('app.current_user_id', :u, true)"),
+                              {"u": settings.intake_user_id})
+        await enter_role(session, settings.db_app_role)
+        yield Intake("ok", session=session, challenge_id=str(row.challenge_id))
 
 
 async def assert_runtime_role(settings: Settings | None = None) -> None:
@@ -259,6 +312,35 @@ def require(module: str, action: str) -> Callable[..., Coroutine[Any, Any, None]
         )
         if not allowed.scalar_one():
             raise ForbiddenError()
+        if module == "tasks" and await _dealer_tasks_off(db):
+            raise ForbiddenError()
+
+    return dep
+
+
+# FS-037: portal roles hold `tasks V:own E` (RBAC.md 6.3), but a dealer has tasks
+# only while the `tasks_for_dealers` setting is on. Off, a dealer is refused the
+# tasks routes and gets no tasks scope, as before 042.
+_DEALER_TASKS_OFF = text(
+    "SELECT app_current_partner() IS NOT NULL AND app_setting_text('tasks_for_dealers') <> 'on'"
+)
+
+
+async def _dealer_tasks_off(db: AsyncSession) -> bool:
+    return bool((await db.execute(_DEALER_TASKS_OFF)).scalar_one())
+
+
+def require_any(*pairs: tuple[str, str]) -> Callable[..., Coroutine[Any, Any, None]]:
+    """`require()` for an endpoint shared by several documents: any one of the
+    permissions passes. The per-document check stays with the database."""
+
+    async def dep(db: DbSession) -> None:
+        for module, action in pairs:
+            allowed = await db.execute(
+                text("SELECT app_has_permission(:m, :a)"), {"m": module, "a": action})
+            if allowed.scalar_one():
+                return
+        raise ForbiddenError()
 
     return dep
 
@@ -280,7 +362,8 @@ def require(module: str, action: str) -> Callable[..., Coroutine[Any, Any, None]
 # predicate for it is the self row or false -- the service never issues an
 # unscoped read (rule 2).
 _ANCHOR_QUERY = text(
-    "SELECT org_unit_id, partner_id FROM app_user WHERE id = (SELECT app_current_user_id())"
+    "SELECT org_unit_id, partner_id, user_type::text AS user_type FROM app_user "
+    "WHERE id = (SELECT app_current_user_id())"
 )
 _PERMS_QUERY = text(
     "SELECT rp.module, rp.action::text AS action, rp.scope::text AS scope "
@@ -292,12 +375,17 @@ _PERMS_QUERY = text(
 async def get_caller(db: DbSession, claims: Claims) -> Caller:
     anchor = (await db.execute(_ANCHOR_QUERY)).one()
     rows = (await db.execute(_PERMS_QUERY)).all()
+    holds_tasks = any(r.module == "tasks" for r in rows)
+    if anchor.partner_id is not None and holds_tasks and await _dealer_tasks_off(db):
+        rows = [r for r in rows if r.module != "tasks"]
     return Caller(
         user_id=claims.sub,
         org_unit_id=str(anchor.org_unit_id) if anchor.org_unit_id is not None else None,
         partner_id=str(anchor.partner_id) if anchor.partner_id is not None else None,
         scopes={r.module: r.scope for r in rows if r.action == "view"},
         deletes=frozenset(r.module for r in rows if r.action == "delete"),
+        user_type=anchor.user_type,
+        permissions=frozenset((r.module, r.action) for r in rows),
     )
 
 

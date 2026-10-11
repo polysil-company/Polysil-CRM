@@ -78,7 +78,7 @@ def _dsn() -> dict | None:
             env[k.strip()] = v.strip()
     if not all(env.get(k) for k in ("DB_USER", "DB_PASSWORD", "DB_NAME")):
         return None
-    return dict(host="127.0.0.1", port=6432, user=env["DB_USER"],
+    return dict(host="127.0.0.1", port=int(env.get("PGBOUNCER_PORT", "6432")), user=env["DB_USER"],
                 password=env["DB_PASSWORD"], dbname=env["DB_NAME"], connect_timeout=4)
 
 

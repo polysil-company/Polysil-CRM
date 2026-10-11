@@ -18,7 +18,6 @@ from __future__ import annotations
 import itertools
 import uuid
 from collections.abc import AsyncIterator, Callable
-from dataclasses import dataclass
 from decimal import Decimal
 
 import httpx
@@ -27,26 +26,12 @@ import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.api.conftest import V1, Admin, _auth, _key
+from tests.api.conftest import V1, Admin, Catalogue, _auth, _key
 
 pytestmark = pytest.mark.db
 
 D = Decimal
 AS_OF = "2020-06-01"
-
-
-@dataclass
-class Catalogue:
-    """One product, classified and taxed, priced in a list of this test's own."""
-
-    product_id: str
-    description: str
-    category: str
-    uom: str
-    gstin_id: str
-    gujarat_district_id: str
-    price_list_id: str
-    rate: str
 
 
 @pytest_asyncio.fixture
@@ -61,85 +46,6 @@ async def trader(sessions: Callable[[], AsyncSession], admin: Admin) -> AsyncIte
         {"r": admin.user.role_id})
     await s.commit()
     yield admin
-
-
-def _gstin() -> str:
-    """A registration number of this test's own.
-
-    `ck_seller_gstin_format` is two digits, five letters, four digits, a letter,
-    then three alphanumerics, and `gstin` is uniquely indexed. Varying one
-    character of a hex tag gives sixteen possible numbers, so a file with thirty
-    tests collides with itself - and one of the sixteen is the seeded
-    registration, which collides on the first run.
-    """
-    alnum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    n = uuid.uuid4().int
-    tail = "".join(alnum[(n >> (6 * i)) % 36] for i in range(3))
-    return f"24AAAAA{n % 9000 + 1000:04d}A{tail}"
-
-
-@pytest_asyncio.fixture
-async def catalogue(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Catalogue]:
-    tag = uuid.uuid4().hex[:8]
-    description = f"TEST PIPE {tag}"
-    s = sessions()
-    category = (await s.execute(text(
-        "SELECT code::text FROM product_category ORDER BY sort_order LIMIT 1"))).scalar_one()
-    uom = (await s.execute(text(
-        "SELECT code::text FROM uom WHERE decimals = 0 LIMIT 1"))).scalar_one()
-    product = str((await s.execute(text(
-        "INSERT INTO product (description, product_category_id, quotation_category, uom_id, "
-        "  provisional_fields) "
-        "SELECT CAST(:d AS citext), c.id, 'field', u.id, ARRAY['gst_slab','mrp']::text[] "
-        "FROM product_category c, uom u "
-        "WHERE c.code = CAST(:c AS citext) AND u.code = CAST(:u AS citext) RETURNING id"),
-        {"d": description, "c": category, "u": uom})).scalar_one())
-    await s.execute(text(
-        "INSERT INTO product_hsn (product_id, hsn_code, effective_from) "
-        "VALUES (CAST(:p AS uuid), '3917', DATE '2019-01-01')"), {"p": product})
-    # 3917 already carries a rate from 2026-04-01; this one covers the test window
-    # and closes before it, so the two never overlap.
-    await s.execute(text(
-        "INSERT INTO gst_rate (hsn_code, rate, effective_from, effective_to) "
-        "VALUES ('3917', 5, DATE '2019-01-01', DATE '2021-01-01')"))
-    # A second registration, not the default: the unique index allows only one
-    # default, and the seeded one does not start until 2026.
-    gstin = str((await s.execute(text(
-        "INSERT INTO seller_gstin (gstin, legal_name, state_territory_id, effective_from, "
-        "  effective_to) "
-        "SELECT CAST(:g AS citext), 'Polysil Test', t.id, DATE '2019-01-01', DATE '2021-01-01' "
-        "FROM territory t WHERE t.level = 'state' AND t.code = 'GJ' RETURNING id"),
-        {"g": _gstin()})).scalar_one())
-    district = str((await s.execute(text(
-        "SELECT d.id FROM territory d JOIN territory s ON s.id = d.parent_id "
-        "WHERE s.level = 'state' AND s.code = 'GJ' AND d.level = 'district' LIMIT 1"
-    ))).scalar_one())
-    price_list = str((await s.execute(text(
-        "INSERT INTO price_list (name, channel_tier, status, published_at, effective_from, "
-        "  effective_to, is_provisional) "
-        "VALUES (:n, 'farmer', 'published', now(), DATE '2020-01-01', DATE '2021-01-01', true) "
-        "RETURNING id"), {"n": f"test list {tag}"})).scalar_one())
-    await s.execute(text(
-        "INSERT INTO price_list_item (price_list_id, product_id, rate) "
-        "VALUES (CAST(:l AS uuid), CAST(:p AS uuid), 103.19)"),
-        {"l": price_list, "p": product})
-    await s.commit()
-
-    try:
-        yield Catalogue(product, description, category, uom, gstin, district, price_list,
-                        "103.19")
-    finally:
-        c = sessions()
-        for stmt in (
-            "DELETE FROM price_list_item WHERE product_id = CAST(:p AS uuid)",
-            "DELETE FROM price_list WHERE id = CAST(:l AS uuid)",
-            "DELETE FROM product_hsn WHERE product_id = CAST(:p AS uuid)",
-            "DELETE FROM gst_rate WHERE hsn_code = '3917' AND effective_to = DATE '2021-01-01'",
-            "DELETE FROM seller_gstin WHERE id = CAST(:g AS uuid)",
-            "DELETE FROM product WHERE id = CAST(:p AS uuid)",
-        ):
-            await c.execute(text(stmt), {"p": product, "l": price_list, "g": gstin})
-        await c.commit()
 
 
 _SLOT = itertools.count()
@@ -455,6 +361,44 @@ async def test_an_intra_state_quotation_splits_the_tax_and_reports_every_figure(
 
     assert data["totals"]["total"] == "1950.30"
     assert any(w.startswith("provisional_pricing:") for w in data["warnings"])
+
+
+async def test_the_preview_takes_three_discount_tiers_and_prints_each(
+        client: httpx.AsyncClient, trader: Admin, catalogue: Catalogue) -> None:
+    """FS-005 rule 6, the spec's own example: 1857.42 less 10 % then 5 %. Each
+    tier is a percentage of the running balance, rounded before the next, and the
+    response carries every column the client's sheet prints so nothing on the
+    screen derives one. `discount` is the sum of the tiers, not gross x
+    discount_pct."""
+    h = await _auth(client, trader.user)
+    r = await client.post(f"{V1}/pricing/quote-lines", headers=h, json=_quote(
+        catalogue, lines=[{"product_id": catalogue.product_id, "qty": "18",
+                           "discount_pct": "10", "discount2_pct": "5.000"}]))
+    assert r.status_code == 200, r.text
+    line = r.json()["data"]["lines"][0]
+    assert (line["gross"], line["discount_pct"], line["discount1_amt"],
+            line["after_discount1"]) == ("1857.42", "10.000", "185.74", "1671.68")
+    assert (line["discount2_pct"], line["discount2_amt"],
+            line["after_discount2"]) == ("5.000", "83.58", "1588.10")
+    assert (line["discount3_pct"], line["discount3_amt"]) == ("0.000", "0.00")
+    assert line["discount"] == "269.32" and line["taxable"] == "1588.10"
+    assert line["cgst"] == line["sgst"] == "39.70" and line["total"] == "1667.50"
+    assert r.json()["data"]["totals"]["discount"] == "269.32"
+
+    # one tier is the cascade with two zero tiers: the old fields keep their meaning
+    one = await client.post(f"{V1}/pricing/quote-lines", headers=h, json=_quote(
+        catalogue, lines=[{"product_id": catalogue.product_id, "qty": "18",
+                           "discount_pct": "10"}]))
+    old = one.json()["data"]["lines"][0]
+    assert old["discount"] == old["discount1_amt"] == "185.74"
+    assert old["taxable"] == old["after_discount1"] == old["after_discount2"] == "1671.68"
+
+    # an out-of-range second tier names its own field
+    bad = await client.post(f"{V1}/pricing/quote-lines", headers=h, json=_quote(
+        catalogue, lines=[{"product_id": catalogue.product_id, "qty": "18",
+                           "discount2_pct": "100.5"}]))
+    assert bad.status_code == 422
+    assert "lines.0.discount2_pct" in bad.json()["error"]["fields"]  # the schema refuses it first
 
 
 async def test_an_inter_state_quotation_charges_igst_at_the_full_slab(

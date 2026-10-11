@@ -25,24 +25,44 @@ TRANSITIONS: dict[str, frozenset[str]] = {
     "new": frozenset({"contacted", "lost"}),
     "contacted": frozenset({"qualified", "lost"}),
     "qualified": frozenset({"quoted", "lost"}),
-    "quoted": frozenset({"negotiation", "lost"}),
+    # quoted -> won: a quotation accepted as sent never passes through negotiation,
+    # and the flowchart's straight line would otherwise force a fake stage (FS-005 3)
+    "quoted": frozenset({"negotiation", "won", "lost"}),
     "negotiation": frozenset({"won", "lost"}),
+    # the worker parks a lead here; a person closes it as lost, or reopens it (FS-035)
+    "dormant": frozenset({"lost"}),
 }
+
+# Stages a lead leaves through POST /leads/{id}/reopen: lost returns to the stage it
+# was lost from, dormant to the stage it was swept from (FS-035 rule 10).
+REOPENABLE: frozenset[str] = frozenset({"lost", "dormant"})
 
 # won, lost and merged accept no transition and no edit; a lost lead is reopened.
 TERMINAL: frozenset[str] = frozenset({"won", "lost", "merged"})
 
-# Moving into these needs an accepted quotation, and no quotation table exists yet,
-# so the service refuses them with quotation_required until FS-005 (GAP-051).
-REQUIRES_QUOTATION: frozenset[str] = frozenset({"quoted", "negotiation", "won"})
+# Reached through the quotation, never from the lead endpoint: sending one moves
+# the lead to quoted, a negotiation moves it on (FS-005 3). Refused here with
+# quotation_required.
+VIA_QUOTATION: frozenset[str] = frozenset({"quoted", "negotiation"})
+# Reachable from the lead endpoint once an accepted quotation is linked
+# (AC-LEAD-6, GAP-051 closed by FS-005); refused with quotation_required until then.
+REQUIRES_QUOTATION: frozenset[str] = frozenset({"won"})
 
 # A lead must carry all of these before it can be qualified (FS-003 3).
 QUALIFICATION_FIELDS: tuple[str, ...] = (
     "farmer_name", "mobile", "territory_id", "mis_system_id", "inquiry_type")
 
 
-def can_transition(frm: str, to: str) -> bool:
-    """True if `frm -> to` is a move the stage machine allows."""
+# FS-053 (GAP-294): a prospective dealer is won without a quotation; winning starts
+# the dealer application
+DEALERSHIP: str = "dealership"
+
+
+def can_transition(frm: str, to: str, inquiry_type: str | None = None) -> bool:
+    """True if `frm -> to` is a move the stage machine allows. A dealership lead may
+    also go from qualified straight to won."""
+    if inquiry_type == DEALERSHIP and frm == "qualified" and to == "won":
+        return True
     return to in TRANSITIONS.get(frm, frozenset())
 
 
@@ -115,7 +135,9 @@ def score(
            + config["w_value"] * value
            + config["w_speed"] * speed
            + config["w_engagement"] * engagement)
-    total = raw.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    # a whole number: staff read 27.5 as more precise than the weights are (walk R-12),
+    # and the band follows the number they see
+    total = raw.quantize(_ONE, rounding=ROUND_HALF_UP)
 
     if total >= config["threshold_hot"]:
         band = "hot"
@@ -124,3 +146,45 @@ def score(
     else:
         band = "cold"
     return total, band
+
+# ── what a partner reads of a lead's history (ISS-107, GAP-284) ──────────────
+
+# GAP-284: client question 20.1 is open. The suggested answer is applied: duplicate
+# handling, staff notes and the lost reason are internal; the dealer's own words stay.
+PARTNER_HIDDEN_KINDS: frozenset[str] = frozenset(
+    {"lead.duplicate_flagged", "lead.duplicate_dismissed", "lead.merged"})
+# the stage change stays (the dealer sees the lead is lost); its staff words do not
+PARTNER_STRIPPED_KEYS: frozenset[str] = frozenset(
+    {"lost_reason_id", "lost_reason", "lost_note", "note"})
+
+
+def partner_timeline_entry(kind: str, payload: dict[str, object], *,
+                           own: bool) -> dict[str, object] | None:
+    """The entry as a partner caller reads it, or None when it is hidden. `own` is
+    true when the caller wrote it: a partner always reads its own words."""
+    if own:
+        return payload
+    if kind in PARTNER_HIDDEN_KINDS or kind == "lead.note_added":
+        return None
+    if kind in ("lead.stage_changed", "lead.reopened"):
+        return {k: v for k, v in payload.items() if k not in PARTNER_STRIPPED_KEYS}
+    return payload
+
+
+# ── land (FS-052) ────────────────────────────────────────────────────────────
+
+ACRES_PER_HECTARE: Decimal = Decimal("2.4710538")
+_CENT = Decimal("0.01")
+
+
+def acres_to_hectares(acres: Decimal) -> Decimal:
+    """The stored hectares for acres typed in: two places, half up, as migration 063."""
+    return (acres / ACRES_PER_HECTARE).quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+def hectares_to_acres(hectares: Decimal | None) -> Decimal | None:
+    """What the generated `land_acres` column holds: round(hectares * 2.4710538, 2)."""
+    if hectares is None:
+        return None
+    return (hectares * ACRES_PER_HECTARE).quantize(_CENT, rounding=ROUND_HALF_UP)
+

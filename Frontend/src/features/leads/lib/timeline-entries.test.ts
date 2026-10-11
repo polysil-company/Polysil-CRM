@@ -1,0 +1,318 @@
+import { describe, expect, it } from "vitest";
+
+import type { TimelineEvent } from "@/features/leads/api/leads.schemas";
+
+import {
+  assignmentSentence,
+  joinFields,
+  labelForUnknownKind,
+  toTimelineEntry,
+  type AssignmentChange,
+} from "./timeline-entries";
+
+const LEAD_ID = "lead-1";
+
+function event(kind: string, payload: Record<string, unknown> = {}): TimelineEvent {
+  return {
+    id: `evt-${kind}`,
+    kind,
+    occurredAt: "2026-09-20T10:00:00+05:30",
+    actor: { id: "usr-1", name: "Asha Patel" },
+    payload,
+  };
+}
+
+describe("[LEAD-005] toTimelineEntry", () => {
+  it("reads a created lead with its source", () => {
+    expect(toTimelineEntry(event("lead.created", { source: "agri_fair" }), LEAD_ID)).toEqual({
+      type: "created",
+      source: "agri_fair",
+    });
+  });
+
+  it("reads a note, and falls back to a label when the text is missing", () => {
+    expect(
+      toTimelineEntry(event("lead.note_added", { note: "Called, wants drip" }), LEAD_ID),
+    ).toEqual({
+      type: "note",
+      note: "Called, wants drip",
+    });
+    expect(toTimelineEntry(event("lead.note_added", { note: "   " }), LEAD_ID)).toEqual({
+      type: "other",
+      label: "Note added",
+    });
+  });
+
+  it("reads a stage change, with the lost reason and note on a lost lead", () => {
+    expect(
+      toTimelineEntry(
+        event("lead.stage_changed", {
+          from: "qualified",
+          to: "lost",
+          lost_reason_id: "reason-9",
+          lost_note: "Bought from a competitor",
+        }),
+        LEAD_ID,
+      ),
+    ).toEqual({
+      type: "stage",
+      from: "qualified",
+      to: "lost",
+      lostReasonId: "reason-9",
+      lostNote: "Bought from a competitor",
+    });
+  });
+
+  it("reads a stage the frontend does not know as null rather than dropping the event", () => {
+    expect(
+      toTimelineEntry(event("lead.stage_changed", { from: 3, to: "archived" }), LEAD_ID),
+    ).toEqual({ type: "stage", from: null, to: null, lostReasonId: null, lostNote: null });
+  });
+
+  it("reads a reopening with its note", () => {
+    expect(
+      toTimelineEntry(
+        event("lead.reopened", { from: "lost", to: "contacted", note: "Back" }),
+        LEAD_ID,
+      ),
+    ).toEqual({ type: "reopened", to: "contacted", note: "Back" });
+  });
+
+  it("tells a set owner from a cleared one, and leaves an untouched partner alone", () => {
+    expect(toTimelineEntry(event("lead.assigned", { owner_user_id: "usr-2" }), LEAD_ID)).toEqual({
+      type: "assigned",
+      owner: { kind: "set", name: null },
+      partner: { kind: "unchanged", name: null },
+      previousOwnerName: null,
+    });
+    expect(
+      toTimelineEntry(
+        event("lead.assigned", { owner_user_id: null, assigned_partner_id: "p-1" }),
+        LEAD_ID,
+      ),
+    ).toEqual({
+      type: "assigned",
+      owner: { kind: "cleared", name: null },
+      partner: { kind: "set", name: null },
+      previousOwnerName: null,
+    });
+  });
+
+  it("reads the names written beside the ids (BE-006)", () => {
+    expect(
+      toTimelineEntry(
+        event("lead.assigned", {
+          owner_user_id: "usr-2",
+          owner_name: "Ravi Joshi",
+          previous_owner_user_id: "usr-1",
+          previous_owner_name: "Asha Mehta",
+          assigned_partner_id: "p-1",
+          partner_name: "Shree Agro",
+        }),
+        LEAD_ID,
+      ),
+    ).toEqual({
+      type: "assigned",
+      owner: { kind: "set", name: "Ravi Joshi" },
+      partner: { kind: "set", name: "Shree Agro" },
+      previousOwnerName: "Asha Mehta",
+    });
+    // A cleared id has a null name; an empty name is no name.
+    expect(
+      toTimelineEntry(
+        event("lead.assigned", {
+          owner_user_id: null,
+          owner_name: null,
+          assigned_partner_id: "p-1",
+          partner_name: " ",
+        }),
+        LEAD_ID,
+      ),
+    ).toMatchObject({
+      owner: { kind: "cleared", name: null },
+      partner: { kind: "set", name: null },
+    });
+  });
+
+  it("names the edited fields in words", () => {
+    expect(
+      toTimelineEntry(
+        event("lead.updated", { changed: { farmer_name: "A", territory_id: "t", crop_type: "x" } }),
+        LEAD_ID,
+      ),
+    ).toEqual({ type: "updated", fields: ["farmer name", "territory", "Crop type"] });
+    expect(toTimelineEntry(event("lead.updated", { changed: "oops" }), LEAD_ID)).toEqual({
+      type: "updated",
+      fields: [],
+    });
+  });
+
+  it("reads a merge from the side of the lead on screen", () => {
+    const merge = { survivor: LEAD_ID, loser: "lead-2" };
+    expect(toTimelineEntry(event("lead.merged", merge), LEAD_ID)).toEqual({
+      type: "merged",
+      role: "survivor",
+      otherLeadId: "lead-2",
+    });
+    expect(toTimelineEntry(event("lead.merged", merge), "lead-2")).toEqual({
+      type: "merged",
+      role: "loser",
+      otherLeadId: LEAD_ID,
+    });
+    expect(toTimelineEntry(event("lead.merged", merge), "lead-3")).toEqual({
+      type: "other",
+      label: "Leads merged",
+    });
+  });
+
+  it("counts flagged duplicates, and reads dismissals and deletion", () => {
+    expect(
+      toTimelineEntry(event("lead.duplicate_flagged", { matches: [{}, {}] }), LEAD_ID),
+    ).toEqual({ type: "duplicate-flagged", count: 2 });
+    expect(toTimelineEntry(event("lead.duplicate_dismissed"), LEAD_ID)).toEqual({
+      type: "duplicate-dismissed",
+    });
+    expect(toTimelineEntry(event("lead.deleted"), LEAD_ID)).toEqual({ type: "deleted" });
+  });
+
+  it("labels quotation, order and unknown events instead of hiding them", () => {
+    expect(toTimelineEntry(event("quotation.sent"), LEAD_ID)).toEqual({
+      type: "document",
+      label: "Quotation sent",
+      document: null,
+      dispatchNo: null,
+    });
+    expect(toTimelineEntry(event("subsidy.case_opened"), LEAD_ID)).toEqual({
+      type: "other",
+      label: "Subsidy case opened",
+    });
+    expect(labelForUnknownKind("subsidy.case_opened")).toBe("Subsidy case opened");
+  });
+
+  it("names the quotation or order an event is about, and a dispatch's number", () => {
+    expect(
+      toTimelineEntry(
+        event("quotation.sent", {
+          quotation_id: "q-1",
+          quote_no: "QT/GJ/2026-27/00003",
+          version: 2,
+        }),
+        LEAD_ID,
+      ),
+    ).toMatchObject({
+      type: "document",
+      document: { kind: "quotation", id: "q-1", title: "QT/GJ/2026-27/00003 · v2" },
+    });
+    expect(
+      toTimelineEntry(
+        event("quotation.created", { quotation_id: "q-2", quote_no: null, version: 1 }),
+        LEAD_ID,
+      ),
+    ).toMatchObject({ document: { kind: "quotation", title: "Draft" } });
+    expect(
+      toTimelineEntry(
+        event("order.submitted", { order_id: "o-1", order_no: "SO/GJ/2026-27/00041" }),
+        LEAD_ID,
+      ),
+    ).toMatchObject({
+      label: "Sales order submitted",
+      document: { kind: "order", id: "o-1", title: "SO/GJ/2026-27/00041" },
+    });
+    expect(
+      toTimelineEntry(event("dispatch.recorded", { dispatch_no: "D/SO/1/2" }), LEAD_ID),
+    ).toEqual({
+      type: "document",
+      label: "Dispatch recorded",
+      document: null,
+      dispatchNo: "D/SO/1/2",
+    });
+  });
+
+  it("reads an approval decision with its step", () => {
+    expect(
+      toTimelineEntry(
+        event("approval.decided", { seq: 1, role: "district_manager", decision: "approve" }),
+        LEAD_ID,
+      ),
+    ).toEqual({ type: "approval", decision: "approve", role: "district_manager" });
+    expect(toTimelineEntry(event("approval.decided", { decision: "maybe" }), LEAD_ID)).toEqual({
+      type: "approval",
+      decision: null,
+      role: null,
+    });
+  });
+});
+
+describe("[LEAD-005] joinFields", () => {
+  it("joins field names as a sentence does", () => {
+    expect(joinFields([])).toBe("");
+    expect(joinFields(["mobile"])).toBe("mobile");
+    expect(joinFields(["mobile", "email"])).toBe("mobile and email");
+    expect(joinFields(["farmer name", "mobile", "village"])).toBe(
+      "farmer name, mobile and village",
+    );
+  });
+});
+
+describe("[LEAD-008] assignmentSentence", () => {
+  const set = (name: string | null): AssignmentChange => ({ kind: "set", name });
+  const cleared: AssignmentChange = { kind: "cleared", name: null };
+  const unchanged: AssignmentChange = { kind: "unchanged", name: null };
+
+  it("names the new owner and partner", () => {
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: set("Ravi Joshi"),
+        partner: set("Shree Agro"),
+        previousOwnerName: null,
+      }),
+    ).toBe("assigned the lead to Ravi Joshi and made Shree Agro the channel partner");
+  });
+
+  it("names both owners on a handover, and who was unassigned", () => {
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: set("Ravi Joshi"),
+        partner: unchanged,
+        previousOwnerName: "Asha Mehta",
+      }),
+    ).toBe("handed the lead from Asha Mehta to Ravi Joshi");
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: cleared,
+        partner: cleared,
+        previousOwnerName: "Asha Mehta",
+      }),
+    ).toBe("unassigned Asha Mehta and removed the channel partner");
+  });
+
+  it("still reads for events without names", () => {
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: set(null),
+        partner: set(null),
+        previousOwnerName: null,
+      }),
+    ).toBe("changed the owner and the channel partner");
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: cleared,
+        partner: unchanged,
+        previousOwnerName: null,
+      }),
+    ).toBe("unassigned the owner");
+    expect(
+      assignmentSentence({
+        type: "assigned",
+        owner: unchanged,
+        partner: unchanged,
+        previousOwnerName: null,
+      }),
+    ).toBe("updated the assignment");
+  });
+});

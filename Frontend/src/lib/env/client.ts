@@ -15,7 +15,15 @@ import { z } from "zod";
 export const APP_ENVS = ["development", "feature", "staging", "production"] as const;
 export type AppEnv = (typeof APP_ENVS)[number];
 
-export const API_MOCKING_MODES = ["enabled", "disabled"] as const;
+/**
+ * enabled  — every endpoint is mocked (local work, feature previews, tests).
+ * partial  — only what the backend does not serve yet is mocked; everything else, sign-in
+ *            included, goes to the real API through API_PROXY_TARGET (e.g. the shared dev API).
+ *            The list lives in `unbuiltHandlers`, src/mocks/handlers/index.ts.
+ * disabled — nothing is mocked.
+ */
+export const API_MOCKING_MODES = ["enabled", "partial", "disabled"] as const;
+export type ApiMockingMode = (typeof API_MOCKING_MODES)[number];
 
 /**
  * Same origin by default: next.config.ts rewrites /api/v1 to the backend. The
@@ -48,7 +56,8 @@ export const clientEnvSchema = z
     const isDeployed =
       env.NEXT_PUBLIC_APP_ENV === "staging" || env.NEXT_PUBLIC_APP_ENV === "production";
 
-    if (isDeployed && env.NEXT_PUBLIC_API_MOCKING === "enabled") {
+    const mocking = env.NEXT_PUBLIC_API_MOCKING;
+    if (isDeployed && mocking !== undefined && mocking !== "disabled") {
       ctx.addIssue({
         code: "custom",
         path: ["NEXT_PUBLIC_API_MOCKING"],
@@ -64,17 +73,20 @@ export const clientEnvSchema = z
       });
     }
   })
-  .transform((env) => ({
-    appEnv: env.NEXT_PUBLIC_APP_ENV,
-    apiBaseUrl: env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL,
+  .transform((env) => {
     // Mocks default ON only for local development and feature previews.
-    apiMocking:
+    const apiMocking: ApiMockingMode =
       env.NEXT_PUBLIC_API_MOCKING ??
       (env.NEXT_PUBLIC_APP_ENV === "development" || env.NEXT_PUBLIC_APP_ENV === "feature"
         ? "enabled"
-        : "disabled"),
-    release: env.NEXT_PUBLIC_RELEASE,
-  }));
+        : "disabled");
+    return {
+      appEnv: env.NEXT_PUBLIC_APP_ENV,
+      apiBaseUrl: env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL,
+      apiMocking,
+      release: env.NEXT_PUBLIC_RELEASE,
+    };
+  });
 
 export type ClientEnv = z.output<typeof clientEnvSchema>;
 

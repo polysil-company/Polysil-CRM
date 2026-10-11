@@ -117,11 +117,35 @@ def test_a_self_keyed_subtree_admits_a_new_row_through_its_parent() -> None:
     assert "parent_id IN" not in stmts["channel_partner_sel_partner_subtree"]
 
 
-def test_org_via_territory_resolves_through_org_unit() -> None:
-    stmts = "\n".join(policies_for(SPECS["partners"]))
-    assert ("territory_id IN (SELECT ou.territory_id FROM org_unit ou WHERE ou.id IN "
-            "(SELECT descendant_id FROM org_closure WHERE ancestor_id = "
-            "(SELECT app_current_org_unit())))") in stmts
+def test_org_via_territory_reads_up_and_down_and_writes_only_down() -> None:
+    """FS-020: a read reaches the dealers at, under or above the offices'
+    territories; a write only at or under them."""
+    stmts = {s.split(" ON ")[0].split("CREATE POLICY ")[1]: s
+             for s in policies_for(SPECS["partners"]) if s.startswith("CREATE POLICY")}
+    offices = ("(SELECT ou.territory_id FROM org_unit ou WHERE ou.id IN "
+               "(SELECT descendant_id FROM org_closure WHERE ancestor_id = "
+               "(SELECT app_current_org_unit())))")
+    under = ("territory_id IN (SELECT tc.descendant_id FROM territory_closure tc "
+             f"WHERE tc.ancestor_id IN {offices})")
+    above = ("territory_id IN (SELECT tc.ancestor_id FROM territory_closure tc "
+             f"WHERE tc.descendant_id IN {offices})")
+    read = stmts["channel_partner_sel_org_subtree"]
+    assert under in read and above in read
+    for name in ("channel_partner_ins", "channel_partner_upd", "channel_partner_del"):
+        assert under in stmts[name] and above not in stmts[name], name
+
+
+def test_the_document_fallback_reaches_the_partner_check_and_its_guard() -> None:
+    """FS-020 rule 1: a quotation or order may carry a dealer the writer reaches
+    through a document; the lead's own partner check is unchanged."""
+    from api.authz.policy_sql import parent_guard_ddl
+    for module in ("quotations", "sales_orders"):
+        spec = SPECS[module]
+        ins = next(s for s in policies_for(spec)
+                   if s.startswith(f"CREATE POLICY {spec.table}_ins "))
+        assert "OR partner_on_visible_document(partner_id))" in ins
+        assert "AND NOT partner_on_visible_document(NEW.partner_id)" in parent_guard_ddl(spec)[0]
+    assert "partner_on_visible_document" not in "\n".join(policies_for(SPECS["leads"]))
 
 
 def test_every_referenced_column_gets_an_index_and_soft_delete_is_partial() -> None:
@@ -281,7 +305,8 @@ def test_org_via_territory_in_the_predicate() -> None:
                   sa.column("deleted_at"))
     c = Caller(user_id=U, org_unit_id=ORG, partner_id=None, scopes={"partners": "org_subtree"})
     s = _sql(scope_predicate(SPECS["partners"], c, cp))
-    assert "channel_partner.territory_id IN (SELECT org_unit.territory_id" in s
+    assert "channel_partner.territory_id IN (SELECT territory_closure.descendant_id" in s
+    assert "channel_partner.territory_id IN (SELECT territory_closure.ancestor_id" in s
     assert "org_unit.id IN (SELECT org_closure.descendant_id" in s
 
 

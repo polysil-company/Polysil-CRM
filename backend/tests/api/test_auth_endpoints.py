@@ -165,6 +165,8 @@ async def test_a_dealer_carries_a_partner_and_no_org_unit(
     me = r.json()["data"]
     assert me["user_type"] == "partner_user"
     assert me["partner"] is not None and me["org_unit"] is None
+    # the portal header shows the firm (API review B3)
+    assert me["partner"]["name"] == "API Dealer" and me["partner"]["partner_type"] == "dealer"
 
 
 @pytest.mark.parametrize("header", [None, "Bearer garbage", "Basic abc", "garbage"])

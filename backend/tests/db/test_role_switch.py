@@ -235,7 +235,7 @@ async def test_the_migration_raises_without_the_role(db: AsyncSession) -> None:
 
 async def test_startup_refuses_outside_local_without_the_role() -> None:
     base = {"database_url": "postgresql+asyncpg://u:p@127.0.0.1:6432/appdb",
-            "jwt_secret": "x" * 32}
+            "jwt_secret": "x" * 32, "public_web_url": "https://crm.polysil.in"}
     with pytest.raises(RuntimeError, match="does not exist"):
         await assert_runtime_role(Settings(_env_file=None, environment="staging",
                                            db_app_role="no_such_role_probe", **base))

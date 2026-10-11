@@ -4,7 +4,11 @@
     python scripts/deploy_staging.py provision   # the role, the database, the grants
     python scripts/deploy_staging.py deploy      # sync, build, up, alembic upgrade head
     python scripts/deploy_staging.py seed        # demo users, masters, showcase dataset
+    python scripts/deploy_staging.py templates   # order messages on only where 11za approved them
     python scripts/deploy_staging.py status      # containers, health, resource use
+    python scripts/deploy_staging.py frontend-provision   # the deploy key and the webhook receiver
+    python scripts/deploy_staging.py frontend    # pull integration and rebuild the frontend now
+    python scripts/deploy_staging.py frontend-caddy   # add polysil.pranayx.tech to the box's Caddy
     python scripts/deploy_staging.py logs [svc]
     python scripts/deploy_staging.py down
 
@@ -55,6 +59,10 @@ INCLUDE = [
     # The prepared reverse-proxy site block, so it is on the box when the DNS
     # record lands and someone applies it. GAP-097.
     "infra/caddy",
+    # the frontend's image, its compose file and the webhook receiver that
+    # rebuilds it on a push to integration. The deploy key lives in
+    # infra/frontend/keys on the box only.
+    "infra/frontend",
     "docs/architecture/RBAC.md",
     # The client's workbooks, read by the two master loaders. Mounted read-only
     # into the one-shot container, never baked into an image.
@@ -123,7 +131,9 @@ def load_config() -> dict[str, str]:
 
     required = ["SSH_HOST", "SSH_USER", "SSH_KEY_PATH", "REMOTE_DIR",
                 "DB_NAME", "DB_USER", "DB_PASSWORD", "JWT_SECRET",
-                "PG_HOST", "PG_CONTAINER", "PG_SUPERUSER"]
+                "PG_HOST", "PG_CONTAINER", "PG_SUPERUSER",
+                # FS-005: the share link's origin; the API refuses to start without it
+                "PUBLIC_WEB_URL"]
     missing = [k for k in required if not env.get(k)]
     if missing:
         die("infra/.env.staging is missing: " + ", ".join(missing))
@@ -258,6 +268,26 @@ def migrate(env: dict[str, str]) -> None:
     guard(env)
     run_remote(env, compose(env, "run", "--rm", "tools",
                             "alembic", "upgrade", "head", profile="tools"))
+    # The api came up before the migration. A migration that changes a table's
+    # columns leaves plans on the pooled connections that fail once each with
+    # "cached statement plan is invalid" (ISS-100). Fresh connections plan anew.
+    run_remote(env, compose(env, "restart", "pgbouncer", "api", "worker"))
+    sync_templates(env)
+
+
+def requeue_pdfs(env: dict[str, str]) -> None:
+    """Failed quotation and order PDFs back in the render queue, once storage works
+    (ISS-094). Sends nothing by itself; see scripts/requeue_pdfs.py."""
+    guard(env)
+    run_remote(env, compose(env, "run", "--rm", "tools", "python",
+                            "scripts/requeue_pdfs.py", profile="tools"))
+
+
+def sync_templates(env: dict[str, str]) -> None:
+    """Switch each order message on only if 11za has approved its template (FS-012
+    rule 3). A failed listing leaves the switches alone and the deploy goes on."""
+    run_remote(env, compose(env, "run", "--rm", "tools", "python",
+                            "scripts/sync_message_templates.py", profile="tools"), check=False)
 
 
 # scripts/seed_demo.py reads DB_USER, DB_PASSWORD and DB_NAME out of infra/.env
@@ -291,6 +321,13 @@ SEED_SHOWCASE = SEED_DEMO.replace("python scripts/seed_demo.py",
 
 def seed(env: dict[str, str], *, masters: bool = True, showcase: bool = True) -> None:
     guard(env)
+    # The seeds sign partners in by reading their code from the outbox and create
+    # leads on generated mobiles. On a real provider the first texts made-up numbers
+    # and then fails (a sent code's payload is cleared), and the second texts one
+    # stranger per lead.
+    if env.get("WHATSAPP_PROVIDER", "mock").strip() != "mock":
+        die("refusing to seed while WHATSAPP_PROVIDER is not mock",
+            "set WHATSAPP_PROVIDER=mock in infra/.env.staging, deploy, seed, then switch back")
     run_remote(env, compose(env, "run", "--rm", "--entrypoint", "sh", "tools",
                             "-c", SEED_DEMO, profile="tools"))
     if masters:
@@ -341,11 +378,85 @@ def deploy(env: dict[str, str], *, with_seed: bool) -> None:
     sys.exit(0 if ok else 1)
 
 
+HOOK_COMPOSE = "infra/frontend/docker-compose.hook.yml"
+
+
+def _webhook_secret() -> None:
+    """A WEBHOOK_SECRET in the local env file, made once and never printed. Paste it
+    into the GitHub webhook from the file itself."""
+    text = ENV_FILE.read_text(encoding="utf-8")
+    if any(line.startswith("WEBHOOK_SECRET=") and line.strip() != "WEBHOOK_SECRET="
+           for line in text.splitlines()):
+        return
+    import secrets
+    with ENV_FILE.open("a", encoding="utf-8") as out:
+        lead = "" if text.endswith("\n") else "\n"
+        out.write(f"{lead}WEBHOOK_SECRET={secrets.token_hex(32)}\n")
+    print("  secret   WEBHOOK_SECRET added to infra/.env.staging (not printed)")
+
+
+def frontend_provision(env: dict[str, str]) -> None:
+    """The deploy key (made on the box, the private half never leaves it), then the
+    receiver. Prints the public key for GitHub. Idempotent."""
+    _webhook_secret()
+    env = load_config()
+    sync(env)
+    push_env(env)
+    d = shlex.quote(env["REMOTE_DIR"])
+    run_remote(env, f"mkdir -p {d}/infra/frontend/keys && chmod 700 {d}/infra/frontend/keys && "
+                    f"[ -f {d}/infra/frontend/keys/deploy_key ] || ssh-keygen -q -t ed25519 -N '' "
+                    f"-C polysil-staging-frontend -f {d}/infra/frontend/keys/deploy_key")
+    run_remote(env, f"docker compose -f {d}/{HOOK_COMPOSE} --env-file {d}/infra/.env.staging "
+                    f"up -d --build")
+    print("\n  Add this as a READ-ONLY deploy key on github.com/polysil-company/Polysil-CRM "
+          "(Settings > Deploy keys):\n")
+    run_remote(env, f"cat {d}/infra/frontend/keys/deploy_key.pub")
+    print("\n  Then: python scripts/deploy_staging.py frontend   (the first build)\n")
+
+
+def frontend(env: dict[str, str]) -> None:
+    """Pull integration and rebuild now, through the receiver's own script."""
+    run_remote(env, "docker exec polysil-deploy-hook /opt/hook/redeploy.sh")
+
+
+CADDYFILE = "/home/opc/Distributed-File-System/Caddyfile"
+CADDY_CONTAINER = "distributed-file-system-web-1"
+
+
+def frontend_caddy(env: dict[str, str]) -> None:
+    """Put polysil.pranayx.tech in the Caddyfile the box's proxy serves, replacing
+    the block if it is there already, so a change to the block reaches the box.
+    The file belongs to another project: it is backed up first, and restored if
+    Caddy refuses the result, so their site is never left on a broken config."""
+    text = (INFRA / "caddy" / "polysil-app.caddy").read_text(encoding="utf-8")
+    block = text[text.index("polysil.pranayx.tech {"):].rstrip() + "\n"
+    f = shlex.quote(CADDYFILE)
+    backup = shlex.quote(CADDYFILE + ".bak-polysil-app")
+    c = CADDY_CONTAINER
+    # drop the old block: from its opening line to the first closing brace at column 0
+    strip = ("awk 'index($0, \"polysil.pranayx.tech {\") == 1 {skip=1} "
+             "skip && /^}/ {skip=0; next} !skip'")
+    # `cat > file` keeps the inode: the Caddyfile is bind-mounted into the proxy
+    script = (
+        f"cp {f} {backup} && {strip} {backup} > {f}.new && printf '\\n' >> {f}.new && "
+        f"cat >> {f}.new && cat {f}.new > {f} && rm -f {f}.new && "
+        f"if docker exec {c} caddy validate --config /etc/caddy/Caddyfile "
+        f"--adapter caddyfile >/dev/null 2>&1; "
+        f"then echo '  caddy    block written and valid'; "
+        f"else cp {backup} {f}; echo '  caddy    refused, the original is restored' >&2; "
+        f"exit 1; fi && "
+        f"docker exec {c} caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile && "
+        f"echo '  caddy    reloaded'"
+    )
+    run_remote(env, script, stdin=block.encode())
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("step", nargs="?", default="deploy",
                         choices=["provision", "deploy", "sync", "build", "up", "migrate",
-                                 "seed", "status", "logs", "down"])
+                                 "seed", "templates", "requeue-pdfs", "status", "logs", "down",
+                                 "frontend-provision", "frontend", "frontend-caddy"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
     parser.add_argument("--seed", action="store_true", help="deploy: run the seeds too")
     parser.add_argument("--no-showcase", action="store_true",
@@ -371,6 +482,10 @@ def main(argv: list[str] | None = None) -> int:
         migrate(env)
     elif args.step == "seed":
         seed(env, masters=not args.no_masters, showcase=not args.no_showcase)
+    elif args.step == "templates":
+        sync_templates(env)
+    elif args.step == "requeue-pdfs":
+        requeue_pdfs(env)
     elif args.step == "status":
         status(env)
     elif args.step == "logs":
@@ -378,6 +493,12 @@ def main(argv: list[str] | None = None) -> int:
         run_remote(env, compose(env, "logs", "--tail", "120", *tail))
     elif args.step == "down":
         run_remote(env, compose(env, "down"))
+    elif args.step == "frontend-provision":
+        frontend_provision(env)
+    elif args.step == "frontend":
+        frontend(env)
+    elif args.step == "frontend-caddy":
+        frontend_caddy(env)
     return 0
 
 

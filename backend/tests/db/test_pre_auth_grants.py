@@ -20,7 +20,7 @@ from tests.db.test_migration_003_identity import PRE_AUTH
 pytestmark = pytest.mark.db
 
 
-async def test_anon_holds_execute_on_all_eight(db: AsyncSession) -> None:
+async def test_anon_holds_execute_on_all_ten(db: AsyncSession) -> None:
     role = _anon_role()
     rows = (
         await db.execute(
@@ -56,7 +56,7 @@ async def test_anon_holds_schema_usage(db: AsyncSession) -> None:
 
 async def test_anon_holds_no_table_privilege_at_all(db: AsyncSession) -> None:
     """The containment half. app_user holds every password hash, and app_anon must not
-    be able to read it directly, only through the eight definer functions."""
+    be able to read it directly, only through the ten definer functions."""
     role = _anon_role()
     rows = (
         await db.execute(

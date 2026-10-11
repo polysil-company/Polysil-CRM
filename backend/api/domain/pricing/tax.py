@@ -40,10 +40,12 @@ differ by paise, and paise are what an auditor checks.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
 
 from api.domain.money import HUNDRED, ZERO, round2
 from api.domain.pricing.types import (
+    DiscountStep,
     DocumentTotals,
     LineTax,
     PricingError,
@@ -59,6 +61,8 @@ MAX_LINE_TOTAL = Decimal("99999999.99")
 # times larger: two zero-rated 75,000,000 lines were accepted as a 150,000,000
 # document (cross-vendor review, September).
 MAX_DOCUMENT_TOTAL = Decimal("99999999.99")
+# FS-005 rule 6: the client's format has three discount columns, not n.
+MAX_TIERS = 3
 
 
 def half(slab: Decimal) -> Decimal:
@@ -66,38 +70,63 @@ def half(slab: Decimal) -> Decimal:
     return slab / 2
 
 
-def compute_line(*, rate: Decimal, qty: Decimal, discount_pct: Decimal, slab: Decimal,
+def compute_line(*, rate: Decimal, qty: Decimal, discount_pct: Decimal = ZERO,
+                 discounts: Sequence[Decimal] | None = None, slab: Decimal,
                  intra_state: bool) -> LineTax:
-    """One line's money, in the order the invoice prints it."""
+    """One line's money, in the order the invoice prints it.
+
+    `discounts` is the cascade: up to three percentages, each taken off the
+    running balance and rounded to the paisa before the next applies (FS-005
+    rule 6). `discount_pct` is the one-tier spelling, and one tier is the cascade
+    with two zero tiers: `round2(balance * 0 / 100)` is exactly 0.00, so the
+    figures are identical.
+    """
     if qty <= 0:
         raise PricingError("qty_not_positive", "A quantity must be above zero.", "qty")
     if qty > MAX_QTY:
         raise PricingError("qty_too_large", f"A quantity may not exceed {MAX_QTY:f}.", "qty")
     if rate <= 0:
         raise PricingError("rate_not_positive", "A rate must be above zero.", "rate")
-    if not ZERO <= discount_pct <= HUNDRED:
-        raise PricingError("discount_out_of_range",
-                           "A discount must be between 0 and 100 per cent.", "discount_pct")
+    tiers = tuple(discounts) if discounts is not None else (discount_pct,)
+    if len(tiers) > MAX_TIERS:
+        raise PricingError("too_many_discounts",
+                           f"At most {MAX_TIERS} discount tiers.", "discounts")
+    for i, pct in enumerate(tiers):
+        if not ZERO <= pct <= HUNDRED:
+            raise PricingError("discount_out_of_range",
+                               "A discount must be between 0 and 100 per cent.",
+                               "discount_pct" if i == 0 else f"discount{i + 1}_pct")
 
     gross = round2(rate * qty)
     if gross > MAX_LINE_TOTAL:
         raise PricingError(
             "line_total_too_large",
             f"A line total may not exceed {MAX_LINE_TOTAL:f}; this one is {gross:f}.", "qty")
-    discount = round2(gross * discount_pct / HUNDRED)
-    taxable = gross - discount
+    # The cascade. Each tier's amount is rounded before the next tier sees the
+    # balance, so every printed column is a printed figure and the columns add up.
+    # The client's own sheet applies each tier to the running balance (row 14:
+    # 3.15 is 5 % of 63.00, not of 70.00) but does not round between tiers; on
+    # its seven lines that is one paisa on the document (GAP-118).
+    balance = gross
+    steps: list[DiscountStep] = []
+    for pct in tiers:
+        amount = round2(balance * pct / HUNDRED)
+        balance = balance - amount
+        steps.append(DiscountStep(pct=pct, amount=amount, after=balance))
+    discount = gross - balance
+    taxable = balance
 
     if intra_state:
         component = round2(taxable * half(slab) / HUNDRED)
         return LineTax(gross=gross, discount=discount, taxable=taxable,
                        cgst_rate=half(slab), sgst_rate=half(slab), igst_rate=ZERO,
                        cgst=component, sgst=component, igst=ZERO,
-                       total=taxable + component + component)
+                       total=taxable + component + component, steps=tuple(steps))
     igst = round2(taxable * slab / HUNDRED)
     return LineTax(gross=gross, discount=discount, taxable=taxable,
                    cgst_rate=ZERO, sgst_rate=ZERO, igst_rate=slab,
                    cgst=ZERO, sgst=ZERO, igst=igst,
-                   total=taxable + igst)
+                   total=taxable + igst, steps=tuple(steps))
 
 
 def document_totals(lines: tuple[LineTax, ...]) -> DocumentTotals:

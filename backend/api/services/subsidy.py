@@ -15,6 +15,7 @@ the superseded set until it restarted.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import time
 from dataclasses import dataclass
@@ -24,10 +25,11 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.domain.subsidy.jantri import Matrix2D, OutsideTable
+from api.domain.subsidy.jantri import Matrix2D, OutsideTable, RowTable
 from api.domain.subsidy.money import RoundingPolicy, round2
 from api.domain.subsidy.pipeline import seven_block
-from api.domain.subsidy.sprinkler import field_inspection
+from api.domain.subsidy.sprinkler import field_inspection, missing_quantity_rows, required_rates
+from api.domain.subsidy.state_pipelines import gst_inclusive_drip, unit_cost_only
 from api.domain.subsidy.types import (
     Category,
     ComponentRate,
@@ -39,6 +41,7 @@ from api.domain.subsidy.types import (
     QuotationResult,
     SubsidyError,
     SystemPolicy,
+    rate_matches,
 )
 from api.errors import NotFoundError, ValidationFailed
 from api.schemas.subsidy import (
@@ -78,6 +81,8 @@ class ResolvedMasters:
     has_head_unit: bool
     supports_group: bool
     quantity_source: str
+    pipeline: str = "full_abcdefg"
+    spacing_labels: tuple[str, ...] = ()
 
 
 _CACHE: dict[tuple[str, str, dt.date], tuple[float, ResolvedMasters]] = {}
@@ -109,10 +114,11 @@ async def _system_row(db: AsyncSession, scheme: str, system: str) -> Any:
         "SELECT y.id, y.crop_count_max, y.has_head_unit, y.supports_group, y.rounded_blocks, "
         "y.rounded_lines, y.spacing_rule::text, y.seven_year_spacing_floor, "
         "y.spacing_outside_table::text, y.formula_version, y.quantity_source::text, "
-        "y.jantri_variant::text, s.id "
+        "y.jantri_variant::text, s.id, y.pipeline_variant::text AS pipeline, y.cap_mode "
         "FROM subsidy_system y JOIN subsidy_scheme s ON s.id = y.scheme_id "
-        "WHERE s.code = :c AND s.is_active AND y.system_type = CAST(:t AS subsidy_system_type) "
-        "AND y.is_active"), {"c": scheme, "t": system})
+        "WHERE s.code = upper(:c) AND s.is_active "
+        "AND y.system_type = CAST(:t AS subsidy_system_type) AND y.is_active"),
+        {"c": scheme, "t": system})
     row = got.one_or_none()
     if row is None:
         # Section 4 lists an unknown or inactive scheme in the validation list and
@@ -120,7 +126,7 @@ async def _system_row(db: AsyncSession, scheme: str, system: str) -> Any:
         # two were one answer here; the scheme is the caller's field (code review
         # F-12), and a scheme that exists without this system is not.
         known = await db.execute(text(
-            "SELECT 1 FROM subsidy_scheme WHERE code = :c AND is_active"), {"c": scheme})
+            "SELECT 1 FROM subsidy_scheme WHERE code = upper(:c) AND is_active"), {"c": scheme})
         if known.one_or_none() is None:
             raise ValidationFailed(fields={"scheme": f"{scheme!r} is not an active scheme."})
         raise NotFoundError(f"No active {system} configuration for scheme {scheme}.")
@@ -138,10 +144,24 @@ async def _matrix(db: AsyncSession, scheme_id: str, system: str, variant: str,
     if row is None:
         raise NotFoundError(f"No {system} {variant} unit cost table is in force on {as_of}.")
     cells = (await db.execute(text(
-        "SELECT lateral_spacing, area_breakpoint, unit_cost FROM unit_cost_cell "
-        "WHERE matrix_id = :m ORDER BY lateral_spacing DESC NULLS LAST, area_breakpoint"),
+        # FS-056: a label table's row is its label; a size table's is the size
+        "SELECT COALESCE(row_label, lateral_spacing::text), area_breakpoint, unit_cost "
+        "FROM unit_cost_cell WHERE matrix_id = :m "
+        "ORDER BY lateral_spacing DESC NULLS LAST, row_label, area_breakpoint"),
         {"m": row.id})).all()
+    if not cells:
+        raise NotFoundError(
+            f"The {system} {variant} unit cost table in force on {as_of} has no cells.")
     return str(row.id), row.dimensionality, [tuple(c) for c in cells]
+
+
+def _ragged(cells: list[tuple[Any, Any, Any]]) -> bool:
+    """A 2-D table whose spacings do not all hold the same areas: `_as_matrix_2d`
+    would raise a KeyError on it (FS-039 code review F-1)."""
+    by_spacing: dict[Any, set[Any]] = {}
+    for spacing, area, _cost in cells:
+        by_spacing.setdefault(spacing, set()).add(_dec(area))
+    return len({frozenset(a) for a in by_spacing.values()}) > 1
 
 
 def _as_matrix_2d(cells: list[tuple[Any, Any, Any]]) -> Matrix2D:
@@ -153,29 +173,28 @@ def _as_matrix_2d(cells: list[tuple[Any, Any, Any]]) -> Matrix2D:
                                       for s, row in sorted(by_spacing.items(), reverse=True)])
 
 
+def _as_rows(cells: list[tuple[Any, Any, Any]]) -> RowTable:
+    """FS-056: a size or label table. A size reads as its integer ('75.00' -> '75')."""
+    rows: dict[str, dict[Decimal, Decimal]] = {}
+    for key, area, cost in cells:
+        name = str(key)
+        with contextlib.suppress(ArithmeticError, ValueError):
+            name = str(int(Decimal(name))) if Decimal(name) == int(Decimal(name)) else name
+        rows.setdefault(RowTable.key(name), {})[_dec(area)] = _dec(cost)
+    return RowTable(rows)
+
+
+# the unit cost table's dimensionality for each shape
+DIMENSIONS = {"bilinear_2d": 2, "area_lookup_1d": 1, "size_area_2d": 2, "label_anchor_linear": 2}
+ROW_SHAPES = ("size_area_2d", "label_anchor_linear")
+
+
 def _as_table_1d(cells: list[tuple[Any, Any, Any]]) -> dict[Decimal, Decimal]:
     return {_dec(area): _dec(cost) for _spacing, area, cost in cells}
 
 
-async def _resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) -> ResolvedMasters:
-    row = await _system_row(db, scheme, system)
-    scheme_id = str(row[12])
-
-    reg_id, reg_dim, reg_cells = await _matrix(db, scheme_id, system, "regular", as_of)
-    sy_id, sy_dim, sy_cells = await _matrix(db, scheme_id, system, "seven_year", as_of)
-    # Each table is shaped from its own `dimensionality`, and both must agree with
-    # the system's declared variant. Reading the regular table's for both would
-    # turn a mis-loaded 7-year table into a silently wrong subsidy rather than a
-    # refusal: 1-D cells through the 2-D reader interpolate on nothing, and 2-D
-    # cells through the 1-D reader collapse onto one row per area (code review F-6).
-    wanted = 2 if row.jantri_variant == "bilinear_2d" else 1
-    if reg_dim != wanted or sy_dim != wanted:
-        raise NotFoundError(
-            f"The {system} tables in force on {as_of} are {reg_dim}-D and {sy_dim}-D, but the "
-            f"system is configured as {row.jantri_variant}.")
-    regular: Any = _as_matrix_2d(reg_cells) if reg_dim == 2 else _as_table_1d(reg_cells)
-    seven_year: Any = _as_matrix_2d(sy_cells) if sy_dim == 2 else _as_table_1d(sy_cells)
-
+async def _categories(db: AsyncSession, scheme_id: str, system: str,
+                      as_of: dt.date) -> tuple[Category, ...]:
     cats = (await db.execute(text(
         "SELECT code::text, name, pct, variant::text, per_ha_cap, gsdma_pct, sort_order "
         "FROM subsidy_category WHERE scheme_id = :s "
@@ -183,10 +202,12 @@ async def _resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) -
         {"s": scheme_id, "t": system, "d": as_of})).all()
     if not cats:
         raise NotFoundError(f"No {system} categories are in force on {as_of}.")
-    categories = tuple(Category(c[0], c[1], _dec(c[2]), c[3],
-                                _dec(c[4]) if c[4] is not None else None,
-                                _dec(c[5]) if c[5] is not None else None, c[6]) for c in cats)
+    return tuple(Category(c[0], c[1], _dec(c[2]), c[3],
+                          _dec(c[4]) if c[4] is not None else None,
+                          _dec(c[5]) if c[5] is not None else None, c[6]) for c in cats)
 
+
+async def _crop_spacings(db: AsyncSession, scheme_id: str, as_of: dt.date) -> dict[str, Decimal]:
     crops = (await db.execute(text(
         "SELECT crop::text, standard_spacing FROM crop_lateral_spacing WHERE scheme_id = :s "
         + _IN_FORCE), {"s": scheme_id, "d": as_of})).all()
@@ -195,30 +216,91 @@ async def _resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) -
         # answer 200 with a Jantri read off the wrong row, or blame the caller for
         # a crop name that is missing because the master is (code review F-7).
         raise NotFoundError(f"No crop spacings are in force on {as_of}.")
-    spacings = {" ".join(c[0].split()).lower(): _dec(c[1]) for c in crops}
+    return {" ".join(c[0].split()).lower(): _dec(c[1]) for c in crops}
 
-    params = {p[0]: (_dec(p[1]), p[2]) for p in (await db.execute(text(
+
+async def _parameters(db: AsyncSession, scheme_id: str, system: str,
+                      as_of: dt.date) -> dict[str, tuple[Decimal, str]]:
+    """The system's row wins over the scheme-wide one: NULLS FIRST, later keys overwrite."""
+    return {p[0]: (_dec(p[1]), p[2]) for p in (await db.execute(text(
         "SELECT key::text, value, unit::text FROM subsidy_parameter WHERE scheme_id = :s "
         "AND (system_type IS NULL OR system_type = CAST(:t AS subsidy_system_type)) " + _IN_FORCE
         + " ORDER BY system_type NULLS FIRST"), {"s": scheme_id, "t": system, "d": as_of})).all()}
+
+
+async def _rates(db: AsyncSession, scheme_id: str, system: str,
+                 as_of: dt.date) -> tuple[ComponentRate, ...]:
+    return tuple(ComponentRate(r[0], r[1], r[2], _dec(r[3]), r[4], r[5])
+                 for r in (await db.execute(text(
+                     "SELECT component_code::text, description, uom, rate, pipe_size_mm, "
+                     "nozzle::text FROM subsidy_component_rate WHERE scheme_id = :s "
+                     "AND system_type = CAST(:t AS subsidy_system_type) " + _IN_FORCE),
+                     {"s": scheme_id, "t": system, "d": as_of})).all())
+
+
+async def _resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) -> ResolvedMasters:
+    row = await _system_row(db, scheme, system)
+    scheme_id = str(row[12])
+
+    reg_id, reg_dim, reg_cells = await _matrix(db, scheme_id, system, "regular", as_of)
+    ggrc = row.cap_mode == "ggrc"
+    try:
+        sy_id, sy_dim, sy_cells = await _matrix(db, scheme_id, system, "seven_year", as_of)
+    except NotFoundError:
+        if ggrc:
+            raise
+        # FS-056: other states have no 7-year table; the application stores the
+        # regular table's id in its place (the column is NOT NULL)
+        sy_id, sy_dim, sy_cells = reg_id, reg_dim, reg_cells
+    # Each table is shaped from its own `dimensionality`, and both must agree with
+    # the system's declared variant. Reading the regular table's for both would
+    # turn a mis-loaded 7-year table into a silently wrong subsidy rather than a
+    # refusal: 1-D cells through the 2-D reader interpolate on nothing, and 2-D
+    # cells through the 1-D reader collapse onto one row per area (code review F-6).
+    wanted = DIMENSIONS[row.jantri_variant]
+    if reg_dim != wanted or sy_dim != wanted:
+        raise NotFoundError(
+            f"The {system} tables in force on {as_of} are {reg_dim}-D and {sy_dim}-D, but the "
+            f"system is configured as {row.jantri_variant}.")
+    for variant, dim, cells in (("regular", reg_dim, reg_cells), ("seven_year", sy_dim, sy_cells)):
+        if dim == 2 and row.jantri_variant not in ROW_SHAPES and _ragged(cells):
+            raise NotFoundError(
+                f"The {system} {variant} unit cost table in force on {as_of} is missing cells.")
+    def shaped(dim: int, cells: list[tuple[Any, Any, Any]]) -> Any:
+        if row.jantri_variant in ROW_SHAPES:
+            return _as_rows(cells)
+        return _as_matrix_2d(cells) if dim == 2 else _as_table_1d(cells)
+
+    regular: Any = shaped(reg_dim, reg_cells)
+    seven_year: Any = shaped(sy_dim, sy_cells) if ggrc else None
+
+    categories = await _categories(db, scheme_id, system, as_of)
+    try:
+        spacings = await _crop_spacings(db, scheme_id, as_of)
+    except NotFoundError:
+        if ggrc:
+            raise
+        spacings = {}       # FS-056: the state sheets take the designed spacing
+    params = await _parameters(db, scheme_id, system, as_of)
 
     quantities = qty_id = None
     rates: tuple[ComponentRate, ...] = ()
     areas: tuple[Decimal, ...] | None = None
     if row.quantity_source == "area_matrix":
         quantities, qty_id, areas = await _quantities(db, scheme_id, system, as_of)
-        rates = tuple(ComponentRate(r[0], r[1], r[2], _dec(r[3]), r[4], r[5])
-                      for r in (await db.execute(text(
-                          "SELECT component_code::text, description, uom, rate, pipe_size_mm, "
-                          "nozzle::text FROM subsidy_component_rate WHERE scheme_id = :s "
-                          "AND system_type = CAST(:t AS subsidy_system_type) " + _IN_FORCE),
-                          {"s": scheme_id, "t": system, "d": as_of})).all())
+        gaps = missing_quantity_rows(quantities, every_part=ggrc)
+        if gaps:
+            raise NotFoundError(f"The {system} quantity table in force on {as_of} lacks a full "
+                                f"row for: {', '.join(gaps)}.")
+    rates = await _rates(db, scheme_id, system, as_of)       # RJ's add-ons need them too
 
     masters = Masters(regular, seven_year, categories, spacings, quantities, rates,
                       row.formula_version)
     return ResolvedMasters(masters, _policy(system, row, params), reg_id, sy_id, qty_id,
                            row.formula_version, areas, row.crop_count_max, row.has_head_unit,
-                           row.supports_group, row.quantity_source)
+                           row.supports_group, row.quantity_source, row.pipeline,
+                           regular.labels() if isinstance(regular, RowTable)
+                           and row.jantri_variant == "label_anchor_linear" else ())
 
 
 async def _quantities(db: AsyncSession, scheme_id: str, system: str,
@@ -233,6 +315,8 @@ async def _quantities(db: AsyncSession, scheme_id: str, system: str,
     cells = (await db.execute(text(
         "SELECT component_code::text, area_breakpoint, qty FROM quantity_matrix_cell "
         "WHERE matrix_id = :m ORDER BY area_breakpoint"), {"m": row.id})).all()
+    if not cells:
+        raise NotFoundError(f"The {system} quantity table in force on {as_of} has no cells.")
     rows: dict[str, dict[Decimal, Decimal]] = {}
     for code, area, qty in cells:
         rows.setdefault(code, {})[_dec(area)] = _dec(qty)
@@ -241,12 +325,17 @@ async def _quantities(db: AsyncSession, scheme_id: str, system: str,
 
 
 def _policy(system: str, row: Any, params: dict[str, tuple[Decimal, str]]) -> SystemPolicy:
+    ggrc = row.cap_mode == "ggrc"
+
     def p(key: str, default: Decimal | None = None) -> Decimal:
         if key in params:
             return params[key][0]
-        if default is None:
-            raise NotFoundError(f"The subsidy parameter {key} is not in force.")
-        return default
+        if default is not None:
+            return default
+        if not ggrc:
+            # FS-056: the state sheets have no education, insurance or 7-year rows
+            return STATE_DEFAULTS.get(key, Decimal(0))
+        raise NotFoundError(f"The subsidy parameter {key} is not in force.")
 
     return SystemPolicy(
         system_type=system,
@@ -258,7 +347,7 @@ def _policy(system: str, row: Any, params: dict[str, tuple[Decimal, str]]) -> Sy
         inspection_floor=p("inspection_floor"),
         min_area_prorate=bool(p("min_area_prorate")),
         max_area_scaling=bool(p("max_area_scaling")),
-        warn_sump_divergence=system == "mini_sprinkler",
+        warn_sump_divergence=system == "mini_sprinkler" and ggrc,   # GAP-082 is GGRC's sheet
         education_amount=p("education_amount"),
         insurance_rate=p("insurance_rate"),
         inspection_rate=p("inspection_rate"),
@@ -269,6 +358,18 @@ def _policy(system: str, row: Any, params: dict[str, tuple[Decimal, str]]) -> Sy
         gsdma_max_area=params["gsdma_max_area"][0] if "gsdma_max_area" in params else None,
         pipe_size_band_ha=p("pipe_size_band_ha", Decimal("2.0")),
         exact_area_match_required=bool(p("exact_area_match_required", Decimal(1))),
+        # FS-056
+        cap_mode=row.cap_mode,
+        share_floor_zero=bool(p("share_floor_zero", Decimal(0))),
+        jantri_guards=bool(p("jantri_guards", Decimal(1))),
+        pipe_size_from_input=bool(p("pipe_size_from_input", Decimal(0))),
+        fittings_rate=p("fittings_rate", Decimal(0)),
+        flat_inspection=p("flat_inspection", Decimal(0)),
+        unit_cost_round_rupee=bool(p("unit_cost_round_rupee", Decimal(0))),
+        zero_above_max_area=bool(p("zero_above_max_area", Decimal(0))),
+        head_unit_deduction=p("head_unit_deduction", Decimal(0)),
+        gst_inclusive_rate=p("gst_inclusive_rate", Decimal("0.05")),
+        rates_include_gst=row.pipeline == "gst_inclusive",
     )
 
 
@@ -281,6 +382,68 @@ async def resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) ->
     resolved = await _resolve(db, scheme, system, as_of)
     _CACHE[key] = (now, resolved)
     return resolved
+
+
+# FS-056: what a state system reads when its sheet has no such parameter
+STATE_DEFAULTS: dict[str, Decimal] = {
+    "max_area_scaling": Decimal(0), "seven_year_area_min": Decimal("0.2"),
+    "seven_year_area_max": Decimal(5), "inspection_rate": Decimal("0.004"),
+    "gst_material_half": Decimal("0.025"), "gst_service_half": Decimal("0.09")}
+
+# The keys `_policy` reads with no default: a scheme lacking one cannot calculate.
+REQUIRED_PARAMETERS: tuple[str, ...] = (
+    "inspection_floor", "min_area_prorate", "max_area_scaling", "education_amount",
+    "insurance_rate", "inspection_rate", "gst_material_half", "gst_service_half",
+    "seven_year_area_min", "seven_year_area_max")
+
+
+async def readiness(db: AsyncSession, scheme_id: str, system: str, jantri_variant: str,
+                    quantity_source: str, as_of: dt.date, cap_mode: str = "ggrc") -> list[str]:
+    """What a calculation on this system would refuse on, in `_resolve`'s order, read
+    through `_resolve`'s own helpers and never through the cache (FS-039 rule 7).
+    Component rates are not a `_resolve` refusal; `required_rates` lists the ones
+    `field_inspection` will ask for."""
+    missing: list[str] = []
+    ggrc = cap_mode == "ggrc"
+    wanted = DIMENSIONS.get(jantri_variant, 1)
+    # FS-056: a state system has no 7-year table, crop spacings or GGRC parameters
+    for variant in ("regular", "seven_year") if ggrc else ("regular",):
+        try:
+            _id, dim, cells = await _matrix(db, scheme_id, system, variant, as_of)
+        except NotFoundError:
+            missing.append(f"unit_cost_matrix:{variant}")
+            continue
+        if dim != wanted or (dim == 2 and jantri_variant not in ROW_SHAPES and _ragged(cells)):
+            missing.append(f"unit_cost_matrix:{variant}")
+    reads: list[tuple[str, Any]] = [("categories", _categories(db, scheme_id, system, as_of))]
+    if ggrc:
+        reads.append(("crop_spacings", _crop_spacings(db, scheme_id, as_of)))
+    for name, read in reads:
+        try:
+            await read
+        except NotFoundError:
+            missing.append(name)
+    params = await _parameters(db, scheme_id, system, as_of)
+    areas: tuple[Decimal, ...] | None = None
+    if quantity_source == "area_matrix":
+        try:
+            quantities, _qid, areas = await _quantities(db, scheme_id, system, as_of)
+        except NotFoundError:
+            missing.append("quantity_matrix")
+        else:
+            missing += [f"quantity_matrix:{code}"
+                        for code in missing_quantity_rows(quantities, every_part=ggrc)]
+    if not ggrc:
+        return missing
+    missing += [f"parameters:{k}" for k in REQUIRED_PARAMETERS if k not in params]
+    if areas:
+        rates = await _rates(db, scheme_id, system, as_of)
+        band = params["pipe_size_band_ha"][0] if "pipe_size_band_ha" in params else Decimal("2.0")
+        for code, size, nozzle in required_rates(areas, band):
+            if not any(rate_matches(r, code, size, nozzle) for r in rates):
+                tail = size if size is not None else nozzle
+                missing.append(f"component_rate:{code}" + (f":{tail}" if tail is not None else ""))
+    return missing
 
 
 # ── the endpoint's work ──────────────────────────────────────────────────────
@@ -301,7 +464,7 @@ def _validate(req: CalculateRequest, resolved: ResolvedMasters) -> None:
     if req.group_total_area is not None and not resolved.supports_group:
         fields["group_total_area"] = f"{req.system_type} has no group sharing."
     if req.system_type == "sprinkler":
-        if req.nozzle is None:
+        if req.nozzle is None and not resolved.policy.pipe_size_from_input:
             fields["nozzle"] = "Sprinkler needs a nozzle type: plastic or brass."
         for i, crop in enumerate(req.crops):
             if crop.lines:
@@ -317,7 +480,9 @@ def _validate(req: CalculateRequest, resolved: ResolvedMasters) -> None:
     for i, crop in enumerate(req.crops):
         for name in ("crop", "inter_crop"):
             value = getattr(crop, name)
-            if value and " ".join(value.split()).lower() not in resolved.masters.standard_spacings:
+            # FS-056: a state with no crop table takes the crop as written
+            if value and resolved.masters.standard_spacings \
+                    and " ".join(value.split()).lower() not in resolved.masters.standard_spacings:
                 fields[f"crops[{i}].{name}"] = f"{value!r} is not in the crop table."
     if sum(len(c.lines) for c in req.crops) + len(req.head_lines) > 200:
         fields["lines"] = "A quotation carries at most 200 lines."
@@ -389,15 +554,29 @@ async def calculate(db: AsyncSession, req: CalculateRequest) -> CalculateRespons
         req.system_type, crops, head_lines=_lines(req.head_lines),
         sump_rate_per_ha=req.sump.rate_per_ha if req.sump else Decimal(0),
         group_total_area=req.group_total_area,
-        installation_rate_per_ha=req.installation_rate_per_ha, nozzle=req.nozzle)
+        installation_rate_per_ha=req.installation_rate_per_ha, nozzle=req.nozzle,
+        pipe_size_mm=req.pipe_size_mm, spacing_label=req.spacing_label,
+        hydrocyclone_m3=req.hydrocyclone_m3 or Decimal(0),
+        gravel_filter_m3=req.gravel_filter_m3 or Decimal(0),
+        head_unit_existing=bool(req.head_unit_existing), pvc_existing=bool(req.pvc_existing))
 
-    run = field_inspection if req.system_type == "sprinkler" else seven_block
+    run = PIPELINES[(resolved.pipeline, "sprinkler" if req.system_type == "sprinkler" else "drip")]
     try:
         result = run(quotation, resolved.masters, resolved.policy)
     except SubsidyError as exc:
         raise ValidationFailed(exc.message,
                                fields={exc.field_path or "body": exc.message}) from exc
     return _shape(req, result, resolved, as_of)
+
+
+# (pipeline, sprinkler or not) -> the engine function (FS-056 §2)
+PIPELINES = {
+    ("full_abcdefg", "drip"): seven_block, ("full_abcdefg", "sprinkler"): seven_block,
+    ("field_inspection_only", "sprinkler"): field_inspection,
+    ("field_inspection_only", "drip"): field_inspection,
+    ("gst_inclusive", "sprinkler"): field_inspection, ("gst_inclusive", "drip"): gst_inclusive_drip,
+    ("unit_cost_only", "drip"): unit_cost_only, ("unit_cost_only", "sprinkler"): unit_cost_only,
+}
 
 
 def _blocks(source: Any) -> Blocks:
@@ -417,7 +596,8 @@ def _shape(req: CalculateRequest, result: QuotationResult, resolved: ResolvedMas
             blocks=_blocks(crop.blocks),
             jantri=JantriOut(regular=_s4(j.regular), regular_with_sump=_s4(j.regular_with_sump),
                              regular_for_cap=_s4(j.regular_for_cap),
-                             seven_year=_s4(j.seven_year) if j.seven_year is not None else None),
+                             seven_year=_s4(j.seven_year) if j.seven_year is not None else None,
+                             add_ons=_s(j.add_ons), deductions=_s(j.deductions)),
             categories=[CategoryOut(
                 code=row.code, name=row.name, pct=f"{row.pct.normalize():f}",
                 variant=row.variant,  # type: ignore[arg-type]
@@ -430,9 +610,9 @@ def _shape(req: CalculateRequest, result: QuotationResult, resolved: ResolvedMas
 
     sprinkler = None
     if result.sprinkler is not None:
-        assert req.nozzle is not None
         sprinkler = SprinklerOut(
-            pipe_size_mm=result.sprinkler.pipe_size_mm, nozzle=req.nozzle,
+            pipe_size_mm=result.sprinkler.pipe_size_mm,
+            nozzle=req.nozzle or result.sprinkler.nozzle,  # type: ignore[arg-type]
             lines=[SprinklerLineOut(component=ln.component, description=ln.description,
                                     uom=ln.uom, qty=f"{ln.qty:f}", rate=_s(ln.rate),
                                     amount=_s(ln.amount))
@@ -477,11 +657,28 @@ async def categories(db: AsyncSession, scheme: str, system: str,
             for r in rows]
 
 
+def _inputs(resolved: ResolvedMasters) -> list[str]:
+    """FS-056: the optional request fields a system needs."""
+    out = []
+    if resolved.policy.pipe_size_from_input:
+        out.append("pipe_size_mm")
+    if resolved.spacing_labels:
+        out.append("spacing_label")
+    if resolved.pipeline == "unit_cost_only":
+        out += ["hydrocyclone_m3", "gravel_filter_m3", "head_unit_existing", "pvc_existing"]
+    return out
+
+
 async def config(db: AsyncSession, scheme: str, as_of: dt.date | None) -> ConfigOut:
     day = as_of or today_ist()
     systems = []
     parameters: dict[str, str] = {}
-    for system in _SYSTEMS:
+    present = {r[0] for r in (await db.execute(text(
+        "SELECT y.system_type::text FROM subsidy_system y "
+        "JOIN subsidy_scheme s ON s.id = y.scheme_id "
+        "WHERE s.code = upper(:c) AND s.is_active AND y.is_active"), {"c": scheme})).all()}
+    # FS-056: a scheme lists the systems it has (CG has no mini sprinkler)
+    for system in [x for x in _SYSTEMS if x in present] or list(_SYSTEMS):
         resolved = await resolve(db, scheme, system, day)
         policy = resolved.policy
         systems.append(SystemConfig(
@@ -493,10 +690,12 @@ async def config(db: AsyncSession, scheme: str, as_of: dt.date | None) -> Config
             quantity_source=resolved.quantity_source,
             formula_version=resolved.formula_version,
             sprinkler_areas=([f"{a:.3f}" for a in resolved.sprinkler_areas]
-                             if resolved.sprinkler_areas is not None else None)))
+                             if resolved.sprinkler_areas is not None else None),
+            pipeline=resolved.pipeline, cap_mode=policy.cap_mode,
+            inputs=_inputs(resolved), spacing_labels=list(resolved.spacing_labels)))
         parameters[f"{system}.inspection_floor"] = _s(policy.inspection_floor)
     # The figures every system shares, so a screen can print them without a second call.
-    one = (await resolve(db, scheme, "drip", day)).policy
+    one = (await resolve(db, scheme, systems[0].system_type, day)).policy
     parameters |= {
         "education_amount": _s(one.education_amount),
         "insurance_rate": f"{one.insurance_rate:f}",

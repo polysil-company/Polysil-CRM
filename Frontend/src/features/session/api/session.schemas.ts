@@ -29,6 +29,12 @@ export const meResponseSchema = z
       /** Portal users only. The name stays null until the channel module lands. */
       partner: z.object({ id: z.string().min(1), name: z.string().nullish() }).nullish(),
       permissions: z.array(modulePermissionSchema).optional(),
+      /**
+       * AUTH-007 · A temporary password set by an administrator is in force: until it is
+       * changed, every call but this one and `POST /auth/password` answers 403
+       * `password_change_required`.
+       */
+      must_change_password: z.boolean().nullish(),
     }),
   })
   .transform(({ data }) => ({
@@ -42,6 +48,7 @@ export const meResponseSchema = z
       actions: permission.actions,
       scope: permission.scope ?? null,
     })),
+    mustChangePassword: data.must_change_password === true,
   }));
 
 /** The backend's JSON, as the mock backend must produce it. */

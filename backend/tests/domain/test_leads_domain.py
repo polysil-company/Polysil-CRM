@@ -9,9 +9,11 @@ from decimal import Decimal
 import pytest
 
 from api.domain.leads import (
+    REOPENABLE,
     REQUIRES_QUOTATION,
     TERMINAL,
     TRANSITIONS,
+    VIA_QUOTATION,
     MobileError,
     can_transition,
     financial_year,
@@ -43,8 +45,22 @@ def test_terminal_stages_have_no_transition_out() -> None:
     assert can_transition("merged", "new") is False
 
 
+def test_a_dormant_lead_can_only_be_lost_or_reopened() -> None:
+    """FS-035: the worker parks a lead; a person loses it or reopens it, and no
+    transition() call parks one or moves it anywhere else."""
+    assert TRANSITIONS["dormant"] == frozenset({"lost"})
+    assert "dormant" not in TERMINAL
+    assert frozenset({"lost", "dormant"}) == REOPENABLE
+    for frm in TRANSITIONS:
+        assert not can_transition(frm, "dormant")
+
+
 def test_the_quotation_gated_stages_are_marked() -> None:
-    assert set(REQUIRES_QUOTATION) == {"quoted", "negotiation", "won"}
+    """FS-005: quoted and negotiation are reached through the quotation, never from
+    the lead endpoint; won needs an accepted quotation on the lead."""
+    assert set(VIA_QUOTATION) == {"quoted", "negotiation"}
+    assert set(REQUIRES_QUOTATION) == {"won"}
+    assert "won" in TRANSITIONS["quoted"], "a quotation accepted as sent skips negotiation"
 
 
 # ── mobile normalisation ─────────────────────────────────────────────────────
@@ -116,14 +132,14 @@ def test_the_top_score_is_hot() -> None:
     total, band = score(source_quality=Decimal(1), estimated_value=Decimal(500000),
                         created_at=T0, first_contacted_at=T0 + timedelta(hours=1),
                         event_count=10, config=CFG)
-    assert total == Decimal("100.00") and band == "hot"
+    assert total == Decimal("100") and band == "hot"
 
 
 def test_a_cold_lead() -> None:
     total, band = score(source_quality=Decimal("0.5"), estimated_value=None,
                         created_at=T0, first_contacted_at=None, event_count=0, config=CFG)
-    # only source: 25 * 0.5 = 12.50
-    assert total == Decimal("12.50") and band == "cold"
+    # only source: 25 * 0.5 = 12.50, a whole number half up (walk R-12)
+    assert total == Decimal("13") and band == "cold"
 
 
 def test_response_speed_steps() -> None:
@@ -148,3 +164,18 @@ def test_the_warm_boundary_is_inclusive() -> None:
     total, band = score(source_quality=Decimal(1), estimated_value=None, created_at=T0,
                         first_contacted_at=None, event_count=8, config=CFG)  # 25 + 20*0.8=16 -> 41
     assert total == Decimal("41.00") and band == "warm"
+
+
+def test_the_score_is_a_whole_number_and_the_band_follows_it() -> None:
+    """Walk R-12: 27.5 read as false precision. 39.58 rounds to 40, which is warm."""
+    total, band = score(source_quality=Decimal("0.98"), estimated_value=None, created_at=T0,
+                        first_contacted_at=None, event_count=0, config=CFG)
+    assert total == Decimal("25") and total == total.to_integral_value()  # 24.5 half up
+    total, band = score(source_quality=Decimal("0.98"), estimated_value=None, created_at=T0,
+                        first_contacted_at=T0 + timedelta(hours=48), event_count=0,
+                        config=CFG)
+    assert total == Decimal("35") and band == "cold"
+    total, band = score(source_quality=Decimal(1), estimated_value=None, created_at=T0,
+                        first_contacted_at=None, event_count=7, config={
+                            **CFG, "engagement_cap": Decimal("9.6")})
+    assert total == Decimal("40") and band == "warm"   # 25 + 20 * 7 / 9.6 = 39.58

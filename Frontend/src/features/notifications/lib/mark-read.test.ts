@@ -5,7 +5,7 @@ import type {
   NotificationList,
 } from "@/features/notifications/api/notifications.schemas";
 
-import { markReadLocally } from "./mark-read";
+import { markReadLocally, unreadAfterMarking } from "./mark-read";
 
 const READ_AT = "2026-09-15T10:00:00.000Z";
 
@@ -46,5 +46,18 @@ describe("[NOTIF-002] markReadLocally", () => {
 
     expect(next.items.every((item) => item.readAt !== null)).toBe(true);
     expect(next.unreadCount).toBe(0);
+  });
+});
+
+describe("[NOTIF-002] unreadAfterMarking", () => {
+  it("lowers the badge by the unread ones among the ids the list knows", () => {
+    // "c" was read already and "z" is not on screen: only "a" counts.
+    expect(unreadAfterMarking(5, LIST, { ids: ["a", "c", "z"] })).toBe(4);
+  });
+
+  it("clears the badge for everything, and never goes below zero", () => {
+    expect(unreadAfterMarking(5, LIST, { all: true })).toBe(0);
+    expect(unreadAfterMarking(0, LIST, { ids: ["a", "b"] })).toBe(0);
+    expect(unreadAfterMarking(3, undefined, { ids: ["a"] })).toBe(3);
   });
 });

@@ -2,17 +2,22 @@ import {
   Analytics01Icon,
   BubbleChatIcon,
   CheckmarkBadge01Icon,
+  Clock01Icon,
   CustomerSupportIcon,
   DashboardSquare02Icon,
   Database01Icon,
   DeliveryTruck01Icon,
   DiscountTag01Icon,
+  GridTableIcon,
   Invoice03Icon,
   LegalDocument01Icon,
   Megaphone02Icon,
   PackageIcon,
+  PackageOpenIcon,
+  QrCodeIcon,
   RupeeIcon,
   Settings02Icon,
+  SlidersHorizontalIcon,
   Store01Icon,
   Task01Icon,
   UserMultiple02Icon,
@@ -20,7 +25,7 @@ import {
 import type { Route } from "next";
 
 import type { IconGlyph } from "@/components/ui/icon";
-import { can, type ModuleCode, type ModulePermission } from "@/lib/auth/permissions";
+import { can, canApprove, type ModuleCode, type ModulePermission } from "@/lib/auth/permissions";
 import type { DataId } from "@/lib/data-ids";
 
 export interface NavItem {
@@ -36,8 +41,10 @@ export interface NavItem {
   readonly href?: Route;
   /** Who the item is for. "staff" hides it from partner users, whatever their permissions. */
   readonly audience?: "staff";
+  /** "approvers": shown to whoever may approve an order or a quotation discount, whatever `module` says. */
+  readonly visibleTo?: "approvers";
   /** A live count shown next to the label. */
-  readonly countSource?: "leads" | "messages";
+  readonly countSource?: "leads" | "messages" | "approvals";
 }
 
 export interface NavSection {
@@ -70,7 +77,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "messages",
         label: "Messages",
-        description: "Talk to colleagues — about a lead, an order or anything else.",
+        description: "Talk to colleagues about a lead, an order or anything else.",
         icon: BubbleChatIcon,
         module: null,
         audience: "staff",
@@ -109,23 +116,41 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         description:
           "Orders from won leads or placed directly, with dispatch details and payment terms.",
         icon: PackageIcon,
-        module: "orders",
+        module: "sales_orders",
         dataId: "SO-001",
         href: "/sales-orders",
       },
       {
+        id: "qr-codes",
+        label: "QR codes",
+        description: "Codes for printed material that open the enquiry form.",
+        icon: QrCodeIcon,
+        module: "leads",
+        audience: "staff",
+        dataId: "LEAD-013",
+        href: "/qr-codes",
+      },
+      {
         id: "approvals",
         label: "Approvals",
+        description: "Quotation discounts and sales orders waiting for your decision.",
         icon: CheckmarkBadge01Icon,
-        module: "approvals",
+        module: "sales_orders",
+        visibleTo: "approvers",
         dataId: "APPR-001",
+        href: "/approvals",
+        countSource: "approvals",
       },
       {
         id: "subsidy",
         label: "Subsidy",
+        description: "Applications through the scheme's stages, and the subsidy calculator.",
         icon: LegalDocument01Icon,
         module: "subsidy",
-        dataId: "SUBS-001",
+        // Portal users get 403 on every subsidy endpoint (handover subsidy-calculation.md).
+        audience: "staff",
+        dataId: "SUBS-005",
+        href: "/subsidy",
       },
     ],
   },
@@ -136,16 +161,21 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "complaints",
         label: "Complaints",
+        description: "From the farmer's report to the manager's check, QC and the remedy.",
         icon: CustomerSupportIcon,
         module: "complaints",
         dataId: "CMPL-001",
+        href: "/complaints",
       },
       {
         id: "tasks",
         label: "Tasks",
+        description: "Your calls, visits and meetings for the day, and your team's.",
         icon: Task01Icon,
         module: "tasks",
+        audience: "staff",
         dataId: "TASK-001",
+        href: "/tasks",
       },
     ],
   },
@@ -190,9 +220,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "dispatch",
         label: "Dispatch queue",
+        description: "Approved orders waiting to ship, and what has left.",
         icon: DeliveryTruck01Icon,
         module: "dispatch",
+        audience: "staff",
         dataId: "DISP-001",
+        href: "/dispatch",
       },
     ],
   },
@@ -208,6 +241,45 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         dataId: "RPT-002",
       },
       {
+        id: "approval-limits",
+        label: "Approval limits",
+        description: "How much each role may approve: an order's value and a quotation's discount.",
+        icon: SlidersHorizontalIcon,
+        module: "masters",
+        dataId: "APPR-002",
+        href: "/approval-limits",
+      },
+      {
+        id: "complaint-targets",
+        label: "Complaint targets",
+        description: "How quickly a complaint is answered and resolved, by severity.",
+        icon: Clock01Icon,
+        module: "complaints",
+        audience: "staff",
+        dataId: "CMPL-008",
+        href: "/complaint-targets",
+      },
+      {
+        id: "subsidy-masters",
+        label: "Subsidy masters",
+        description: "The scheme's categories, rates, crop spacings and unit-cost tables, by date.",
+        icon: GridTableIcon,
+        module: "masters",
+        audience: "staff",
+        dataId: "SUBS-012",
+        href: "/subsidy-masters",
+      },
+      {
+        id: "products",
+        label: "Products & prices",
+        description: "The catalogue, its price lists and the GST rate for each HSN code.",
+        icon: PackageOpenIcon,
+        module: "products",
+        audience: "staff",
+        dataId: "MSTR-004",
+        href: "/products",
+      },
+      {
         id: "masters",
         label: "Masters",
         icon: Database01Icon,
@@ -218,8 +290,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         id: "users",
         label: "Users & roles",
         icon: Settings02Icon,
+        href: "/users",
         module: "users",
         dataId: "ADMN-001",
+        description: "Staff and partner users: who signs in, with what role, where.",
       },
     ],
   },
@@ -236,6 +310,9 @@ export function canSeeNavItem(
 ): boolean {
   if (item.audience === "staff" && userType !== "staff") {
     return false;
+  }
+  if (item.visibleTo === "approvers") {
+    return canApprove(permissions);
   }
   return item.module === null || can(permissions, item.module, "view");
 }

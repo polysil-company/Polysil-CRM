@@ -13,7 +13,13 @@ import { parseShareParam, toShareParam } from "./share-attachment";
 function conversation(id: string, updatedAt: string, unreadCount: number): Conversation {
   return {
     id,
-    participant: { id: `usr-${id}`, name: `Person ${id}`, roleName: null, orgUnitName: null },
+    participant: {
+      id: `usr-${id}`,
+      name: `Person ${id}`,
+      roleName: null,
+      orgUnitName: null,
+      isActive: true,
+    },
     lastMessage: null,
     unreadCount,
     updatedAt,
@@ -70,11 +76,18 @@ describe("[MSG-002] thread formatting", () => {
         name: "Priya Nair",
         roleName: "District Manager",
         orgUnitName: "Vadodara District",
+        isActive: true,
       }),
     ).toBe("District Manager · Vadodara District");
-    expect(describePerson({ id: "x", name: "X", roleName: null, orgUnitName: "Head Office" })).toBe(
-      "Head Office",
-    );
+    expect(
+      describePerson({
+        id: "x",
+        name: "X",
+        roleName: null,
+        orgUnitName: "Head Office",
+        isActive: true,
+      }),
+    ).toBe("Head Office");
   });
 });
 

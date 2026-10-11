@@ -12,24 +12,20 @@ import type { DataTableColumnMeta } from "@/components/patterns/data-table";
 export const LEAD_COLUMN_META = {
   select: { width: "checkbox" },
   customerName: { width: "fill", isRowHeader: true },
-  status: { width: "sm" },
+  stage: { width: "sm" },
   source: { width: "sm", hideBelow: "lg" },
   crops: { width: "fill", hideBelow: "xl" },
-  winProbability: { width: "md", hideBelow: "md" },
-  engagement: { width: "md", hideBelow: "xl" },
   owner: { width: "fill", hideBelow: "lg" },
   followUpAt: { width: "sm", hideBelow: "sm" },
-  estimatedValue: { width: "sm", align: "end" },
+  estimatedValue: { width: "md", align: "end" },
 } as const satisfies Record<string, DataTableColumnMeta>;
 
 const COLUMN_ORDER = [
   "select",
   "customerName",
-  "status",
+  "stage",
   "source",
   "crops",
-  "winProbability",
-  "engagement",
   "owner",
   "followUpAt",
   "estimatedValue",

@@ -1,10 +1,19 @@
 "use client";
 
 import {
+  ArrowTurnBackwardIcon,
+  CancelCircleIcon,
   CheckmarkBadge01Icon,
+  CheckmarkCircle02Icon,
+  CustomerSupportIcon,
+  DiscountTag01Icon,
+  Note01Icon,
   Notification01Icon,
   Notification03Icon,
   NotificationOff01Icon,
+  PackageIcon,
+  Search01Icon,
+  SecurityCheckIcon,
   TaskDone01Icon,
   UserAdd01Icon,
 } from "@hugeicons/core-free-icons";
@@ -23,7 +32,11 @@ import { Icon, type IconGlyph } from "@/components/ui/icon";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMarkNotificationsRead } from "@/features/notifications/api/notifications.mutations";
-import { notificationListQueryOptions } from "@/features/notifications/api/notifications.queries";
+import {
+  NOTIFICATION_POLL_MS,
+  notificationCountQueryOptions,
+  notificationListQueryOptions,
+} from "@/features/notifications/api/notifications.queries";
 import {
   NOTIFICATION_KINDS,
   type AppNotification,
@@ -41,9 +54,20 @@ const log = createLogger({
 
 /** One icon per known kind — adding a kind to the contract without an icon is a type error. */
 const KIND_ICONS: Readonly<Record<NotificationKind, IconGlyph>> = {
-  approval_requested: CheckmarkBadge01Icon,
   lead_assigned: UserAdd01Icon,
   task_assigned: TaskDone01Icon,
+  lead_note: Note01Icon,
+  approval_requested: CheckmarkBadge01Icon,
+  order_approved: PackageIcon,
+  order_returned: ArrowTurnBackwardIcon,
+  discount_approved: DiscountTag01Icon,
+  discount_returned: ArrowTurnBackwardIcon,
+  complaint_assigned: CustomerSupportIcon,
+  complaint_to_check: Search01Icon,
+  complaint_to_qc: SecurityCheckIcon,
+  complaint_returned: ArrowTurnBackwardIcon,
+  complaint_qc_approved: CheckmarkCircle02Icon,
+  complaint_qc_rejected: CancelCircleIcon,
 };
 
 /** A kind the backend added before the app knew about it gets the plain bell. */
@@ -57,13 +81,23 @@ const MAX_BADGE_COUNT = 99;
 
 /**
  * NOTIF-001 · The bell in the top bar: unread count, the latest notifications, and
- * "Mark all as read". New notifications arrive by polling (see notifications.queries).
+ * "Mark all as read". The badge polls the count alone; the list is read when the bell opens
+ * and polled only while it stays open (see notifications.queries).
  */
 export function NotificationBell(): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const query = useQuery(notificationListQueryOptions());
+  const count = useQuery(notificationCountQueryOptions());
+  const query = useQuery({
+    ...notificationListQueryOptions(),
+    enabled: open,
+    refetchInterval: open ? NOTIFICATION_POLL_MS : false,
+  });
   const markRead = useMarkNotificationsRead();
-  const unread = query.data?.unreadCount ?? 0;
+  // Whichever answered last knows the count best.
+  const unread =
+    query.data !== undefined && query.dataUpdatedAt > count.dataUpdatedAt
+      ? query.data.unreadCount
+      : (count.data ?? 0);
   const label = unread === 0 ? "Notifications" : `Notifications, ${formatNumber(unread)} unread`;
 
   const markAsRead = (target: "all" | string): void => {
@@ -194,8 +228,9 @@ function NotificationItem({
         {notification.body === null ? null : (
           <span className="line-clamp-2 text-xs text-muted-foreground">{notification.body}</span>
         )}
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-subtle-foreground">
-          <RelativeDate value={notification.createdAt} className="text-xs text-subtle-foreground" />
+        {/* Muted, not subtle: subtle text falls below 4.5:1 on the dark popover. */}
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <RelativeDate value={notification.createdAt} className="text-xs text-muted-foreground" />
           {notification.resource === null ? null : (
             <>
               <span aria-hidden="true">·</span>

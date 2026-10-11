@@ -191,9 +191,9 @@ class OrgUnitRef(BaseModel):
 class PartnerRef(BaseModel):
     id: str
     name: str | None = Field(
-        default=None,
-        description="Null until the channel module lands; the id is stable now.",
-    )
+        default=None, description="The partner firm, for the portal header.")
+    partner_type: str | None = Field(
+        default=None, description="distributor, dealer or sub_dealer.")
 
 
 class ModulePermission(BaseModel):

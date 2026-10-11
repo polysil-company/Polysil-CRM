@@ -100,9 +100,20 @@ class LineInput:
 
 
 @dataclass(frozen=True)
+class DiscountStep:
+    """One tier of the cascade (FS-005 rule 6): its percentage, the amount it took
+    off the running balance, and the balance it left. Stored, never recomputed."""
+
+    pct: Decimal
+    amount: Decimal
+    after: Decimal
+
+
+@dataclass(frozen=True)
 class LineTax:
     """Every figure the invoice prints, in the order it prints them. `gross` is
-    returned so no client derives it and lands on a different paisa."""
+    returned so no client derives it and lands on a different paisa. `discount` is
+    the sum of every tier's amount; `steps` are the tiers themselves."""
 
     gross: Decimal
     discount: Decimal
@@ -114,6 +125,7 @@ class LineTax:
     sgst: Decimal
     igst: Decimal
     total: Decimal
+    steps: tuple[DiscountStep, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -124,6 +136,8 @@ class PricedLine:
     rate: Rate
     tax: TaxRate
     money: LineTax
+    # the cascade as requested, tier one first; `discount_pct` is its first entry
+    discounts: tuple[Decimal, ...] = ()
 
     @property
     def provisional_fields(self) -> tuple[str, ...]:

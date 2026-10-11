@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { toUserFacingError } from "./error-messages";
-import { ApiError, parseErrorBody, type ApiErrorInit } from "./errors";
+import { ApiError, parseErrorBody, readFieldErrors, type ApiErrorInit } from "./errors";
 import { createRequestId } from "./request-id";
-import { buildApiUrl } from "./url";
+import { asApiPath, buildApiUrl } from "./url";
 
 function apiError(init: Partial<ApiErrorInit>): ApiError {
   return new ApiError({
@@ -38,6 +38,18 @@ describe("[OBS-002] buildApiUrl", () => {
         "https://api.example.com",
       ),
     ).toBe("https://api.example.com/leads?status=new&status=won&q=Patel+%26+Sons");
+  });
+});
+
+describe("[QUOT-012] asApiPath", () => {
+  it("takes a path from an answer as given, without the backend's own prefix twice", () => {
+    expect(asApiPath("/public/q/abc/pdf")).toBe("/public/q/abc/pdf");
+    expect(asApiPath("/api/v1/public/q/abc/pdf")).toBe("/public/q/abc/pdf");
+    expect(buildApiUrl("/public/q/abc/pdf", undefined, "/api/v1")).not.toContain("/api/v1/api/v1");
+    expect(asApiPath("/api/v1")).toBe("/");
+    expect(asApiPath("/api/v12/x")).toBe("/api/v12/x");
+    expect(asApiPath("https://evil.example/pdf")).toBeNull();
+    expect(asApiPath("//evil.example/pdf")).toBeNull();
   });
 });
 
@@ -93,6 +105,23 @@ describe("[OBS-002] parseErrorBody", () => {
   it("falls back to a short plain-text body", () => {
     expect(parseErrorBody("Gateway timeout").message).toBe("Gateway timeout");
     expect(parseErrorBody(undefined).message).toBeUndefined();
+  });
+});
+
+describe("[OBS-002] readFieldErrors", () => {
+  it("returns the field errors of a 422, keyed by the backend's field path", () => {
+    const error = apiError({
+      status: 422,
+      details: { fields: { "estimated_value.float": "Bad" } },
+    });
+
+    expect(readFieldErrors(error)).toEqual({ "estimated_value.float": "Bad" });
+  });
+
+  it("returns null for anything that is not a field validation failure", () => {
+    expect(readFieldErrors(apiError({ status: 500, details: { fields: { a: "b" } } }))).toBeNull();
+    expect(readFieldErrors(apiError({ status: 422, details: { issues: 2 } }))).toBeNull();
+    expect(readFieldErrors(new Error("offline"))).toBeNull();
   });
 });
 

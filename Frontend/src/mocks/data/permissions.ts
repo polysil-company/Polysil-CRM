@@ -36,36 +36,53 @@ function grant(
 }
 
 const SCHEMES_VIEW = grant("schemes", ["view"], "global");
+/** Everyone reads the catalogue and the prices of their tier; Admin alone edits (RBAC.md §6). */
+const CATALOGUE_VIEW = [
+  grant("products", ["view"], "global"),
+  grant("pricing", ["view"], "global"),
+];
 
 function fieldStaff(scope: Scope): MockModulePermission[] {
   return [
     grant("leads", ["view", "create", "edit"], scope),
     grant("quotations", ["view", "create", "edit"], scope),
-    grant("orders", ["view", "create"], scope),
+    grant("sales_orders", ["view", "create", "edit"], scope),
     grant("subsidy", ["view", "create"], scope),
     grant("complaints", ["view", "create"], scope),
     grant("tasks", ["view", "create", "edit"], scope),
     grant("partners", ["view"], scope),
     SCHEMES_VIEW,
+    ...CATALOGUE_VIEW,
   ];
 }
 
 function manager(scope: Scope): MockModulePermission[] {
   return [
-    ...fieldStaff(scope),
-    grant("approvals", ["view", "approve"], scope),
+    // One entry per module, as GET /auth/me returns: the manager's replace the officer's.
+    ...fieldStaff(scope).filter(
+      (entry) =>
+        entry.module !== "quotations" &&
+        entry.module !== "sales_orders" &&
+        entry.module !== "complaints",
+    ),
+    // Managers check complaints before QC (RBAC.md §6.1: complaints CEA).
+    grant("complaints", ["view", "create", "edit", "approve"], scope),
+    // Managers approve orders and quotation discounts (RBAC.md §6.1).
+    grant("quotations", ["view", "create", "edit", "approve"], scope),
+    grant("sales_orders", ["view", "create", "edit", "approve"], scope),
     grant("reports", ["view"], scope),
   ];
 }
 
+/** No `subsidy`: the backend answers portal users 403 there (handover `subsidy-calculation.md`). */
 function channelPartner(): MockModulePermission[] {
   return [
     grant("leads", ["view", "edit"], "partner_subtree"),
-    grant("orders", ["view", "create"], "partner_subtree"),
-    grant("subsidy", ["view", "create"], "partner_subtree"),
+    grant("sales_orders", ["view", "create", "edit"], "partner_subtree"),
     grant("complaints", ["view", "create"], "partner_subtree"),
     grant("marketing", ["view"], "global"),
     SCHEMES_VIEW,
+    ...CATALOGUE_VIEW,
   ];
 }
 
@@ -77,23 +94,39 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
     case "state_manager":
       return manager("org_subtree");
     case "regional_manager":
-      return manager("territory");
+      // Regional Managers watch subsidy applications but don't change them (handover).
+      return [
+        ...manager("territory").filter((entry) => entry.module !== "subsidy"),
+        grant("subsidy", ["view"], "territory"),
+      ];
     case "admin":
       return MODULE_CODES.map((module) => grant(module, PERMISSION_ACTIONS, "global"));
     case "account_manager":
       return [
         grant("accounts", ["view", "edit", "approve"], "global"),
-        grant("orders", ["view"], "global"),
+        // Accounts sees complaints (refunds are paid through them) but decides none.
+        grant("complaints", ["view"], "global"),
+        // Accounts decides the payment step of every order (RBAC.md §6.2).
+        grant("sales_orders", ["view", "approve"], "global"),
+        // Accounts follows subsidy applications without changing them (handover).
+        grant("subsidy", ["view"], "global"),
         SCHEMES_VIEW,
+        ...CATALOGUE_VIEW,
       ];
     case "dispatch_manager":
       return [
-        grant("dispatch", ["view", "edit"], "global"),
-        grant("orders", ["view"], "global"),
+        // Dispatch approves the last step, then records what left (RBAC.md §6.2).
+        grant("dispatch", ["view", "create", "edit", "approve"], "global"),
+        grant("sales_orders", ["view", "approve"], "global"),
         SCHEMES_VIEW,
+        ...CATALOGUE_VIEW,
       ];
     case "qa_manager":
-      return [grant("complaints", ["view", "edit", "approve"], "global"), SCHEMES_VIEW];
+      return [
+        grant("complaints", ["view", "edit", "approve"], "global"),
+        SCHEMES_VIEW,
+        ...CATALOGUE_VIEW,
+      ];
     case "distributor":
     case "dealer":
     case "sub_dealer":

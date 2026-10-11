@@ -20,6 +20,10 @@ def _settings(monkeypatch: pytest.MonkeyPatch, **over: str) -> Settings:
     # pre-auth grant test runs rather than skips - failed the defaults test.
     for name in ("DB_ANON_ROLE", "DB_APP_ROLE"):
         monkeypatch.delenv(name, raising=False)
+    # FS-005: the origin is required outside local; a test that builds staging
+    # or production settings for another reason gets a real one
+    if over.get("ENVIRONMENT", "local") != "local":
+        over.setdefault("PUBLIC_WEB_URL", "https://crm.polysil.in")
     for k, v in {**BASE, **over}.items():
         monkeypatch.setenv(k, v)
     # _env_file=None: these tests describe Settings' own defaults, not whatever the
@@ -37,6 +41,12 @@ def test_direct_connection_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     which is the one failure this architecture exists to prevent."""
     with pytest.raises(ValueError, match="6432"):
         _settings(monkeypatch, DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:5432/appdb")
+
+
+def test_second_pgbouncer_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """pgbouncer-b on 6433 serves a parallel worktree's database copy."""
+    s = _settings(monkeypatch, DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:6433/appdb_b")
+    assert s.environment == "local"
 
 
 def test_direct_connection_escape_hatch(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -118,3 +128,64 @@ def test_production_refuses_the_mock_provider(monkeypatch: pytest.MonkeyPatch) -
         _settings(monkeypatch, ENVIRONMENT="production")
     assert _settings(monkeypatch, ENVIRONMENT="production", WHATSAPP_PROVIDER="11za",
                      WHATSAPP_AUTH_TOKEN="x").environment == "production"
+
+
+# ── FS-005: the quotation settings ───────────────────────────────────────────
+
+def test_a_long_public_origin_is_refused_because_the_link_would_be_truncated(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """Edge case 17: a share link is the origin plus 46 characters, and the WhatsApp
+    adapter silently cuts a value at 100."""
+    ok = _settings(monkeypatch, PUBLIC_WEB_URL="https://crm.polysil.in/")
+    assert ok.public_web_url == "https://crm.polysil.in", "no trailing slash"
+    with pytest.raises(ValueError, match="54 characters"):
+        _settings(monkeypatch,
+                  PUBLIC_WEB_URL="https://polysil-irrigation-crm.staging.example.co.in/portal")
+
+
+def test_the_html_renderer_is_a_dev_box_convenience_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert _settings(monkeypatch, PDF_RENDERER="html").pdf_renderer == "html"
+    with pytest.raises(ValueError, match="weasyprint outside local"):
+        _settings(monkeypatch, ENVIRONMENT="staging", PDF_RENDERER="html",
+                  WHATSAPP_PROVIDER="11za", WHATSAPP_AUTH_TOKEN="x")
+
+
+def test_storage_is_the_directory_locally_and_r2_or_nothing_elsewhere(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR-026 rejects local disk outside local. A missing bucket does not refuse
+    startup (edge case 20); it makes storage_configured false, and every render
+    fails with the reason."""
+    assert _settings(monkeypatch).storage_configured is True
+    staging = _settings(monkeypatch, ENVIRONMENT="staging", WHATSAPP_PROVIDER="11za",
+                        WHATSAPP_AUTH_TOKEN="x")
+    assert staging.storage_configured is False
+    with_r2 = _settings(monkeypatch, ENVIRONMENT="staging", WHATSAPP_PROVIDER="11za",
+                        WHATSAPP_AUTH_TOKEN="x", R2_ENDPOINT="https://x.r2.cloudflarestorage.com",
+                        R2_BUCKET="polysil", R2_ACCESS_KEY_ID="k", R2_SECRET_ACCESS_KEY="s")
+    assert with_r2.storage_configured is True
+
+
+def test_the_share_template_is_optional_until_the_bsp_approves_it(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """GAP-110: a bare str would refuse to start every process."""
+    from api.integrations.whatsapp.check import unconfigured_templates
+
+    assert _settings(monkeypatch).whatsapp_template_quotation_share is None
+    assert unconfigured_templates(_settings(monkeypatch)) == ["quotation_share"]
+    named = _settings(monkeypatch, WHATSAPP_TEMPLATE_QUOTATION_SHARE="polysil_quotation")
+    assert unconfigured_templates(named) == []
+
+
+def test_the_public_origin_is_required_outside_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Code review F-4, FS-005 5.3: an unset origin is localhost, and a share link
+    to localhost would reach a farmer's phone once the template is approved.
+    Locally the default stands; anywhere else the value must be a real origin."""
+    assert _settings(monkeypatch, PUBLIC_WEB_URL="").public_web_url == "http://localhost:3000"
+    # ISS-113: no scheme, or a scheme with no host, is not an origin either
+    for origin in ("", "http://localhost:3000", "http://127.0.0.1:3000", "crm.polysil.in", "https://"):
+        with pytest.raises(ValueError, match="real origin"):
+            _settings(monkeypatch, ENVIRONMENT="staging", WHATSAPP_PROVIDER="11za",
+                      WHATSAPP_AUTH_TOKEN="x", PUBLIC_WEB_URL=origin)
+    ok = _settings(monkeypatch, ENVIRONMENT="staging", WHATSAPP_PROVIDER="11za",
+                   WHATSAPP_AUTH_TOKEN="x", PUBLIC_WEB_URL="https://crm.polysil.in/")
+    assert ok.public_web_url == "https://crm.polysil.in"

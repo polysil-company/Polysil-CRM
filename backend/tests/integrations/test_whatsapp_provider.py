@@ -20,6 +20,7 @@ from api.config import Settings
 from api.integrations.messages import (
     TEMPLATE_AUTH_OTP,
     TEMPLATE_LEAD_ACK,
+    TEMPLATE_QUOTATION_SHARE,
     TEMPLATES,
     render,
     template_values,
@@ -165,18 +166,26 @@ async def test_responses_are_classified_on_the_body(response: httpx.Response,
     assert result.outcome is outcome, result
 
 
-@pytest.mark.parametrize("exc", [
-    httpx.ReadTimeout("read timed out"),
-    httpx.ConnectError("connection refused; body was authToken=" + TOKEN),
+@pytest.mark.parametrize(("exc", "outcome"), [
+    # before the request left: surely unsent, every message may resend
+    (httpx.ConnectError("connection refused; body was authToken=" + TOKEN), Outcome.TRANSIENT),
+    (httpx.ConnectTimeout("connect timed out"), Outcome.TRANSIENT),
+    (httpx.PoolTimeout("no free connection"), Outcome.TRANSIENT),
+    # after it left: 11za may have delivered (GAP-073, walk 10 Oct)
+    (httpx.ReadTimeout("read timed out"), Outcome.UNCERTAIN),
+    (httpx.RemoteProtocolError("server disconnected"), Outcome.UNCERTAIN),
+    (httpx.ReadError("connection reset"), Outcome.UNCERTAIN),
 ])
-async def test_transport_failures_are_transient_and_carry_only_the_class_name(
-        exc: Exception) -> None:
+async def test_transport_failures_carry_only_the_class_name(exc: Exception,
+                                                            outcome: Outcome) -> None:
     result, _ = await _send(lambda r: exc)
-    assert result.outcome is Outcome.TRANSIENT
+    assert result.outcome is outcome
     assert result.error == type(exc).__name__
 
 
-async def test_a_send_that_outlives_its_deadline_is_transient() -> None:
+async def test_a_send_that_outlives_its_deadline_is_uncertain() -> None:
+    """The total deadline fires while 11za is working on a request it already has:
+    the staging walk's three quotation messages were exactly this."""
     import asyncio
 
     async def _slow(request: httpx.Request) -> httpx.Response:
@@ -186,7 +195,7 @@ async def test_a_send_that_outlives_its_deadline_is_transient() -> None:
     async with httpx.AsyncClient(transport=httpx.MockTransport(_slow)) as client:
         provider = ElevenZaProvider(_settings(whatsapp_send_timeout=0.05), client)
         result = await provider.send(OTP)
-    assert result.outcome is Outcome.TRANSIENT and result.error == "TimeoutError"
+    assert result.outcome is Outcome.UNCERTAIN and result.error == "TimeoutError"
 
 
 # ── rule 5: the token and the code never leave ───────────────────────────────
@@ -445,3 +454,86 @@ def test_a_refused_configuration_does_not_print_the_token() -> None:
     with pytest.raises(ValueError) as exc:
         _settings(environment="production", whatsapp_provider="mock")
     assert TOKEN not in str(exc.value) and "mock" in str(exc.value)
+
+
+# ── the live listing's shape (W10, settled 23 Sep by the first live run) ─────
+
+def _doc(name: str, category: str, *locs: tuple[str, str, str]) -> dict[str, object]:
+    """One template as 11za lists it: localizations carry the language, the status
+    and the components."""
+    return {"_id": "x", "name": name, "category": category, "subCategory": "CUSTOM",
+            "localizations": [{"language": lang, "status": status,
+                               "components": [{"type": "HEADER", "format": "TEXT", "text": "Hi"},
+                                              {"type": "BODY", "text": body}]}
+                              for lang, status, body in locs]}
+
+
+def _live_listing(docs: list[dict[str, object]], pages: list[int] | None = None) -> Any:
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = json.loads(request.content)["page"]
+        if pages is not None:
+            pages.append(page)
+        return _json(200, {"Message": "template list",
+                           "Data": {"docs": docs if page == 1 else [], "totalDocs": len(docs),
+                                    "hasNextPage": False}})
+    return handler
+
+
+async def test_the_live_listing_becomes_one_row_per_localization() -> None:
+    docs = [_doc("polysil_lead_ack", "UTILITY",
+                 ("hi", "PENDING", "नमस्ते {{1}}, {{2}}"),
+                 ("en", "APPROVED", "Hello {{1}}, your inquiry {{2}} is received.")),
+            _doc("dealer_gift", "MARKETING", ("en", "APPROVED", "A small gesture"))]
+    pages: list[int] = []
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_live_listing(docs, pages))) as c:
+        rows = await ElevenZaProvider(_settings(), c).list_templates()
+    assert pages == [1], "three rows from two templates is one short page, not a full one"
+    assert [(r["name"], r["language"], r["status"]) for r in rows] == [
+        ("polysil_lead_ack", "hi", "PENDING"), ("polysil_lead_ack", "en", "APPROVED"),
+        ("dealer_gift", "en", "APPROVED")]
+    assert rows[1]["body"] == "Hello {{1}}, your inquiry {{2}} is received."
+    assert rows[1]["category"] == "UTILITY"
+
+
+async def test_the_paging_counts_templates_not_localizations() -> None:
+    """A full page of 100 templates, half of them with no localization yet, is 50
+    rows: counting rows would stop there and lose page 2."""
+    asked: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = json.loads(request.content)["page"]
+        asked.append(page)
+        count = 100 if page == 1 else 1
+        docs = [_doc(f"t{page}_{i}", "UTILITY", *([("en", "APPROVED", "x")] if i % 2 == 0 else []))
+                for i in range(count)]
+        return _json(200, {"Data": {"docs": docs}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+        rows = await ElevenZaProvider(_settings(), c).list_templates()
+    assert asked == [1, 2] and len(rows) == 51
+
+
+async def test_the_check_reads_the_live_shape_in_our_language() -> None:
+    """The approved English localization passes even when a pending Hindi one is
+    listed first; the missing templates are named."""
+    docs = [_doc("polysil_lead_ack", "UTILITY",
+                 ("hi", "PENDING", "नमस्ते {{1}}, {{2}}"),
+                 ("en", "APPROVED", "Hello {{1}}, your inquiry {{2}} is received."))]
+    settings = _settings(whatsapp_template_lead_ack="polysil_lead_ack")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_live_listing(docs))) as c:
+        problems = await check_templates(ElevenZaProvider(settings, c), settings)
+    assert problems == ["auth.otp: template 'polysil_auth_otp' is not on the account"], problems
+
+
+async def test_an_unset_template_name_is_a_dead_letter_and_sends_nothing() -> None:
+    """PR 11 review: with the quotation share template unset (GAP-110), the send went
+    out with a null name and its outcome depended on the provider's wording."""
+    share = OutboundMessage(channel="whatsapp", recipient="919876543210",
+                            template_key=TEMPLATE_QUOTATION_SHARE,
+                            payload={"party_name": "Ram", "quote_no": "QT/GJ/2026-27/00001",
+                                     "link": "https://example.test/q/abc"},
+                            reference="row-3")
+    result, seen = await _send(lambda r: _json(200, {"IsSuccess": True}), share,
+                               whatsapp_template_quotation_share=None)
+    assert result.outcome is Outcome.PERMANENT and result.error == "template not configured"
+    assert seen == [], "no request reaches the provider"

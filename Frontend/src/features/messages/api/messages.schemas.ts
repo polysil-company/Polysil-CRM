@@ -3,20 +3,15 @@ import { z } from "zod";
 import type { ResourceRef } from "@/lib/navigation/resource-href";
 
 /**
- * MSG-001 … MSG-005 · Direct messages between staff — a PROPOSED contract.
- *
- * The backend has no messaging endpoints yet. This follows the conventions of
- * GET /auth/me: a `data` envelope, snake_case fields, optional fields read leniently.
- * Staff only: the backend must answer partner users with 403.
- *
- * TODO(MSG-001): agree endpoints, field names and paging (older messages) with the
- * backend developer — and how new messages reach the browser (polling today).
+ * MSG-001 … MSG-005 · Direct messages between staff, as the backend serves them since BE-010
+ * (backend/docs/api/messages.md). Staff only: the backend answers partner users with 403.
+ * There is no push: the list and the open conversation poll.
  */
 
 const isoDateTime = z.iso.datetime({ offset: true });
 const count = z.number().int().nonnegative();
 
-/** Longest message the composer accepts. TODO(MSG-003): confirm the backend's limit. */
+/** Longest message the backend takes (`MESSAGE_MAX` in backend/api/schemas/messages.py). */
 export const MESSAGE_MAX_LENGTH = 2000;
 
 export const personWireSchema = z.object({
@@ -24,6 +19,8 @@ export const personWireSchema = z.object({
   full_name: z.string().min(1),
   role_name: z.string().nullish(),
   org_unit_name: z.string().nullish(),
+  /** False for a colleague who has left: the history stays readable, a new message is refused. */
+  is_active: z.boolean().optional(),
 });
 
 export type PersonWire = z.input<typeof personWireSchema>;
@@ -62,6 +59,8 @@ export interface Person {
   readonly name: string;
   readonly roleName: string | null;
   readonly orgUnitName: string | null;
+  /** False once they have left Polysil: their messages stay, new ones are refused. */
+  readonly isActive: boolean;
 }
 
 export interface Message {
@@ -104,6 +103,7 @@ function toPerson(wire: z.output<typeof personWireSchema>): Person {
     name: wire.full_name,
     roleName: wire.role_name ?? null,
     orgUnitName: wire.org_unit_name ?? null,
+    isActive: wire.is_active ?? true,
   };
 }
 
@@ -186,6 +186,14 @@ export const sendMessageRequestSchema = z.object({
 });
 
 export type SendMessageRequest = z.input<typeof sendMessageRequestSchema>;
+
+/**
+ * MSG-005 request body. `up_to` is the newest message on screen, so one that arrives while
+ * the call runs stays unread; left out, everything so far is read.
+ */
+export interface MarkConversationReadRequest {
+  readonly up_to?: string;
+}
 
 /** MSG-004 request body. Returns the existing conversation when there already is one. */
 export const startConversationRequestSchema = z.object({ participant_id: z.string().min(1) });

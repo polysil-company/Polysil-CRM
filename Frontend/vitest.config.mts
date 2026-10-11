@@ -34,6 +34,9 @@ export default defineConfig({
           include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
           setupFiles: ["./vitest.setup.ts"],
           restoreMocks: true,
+          // Tests are written for the full mock backend. Pin it, so a local .env.local
+          // pointing at the dev API (NEXT_PUBLIC_API_MOCKING=partial) can't change them.
+          env: { NEXT_PUBLIC_APP_ENV: "development", NEXT_PUBLIC_API_MOCKING: "enabled" },
         },
       },
       {

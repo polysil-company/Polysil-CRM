@@ -47,9 +47,9 @@ enforced in the database, so an empty page is an answer, not a failure.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `status` | query | string | null |  | draft or published. |
-| `state_territory_id` | query | string | null |  |  |
-| `channel_tier` | query | string | null |  | distributor, dealer, sub_dealer or farmer. |
+| `status` | query | string \| null |  | draft or published. |
+| `state_territory_id` | query | string \| null |  |  |
+| `channel_tier` | query | string \| null |  | distributor, dealer, sub_dealer or farmer. |
 | `page` | query | integer |  |  |
 | `limit` | query | integer |  |  |
 
@@ -79,7 +79,7 @@ and `channel_tier` null for the base list that applies everywhere.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -89,10 +89,10 @@ and `channel_tier` null for the base list that applies everywhere.
 |---|---|---|---|
 | `name` | string | yes |  |
 | `effective_from` | date | yes |  |
-| `state_territory_id` | string | null |  | A state territory, or null for every state. |
-| `channel_tier` | `distributor` | `dealer` | `sub_dealer` | `farmer` | null |  | Null for every tier. `farmer` prices retail. |
-| `effective_to` | date | null |  |  |
-| `source_note` | string | null |  | Where the rates came from. |
+| `state_territory_id` | string \| null |  | A state territory, or null for every state. |
+| `channel_tier` | `distributor` \| `dealer` \| `sub_dealer` \| `farmer` \| null |  | Null for every tier. `farmer` prices retail. |
+| `effective_to` | date \| null |  |  |
+| `source_note` | string \| null |  | Where the rates came from. |
 
 **Responses**
 
@@ -148,7 +148,7 @@ and not in the past.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `list_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -186,7 +186,7 @@ narrows it to exactly those.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `list_id` | path | string | yes |  |
-| `q` | query | string | null |  |  |
+| `q` | query | string \| null |  |  |
 | `unpriced` | query | boolean |  | Only the active products this list has no rate for. |
 | `page` | query | integer |  |  |
 | `limit` | query | integer |  |  |
@@ -221,7 +221,7 @@ At most 2,000 items in one call.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `list_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -266,7 +266,7 @@ mean, which is the normal case for a state list that corrects a few rates.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `list_id` | path | string | yes |  |
-| `idempotency-key` | header | string | null |  |  |
+| `idempotency-key` | header | string \| null |  |  |
 
 **Request body**
 
@@ -330,9 +330,10 @@ base, and nobody has told us which.
 |---|---|---|---|
 | `place_of_supply_territory_id` | string | yes | Where the goods are delivered. Resolved up to its state, which decides whether the supply is intra-state. Not the partner's own territory. |
 | `lines` | QuoteLineIn[] | yes |  |
-| `as_of` | date | null |  | Price against the masters in force on this date. Today in India by default. A future date is allowed and warns; more than a year ahead is refused. |
-| `partner_id` | string | null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
-| `seller_gstin_id` | string | null |  | Which of our registrations supplies. Defaults to the one in force. |
+| `as_of` | date \| null |  | Price against the masters in force on this date. Today in India by default. A future date is allowed and warns; more than a year ahead is refused. |
+| `partner_id` | string \| null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
+| `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
 
 **Responses**
 
@@ -371,7 +372,7 @@ base, and nobody has told us which.
 |---|---|---|---|
 | `code` | string | yes | Stable machine-readable code. Switch on this, never on the message. |
 | `message` | string | yes | Human-readable and safe to show a user. May be reworded at any time, and is not part of the contract. |
-| `fields` | object | null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
+| `fields` | object \| null |  | Present only on a 422. Maps a field path to why it was rejected, so a form can mark the offending input rather than showing a banner. |
 
 **`ErrorResponse`**
 
@@ -399,12 +400,12 @@ base, and nobody has told us which.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `state_territory` | StateRef | null | yes | The state this list prices for; null means it applies everywhere. |
-| `channel_tier` | `distributor` | `dealer` | `sub_dealer` | `farmer` | null | yes | The tier this list prices for; null means every tier. |
-| `status` | `draft` | `published` | yes |  |
-| `published_at` | string | null | yes |  |
+| `state_territory` | StateRef \| null | yes | The state this list prices for; null means it applies everywhere. |
+| `channel_tier` | `distributor` \| `dealer` \| `sub_dealer` \| `farmer` \| null | yes | The tier this list prices for; null means every tier. |
+| `status` | `draft` \| `published` | yes |  |
+| `published_at` | string \| null | yes |  |
 | `effective_from` | date | yes |  |
-| `effective_to` | date | null | yes | Exclusive. Null while open-ended. |
+| `effective_to` | date \| null | yes | Exclusive. Null while open-ended. |
 | `is_active` | boolean | yes |  |
 | `is_provisional` | boolean | yes | True while the rates are our stand-ins rather than the client's. |
 | `item_count` | integer | yes |  |
@@ -416,10 +417,10 @@ base, and nobody has told us which.
 |---|---|---|---|
 | `name` | string | yes |  |
 | `effective_from` | date | yes |  |
-| `state_territory_id` | string | null |  | A state territory, or null for every state. |
-| `channel_tier` | `distributor` | `dealer` | `sub_dealer` | `farmer` | null |  | Null for every tier. `farmer` prices retail. |
-| `effective_to` | date | null |  |  |
-| `source_note` | string | null |  | Where the rates came from. |
+| `state_territory_id` | string \| null |  | A state territory, or null for every state. |
+| `channel_tier` | `distributor` \| `dealer` \| `sub_dealer` \| `farmer` \| null |  | Null for every tier. `farmer` prices retail. |
+| `effective_to` | date \| null |  |  |
+| `source_note` | string \| null |  | Where the rates came from. |
 
 **`PriceListItem`**
 
@@ -428,7 +429,7 @@ base, and nobody has told us which.
 | `product_id` | string | yes |  |
 | `description` | string | yes |  |
 | `uom` | string | yes |  |
-| `rate` | string | null | yes | Null when this list holds no rate for the product. |
+| `rate` | string \| null | yes | Null when this list holds no rate for the product. |
 | `is_active` | boolean | yes |  |
 
 **`PriceListItemIn`**
@@ -436,7 +437,7 @@ base, and nobody has told us which.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `product_id` | string | yes |  |
-| `rate` | number | string | yes | Rupees per unit, at most two decimals. More is refused, not rounded: it is the client's number. |
+| `rate` | number \| string | yes | Rupees per unit, at most two decimals. More is refused, not rounded: it is the client's number. |
 
 **`PriceListItemsPage`**
 
@@ -476,7 +477,7 @@ base, and nobody has told us which.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `price_list` | PriceList | yes |  |
-| `closed_predecessor_id` | string | null | yes | The list this one superseded, closed at the same date in the same transaction. |
+| `closed_predecessor_id` | string \| null | yes | The list this one superseded, closed at the same date in the same transaction. |
 | `unpriced_count` | integer | yes |  |
 
 **`QuoteLine`**
@@ -491,9 +492,16 @@ base, and nobody has told us which.
 | `price_list_id` | string | yes |  |
 | `price_list_item_id` | string | yes |  |
 | `gross` | string | yes |  |
-| `discount_pct` | string | yes |  |
-| `discount` | string | yes |  |
-| `taxable` | string | yes |  |
+| `discount_pct` | string | yes | The first tier's percentage. |
+| `discount1_amt` | string | yes | What the first tier took off the gross. |
+| `after_discount1` | string | yes |  |
+| `discount2_pct` | string | yes |  |
+| `discount2_amt` | string | yes | What the second tier took off after_discount1. |
+| `after_discount2` | string | yes |  |
+| `discount3_pct` | string | yes |  |
+| `discount3_amt` | string | yes | What the third tier took off after_discount2. |
+| `discount` | string | yes | The three amounts summed. Not gross x discount_pct: that is only the first tier. |
+| `taxable` | string | yes | The balance after the third tier. |
 | `hsn_code` | string | yes |  |
 | `gst_slab` | string | yes |  |
 | `gst_rate_id` | string | yes |  |
@@ -511,8 +519,10 @@ base, and nobody has told us which.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `product_id` | string | yes |  |
-| `qty` | number | string | yes | At most as many decimals as the unit admits, and a multiple of `pack_multiple` when the product sets one. |
-| `discount_pct` | number | string |  | Per cent off this line, at most three decimals. Default `0`. |
+| `qty` | number \| string | yes | At most as many decimals as the unit admits, and a multiple of `pack_multiple` when the product sets one. |
+| `discount_pct` | number \| string |  | The first discount tier: per cent off the gross, at most three decimals. Default `0`. |
+| `discount2_pct` | number \| string |  | The second tier, per cent off the balance after the first. Each tier's amount is rounded to the paisa before the next applies. Default `0`. |
+| `discount3_pct` | number \| string |  | The third tier, per cent off the balance after the second. Default `0`. |
 
 **`QuoteLinesRequest`**
 
@@ -520,9 +530,10 @@ base, and nobody has told us which.
 |---|---|---|---|
 | `place_of_supply_territory_id` | string | yes | Where the goods are delivered. Resolved up to its state, which decides whether the supply is intra-state. Not the partner's own territory. |
 | `lines` | QuoteLineIn[] | yes |  |
-| `as_of` | date | null |  | Price against the masters in force on this date. Today in India by default. A future date is allowed and warns; more than a year ahead is refused. |
-| `partner_id` | string | null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
-| `seller_gstin_id` | string | null |  | Which of our registrations supplies. Defaults to the one in force. |
+| `as_of` | date \| null |  | Price against the masters in force on this date. Today in India by default. A future date is allowed and warns; more than a year ahead is refused. |
+| `partner_id` | string \| null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
+| `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
+| `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
 
 **`QuoteLinesResponse`**
 
@@ -556,13 +567,13 @@ base, and nobody has told us which.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
-| `code` | string | null | yes |  |
+| `code` | string \| null | yes |  |
 
 **`ValidationError`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `loc` | string | integer[] | yes |  |
+| `loc` | string \| integer[] | yes |  |
 | `msg` | string | yes |  |
 | `type` | string | yes |  |
 | `input` | any |  |  |

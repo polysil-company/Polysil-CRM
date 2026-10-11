@@ -10,7 +10,12 @@ import {
 } from "@/lib/logger";
 import { server } from "@/mocks/node";
 
-import { apiRequest, registerAccessTokenProvider, type AccessTokenProvider } from "./client";
+import {
+  apiDownload,
+  apiRequest,
+  registerAccessTokenProvider,
+  type AccessTokenProvider,
+} from "./client";
 import { ApiError } from "./errors";
 import { buildApiUrl } from "./url";
 
@@ -396,15 +401,19 @@ describe("[AUTH-004] apiRequest authentication", () => {
     expect(provider.getAccessToken).not.toHaveBeenCalled();
   });
 
-  it("sends an Idempotency-Key on mutations, except to /auth", async () => {
+  it("sends an Idempotency-Key on mutations, except the keyless /auth ones", async () => {
     const keys: Record<string, string | null> = {};
     server.use(
       http.post(buildApiUrl("/test/item"), ({ request }) => {
         keys.item = request.headers.get("idempotency-key");
         return HttpResponse.json({ id: "a", total: 1 });
       }),
-      http.post(buildApiUrl("/auth/test"), ({ request }) => {
-        keys.auth = request.headers.get("idempotency-key");
+      http.post(buildApiUrl("/auth/login"), ({ request }) => {
+        keys.login = request.headers.get("idempotency-key");
+        return HttpResponse.json({ id: "a", total: 1 });
+      }),
+      http.post(buildApiUrl("/auth/password"), ({ request }) => {
+        keys.password = request.headers.get("idempotency-key");
         return HttpResponse.json({ id: "a", total: 1 });
       }),
       http.get(buildApiUrl("/test/item"), ({ request }) => {
@@ -413,7 +422,7 @@ describe("[AUTH-004] apiRequest authentication", () => {
       }),
     );
 
-    const post = (path: "/test/item" | "/auth/test"): Promise<unknown> =>
+    const post = (path: "/test/item" | "/auth/login" | "/auth/password"): Promise<unknown> =>
       apiRequest({
         dataId: "AUTH-002",
         logger: log,
@@ -423,11 +432,14 @@ describe("[AUTH-004] apiRequest authentication", () => {
         schema: itemSchema,
       });
     await post("/test/item");
-    await post("/auth/test");
+    await post("/auth/login");
+    await post("/auth/password");
     await getItem("none");
 
     expect(keys.item).toMatch(UUID);
-    expect(keys.auth).toBeNull();
+    // Login, OTP, refresh and logout take no key; changing a password needs one (AUTH-007).
+    expect(keys.login).toBeNull();
+    expect(keys.password).toMatch(UUID);
     expect(keys.read).toBeNull();
   });
 
@@ -452,5 +464,71 @@ describe("[AUTH-004] apiRequest authentication", () => {
     expect(logged).not.toContain("482913");
     expect(logged).not.toContain("tok-9f2c");
     expect(logged).toContain("[REDACTED]");
+  });
+});
+
+describe("[OBS-002] apiDownload", () => {
+  afterEach(() => {
+    registerAccessTokenProvider(null);
+  });
+
+  const download = (): ReturnType<typeof apiDownload> =>
+    apiDownload({
+      dataId: "TASK-008",
+      logger: log,
+      fn: "exportTasks",
+      path: "/tasks/export",
+      query: { status: ["open"], lead_id: null },
+    });
+
+  it("returns the file and the name the backend gave it, with the token and the Data ID", async () => {
+    registerAccessTokenProvider({
+      getAccessToken: () => Promise.resolve("token-1"),
+      peekAccessToken: () => "token-1",
+      onSessionRejected: vi.fn(),
+    });
+    let headers: Headers | undefined;
+    let url: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/tasks/export"), ({ request }) => {
+        headers = request.headers;
+        url = new URL(request.url);
+        return new HttpResponse("PK-xlsx", {
+          headers: {
+            "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "content-disposition": 'attachment; filename="tasks-2026-10-04.xlsx"',
+          },
+        });
+      }),
+    );
+
+    const file = await download();
+
+    expect(file.filename).toBe("tasks-2026-10-04.xlsx");
+    expect(await file.blob.text()).toBe("PK-xlsx");
+    expect(headers?.get("authorization")).toBe("Bearer token-1");
+    expect(headers?.get("x-data-id")).toBe("TASK-008");
+    expect(url?.searchParams.getAll("status")).toEqual(["open"]);
+  });
+
+  it("has no name when the backend gives none", async () => {
+    server.use(http.get(buildApiUrl("/tasks/export"), () => new HttpResponse("x")));
+
+    await expect(download()).resolves.toMatchObject({ filename: null });
+  });
+
+  it("reads the error envelope of a refused export as an ApiError", async () => {
+    server.use(
+      http.get(buildApiUrl("/tasks/export"), () =>
+        HttpResponse.json(
+          { error: { code: "export_too_large", message: "More than 5000 rows." } },
+          { status: 422 },
+        ),
+      ),
+    );
+
+    const error = await expectApiError(download());
+
+    expect(error).toMatchObject({ status: 422, code: "export_too_large" });
   });
 });

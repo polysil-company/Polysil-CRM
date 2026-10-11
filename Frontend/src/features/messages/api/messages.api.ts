@@ -11,6 +11,7 @@ import {
   staffDirectoryResponseSchema,
   type Conversation,
   type ConversationList,
+  type MarkConversationReadRequest,
   type MarkConversationReadResult,
   type Message,
   type MessagePage,
@@ -43,7 +44,11 @@ export function listConversations(signal?: AbortSignal): Promise<ConversationLis
   });
 }
 
-/** MSG-002 · GET /conversations/{conversationId}/messages */
+/**
+ * MSG-002 · GET /conversations/{conversationId}/messages: the newest page, oldest first.
+ * TODO(MSG-002): "Show older messages" with `meta.next_cursor`; the thread shows the latest
+ * 50 until then, which covers every conversation the demo data and early use will have.
+ */
 export function listMessages(conversationId: string, signal?: AbortSignal): Promise<MessagePage> {
   return apiRequest({
     dataId: "MSG-002",
@@ -96,14 +101,22 @@ export function startConversation(participantId: string): Promise<Conversation> 
   });
 }
 
-/** MSG-005 · POST /conversations/{conversationId}/read */
-export function markConversationRead(conversationId: string): Promise<MarkConversationReadResult> {
+/**
+ * MSG-005 · POST /conversations/{conversationId}/read, up to `upTo`: the newest message the
+ * screen shows. Null reads everything so far, for "mark all read" from the inbox only.
+ */
+export function markConversationRead(
+  conversationId: string,
+  upTo: string | null,
+): Promise<MarkConversationReadResult> {
+  const body: MarkConversationReadRequest = upTo === null ? {} : { up_to: upTo };
   return apiRequest({
     dataId: "MSG-005",
     logger: log,
     fn: "markConversationRead",
     method: "POST",
     path: `${conversationPath(conversationId)}/read`,
+    body,
     schema: markConversationReadResponseSchema,
   });
 }
