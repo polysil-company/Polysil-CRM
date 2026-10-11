@@ -571,7 +571,7 @@ async def pass_3b_quotations(client: httpx.AsyncClient, admin: Api) -> None:
     if not leads:
         print("pass 3b: no qualified leads to quote")
         return
-    products = (await admin.get("/products", limit=50))["data"]
+    products = (await admin.get("/products", active="true", limit=50))["data"]
     sessions: dict[str, Api] = {}
     created = 0
     for lead, outcome in zip(leads, QUOTATION_MIX, strict=False):
