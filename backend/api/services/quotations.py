@@ -980,8 +980,8 @@ async def follow_lead_partner(db: AsyncSession, caller: Caller, lead_id: str,
     for qid in drafts:
         try:
             async with db.begin_nested():
-                await patch_quotation(db, caller, str(qid), sch.QuotationPatch(
-                    partner_id=partner_id, expected_status="draft"), settings)
+                await patch_quotation(db, caller, str(qid), sch.QuotationPatch.model_validate(
+                    {"partner_id": partner_id, "expected_status": "draft"}), settings)
         except ApiError:
             kept.append(str(qid))
             continue
