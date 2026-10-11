@@ -21,6 +21,7 @@ library fails jobs with a recorded `pdf_error`, not the CRM (edge case 20).
 from __future__ import annotations
 
 import asyncio
+import base64
 import datetime as dt
 import functools
 import json
@@ -99,7 +100,22 @@ def _date(v: Any) -> str:
     return dt.date.fromisoformat(s).strftime("%d %b %Y")
 
 
-_env.filters.update(money=_money, rupees=_rupees, pct=_plain, qty=_plain, date=_date)
+def _mobile(v: Any) -> str:
+    """An Indian mobile as people write it: +91 80858 10855, not +918085810855
+    (walk F-15). Anything else prints as given."""
+    s = str(v or "")
+    digits = s[1:] if s.startswith("+") else s
+    if len(digits) == 12 and digits.isdigit() and digits.startswith("91"):
+        return f"+91 {digits[2:7]} {digits[7:]}"
+    return s
+
+
+_env.filters.update(money=_money, rupees=_rupees, pct=_plain, qty=_plain, date=_date,
+                    mobile=_mobile)
+# the client's logo with its black background knocked out; a data URI, so the
+# renderer needs no file access (walk F-15, client item 5)
+_env.globals["logo"] = "data:image/png;base64," + base64.b64encode(
+    (TEMPLATES / "assets" / "polysil-logo.png").read_bytes()).decode("ascii")
 
 
 def render_html(doc: dict[str, Any]) -> str:

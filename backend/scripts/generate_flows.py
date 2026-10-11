@@ -400,8 +400,9 @@ def f_lead() -> None:
                "wrong code -> count the attempt, burn at five, 422 invalid_code", RED),
         ("p5", "code matched -> claim = the intake account, enter app_role\n"
                "same mobile already enquired today -> 200 created:false, same number", BLUE),
-        ("p6", "create_lead(intake=True): the territory's unit and auto-owner,\n"
-               "or unassigned; a QR code's dealer becomes the assigned partner", GREEN),
+        ("p6", "create_lead(intake=True): the territory's unit and auto-owner\n"
+               "(covering officer, else the least-loaded one inside a district-only\n"
+               "lead's district, 056); a QR code's dealer becomes the assigned partner", GREEN),
         ("p7", "LEAD + lead.created event + acknowledgement on the outbox\n"
                "returns {inquiry_no, created} and nothing else", GREEN),
     ]

@@ -196,16 +196,27 @@ async def _load_config(db: AsyncSession) -> dict[str, Decimal]:
         text("SELECT key, value FROM lead_score_rule"))).all()}
 
 
+# the stages whose score no longer moves; the open stages are the rest
+_CLOSED_STAGES = frozenset({"won", "lost", "merged", "dormant"})
+
+
 async def _rescore(db: AsyncSession, lead_id: Any) -> None:
     """Recompute score and priority from the lead's current factors and its events
     (rule 7). Called after any mutation that changes a factor: contact, note, reopen.
-    Runs under the leads UPDATE policy, which the caller already satisfies."""
+    Runs under the leads UPDATE policy, which the caller already satisfies. A closed
+    lead keeps its score: marking it lost is an event, and the score rose on it
+    (walk R-12). Reopening scores it again."""
     row = (await db.execute(text(
-        "SELECT l.estimated_value, l.created_at, l.first_contacted_at, src.quality, "
+        "SELECT l.stage::text AS stage, l.estimated_value, l.created_at, "
+        "l.first_contacted_at, src.quality, "
         "(SELECT count(*) FROM activity_event ae WHERE ae.lead_id = l.id "
         " AND ae.kind <> 'lead.created') AS events "
         "FROM lead l JOIN lead_source src ON src.id = l.lead_source_id WHERE l.id = :id"),
         {"id": lead_id})).one()
+    if row.stage in _CLOSED_STAGES:
+        await db.execute(text("UPDATE lead SET last_activity_at = now() WHERE id = :id"),
+                         {"id": lead_id})
+        return
     score, priority = domain.score(
         source_quality=Decimal(row.quality), estimated_value=row.estimated_value,
         created_at=row.created_at, first_contacted_at=row.first_contacted_at,
@@ -967,6 +978,17 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
         sets.append("assigned_partner_id = CAST(:partner AS uuid)")
         params["partner"] = body.assigned_partner_id
         payload["assigned_partner_id"] = body.assigned_partner_id
+        if body.assigned_partner_id != (
+                str(row.assigned_partner_id) if row.assigned_partner_id else None):
+            # GAP-378: the drafts follow, or the dealer could never see them (walk F-4).
+            # The ids go on the event, so a draft that kept its partner is on the record
+            # (code review F-3). quotations imports this module, so the import is here.
+            from api.services import quotations
+            followed, kept = await quotations.follow_lead_partner(
+                db, caller, lead_id, body.assigned_partner_id, get_settings())
+            if followed or kept:
+                payload["quotations_followed"] = followed
+                payload["quotations_kept"] = kept
 
     await _emit(db, lead_id=lead_id, kind="lead.assigned", actor_id=caller.user_id,
                 actor_name=await _actor_name(db), **payload)
@@ -1483,10 +1505,14 @@ async def _lead_filters(db: AsyncSession, caller: Caller, *, stage: str | None =
                         assigned_partner_id: str | None = None,
                         source: str | None = None, inquiry_type: str | None = None,
                         created_from: str | None = None, created_to: str | None = None,
-                        q: str | None = None, campaign_id: str | None = None) -> list[Any]:
+                        q: str | None = None, campaign_id: str | None = None,
+                        deleted: bool = False) -> list[Any]:
     """The scope and every filter of the lead list, shared with the counts so the
-    two can never disagree about which leads a filter means."""
-    where = [scope_predicate(_LEADS, caller, lead_t)]
+    two can never disagree about which leads a filter means. Deleted leads are left
+    out unless `deleted` asks for them alone: a deleter could read them, so the list
+    and its count once disagreed with the dashboard (walk F-7)."""
+    where = [scope_predicate(_LEADS, caller, lead_t),
+             lead_t.c.deleted_at.is_not(None) if deleted else lead_t.c.deleted_at.is_(None)]
 
     if stage:
         wanted = [s.strip() for s in stage.split(",") if s.strip()]
@@ -1620,6 +1646,7 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
                      source: str | None = None, inquiry_type: str | None = None,
                      created_from: str | None = None, created_to: str | None = None,
                      q: str | None = None, campaign_id: str | None = None,
+                     deleted: bool = False,
                      limit: int = 50,
                      cursor: str | None = None,
                      include_total: bool = False,
@@ -1636,7 +1663,8 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
         db, caller, stage=stage, priority=priority, owner_user_id=owner_user_id, owner=owner,
         territory_id=territory_id, owner_org_unit_id=owner_org_unit_id,
         assigned_partner_id=assigned_partner_id, source=source, inquiry_type=inquiry_type,
-        created_from=created_from, created_to=created_to, q=q, campaign_id=campaign_id)
+        created_from=created_from, created_to=created_to, q=q, campaign_id=campaign_id,
+        deleted=deleted)
     filters = list(where)
     legacy = (sort, order) == ("created_at", "desc")
     if cursor:
@@ -1683,10 +1711,11 @@ async def list_leads(db: AsyncSession, caller: Caller, *, stage: str | None = No
 _PRIORITIES = ("hot", "warm", "cold")
 
 
-async def lead_stats(db: AsyncSession, caller: Caller, **filters: str | None) -> LeadStats:
+async def lead_stats(db: AsyncSession, caller: Caller, *, deleted: bool = False,
+                     **filters: str | None) -> LeadStats:
     """Counts under the list's own scope and filters (API review B2). One pass
     over the matching rows; no ceiling, because a count per stage is the point."""
-    where = await _lead_filters(db, caller, **filters)
+    where = await _lead_filters(db, caller, deleted=deleted, **filters)
     stage = sa.cast(lead_t.c.stage, sa.Text)
     priority = sa.cast(lead_t.c.priority, sa.Text)
     inquiry = sa.cast(lead_t.c.inquiry_type, sa.Text)
@@ -1926,8 +1955,10 @@ async def list_partners(db: AsyncSession, *, q: str | None = None,
                         limit: int = 50) -> list[PartnerPick]:
     """The partner picker for assignment (FS-003 4). channel_partner's own policies
     scope it: a dealer sees its subtree, a manager the partners in its territories,
-    an admin all. q matches the name, the code or the contact person, since staff
-    know a dealer by its owner as often as by its firm."""
+    an admin all. q matches the name, the code, the contact person or one of the
+    partner's users, since staff know a dealer by its owner as often as by its firm
+    (walk F-9). The user match is a definer function returning ids only; the join
+    stays under channel_partner's policies, so it widens nothing (056)."""
     limit = max(1, min(limit, _MAX_LIMIT))
     like = _contains(q) if q else None
     rows = (await db.execute(text("""
@@ -1938,7 +1969,8 @@ async def list_partners(db: AsyncSession, *, q: str | None = None,
          WHERE cp.is_active AND cp.deleted_at IS NULL
            AND (CAST(:like AS text) IS NULL
                 OR cp.name ILIKE CAST(:like AS text) OR cp.code ILIKE CAST(:like AS text)
-                OR cp.contact_name ILIKE CAST(:like AS text))
+                OR cp.contact_name ILIKE CAST(:like AS text)
+                OR cp.id IN (SELECT partner_ids_by_user_name(CAST(:like AS text))))
          ORDER BY cp.name LIMIT :lim"""), {"like": like, "lim": limit})).all()
     return [PartnerPick(
         id=str(r.id), code=r.code, name=r.name, partner_type=r.ptype,

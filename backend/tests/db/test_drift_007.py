@@ -74,6 +74,11 @@ def _statements() -> dict[str, str]:
         body = out["authz_user_assignable"]
         assert body.count(m42._ASSIGNABLE_OLD) == 1
         out["authz_user_assignable"] = body.replace(m42._ASSIGNABLE_OLD, m42._ASSIGNABLE_NEW)
+    # 056 replaces lead_auto_owner: an officer inside a district-only lead's territory (walk F-6)
+    m56 = _load("056_walk_fixes")
+    if m56 is not None:
+        stmt = next(s for s in m56.FUNCTIONS if "FUNCTION lead_auto_owner" in s)
+        out["lead_auto_owner"] = stmt.replace("CREATE OR REPLACE FUNCTION", "CREATE FUNCTION", 1)
     return out
 
 

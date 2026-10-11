@@ -167,6 +167,7 @@ day it is the slowest thing on the screen.
 | `created_to` | query | string \| null |  | ISO date, inclusive. |
 | `q` | query | string \| null |  | Name, mobile or inquiry number. |
 | `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
+| `deleted` | query | boolean |  | true: only deleted leads, to restore one. Needs leads.delete to return anything. Deleted leads are never listed otherwise. |
 | `limit` | query | integer |  |  |
 | `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 | `include_total` | query | boolean |  | Also count how many leads match, for a "1 to 25 of 137" caption. Off by default: it costs a second query over everything in your scope, and most screens do not need it. |
@@ -369,6 +370,7 @@ narrow the filters. An empty list gives a file with the header row only.
 | `created_to` | query | string \| null |  | ISO date, inclusive. |
 | `q` | query | string \| null |  | Name, mobile or inquiry number. |
 | `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
+| `deleted` | query | boolean |  | true: only deleted leads, to restore one. Needs leads.delete to return anything. Deleted leads are never listed otherwise. |
 | `sort` | query | `created_at` \| `farmer_name` \| `estimated_value` |  | The column to sort by. `farmer_name` ignores case; leads with no `estimated_value` come last in both orders. |
 | `order` | query | `asc` \| `desc` |  | asc or desc. |
 
@@ -408,6 +410,7 @@ column and its list always agree. Every stage is present, 0 when empty.
 | `created_to` | query | string \| null |  | ISO date, inclusive. |
 | `q` | query | string \| null |  | Name, mobile or inquiry number. |
 | `campaign_id` | query | string \| null |  | Leads from this campaign, or `none` for leads with no campaign. |
+| `deleted` | query | boolean |  | true: count only deleted leads. |
 
 **Responses**
 
