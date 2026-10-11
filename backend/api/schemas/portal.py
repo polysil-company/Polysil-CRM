@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -56,3 +58,22 @@ class PortalComplaint(BaseModel):
     complaint_no: str
     status: str = Field(description="in_progress or closed.")
     raised_at: str | None
+
+
+class PortalRating(BaseModel):
+    target: Literal["installation", "service"]
+    order_no: str | None = Field(description="Installation: the order rated.")
+    complaint_no: str | None = Field(description="Service: the complaint rated.")
+    score: int = Field(description="1 to 5 stars.")
+    comment: str | None = Field(description="His own words; null when an officer recorded the rating for him.")
+    entered_via: Literal["portal", "staff"] = Field(description="portal: he rated it here; staff: an officer recorded it for him.")
+    created_at: str = Field(description="IST, +05:30.")
+
+
+class PortalRatingCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    target: Literal["installation", "service"] = Field(description="installation: a dispatched order; service: a closed complaint.")
+    order_no: str | None = Field(default=None, max_length=40, description="Installation: the order's number, as the orders list gives it.")
+    complaint_no: str | None = Field(default=None, max_length=40, description="Service: the complaint's number.")
+    score: int = Field(ge=1, le=5, description="1 to 5 stars.")
+    comment: str | None = Field(default=None, max_length=1000, description="Optional.")
