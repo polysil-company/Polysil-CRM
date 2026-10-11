@@ -11,7 +11,7 @@ it, so customer traffic cannot lock them out.
 `AUTH_ISSUE_OTP_055`; `tests/db/test_drift_008.py` compares the live body with it.
 
 Revision ID: 055_portal_code_ceiling
-Revises: 054_approval_step_stalled
+Revises: 056_walk_fixes
 """
 
 # ruff: noqa: E501  (embedded SQL)
@@ -25,7 +25,7 @@ from types import ModuleType
 from alembic import op
 
 revision: str = "055_portal_code_ceiling"
-down_revision: str | None = "054_approval_step_stalled"
+down_revision: str | None = "056_walk_fixes"
 branch_labels = None
 depends_on = None
 

@@ -11,6 +11,7 @@
          font-size: 10.5pt; color: #111; }
   h1 { font-size: 18pt; margin: 0 0 2mm; }
   .muted { color: #555; }
+  .logo { height: 14mm; margin-bottom: 3mm; }
   .banner { border: 2px solid #b3402c; color: #b3402c; padding: 2mm 4mm; font-weight: 700;
             letter-spacing: .08em; text-transform: uppercase; margin: 4mm 0; }
   .head { display: flex; justify-content: space-between; gap: 8mm; }
@@ -32,6 +33,7 @@
 </style>
 </head>
 <body>
+  <img class="logo" src="{{ logo }}" alt="Polysil">
   <h1>Quotation {{ q.quote_no }} <span class="muted">version {{ q.version }}</span></h1>
   <div class="muted">
     Sent {{ q.sent_at | date }} &middot; Valid until {{ q.valid_until | date }} &middot;
@@ -52,7 +54,7 @@
       <h3>To</h3>
       <div><strong>{{ q.party_name }}</strong></div>
       {% if q.party_address %}<div>{{ q.party_address }}</div>{% endif %}
-      <div>{{ q.party_mobile }}</div>
+      <div>{{ q.party_mobile | mobile }}</div>
       {% if q.party_gstin %}<div>GSTIN {{ q.party_gstin }}</div>{% endif %}
       {% if q.export_country %}<div>Place of supply: Outside India ({{ q.export_country }})</div>{% endif %}
     </div>
@@ -75,18 +77,18 @@
       {% for l in lines %}
       <tr>
         <td>{{ l.line_no }}</td><td>{{ l.description }}</td><td>{{ l.hsn_code }}</td><td>{{ l.uom }}</td>
-        <td class="n">{{ l.qty | qty }}</td><td class="n">{{ l.rate | money }}</td><td class="n">{{ l.gross | money }}</td>
+        <td class="n">{{ l.qty | qty }}</td><td class="n">{{ l.rate | rupees }}</td><td class="n">{{ l.gross | rupees }}</td>
         {% if 1 in tiers %}<td class="n">{{ l.discount_pct | pct }}%</td><td class="n">{{ l.discount1_amt | money }}</td><td class="n">{{ l.after_discount1 | money }}</td>{% endif %}
         {% if 2 in tiers %}<td class="n">{{ l.discount2_pct | pct }}%</td><td class="n">{{ l.discount2_amt | money }}</td><td class="n">{{ l.after_discount2 | money }}</td>{% endif %}
         {% if 3 in tiers %}<td class="n">{{ l.discount3_pct | pct }}%</td><td class="n">{{ l.discount3_amt | money }}</td>{% endif %}
-        <td class="n">{{ l.taxable | money }}</td>
+        <td class="n">{{ l.taxable | rupees }}</td>
         {% if intra_state %}
         <td class="n">{{ l.cgst | money }} <span class="muted">({{ l.cgst_rate | pct }}%)</span></td>
         <td class="n">{{ l.sgst | money }} <span class="muted">({{ l.sgst_rate | pct }}%)</span></td>
         {% else %}
         <td class="n">{{ l.igst | money }} <span class="muted">({{ l.igst_rate | pct }}%)</span></td>
         {% endif %}
-        <td class="n">{{ l.total | money }}</td>
+        <td class="n">{{ l.total | rupees }}</td>
       </tr>
       {% endfor %}
     </tbody>
