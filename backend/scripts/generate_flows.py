@@ -2318,6 +2318,26 @@ def f_ratings() -> None:
          ("n3", "Left out of payment days: orders owing nothing,\nclosed-short orders, unpaid orders younger than the\nfirst band. Never below 0 days.", RED),
          ("n4", "Ours: 1-5 stars, never edited, the formula and bands,\nscore-only for dealers (GAP-372 to GAP-377).", YELLOW)])
 
+def f_subsidised_orders() -> None:
+    _columns(
+        "64-subsidised-orders", "Subsidised orders: typed in, the subsidy entered by hand",
+        "A subsidy sale entered without a quotation, for one farmer's lead or several.",
+        "BUILT. FS-054: migration 067, POST /orders (subsidy), PUT /orders/{id}/subsidy.",
+        [("s1", "staff: POST /orders, type subsidised\nlines from the price list + subsidy block", GREY),
+         ("s2", "subsidy.lead_ids: 1 to 50, repeats dropped\nthe FIRST lead is the order's lead and routes it", BLUE),
+         ("s3", "amounts typed in: material (null = the total),\nsubsidy, farmer payable (null = material - subsidy)", BLUE),
+         ("s4", "the service checks leads and caps, names the field;\nthen order_subsidy_set() re-checks under the row lock", GREEN),
+         ("s5", "documents: POST /documents on the order\nquotation copy, payment slip (FS-050)", GREY),
+         ("s6", "submit: block exists, caps against the total NOW,\nevery named lead still open; chain on the total", GREEN)],
+        [("d1", "PUT /orders/{id}/subsidy while draft\n(also after an amend); first lead fixed", YELLOW),
+         ("d2", "type fixed both ways: PATCH to or from\nsubsidised is 422 order_type_fixed", GREEN),
+         ("d3", "order_submit's dealer gate names subsidised\n(second enforcer, 045 swapped live)", VIOLET)],
+        [("n1", "NULL MEANS THE TOTAL\n\nmaterial_amount left out is stored null and read as the\norder total at the time. A lines edit moves it. The read\nreturns the resolved number plus material_is_total.", RED),
+         ("n2", "LEADS AFTER THE FIRST SEE LITTLE\n\nThey get order.subsidy_set, shown only to a reader who\nsees the order. Submit, approval and dispatch events go\nto the first lead (GAP-452).", RED),
+         ("n3", "THE FARMER SEES THE FULL TOTAL\n\nThe approval WhatsApp and payments use the order total,\nnot the farmer payable (GAP-450, GAP-451).", RED),
+         ("n4", "Ours: chain on the total, caps at the material, any\ninquiry type may be named (GAP-299).", YELLOW)])
+
+
 def f_warranty() -> None:
     _columns(
         "57-warranty", "Warranty: a period per category, a warranty per dispatch",
@@ -2348,4 +2368,5 @@ if __name__ == "__main__":
     f_campaigns(); f_customer_record(); f_consumer_portal(); f_assistant()
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
     f_export_sample_orders(); f_ratings(); f_warranty()
+    f_subsidised_orders()
     print(f"\nwrote to {OUT}")

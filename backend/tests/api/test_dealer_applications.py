@@ -302,3 +302,39 @@ async def test_return_resubmit_reject_renewal_and_a_released_portal_account(
     assert r.status_code == 200 and r.json()["data"]["status"] == "rejected"
     assert (await client.get(f"{V1}/public/dealer-apply/{token2}")).status_code == 404
 
+
+
+async def test_a_won_dealership_lead_starts_the_application(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions, apps: list[str]) -> None:
+    """FS-053 (GAP-294): won without a quotation, and the application starts from the lead."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    m10 = _mobile10()
+    apps.append(m10)
+
+    async def _lead(kind: str) -> str:
+        r = await client.post(f"{V1}/leads", headers={**ho, **_key()}, json={
+            "farmer_name": "Bhavesh Traders", "mobile": m10, "territory_id": shop.district,
+            "inquiry_type": kind, "mis_system": "drip", "village": "Vadod"})
+        assert r.status_code == 201, r.text
+        lid = r.json()["data"]["id"]
+        for stage in ("contacted", "qualified"):
+            r = await client.post(f"{V1}/leads/{lid}/transition", headers={**ho, **_key()}, json={"to_stage": stage})
+            assert r.status_code == 200, r.text
+        return str(lid)
+
+    commercial = await _lead("commercial")
+    r = await client.post(f"{V1}/leads/{commercial}/transition", headers={**ho, **_key()}, json={"to_stage": "won"})
+    assert r.status_code == 422, "a commercial lead still needs its quotation"
+
+    dealer_lead = await _lead("dealership")
+    r = await client.post(f"{V1}/leads/{dealer_lead}/transition", headers={**ho, **_key()}, json={"to_stage": "won"})
+    assert r.status_code == 200, r.text
+    won = r.json()["data"]
+    started = won["dealer_application"]
+    assert won["stage"] == "won" and started["id"] and started["apply_url"] and started["not_started"] is None, won
+    app = (await client.get(f"{V1}/dealer-applications/{started['id']}", headers=ho)).json()["data"]
+    assert app["lead_id"] == dealer_lead and app["firm_name"] == "Bhavesh Traders" and app["status"] == "draft"
+
+    second = await _lead("dealership")
+    r = await client.post(f"{V1}/leads/{second}/transition", headers={**ho, **_key()}, json={"to_stage": "won"})
+    assert r.status_code == 200 and r.json()["data"]["dealer_application"]["not_started"] == "application_open", r.text

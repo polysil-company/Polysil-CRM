@@ -120,6 +120,9 @@ services:
       # without it), the share template once the BSP approves it, and R2 for the
       # PDFs. Empty means unset.
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}
+      # FS-053: GSTIN details for dealer applications; none until a key is set
+      GST_PROVIDER: ${GST_PROVIDER:-none}
+      GSTINAPI_KEY: ${GSTINAPI_KEY:-}
       WHATSAPP_TEMPLATE_QUOTATION_SHARE: ${WHATSAPP_TEMPLATE_QUOTATION_SHARE:-}
       R2_ENDPOINT: ${R2_ENDPOINT:-}
       R2_BUCKET: ${R2_BUCKET:-}

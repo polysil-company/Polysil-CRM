@@ -134,9 +134,10 @@ async def renew_link(app_id: Id, db: DbSession, caller: CallerDep, claims: Claim
 
 @gstin_router.get("/gstin/{gstin}", response_model=Envelope[DealerGstLookup], responses=_ERRORS)
 async def gstin_lookup(gstin: Annotated[str, Path(max_length=20)], caller: CallerDep) -> Envelope[DealerGstLookup]:
-    """What a GSTIN says about itself: valid, its state code and PAN. Firm details need
-    a GST data provider, not configured yet (`lookup: unavailable`)."""
-    return Envelope(data=service.lookup(gstin))
+    """What a GSTIN says about itself (valid, its state code and PAN), and its legal
+    name, trade name, address and status from the GST data provider when one is
+    configured (`lookup: found`); `unavailable` without one."""
+    return Envelope(data=await service.lookup(gstin))
 
 
 # ── the applicant ────────────────────────────────────────────────────────────
@@ -192,7 +193,7 @@ async def applicant_gstin(token: Token, gstin: Annotated[str, Path(max_length=20
                           session: Session = None) -> Envelope[DealerGstLookup]:
     """The GSTIN read from itself, for the form's "Fetch details" button."""
     await service.view(db, token, session)
-    return Envelope(data=service.lookup(gstin))
+    return Envelope(data=await service.lookup(gstin))
 
 
 @public.post("/{token}/documents", status_code=201, responses=_PUBLIC_ERRORS)
