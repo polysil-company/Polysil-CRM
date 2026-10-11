@@ -107,6 +107,8 @@ The way the frontend was built lived only in one long working session:
   - **P0:** the go-live fixes for leads, quotations and orders from the 10 Oct walk.
   - **P1:** backend pick-ups: BE-021, BE-022 with payments, BE-023 and BE-024 when ticked, subsidised orders, subsidy completion.
   - **P2:** 22 modules the backend serves with no screens, each with its handover file, plus the dealer-portal walk.
+  - **The measured gap:** every endpoint in `backend/docs/api` (372) compared with every endpoint the frontend's mock serves (178). That is a built/total table per module, the missing pieces of modules otherwise built (orders amend and subsidy, subsidised quotations, group chats, lookups admin, reopen actions…), and new fields on built screens (dashboard charts, order filters, land in hectares).
+- **§12:** all 194 endpoints without a frontend, and the script to measure the gap again.
 - **§11:** a first message for the next session.
 
 #### Discussion
@@ -114,6 +116,7 @@ The way the frontend was built lived only in one long working session:
 - **One file, in `Docs/`, beside the other records.** The next session reads `AGENTS.md` first, so the link there is how it finds the handover.
 - **No credentials in it.** The walk helper reads the demo sign-in from environment variables, and points to `Docs/Tested-Features.md` for the mock fixture. Real staging logins come from the user.
 - **The P0 items summarise the backend's walk-fix handovers.** The file says to read those first, since they are the source.
+- **The gap was measured, not guessed.** The first draft listed whole modules by their handover names and missed the half-built ones. The comparison against the mock catches every unused endpoint; the field-level changes come from reading the recent handovers.
 - **Status is pinned to `integration` at `ed010e1`** (11 October 2026). The file says to check `git log` and `docs/Backend-Tasks.md` for anything newer.
 
 #### Files changed

@@ -520,6 +520,12 @@ No frontend PR is open.
 
 ## 10. Everything left to build, in order
 
+**How complete this list is.** §10 was checked two ways on 11 October 2026:
+
+1. **Endpoint by endpoint.** Every endpoint in `backend/docs/api/*.md` (372) was compared with every endpoint the frontend's mock serves (178). Every call the frontend makes must be mocked, because an unhandled request fails a test, so the mock is a reliable list of what the frontend uses. **194 endpoints have no frontend yet.** The coverage table is in "The measured gap" below, the full list in §12, and the script to measure it again in §12.2.
+2. **Field by field,** from the recent handovers. Built endpoints have also gained fields and filters the screens don't use yet. These are in P1 under "New fields on screens already built". The endpoint comparison can't see them, so read every new handover for this kind of change.
+
+
 The client is going live on **leads, quotations and sales orders** first, so P0 is what that go-live needs. Within each tier, top first.
 
 ### P0: go-live fixes for leads, quotations and orders
@@ -574,6 +580,80 @@ Ship these as one or two `fix(...)` PRs ("Go-live fixes from the 10 Oct walk"), 
   - `subsidy-completion.md`: the farmer's share paying a subsidised order, the dispatch date on an application, new bell notifications, reopening a closed file, and Sprinkler areas between steps.
   - `subsidised-quotations.md`: check what is already covered in the quotation builder.
 
+- [ ] **Missing pieces of modules that are otherwise built** (from the endpoint comparison; check each against its handover):
+  - **Orders:**
+    - `POST /orders/{id}/amend`: amend an approved order (`settings-amend-reopen-contract.md`; also "Amend after a voided dispatch" in `subsidised-orders-and-small-changes.md`);
+    - `PUT /orders/{id}/subsidy`: subsidised orders;
+    - `GET /orders/{id}/schemes`: schemes applied to an order;
+    - `GET /orders/stats`: counts, also used for the Accounts queue badge (BE-022);
+    - `GET /orders/{id}/dispatches`: the order page reads dispatches from the order today; check whether this adds anything.
+  - **Quotations:** `PUT /quotations/{id}/subsidy` and `GET /quotations/{id}/subsidy/calculation`, the subsidised quotation (`subsidised-quotations.md`).
+  - **Complaints:** `POST /complaints/{id}/reopen` (`settings-amend-reopen-contract.md`).
+  - **Subsidy applications:** `POST /subsidy-applications/{id}/reopen`, reopening a closed file (`subsidy-completion.md` §4), and `GET /subsidy-document-types`.
+  - **Messages:** `GET /conversations/{id}` (BE-021), plus group chats: `POST /conversations/groups`, `PATCH /conversations/{id}`, and the members endpoints (`group-chat.md`).
+  - **Tasks:** `GET /minutes/{id}`, one set of minutes on its own page.
+  - **Approvals:** `GET /approvals/{request_id}`, one approval request on its own; check whether a deep link needs it.
+  - **Lookups admin:** create and edit for complaint types, crops, lead sources, lost reasons, meeting types and MIS systems, plus `GET/PATCH /lookups/scoring` for lead scoring. The forms read these lists already, but nothing edits them. This is the "Masters" admin screen.
+  - **Org units:** only the list is used (by the users screens). Create, read, edit, close and reopen offices are missing.
+- [ ] **New fields on screens already built** (the endpoint comparison can't see these):
+  - **Dashboard** (`GET /dashboard/overview`): `area_by_system: [{system, name, leads, hectares}]`, and `targets_by_month: [{month, target, achieved}]` (6 months, null without a targets permission). Two new charts (`dealer-recruitment-and-small-changes.md`, "Five small changes").
+  - **Order list filters:** `territory_id` (a comma list; a state selects its districts) and `owner_org_unit_id` on `GET /orders`, `/orders/stats` and `/orders/export`, as the lead list already has.
+  - **Land in hectares:** leads take and return `land_hectares` (`land_acres` still works). Ask for hectares on the lead forms and show it on the lead page.
+  - **Lead score** as a whole number, and the other P0 items above.
+  - **Dormant leads and "assign moves the office":** `lead-small-gaps-contract.md`. Dormant is already in the lead schemas; check the "Screens" section of that file against what is on screen.
+  - **List exports:** `list-exports.md`. Leads, quotations and orders have export buttons; check the rest of the lists it names.
+
+### The measured gap: built endpoints per backend module
+
+| Module (backend/docs/api) | Built / total | Missing |
+| --- | --- | --- |
+| `approvals` | 4 / 5 | 1 |
+| `assistant` | 0 / 2 | 2 |
+| `auth` | 7 / 7 | 0 |
+| `campaigns` | 0 / 5 | 5 |
+| `complaints` | 21 / 22 | 1 |
+| `customers` | 0 / 4 | 4 |
+| `dashboard` | 1 / 1 | 0 |
+| `dealer-applications` | 0 / 17 | 17 |
+| `dealer-commission` | 0 / 12 | 12 |
+| `dispatch` | 2 / 2 | 0 |
+| `documents` | 0 / 6 | 6 |
+| `holidays` | 0 / 3 | 3 |
+| `leads` | 20 / 20 | 0 |
+| `lookups` | 9 / 23 | 14 |
+| `marketing-material` | 0 / 11 | 11 |
+| `messages` | 6 / 12 | 6 |
+| `notifications` | 2 / 2 | 0 |
+| `orders` | 13 / 18 | 5 |
+| `org-units` | 1 / 6 | 5 |
+| `partners` | 0 / 7 | 7 |
+| `payments` | 0 / 8 | 8 |
+| `portal` | 0 / 6 | 6 |
+| `pricing` | 8 / 8 | 0 |
+| `products` | 8 / 8 | 0 |
+| `public` | 6 / 6 | 0 |
+| `quotations` | 14 / 16 | 2 |
+| `ratings` | 0 / 4 | 4 |
+| `reports` | 0 / 9 | 9 |
+| `rewards` | 0 / 19 | 19 |
+| `schemes` | 0 / 6 | 6 |
+| `seller-gstins` | 0 / 3 | 3 |
+| `settings` | 0 / 2 | 2 |
+| `stock` | 0 / 7 | 7 |
+| `subsidy` | 4 / 4 | 0 |
+| `subsidy-applications` | 13 / 15 | 2 |
+| `subsidy-masters` | 4 / 4 | 0 |
+| `subsidy-reports` | 6 / 6 | 0 |
+| `subsidy-schemes` | 6 / 6 | 0 |
+| `targets` | 0 / 3 | 3 |
+| `tasks` | 13 / 14 | 1 |
+| `territories` | 0 / 4 | 4 |
+| `tracking` | 0 / 16 | 16 |
+| `users` | 10 / 10 | 0 |
+| `warranty` | 0 / 3 | 3 |
+
+The modules at 0 are the P2 table below. A partly built module has its missing pieces listed in P1 above. All 194 endpoints are listed in §12.
+
 ### P2: modules the backend serves with no screens yet
 
 Each has a handover in `backend/docs/handover/` and an API file in `backend/docs/api/`. Rough order of value to the client, after go-live:
@@ -593,7 +673,7 @@ Each has a handover in `backend/docs/handover/` and an API file in `backend/docs
 | 11 | **Documents on records; the replacement order's approvers** | `documents-and-replacement-chain.md` | — |
 | 12 | **Warranty tracking** | `warranty.md` | — |
 | 13 | **Group chats** | `group-chat.md` | Messages |
-| 14 | **Export and sample orders** | `export-sample-orders-contract.md` | — |
+| 14 | **Export and sample orders**, with the seller GSTINs and their LUTs (`/seller-gstins`) | `export-sample-orders-contract.md`, `backend/docs/api/seller-gstins.md` | — |
 | 15 | **Dealer tasks** (tasks for partner users) | `dealer-tasks-contract.md` | — |
 | 16 | **Complaint holidays and escalation** (admin) | `complaint-holidays-escalation.md` | — |
 | 17 | **Customer record** | `customer-record.md` | — |
@@ -620,3 +700,337 @@ Each has a handover in `backend/docs/handover/` and an API file in `backend/docs
 Paste this to start:
 
 > You are continuing the Polysil CRM web frontend in `polysil-company/polysil-crm` (`Frontend/`). First read `Frontend/AGENTS.md`, then `Frontend/Docs/Frontend-Handover.md` end to end, and follow its process exactly: branch from `origin/integration`, mocks first, a browser walk with screenshots and axe, tests, records, then verify, knip, prettier and build, then a PR to `integration`. Check `git log origin/integration` and `docs/Backend-Tasks.md` for anything newer than the handover's date. Then start on §10 P0, the go-live fixes from the 10 Oct walk, as one `fix` PR. Follow the user's rules in §2.
+
+---
+
+## 12. Appendix: every backend endpoint without a frontend (11 October 2026)
+
+### 12.1 The list
+
+194 endpoints, grouped by `backend/docs/api` module.
+
+**`approvals (1)`**
+
+- `GET /approvals/{request_id}`
+
+**`assistant (2)`**
+
+- `GET /assistant`
+- `GET /assistant/actions`
+
+**`campaigns (5)`**
+
+- `GET /campaigns`
+- `POST /campaigns`
+- `DELETE /campaigns/{campaign_id}`
+- `GET /campaigns/{campaign_id}`
+- `PATCH /campaigns/{campaign_id}`
+
+**`complaints (1)`**
+
+- `POST /complaints/{complaint_id}/reopen`
+
+**`customers (4)`**
+
+- `GET /customers`
+- `GET /customers/{customer_id}`
+- `PATCH /customers/{customer_id}`
+- `GET /customers/{customer_id}/timeline`
+
+**`dealer-applications (17)`**
+
+- `GET /dealer-applications`
+- `POST /dealer-applications`
+- `GET /dealer-applications/{app_id}`
+- `PATCH /dealer-applications/{app_id}`
+- `POST /dealer-applications/{app_id}/decision`
+- `POST /dealer-applications/{app_id}/link`
+- `POST /dealer-applications/{app_id}/submit`
+- `POST /dealer-applications/{app_id}/withdraw`
+- `GET /gstin/{gstin}`
+- `GET /public/dealer-apply/{token}`
+- `PATCH /public/dealer-apply/{token}`
+- `POST /public/dealer-apply/{token}/documents`
+- `DELETE /public/dealer-apply/{token}/documents/{doc_id}`
+- `GET /public/dealer-apply/{token}/gstin/{gstin}`
+- `POST /public/dealer-apply/{token}/submit`
+- `POST /public/dealer-apply/{token}/verify`
+- `POST /public/dealer-apply/{token}/verify/check`
+
+**`dealer-commission (12)`**
+
+- `GET /commission-rates`
+- `POST /commission-rates`
+- `GET /dealer-commissions`
+- `GET /dealer-commissions/export`
+- `GET /dealer-commissions/{commission_id}`
+- `POST /dealer-commissions/{commission_id}/approve`
+- `POST /dealer-commissions/{commission_id}/cancel`
+- `POST /dealer-commissions/{commission_id}/pay`
+- `POST /dealer-commissions/{commission_id}/return`
+- `GET /subsidy-applications/{app_id}/commission`
+- `POST /subsidy-applications/{app_id}/commission`
+- `GET /subsidy-applications/{app_id}/commission/preview`
+
+**`documents (6)`**
+
+- `GET /documents`
+- `POST /documents`
+- `GET /documents/types`
+- `DELETE /documents/{document_id}`
+- `GET /documents/{document_id}/link`
+- `GET /leads/{lead_id}/documents`
+
+**`holidays (3)`**
+
+- `GET /holidays`
+- `POST /holidays`
+- `DELETE /holidays/{day}`
+
+**`lookups (14)`**
+
+- `POST /lookups/complaint-types`
+- `PATCH /lookups/complaint-types/{item_id}`
+- `POST /lookups/crops`
+- `PATCH /lookups/crops/{item_id}`
+- `POST /lookups/lead-sources`
+- `PATCH /lookups/lead-sources/{item_id}`
+- `POST /lookups/lost-reasons`
+- `PATCH /lookups/lost-reasons/{item_id}`
+- `POST /lookups/meeting-types`
+- `PATCH /lookups/meeting-types/{item_id}`
+- `POST /lookups/mis-systems`
+- `PATCH /lookups/mis-systems/{item_id}`
+- `GET /lookups/scoring`
+- `PATCH /lookups/scoring`
+
+**`marketing-material (11)`**
+
+- `GET /marketing-materials`
+- `POST /marketing-materials`
+- `PATCH /marketing-materials/{material_id}`
+- `GET /marketing-orders`
+- `POST /marketing-orders`
+- `GET /marketing-orders/export`
+- `GET /marketing-orders/{order_id}`
+- `POST /marketing-orders/{order_id}/approve`
+- `POST /marketing-orders/{order_id}/cancel`
+- `POST /marketing-orders/{order_id}/dispatch`
+- `POST /marketing-orders/{order_id}/reject`
+
+**`messages (6)`**
+
+- `POST /conversations/groups`
+- `GET /conversations/{conversation_id}`
+- `PATCH /conversations/{conversation_id}`
+- `GET /conversations/{conversation_id}/members`
+- `POST /conversations/{conversation_id}/members`
+- `DELETE /conversations/{conversation_id}/members/{user_id}`
+
+**`orders (5)`**
+
+- `GET /orders/stats`
+- `POST /orders/{order_id}/amend`
+- `GET /orders/{order_id}/dispatches`
+- `GET /orders/{order_id}/schemes`
+- `PUT /orders/{order_id}/subsidy`
+
+**`org-units (5)`**
+
+- `POST /org-units`
+- `GET /org-units/{item_id}`
+- `PATCH /org-units/{item_id}`
+- `POST /org-units/{item_id}/close`
+- `POST /org-units/{item_id}/reopen`
+
+**`partners (7)`**
+
+- `GET /partners`
+- `POST /partners`
+- `GET /partners/export`
+- `GET /partners/{item_id}`
+- `PATCH /partners/{item_id}`
+- `POST /partners/{item_id}/close`
+- `POST /partners/{item_id}/reopen`
+
+**`payments (8)`**
+
+- `PUT /orders/{order_id}/payment-schedule`
+- `GET /partners/{partner_id}/credit`
+- `GET /partners/{partner_id}/ledger`
+- `GET /payments`
+- `POST /payments`
+- `GET /payments/{payment_id}`
+- `POST /payments/{payment_id}/allocations`
+- `POST /payments/{payment_id}/void`
+
+**`portal (6)`**
+
+- `GET /portal/complaints`
+- `GET /portal/enquiries`
+- `GET /portal/me`
+- `PATCH /portal/me`
+- `GET /portal/orders`
+- `GET /portal/quotations`
+
+**`quotations (2)`**
+
+- `PUT /quotations/{quotation_id}/subsidy`
+- `GET /quotations/{quotation_id}/subsidy/calculation`
+
+**`ratings (4)`**
+
+- `GET /partners/{partner_id}/dealer-rating`
+- `GET /ratings`
+- `POST /ratings`
+- `GET /ratings/summary`
+
+**`reports (9)`**
+
+- `GET /leads/{lead_id}/360`
+- `GET /reports/campaign-performance`
+- `GET /reports/complaints`
+- `GET /reports/dealer-performance`
+- `GET /reports/follow-ups`
+- `GET /reports/lead-conversion`
+- `GET /reports/lost-leads`
+- `GET /reports/salesperson-performance`
+- `GET /reports/territory-performance`
+
+**`rewards (19)`**
+
+- `GET /gifts`
+- `POST /gifts`
+- `PATCH /gifts/{gift_id}`
+- `DELETE /orders/{order_id}/reward-redemption`
+- `POST /orders/{order_id}/reward-redemption`
+- `GET /reward-rules`
+- `POST /reward-rules`
+- `GET /reward-rules/{rule_id}`
+- `PATCH /reward-rules/{rule_id}`
+- `GET /reward-settings`
+- `PUT /reward-settings`
+- `POST /rewards/adjustments`
+- `GET /rewards/balance`
+- `GET /rewards/gift-redemptions`
+- `POST /rewards/gift-redemptions`
+- `POST /rewards/gift-redemptions/{rid}/fulfil`
+- `POST /rewards/gift-redemptions/{rid}/reject`
+- `POST /rewards/gift-redemptions/{rid}/withdraw`
+- `GET /rewards/ledger`
+
+**`schemes (6)`**
+
+- `GET /scheme-entitlements`
+- `GET /schemes`
+- `POST /schemes`
+- `GET /schemes/{scheme_id}`
+- `PATCH /schemes/{scheme_id}`
+- `GET /schemes/{scheme_id}/standing`
+
+**`seller-gstins (3)`**
+
+- `GET /seller-gstins`
+- `POST /seller-gstins/{gstin_id}/luts`
+- `DELETE /seller-gstins/{gstin_id}/luts/{lut_id}`
+
+**`settings (2)`**
+
+- `GET /settings`
+- `PATCH /settings`
+
+**`stock (7)`**
+
+- `GET /stock`
+- `GET /stock/availability`
+- `GET /stock/movements`
+- `POST /stock/movements`
+- `GET /warehouses`
+- `POST /warehouses`
+- `PATCH /warehouses/{warehouse_id}`
+
+**`subsidy-applications (2)`**
+
+- `POST /subsidy-applications/{app_id}/reopen`
+- `GET /subsidy-document-types`
+
+**`targets (3)`**
+
+- `GET /targets`
+- `PUT /targets`
+- `GET /targets/achievement`
+
+**`tasks (1)`**
+
+- `GET /minutes/{minutes_id}`
+
+**`territories (4)`**
+
+- `GET /territories`
+- `POST /territories`
+- `GET /territories/{item_id}`
+- `PATCH /territories/{item_id}`
+
+**`tracking (16)`**
+
+- `POST /locations/batch`
+- `GET /me/tracking-config`
+- `POST /tracking/consent`
+- `POST /tracking/duty/end`
+- `POST /tracking/duty/start`
+- `GET /tracking/policy`
+- `PUT /tracking/policy`
+- `GET /tracking/team/latest`
+- `GET /tracking/users/{user_id}/route`
+- `GET /tracking/view-log`
+- `GET /visits`
+- `POST /visits`
+- `GET /visits/{visit_id}`
+- `POST /visits/{visit_id}/check-out`
+- `POST /visits/{visit_id}/photos`
+- `GET /visits/{visit_id}/photos/{photo_id}`
+
+**`warranty (3)`**
+
+- `GET /orders/{order_id}/warranty`
+- `GET /warranty-terms`
+- `POST /warranty-terms`
+
+### 12.2 Measure it again
+
+The gap changes every time either side merges. To measure it again, run these from the repository root.
+
+**Step 1: dump the frontend's mocked endpoints.** This is a scratch script: don't commit it. Its type cast is only there to read MSW's internal `info`.
+
+```bash
+cd Frontend
+cat > src/__list-handlers.ts <<'TS'
+import { handlers } from "@/mocks/handlers";
+for (const h of handlers) {
+  const info = (h as unknown as { info: { method?: unknown; path?: unknown } }).info;
+  console.log(`${String(info.method)} ${String(info.path)}`);
+}
+TS
+NEXT_PUBLIC_API_MOCKING=enabled NEXT_PUBLIC_APP_ENV=development npx tsx src/__list-handlers.ts > /tmp/fe-endpoints.txt
+rm src/__list-handlers.ts
+cd ..
+```
+
+**Step 2: compare with the backend's generated docs.**
+
+```python
+# python3 gap.py
+import re, glob, os
+def norm(p):
+    p = re.sub(r"^.*?/api/v1", "", p.split("?")[0])
+    p = re.sub(r"\{[^}]+\}", ":x", p); p = re.sub(r":[A-Za-z_]+", ":x", p)
+    return p.rstrip("/")
+fe = {(m, norm(p)) for m, p in (l.split() for l in open("/tmp/fe-endpoints.txt") if len(l.split()) == 2)}
+for f in sorted(glob.glob("backend/docs/api/*.md")):
+    if f.endswith("README.md"): continue
+    for m in re.finditer(r"^## `(GET|POST|PUT|PATCH|DELETE) /api/v1(\S*)`", open(f).read(), re.M):
+        if (m.group(1), norm(m.group(2))) not in fe:
+            print(os.path.basename(f)[:-3], m.group(1), m.group(2))
+```
+
+A mocked endpoint isn't proof that a screen uses it. The reverse holds, though: an endpoint missing from the mock is certainly unused by the frontend.
