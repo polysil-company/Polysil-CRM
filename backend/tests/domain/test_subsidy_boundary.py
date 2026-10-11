@@ -376,6 +376,42 @@ def test_an_off_step_area_is_refused_with_the_steps_named() -> None:
     assert "0.4" in err.value.message
 
 
+def between(system: str, area: str) -> QuotationResult:
+    base = quotation(system)
+    off = replace(policy(system), exact_area_match_required=False)
+    q = replace(base, crops=(replace(base.crops[0], area=D(area)),))
+    return field_inspection(q, masters(system), off)
+
+
+def test_an_area_between_steps_takes_the_next_steps_quantities_and_a_pro_rata_jantri() -> None:
+    """FS-055 rule 20 (GAP-076, PMKSY §9.5): 1.1 Ha takes 1.2 Ha's material and
+    the unit cost halfway between 1.0 and 1.2."""
+    got = between("sprinkler", "1.1")
+    upper = one_crop("sprinkler", area=D("1.2"))
+    lower = one_crop("sprinkler", area=D("1.0"))
+    assert got.sprinkler is not None and upper.sprinkler is not None
+    want = [ln.qty for ln in upper.sprinkler.lines[:-1]]
+    assert [ln.qty for ln in got.sprinkler.lines[:-1]] == want
+    assert got.sprinkler.lines[-1].qty == D("1.1")          # transport is the area itself
+    mid = (lower.crops[0].jantri.regular + upper.crops[0].jantri.regular) / 2
+    assert got.crops[0].jantri.regular == mid
+    assert "area_between_steps" in codes(got)
+
+
+def test_an_exact_step_is_unchanged_with_the_flag_off() -> None:
+    off = between("sprinkler", "1.0")
+    on = one_crop("sprinkler", area=D("1.0"))
+    assert off.total == on.total and off.crops[0].jantri == on.crops[0].jantri
+    assert "area_between_steps" not in codes(off)
+
+
+@pytest.mark.parametrize("area", ["0.3", "5.2"])
+def test_an_area_outside_the_table_is_still_refused_with_the_flag_off(area: str) -> None:
+    with pytest.raises(SubsidyError) as err:
+        between("sprinkler", area)
+    assert err.value.code == "exact_area_match_required"
+
+
 def test_the_sprinkler_inspection_floor_holds_at_the_smallest_area() -> None:
     """Rule 5 and rule 21: 0.4 % of a small A is under 200, so the floor binds and
     `R24` prints 200 exactly."""

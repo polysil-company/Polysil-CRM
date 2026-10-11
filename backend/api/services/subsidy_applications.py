@@ -163,12 +163,16 @@ async def create(db: AsyncSession, caller: Caller, body: sch.ApplicationCreate) 
     return await get(db, app_id)
 
 
+SUPPLY_FIELD = "supply"   # stage 7's material supply date (GAP-176)
+
+
 # ── reading ──────────────────────────────────────────────────────────────────
 
 _SELECT = """
 SELECT a.*, s.code AS scheme_code, d.seq AS stage_seq, d.code AS stage_code, d.name AS stage_name,
        l.inquiry_no::text AS inquiry_no, t.name AS territory_name, t.level::text AS territory_level,
        cp.name AS partner_name, ou.name AS org_unit_name,
+       subsidy_dispatched_on(a.lead_id) AS dispatched_on,
        (SELECT count(DISTINCT sd.document_type_id) FROM subsidy_document sd
          WHERE sd.application_id = a.id AND sd.deleted_at IS NULL) AS docs_uploaded,
        (SELECT count(*) FROM subsidy_document_type dt2 WHERE dt2.is_active AND dt2.deleted_at IS NULL) AS docs_listed,
@@ -209,6 +213,7 @@ def _to_app(r: Any, names: people.Names) -> sch.Application:
         ageing=sch.Ageing(days_in_stage=(today - r.current_since).days,
                           days_since_inward=(today - r.inward_on).days if r.inward_on else None),
         full_fp_received_on=r.full_fp_received_on.isoformat() if r.full_fp_received_on else None,
+        dispatched_on=r.dispatched_on.isoformat() if r.dispatched_on else None,
         created_at=r.created_at.isoformat(),
         cancellation=sch.ApplicationCancellation(reason=r.cancel_reason) if r.cancel_reason else None)
 
@@ -359,6 +364,13 @@ async def record(db: AsyncSession, app_id: str, body: sch.StageRecord) -> sch.Ap
         _check_value(fields[key], key, value)
     # blank text is a cleared field, as null is (review F-2)
     values = {k: (None if v is None or str(v).strip() == "" else str(v).strip()) for k, v in body.values.items()}
+    if SUPPLY_FIELD in fields and SUPPLY_FIELD not in body.values:
+        # FS-055 rule 10: the supply date comes from the dispatch unless one is sent
+        shipped = (await db.execute(text(
+            "SELECT subsidy_dispatched_on(lead_id) FROM subsidy_application WHERE id = CAST(:a AS uuid)"),
+            {"a": app_id})).scalar_one_or_none()
+        if shipped is not None:
+            values[SUPPLY_FIELD] = shipped.isoformat()
     try:
         async with db.begin_nested():
             await db.execute(text(
@@ -395,6 +407,30 @@ async def cancel(db: AsyncSession, app_id: str, body: sch.Cancel) -> sch.Applica
             raise ConflictError("The application is closed.", code="status_changed") from exc
         if state == "42501":
             raise ForbiddenError("You may not cancel applications.") from exc
+        raise
+    return await get(db, app_id)
+
+
+async def reopen(db: AsyncSession, app_id: str, body: sch.Reopen) -> sch.Application:
+    """FS-055 rule 16: a closed application opens again; its stages stay."""
+    try:
+        async with db.begin_nested():
+            await db.execute(text("SELECT subsidy_application_reopen(CAST(:a AS uuid), :r)"),
+                             {"a": app_id, "r": body.reason})
+    except DBAPIError as exc:
+        state = _state(exc)
+        if state == "SAPAN":
+            raise NotFoundError("No such application.") from exc
+        if state == "SAPOP":
+            raise ConflictError("Only a closed application can be reopened.",
+                                code="application_not_closed") from exc
+        if state == "SAPCM":
+            raise ConflictError("The dealer's commission on this file is approved or paid.",
+                                code="commission_settled") from exc
+        if state == "SAPRM":
+            raise ValidationFailed(fields={"reason": "Required."}) from exc
+        if state == "42501":
+            raise ForbiddenError("You may not reopen applications.") from exc
         raise
     return await get(db, app_id)
 

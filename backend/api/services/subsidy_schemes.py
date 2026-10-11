@@ -80,7 +80,7 @@ async def _call(db: AsyncSession, sql: str, params: dict[str, Any]) -> Any:
 async def _systems(db: AsyncSession, scheme_id: str) -> list[Any]:
     return list((await db.execute(text(
         "SELECT system_type::text AS system_type, jantri_variant::text AS jantri_variant, "
-        "quantity_source::text AS quantity_source FROM subsidy_system "
+        "quantity_source::text AS quantity_source, cap_mode FROM subsidy_system "
         "WHERE scheme_id = CAST(:s AS uuid) AND is_active ORDER BY system_type"),
         {"s": scheme_id})).all())
 
@@ -97,7 +97,7 @@ async def _readiness(db: AsyncSession, scheme_id: str, on: dt.date,
     systems = []
     for y in await _systems(db, scheme_id):
         missing = await engine.readiness(db, scheme_id, y.system_type, y.jantri_variant,
-                                         y.quantity_source, on)
+                                         y.quantity_source, on, y.cap_mode)
         systems.append(sch.SystemReadiness(system_type=y.system_type, ready=not missing, missing=missing))
     stages = await _stages(db, scheme_id)
     # a switched-off scheme is never ready: no calculation or application takes it (review F-5)

@@ -38,11 +38,11 @@ VALIDITY_DAYS = 45
 
 # rule 18: the sales types priced today; the other three name their question.
 # FS-042 added export, on a setting standing in for question 14.5.
-SALES_TYPES_ACCEPTED: frozenset[str] = frozenset({"commercial", "industrial", "export"})
+SALES_TYPES_ACCEPTED: frozenset[str] = frozenset({"commercial", "industrial", "export",
+                                                   "subsidised"})   # FS-057
 SALES_TYPE_BLOCKED_ON: dict[str, str] = {
     "marketing": "questions 6.11 and 14.6: the 50/50 split, limits and approval",
     "sample": "a sample is an order, not a quotation (FS-042 rule 10, GAP-367)",
-    "subsidised": "Milestone 3: the subsidised quotation is built on the FS-008 calculator",
 }
 
 # the lead's inquiry type is the quotation's default sales type
@@ -116,6 +116,7 @@ def pdf_filename(quote_no: str, version: int) -> str:
 PUBLIC_FIELDS: tuple[str, ...] = (
     "quote_no", "version", "status", "sales_type", "seller", "sent_at", "valid_until",
     "expired", "superseded", "totals", "line_count", "pdf_ready", "pdf_url",
+    "subsidy",       # FS-057: scheme, category, subsidy and the farmer's share; no party
 )
 PARTY_COLUMNS: frozenset[str] = frozenset({
     "party_name", "party_mobile", "party_address", "party_gstin", "lead_id", "lines",

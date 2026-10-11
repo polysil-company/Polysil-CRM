@@ -13,6 +13,7 @@ import type {
   StageEntryWire,
 } from "@/features/subsidy/api/subsidy-applications.schemas";
 import type { CalculateResponseWire } from "@/features/subsidy/api/subsidy.schemas";
+import type { OfficeWire } from "@/features/users/api/users.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
@@ -33,6 +34,7 @@ import { generateQuotations } from "./data/quotations";
 import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
 import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
+import { seedOffices, seedUsers, type MockUserRecord } from "./data/users";
 
 export interface MockDb {
   /** Newest first, in the backend's wire format. */
@@ -131,6 +133,12 @@ export interface MockDb {
   taxRates: TaxRateWire[];
   /** Price lists with their rates (MSTR-006). */
   priceLists: MockPriceList[];
+  /** Staff and partner users, deleted ones kept with `deleted_at` (ADMN-001…006). */
+  users: MockUserRecord[];
+  /** The offices a staff member is anchored on (`GET /org-units`). */
+  offices: OfficeWire[];
+  /** POST /users replays: Idempotency-Key → the request and the person made. */
+  userWrites: Map<string, { body: string; userId: string }>;
 }
 
 function createMockDb(): MockDb {
@@ -199,6 +207,9 @@ function createMockDb(): MockDb {
     hsnHistory: seedHsnHistory(products),
     taxRates: seedTaxRates(),
     priceLists: seedPriceLists(products),
+    users: seedUsers(),
+    offices: seedOffices(),
+    userWrites: new Map(),
   };
 }
 

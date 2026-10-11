@@ -8,6 +8,13 @@ the workbook's exact figures (`exact`) and the paisa figures the quotation
 prints (`money`), which tie: `subsidy + farmer_share - total_gst + sump =
 cost` holds on the rounded values because every term of that identity is
 rounded first and the share is derived last (rule 10b).
+
+FS-056 adds two cap modes for other states' workbooks. `incl_gst`: the subsidy
+caps on MIN(unit cost, total incl GST), no sump, and the share is that total
+less the subsidy (floored at 0 where the workbook wraps it in MAX). Then
+`unit_cost_only` (RJ drip): the subsidy is the percent of the unit cost, uncapped,
+and the share MAX(total - subsidy, 0). A flat charge outside the cap (CG's
+inspection) is added to the share in both.
 """
 
 from __future__ import annotations
@@ -19,12 +26,24 @@ from api.domain.subsidy.types import Category, CategoryMoney, CategoryResult, Ja
 
 NOT_APPLICABLE = CategoryMoney(ZERO, ZERO, ZERO, None)
 SEVEN_YEAR_OUTSIDE_WINDOW = "area_outside_7y_window"
+CAP_MODES = ("ggrc", "incl_gst", "unit_cost_only")
 
 
 def category_rows(categories: tuple[Category, ...], *, cost: Decimal, total_gst: Decimal,
                   sump: Decimal, area: Decimal, jantri: JantriFigures,
                   seven_year_applicable: bool,
-                  gsdma_max_area: Decimal | None) -> tuple[CategoryResult, ...]:
+                  gsdma_max_area: Decimal | None, cap_mode: str = "ggrc",
+                  share_floor_zero: bool = False,
+                  share_extra: Decimal = ZERO) -> tuple[CategoryResult, ...]:
+    if cap_mode not in CAP_MODES:
+        raise ValueError(f"unknown cap mode {cap_mode!r}")
+    if cap_mode != "ggrc":
+        return tuple(_state_row(cat, total=cost + total_gst, cost=cost, area=area,
+                                basis=jantri.regular_for_cap, cap_mode=cap_mode,
+                                floor=share_floor_zero or cap_mode == "unit_cost_only",
+                                extra=share_extra)
+                     for cat in sorted(categories, key=lambda c: c.sort_order)
+                     if cat.variant != "seven_year")
     rows = []
     for cat in sorted(categories, key=lambda c: c.sort_order):
         if cat.variant == "seven_year":
@@ -44,6 +63,27 @@ def category_rows(categories: tuple[Category, ...], *, cost: Decimal, total_gst:
             rows.append(_row(cat, cost=cost, total_gst=total_gst, sump=sump, area=area,
                              basis=jantri.regular_for_cap, gsdma=gsdma))
     return tuple(rows)
+
+
+def _state_row(cat: Category, *, total: Decimal, cost: Decimal, area: Decimal, basis: Decimal,
+               cap_mode: str, floor: bool, extra: Decimal) -> CategoryResult:
+    """FS-056 rules 2 to 4."""
+    pct = as_pct(cat.pct)
+    candidates = [basis * pct] if cap_mode == "unit_cost_only" else [basis * pct, total * pct]
+    if cat.per_ha_cap is not None:
+        candidates.append(area * cat.per_ha_cap)
+    subsidy = min(candidates)
+
+    def share_of(t: Decimal, s: Decimal) -> Decimal:
+        rest = t - s
+        return (max(rest, ZERO) if floor else rest) + extra
+
+    exact = CategoryMoney(subsidy, share_of(total, subsidy),
+                          subsidy / total * 100 if total else ZERO, None)
+    total2, subsidy2 = round2(total), round2(subsidy)
+    money = CategoryMoney(subsidy2, share_of(total2, subsidy2) - extra + round2(extra),
+                          round2(subsidy2 / total2 * 100) if total2 else ZERO, None)
+    return CategoryResult(cat.code, cat.name, cat.pct, cat.variant, True, None, exact, money)
 
 
 def _row(cat: Category, *, cost: Decimal, total_gst: Decimal, sump: Decimal, area: Decimal,

@@ -55,7 +55,7 @@ from api.schemas.leads import (
 )
 from api.schemas.quotations import PdfLink, QuotationLineIn, Totals
 from api.schemas.stock import WarehouseRef
-from api.services import approval_view, people, pricing
+from api.services import approval_view, people, pricing, quotation_subsidy
 from api.services import payments as payments_service
 from api.services import stock as stock_service
 from api.services.clock import IST, today_ist
@@ -619,9 +619,13 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         complaint = sch.OrderComplaintRef(id=str(c.id), complaint_no=c.complaint_no) if c else None
     from api.services import schemes as scheme_service  # schemes imports this module
     totals = _totals(r)
-    benefits, payable = await scheme_service.order_benefits(db, order_id, Decimal(totals.total))
     subsidy, subsidy_warnings = (await _subsidy_block(db, order_id, Decimal(totals.total))
                                  if r.type_text == domain.SUBSIDISED else (None, []))
+    # FS-055 rule 4: a subsidised order is paid by the farmer's share, as order_owed() has it
+    base = Decimal(totals.total)
+    if subsidy is not None:
+        base = max(Decimal(0), min(base, Decimal(subsidy.farmer_payable)))   # EC-6, EC-12
+    benefits, payable = await scheme_service.order_benefits(db, order_id, base)
     return sch.Order(
         benefits=benefits, payable=payable, subsidy=subsidy,
         id=str(r.id), order_no=r.order_no, complaint=complaint, status=r.status_text,
@@ -942,6 +946,11 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
                                    fields={"quotation_ids": str(r.id)})
     # FS-042 rule 17: an export order from export quotations only, one treatment.
     # Commercial and industrial keep FS-011's behaviour.
+    subsidised = {r.sales_type == "subsidised" for r in rows}
+    if subsidised != {body.order_type == domain.SUBSIDISED}:
+        raise ValidationFailed("A subsidised order is made from a subsidised quotation, and "
+                               "only it.", code="type_mismatch",
+                               fields={"order_type": body.order_type})
     exports = {r.sales_type == "export" for r in rows}
     if len(exports) > 1 or exports != {body.order_type == "export"} \
             or len({(r.tax_treatment, r.export_country) for r in rows}) > 1:
@@ -1077,13 +1086,19 @@ def _check_subsidy_shape(body: sch.OrderCreate) -> None:
             raise ValidationFailed("Only a subsidised order takes a subsidy.",
                                    code="subsidy_not_allowed", fields={"subsidy": "not allowed"})
         return
+    if body.quotation_ids:
+        # FS-057 rule 8: from one accepted subsidised quotation, its subsidy with it
+        if len(set(body.quotation_ids)) != 1:
+            raise ValidationFailed("A subsidised order is made from one quotation.",
+                                   code="subsidised_quotation_count",
+                                   fields={"quotation_ids": "exactly one"})
+        if body.subsidy is not None:
+            raise ValidationFailed("The subsidy comes from the quotation.",
+                                   code="subsidy_from_quotation", fields={"subsidy": "not allowed"})
+        return
     if body.subsidy is None:
         raise ValidationFailed("A subsidised order needs its subsidy and leads.",
                                code="subsidy_missing", fields={"subsidy": "required"})
-    if body.quotation_ids:
-        raise ValidationFailed("A subsidised order is typed in, not made from quotations.",
-                               code="subsidised_from_quotation",
-                               fields={"quotation_ids": "not on a subsidised order"})
     if body.lead_id is not None:
         raise ValidationFailed("A subsidised order takes its leads from subsidy.lead_ids.",
                                code="lead_from_subsidy", fields={"lead_id": "use subsidy.lead_ids"})
@@ -1162,6 +1177,7 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
     warnings: list[str] = []
     sources: list[str | None] | None = None
     snaps: list[Any] | None = None
+    from_quote: dict[str, Decimal] | None = None
     if body.quotation_ids:
         src = await _from_quotations(db, caller, body)
         mode: _Mode = src["mode"]
@@ -1174,6 +1190,8 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
                            as_of=src["day"], specs=_specs(src["lines"]), existing=True,
                            treatment=mode.treatment)
         warnings += _repriced(src["lines"], ctx)
+        if body.order_type == domain.SUBSIDISED:
+            from_quote = await quotation_subsidy.for_order(db, body.quotation_ids[0], src["lead"])
         sources = [str(r.id) for r in src["lines"]]
         snaps = src["lines"]
         lead_id, partner, party = src["lead"], src["partner"], src["party"]
@@ -1252,6 +1270,11 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
         raise map_db_error(exc) from exc
     await _write_lines(db, order_id, ctx, snaps, sources)
     await _write_figures(db, order_id, ctx, caller)
+    if from_quote is not None:
+        await _call(db, "SELECT order_subsidy_set(CAST(:o AS uuid), :m, :s, :p, "
+                        "CAST(:l AS uuid[]))",
+                    {"o": order_id, "m": from_quote["material"], "s": from_quote["subsidy"],
+                     "p": from_quote["farmer"], "l": [str(lead_id)]})
     if body.subsidy is not None:
         # after the figures: a null material is capped against the stored total (S-1)
         await _write_subsidy(db, order_id, body.subsidy, subsidy_ids)

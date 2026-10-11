@@ -301,6 +301,7 @@ The children of one territory, name and id only, at most 200.
 | `line_count` | integer | yes |  |
 | `pdf_ready` | boolean | yes |  |
 | `pdf_url` | string | yes |  |
+| `subsidy` | PublicSubsidy \| null |  | FS-057: a subsidised quotation's subsidy and the farmer's share; null otherwise. |
 
 **`PublicSeller`**
 
@@ -315,6 +316,16 @@ The children of one territory, name and id only, at most 200.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
+
+**`PublicSubsidy`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `scheme` | string | yes |  |
+| `category` | string | yes |  |
+| `total_cost` | string | yes |  |
+| `subsidy` | string | yes |  |
+| `farmer_share` | string | yes | What the farmer pays. |
 
 **`PublicSystem`**
 

@@ -1,0 +1,1123 @@
+{
+  "CG/drip": {
+    "scheme": "CG",
+    "system_type": "drip",
+    "system": {
+      "pipeline": "gst_inclusive",
+      "jantri_variant": "label_anchor_linear",
+      "quantity_source": "manual",
+      "cap_mode": "incl_gst",
+      "rounded_blocks": [],
+      "rounded_lines": [],
+      "spacing_rule": "design",
+      "spacing_outside_table": "clamp",
+      "has_head_unit": false,
+      "supports_group": false,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "fittings_rate": "0.04",
+      "flat_inspection": "1003",
+      "unit_cost_round_rupee": "1",
+      "gst_inclusive_rate": "0.05"
+    },
+    "categories": [
+      {
+        "code": "small",
+        "name": "Small farmer (55%)",
+        "pct": "55",
+        "variant": "regular",
+        "sort_order": 1
+      },
+      {
+        "code": "big",
+        "name": "Big farmer (45%)",
+        "pct": "45",
+        "variant": "regular",
+        "sort_order": 2
+      }
+    ],
+    "unit_cost": {
+      "kind": "rows",
+      "rows": {
+        "12": {
+          "0.4": "20710",
+          "1": "28274",
+          "2": "44962",
+          "3": "69810",
+          "4": "86849",
+          "5": "110591"
+        },
+        "10": {
+          "0.4": "21450",
+          "1": "30109",
+          "2": "48560",
+          "3": "75310",
+          "4": "94329",
+          "5": "119935"
+        },
+        "9": {
+          "0.4": "21981",
+          "1": "31399",
+          "2": "51139",
+          "3": "79181",
+          "4": "99597",
+          "5": "126527"
+        },
+        "8": {
+          "0.4": "22667",
+          "1": "33094",
+          "2": "54412",
+          "3": "84263",
+          "4": "106507",
+          "5": "135159"
+        },
+        "6": {
+          "0.4": "24947",
+          "1": "39890",
+          "2": "66685",
+          "3": "107741",
+          "4": "130661",
+          "5": "163951"
+        },
+        "5": {
+          "0.4": "27009",
+          "1": "45285",
+          "2": "77279",
+          "3": "111676",
+          "4": "141921",
+          "5": "190687"
+        },
+        "4": {
+          "0.4": "27975",
+          "1": "47765",
+          "2": "83719",
+          "3": "130594",
+          "4": "170987",
+          "5": "203508"
+        },
+        "3": {
+          "0.4": "30119",
+          "1": "54913",
+          "2": "95052",
+          "3": "146402",
+          "4": "184119",
+          "5": "230523"
+        },
+        "2.5 x 2.5": {
+          "0.4": "40702",
+          "1": "78469",
+          "2": "142848",
+          "3": "218183",
+          "4": "306215",
+          "5": "374018"
+        },
+        "2": {
+          "0.4": "47498",
+          "1": "95547",
+          "2": "185453",
+          "3": "269421",
+          "4": "374289",
+          "5": "459418"
+        },
+        "1.5": {
+          "0.4": "54044",
+          "1": "111832",
+          "2": "213122",
+          "3": "318282",
+          "4": "439583",
+          "5": "540852"
+        },
+        "2.5 x 0.60": {
+          "0.4": "40250",
+          "1": "82493",
+          "2": "151597",
+          "3": "231684",
+          "4": "321735",
+          "5": "394948"
+        },
+        "1.8 x 0.60": {
+          "0.4": "49441",
+          "1": "105295",
+          "2": "199293",
+          "3": "299998",
+          "4": "408621",
+          "5": "508857"
+        },
+        "1.5 x 0.60": {
+          "0.4": "57634",
+          "1": "125960",
+          "2": "239039",
+          "3": "360995",
+          "4": "488967",
+          "5": "610541"
+        },
+        "1.2 x 0.60": {
+          "0.4": "65827",
+          "1": "146626",
+          "2": "278786",
+          "3": "421992",
+          "4": "569313",
+          "5": "712224"
+        }
+      }
+    },
+    "source": "cg/CG-Drip-Quotation-Format.xlsx"
+  },
+  "CG/sprinkler": {
+    "scheme": "CG",
+    "system_type": "sprinkler",
+    "system": {
+      "pipeline": "gst_inclusive",
+      "jantri_variant": "size_area_2d",
+      "quantity_source": "area_matrix",
+      "cap_mode": "incl_gst",
+      "rounded_blocks": [],
+      "rounded_lines": [
+        "field",
+        "transport"
+      ],
+      "spacing_rule": "design",
+      "spacing_outside_table": "clamp",
+      "has_head_unit": false,
+      "supports_group": false,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "pipe_size_from_input": "1",
+      "share_floor_zero": "1",
+      "flat_inspection": "295",
+      "gst_inclusive_rate": "0.05",
+      "exact_area_match_required": "0"
+    },
+    "categories": [
+      {
+        "code": "small",
+        "name": "Small farmer (55%)",
+        "pct": "55",
+        "variant": "regular",
+        "sort_order": 1
+      },
+      {
+        "code": "big",
+        "name": "Big farmer (45%)",
+        "pct": "45",
+        "variant": "regular",
+        "sort_order": 2
+      }
+    ],
+    "unit_cost": {
+      "kind": "rows",
+      "rows": {
+        "63": {
+          "0.4": "13211",
+          "0.6": "16003.3333333333",
+          "0.8": "18795.6666666667",
+          "1": "21588",
+          "1.2": "23503.8",
+          "1.4": "25419.6",
+          "1.6": "27335.4",
+          "1.8": "29251.2",
+          "2": "31167"
+        },
+        "75": {
+          "0.4": "13211",
+          "0.6": "16003.3333333333",
+          "0.8": "18795.6666666667",
+          "1": "24194",
+          "1.2": "26286.6",
+          "1.4": "28379.2",
+          "1.6": "30471.8",
+          "1.8": "32564.4",
+          "2": "34657"
+        },
+        "90": {
+          "0.4": "13211",
+          "0.6": "16003.3333333333",
+          "0.8": "18795.6666666667",
+          "1": "24194",
+          "1.2": "26286.6",
+          "1.4": "28379.2",
+          "1.6": "30471.8",
+          "1.8": "32564.4",
+          "2": "34657",
+          "2.01": "34778.22",
+          "2.2": "37081.4",
+          "2.4": "39505.8",
+          "2.6": "41930.2",
+          "2.8": "44354.6",
+          "3": "46779",
+          "3.2": "49222.2",
+          "3.4": "51665.4",
+          "3.6": "54108.6",
+          "3.8": "56551.8",
+          "4": "58995",
+          "4.2": "60553.8",
+          "4.4": "62112.6",
+          "4.6": "63671.4",
+          "4.8": "65230.2",
+          "5": "66789"
+        }
+      }
+    },
+    "source": "cg/CG-Sprinkler-Quotation-Format.xlsx"
+  },
+  "RJ/drip": {
+    "scheme": "RJ",
+    "system_type": "drip",
+    "system": {
+      "pipeline": "unit_cost_only",
+      "jantri_variant": "label_anchor_linear",
+      "quantity_source": "manual",
+      "cap_mode": "unit_cost_only",
+      "rounded_blocks": [],
+      "rounded_lines": [],
+      "spacing_rule": "design",
+      "spacing_outside_table": "clamp",
+      "has_head_unit": true,
+      "supports_group": false,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "min_area_prorate": "1",
+      "zero_above_max_area": "1",
+      "head_unit_deduction": "8000",
+      "gst_inclusive_rate": "0.05"
+    },
+    "categories": [
+      {
+        "code": "small_marginal",
+        "name": "Small or marginal farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 1
+      },
+      {
+        "code": "sc",
+        "name": "SC farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 2
+      },
+      {
+        "code": "st",
+        "name": "ST farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 3
+      },
+      {
+        "code": "woman",
+        "name": "Woman farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 4
+      },
+      {
+        "code": "others",
+        "name": "Others farmer (70%)",
+        "pct": "70",
+        "variant": "regular",
+        "sort_order": 5
+      }
+    ],
+    "unit_cost": {
+      "kind": "rows",
+      "rows": {
+        "1.2X0.30": {
+          "0.2": "31436",
+          "0.4": "57241",
+          "1": "127501",
+          "2": "242422",
+          "3": "366950",
+          "4": "495055",
+          "5": "619326"
+        },
+        "1.5x0.30": {
+          "0.2": "28003",
+          "0.4": "50116",
+          "1": "109531",
+          "2": "207860",
+          "3": "313909",
+          "4": "425189",
+          "5": "530905"
+        },
+        "1.8x0.30": {
+          "0.2": "24569",
+          "0.4": "42992",
+          "1": "91560",
+          "2": "173298",
+          "3": "260868",
+          "4": "355323",
+          "5": "442484"
+        },
+        "2.5x0.60": {
+          "0.2": "20201",
+          "0.4": "35000",
+          "1": "71733",
+          "2": "131824",
+          "3": "201464",
+          "4": "279770",
+          "5": "343433"
+        },
+        "1.5x1.5": {
+          "0.2": "28106",
+          "0.4": "46995",
+          "1": "97245",
+          "2": "185324",
+          "3": "276767",
+          "4": "382246",
+          "5": "470306"
+        },
+        "2x2": {
+          "0.2": "23932",
+          "0.4": "41303",
+          "1": "83085",
+          "2": "161263",
+          "3": "234280",
+          "4": "325469",
+          "5": "399494"
+        },
+        "2.5x2.5": {
+          "0.2": "19516",
+          "0.4": "35393",
+          "1": "68234",
+          "2": "124216",
+          "3": "189724",
+          "4": "266274",
+          "5": "325233"
+        },
+        "3x3": {
+          "0.2": "15792",
+          "0.4": "26190",
+          "1": "47751",
+          "2": "82654",
+          "3": "127306",
+          "4": "160103",
+          "5": "200455"
+        },
+        "4x4": {
+          "0.2": "14602",
+          "0.4": "24326",
+          "1": "41534",
+          "2": "72799",
+          "3": "113560",
+          "4": "148684",
+          "5": "176964"
+        },
+        "5x5": {
+          "0.2": "13144",
+          "0.4": "23486",
+          "1": "39378",
+          "2": "67199",
+          "3": "97110",
+          "4": "123409",
+          "5": "165815"
+        },
+        "6x6": {
+          "0.2": "12400",
+          "0.4": "21693",
+          "1": "34687",
+          "2": "57987",
+          "3": "93688",
+          "4": "113618",
+          "5": "142566"
+        },
+        "8x8": {
+          "0.2": "11330",
+          "0.4": "19711",
+          "1": "28777",
+          "2": "47314",
+          "3": "73272",
+          "4": "92615",
+          "5": "117529"
+        },
+        "9x9": {
+          "0.2": "11091",
+          "0.4": "19114",
+          "1": "27304",
+          "2": "44469",
+          "3": "68853",
+          "4": "86606",
+          "5": "110024"
+        },
+        "10x10": {
+          "0.2": "10854",
+          "0.4": "18652",
+          "1": "26181",
+          "2": "42226",
+          "3": "65487",
+          "4": "82025",
+          "5": "104292"
+        },
+        "12x12": {
+          "0.2": "10526",
+          "0.4": "18009",
+          "1": "24586",
+          "2": "39098",
+          "3": "60704",
+          "4": "75521",
+          "5": "96166"
+        }
+      }
+    },
+    "source": "rj/RJ-Drip-Quotation-Format.xlsx"
+  },
+  "RJ/mini_sprinkler": {
+    "scheme": "RJ",
+    "system_type": "mini_sprinkler",
+    "system": {
+      "pipeline": "unit_cost_only",
+      "jantri_variant": "label_anchor_linear",
+      "quantity_source": "manual",
+      "cap_mode": "unit_cost_only",
+      "rounded_blocks": [],
+      "rounded_lines": [],
+      "spacing_rule": "design",
+      "spacing_outside_table": "clamp",
+      "has_head_unit": true,
+      "supports_group": false,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "min_area_prorate": "1",
+      "zero_above_max_area": "1",
+      "head_unit_deduction": "8000",
+      "gst_inclusive_rate": "0.05"
+    },
+    "categories": [
+      {
+        "code": "small_marginal",
+        "name": "Small or marginal farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 1
+      },
+      {
+        "code": "sc",
+        "name": "SC farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 2
+      },
+      {
+        "code": "st",
+        "name": "ST farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 3
+      },
+      {
+        "code": "woman",
+        "name": "Woman farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 4
+      },
+      {
+        "code": "others",
+        "name": "Others farmer (70%)",
+        "pct": "70",
+        "variant": "regular",
+        "sort_order": 5
+      }
+    ],
+    "unit_cost": {
+      "kind": "rows",
+      "rows": {
+        "8x8": {
+          "0.4": "47528",
+          "1": "103873",
+          "2": "187929",
+          "3": "290935",
+          "4": "380031",
+          "5": "469890"
+        },
+        "10x10": {
+          "0.4": "45694",
+          "1": "94134",
+          "2": "176766",
+          "3": "268422",
+          "4": "345497",
+          "5": "423236"
+        }
+      }
+    },
+    "source": "rj/RJ-Mini-Sprinkler-Quotation-Format.xlsx"
+  },
+  "RJ/sprinkler": {
+    "scheme": "RJ",
+    "system_type": "sprinkler",
+    "system": {
+      "pipeline": "field_inspection_only",
+      "jantri_variant": "size_area_2d",
+      "quantity_source": "area_matrix",
+      "cap_mode": "incl_gst",
+      "rounded_blocks": [],
+      "rounded_lines": [
+        "field",
+        "transport"
+      ],
+      "spacing_rule": "design",
+      "spacing_outside_table": "clamp",
+      "has_head_unit": false,
+      "supports_group": false,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "pipe_size_from_input": "1",
+      "share_floor_zero": "1",
+      "inspection_floor": "200",
+      "inspection_rate": "0.004",
+      "gst_material_half": "0.025",
+      "gst_service_half": "0.09",
+      "exact_area_match_required": "0"
+    },
+    "categories": [
+      {
+        "code": "small_marginal",
+        "name": "Small or marginal farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 1
+      },
+      {
+        "code": "sc",
+        "name": "SC farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 2
+      },
+      {
+        "code": "st",
+        "name": "ST farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 3
+      },
+      {
+        "code": "woman",
+        "name": "Woman farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 4
+      },
+      {
+        "code": "others",
+        "name": "Others farmer (70%)",
+        "pct": "70",
+        "variant": "regular",
+        "sort_order": 5
+      }
+    ],
+    "unit_cost": {
+      "kind": "rows",
+      "rows": {
+        "63": {
+          "0.4": "13211",
+          "0.6": "16003.3333333333",
+          "0.8": "18795.6666666667",
+          "1": "21588",
+          "1.2": "23503.8",
+          "1.4": "25419.6",
+          "1.6": "27335.4",
+          "1.8": "29251.2",
+          "2": "31167"
+        },
+        "75": {
+          "0.4": "13211",
+          "0.6": "16003.3333333333",
+          "0.8": "18795.6666666667",
+          "1": "24194",
+          "1.2": "26286.6",
+          "1.4": "28379.2",
+          "1.6": "30471.8",
+          "1.8": "32564.4",
+          "2": "34657"
+        },
+        "90": {
+          "0.4": "13211",
+          "0.6": "16003.3333333333",
+          "0.8": "18795.6666666667",
+          "1": "24194",
+          "1.2": "26286.6",
+          "1.4": "28379.2",
+          "1.6": "30471.8",
+          "1.8": "32564.4",
+          "2": "34657",
+          "2.01": "34778.22",
+          "2.2": "37081.4",
+          "2.4": "39505.8",
+          "2.6": "41930.2",
+          "2.8": "44354.6",
+          "3": "46779",
+          "3.2": "49222.2",
+          "3.4": "51665.4",
+          "3.6": "54108.6",
+          "3.8": "56551.8",
+          "4": "58995",
+          "4.2": "60553.8",
+          "4.4": "62112.6",
+          "4.6": "63671.4",
+          "4.8": "65230.2",
+          "5": "66789"
+        }
+      }
+    },
+    "source": "rj/RJ-Sprinkler-Quotation-Format.xlsx"
+  },
+  "UP/drip": {
+    "scheme": "UP",
+    "system_type": "drip",
+    "system": {
+      "pipeline": "full_abcdefg",
+      "jantri_variant": "bilinear_2d",
+      "quantity_source": "manual",
+      "cap_mode": "incl_gst",
+      "rounded_blocks": [
+        "total_abc_gst",
+        "insurance",
+        "cost_of_mis",
+        "total_gst"
+      ],
+      "rounded_lines": [],
+      "spacing_rule": "design",
+      "spacing_outside_table": "extrapolate",
+      "has_head_unit": true,
+      "supports_group": true,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "insurance_rate": "0.00169",
+      "education_amount": "0",
+      "inspection_floor": "200",
+      "inspection_rate": "0.004",
+      "gst_material_half": "0.025",
+      "gst_service_half": "0.09",
+      "min_area_prorate": "0",
+      "max_area_scaling": "0",
+      "jantri_guards": "0",
+      "seven_year_area_min": "0.2",
+      "seven_year_area_max": "5"
+    },
+    "categories": [
+      {
+        "code": "big",
+        "name": "Big farmer (80%)",
+        "pct": "80",
+        "variant": "regular",
+        "sort_order": 1
+      },
+      {
+        "code": "small",
+        "name": "Small farmer (90%)",
+        "pct": "90",
+        "variant": "regular",
+        "sort_order": 2
+      }
+    ],
+    "unit_cost": {
+      "kind": "bilinear_2d",
+      "areas": [
+        "0.2",
+        "0.4",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "rows": [
+        {
+          "spacing": "12",
+          "costs": [
+            "12104.9",
+            "20710.35",
+            "28273.9",
+            "44962.7",
+            "69809.6",
+            "86849.15",
+            "110590.9"
+          ]
+        },
+        {
+          "spacing": "10",
+          "costs": [
+            "12482.1",
+            "21449.8",
+            "30108.15",
+            "48559.9",
+            "75310.05",
+            "94328.75",
+            "119935.8"
+          ]
+        },
+        {
+          "spacing": "9",
+          "costs": [
+            "12754.65",
+            "21981.1",
+            "31399.6",
+            "51139.35",
+            "79180.95",
+            "99596.9",
+            "126527.6"
+          ]
+        },
+        {
+          "spacing": "8",
+          "costs": [
+            "13029.5",
+            "22667.65",
+            "33093.55",
+            "54411.1",
+            "84262.8",
+            "106507.25",
+            "135158.35"
+          ]
+        },
+        {
+          "spacing": "6",
+          "costs": [
+            "14260",
+            "24946.95",
+            "39890.05",
+            "66685.05",
+            "107741.2",
+            "130660.7",
+            "163950.9"
+          ]
+        },
+        {
+          "spacing": "5",
+          "costs": [
+            "15115.6",
+            "27008.9",
+            "45284.7",
+            "77278.85",
+            "111676.5",
+            "141920.35",
+            "190687.25"
+          ]
+        },
+        {
+          "spacing": "4",
+          "costs": [
+            "16792.3",
+            "27974.9",
+            "47764.1",
+            "83718.85",
+            "130594",
+            "170986.6",
+            "203508.6"
+          ]
+        },
+        {
+          "spacing": "3",
+          "costs": [
+            "18160.8",
+            "30118.5",
+            "54913.65",
+            "95052.1",
+            "146401.9",
+            "184118.45",
+            "230523.25"
+          ]
+        },
+        {
+          "spacing": "2.5",
+          "costs": [
+            "23231.15",
+            "40250",
+            "82492.95",
+            "151597.6",
+            "231683.6",
+            "321735.5",
+            "394947.95"
+          ]
+        },
+        {
+          "spacing": "2",
+          "costs": [
+            "27521.8",
+            "47498.45",
+            "95547.75",
+            "185452.45",
+            "269422",
+            "374289.35",
+            "459418.1"
+          ]
+        },
+        {
+          "spacing": "1.8",
+          "costs": [
+            "28254.35",
+            "49440.8",
+            "105294",
+            "199292.7",
+            "299998.2",
+            "408621.45",
+            "508856.6"
+          ]
+        },
+        {
+          "spacing": "1.5",
+          "costs": [
+            "32203.45",
+            "57633.4",
+            "125960.65",
+            "239039",
+            "360995.35",
+            "488967.35",
+            "610540.75"
+          ]
+        },
+        {
+          "spacing": "1.2",
+          "costs": [
+            "36151.4",
+            "65827.15",
+            "146626.15",
+            "278785.3",
+            "421992.5",
+            "569313.25",
+            "712224.9"
+          ]
+        }
+      ]
+    },
+    "source": "up/UP-Drip-Quotation-Format.xlsx"
+  },
+  "UP/mini_sprinkler": {
+    "scheme": "UP",
+    "system_type": "mini_sprinkler",
+    "system": {
+      "pipeline": "full_abcdefg",
+      "jantri_variant": "bilinear_2d",
+      "quantity_source": "manual",
+      "cap_mode": "incl_gst",
+      "rounded_blocks": [
+        "total_abc_gst",
+        "insurance",
+        "cost_of_mis",
+        "total_gst"
+      ],
+      "rounded_lines": [],
+      "spacing_rule": "design",
+      "spacing_outside_table": "extrapolate",
+      "has_head_unit": true,
+      "supports_group": true,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "insurance_rate": "0.00169",
+      "education_amount": "0",
+      "inspection_floor": "200",
+      "inspection_rate": "0.004",
+      "gst_material_half": "0.025",
+      "gst_service_half": "0.09",
+      "min_area_prorate": "0",
+      "max_area_scaling": "0",
+      "jantri_guards": "0",
+      "seven_year_area_min": "0.2",
+      "seven_year_area_max": "5"
+    },
+    "categories": [
+      {
+        "code": "big",
+        "name": "Big farmer (80%)",
+        "pct": "80",
+        "variant": "regular",
+        "sort_order": 1
+      },
+      {
+        "code": "small",
+        "name": "Small farmer (90%)",
+        "pct": "90",
+        "variant": "regular",
+        "sort_order": 2
+      }
+    ],
+    "unit_cost": {
+      "kind": "bilinear_2d",
+      "areas": [
+        "0.2",
+        "0.4",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "rows": [
+        {
+          "spacing": "10",
+          "costs": [
+            "26274.05",
+            "52548.1",
+            "108254.1",
+            "203280.9",
+            "308685.3",
+            "397321.55",
+            "486721.4"
+          ]
+        },
+        {
+          "spacing": "8",
+          "costs": [
+            "27328.6",
+            "54657.2",
+            "119453.95",
+            "216118.35",
+            "334575.25",
+            "437035.65",
+            "540373.5"
+          ]
+        },
+        {
+          "spacing": "5",
+          "costs": [
+            "18810.55",
+            "37619.95",
+            "74867.3",
+            "131589.9",
+            "189677.55",
+            "256129.15",
+            "323790.55"
+          ]
+        },
+        {
+          "spacing": "3",
+          "costs": [
+            "22001.8",
+            "44002.45",
+            "85397.85",
+            "153894.15",
+            "219739.7",
+            "303429.8",
+            "369681.3"
+          ]
+        }
+      ]
+    },
+    "source": "up/UP-Mini-Sprinkler-Quotation-Format.xlsx"
+  },
+  "UP/sprinkler": {
+    "scheme": "UP",
+    "system_type": "sprinkler",
+    "system": {
+      "pipeline": "field_inspection_only",
+      "jantri_variant": "size_area_2d",
+      "quantity_source": "area_matrix",
+      "cap_mode": "incl_gst",
+      "rounded_blocks": [],
+      "rounded_lines": [
+        "field",
+        "transport"
+      ],
+      "spacing_rule": "design",
+      "spacing_outside_table": "clamp",
+      "has_head_unit": false,
+      "supports_group": false,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "pipe_size_from_input": "1",
+      "share_floor_zero": "0",
+      "inspection_floor": "200",
+      "inspection_rate": "0.004",
+      "gst_material_half": "0.025",
+      "gst_service_half": "0.09",
+      "exact_area_match_required": "0"
+    },
+    "categories": [
+      {
+        "code": "small",
+        "name": "Small farmer (75%)",
+        "pct": "75",
+        "variant": "regular",
+        "sort_order": 1
+      },
+      {
+        "code": "other",
+        "name": "Other farmer (65%)",
+        "pct": "65",
+        "variant": "regular",
+        "sort_order": 2
+      }
+    ],
+    "unit_cost": {
+      "kind": "rows",
+      "rows": {
+        "63": {
+          "0.4": "15193",
+          "0.6": "18404",
+          "0.8": "21615",
+          "1": "24826",
+          "1.2": "27029.2",
+          "1.4": "29232.4",
+          "1.6": "31435.6",
+          "1.8": "33638.8",
+          "2": "35842"
+        },
+        "75": {
+          "1": "27823",
+          "1.2": "30229.6",
+          "1.4": "32636.2",
+          "1.6": "35042.8",
+          "1.8": "37449.4",
+          "2": "39856"
+        },
+        "90": {
+          "1": "27823",
+          "1.2": "30229.6",
+          "1.4": "32636.2",
+          "1.6": "35042.8",
+          "1.8": "37449.4",
+          "2": "39856",
+          "2.01": "40055.28",
+          "2.2": "43841.6",
+          "2.4": "47827.2",
+          "2.6": "51812.8",
+          "2.8": "55798.4",
+          "3": "59784",
+          "3.2": "63769.6",
+          "3.4": "67755.2",
+          "3.6": "71740.8",
+          "3.8": "75726.4",
+          "4": "79712",
+          "4.2": "83697.6",
+          "4.4": "87683.2",
+          "4.6": "91668.8",
+          "4.8": "95654.4",
+          "5": "99640"
+        },
+        "110": {
+          "1": "27823",
+          "1.2": "30229.6",
+          "1.4": "32636.2",
+          "1.6": "35042.8",
+          "1.8": "37449.4",
+          "2": "39856",
+          "2.01": "40055.28",
+          "2.2": "43841.6",
+          "2.4": "47827.2",
+          "2.6": "51812.8",
+          "2.8": "55798.4",
+          "3": "59784",
+          "3.2": "63769.6",
+          "3.4": "67755.2",
+          "3.6": "71740.8",
+          "3.8": "75726.4",
+          "4": "79712",
+          "4.2": "83697.6",
+          "4.4": "87683.2",
+          "4.6": "91668.8",
+          "4.8": "95654.4",
+          "5": "99640"
+        }
+      }
+    },
+    "source": "up/UP-Sprinkler-Quotation-Format.xlsx"
+  }
+}

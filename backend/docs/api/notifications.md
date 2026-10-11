@@ -157,6 +157,6 @@ are not yours, or already read, are ignored. Answers the new unread count.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `type` | string | yes | lead, task, sales_order, quotation or complaint. |
+| `type` | string | yes | lead, task, sales_order, quotation, complaint or subsidy_application. |
 | `id` | string | yes |  |
 | `label` | string | yes | The record's number or title, for the link text. |

@@ -57,7 +57,7 @@ from api.schemas.leads import (
     TimelinePage,
     UserRef,
 )
-from api.services import approval_view, people, pricing
+from api.services import approval_view, people, pricing, quotation_subsidy
 from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor
 from api.services.pricing import LineSpec, PricedContext, _rate, _s
@@ -607,6 +607,9 @@ async def get_quotation(db: AsyncSession, quotation_id: str, settings: Settings,
     out = _to_quotation(row, await _stored_lines(db, row.id), settings,
                         await _names(db, [row]), portal)
     out.approval, _ = await approval_view.load(db, "quotation", quotation_id, portal)
+    if row.sales_type == "subsidised":
+        out.subsidy, drift = await quotation_subsidy.block(db, quotation_id, Decimal(row.total))
+        out.warnings += drift
     if row.status == "draft" and not portal:
         # a dealer does not learn the officer's discount limit (OCR review)
         out.discount = await _discount(db, quotation_id)
@@ -900,6 +903,13 @@ async def patch_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
 
     sales_type = body.sales_type or row.sales_type
     _check_sales_type(sales_type)
+    if row.sales_type == "subsidised" and sales_type != "subsidised" and (await db.execute(text(
+            "SELECT 1 FROM quotation_subsidy WHERE quotation_id = CAST(:q AS uuid)"),
+            {"q": quotation_id})).first():
+        # FS-057 S-5: the block belongs to a subsidised quotation
+        raise ValidationFailed("Remove the subsidy by making a new quotation; this one carries "
+                               "a subsidy calculation.", code="subsidy_block_exists",
+                               fields={"sales_type": "subsidised"})
     partner_id = body.partner_id if body.partner_given else (
         str(row.partner_id) if row.partner_id else None)
     pos_territory = body.place_of_supply_territory_id or str(row.place_of_supply_territory_id)
@@ -1057,6 +1067,8 @@ async def send_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     if not stored:
         raise ValidationFailed("Add at least one line before sending.", code="no_lines",
                                fields={"lines": "empty"})
+    if row.sales_type == "subsidised":
+        await quotation_subsidy.check_ready(db, str(row.id), str(head.lead_id))   # FS-057 rule 5
     if predecessor is not None and predecessor.status == "accepted":
         raise ConflictError("The version this revises was accepted meanwhile.",
                             code="predecessor_accepted")
@@ -1149,6 +1161,11 @@ async def request_approval(db: AsyncSession, caller: Caller, quotation_id: str,
     if head is None:
         raise NotFoundError("No such quotation.")
     await _lock_lead(db, str(head.lead_id), require_open=False)
+    kind = (await db.execute(text(
+        "SELECT sales_type::text FROM quotation WHERE id = CAST(:q AS uuid)"),
+        {"q": quotation_id})).scalar_one()
+    if kind == "subsidised":
+        await quotation_subsidy.check_ready(db, quotation_id, str(head.lead_id))  # FS-057 rule 5
     try:
         await db.execute(text("SELECT quotation_request_approval(CAST(:q AS uuid), :r)"),
                          {"q": quotation_id, "r": body.remark})
@@ -1282,6 +1299,8 @@ async def revise_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
         raise _map_write_error(exc) from exc
     await _write_lines(db, new_id, ctx, snapshots=stored)
     await _write_header_figures(db, new_id, ctx)
+    carried = (await quotation_subsidy.copy(db, str(src.id), str(new_id), lead_id)
+               if src.sales_type == "subsidised" else [])    # FS-057 rule 6
     repriced = sum(1 for r, p in zip(stored, ctx.document.lines, strict=True)
                    if Decimal(r.rate) != p.rate.rate or Decimal(r.gst_slab) != p.tax.slab)
     actor = await _actor_name(db)
@@ -1294,6 +1313,7 @@ async def revise_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     out = _with_pricing_warnings(await get_quotation(db, str(new_id), settings), ctx)
     if repriced:
         out.warnings.append(f"repriced: {repriced} lines changed since version {src.version}.")
+    out.warnings += carried
     return out
 
 
@@ -1340,7 +1360,16 @@ def _public(doc: dict[str, Any], token: str) -> sch.PublicQuotation:
         totals=sch.Totals(**{k: _s(Decimal(str(t[k]))) for k in
                              ("gross", "discount", "taxable", "cgst", "sgst", "igst", "total")}),
         line_count=int(doc["line_count"]), pdf_ready=doc.get("pdf_state") == "ready",
-        pdf_url=f"/api/v1/public/q/{token}/pdf")
+        pdf_url=f"/api/v1/public/q/{token}/pdf", subsidy=_public_subsidy(doc.get("subsidy")))
+
+
+def _public_subsidy(s: dict[str, Any] | None) -> sch.PublicSubsidy | None:
+    if not s:
+        return None
+    return sch.PublicSubsidy(scheme=s["scheme"], category=s["category"],
+                             total_cost=_s(Decimal(str(s["total_cost"]))),
+                             subsidy=_s(Decimal(str(s["subsidy"]))),
+                             farmer_share=_s(Decimal(str(s["farmer_share"]))))
 
 
 async def public_view(db: AsyncSession, token: str) -> sch.PublicQuotation:
@@ -1372,3 +1401,21 @@ async def public_open(db: AsyncSession, token: str, user_agent: str | None,
         log.warning("quotation.storage_unavailable", reason=str(exc))
         raise ConflictError(_STORAGE_DOWN, code="storage_unavailable") from exc
     return url
+
+
+# ── the subsidy block (FS-057) ───────────────────────────────────────────────
+
+async def set_subsidy(db: AsyncSession, caller: Caller, quotation_id: str,
+                      body: sch.QuotationSubsidyIn, settings: Settings) -> sch.Quotation:
+    """Rule 2: the lead first, then the quotation (the module's lock order, S-1)."""
+    head = (await db.execute(text(
+        "SELECT lead_id FROM quotation WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL"),
+        {"id": quotation_id})).one_or_none()
+    if head is None:
+        raise NotFoundError("No such quotation.")
+    await _lock_lead(db, str(head.lead_id), require_open=False)
+    row = await _lock_quotation(db, quotation_id)
+    warnings = await quotation_subsidy.set_block(db, row, body)
+    out = await get_quotation(db, quotation_id, settings)
+    out.warnings += warnings
+    return out

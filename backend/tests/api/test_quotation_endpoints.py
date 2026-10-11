@@ -615,7 +615,8 @@ async def test_the_public_link_shows_no_party_data_and_records_the_view_on_the_p
     assert "Rameshbhai" not in pub.text and q["party"]["mobile"] not in pub.text
     assert set(body) == {"quote_no", "version", "status", "sales_type", "seller", "sent_at",
                          "valid_until", "expired", "superseded", "totals", "line_count",
-                         "pdf_ready", "pdf_url"}
+                         "pdf_ready", "pdf_url", "subsidy"}
+    assert body["subsidy"] is None, "a commercial quotation carries none (FS-057)"
     # the JSON is not a view
     before = (await client.get(f"{V1}/quotations/{q['id']}", headers=h)).json()["data"]
     assert before["viewed_at"] is None
