@@ -191,6 +191,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-001 | Masters — products, stock, price lists, territories | shared | planned |
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
+| MSTR-004 | Product catalogue — browse, add and correct products (`GET`/`POST /products`, `GET`/`PATCH /products/{id}`) | shared | in-progress |
+| MSTR-005 | Tax classification — a product's HSN code and each code's GST slab, from a date (`/products/{id}/hsn`, `/tax-rates`) | shared | in-progress |
+| MSTR-006 | Price lists — draft, fill the rate sheet, publish, close (`/price-lists*`) | shared | in-progress |
 | SUBS-001 | Subsidy forms and case status | shared | planned |
 | ACCT-001 | Accounts work queue | shared | planned |
 | DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |

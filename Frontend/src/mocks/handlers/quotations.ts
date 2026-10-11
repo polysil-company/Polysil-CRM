@@ -15,7 +15,6 @@ import {
   type QuotationVersionsWire,
   type SendGate,
   type PdfLinkWire,
-  type ProductPageWire,
   type QuotationLineWire,
   type QuotePreviewWire,
   type QuotationPageWire,
@@ -540,34 +539,6 @@ export const quotationHandlers = [
         total: counted ? Math.min(matches.length, TOTAL_CEILING) : null,
         total_capped: counted && matches.length > TOTAL_CEILING,
       },
-    };
-    return HttpResponse.json(body);
-  }),
-
-  http.get(buildApiUrl("/products"), async ({ request }) => {
-    const { scenario, failure } = await applyScenario();
-    if (failure) return failure;
-
-    const url = new URL(request.url);
-    const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
-    const limit = Math.min(200, Number(url.searchParams.get("limit") ?? 50) || 50);
-    const matches =
-      scenario === "empty"
-        ? []
-        : MOCK_PRODUCTS.filter((product) => product.name.toLowerCase().includes(q));
-    const body: ProductPageWire = {
-      data: matches.slice(0, limit).map((product) => ({
-        id: product.id,
-        item_code: product.code,
-        description: product.name,
-        uom: product.uom,
-        uom_decimals: product.uomDecimals,
-        hsn_code: product.hsn,
-        gst_slab: product.slab.toFixed(2),
-        pack_multiple: null,
-        is_active: true,
-      })),
-      meta: { page: 1, limit, total: matches.length },
     };
     return HttpResponse.json(body);
   }),

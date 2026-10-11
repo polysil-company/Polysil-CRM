@@ -75,6 +75,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [x] **BE-022** · An Accounts queue: orders waiting on the payment check, and what Accounts records · ACCT-001 · normal
 
+**Product master** — added as the catalogue and price-list screens are built (MSTR-004…006).
+
+- [ ] **BE-024** · List the product categories and units: `GET /lookups/product-categories`, `GET /lookups/uoms` · MSTR-004 · normal
+
 ---
 
 ## Details
@@ -442,3 +446,20 @@ in the same shape. Never renumber or reuse a number.
   contract, or "none planned".
 - **Done in:** #75
 - **Backend notes:** `waiting_on=<role code>` on `GET /orders`, `/orders/stats` and `/orders/export`: same rule as the row's `approval_waiting_on`. An unknown code is an empty page; a malformed one is `422`. For the badge, call stats without it and read `waiting_on.account_manager`. Part 2: payments are built (FS-022, handover `payments-contract.md`): `GET/POST /payments`, and `payments` on `GET /orders/{id}`. No new contract.
+
+### BE-024 · List the product categories and units: `GET /lookups/product-categories`, `GET /lookups/uoms`
+
+- **Status:** ⬜ Open
+- **Asked:** 11 Oct 2026 · MSTR-004
+- **What:** two lookups the product form can offer as choices:
+  - `GET /lookups/product-categories`: every category code (migration 010's seeds: DRIP
+    COMPONENTS, HDPE PIPES, … Marketing) with its label and whether it is active.
+  - `GET /lookups/uoms`: every unit code with its `decimals` (NOS. 0, MTR 3, Set. 0, ML 0).
+  Same shape as the other lookups (`{ data: [{ code, name, is_active, … }] }`).
+- **Why:** `POST /products` refuses a `product_category` or `uom` that isn't a code, but nothing
+  lists the codes. Until then the product form offers the categories and units the catalogue
+  already uses, read from every page of `GET /products` (active and switched off). That works,
+  but a category with no product yet can't be chosen, and it costs a few calls each time the
+  form opens.
+- **Done when:** both endpoints answer for anyone who may view `products`, and the form offers
+  every code, used or not.

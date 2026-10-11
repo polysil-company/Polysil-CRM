@@ -510,7 +510,6 @@ export const productPageSchema = z
   }));
 
 export type ProductPick = z.output<typeof productPageSchema>["items"][number];
-export type ProductPageWire = z.input<typeof productPageSchema>;
 
 /** POST /pricing/quote-lines request, as the backend reads it. */
 export interface QuoteLinesRequest {

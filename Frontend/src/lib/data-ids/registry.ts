@@ -654,6 +654,40 @@ export const DATA_IDS = {
     notes:
       "Active products by description; the rate is not here — it comes from the pricing preview.",
   },
+  "MSTR-004": {
+    domain: "MSTR",
+    title: "Product catalogue — browse, add and correct products",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /products", "POST /products", "GET /products/{id}", "PATCH /products/{id}"],
+  },
+  "MSTR-005": {
+    domain: "MSTR",
+    title: "Tax classification — a product's HSN code and each code's GST slab, from a date",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /products/{id}/hsn",
+      "PUT /products/{id}/hsn",
+      "GET /tax-rates",
+      "PUT /tax-rates/{hsn_code}",
+    ],
+  },
+  "MSTR-006": {
+    domain: "MSTR",
+    title: "Price lists — draft, fill the rate sheet, publish, close",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /price-lists",
+      "POST /price-lists",
+      "GET /price-lists/{id}",
+      "PATCH /price-lists/{id}",
+      "GET /price-lists/{id}/items",
+      "PUT /price-lists/{id}/items",
+      "POST /price-lists/{id}/publish",
+    ],
+  },
   "MSTR-002": {
     domain: "MSTR",
     title: "Lead lookups — sources, irrigation systems, lost reasons and the territory picker",
