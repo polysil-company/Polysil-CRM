@@ -211,10 +211,14 @@ async def test_create_needs_a_coded_state(
         client: httpx.AsyncClient, staff: Staff, env: Env, sessions) -> None:
     """A territory with no coded state ancestor refuses rather than allocating under
     a made-up code (rule 3)."""
-    lone = (await sessions().execute(text(
+    # one session: committing a second, empty one left the territory unwritten, and
+    # the test passed only because a missing territory was refused the same way
+    made = sessions()
+    lone = (await made.execute(text(
         "INSERT INTO territory (level, name) VALUES ('district', :n) RETURNING id"),
         {"n": "orphan_" + uuid.uuid4().hex[:8]})).scalar_one()
-    await sessions().commit()
+    await made.commit()
+    await made.close()
     try:
         h = await _auth(client, staff)
         r = await client.post(f"{V1}/leads", json=_body(env, territory_id=str(lone)),
