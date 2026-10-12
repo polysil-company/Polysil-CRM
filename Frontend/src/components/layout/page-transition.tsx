@@ -12,10 +12,14 @@ const DIRECTIONAL = {
  * their enter/exit never fire). Links and router calls pass
  * `transitionTypes={["nav-forward"]}` or `["nav-back"]`; anything else (back
  * button, redirects) swaps instantly. Animations: src/styles/tokens.css §7.
+ *
+ * Only the page being left animates: it slides and fades out over the new one. The new page
+ * is never captured, because Chrome doesn't hit-test a captured element until the transition
+ * ends, so the first click on a page that had just arrived went to nothing (walk F-13).
  */
 export function PageTransition({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <ViewTransition enter={DIRECTIONAL} exit={DIRECTIONAL} default="none">
+    <ViewTransition enter="none" exit={DIRECTIONAL} default="none">
       {children}
     </ViewTransition>
   );

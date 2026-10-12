@@ -137,6 +137,10 @@ describe("[CMPL-003] Raise and submit", () => {
     const user = show(draft.id);
 
     await user.click(await screen.findByRole("button", { name: "Submit" }));
+    // F-19 · Submitting messages the contact, so it is confirmed first, and says so honestly.
+    const dialog = await screen.findByRole("dialog", { name: "Submit for the manager's check?" });
+    expect(within(dialog).getByText(/once messages are switched on/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Submit" }));
 
     expect(await screen.findByText("Submitted", { selector: "[data-title]" })).toBeVisible();
     expect(await screen.findByRole("heading", { name: /^Poly\/Comp\./ })).toBeInTheDocument();
@@ -149,12 +153,12 @@ describe("[CMPL-003] Raise and submit", () => {
     const user = show(draft.id);
 
     await user.click(await screen.findByRole("button", { name: "Submit" }));
+    const dialog = await screen.findByRole("dialog", { name: "Submit for the manager's check?" });
+    await user.click(within(dialog).getByRole("button", { name: "Submit" }));
 
+    expect(await within(dialog).findByText("Not ready to submit")).toBeVisible();
     expect(
-      await screen.findByText("Not ready to submit", { selector: "[data-title]" }),
-    ).toBeVisible();
-    expect(
-      screen.getByText(/Add the challan number and the supply date first/),
+      within(dialog).getByText(/Add the challan number and the supply date first/),
     ).toBeInTheDocument();
   });
 

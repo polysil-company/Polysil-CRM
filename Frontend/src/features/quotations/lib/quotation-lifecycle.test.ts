@@ -8,6 +8,7 @@ import {
   draftSendNotice,
   lifecycleRefusal,
   quotationActions,
+  isShownInHistory,
   quotationHistoryEntry,
   sendStepFor,
 } from "./quotation-lifecycle";
@@ -137,6 +138,7 @@ describe("[QUOT-007] draftSendNotice", () => {
       by: null,
       remark: null,
       decidedAt: null,
+      stalled: false,
     };
     expect(
       draftSendNotice(quotation({ status: "draft", discount: discount("required") })),
@@ -150,6 +152,16 @@ describe("[QUOT-007] draftSendNotice", () => {
         }),
       )?.title,
     ).toBe("Waiting for a State Manager to approve the 11.8% discount");
+    // F-11 · Nobody of the step's role can decide it: a higher manager has it.
+    expect(
+      draftSendNotice(
+        quotation({
+          status: "draft",
+          discount: discount("pending"),
+          approval: { status: "pending", requestRemark: null, steps: [{ ...step, stalled: true }] },
+        }),
+      )?.title,
+    ).toBe("No State Manager to decide. With the next manager up.");
     expect(
       draftSendNotice(
         quotation({
@@ -194,6 +206,11 @@ describe("[QUOT-010] quotationHistoryEntry", () => {
   function event(kind: string, payload: Record<string, unknown> = {}): TimelineEvent {
     return { id: "e-1", kind, occurredAt: "2026-09-28T10:00:00+05:30", actor: null, payload };
   }
+
+  it("shows a discount decision once: the outcome, not the step too (F-16)", () => {
+    expect(isShownInHistory(event("approval.decided", { decision: "approve" }))).toBe(false);
+    expect(isShownInHistory(event("quotation.approval_approved"))).toBe(true);
+  });
 
   it("reads each event with its remark, opens, version or approver", () => {
     expect(quotationHistoryEntry(event("quotation.sent", { channel: "none" }))).toEqual({

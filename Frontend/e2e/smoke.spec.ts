@@ -296,3 +296,24 @@ test.describe("[MSG-002] Messages", () => {
     await expectNoAccessibilityViolations(page);
   });
 });
+
+test.describe("[APP-003] Page transitions", () => {
+  test("the first click on a page that has just arrived lands (walk F-13)", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "The sidebar is a desktop navigation.");
+    await signIn(page, "/dashboard");
+
+    await page.getByRole("navigation").getByRole("link", { name: "Tasks" }).click();
+    const newTask = page.getByRole("button", { name: /New task/ }).first();
+    await newTask.waitFor();
+    // A person's click, at once and without waiting for the element to settle: the arriving
+    // page used to be captured by the view transition, so this went to <main>.
+    const box = await newTask.boundingBox();
+    if (box === null) throw new Error("The New task button has no box");
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 2000 });
+  });
+});

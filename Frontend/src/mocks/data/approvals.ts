@@ -307,6 +307,14 @@ export function seedApprovals(
     const waitsOn = order.approval?.steps.find((item) => (item.decision ?? null) === null)?.role;
     const stalled: boolean = !stalledOne && waitsOn === "district_manager";
     stalledOne ||= stalled;
+    if (stalled && order.approval) {
+      // The order's own trail says so too (walk F-11), as the backend's steps do.
+      order.approval.steps = order.approval.steps.map((item) =>
+        (item.decision ?? null) === null && item.role === waitsOn
+          ? { ...item, stalled: true }
+          : item,
+      );
+    }
     const step = orderQueueStep(order, stalled);
     if (step !== null) {
       steps.push(step);

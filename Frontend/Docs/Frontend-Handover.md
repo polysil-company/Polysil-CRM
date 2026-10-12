@@ -532,31 +532,31 @@ The client is going live on **leads, quotations and sales orders** first, so P0 
 
 These come from the 10 Oct staging walk: `backend/docs/handover/walk-fixes-10-oct.md` and `walk-fixes-10-oct-whatsapp-history-approvals.md`, section "Yours (frontend)". The backend side is done; each needs a frontend change. **Read both files first:** the item text below is a summary.
 
-- [ ] **F-1:** a dealer still sees the lead score, the duplicates box and the "Possible duplicates" button. Hide them for partner users. The API now sends `score: null` and empty `duplicates`.
-- [ ] **F-8:**
+- [x] **F-1:** a dealer still sees the lead score, the duplicates box and the "Possible duplicates" button. Hide them for partner users. The API now sends `score: null` and empty `duplicates`.
+- [x] **F-8:**
   - Route guards: a dealer can open `/approval-limits`, `/qr-codes` and `/dispatch` by URL. `GET /approvals/thresholds` is now 403 for non-staff.
   - The empty approval-limits text says "Ask the backend team to seed them"; change it to "No approval limits are set."
   - On `/qr-codes` a dealer sees his own codes read-only: hide New QR code, Edit and Switch off, since `POST`/`PATCH /lead-qr-codes` are 403 for dealers.
-- [ ] **F-9:** the channel-partner box holds "No channel partner" as editable text, so typing searches `q=No+channel+partnerBhavesh`. Make it a real placeholder.
-- [ ] **F-11:** show `approval.steps[].stalled` on the approval trail of orders, quotations and complaint refunds. The text is "No District Manager to decide. With the next manager up." The inbox already handles the row-level `stalled`; the per-step trail on detail pages does not.
-- [ ] **F-13:** the first click after a page loads is ignored on `/tasks`, `/leads`, the lead page and `/approvals`. On `/approvals`, the next Approve after a decision needed up to 4 clicks. Investigate likely causes: a focus trap or overlay from the page transition, or the command-menu listener.
-- [ ] **F-14:** "Preparing PDF" doesn't clear without a reload after Send. The poll must keep running when the tab isn't focused (TanStack `refetchIntervalInBackground: true` on that query).
-- [ ] **F-16:** timeline text.
+- [x] **F-9:** the channel-partner box holds "No channel partner" as editable text, so typing searches `q=No+channel+partnerBhavesh`. Make it a real placeholder.
+- [x] **F-11:** show `approval.steps[].stalled` on the approval trail of orders, quotations and complaint refunds. The text is "No District Manager to decide. With the next manager up." The inbox already handles the row-level `stalled`; the per-step trail on detail pages does not.
+- [x] **F-13:** the first click after a page loads is ignored on `/tasks`, `/leads`, the lead page and `/approvals`. On `/approvals`, the next Approve after a decision needed up to 4 clicks. Investigate likely causes: a focus trap or overlay from the page transition, or the command-menu listener.
+- [x] **F-14:** "Preparing PDF" doesn't clear without a reload after Send. The poll must keep running when the tab isn't focused (TanStack `refetchIntervalInBackground: true` on that query).
+- [x] **F-16:** timeline text.
   - Use the new numbers in the payloads (`loser_inquiry_no`, `survivor_inquiry_no`, `matches[].inquiry_no`, `other_inquiry_no`).
   - A draft has no number, so write "draft quotation v1".
   - Don't repeat "the customer · Quotation opened by the customer QT/…".
   - One line per discount decision.
-- [ ] **F-17:** access-denied pages show "REF TASK-001 · <uuid>". Drop the reference, and don't draw the page behind the message.
-- [ ] **F-19, copy:**
+- [x] **F-17:** access-denied pages show "REF TASK-001 · <uuid>". Drop the reference, and don't draw the page behind the message.
+- [x] **F-19, copy:**
   - Dealer sign-in says the code comes "by SMS"; it comes on WhatsApp.
   - The enquiry form shows the QR code's internal label to the farmer.
   - It reads "Loading…" before a state is picked.
   - It should submit by itself on the 6th digit.
   - Other copy items are listed in the handover.
-- [ ] **F-19, menus:** a field officer has Assign on a lead, and QR codes, Dispatch queue and Complaint targets in the menu. Check against the role table (`backend/docs/architecture/RBAC.md`), and ask the user if unclear.
+- [x] **F-19, menus:** a field officer has Assign on a lead, and QR codes, Dispatch queue and Complaint targets in the menu. Check against the role table (`backend/docs/architecture/RBAC.md`), and ask the user if unclear.
 - [ ] **F-12:** files on a complaint can't be added after the QC verdict. Ask the user to confirm this is meant.
-- [ ] **F-20:** check by eye that the theme button's "Light" gives a light page.
-- [ ] **Leads, from `walk-fixes-10-oct.md` "Changed responses":**
+- [x] **F-20:** check by eye that the theme button's "Light" gives a light page.
+- [x] **Leads, from `walk-fixes-10-oct.md` "Changed responses":** (all but the optional "Deleted leads" view)
   - Show `score` as a whole number (it is now `"28.00"`).
   - Leave deleted leads out of the lists (the backend does already). Optionally add a "Deleted leads" view with `deleted=true` for `leads.delete` holders.
   - Refetch open draft quotations after an assign changes the partner: they are re-priced at the new tier.
@@ -564,6 +564,8 @@ These come from the 10 Oct staging walk: `backend/docs/handover/walk-fixes-10-oc
 - [ ] **The mock's product gap:** quotation pricing in the mock still uses the six `MOCK_PRODUCTS` (`src/mocks/data/quotations.ts`), so a product added in Products & prices doesn't price in the mock builder. This is optional, mock-only polish: make `POST /pricing/quote-lines` in the mock read `mockDb.products` and the in-force price list.
 
 Ship these as one or two `fix(...)` PRs ("Go-live fixes from the 10 Oct walk"), each finding named.
+
+**12 October:** done in PR #PRNUM (changelog `2026-10-12--fix--APP-006--go-live-fixes-from-the-10-oct-walk.md`). F-19 menus were checked against RBAC.md and left as they are. Still open: F-12 and the menu questions wait on the user; the "Deleted leads" view and the mock's product gap are optional.
 
 ### P1: backend pick-ups waiting on the frontend
 

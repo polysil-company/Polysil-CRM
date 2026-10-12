@@ -45,6 +45,7 @@ describe("[LEAD-008] LeadAssignDialog", () => {
   afterEach(() => {
     writeMockRole("state_manager");
     resetMockDb();
+    server.events.removeAllListeners("request:start");
   });
 
   it("changes the owner and the partner, and shows them on the lead", async () => {
@@ -107,6 +108,54 @@ describe("[LEAD-008] LeadAssignDialog", () => {
     ).toBeInTheDocument();
     expect(within(dialog).queryByRole("combobox", { name: "Owner" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("combobox", { name: "Channel partner" })).toBeInTheDocument();
+  });
+
+  it("holds no text for 'no channel partner', so a search is only what was typed (F-9)", async () => {
+    signInAs("state_manager");
+    const lead = mockDb.leads.find(
+      (item) => item.stage === "contacted" && item.assigned_partner === null,
+    );
+    if (lead === undefined) throw new Error("No contacted lead without a partner");
+    const searches: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      const url = new URL(request.url);
+      if (url.pathname.endsWith("/lookups/partners"))
+        searches.push(url.searchParams.get("q") ?? "");
+    });
+    const user = showLead(lead.id);
+
+    await user.click(await screen.findByRole("button", { name: "Assign" }));
+    const dialog = await screen.findByRole("dialog", { name: "Assign lead" });
+    const partner = within(dialog).getByRole("combobox", { name: "Channel partner" });
+    expect(partner).toHaveValue("");
+    expect(partner).toHaveAttribute("placeholder", "No channel partner");
+
+    await user.type(partner, "Khodiyar");
+    await waitFor(() => {
+      expect(searches).toContain("Khodiyar");
+    });
+    // It used to search "No channel partnerKhodiyar".
+    expect(searches.filter((q) => q !== "").every((q) => "Khodiyar".startsWith(q))).toBe(true);
+  });
+
+  it("refreshes the lead's quotations when the partner changes: drafts are re-priced", async () => {
+    signInAs("state_manager");
+    const lead = leadAt("contacted");
+    const user = userEvent.setup();
+    const { queryClient } = renderWithProviders(<LeadDetail leadId={lead.id} />);
+    queryClient.setQueryData(["quotations", "probe"], "before");
+
+    await user.click(await screen.findByRole("button", { name: "Assign" }));
+    const dialog = await screen.findByRole("dialog", { name: "Assign lead" });
+    const partner = within(dialog).getByRole("combobox", { name: "Channel partner" });
+    await user.clear(partner);
+    await user.type(partner, "Khodiyar");
+    await user.click(await screen.findByRole("option", { name: /Khodiyar Irrigation/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(queryClient.getQueryState(["quotations", "probe"])?.isInvalidated).toBe(true);
+    });
   });
 
   it("puts a refused partner on the partner field", async () => {

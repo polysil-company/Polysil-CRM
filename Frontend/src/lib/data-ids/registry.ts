@@ -105,6 +105,12 @@ export const DATA_IDS = {
     owner: "frontend",
     status: "in-progress",
   },
+  "APP-006": {
+    domain: "APP",
+    title: "Route guards — a page the user may not open shows access denied, not the page",
+    owner: "frontend",
+    status: "in-progress",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",

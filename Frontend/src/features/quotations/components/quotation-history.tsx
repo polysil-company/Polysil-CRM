@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { TimelineEvent } from "@/features/leads/api/leads.schemas";
 import { quotationTimelineQueryOptions } from "@/features/quotations/api/quotations.queries";
 import {
+  isShownInHistory,
   quotationHistoryEntry,
   type QuotationHistoryEntry,
 } from "@/features/quotations/lib/quotation-lifecycle";
@@ -40,7 +41,9 @@ export function QuotationHistory({ quotationId }: { quotationId: string }): Reac
     <QueryView
       query={query}
       pending={<QuotationHistorySkeleton />}
-      isEmpty={(data) => data.pages.every((page) => page.items.length === 0)}
+      isEmpty={(data) =>
+        data.pages.every((page) => page.items.filter(isShownInHistory).length === 0)
+      }
       empty={
         <EmptyState
           icon={Clock01Icon}
@@ -53,7 +56,9 @@ export function QuotationHistory({ quotationId }: { quotationId: string }): Reac
         <div className="flex flex-col gap-3">
           <ol aria-label="Quotation history, newest first" className="flex flex-col">
             {data.pages.flatMap((page) =>
-              page.items.map((event) => <HistoryItem key={event.id} event={event} />),
+              page.items
+                .filter(isShownInHistory)
+                .map((event) => <HistoryItem key={event.id} event={event} />),
             )}
           </ol>
           {query.hasNextPage ? (
@@ -97,7 +102,8 @@ function HistoryItem({ event }: { event: TimelineEvent }): React.JSX.Element {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <p className="text-sm text-foreground">
           <span className="font-medium">{entry.title}</span>
-          {event.actor?.name == null ? null : (
+          {/* "Opened by the customer · the customer" said it twice (walk F-16). */}
+          {event.actor?.name == null || event.kind === "quotation.viewed" ? null : (
             <span className="text-muted-foreground"> · {event.actor.name}</span>
           )}
         </p>

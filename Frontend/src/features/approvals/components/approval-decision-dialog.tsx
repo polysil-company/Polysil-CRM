@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { useForm, useFormState } from "react-hook-form";
 import { toast } from "sonner";
@@ -42,9 +42,6 @@ const log = createLogger({
   file: "features/approvals/components/approval-decision-dialog.tsx",
   dataId: "APPR-001",
 });
-
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
 
 export interface PendingDecision {
   readonly row: QueueRow;
@@ -106,12 +103,6 @@ function DecisionForm({
     mode: "onTouched",
   });
   const { errors } = useFormState({ control: form.control });
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
 
   const approve = decision === "approve";
   const title = documentTitle(row.docType, row.document.number);
@@ -133,7 +124,9 @@ function DecisionForm({
       toast.success(approve ? "Approved" : "Rejected", {
         description: `${DOC_TYPE_LABELS[row.docType]} · ${row.document.partyName}`,
       });
-      timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
+      // Closed at once: the toast confirms it, and the next row is the next thing to click. A
+      // dialog held open to show its tick took the first clicks on that row (walk F-13).
+      onClose();
     },
     onError: (error) => {
       const view = decisionRefusal(error);

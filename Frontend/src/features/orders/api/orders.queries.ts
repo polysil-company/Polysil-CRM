@@ -90,6 +90,8 @@ export function orderDetailQueryOptions(orderId: string) {
       if (order?.status === "submitted") return ORDER_APPROVAL_POLL_MS;
       return false;
     },
+    // The PDF is ready when the user comes back from another tab or app (walk F-14).
+    refetchIntervalInBackground: true,
     meta: { dataId: "SO-002" },
   });
 }

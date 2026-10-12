@@ -4,8 +4,10 @@ import type { TimelineEvent } from "@/features/leads/api/leads.schemas";
 
 import {
   assignmentSentence,
+  isShownOnTimeline,
   joinFields,
   labelForUnknownKind,
+  shortInquiryNumber,
   toTimelineEntry,
   type AssignmentChange,
 } from "./timeline-entries";
@@ -147,31 +149,71 @@ describe("[LEAD-005] toTimelineEntry", () => {
     });
   });
 
-  it("reads a merge from the side of the lead on screen", () => {
-    const merge = { survivor: LEAD_ID, loser: "lead-2" };
+  it("reads a merge from the side of the lead on screen, naming the other lead (F-16)", () => {
+    const merge = {
+      survivor: LEAD_ID,
+      loser: "lead-2",
+      survivor_inquiry_no: "POL/GJ/2026-27/00090",
+      loser_inquiry_no: "POL/GJ/2026-27/00094",
+    };
     expect(toTimelineEntry(event("lead.merged", merge), LEAD_ID)).toEqual({
       type: "merged",
       role: "survivor",
       otherLeadId: "lead-2",
+      otherNumber: "POL/GJ/2026-27/00094",
     });
     expect(toTimelineEntry(event("lead.merged", merge), "lead-2")).toEqual({
       type: "merged",
       role: "loser",
       otherLeadId: LEAD_ID,
+      otherNumber: "POL/GJ/2026-27/00090",
     });
+    // A number is null when the reader cannot see that lead.
+    expect(
+      toTimelineEntry(event("lead.merged", { survivor: LEAD_ID, loser: "lead-2" }), LEAD_ID),
+    ).toMatchObject({ otherNumber: null });
     expect(toTimelineEntry(event("lead.merged", merge), "lead-3")).toEqual({
       type: "other",
       label: "Leads merged",
     });
   });
 
-  it("counts flagged duplicates, and reads dismissals and deletion", () => {
+  it("names flagged duplicates and the dismissed one, and reads deletion (F-16)", () => {
     expect(
-      toTimelineEntry(event("lead.duplicate_flagged", { matches: [{}, {}] }), LEAD_ID),
-    ).toEqual({ type: "duplicate-flagged", count: 2 });
+      toTimelineEntry(
+        event("lead.duplicate_flagged", {
+          matches: [
+            { lead_id: "lead-2", inquiry_no: "POL/GJ/2026-27/00083" },
+            { lead_id: "lead-3", inquiry_no: null },
+          ],
+        }),
+        LEAD_ID,
+      ),
+    ).toEqual({
+      type: "duplicate-flagged",
+      matches: [
+        { leadId: "lead-2", number: "POL/GJ/2026-27/00083" },
+        { leadId: "lead-3", number: null },
+      ],
+    });
+    expect(
+      toTimelineEntry(
+        event("lead.duplicate_dismissed", {
+          other_lead_id: "lead-2",
+          other_inquiry_no: "POL/GJ/2026-27/00083",
+        }),
+        LEAD_ID,
+      ),
+    ).toEqual({
+      type: "duplicate-dismissed",
+      other: { leadId: "lead-2", number: "POL/GJ/2026-27/00083" },
+    });
+    // Events from before the backend named the other lead still read.
     expect(toTimelineEntry(event("lead.duplicate_dismissed"), LEAD_ID)).toEqual({
       type: "duplicate-dismissed",
+      other: null,
     });
+    expect(shortInquiryNumber("POL/GJ/2026-27/00083")).toBe("00083");
     expect(toTimelineEntry(event("lead.deleted"), LEAD_ID)).toEqual({ type: "deleted" });
   });
 
@@ -208,7 +250,20 @@ describe("[LEAD-005] toTimelineEntry", () => {
         event("quotation.created", { quotation_id: "q-2", quote_no: null, version: 1 }),
         LEAD_ID,
       ),
-    ).toMatchObject({ document: { kind: "quotation", title: "Draft" } });
+    ).toMatchObject({ document: { kind: "quotation", title: "draft quotation v1" } });
+    expect(
+      toTimelineEntry(event("order.created", { order_id: "o-2", order_no: null }), LEAD_ID),
+    ).toMatchObject({ document: { kind: "order", title: "draft order" } });
+    // F-16 · The customer opening a quotation is said without an actor.
+    expect(
+      toTimelineEntry(
+        event("quotation.viewed", { quotation_id: "q-1", quote_no: "QT/GJ/2026-27/00003" }),
+        LEAD_ID,
+      ),
+    ).toEqual({
+      type: "customer-opened",
+      document: { kind: "quotation", id: "q-1", title: "QT/GJ/2026-27/00003" },
+    });
     expect(
       toTimelineEntry(
         event("order.submitted", { order_id: "o-1", order_no: "SO/GJ/2026-27/00041" }),
@@ -240,6 +295,15 @@ describe("[LEAD-005] toTimelineEntry", () => {
       decision: null,
       role: null,
     });
+  });
+
+  it("gives a quotation's discount decision one line, not two (F-16)", () => {
+    expect(isShownOnTimeline(event("approval.decided", { quotation_id: "q-1" }))).toBe(false);
+    expect(isShownOnTimeline(event("quotation.approval_approved", { quotation_id: "q-1" }))).toBe(
+      true,
+    );
+    // An order's steps each keep their line.
+    expect(isShownOnTimeline(event("approval.decided", { order_id: "o-1" }))).toBe(true);
   });
 });
 

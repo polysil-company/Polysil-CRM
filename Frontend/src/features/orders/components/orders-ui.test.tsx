@@ -113,6 +113,26 @@ describe("[SO-002] OrderDetail", () => {
   });
 });
 
+describe("[APPR-001] A stalled step on the order's approval trail", () => {
+  afterEach(reset);
+
+  it("says nobody of the role can decide it, and that it went up (F-11)", async () => {
+    signInAs("state_manager");
+    const stalled = mockDb.orders.find(
+      (order) => order.approval?.steps.some((step) => step.stalled === true) === true,
+    );
+    if (stalled === undefined) throw new Error("No stalled order in the mock");
+    showOrder(stalled.id);
+
+    const steps = await screen.findByRole("list", { name: "Approval steps, in order" });
+    const current = within(steps)
+      .getAllByRole("listitem")
+      .find((item) => item.getAttribute("aria-current") === "step");
+    expect(current).toHaveTextContent("No District Manager to decide. With the next manager up.");
+    expect(within(steps).queryByText(/Waiting now/)).not.toBeInTheDocument();
+  });
+});
+
 describe("[SO-004] Submit a returned order again", () => {
   afterEach(reset);
 

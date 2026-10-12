@@ -7,11 +7,12 @@ import type * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
+import { useSession } from "@/features/session/hooks/use-session";
 import { cn } from "@/lib/utils";
 
 import { useCommandMenu } from "./command-menu-context";
 import { MobileNav } from "./mobile-nav";
-import { findPageHeading } from "./navigation";
+import { canOpenPath, findPageHeading, type PageHeading } from "./navigation";
 import { SidebarToggle } from "./sidebar-toggle";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
@@ -24,7 +25,11 @@ import { UserMenu } from "./user-menu";
 export function AppHeader({ className }: { className?: string }): React.JSX.Element {
   const pathname = usePathname();
   const { open } = useCommandMenu();
-  const heading = findPageHeading(pathname);
+  const { data: session } = useSession();
+  // A page the user may not open is not named either: the route guard says so (APP-006, F-17).
+  const denied =
+    session !== undefined && !canOpenPath(pathname, session.permissions, session.userType);
+  const heading: PageHeading = denied ? { title: "Polysil CRM" } : findPageHeading(pathname);
 
   return (
     <header

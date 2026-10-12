@@ -122,6 +122,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | APP-003 | Route transitions, page skeletons and route-level error boundaries | frontend | in-progress |
 | APP-004 | Mock scenarios for previewing loading, empty, error and contract states | frontend | in-progress |
 | APP-005 | Collapsible desktop sidebar and page titles in the top bar | frontend | in-progress |
+| APP-006 | Route guards — a page the user may not open shows access denied, not the page | frontend | in-progress |
 | OBS-001 | Logger utility with runtime log level | frontend | in-progress |
 | OBS-002 | API client — request IDs, error normalisation, response contract validation | shared | in-progress |
 | DS-001 | Design tokens and component library | frontend | in-progress |

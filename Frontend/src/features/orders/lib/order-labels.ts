@@ -5,7 +5,7 @@ import type {
   OrderType,
   PaymentTerms,
 } from "@/features/orders/api/orders.schemas";
-import { roleLabel } from "@/features/quotations/lib/quotation-lifecycle";
+import { roleLabel, stalledApproverText } from "@/features/quotations/lib/quotation-lifecycle";
 
 export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
   draft: "Draft",
@@ -58,6 +58,14 @@ export function orderNumber(order: { orderNo: string | null }): string {
 /** "Waiting on State Manager", for the list and the approval card. */
 export function waitingOnLabel(role: string | null): string | null {
   return role === null ? null : `Waiting on ${stepRoleLabel(role)}`;
+}
+
+/**
+ * APPR-001 · A step nobody of its role can decide: a higher manager decides it and has it in
+ * their inbox (walk F-11). Said instead of "Waiting on District Manager".
+ */
+export function stalledStepText(role: string): string {
+  return stalledApproverText(stepRoleLabel(role));
 }
 
 /** Accounts and Dispatch are named by their desks, as the business says them. */

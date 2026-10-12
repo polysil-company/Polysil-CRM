@@ -61,6 +61,8 @@ export function mockTimelineFor(lead: LeadWire): TimelineEventWire[] {
           lead_id: duplicate.lead_id,
           signal: duplicate.signal,
           score: duplicate.score ?? "1.00",
+          // Added at read time by the backend since the 10 Oct walk (F-16).
+          inquiry_no: duplicate.inquiry_no,
         })),
       },
     });
@@ -140,6 +142,8 @@ export function mockTimelineFor(lead: LeadWire): TimelineEventWire[] {
         actor_name: actor?.full_name ?? "",
         loser: lead.id,
         survivor: lead.merged_into.id,
+        loser_inquiry_no: lead.inquiry_no,
+        survivor_inquiry_no: lead.merged_into.inquiry_no,
       },
     });
   }

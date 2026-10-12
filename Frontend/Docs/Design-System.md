@@ -262,7 +262,7 @@ There is no `ease-in`: it makes interfaces feel slow.
 | `duration-fast` | 150ms | Hover, tooltips |
 | `duration-base` | 200ms | Menus, popovers, state swaps |
 | `duration-slow` | 300ms | Dialogs, sheets |
-| page tokens | 120 / 220 / 320ms | Directional page transitions (CSS only) |
+| page tokens | 120 / 220 / 320ms | Page transitions (CSS only): the leaving page's fade and slide; enter is the Suspense reveal |
 
 ### Patterns — use the utility, do not hand-roll
 
@@ -277,7 +277,9 @@ There is no `ease-in`: it makes interfaces feel slow.
 - **Crossfades use a 2px blur** (`blur-2xs`) to hide the double image — see the async button.
 - **Directional page transitions:** links pass `transitionTypes={["nav-forward"]}` (deeper, or down
   the sidebar) or `["nav-back"]`. Pages wrap their content in `<PageTransition>`. The sidebar and
-  header are anchored so they never slide.
+  header are anchored so they never slide. Only the page being left animates: it slides and fades
+  out over the new page, which is live at once. A page captured into a view transition takes no
+  clicks until the transition ends, and the first click on an arriving page was lost (walk F-13).
 - **JavaScript animation (Motion)** only for layout animation (tab underline), presence (selection
   bar) and springs. Import from `motion/react`; values from `@/lib/motion/tokens`.
 - **Custom carets:** `animate-caret-blink` for a caret drawn inside a custom field (`OtpInput`). Pair

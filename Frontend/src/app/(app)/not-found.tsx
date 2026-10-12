@@ -11,6 +11,7 @@ export default function AppNotFound(): React.JSX.Element {
     <PageContainer className="min-h-full justify-center">
       <EmptyState
         icon={Location01Icon}
+        level={2}
         title="Page not found"
         description="It may have been removed, or the link is wrong."
         action={

@@ -40,6 +40,17 @@ describe("[APPR-002] ApprovalLimits", () => {
     expect(screen.queryByRole("button", { name: /^Change the/ })).not.toBeInTheDocument();
   });
 
+  it("says plainly when no limits are set, with no ask of the backend team (F-8)", async () => {
+    signInAs("admin");
+    server.use(
+      http.get(buildApiUrl("/approvals/thresholds"), () => HttpResponse.json({ data: [] })),
+    );
+    renderWithProviders(<ApprovalLimits />);
+
+    expect(await screen.findByText("No approval limits are set.")).toBeInTheDocument();
+    expect(screen.queryByText(/backend team/)).not.toBeInTheDocument();
+  });
+
   it("lets an administrator change a limit, refusing one out of order first", async () => {
     signInAs("admin");
     const user = userEvent.setup();

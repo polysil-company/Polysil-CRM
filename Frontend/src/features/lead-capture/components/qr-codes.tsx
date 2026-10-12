@@ -46,7 +46,7 @@ import { qrCodesQueryOptions } from "@/features/lead-capture/api/lead-capture.qu
 import type { QrCode } from "@/features/lead-capture/api/lead-capture.schemas";
 import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
-import { useCan } from "@/features/session/hooks/use-session";
+import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toUserFacingError } from "@/lib/api/error-messages";
@@ -79,8 +79,12 @@ type Editing = { readonly mode: "new" } | { readonly mode: "edit"; readonly code
  */
 export function QrCodes(): React.JSX.Element {
   const query = useQuery(qrCodesQueryOptions());
-  const canCreate = useCan("leads", "create");
-  const canEdit = useCan("leads", "edit");
+  // A partner user reads their own codes; making or changing one is staff only (walk F-8).
+  const staff = useIsStaff();
+  const mayCreate = useCan("leads", "create");
+  const mayEdit = useCan("leads", "edit");
+  const canCreate = mayCreate && staff;
+  const canEdit = mayEdit && staff;
   const [editing, setEditing] = useState<Editing | null>(null);
 
   return (
@@ -88,8 +92,8 @@ export function QrCodes(): React.JSX.Element {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <p className="max-w-prose text-sm text-muted-foreground">
           A farmer who scans a code opens the enquiry form, checks their mobile on WhatsApp, and
-          becomes a lead for the officer covering their area — credited to the code&apos;s dealer
-          when it has one.
+          becomes a lead for the officer covering their area. When the code has a dealer, the lead
+          is credited to them.
         </p>
         {canCreate ? (
           <Button
@@ -244,7 +248,7 @@ function QrCodeCard({
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
         <dt className="text-muted-foreground">Campaign</dt>
-        <dd className="text-foreground">{code.campaign ?? "—"}</dd>
+        <dd className="text-foreground">{code.campaign ?? "None"}</dd>
         <dt className="text-muted-foreground">Dealer</dt>
         <dd className="text-foreground">
           {code.partner?.name ?? "None: leads go to the area's officer"}

@@ -105,6 +105,24 @@ describe("[LEAD-007] LeadStageMenu", () => {
     expect(lead.stage).toBe("lost");
   });
 
+  it("doesn't call the Reason wrong just for opening its list (F-19)", async () => {
+    signInAs("employee");
+    const user = showLead(leadAt("contacted").id);
+
+    const menu = await openStageMenu(user);
+    await user.click(within(menu).getByRole("menuitem", { name: "Mark as lost…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Mark as lost" });
+    const reason = within(dialog).getByRole("combobox", { name: "Reason" });
+    await waitFor(() => {
+      expect(reason).toBeEnabled();
+    });
+    await user.click(reason);
+
+    expect(await screen.findByRole("option", { name: "Competitor" })).toBeInTheDocument();
+    expect(reason).not.toHaveAttribute("aria-invalid");
+    expect(within(dialog).queryByText("Choose why the lead was lost")).not.toBeInTheDocument();
+  });
+
   it("reopens a lost lead with a note", async () => {
     signInAs("employee");
     const lead = leadAt("lost");

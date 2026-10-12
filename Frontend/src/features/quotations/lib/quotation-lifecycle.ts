@@ -245,6 +245,22 @@ const text = z.string().trim().min(1).nullish().catch(null);
 const count = z.number().int().nonnegative().nullish().catch(null);
 
 /** Turns one event into the line the history shows. Unknown kinds keep a readable label. */
+/**
+ * APPR-001 · A step nobody of its role can decide: a higher manager decides it and has it in
+ * their inbox (walk F-11). Said instead of "Waiting on District Manager". `role` is a label.
+ */
+export function stalledApproverText(role: string): string {
+  return `No ${role} to decide. With the next manager up.`;
+}
+
+/**
+ * A discount decision is written twice: as the approval step and as the discount's outcome
+ * (`quotation.approval_approved` or `_returned`). The second says it; one line each (walk F-16).
+ */
+export function isShownInHistory(event: TimelineEvent): boolean {
+  return event.kind !== "approval.decided";
+}
+
 export function quotationHistoryEntry(event: TimelineEvent): QuotationHistoryEntry {
   const { payload } = event;
   const remark = text.parse(payload.remark) ?? null;
@@ -333,6 +349,7 @@ export function draftSendNotice(
   const effective = formatRate(discount.effectivePct);
   const limit = discount.ownerLimitPct === null ? null : formatRate(discount.ownerLimitPct);
   const step = approval?.steps[0] ?? null;
+  const waiting = approval?.steps.find((candidate) => candidate.decision === null) ?? null;
   const approver = step === null ? "a manager" : `a ${roleLabel(step.decidedRole ?? step.role)}`;
 
   switch (discount.sendGate) {
@@ -347,7 +364,10 @@ export function draftSendNotice(
     case "pending":
       return {
         tone: "info",
-        title: `Waiting for ${approver} to approve the ${effective} discount`,
+        title:
+          waiting?.stalled === true
+            ? stalledApproverText(roleLabel(waiting.role))
+            : `Waiting for ${approver} to approve the ${effective} discount`,
         detail:
           "Editing or deleting the draft withdraws the request, so the approval is always for the figures on screen.",
       };

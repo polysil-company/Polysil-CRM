@@ -212,6 +212,11 @@ const approvalStepSchema = z
     by: userRef.nullish(),
     remark: z.string().nullish(),
     decided_at: isoDateTime.nullish(),
+    /**
+     * True on the step waiting now when nobody of its role can decide it: a higher manager
+     * decides it instead (walk F-11). Always false for a partner user.
+     */
+    stalled: z.boolean().nullish(),
   })
   .transform((wire) => ({
     id: wire.id,
@@ -222,6 +227,7 @@ const approvalStepSchema = z
     by: wire.by ?? null,
     remark: wire.remark ?? null,
     decidedAt: wire.decided_at ?? null,
+    stalled: wire.stalled === true,
   }));
 
 export type OrderApprovalStep = z.output<typeof approvalStepSchema>;

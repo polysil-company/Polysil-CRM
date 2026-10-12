@@ -142,11 +142,8 @@ function EnquiryFlow({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
-        {setup.qr === null ? null : (
-          <p className="w-fit rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary-text">
-            Enquiry through {setup.qr.label}
-          </p>
-        )}
+        {/* A QR code's label is for staff ("Shah Irrigation counter, Oct fair"); the farmer
+            never sees it (walk F-19). The code still credits its dealer. */}
         <h1 className="text-2xl font-semibold text-balance text-foreground">
           {step.kind === "done" ? "Thank you" : "Ask about drip and sprinkler irrigation"}
         </h1>
@@ -379,7 +376,12 @@ function DetailsStep({
                         aria-describedby={fieldState.error ? "enquiry-district-error" : undefined}
                       >
                         <SelectValue
-                          placeholder={districts.isPending ? "Loading…" : "Choose your district"}
+                          placeholder={
+                            // Before a state is picked the list isn't loading: it waits (F-19).
+                            stateId !== "" && districts.isPending
+                              ? "Loading…"
+                              : "Choose your district"
+                          }
                         />
                       </SelectTrigger>
                       <SelectContent>
