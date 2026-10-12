@@ -687,6 +687,8 @@ Every version of the number, oldest first. Any version's id works.
 | `gravel_filter_m3` | number \| string \| null |  | RJ: gravel filter size in m³, 0 for none. |
 | `head_unit_existing` | boolean \| null |  | RJ: the farmer already has a head unit. |
 | `pvc_existing` | boolean \| null |  | RJ: the farmer already has the PVC main line. |
+| `guided_cost` | number \| string \| null |  | AP drip: the guided cost from the AP MIP portal's bill of quantities. Required there, refused for every other system. |
+| `fittings_amount` | number \| string \| null |  | AP drip: the portal's 'Fittings and accessories' amount, as printed; 0 for none. Required there, refused for every other system. |
 
 **`CropRequest`**
 

@@ -224,6 +224,15 @@ async def revise_matrix(db: AsyncSession, user_id: str, kind: str, body: sch.Mat
     _check_date(body.effective_from)
     sid = await _scheme_id(db, body.scheme)
     if kind == "unit-cost-matrices":
+        variant = (await db.execute(text(
+            "SELECT jantri_variant::text FROM subsidy_system WHERE scheme_id = CAST(:s AS uuid) "
+            "AND system_type = CAST(:t AS subsidy_system_type)"),
+            {"s": sid, "t": body.system_type})).scalar_one_or_none()
+        if variant == "none":
+            # FS-063 plan review S-4: AP drip takes the portal's guided cost; a table
+            # here would be stored and never read
+            raise ValidationFailed("This system has no unit cost table.", code="system_has_no_table",
+                                   fields={"system_type": "takes the guided cost from the portal"})
         if not body.unit_cost_cells or body.variant is None or body.dimensionality is None:
             raise ValidationFailed(fields={"unit_cost_cells": "Cells, variant and dimensionality are required."})
         table, match = "unit_cost_matrix", "AND variant = CAST(:v AS subsidy_matrix_variant)"

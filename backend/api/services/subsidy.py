@@ -29,7 +29,7 @@ from api.domain.subsidy.jantri import Matrix2D, OutsideTable, RowTable
 from api.domain.subsidy.money import RoundingPolicy, round2
 from api.domain.subsidy.pipeline import seven_block
 from api.domain.subsidy.sprinkler import field_inspection, missing_quantity_rows, required_rates
-from api.domain.subsidy.state_pipelines import gst_inclusive_drip, unit_cost_only
+from api.domain.subsidy.state_pipelines import gst_inclusive_drip, portal_manual, unit_cost_only
 from api.domain.subsidy.types import (
     Category,
     ComponentRate,
@@ -72,8 +72,8 @@ BLOCK_FIELDS = tuple(Blocks.model_fields)
 class ResolvedMasters:
     masters: Masters
     policy: SystemPolicy
-    regular_matrix_id: str
-    seven_year_matrix_id: str
+    regular_matrix_id: str | None          # FS-063: none for a system with no table
+    seven_year_matrix_id: str | None
     quantity_matrix_id: str | None
     formula_version: str
     sprinkler_areas: tuple[Decimal, ...] | None
@@ -186,6 +186,7 @@ def _as_rows(cells: list[tuple[Any, Any, Any]]) -> RowTable:
 
 # the unit cost table's dimensionality for each shape
 DIMENSIONS = {"bilinear_2d": 2, "area_lookup_1d": 1, "size_area_2d": 2, "label_anchor_linear": 2}
+NO_TABLE = "none"               # FS-063: a system with no unit cost table (AP drip)
 ROW_SHAPES = ("size_area_2d", "label_anchor_linear")
 
 
@@ -241,6 +242,8 @@ async def _rates(db: AsyncSession, scheme_id: str, system: str,
 async def _resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) -> ResolvedMasters:
     row = await _system_row(db, scheme, system)
     scheme_id = str(row[12])
+    if row.jantri_variant == NO_TABLE:
+        return await _resolve_untabled(db, row, scheme_id, system, as_of)
 
     reg_id, reg_dim, reg_cells = await _matrix(db, scheme_id, system, "regular", as_of)
     ggrc = row.cap_mode == "ggrc"
@@ -301,6 +304,18 @@ async def _resolve(db: AsyncSession, scheme: str, system: str, as_of: dt.date) -
                            row.supports_group, row.quantity_source, row.pipeline,
                            regular.labels() if isinstance(regular, RowTable)
                            and row.jantri_variant == "label_anchor_linear" else ())
+
+
+async def _resolve_untabled(db: AsyncSession, row: Any, scheme_id: str, system: str,
+                            as_of: dt.date) -> ResolvedMasters:
+    """FS-063: AP drip has no unit cost table, no crop table and no quantity table;
+    the request carries the portal's guided cost in their place."""
+    categories = await _categories(db, scheme_id, system, as_of)
+    params = await _parameters(db, scheme_id, system, as_of)
+    masters = Masters({}, None, categories, {}, None, (), row.formula_version)
+    return ResolvedMasters(masters, _policy(system, row, params), None, None, None,
+                           row.formula_version, None, row.crop_count_max, row.has_head_unit,
+                           row.supports_group, row.quantity_source, row.pipeline, ())
 
 
 async def _quantities(db: AsyncSession, scheme_id: str, system: str,
@@ -370,6 +385,11 @@ def _policy(system: str, row: Any, params: dict[str, tuple[Decimal, str]]) -> Sy
         head_unit_deduction=p("head_unit_deduction", Decimal(0)),
         gst_inclusive_rate=p("gst_inclusive_rate", Decimal("0.05")),
         rates_include_gst=row.pipeline == "gst_inclusive",
+        # FS-063
+        subsidy_cap=params["subsidy_cap"][0] if "subsidy_cap" in params else None,
+        farmer_gst_fraction=p("farmer_gst_fraction", Decimal(1)),
+        subsidy_round_rupee=bool(p("subsidy_round_rupee", Decimal(0))),
+        transport_flat=bool(p("transport_flat", Decimal(0))),
     )
 
 
@@ -407,7 +427,9 @@ async def readiness(db: AsyncSession, scheme_id: str, system: str, jantri_varian
     ggrc = cap_mode == "ggrc"
     wanted = DIMENSIONS.get(jantri_variant, 1)
     # FS-056: a state system has no 7-year table, crop spacings or GGRC parameters
-    for variant in ("regular", "seven_year") if ggrc else ("regular",):
+    variants = () if jantri_variant == NO_TABLE else ("regular", "seven_year") if ggrc \
+        else ("regular",)
+    for variant in variants:
         try:
             _id, dim, cells = await _matrix(db, scheme_id, system, variant, as_of)
         except NotFoundError:
@@ -472,6 +494,14 @@ def _validate(req: CalculateRequest, resolved: ResolvedMasters) -> None:
                                                "send none.")
     elif req.nozzle is not None:
         fields["nozzle"] = "Only Sprinkler takes a nozzle type."
+    # FS-063: the portal's figures, for the system that takes them and no other
+    portal = resolved.pipeline == PORTAL_MANUAL
+    for name in ("guided_cost", "fittings_amount"):
+        sent = getattr(req, name) is not None
+        if portal and not sent:
+            fields[name] = "Required: copy it from the AP MIP portal's bill of quantities."
+        elif sent and not portal:
+            fields[name] = f"This scheme's {req.system_type} does not take {name}."
 
     total = sum((c.area for c in req.crops), Decimal(0))
     if req.group_total_area is not None and req.group_total_area < total:
@@ -558,7 +588,8 @@ async def calculate(db: AsyncSession, req: CalculateRequest) -> CalculateRespons
         pipe_size_mm=req.pipe_size_mm, spacing_label=req.spacing_label,
         hydrocyclone_m3=req.hydrocyclone_m3 or Decimal(0),
         gravel_filter_m3=req.gravel_filter_m3 or Decimal(0),
-        head_unit_existing=bool(req.head_unit_existing), pvc_existing=bool(req.pvc_existing))
+        head_unit_existing=bool(req.head_unit_existing), pvc_existing=bool(req.pvc_existing),
+        guided_cost=req.guided_cost, fittings_amount=req.fittings_amount)
 
     run = PIPELINES[(resolved.pipeline, "sprinkler" if req.system_type == "sprinkler" else "drip")]
     try:
@@ -576,7 +607,9 @@ PIPELINES = {
     ("field_inspection_only", "drip"): field_inspection,
     ("gst_inclusive", "sprinkler"): field_inspection, ("gst_inclusive", "drip"): gst_inclusive_drip,
     ("unit_cost_only", "drip"): unit_cost_only, ("unit_cost_only", "sprinkler"): unit_cost_only,
+    ("portal_manual", "drip"): portal_manual, ("portal_manual", "sprinkler"): portal_manual,
 }
+PORTAL_MANUAL = "portal_manual"
 
 
 def _blocks(source: Any) -> Blocks:
@@ -666,6 +699,8 @@ def _inputs(resolved: ResolvedMasters) -> list[str]:
         out.append("spacing_label")
     if resolved.pipeline == "unit_cost_only":
         out += ["hydrocyclone_m3", "gravel_filter_m3", "head_unit_existing", "pvc_existing"]
+    if resolved.pipeline == PORTAL_MANUAL:
+        out += ["guided_cost", "fittings_amount"]
     return out
 
 

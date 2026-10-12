@@ -208,3 +208,32 @@ async def test_a_changed_lead_system_stops_the_send(
     assert r.status_code == 200, r.text
     r = await client.post(f"{Q}/{q['id']}/send", headers={**fo, **_key()}, json={"channel": "none"})
     assert r.status_code == 422 and _code(r) == "subsidy_system_changed", r.text
+
+
+async def test_ap_state_gst_joins_the_orders_subsidy(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest],
+        sessions: Sessions) -> None:
+    """FS-063 rule 13, EC-6: the order's subsidy is what the government pays, so AP's
+    state GST joins it and the farmer is owed his share only."""
+    fo = await _as(client, office, "field_officer")
+    q = await _quotation(client, office, fo)
+    assert (await _put(client, fo, q["id"], office)).status_code == 200
+    s = sessions()
+    # the stored answer as the AP engine writes it: 1,000.00 of the GST is the state's
+    # material 95,000.75 = subsidy 70,000.50 + share 24,000.25 + state GST 1,000.00
+    await s.execute(text(
+        "UPDATE quotation_subsidy SET calculation = jsonb_set(calculation, "
+        "'{total,blocks,gst_paid_by_state}', '\"1000.00\"'), farmer_share = 24000.25 "
+        "WHERE quotation_id = CAST(:q AS uuid)"),
+        {"q": q["id"]})
+    await s.commit()
+    await s.close()
+    for path, body in (("send", {"channel": "none"}), ("transition", {"to": "accepted"})):
+        r = await client.post(f"{Q}/{q['id']}/{path}", headers={**fo, **_key()}, json=body)
+        assert r.status_code == 200, r.text
+    order = await endpoints._create(client, fo, {"order_type": "subsidised", "quotation_ids": [q["id"]]})
+    block = order["subsidy"]
+    assert (block["subsidy_amount"], block["farmer_payable"]) == ("71000.50", "24000.25")
+    assert "farmer_payable_not_material_less_subsidy" not in order.get("warnings", []), order
+    got = (await client.get(f"{Q}/{q['id']}", headers=fo)).json()["data"]["subsidy"]
+    assert got["gst_paid_by_state"] == "1000.00", "code review F-4: the block shows it"

@@ -10,14 +10,18 @@ one 5 % GST on their sum, and a subsidy that is the category percent of the unit
 cost after the filter add-ons and the existing-equipment deductions, with no cap
 at the cost (`'Unit Cost'!K26:K29`, `'DRIP QTY'!M`).
 
-Both quote one crop, as the workbooks do.
+`portal_manual` is AP's drip (FS-063): the government's MIP portal designs the
+system and prints the guided cost, so the CRM takes the portal's lines, its
+fittings amount and its guided cost as given, and checks the arithmetic.
+
+All three quote one crop, as the workbooks do.
 """
 
 from __future__ import annotations
 
 from decimal import ROUND_HALF_UP, Decimal
 
-from api.domain.subsidy.categories import category_rows
+from api.domain.subsidy.categories import category_rows, state_gst
 from api.domain.subsidy.jantri import RowTable
 from api.domain.subsidy.money import ZERO, round2
 from api.domain.subsidy.types import (
@@ -137,6 +141,55 @@ def unit_cost_only(q: QuotationInput, masters: Masters, policy: SystemPolicy) ->
     if any(c.exact.subsidy > mis for c in categories):
         warnings.append("subsidy_above_cost: the subsidy is above the cost, as the scheme's "
                         "sheet has it (GAP-458)")
+    result = CropResult(crop.crop, crop.inter_crop, crop.area, crop.lateral_spacing, jantri,
+                        blocks, categories, tuple(warnings))
+    return QuotationResult(q.system_type, (result,), blocks, None, tuple(warnings))
+
+
+def portal_manual(q: QuotationInput, masters: Masters, policy: SystemPolicy) -> QuotationResult:
+    """FS-063 rules 7 to 11. The portal's BOQ: head lines, field lines, the fittings
+    line as typed, 5 % GST; the subsidy is the percent of the lower of the guided
+    cost and the cost before GST."""
+    if len(q.crops) != 1:
+        raise SubsidyError("crop_count", "this scheme quotes one crop", "crops")
+    crop = q.crops[0]
+    if crop.area <= 0:
+        raise SubsidyError("zero_area", "a crop's area must be positive", "area")
+    if q.guided_cost is None or q.guided_cost <= 0:
+        raise SubsidyError("guided_cost_required", "the portal's guided cost is required",
+                           "guided_cost")
+    if q.fittings_amount is None or q.fittings_amount < 0:
+        raise SubsidyError("fittings_amount_required",
+                           "the portal's fittings amount is required (0 for none)",
+                           "fittings_amount")
+    r = policy.rounding
+    head = sum((r.line("head", ln.rate * ln.qty) for ln in q.head_lines), ZERO)
+    field = sum((r.line("field", ln.rate * ln.qty) for ln in crop.lines), ZERO)
+    if head + field <= 0:
+        raise SubsidyError("zero_cost", "the quotation has no material", "crops")
+    cost = head + field + q.fittings_amount                          # the portal's V
+    gst = cost * policy.gst_inclusive_rate                           # VI, unrounded
+    total = cost + gst                                               # VII
+    blocks = Blocks(head_unit=head, field_unit=field, a_plus_b=cost, fittings=q.fittings_amount,
+                    cgst_ab=gst / HALF, sgst_ab=gst / HALF, cost_excl_gst=cost,
+                    total_cgst=gst / HALF, total_sgst=gst / HALF, total_gst=gst,
+                    total_incl_gst=total,
+                    gst_paid_by_state=state_gst(cost, gst, policy.farmer_gst_fraction))
+    warnings: list[str] = []
+    if q.guided_cost > cost:
+        warnings.append("guided_cost_above_cost: the subsidy is taken on the cost, the lower "
+                        "of the two (GAP-480)")
+    if q.fittings_amount > head + field:
+        warnings.append("fittings_above_material: the fittings amount is more than the lines; "
+                        "check it against the portal")
+    jantri = _jantri(q.guided_cost, crop.lateral_spacing, warnings=tuple(warnings))
+    categories = category_rows(masters.categories, cost=cost, total_gst=gst, sump=ZERO,
+                               area=crop.area, jantri=jantri, seven_year_applicable=False,
+                               gsdma_max_area=None, cap_mode=policy.cap_mode,
+                               share_floor_zero=policy.share_floor_zero,
+                               subsidy_cap=policy.subsidy_cap,
+                               farmer_gst_fraction=policy.farmer_gst_fraction,
+                               round_rupee=policy.subsidy_round_rupee)
     result = CropResult(crop.crop, crop.inter_crop, crop.area, crop.lateral_spacing, jantri,
                         blocks, categories, tuple(warnings))
     return QuotationResult(q.system_type, (result,), blocks, None, tuple(warnings))

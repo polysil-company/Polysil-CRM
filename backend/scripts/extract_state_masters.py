@@ -3,7 +3,7 @@ quotation formats (FS-056).
 
     python scripts/extract_state_masters.py
 
-Reads `data/quotation-formats/{cg,rj,up}/*.xlsx` in the main checkout (the
+Reads `data/quotation-formats/{ap,cg,rj,up}/*.xlsx` in the main checkout (the
 formats are not in the shared repository) and writes two files:
 
 * `tests/fixtures/subsidy/states.json`: public scheme data per "<STATE>/<system>":
@@ -40,6 +40,8 @@ DATA_CANDIDATES = (ROOT / "data" / "quotation-formats", Path(r"D:\Polysil-CRM\da
 OUT = ROOT / "tests" / "fixtures" / "subsidy"
 
 FILES = {
+    "AP/drip": "ap/AP-Drip-Portal-BOQ.xlsx",
+    "AP/sprinkler": "ap/AP-Sprinkler-Quotation-Format.xlsx",
     "CG/drip": "cg/CG-Drip-Quotation-Format.xlsx",
     "CG/sprinkler": "cg/CG-Sprinkler-Quotation-Format.xlsx",
     "RJ/drip": "rj/RJ-Drip-Quotation-Format.xlsx",
@@ -130,7 +132,7 @@ def example_input(**kw: Any) -> dict[str, Any]:
         "crops": [], "head_lines": [], "group_total_area": None, "installation_rate_per_ha": "0",
         "sump_rate_per_ha": "0", "nozzle": None, "pipe_size_mm": None, "spacing_label": None,
         "hydrocyclone_m3": "0", "gravel_filter_m3": "0", "head_unit_existing": False,
-        "pvc_existing": False,
+        "pvc_existing": False, "guided_cost": None, "fittings_amount": None,
     }
     base.update(kw)
     return base
@@ -300,8 +302,10 @@ def sprinkler_unit_cost(b: Book) -> dict[str, Any]:
 
 def sprinkler(b: Book, state: str) -> tuple[dict, dict]:
     calc = "Unit Cost & Calculation"
-    q = "Quotation SIS-CG" if state == "CG" else "Quotation SIS-UP"
-    nozzle = "brass" if "brass" in (b.text(q, "B14") or "").lower() else "plastic"
+    q = {"CG": "Quotation SIS-CG", "AP": "Quotation SIS-APMIP"}.get(state, "Quotation SIS-UP")
+    nozzle = "brass" if "brass" in (b.text(q, "B16" if state == "AP" else "B14") or "").lower() else "plastic"
+    if state == "AP":
+        return ap_sprinkler(b, q, calc, nozzle)
     if state == "CG":
         sys_ = system("gst_inclusive", "size_area_2d", "area_matrix", "incl_gst", [], ["field", "transport"])
         params = {"pipe_size_from_input": "1", "share_floor_zero": "1",
@@ -334,6 +338,90 @@ def sprinkler(b: Book, state: str) -> tuple[dict, dict]:
               "example": {"input": inp, "category": code,
                           "expected": expected(total, b.num(calc, "I6"), b.num(calc, f"J{row}"),
                                                b.num(calc, f"K{row}"))}}
+    return pub, sample
+
+
+# ── AP: sprinkler (excl GST, ceiling) and drip (the portal's figures) ───────
+
+_CEILING = re.compile(r"MIN\(MIN\(I6,I7\)\*I\d+,\s*([0-9.]+)\)")
+_LEADING = re.compile(r"^\s*([0-9][0-9,.]*)")
+
+
+def ap_sprinkler(b: Book, q: str, calc: str, nozzle: str) -> tuple[dict, dict]:
+    """FS-063 rule 6. 'Unit Cost & Calculation'!J8 = MIN(MIN(I6,I7)*I8,19000):
+    the lower of the unit cost and the cost before GST, times the percent, under a
+    ceiling; K8 = I7 - J8 + I28, the farmer paying half the GST (I28 = I23*2.5 %)."""
+    formula = str(b.f[calc]["J8"].value)
+    m = _CEILING.search(formula.replace(" ", ""))
+    assert m, formula
+    assert str(b.f[q]["I28"].value).replace(" ", "") == "=+I23*0.025", b.f[q]["I28"].value
+    sys_ = system("field_inspection_only", "size_area_2d", "area_matrix", "excl_gst", [],
+                  ["field", "transport"])
+    params = {"pipe_size_from_input": "1", "share_floor_zero": "0", "inspection_floor": "0",
+              "inspection_rate": "0", "gst_material_half": "0.025", "gst_service_half": "0.09",
+              "exact_area_match_required": "0", "subsidy_cap": s(Decimal(m.group(1))),
+              "farmer_gst_fraction": "0.5", "transport_flat": "1"}
+    cats = [cat("small", "Small farmer (50%)", int(b.num(calc, "I8") * 100), 1),
+            cat("other", "Other farmer (50%)", int(b.num(calc, "I9") * 100), 2)]
+    pub = {"scheme": "AP", "system_type": "sprinkler", "system": sys_, "parameters": params,
+           "categories": cats, "unit_cost": sprinkler_unit_cost(b)}
+    quantities = sprinkler_quantities(b, nozzle)
+    # J22 'Fix': transport is one flat charge per quotation, not per hectare (rule 6)
+    assert b.text(q, "F22") == "Fix", b.text(q, "F22")
+    quantities["rows"]["transport"] = dict.fromkeys(quantities["areas"], "1")
+    chosen = b.text(q, "H10")
+    row = next(r for r in (8, 9) if (b.text(calc, f"H{r}") or "").replace(" ", "")
+               == (chosen or "").replace(" ", ""))
+    inp = example_input(crops=[crop(b.num(q, "H8"), None, [])], nozzle=nozzle,
+                        pipe_size_mm=size_mm(b.raw(q, "H7")))
+    sample = {"component_rates": sprinkler_rates(b), "quantities": quantities,
+              "example": {"input": inp, "category": cats[row - 8]["code"],
+                          "expected": expected(b.num(q, "I25"), b.num(calc, "I6"),
+                                               b.num(calc, f"J{row}"), b.num(calc, f"K{row}"))}}
+    return pub, sample
+
+
+def _manual(b: Book, sheet: str, cell: str) -> Decimal:
+    """'134367 (MANUAL)': the number the portal printed, typed into the sheet."""
+    m = _LEADING.match(str(b.raw(sheet, cell)))
+    assert m, (cell, b.raw(sheet, cell))
+    return Decimal(m.group(1).replace(",", ""))
+
+
+def ap_drip(b: Book) -> tuple[dict, dict]:
+    """FS-063 rules 7 to 11. The portal's BOQ for one farmer: only the lines and the
+    figures are copied, never the name, ids, survey or Aadhaar (rule 15)."""
+    sh = "MIP_GET_VIEW_BOQDripSystem"
+
+    def block(rows: range, desc: str, size: str, rate: str, qty: str) -> list[dict[str, str]]:
+        out = []
+        for r in rows:
+            d, rv = b.text(sh, f"{desc}{r}"), b.raw(sh, f"{rate}{r}")
+            if not d or rv is None or isinstance(rv, str):
+                continue
+            label = " ".join(f"{d.strip()} {(b.text(sh, f'{size}{r}') or '').strip()}".split())
+            out.append({"description": label, "uom": "No.", "rate": s(b.num(sh, f"{rate}{r}")),
+                        "qty": s(b.num(sh, f"{qty}{r}", Decimal(0)))})
+        return out
+
+    head = block(range(23, 32), "D", "N", "W", "Z")
+    field = (block(range(36, 43), "F", "N", "W", "Z") + block(range(47, 55), "F", "N", "W", "Z")
+             + block(range(58, 64), "G", "O", "X", "AA"))
+    pct = _manual(b, sh, "AE77")
+    pub = {"scheme": "AP", "system_type": "drip",
+           "system": system("portal_manual", "none", "manual", "excl_gst", [], [], head=True),
+           "parameters": {"farmer_gst_fraction": "0.5", "subsidy_round_rupee": "1",
+                          "gst_inclusive_rate": "0.05"},
+           "categories": [cat(f"eligible_{s(pct)}", f"Eligible {s(pct)}% (portal)", int(pct), 1)]}
+    inp = example_input(crops=[crop(dec(b.raw(sh, "M5")), b.num(sh, "M10"), field)],
+                        head_lines=head, guided_cost=s(_manual(b, sh, "AE78")),
+                        fittings_amount=s(b.num(sh, "AF70")))
+    sample = {"component_rates": [], "quantities": None,
+              "example": {"input": inp, "category": pub["categories"][0]["code"],
+                          "expected": expected(b.num(sh, "L72"), _manual(b, sh, "AE78"),
+                                               _manual(b, sh, "K79"), _manual(b, sh, "AE79")),
+                          # the portal prints whole rupees (rule 4; the share is compared to the rupee)
+                          "rupees": True}}
     return pub, sample
 
 
@@ -434,7 +522,9 @@ def main() -> int:
     for key, rel in FILES.items():
         b = Book(data / rel)
         state, system_type = key.split("/")
-        if key == "UP/drip":
+        if key == "AP/drip":
+            pub, smp = ap_drip(b)
+        elif key == "UP/drip":
             pub, smp = up_drip(b)
         elif key == "UP/mini_sprinkler":
             pub, smp = up_mini(b)

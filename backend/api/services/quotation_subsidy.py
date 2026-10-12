@@ -110,7 +110,9 @@ async def block(db: AsyncSession, quotation_id: str,
                 quotation_total: Decimal) -> tuple[sch.QuotationSubsidy | None, list[str]]:
     r = (await db.execute(text(
         "SELECT scheme_code, system_type, category_code, category_name, category_pct, total_cost, "
-        "flat_charge, subsidy, farmer_share, as_of, formula_version FROM quotation_subsidy "
+        "flat_charge, subsidy, farmer_share, as_of, formula_version, "
+        "COALESCE(CAST(calculation->'total'->'blocks'->>'gst_paid_by_state' AS numeric), 0) "
+        "AS state_gst FROM quotation_subsidy "
         "WHERE quotation_id = CAST(:q AS uuid)"), {"q": quotation_id})).one_or_none()
     if r is None:
         return None, []
@@ -126,7 +128,8 @@ async def block(db: AsyncSession, quotation_id: str,
                                      pct=f"{Decimal(r.category_pct).normalize():f}"),
         total_cost=f"{cost.quantize(CENT):.2f}", flat_charge=f"{Decimal(r.flat_charge):.2f}",
         subsidy=f"{Decimal(r.subsidy):.2f}", farmer_share=f"{Decimal(r.farmer_share):.2f}",
-        as_of=r.as_of.isoformat(), formula_version=r.formula_version)
+        as_of=r.as_of.isoformat(), formula_version=r.formula_version,
+        gst_paid_by_state=f"{Decimal(r.state_gst):.2f}")
     return out, warnings
 
 
@@ -194,10 +197,13 @@ async def calculation(db: AsyncSession, quotation_id: str) -> dict[str, Any]:
 async def for_order(db: AsyncSession, quotation_id: str, lead_id: str) -> dict[str, Decimal]:
     """Rule 8: the order's subsidy from the quotation's block. Material is the
     calculation's total with any flat charge, so subsidy and share stay within it
-    whatever the order's lines come to (plan review S-3)."""
+    whatever the order's lines come to (plan review S-3). FS-063 rule 13: the
+    order's subsidy is what the government pays, so AP's state GST joins it and
+    material less subsidy is the farmer's share exactly."""
     r = (await db.execute(text(
-        "SELECT scheme_code, system_type, total_cost, flat_charge, subsidy, farmer_share "
-        "FROM quotation_subsidy WHERE quotation_id = CAST(:q AS uuid)"),
+        "SELECT scheme_code, system_type, total_cost, flat_charge, subsidy, farmer_share, "
+        "COALESCE(CAST(calculation->'total'->'blocks'->>'gst_paid_by_state' AS numeric), 0) "
+        "AS state_gst FROM quotation_subsidy WHERE quotation_id = CAST(:q AS uuid)"),
         {"q": quotation_id})).one_or_none()
     if r is None:
         raise ValidationFailed("The quotation has no subsidy calculation.",
@@ -210,4 +216,5 @@ async def for_order(db: AsyncSession, quotation_id: str, lead_id: str) -> dict[s
                                code="subsidy_scheme_changed",
                                fields={"quotation_ids": quotation_id})
     return {"material": Decimal(r.total_cost) + Decimal(r.flat_charge),
-            "subsidy": Decimal(r.subsidy), "farmer": Decimal(r.farmer_share)}
+            "subsidy": Decimal(r.subsidy) + Decimal(r.state_gst),
+            "farmer": Decimal(r.farmer_share)}
