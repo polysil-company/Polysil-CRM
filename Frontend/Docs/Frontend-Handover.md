@@ -361,7 +361,7 @@ Both kinds live beside the code, and every top-level `describe` starts with the 
    - Add a §9.1 row (area, Data IDs, endpoints).
    - Remove the feature from §9.3.
 3. **`Docs/Tested-Features.md`:**
-   - Add an "At a glance" row (module, story count, marks, `PR #PRNUM`).
+   - Add an "At a glance" row (module, story count, marks, `PR #109`).
    - Add a section of user stories with links to the screenshots.
    - Update "Not built yet".
    - Marks: 🧪 automated, 🌐 end to end, 👀 walked through, 🔌 checked on the real backend. **Never mark 🔌 without that check.**
@@ -372,7 +372,7 @@ Both kinds live beside the code, and every top-level `describe` starts with the 
      for b in $(git branch -r | grep -v HEAD); do git show $b:docs/Backend-Tasks.md 2>/dev/null | grep -o "BE-0[0-9][0-9]"; done | sort -u
      ```
 5. **Screenshots** in `Docs/screenshots/<module>/` (§4.9).
-6. Once the PR exists, replace `PR #PRNUM` with the real number (`sed -i 's/PR #PRNUM/PR #95/g' Docs/Tested-Features.md`), then commit and push that.
+6. Once the PR exists, replace `PR #109` with the real number (`sed -i 's/PR #109/PR #95/g' Docs/Tested-Features.md`), then commit and push that.
 
 ### 4.12 Final checks, commit, push, PR
 
@@ -565,7 +565,7 @@ These come from the 10 Oct staging walk: `backend/docs/handover/walk-fixes-10-oc
 
 Ship these as one or two `fix(...)` PRs ("Go-live fixes from the 10 Oct walk"), each finding named.
 
-**12 October:** done in PR #PRNUM (changelog `2026-10-12--fix--APP-006--go-live-fixes-from-the-10-oct-walk.md`). F-19 menus were checked against RBAC.md and left as they are. Still open: F-12 and the menu questions wait on the user; the "Deleted leads" view and the mock's product gap are optional.
+**12 October:** done in PR #109 (changelog `2026-10-12--fix--APP-006--go-live-fixes-from-the-10-oct-walk.md`). F-19 menus were checked against RBAC.md and left as they are. Still open: F-12 and the menu questions wait on the user; the "Deleted leads" view and the mock's product gap are optional.
 
 ### P1: backend pick-ups waiting on the frontend
 

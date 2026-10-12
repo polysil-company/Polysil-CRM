@@ -41,7 +41,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Users and roles](#users-and-roles) | 6 | 🧪 👀 | PR #90 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
-| [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #PRNUM |
+| [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
