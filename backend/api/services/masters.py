@@ -226,7 +226,8 @@ async def list_org_units(db: AsyncSession, *, q: str | None = None, parent_id: s
     c_ts, c_id = _decode_cursor(cursor) if cursor else (None, None)
     rows = (await db.execute(text("""
         SELECT id, created_at FROM org_unit
-         WHERE (CAST(:like AS text) IS NULL OR name ILIKE CAST(:like AS text))
+         WHERE id <> CAST(:system AS uuid)
+           AND (CAST(:like AS text) IS NULL OR name ILIKE CAST(:like AS text))
            AND (CAST(:parent AS uuid) IS NULL OR parent_id = CAST(:parent AS uuid))
            AND (CAST(:open AS boolean) IS NULL
                 OR (deleted_at IS NULL) = CAST(:open AS boolean))
@@ -234,7 +235,8 @@ async def list_org_units(db: AsyncSession, *, q: str | None = None, parent_id: s
                 OR (created_at, id) < (CAST(:c_ts AS timestamptz), CAST(:c_id AS uuid)))
          ORDER BY created_at DESC, id DESC LIMIT :lim"""),
         {"like": _contains(q) if q else None, "parent": parent_id, "open": is_open,
-         "c_ts": c_ts, "c_id": c_id, "lim": limit + 1})).all()
+         "c_ts": c_ts, "c_id": c_id, "lim": limit + 1,
+         "system": identity.SYSTEM_ORG_UNIT_ID})).all()
     rows, next_cursor = _page(rows, limit)
     data = await _ou_rows(db, [str(r.id) for r in rows])
     return OrgUnitPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor))
@@ -248,6 +250,8 @@ async def get_org_unit(db: AsyncSession, org_unit_id: str) -> OrgUnit:
 
 
 async def _open_office(db: AsyncSession, org_unit_id: str, field: str = "parent_id") -> None:
+    if org_unit_id == identity.SYSTEM_ORG_UNIT_ID:
+        raise ValidationFailed(fields={field: "not found or closed"})
     ok = (await db.execute(text(
         "SELECT 1 FROM org_unit WHERE id = CAST(:o AS uuid) AND deleted_at IS NULL"),
         {"o": org_unit_id})).first()

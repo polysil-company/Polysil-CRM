@@ -86,6 +86,10 @@ def normalise_email(raw: str) -> str:
     return s
 
 
+# The office of the System principal (migration 005). It carries scheduled jobs and
+# the website intake, never a person, so it is not listed and not assignable.
+SYSTEM_ORG_UNIT_ID = "a1c3b0dd-6f0c-5f0e-8c1c-1b4f2f6a9e51"
+
 PASSWORD_MIN = 12
 PASSWORD_MAX = 128   # Argon2 is deliberately slow; an unbounded input is a lever
 

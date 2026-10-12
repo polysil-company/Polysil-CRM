@@ -370,6 +370,8 @@ async def _role_for_partner(db: AsyncSession, partner_id: str) -> str:
 
 
 async def _open_office(db: AsyncSession, org_unit_id: str) -> None:
+    if org_unit_id == identity.SYSTEM_ORG_UNIT_ID:
+        raise ValidationFailed(fields={"org_unit_id": "not found or closed"})
     ok = (await db.execute(text(
         "SELECT 1 FROM org_unit WHERE id = CAST(:o AS uuid) AND deleted_at IS NULL"),
         {"o": org_unit_id})).first()
