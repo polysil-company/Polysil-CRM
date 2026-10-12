@@ -13,7 +13,7 @@ Two gates matter here and are worth stating in one place:
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, status
 from fastapi.responses import JSONResponse
@@ -60,11 +60,11 @@ ListId = Annotated[str, Path(pattern=UUID_RE)]
 @price_lists.get("", response_model=PriceListPage)
 async def list_price_lists(
     db: DbSession,
-    status_: Annotated[str | None, Query(alias="status",
-                                         description="draft or published.")] = None,
+    status_: Annotated[Literal["draft", "published"] | None,
+                       Query(alias="status", description="draft or published.")] = None,
     state_territory_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
-    channel_tier: Annotated[str | None, Query(
-        description="distributor, dealer, sub_dealer or farmer.")] = None,
+    channel_tier: Annotated[Literal["distributor", "dealer", "sub_dealer", "farmer"] | None,
+                            Query(description="distributor, dealer, sub_dealer or farmer.")] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> PriceListPage:

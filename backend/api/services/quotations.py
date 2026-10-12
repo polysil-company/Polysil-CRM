@@ -814,7 +814,12 @@ async def create_quotation(db: AsyncSession, caller: Caller, body: sch.Quotation
             code="lead_not_qualified", fields={"lead_stage": stage})
     lead = await _lead_defaults(db, body.lead_id)
 
-    sales_type = body.sales_type or domain.INQUIRY_TO_SALES_TYPE[lead.inquiry_type]
+    sales_type = body.sales_type or domain.INQUIRY_TO_SALES_TYPE.get(lead.inquiry_type)
+    if sales_type is None:
+        # a dealership enquiry is a prospective dealer, not a sale: nothing to default to
+        raise ValidationFailed(f"A {lead.inquiry_type} enquiry has no sales type to quote; "
+                               "name one.", code="sales_type_required",
+                               fields={"sales_type": "required for this enquiry"})
     _check_sales_type(sales_type)
     partner_id = body.partner_id if body.partner_given else (
         str(lead.assigned_partner_id) if lead.assigned_partner_id else None)

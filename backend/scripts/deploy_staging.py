@@ -68,10 +68,14 @@ INCLUDE = [
     # into the one-shot container, never baked into an image.
     "data/boq",
     "data/masters",
+    # FS-056: the CG, RJ and UP scheme tables and price lists, read by
+    # load_state_masters (the samples file is withheld from the shared repo)
+    "tests/fixtures/subsidy/states.json",
+    "tests/fixtures/subsidy/states_samples.json",
 ]
 
 # Replaced wholesale on every deploy, so a file deleted here disappears there.
-REPLACE = ["api", "worker", "scripts", "data", "docs"]
+REPLACE = ["api", "worker", "scripts", "data", "docs", "tests"]
 
 EXCLUDE_NAMES = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".env"}
 EXCLUDE_SUFFIXES = (".pyc", ".pyo", ".key", ".pem")
@@ -339,6 +343,14 @@ def seed(env: dict[str, str], *, masters: bool = True, showcase: bool = True) ->
                                 "-c", SEED_SHOWCASE, profile="tools"))
 
 
+def load_states(env: dict[str, str]) -> None:
+    """FS-056: load or revise the CG, RJ and UP subsidy schemes. A re-run on the same
+    date writes nothing; pass a later --effective-from to the script to revise."""
+    guard(env)
+    run_remote(env, compose(env, "run", "--rm", "tools", "python", "scripts/load_state_masters.py",
+                            profile="tools"))
+
+
 def health(env: dict[str, str], *, attempts: int = 30) -> bool:
     """Ask the box, not the container: this is the path an SSH tunnel takes."""
     port = env["API_HOST_PORT"]
@@ -359,6 +371,15 @@ def status(env: dict[str, str]) -> None:
     stats = ("docker stats --no-stream --format "
              "'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}'")
     run_remote(env, stats)
+    # the bell's trigger logs a failed notification and lets the business write
+    # through; this is the one place anyone reads that log (release review C)
+    sql = ("SELECT count(*) AS last_day, max(created_at) AS latest FROM notification_failure "
+           "WHERE created_at > now() - interval '1 day';")
+    exec_psql = ("docker exec -i " + shlex.quote(env["PG_CONTAINER"]) +
+                 " psql -q -U " + shlex.quote(env["PG_SUPERUSER"]) +
+                 " -d " + shlex.quote(env["DB_NAME"]) + " -c " + shlex.quote(sql))
+    print("  notification failures in the last day:")
+    run_remote(env, exec_psql, check=False)
 
 
 def deploy(env: dict[str, str], *, with_seed: bool) -> None:
@@ -455,7 +476,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("step", nargs="?", default="deploy",
                         choices=["provision", "deploy", "sync", "build", "up", "migrate",
-                                 "seed", "templates", "requeue-pdfs", "status", "logs", "down",
+                                 "seed", "load-states", "templates", "requeue-pdfs", "status",
+                                 "logs", "down",
                                  "frontend-provision", "frontend", "frontend-caddy"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
     parser.add_argument("--seed", action="store_true", help="deploy: run the seeds too")
@@ -482,6 +504,8 @@ def main(argv: list[str] | None = None) -> int:
         migrate(env)
     elif args.step == "seed":
         seed(env, masters=not args.no_masters, showcase=not args.no_showcase)
+    elif args.step == "load-states":
+        load_states(env)
     elif args.step == "templates":
         sync_templates(env)
     elif args.step == "requeue-pdfs":

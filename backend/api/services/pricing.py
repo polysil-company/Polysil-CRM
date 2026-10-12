@@ -856,6 +856,7 @@ async def list_price_lists(db: AsyncSession, *, status: str | None, state_territ
     rows = (await db.execute(text(_LIST_SELECT.replace(
         "SELECT l.id::text AS id", "SELECT count(*) OVER () AS total, l.id::text AS id", 1) + """
 WHERE l.deleted_at IS NULL
+  AND (l.status = 'published' OR (SELECT app_current_partner()) IS NULL)
   AND (CAST(:st AS text) IS NULL OR l.status = CAST(:st AS price_list_status))
   AND (CAST(:state AS text) IS NULL OR l.state_territory_id = CAST(:state AS uuid))
   AND (CAST(:tier AS text) IS NULL OR l.channel_tier = CAST(:tier AS channel_tier))
@@ -958,11 +959,40 @@ async def patch_price_list(db: AsyncSession, list_id: str,
         raise ValidationFailed(code="effective_to_not_forward", fields={
             "effective_to": "Must not be in the past: closing a list retrospectively would "
                             "change what past documents were priced from."})
-    await db.execute(text(
-        "UPDATE price_list SET effective_to = CAST(:d AS date), "
-        "updated_by = app_current_user_id() WHERE id = CAST(:id AS uuid)"),
-        {"d": body.effective_to, "id": list_id})
+    if row.effective_to is not None and body.effective_to > row.effective_to:
+        # release review B M-3: a later end re-opens dates a successor may price
+        later = (await db.execute(text(
+            "SELECT name FROM price_list WHERE id <> CAST(:id AS uuid) AND status = 'published' "
+            "AND deleted_at IS NULL AND state_territory_id IS NOT DISTINCT FROM CAST(:s AS uuid) "
+            "AND channel_tier IS NOT DISTINCT FROM CAST(:t AS channel_tier) "
+            "AND daterange(effective_from, effective_to, '[)') && "
+            "    daterange(CAST(:f AS date), CAST(:to AS date), '[)') LIMIT 1"),
+            {"id": list_id, "s": row.state_territory_id, "t": row.channel_tier,
+             "f": row.effective_to, "to": body.effective_to})).scalar_one_or_none()
+        if later is not None:
+            raise ConflictError(f"{later!r} prices those dates; a list cannot reach over it.",
+                                code="price_list_overlaps",
+                                fields={"effective_to": "overlaps a published list"})
+    try:
+        async with db.begin_nested():
+            await db.execute(text(
+                "UPDATE price_list SET effective_to = CAST(:d AS date), "
+                "updated_by = app_current_user_id() WHERE id = CAST(:id AS uuid)"),
+                {"d": body.effective_to, "id": list_id})
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) == "23P01" or "23P01" in str(exc.orig):
+            raise ConflictError("Another published list prices those dates.",
+                                code="price_list_overlaps",
+                                fields={"effective_to": "overlaps a published list"}) from exc
+        raise
     return await get_price_list(db, list_id)
+
+
+async def _published_or_staff(db: AsyncSession, row: Any) -> None:
+    """Release review B M-1: a dealer reads a list once it is published, not its draft."""
+    if row.status != "published" and (await db.execute(text(
+            "SELECT app_current_partner() IS NOT NULL"))).scalar_one():
+        raise NotFoundError("No such price list.")
 
 
 async def list_items(db: AsyncSession, list_id: str, *, q: str | None, unpriced: bool,
@@ -973,7 +1003,7 @@ async def list_items(db: AsyncSession, list_id: str, *, q: str | None, unpriced:
     the screen's job is filling the gaps: "which of the 1,092 has no rate yet" is
     the question, and a list of what is already there cannot answer it.
     """
-    await _raw_list(db, list_id)
+    await _published_or_staff(db, await _raw_list(db, list_id))
     params: dict[str, Any] = {"id": list_id, "q": _like(q) if q else None,
                               "unpriced": unpriced, "limit": limit, "offset": (page - 1) * limit}
     rows = (await db.execute(text(r"""
@@ -1124,6 +1154,14 @@ async def publish(db: AsyncSession, list_id: str, body: sch.PublishRequest) -> s
                 f"covering the rest of that period first.",
                 code="price_list_gap",
                 fields={"effective_to": f"would strand the scope after {row.effective_to}"})
+        if row.effective_from < today_ist():
+            # release review B H-1: closing the predecessor before today re-prices what
+            # was quoted from it since; patch refuses the same thing (effective_to)
+            raise ConflictError(
+                f"{other.name!r} has priced documents since {row.effective_from}. Start this list "
+                f"today or later; closing the other one in the past would change those prices.",
+                code="effective_from_in_past",
+                fields={"effective_from": "today or later, to supersede a list in force"})
         await db.execute(text(
             "UPDATE price_list SET effective_to = CAST(:d AS date), "
             "updated_by = app_current_user_id() WHERE id = CAST(:id AS uuid)"),

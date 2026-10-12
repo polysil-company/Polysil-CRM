@@ -283,6 +283,18 @@ async def test_an_unbuilt_sales_type_names_its_question(
     assert "6.11" in r.json()["error"]["message"]
 
 
+async def test_a_dealership_lead_names_its_sales_type(
+        client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue) -> None:
+    """Release review A-1: no default for a dealership enquiry was a KeyError, a 500."""
+    h = await _auth(client, quoter)
+    lead = await _qualified_lead(client, h, qenv, inquiry_type="dealership")
+    body = _create_body(lead["id"], catalogue)
+    del body["sales_type"]
+    r = await client.post(f"{V1}/quotations", headers={**h, **_key()}, json=body)
+    assert r.status_code == 422, r.text
+    assert r.json()["error"]["code"] == "sales_type_required"
+
+
 async def test_a_stale_preview_id_is_refused_with_the_new_figures(
         client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue) -> None:
     """Rule 4: the ids the preview showed are compared after re-resolution."""

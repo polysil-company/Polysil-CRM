@@ -88,3 +88,16 @@ def test_a_bare_date_is_a_date_and_a_time_stays_a_time(model: object) -> None:
     assert parse("2026-10-02") == dt.date(2026, 10, 2)  # type: ignore[operator]
     assert parse("2026-10-02T00:00:00+05:30") == dt.datetime(  # type: ignore[operator]
         2026, 10, 2, tzinfo=d.IST), "midnight given with a zone stays midnight"
+
+
+def test_a_far_filter_date_is_held_to_three_years_and_a_far_planner_day_is_refused() -> None:
+    """Release review C M-1: 9999-12-31 as "no end" overflowed into a 500."""
+    from api.domain import tasks as td
+    today = dt.date(2026, 10, 12)
+    assert td.clamp_filter_day(dt.date(9999, 12, 31), today) == today + td.FILTER_REACH
+    assert td.clamp_filter_day(dt.date(1, 1, 1), today) == today - td.FILTER_REACH
+    assert td.clamp_filter_day(today, today) == today
+    td.day_bounds(td.clamp_filter_day(dt.date(9999, 12, 31), today))       # no overflow
+    assert td.planner_day_problem(dt.date(9999, 12, 31), today) is not None
+    assert td.planner_day_problem(today, today) is None
+

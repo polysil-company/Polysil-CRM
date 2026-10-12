@@ -606,3 +606,27 @@ async def test_a_list_cursor_with_a_bad_id_is_a_422(client: httpx.AsyncClient, s
     for path in ("/tasks", "/complaints", "/leads"):
         r = await client.get(f"{V1}{path}", headers=h, params={"cursor": cursor})
         assert r.status_code == 422 and "cursor" in r.json()["error"]["fields"], (path, r.text)
+
+
+async def test_far_dates_are_held_or_refused_not_a_500(client: httpx.AsyncClient, shop: Shop) -> None:
+    """Release review C M-1: 9999-12-31 as "no end" is a list filter; as a planner day it is a 422."""
+    h = await _as(client, shop, "field_officer")
+    r = await client.get(f"{V1}/tasks", headers=h, params={"due_to": "9999-12-31"})
+    assert r.status_code == 200, r.text
+    r = await client.get(f"{V1}/tasks", headers=h, params={"due_from": "0001-01-01"})
+    assert r.status_code == 200, r.text
+    r = await client.get(f"{V1}/planner", headers=h, params={"date": "9999-12-31"})
+    assert r.status_code == 422 and "date" in r.json()["error"]["fields"], r.text
+
+
+async def test_minutes_with_an_unknown_task_name_the_task(client: httpx.AsyncClient, shop: Shop) -> None:
+    """Release review C M-3: the wrong id was reported as the lead."""
+    h = await _as(client, shop, "field_officer")
+    lead = await _lead(client, shop, h)
+    r = await client.post(f"{V1}/minutes", headers={**h, **_key()}, json={
+        "lead_id": lead, "task_id": "00000000-0000-4000-8000-000000000000",
+        "held_at": dt.datetime.now(domain.IST).isoformat(), "notes": "Met"})
+    assert r.status_code in (404, 422), r.text
+    if r.status_code == 422:
+        assert "task_id" in r.json()["error"]["fields"], r.text
+

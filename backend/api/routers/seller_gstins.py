@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from api.deps import Claims, DbSession, IdemKey, require
 from api.idempotency import payload_digest, run_idempotent
 from api.schemas.auth import Envelope, ErrorResponse
+from api.schemas.leads import UUID_RE
 from api.schemas.seller_gstins import Lut, LutCreate, SellerGstin
 from api.services import seller_gstins as service
 
@@ -32,7 +33,7 @@ _ERRORS: dict[int | str, dict[str, object]] = {
     422: {"model": ErrorResponse, "description": "`lut_dates`: the range crosses 31 March or ends before it starts; or a field."},
 }
 _EDIT = [Depends(require("products", "edit"))]
-Id = Annotated[str, Path(pattern=r"^[0-9a-fA-F-]{36}$")]
+Id = Annotated[str, Path(pattern=UUID_RE)]
 
 
 @router.get("", response_model=Envelope[list[SellerGstin]], responses=_ERRORS,

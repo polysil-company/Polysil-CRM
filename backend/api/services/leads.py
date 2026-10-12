@@ -571,6 +571,9 @@ async def check_lead_territory(db: AsyncSession, territory_id: str,
     level = (await db.execute(text(
         "SELECT level::text FROM territory WHERE id = CAST(:t AS uuid)"),
         {"t": territory_id})).scalar_one_or_none()
+    if level is None:
+        # an unknown id failed later on the foreign key, a 500 (release review A)
+        raise ValidationFailed(fields={field: "not a known territory"})
     if level == "state":
         raise ValidationFailed(fields={field: "a district, taluka or village"})
 
