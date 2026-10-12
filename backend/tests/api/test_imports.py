@@ -359,13 +359,30 @@ async def test_rates_fill_a_draft_list_and_merge_keeps_the_others(
     shop = imported.shop
     h = await endpoints._as(client, shop, "admin_sales")
     list_id = await _draft_list(client, h)
+    # CI has no product master (client data stays out of the shared repo), so the
+    # second product is made here rather than picked from the catalogue
+    other = f"IMPORT OTHER {uuid.uuid4().hex[:8].upper()}"
     s = sessions()
-    other = (await s.execute(text(
-        "SELECT description::text FROM product WHERE is_active AND deleted_at IS NULL "
-        "AND id <> CAST(:p AS uuid) ORDER BY description LIMIT 1"),
-        {"p": shop.product})).scalar_one()
+    other_id = str((await s.execute(text(
+        "INSERT INTO product (description, product_category_id, quotation_category, uom_id) "
+        "SELECT CAST(:d AS citext), product_category_id, quotation_category, uom_id "
+        "FROM product WHERE id = CAST(:p AS uuid) RETURNING id"),
+        {"d": other, "p": shop.product})).scalar_one())
+    await s.commit()
     await s.close()
+    try:
+        await _rates_round_trip(client, h, imported, list_id, other)
+    finally:
+        s = sessions()
+        await s.execute(text("DELETE FROM price_list_item WHERE product_id = CAST(:p AS uuid)"),
+                        {"p": other_id})
+        await s.execute(text("DELETE FROM product WHERE id = CAST(:p AS uuid)"), {"p": other_id})
+        await s.commit()
+        await s.close()
 
+
+async def _rates_round_trip(client: httpx.AsyncClient, h: dict[str, str], imported: Fx,
+                            list_id: str, other: str) -> None:
     first = (await _upload(client, h, "price_list_items",
                            _csv([["Product", "Price"], [imported.product_description, "1,234.50"],
                                  [other, "10"]]), name="r.csv", target_id=list_id)).json()["data"]
