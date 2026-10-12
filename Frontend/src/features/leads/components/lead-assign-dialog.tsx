@@ -69,6 +69,21 @@ function sameChoice(a: Choice, b: Choice): boolean {
   return a.id === b.id;
 }
 
+/**
+ * The text the field holds for a choice. "Nobody" holds none, so its name shows as the
+ * placeholder and typing starts a fresh search: it used to search `q=No channel partnerBhavesh`
+ * (walk F-9).
+ */
+function choiceInputText(choice: Choice): string {
+  return choice.id === "" ? "" : choice.name;
+}
+
+/** Filters the list as you type, by name; "nobody" stays on offer whatever is typed. */
+function matchesChoice(choice: Choice, query: string): boolean {
+  const term = query.trim().toLowerCase();
+  return choice.id === "" || term === "" || choice.name.toLowerCase().includes(term);
+}
+
 function ownerOf(lead: Lead): Choice {
   return lead.owner
     ? { id: lead.owner.id, name: lead.owner.name, detail: lead.ownerOrgUnit.name }
@@ -280,7 +295,9 @@ function OwnerField({
           items={[NO_OWNER, ...people.filter((person) => person.id !== "")]}
           value={value}
           onChange={onChange}
-          placeholder={query.isPending ? "Loading people…" : "Search a person"}
+          placeholder={
+            query.isPending ? "Loading people…" : value.id === "" ? value.name : "Search a person"
+          }
           disabled={query.isPending || query.isError}
           invalid={error !== null}
           describedBy={error === null ? "assign-owner-description" : "assign-owner-error"}
@@ -363,7 +380,7 @@ function PartnerField({
         value={value}
         onChange={onChange}
         onSearch={setSearch}
-        placeholder="Dealer name, code or contact person"
+        placeholder={value.id === "" ? value.name : "Dealer name, code or contact person"}
         invalid={error !== null}
         describedBy={error === null ? "assign-partner-description" : "assign-partner-error"}
         emptyText={term === "" ? "No partners in your area." : `No partner matches “${term}”.`}
@@ -422,9 +439,9 @@ function ChoicePicker({
           onSearch?.(next);
         }
       }}
-      itemToStringLabel={(choice: Choice) => choice.name}
+      itemToStringLabel={choiceInputText}
       isItemEqualToValue={sameChoice}
-      {...(onSearch === undefined ? {} : { filter: null })}
+      filter={onSearch === undefined ? matchesChoice : null}
       disabled={disabled}
     >
       <ComboboxInput

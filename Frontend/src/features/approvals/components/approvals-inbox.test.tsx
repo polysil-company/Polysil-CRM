@@ -112,6 +112,8 @@ describe("[APPR-001] ApprovalsInbox", () => {
 
     expect(await screen.findByText("Approved", { selector: "[data-title]" })).toBeInTheDocument();
     expect(mockDb.approvalSteps.some((step) => step.decision === "approve")).toBe(true);
+    // F-13 · The dialog goes at once, so the next row takes the next click.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("closes the dialog and refreshes when someone decided the step first", async () => {

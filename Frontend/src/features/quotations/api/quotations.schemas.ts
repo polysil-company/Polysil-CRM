@@ -296,6 +296,8 @@ const approvalWireSchema = z.object({
       by: userRef.nullish(),
       remark: z.string().nullish(),
       decided_at: isoDateTime.nullish(),
+      /** Nobody of the step's role can decide it; a higher manager does (walk F-11). */
+      stalled: z.boolean().nullish(),
     }),
   ),
   request_remark: z.string().nullish(),
@@ -441,6 +443,7 @@ export const quotationSchema = quotationWireSchema.transform((wire) => ({
             by: toUser(step.by ?? null),
             remark: step.remark ?? null,
             decidedAt: step.decided_at ?? null,
+            stalled: step.stalled === true,
           })),
         },
   createdAt: wire.created_at,

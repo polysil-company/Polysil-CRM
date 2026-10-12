@@ -4,6 +4,7 @@ import type { ModulePermission } from "@/lib/auth/permissions";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 
 import {
+  canOpenPath,
   findActiveNavItem,
   findPageHeading,
   isNavItemActive,
@@ -92,7 +93,7 @@ describe("[APP-005] page headings in the top bar", () => {
   it("uses the section's title, with its description only on the section's own page", () => {
     expect(findPageHeading("/dashboard")).toEqual({
       title: "Dashboard",
-      description: "Your territory at a glance.",
+      description: "Leads, quotations, orders and service at a glance.",
     });
     expect(findPageHeading("/leads/lead-10001")).toEqual({ title: "Leads" });
     expect(findPageHeading("/unknown")).toEqual({ title: "Polysil CRM" });
@@ -105,5 +106,35 @@ describe("[APP-005] page headings in the top bar", () => {
     for (const item of built) {
       expect(item.description?.length ?? 0).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("[APP-006] route guards", () => {
+  const dealer = mockPermissionsFor("dealer");
+  const admin = mockPermissionsFor("admin");
+
+  it("keeps a partner user out of the staff pages they could open by URL (F-8)", () => {
+    for (const path of ["/approval-limits", "/qr-codes", "/dispatch", "/tasks", "/messages"]) {
+      expect(canOpenPath(path, dealer, "partner_user")).toBe(false);
+    }
+    expect(canOpenPath("/leads/duplicates", dealer, "partner_user")).toBe(false);
+  });
+
+  it("lets a partner user open their own pages, and the pages under them", () => {
+    expect(canOpenPath("/leads", dealer, "partner_user")).toBe(true);
+    expect(canOpenPath("/leads/lead-10001", dealer, "partner_user")).toBe(true);
+    expect(canOpenPath("/sales-orders", dealer, "partner_user")).toBe(true);
+    expect(canOpenPath("/dashboard", dealer, "partner_user")).toBe(true);
+  });
+
+  it("lets staff with the permission in, and keeps out staff without it", () => {
+    expect(canOpenPath("/approval-limits", admin, "staff")).toBe(true);
+    expect(canOpenPath("/leads/duplicates", admin, "staff")).toBe(true);
+    expect(canOpenPath("/approval-limits", mockPermissionsFor("employee"), "staff")).toBe(false);
+    expect(canOpenPath("/approvals", mockPermissionsFor("employee"), "staff")).toBe(false);
+  });
+
+  it("leaves pages outside the nav map open", () => {
+    expect(canOpenPath("/account", [], "partner_user")).toBe(true);
   });
 });

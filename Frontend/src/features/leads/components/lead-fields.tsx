@@ -284,18 +284,18 @@ export function LeadFields({
         id={`${idPrefix}-land`}
         label="Land"
         optional
-        description="In acres, e.g. 4.5."
-        error={errors.landAcres?.message}
+        description="In hectares, e.g. 1.8."
+        error={errors.landHectares?.message}
       >
         {(aria) => (
           <InputGroup>
             <InputGroupInput
               inputMode="decimal"
-              placeholder="4.5"
+              placeholder="1.8"
               {...aria}
-              {...form.register("landAcres")}
+              {...form.register("landHectares")}
             />
-            <InputGroupAddon align="end">acres</InputGroupAddon>
+            <InputGroupAddon align="end">hectares</InputGroupAddon>
           </InputGroup>
         )}
       </FormField>

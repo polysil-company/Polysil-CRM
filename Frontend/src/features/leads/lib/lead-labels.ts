@@ -6,6 +6,7 @@ import type {
   LeadPriority,
   LeadStage,
 } from "@/features/leads/api/leads.schemas";
+import { EMPTY_VALUE, formatNumber } from "@/lib/format";
 
 export const LEAD_STAGE_LABELS: Readonly<Record<LeadStage, string>> = {
   new: "New",
@@ -114,4 +115,22 @@ export function formatAcres(acres: string): string {
     return acres;
   }
   return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+/** A lead's score as the backend means it since the 10 Oct walk: a whole number. "28.00" → "28". */
+export function formatScore(score: string): string {
+  return formatNumber(Number(score));
+}
+
+/**
+ * "1.82 hectares (4.5 acres)": the client measures land in hectares (FS-052); acres stay
+ * beside them for the people used to them. Either alone when only one is known.
+ */
+export function landText(lead: Pick<Lead, "landHectares" | "landAcres">): string {
+  const hectares = lead.landHectares === null ? null : `${formatAcres(lead.landHectares)} hectares`;
+  const acres = lead.landAcres === null ? null : `${formatAcres(lead.landAcres)} acres`;
+  if (hectares !== null && acres !== null) {
+    return `${hectares} (${acres})`;
+  }
+  return hectares ?? acres ?? EMPTY_VALUE;
 }

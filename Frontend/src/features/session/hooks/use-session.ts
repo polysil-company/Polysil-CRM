@@ -24,3 +24,13 @@ export function useCanApprove(): boolean {
   const { data } = useSession();
   return data !== undefined && canApprove(data.permissions);
 }
+
+/**
+ * Whether the signed-in user is staff, not a channel partner's user. False while loading, so
+ * a staff-only control never flashes for a partner. For what the backend keeps from partners
+ * whatever their permissions say: QR code writes, lead scores, duplicate review (walk F-1, F-8).
+ */
+export function useIsStaff(): boolean {
+  const { data } = useSession();
+  return data?.userType === "staff";
+}

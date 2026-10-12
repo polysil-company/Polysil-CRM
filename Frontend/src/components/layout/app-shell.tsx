@@ -9,6 +9,7 @@ import { AppHeader } from "./app-header";
 import { AppSidebar } from "./app-sidebar";
 import { CommandMenu } from "./command-menu";
 import { CommandMenuContext } from "./command-menu-context";
+import { RouteGuard } from "./route-guard";
 
 /**
  * APP-001 · The signed-in application frame: sidebar on the canvas, content in
@@ -50,7 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }): React.JSX
               tabIndex={-1}
               className="min-h-0 flex-1 scrollbar-thin overflow-y-auto outline-none"
             >
-              {children}
+              <RouteGuard>{children}</RouteGuard>
             </main>
           </div>
         </div>

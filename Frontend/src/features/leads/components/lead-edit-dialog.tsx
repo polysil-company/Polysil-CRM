@@ -57,7 +57,7 @@ const PATCH_KEYS = [
   "source",
   "estimated_value",
   "crops",
-  "land_acres",
+  "land_hectares",
 ] as const satisfies readonly (keyof PatchLeadRequest)[];
 
 function formValuesOf(lead: Lead): CreateLeadFormValues {
@@ -72,7 +72,7 @@ function formValuesOf(lead: Lead): CreateLeadFormValues {
     source: lead.source,
     estimatedValue: lead.estimatedValue === null ? "" : String(Number(lead.estimatedValue)),
     crops: lead.crops.map((crop) => crop.code),
-    landAcres: lead.landAcres === null ? "" : String(Number(lead.landAcres)),
+    landHectares: lead.landHectares === null ? "" : String(Number(lead.landHectares)),
     note: "",
   };
 }

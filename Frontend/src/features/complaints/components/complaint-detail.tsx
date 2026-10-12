@@ -26,9 +26,10 @@ import {
   SEVERITY_BADGE,
   SEVERITY_LABELS,
 } from "@/features/complaints/lib/complaint-labels";
+import { formatQuantity } from "@/features/quotations/lib/quotation-labels";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
-import { formatDate, formatDateTime, formatIndianPhone, formatNumber } from "@/lib/format";
+import { formatDate, formatDateTime, formatIndianPhone } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { AttachmentsCard } from "./attachments-card";
@@ -294,9 +295,10 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
                       <span
                         className={cn(Number(line.defectiveQty) > 0 && "font-semibold text-danger")}
                       >
-                        {formatNumber(Number(line.defectiveQty), 2)} defective
+                        {formatQuantity(line.defectiveQty)} defective
                       </span>{" "}
-                      of {formatNumber(Number(line.suppliedQty), 2)} {line.uom ?? ""}
+                      {/* "10 defective of 100 NOS", not "10.00 … 100.00" (walk F-19). */}
+                      of {formatQuantity(line.suppliedQty)} {line.uom ?? ""}
                     </p>
                   </li>
                 ))}

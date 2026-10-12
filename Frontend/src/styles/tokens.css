@@ -783,7 +783,9 @@
 
 /* Directional page transitions — React <ViewTransition> + <Link transitionTypes>.
  * nav-forward: deeper into the app (list → detail, down the sidebar).
- * nav-back:    back out (detail → list, up the sidebar). */
+ * nav-back:    back out (detail → list, up the sidebar).
+ * Only the page being left animates, over the new one: a captured element takes no clicks
+ * until its transition ends, so the arriving page is never captured (walk F-13). */
 
 ::view-transition {
   pointer-events: none;
@@ -800,12 +802,6 @@
   to {
     opacity: 0;
     filter: blur(3px);
-  }
-}
-
-@keyframes vt-slide-in {
-  from {
-    translate: var(--vt-offset) 0;
   }
 }
 
@@ -828,25 +824,11 @@
     var(--duration-page-move) var(--ease-in-out) both vt-slide-out;
 }
 
-::view-transition-new(.nav-forward) {
-  --vt-offset: var(--page-offset);
-  animation:
-    var(--duration-page-enter) var(--ease-out) var(--duration-page-exit) both vt-fade-in,
-    var(--duration-page-move) var(--ease-in-out) both vt-slide-in;
-}
-
 ::view-transition-old(.nav-back) {
   --vt-offset: var(--page-offset);
   animation:
     var(--duration-page-exit) var(--ease-out) both vt-fade-out,
     var(--duration-page-move) var(--ease-in-out) both vt-slide-out;
-}
-
-::view-transition-new(.nav-back) {
-  --vt-offset: calc(var(--page-offset) * -1);
-  animation:
-    var(--duration-page-enter) var(--ease-out) var(--duration-page-exit) both vt-fade-in,
-    var(--duration-page-move) var(--ease-in-out) both vt-slide-in;
 }
 
 /* Suspense reveal: the skeleton fades out, content rises in. */

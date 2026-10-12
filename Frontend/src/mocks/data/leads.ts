@@ -105,9 +105,9 @@ const CROP_ROWS = mockLookupRows("crops");
  * BE-003 · A lead's crops and land, from its position rather than the random sequence, so
  * every other seeded figure stays as it was. Every fifth lead has none recorded.
  */
-function cropsAndLandFor(index: number): Pick<LeadWire, "crops" | "land_acres"> {
+function cropsAndLandFor(index: number): Pick<LeadWire, "crops" | "land_acres" | "land_hectares"> {
   if (index % 5 === 4) {
-    return { crops: [], land_acres: null };
+    return { crops: [], ...mockLand(null) };
   }
   const count = 1 + (index % 3);
   const crops = Array.from(
@@ -116,7 +116,20 @@ function cropsAndLandFor(index: number): Pick<LeadWire, "crops" | "land_acres"> 
   )
     .filter((row) => row !== undefined)
     .map((row) => ({ code: row.code, name: row.name, is_active: true }));
-  return { crops, land_acres: (1.5 + (index % 12) * 0.75).toFixed(2) };
+  return { crops, ...mockLand((0.6 + (index % 12) * 0.3).toFixed(2)) };
+}
+
+/** Acres in a hectare, as the backend converts (FS-052). */
+const ACRES_PER_HECTARE = 2.47105;
+
+/** FS-052 · The backend stores hectares and returns acres beside them, converted. */
+export function mockLand(hectares: string | null): Pick<LeadWire, "land_acres" | "land_hectares"> {
+  if (hectares === null) return { land_hectares: null, land_acres: null };
+  const value = Number(hectares);
+  return {
+    land_hectares: value.toFixed(2),
+    land_acres: (value * ACRES_PER_HECTARE).toFixed(2),
+  };
 }
 
 /**

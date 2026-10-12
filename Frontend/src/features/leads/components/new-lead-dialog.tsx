@@ -51,7 +51,7 @@ const EMPTY_FORM: DefaultValues<CreateLeadFormValues> = {
   source: null,
   estimatedValue: "",
   crops: [],
-  landAcres: "",
+  landHectares: "",
   note: "",
 };
 

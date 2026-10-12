@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
 import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,10 @@ export function LookupSelect({
     .map((item) => ({ value: item.code, label: item.name }));
 
   const unavailable = query.isPending || query.isError;
+  // Opening the list moves focus into it, which blurs the trigger. That is not leaving the
+  // field: a required one turned red the moment its list opened (walk F-19). Closing the list
+  // is, so `onBlur` fires then, and on a real blur of the closed field.
+  const listOpen = useRef(false);
 
   return (
     <div className="flex items-center gap-2">
@@ -70,6 +75,10 @@ export function LookupSelect({
         items={items}
         value={value}
         disabled={unavailable}
+        onOpenChange={(open) => {
+          listOpen.current = open;
+          if (!open) onBlur?.();
+        }}
         onValueChange={(next) => {
           if (typeof next === "string") {
             onValueChange(next);
@@ -81,7 +90,13 @@ export function LookupSelect({
           }
         }}
       >
-        <SelectTrigger id={id} onBlur={onBlur} {...aria}>
+        <SelectTrigger
+          id={id}
+          onBlur={() => {
+            if (!listOpen.current) onBlur?.();
+          }}
+          {...aria}
+        >
           <SelectValue
             placeholder={fieldPlaceholder(query.isPending, query.isError, placeholder)}
           />

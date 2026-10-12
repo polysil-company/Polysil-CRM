@@ -34,15 +34,26 @@ export type TimelineEntry =
       readonly previousOwnerName: string | null;
     }
   | { readonly type: "updated"; readonly fields: readonly string[] }
-  | { readonly type: "merged"; readonly role: "survivor" | "loser"; readonly otherLeadId: string }
-  | { readonly type: "duplicate-flagged"; readonly count: number }
-  | { readonly type: "duplicate-dismissed" }
+  | {
+      readonly type: "merged";
+      readonly role: "survivor" | "loser";
+      readonly otherLeadId: string;
+      /** The other lead's inquiry number; null when the reader cannot see that lead. */
+      readonly otherNumber: string | null;
+    }
+  | { readonly type: "duplicate-flagged"; readonly matches: readonly LeadRef[] }
+  | { readonly type: "duplicate-dismissed"; readonly other: LeadRef | null }
   | { readonly type: "deleted" }
   | {
       readonly type: "approval";
       readonly decision: "approve" | "reject" | null;
       /** The step's role code: `district_manager`, `account_manager` … */
       readonly role: string | null;
+    }
+  | {
+      /** The customer opened the quotation link: said without an actor (walk F-16). */
+      readonly type: "customer-opened";
+      readonly document: TimelineDocument | null;
     }
   | {
       readonly type: "document";
@@ -54,11 +65,20 @@ export type TimelineEntry =
     }
   | { readonly type: "other"; readonly label: string };
 
+/** Another lead an event names, with its inquiry number when the reader may see it. */
+export interface LeadRef {
+  readonly leadId: string | null;
+  readonly number: string | null;
+}
+
 /** A quotation or sales order an event links to. */
 export interface TimelineDocument {
   readonly kind: "quotation" | "order";
   readonly id: string;
-  /** "QT/GJ/2026-27/00003 · v2", "SO/GJ/2026-27/00041"; "Draft" when it has no number yet. */
+  /**
+   * "QT/GJ/2026-27/00003 · v2", "SO/GJ/2026-27/00041". A draft has no number yet: "draft
+   * quotation v1", "draft order" (walk F-16).
+   */
   readonly title: string;
 }
 
@@ -134,8 +154,11 @@ const version = z.number().int().positive().nullish().catch(null);
 function documentOf(payload: Readonly<Record<string, unknown>>): TimelineDocument | null {
   const quotationId = optionalText.parse(payload.quotation_id) ?? null;
   if (quotationId !== null) {
-    const number = optionalText.parse(payload.quote_no) ?? "Draft";
+    const number = optionalText.parse(payload.quote_no) ?? null;
     const v = version.parse(payload.version) ?? null;
+    if (number === null) {
+      return { kind: "quotation", id: quotationId, title: `draft quotation v${String(v ?? 1)}` };
+    }
     return {
       kind: "quotation",
       id: quotationId,
@@ -144,7 +167,11 @@ function documentOf(payload: Readonly<Record<string, unknown>>): TimelineDocumen
   }
   const orderId = optionalText.parse(payload.order_id) ?? null;
   if (orderId !== null) {
-    return { kind: "order", id: orderId, title: optionalText.parse(payload.order_no) ?? "Draft" };
+    return {
+      kind: "order",
+      id: orderId,
+      title: optionalText.parse(payload.order_no) ?? "draft order",
+    };
   }
   return null;
 }
@@ -169,6 +196,29 @@ function changeOf(
     kind: set ? "set" : "cleared",
     name: set ? (optionalText.parse(payload[nameKey]) ?? null) : null,
   };
+}
+
+/** A match in `lead.duplicate_flagged`, or the other lead of a dismissal. */
+function leadRefOf(raw: unknown): LeadRef {
+  const fields = z.record(z.string(), z.unknown()).catch({}).parse(raw);
+  return {
+    leadId: optionalText.parse(fields.lead_id) ?? null,
+    number: optionalText.parse(fields.inquiry_no) ?? null,
+  };
+}
+
+/** "POL/GJ/2026-27/00083" → "00083": enough to tell leads apart in a list of them. */
+export function shortInquiryNumber(number: string): string {
+  return number.split("/").at(-1) ?? number;
+}
+
+/**
+ * Whether an event earns its own line. A decision on a quotation's discount is written twice:
+ * as the approval step and as the discount's outcome; the second says it, so the first is left
+ * out (walk F-16). An order's decisions have one line each.
+ */
+export function isShownOnTimeline(event: TimelineEvent): boolean {
+  return !(event.kind === "approval.decided" && typeof event.payload.quotation_id === "string");
 }
 
 /** Turns one event into the entry the timeline renders. `leadId` is the lead on screen. */
@@ -220,21 +270,39 @@ export function toTimelineEntry(event: TimelineEvent, leadId: string): TimelineE
       const survivor = optionalText.parse(payload.survivor);
       const loser = optionalText.parse(payload.loser);
       if (survivor === leadId && loser) {
-        return { type: "merged", role: "survivor", otherLeadId: loser };
+        return {
+          type: "merged",
+          role: "survivor",
+          otherLeadId: loser,
+          otherNumber: optionalText.parse(payload.loser_inquiry_no) ?? null,
+        };
       }
       if (loser === leadId && survivor) {
-        return { type: "merged", role: "loser", otherLeadId: survivor };
+        return {
+          type: "merged",
+          role: "loser",
+          otherLeadId: survivor,
+          otherNumber: optionalText.parse(payload.survivor_inquiry_no) ?? null,
+        };
       }
       return { type: "other", label: "Leads merged" };
     }
 
     case "lead.duplicate_flagged": {
       const matches = z.array(z.unknown()).catch([]).parse(payload.matches);
-      return { type: "duplicate-flagged", count: matches.length };
+      return { type: "duplicate-flagged", matches: matches.map(leadRefOf) };
     }
 
-    case "lead.duplicate_dismissed":
-      return { type: "duplicate-dismissed" };
+    case "lead.duplicate_dismissed": {
+      const other = leadRefOf({
+        lead_id: payload.other_lead_id,
+        inquiry_no: payload.other_inquiry_no,
+      });
+      return {
+        type: "duplicate-dismissed",
+        other: other.leadId === null && other.number === null ? null : other,
+      };
+    }
 
     case "lead.deleted":
       return { type: "deleted" };
@@ -244,6 +312,9 @@ export function toTimelineEntry(event: TimelineEvent, leadId: string): TimelineE
         payload.decision === "approve" || payload.decision === "reject" ? payload.decision : null;
       return { type: "approval", decision, role: optionalText.parse(payload.role) ?? null };
     }
+    case "quotation.viewed":
+      return { type: "customer-opened", document: documentOf(payload) };
+
     default:
       if (DOCUMENT_KIND.test(event.kind)) {
         return {

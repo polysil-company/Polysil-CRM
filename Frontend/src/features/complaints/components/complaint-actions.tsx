@@ -51,7 +51,7 @@ import {
 import { complaintRefusal, SEVERITY_LABELS } from "@/features/complaints/lib/complaint-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
-import { todayInIndia } from "@/lib/format";
+import { formatIndianPhone, todayInIndia } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
 import { COMPLAINT_TEXT_MAX, Refusal, useCloseLater } from "./complaint-dialog-parts";
@@ -63,7 +63,7 @@ const log = createLogger({
 
 const TEXT_MAX = COMPLAINT_TEXT_MAX;
 
-type DialogKind = "check" | "qc" | "cancel" | "delete";
+type DialogKind = "submit" | "check" | "qc" | "cancel" | "delete";
 
 function title(complaint: Complaint): string {
   return complaint.number ?? "this draft";
@@ -81,28 +81,6 @@ export function ComplaintActions({
 }): React.JSX.Element | null {
   const [dialog, setDialog] = useState<DialogKind | null>(null);
   const { can } = complaint;
-  const submit = useSubmitComplaint();
-  const idempotency = useIdempotencyKey();
-  const runSubmit = useAsyncAction({
-    action: () =>
-      submit.mutateAsync({
-        complaintId: complaint.id,
-        idempotencyKey: idempotency.keyFor({ submit: complaint.id, count: complaint.submitCount }),
-      }),
-    logger: log,
-    fn: "handleSubmitComplaint",
-    dataId: "CMPL-003",
-    onSuccess: (saved) => {
-      idempotency.reset();
-      toast.success("Submitted", {
-        description: `${saved.number ?? "The complaint"} waits for a manager's check.`,
-      });
-    },
-    onError: (error) => {
-      const view = complaintRefusal(error);
-      toast.error(view.title, { description: view.message });
-    },
-  });
 
   if (!can.edit && !can.submit && !can.check && !can.qc && !can.cancel && !can.delete) return null;
   const close = (): void => {
@@ -122,12 +100,8 @@ export function ComplaintActions({
       ) : null}
       {can.submit ? (
         <Button
-          state={runSubmit.state}
-          loadingLabel="Submitting…"
-          successLabel="Submitted"
-          errorLabel="Not submitted"
           onClick={() => {
-            void runSubmit.run();
+            setDialog("submit");
           }}
         >
           <Icon icon={SentIcon} />
@@ -181,13 +155,97 @@ export function ComplaintActions({
           if (!open) close();
         }}
       >
-        <DialogContent size={dialog === "delete" || dialog === "cancel" ? "sm" : "md"}>
+        <DialogContent
+          size={dialog === "delete" || dialog === "cancel" || dialog === "submit" ? "sm" : "md"}
+        >
+          {dialog === "submit" ? <SubmitForm complaint={complaint} onClose={close} /> : null}
           {dialog === "check" ? <CheckForm complaint={complaint} onClose={close} /> : null}
           {dialog === "qc" ? <QcForm complaint={complaint} onClose={close} /> : null}
           {dialog === "cancel" ? <CancelForm complaint={complaint} onClose={close} /> : null}
           {dialog === "delete" ? <DeleteForm complaint={complaint} onClose={close} /> : null}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ── submit (CMPL-003) ─────────────────────────────────────────────────────────────
+
+/**
+ * Submitting messages the contact, so it is confirmed first (walk F-19). The complaint
+ * templates are not live in WhatsApp yet (walk F-3), so the promise says so.
+ */
+function SubmitForm({
+  complaint,
+  onClose,
+}: {
+  complaint: Complaint;
+  onClose: () => void;
+}): React.JSX.Element {
+  const submit = useSubmitComplaint();
+  const idempotency = useIdempotencyKey();
+  const closeLater = useCloseLater(onClose);
+  const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
+  const again = complaint.submitCount > 0;
+  const run = useAsyncAction({
+    action: () =>
+      submit.mutateAsync({
+        complaintId: complaint.id,
+        idempotencyKey: idempotency.keyFor({ submit: complaint.id, count: complaint.submitCount }),
+      }),
+    logger: log,
+    fn: "handleSubmitComplaint",
+    dataId: "CMPL-003",
+    onSuccess: (saved) => {
+      idempotency.reset();
+      toast.success("Submitted", {
+        description: `${saved.number ?? "The complaint"} waits for a manager's check.`,
+      });
+      closeLater();
+    },
+    onError: (error) => {
+      const view = complaintRefusal(error);
+      if (view.stale) {
+        toast.error(view.title, { description: view.message });
+        onClose();
+        return;
+      }
+      setRefusal({ title: view.title, message: view.message });
+    },
+  });
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <DialogHeader>
+        <DialogTitle>{again ? "Submit it again?" : "Submit for the manager's check?"}</DialogTitle>
+        <DialogDescription>
+          {complaint.number ?? "The complaint"} goes to a manager to check next.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody>
+        <p className="text-sm text-muted-foreground">
+          {complaint.contactName} ({formatIndianPhone(complaint.contactMobile)}) gets a WhatsApp at
+          each step, once messages are switched on.
+        </p>
+        <Refusal refusal={refusal} />
+      </DialogBody>
+      <DialogFooter>
+        <DialogClose render={<Button type="button" variant="outline" disabled={run.isBusy} />}>
+          Not yet
+        </DialogClose>
+        <Button
+          state={run.state}
+          loadingLabel="Submitting…"
+          successLabel="Submitted"
+          errorLabel="Not submitted"
+          onClick={() => {
+            setRefusal(null);
+            void run.run();
+          }}
+        >
+          {again ? "Submit again" : "Submit"}
+        </Button>
+      </DialogFooter>
     </div>
   );
 }

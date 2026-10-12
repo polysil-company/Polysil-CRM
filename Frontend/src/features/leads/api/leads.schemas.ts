@@ -76,6 +76,8 @@ export const leadWireSchema = z.object({
     .optional(),
   /** BE-003 · Acres, a decimal string at two places. */
   land_acres: z.string().nullish(),
+  /** The land as the client measures it (FS-052); acres are derived from it. */
+  land_hectares: z.string().nullish(),
   lost_reason: refSchema.extend({ code: z.string().min(1) }).nullable(),
   lost_note: z.string().nullable(),
   reopen_count: z.number().int().nonnegative(),
@@ -134,6 +136,7 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
     isActive: crop.is_active,
   })),
   landAcres: wire.land_acres ?? null,
+  landHectares: wire.land_hectares ?? null,
   lostReason: wire.lost_reason,
   lostNote: wire.lost_note,
   reopenCount: wire.reopen_count,
@@ -160,7 +163,7 @@ export type Lead = z.output<typeof leadSchema>;
 
 /**
  * LEAD-010 · PATCH /leads/{id} — only what changes. email, village, estimated_value and
- * land_acres may be sent null to clear them; the rest can't be cleared.
+ * land_hectares may be sent null to clear them; the rest can't be cleared.
  */
 export type PatchLeadRequest = Partial<Omit<CreateLeadRequest, "note">>;
 
@@ -505,7 +508,9 @@ const INDIAN_MOBILE_E164 = /^\+91[6-9]\d{9}$/;
 /** Whole rupees or rupees and paise, no grouping: "125000", "125000.50". */
 const AMOUNT_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
 /** Acres: above 0, at most 99999.99, two decimals (BE-003). */
-const ACRES_PATTERN = /^\d{1,5}(\.\d{1,2})?$/;
+/** At most two decimals, more than 0 and up to the backend's ceiling (FS-052). */
+const HECTARES_PATTERN = /^\d{1,5}(\.\d{1,2})?$/;
+const MAX_HECTARES = 40468.56;
 /** The backend takes at most this many crops on a lead. */
 export const MAX_LEAD_CROPS = 10;
 
@@ -527,8 +532,11 @@ export const createLeadRequestSchema = z.object({
   estimated_value: z.string().regex(AMOUNT_PATTERN).nullable(),
   /** Codes from GET /lookups/crops, at most 10; [] for none. */
   crops: z.array(z.string().min(1)).max(MAX_LEAD_CROPS),
-  /** Acres as a decimal string; null when not known. */
-  land_acres: z.string().regex(ACRES_PATTERN).nullable(),
+  /**
+   * Hectares as a decimal string; null when not known. The client works in hectares (FS-052);
+   * the backend still takes `land_acres` instead, but the forms ask for hectares.
+   */
+  land_hectares: z.string().regex(HECTARES_PATTERN).nullable(),
   /** Becomes the first entry on the lead's timeline. */
   note: z.string().min(1).max(2000).nullable(),
 });
@@ -603,12 +611,14 @@ export const createLeadFormSchema = z
       )
       .transform(emptyToNull),
     crops: z.array(z.string()).max(MAX_LEAD_CROPS, "Choose at most 10 crops."),
-    landAcres: z
+    landHectares: z
       .string()
       .trim()
       .refine(
-        (value) => value === "" || (ACRES_PATTERN.test(value) && Number(value) > 0),
-        "Enter the land in acres, e.g. 4.5.",
+        (value) =>
+          value === "" ||
+          (HECTARES_PATTERN.test(value) && Number(value) > 0 && Number(value) <= MAX_HECTARES),
+        "Enter the land in hectares, e.g. 1.8.",
       )
       .transform(emptyToNull),
     note: z
@@ -628,7 +638,7 @@ export const createLeadFormSchema = z
     source: values.source ?? null,
     estimated_value: values.estimatedValue,
     crops: values.crops,
-    land_acres: values.landAcres,
+    land_hectares: values.landHectares,
     note: values.note,
   }));
 

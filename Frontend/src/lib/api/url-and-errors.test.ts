@@ -156,6 +156,11 @@ describe("[OBS-002] toUserFacingError", () => {
     expect(view.retryable).toBe(retryable);
   });
 
+  it("gives a 403 no reference: nothing failed, so there is nothing to trace (F-17)", () => {
+    expect(toUserFacingError(apiError({ status: 403 })).reference).toBeUndefined();
+    expect(toUserFacingError(apiError({ status: 500 })).reference).toBe("LEAD-001 · req-1");
+  });
+
   it("uses generic copy for unexpected errors", () => {
     expect(toUserFacingError(new TypeError("x is undefined"))).toEqual({
       title: "Something went wrong",

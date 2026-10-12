@@ -9,7 +9,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import type { Order, OrderApprovalStep } from "@/features/orders/api/orders.schemas";
-import { stepRoleLabel } from "@/features/orders/lib/order-labels";
+import { stalledStepText, stepRoleLabel } from "@/features/orders/lib/order-labels";
 import { useCanApprove } from "@/features/session/hooks/use-session";
 import { cn } from "@/lib/utils";
 
@@ -133,7 +133,7 @@ function Step({ step, state }: { step: OrderApprovalStep; state: StepState }): R
           {step.seq}. {stepRoleLabel(step.role)}
         </p>
         <p className="text-xs text-muted-foreground">
-          {STATE_TEXT[state]}
+          {state === "current" && step.stalled ? stalledStepText(step.role) : STATE_TEXT[state]}
           {step.by === null ? null : <> · {step.by.name}</>}
           {step.decidedRole === null ? null : (
             <>

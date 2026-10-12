@@ -35,19 +35,26 @@ export function EmptyMedia({
   );
 }
 
+export interface EmptyTitleProps extends React.ComponentProps<"h3"> {
+  /** 2 when the empty state is the whole page, under the top bar's h1; 3 inside a section. */
+  level?: 2 | 3;
+}
+
 export function EmptyTitle({
+  level = 3,
   className,
   children,
   ...props
-}: React.ComponentProps<"h3">): React.JSX.Element {
+}: EmptyTitleProps): React.JSX.Element {
+  const Heading = level === 2 ? "h2" : "h3";
   return (
-    <h3
+    <Heading
       data-slot="empty-title"
       className={cn("text-base font-semibold text-foreground", className)}
       {...props}
     >
       {children}
-    </h3>
+    </Heading>
   );
 }
 
