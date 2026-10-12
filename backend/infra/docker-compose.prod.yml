@@ -148,6 +148,7 @@ services:
       # scripts/seed_prod.py: the first administrator
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_MUST_CHANGE_PASSWORD: ${ADMIN_MUST_CHANGE_PASSWORD:-true}
     volumes:
       - ../data:/app/data:ro
       - ../tests/fixtures/subsidy:/app/tests/fixtures/subsidy:ro

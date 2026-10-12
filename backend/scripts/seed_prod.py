@@ -11,8 +11,8 @@ a rerun with more modules, no deploy. The rows come from the same RBAC.md matrix
 the demo seed uses (`generate_permission_seed.load_grants`), filtered.
 
 **No demo data, no known password.** The administrator's email and password come
-from ADMIN_EMAIL and ADMIN_PASSWORD (infra/.env.prod), and the account must change
-its password at first sign-in. Idempotent: a rerun reconciles the permission rows,
+from ADMIN_EMAIL and ADMIN_PASSWORD (infra/.env.prod); the account changes its
+password at first sign-in unless ADMIN_MUST_CHANGE_PASSWORD=false. Idempotent: a rerun reconciles the permission rows,
 leaves the thresholds an administrator has edited alone, and never resets an
 existing administrator's password.
 """
@@ -94,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
     password = os.environ.get("ADMIN_PASSWORD", "")
     if not email or len(password) < 12:
         raise SystemExit("set ADMIN_EMAIL and ADMIN_PASSWORD (12 characters or more)")
+    # ADMIN_MUST_CHANGE_PASSWORD=false keeps the given password (no change screen)
+    must_change = os.environ.get("ADMIN_MUST_CHANGE_PASSWORD", "true").strip().lower() != "false"
 
     with psycopg.connect(host=os.environ.get("DB_HOST", "pgbouncer"),
                          port=int(os.environ.get("DB_PORT", "6432")),
@@ -149,9 +151,11 @@ def main(argv: list[str] | None = None) -> int:
             cur.execute(
                 "INSERT INTO app_user (user_type, email, password_hash, full_name, role_id, "
                 "org_unit_id, must_change_password) VALUES ('staff', %s, %s, 'Administrator', "
-                "%s, %s, true)",
-                (email, PasswordHasher().hash(password), role_ids["admin_sales"], ROOT_ORG_UNIT_ID))
-            print(f"  admin    {email} created; the password must be changed at first sign-in")
+                "%s, %s, %s)",
+                (email, PasswordHasher().hash(password), role_ids["admin_sales"], ROOT_ORG_UNIT_ID,
+                 must_change))
+            print(f"  admin    {email} created" + ("; the password must be changed at first sign-in"
+                                                   if must_change else ""))
         else:
             print(f"  admin    {email} exists; left as it is")
         conn.commit()
