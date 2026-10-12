@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.domain import identity
 from tests.api.conftest import Admin, Staff, _auth, _key, _staff_body
 
 pytestmark = pytest.mark.db
@@ -103,6 +104,28 @@ async def test_offices_are_created_moved_closed_and_reopened(
     only_closed = await client.get(f"{V1}/org-units", params={"is_open": "false", "q": tag},
                                    headers=h)
     assert only_closed.json()["data"] == []
+
+
+async def test_the_system_office_is_not_listed_or_assignable(
+        client: httpx.AsyncClient, admin: Admin) -> None:
+    """The System principal's office carries jobs and intake, never a person."""
+    system = identity.SYSTEM_ORG_UNIT_ID
+    h = await _auth(client, admin.user)
+    listed = await client.get(f"{V1}/org-units", params={"limit": 100}, headers=h)
+    assert listed.status_code == 200
+    assert system not in [o["id"] for o in listed.json()["data"]]
+    named = await client.get(f"{V1}/org-units", params={"q": "System"}, headers=h)
+    assert system not in [o["id"] for o in named.json()["data"]]
+
+    person = await client.post(f"{V1}/users", json=_staff_body(admin, org_unit_id=system),
+                               headers={**h, **_key()})
+    assert person.status_code == 422, person.text
+    assert person.json()["error"]["fields"] == {"org_unit_id": "not found or closed"}
+    office = await client.post(f"{V1}/org-units", json={
+        "name": f"Under system {uuid.uuid4().hex[:6]}", "role_level": 2, "parent_id": system},
+        headers={**h, **_key()})
+    assert office.status_code == 422, office.text
+    assert "parent_id" in office.json()["error"]["fields"]
 
 
 # ── territories ──────────────────────────────────────────────────────────────

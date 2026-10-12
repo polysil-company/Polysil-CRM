@@ -40,6 +40,37 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 INFRA = ROOT / "infra"
 ENV_FILE = INFRA / ".env.staging"
+# --target prod points the same steps at the Hostinger box (12 Oct 2026)
+COMPOSE_FILE = "infra/docker-compose.staging.yml"
+REMOTE_ENV = ".env.staging"
+TARGET = "staging"
+# production builds the frontend from this checkout of the shared repo (its Frontend/)
+FRONTEND_SRC = ROOT / "scripts" / "local" / "reviewstaging" / "Frontend"
+# the go-live menu (nav item ids in the frontend's navigation.ts); scripts/seed_prod.py
+# RELEASED is the matching backend scope
+RELEASED_NAV = ("dashboard", "messages", "leads", "quotations", "sales-orders", "approvals",
+                "tasks", "dispatch", "approval-limits", "products", "users")
+# --source: the code comes from a checkout of the shared repo (its backend/ and
+# Frontend/), the release branch; the client's data files always come from here
+CODE_ROOT = ROOT
+LOCAL_ONLY = ("data/", "tests/fixtures/subsidy/")
+
+
+def set_source(checkout: Path) -> None:
+    global CODE_ROOT, FRONTEND_SRC
+    if not (checkout / "backend" / "api").is_dir() or not (checkout / "Frontend").is_dir():
+        die(f"{checkout} is not a checkout of the shared repo (backend/ and Frontend/)")
+    CODE_ROOT = checkout / "backend"
+    FRONTEND_SRC = checkout / "Frontend"
+
+
+def set_target(target: str) -> None:
+    global ENV_FILE, COMPOSE_FILE, REMOTE_ENV, TARGET
+    TARGET = target
+    if target == "prod":
+        ENV_FILE = INFRA / ".env.prod"
+        COMPOSE_FILE = "infra/docker-compose.prod.yml"
+        REMOTE_ENV = ".env.prod"
 DEV_ENV_FILE = INFRA / ".env"
 
 # The development database. One constant, so the guard cannot drift apart across
@@ -56,6 +87,7 @@ INCLUDE = [
     "scripts",
     "infra/Dockerfile",
     "infra/docker-compose.staging.yml",
+    "infra/docker-compose.prod.yml",
     # The prepared reverse-proxy site block, so it is on the box when the DNS
     # record lands and someone applies it. GAP-097.
     "infra/caddy",
@@ -129,8 +161,8 @@ def guard(env: dict[str, str]) -> None:
 
 def load_config() -> dict[str, str]:
     if not ENV_FILE.exists():
-        die("infra/.env.staging not found.",
-            "cp infra/.env.staging.example infra/.env.staging  and fill it in")
+        die(f"infra/{ENV_FILE.name} not found.",
+            f"cp infra/.env.staging.example infra/{ENV_FILE.name}  and fill it in")
     env = read_env(ENV_FILE)
 
     required = ["SSH_HOST", "SSH_USER", "SSH_KEY_PATH", "REMOTE_DIR",
@@ -140,7 +172,12 @@ def load_config() -> dict[str, str]:
                 "PUBLIC_WEB_URL"]
     missing = [k for k in required if not env.get(k)]
     if missing:
-        die("infra/.env.staging is missing: " + ", ".join(missing))
+        die(f"infra/{ENV_FILE.name} is missing: " + ", ".join(missing))
+    if TARGET == "prod":
+        # the admin's email is checked by seed-prod (scripts/seed_prod.py), not here
+        prod_missing = [k for k in ("APP_DOMAIN", "PG_SUPERUSER_PASSWORD") if not env.get(k)]
+        if prod_missing:
+            die("infra/.env.prod is missing: " + ", ".join(prod_missing))
 
     guard(env)
 
@@ -175,8 +212,8 @@ def compose(env: dict[str, str], *args: str, profile: str | None = None) -> str:
     d = env["REMOTE_DIR"]
     parts = ["docker", "compose",
              "--project-directory", d + "/infra",
-             "-f", d + "/infra/docker-compose.staging.yml",
-             "--env-file", d + "/infra/.env.staging"]
+             "-f", d + "/" + COMPOSE_FILE,
+             "--env-file", d + "/infra/" + REMOTE_ENV]
     if profile:
         parts += ["--profile", profile]
     return " ".join(shlex.quote(p) for p in [*parts, *args])
@@ -201,7 +238,7 @@ def sync(env: dict[str, str]) -> None:
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         for rel in INCLUDE:
-            path = ROOT / rel
+            path = (ROOT if rel.startswith(LOCAL_ONLY) else CODE_ROOT) / rel
             if not path.exists():
                 die(f"{rel} not found in the repository.")
             tar.add(path, arcname=rel, filter=_tar_filter)
@@ -218,8 +255,9 @@ def push_env(env: dict[str, str]) -> None:
     """The one env file the box holds, written with mode 600."""
     d = shlex.quote(env["REMOTE_DIR"])
     body = ENV_FILE.read_text(encoding="utf-8")
-    run_remote(env, f"umask 077 && cat > {d}/infra/.env.staging", stdin=body.encode())
-    print("  env      .env.staging written, mode 600")
+    run_remote(env, f"mkdir -p {d}/infra && umask 077 && cat > {d}/infra/{REMOTE_ENV}",
+               stdin=body.encode())
+    print(f"  env      {REMOTE_ENV} written, mode 600")
 
 
 def provision(env: dict[str, str]) -> None:
@@ -239,6 +277,13 @@ def provision(env: dict[str, str]) -> None:
     sql = "\n".join([
         "DO $do$",
         "BEGIN",
+        # a fresh cluster (production) has neither role; staging's already does
+        f"  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{app}') THEN",
+        f"    EXECUTE format('CREATE ROLE %I NOLOGIN', '{app}');",
+        "  END IF;",
+        f"  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{anon}') THEN",
+        f"    EXECUTE format('CREATE ROLE %I NOLOGIN', '{anon}');",
+        "  END IF;",
         f"  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN",
         f"    EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '{role}', '{pw}');",
         "  ELSE",
@@ -349,6 +394,76 @@ def load_states(env: dict[str, str]) -> None:
     guard(env)
     run_remote(env, compose(env, "run", "--rm", "tools", "python", "scripts/load_state_masters.py",
                             profile="tools"))
+
+
+def frontend_sync(env: dict[str, str]) -> None:
+    """Production: the shared repo's Frontend/ to the box, with the image's
+    Dockerfile set to production, then build and start the frontend and Caddy."""
+    if not (FRONTEND_SRC / "package.json").exists():
+        die(f"no frontend source at {FRONTEND_SRC}")
+    skip = {"node_modules", ".next", ".git", "test-results", "playwright-report", "coverage",
+            "storybook-static", ".turbo"}
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        def keep(info: tarfile.TarInfo) -> tarfile.TarInfo | None:
+            if set(Path(info.name).parts) & skip:
+                return None
+            info.uid = info.gid = 0
+            info.uname = info.gname = ""
+            return info
+        tar.add(FRONTEND_SRC, arcname=".", filter=keep)
+        docker = (INFRA / "frontend" / "Dockerfile").read_text(encoding="utf-8")
+        docker = docker.replace("NEXT_PUBLIC_APP_ENV=staging", "NEXT_PUBLIC_APP_ENV=production")
+        # the release's menu: only these screens, whatever the role (the frontend's NAV_ONLY)
+        anchor = "    NEXT_PUBLIC_API_BASE_URL=/api/v1"
+        assert docker.count(anchor) == 1, "the Dockerfile's build ENV block moved"
+        nav_only = ",".join(RELEASED_NAV)
+        docker = docker.replace(anchor, f"    NEXT_PUBLIC_NAV_ONLY={nav_only} \\\n{anchor}")
+        data = docker.encode()
+        info = tarfile.TarInfo("Dockerfile.polysil")
+        info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+    d = shlex.quote(env["REMOTE_DIR"])
+    run_remote(env, f"rm -rf {d}/frontend-src && mkdir -p {d}/frontend-src && "
+                    f"tar xzf - -C {d}/frontend-src", stdin=buf.getvalue())
+    print(f"  synced   frontend {len(buf.getvalue()) / 1024:.0f} KiB")
+    run_remote(env, compose(env, "build", "frontend"))
+    run_remote(env, compose(env, "up", "-d", "frontend", "caddy"))
+
+
+def deploy_prod(env: dict[str, str]) -> None:
+    """The whole production deploy, first run included: database up, roles and
+    database provisioned, images built, migrated, the frontend and Caddy up."""
+    print(f"\n  deploying PRODUCTION to {env['SSH_USER']}@{env['SSH_HOST']}:{env['REMOTE_DIR']}")
+    print(f"  database {env['DB_NAME']} as {env['DB_USER']}\n")
+    sync(env)
+    push_env(env)
+    run_remote(env, compose(env, "up", "-d", "--wait", "postgres"))
+    provision(env)
+    build(env)
+    run_remote(env, compose(env, "up", "-d", "--remove-orphans", "postgres", "pgbouncer",
+                            "redis", "api", "worker"))
+    migrate(env)
+    frontend_sync(env)
+    ok = health(env)
+    print(f"\n  app:     https://{env['APP_DOMAIN']}   (once its A record points here)\n")
+    sys.exit(0 if ok else 1)
+
+
+def seed_prod(env: dict[str, str]) -> None:
+    """Roles, the release-scope permissions, the stand-in thresholds, the states and
+    the first administrator; then the product master. No demo data."""
+    guard(env)
+    run_remote(env, compose(env, "run", "--rm", "tools", "python", "scripts/seed_prod.py",
+                            profile="tools"))
+    run_remote(env, compose(env, "run", "--rm", "tools", "python",
+                            "scripts/load_product_master.py", profile="tools"))
+    # the company's GST registrations: a quotation or order is priced from one
+    run_remote(env, compose(env, "run", "--rm", "tools", "python", "scripts/load_seller_gstins.py",
+                            "--csv", "/app/data/masters/seller-gstins.csv", profile="tools"))
+    # the districts under each state (the official LGD list): territories and leads pick them
+    run_remote(env, compose(env, "run", "--rm", "tools", "python", "scripts/load_districts.py",
+                            "--csv", "/app/data/masters/districts.csv", profile="tools"))
 
 
 def health(env: dict[str, str], *, attempts: int = 30) -> bool:
@@ -476,8 +591,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("step", nargs="?", default="deploy",
                         choices=["provision", "deploy", "sync", "build", "up", "migrate",
-                                 "seed", "load-states", "templates", "requeue-pdfs", "status",
-                                 "logs", "down",
+                                 "seed", "seed-prod", "load-states", "templates", "requeue-pdfs",
+                                 "status", "logs", "down", "frontend-prod",
                                  "frontend-provision", "frontend", "frontend-caddy"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
     parser.add_argument("--seed", action="store_true", help="deploy: run the seeds too")
@@ -485,9 +600,31 @@ def main(argv: list[str] | None = None) -> int:
                         help="seed: skip the showcase dataset, demo users and masters only")
     parser.add_argument("--no-masters", action="store_true",
                         help="seed: the demo users only, not the workbooks")
+    parser.add_argument("--target", choices=["staging", "prod"], default="staging",
+                        help="prod: the Hostinger box, infra/.env.prod and docker-compose.prod.yml")
+    parser.add_argument("--source", type=Path, default=None,
+                        help="a checkout of the shared repo to take the code from (e.g. at main)")
     args = parser.parse_args(argv)
+    set_target(args.target)
+    if args.source is not None:
+        set_source(args.source.resolve())
+        print(f"  source   code from {args.source} (backend/, Frontend/); data from this repo")
+    staging_only = ("seed", "frontend-provision", "frontend", "frontend-caddy")
+    if TARGET == "prod" and args.step in staging_only:
+        die(f"{args.step} is a staging step", "production: deploy, seed-prod, frontend-prod")
 
     env = load_config()
+    if TARGET == "prod" and args.step == "deploy":
+        deploy_prod(env)
+        return 0
+    if args.step == "seed-prod":
+        if TARGET != "prod":
+            die("seed-prod is for --target prod")
+        seed_prod(env)
+        return 0
+    if args.step == "frontend-prod":
+        frontend_sync(env)
+        return 0
     if args.step == "provision":
         provision(env)
     elif args.step == "deploy":
