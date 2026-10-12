@@ -514,6 +514,20 @@ async def test_thresholds_must_rise_with_the_level(client: httpx.AsyncClient, sh
     assert r.status_code == 422 and r.json()["error"]["code"] == "thresholds_not_increasing"
 
 
+async def test_a_lower_manager_cannot_be_unlimited_and_a_territory_must_exist(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    """Release review B M-2, M-3: an unlimited District Manager ended every chain there;
+    an unknown territory reached the foreign key, a 500."""
+    ha = await _as(client, shop, "admin_sales")
+    r = await client.put(f"{V1}/approvals/thresholds", headers={**ha, **_key()}, json={
+        "role": "district_manager", "territory_id": None, "max_amount": None})
+    assert r.status_code == 422 and "max_amount" in r.json()["error"]["fields"], r.text
+    r = await client.put(f"{V1}/approvals/thresholds", headers={**ha, **_key()}, json={
+        "role": "district_manager", "territory_id": "00000000-0000-4000-8000-000000000000",
+        "max_amount": "100000"})
+    assert r.status_code == 422 and "territory_id" in r.json()["error"]["fields"], r.text
+
+
 async def test_the_order_list_takes_several_statuses(client: httpx.AsyncClient, shop: Shop) -> None:
     """API review: "open orders" in one call."""
     ho = await _as(client, shop, "field_officer")

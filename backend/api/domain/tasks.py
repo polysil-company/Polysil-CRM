@@ -24,6 +24,22 @@ TASK_TYPES: Final = ("call", "visit", "meeting", "followup", "other")
 MINUTES_OUTCOME: Final = "Minutes recorded"
 
 
+FILTER_REACH: Final = dt.timedelta(days=1095)       # list filters clamp to three years
+
+
+def clamp_filter_day(day: dt.date, today: dt.date) -> dt.date:
+    """A list filter's date held within three years of today: due times are bound to two
+    (DUE_WINDOW), so nothing is lost, and 9999-12-31 as "no end" cannot overflow."""
+    return min(max(day, today - FILTER_REACH), today + FILTER_REACH)
+
+
+def planner_day_problem(day: dt.date, today: dt.date) -> str | None:
+    """None when a planner date can be shown; else the reason (review C M-1)."""
+    if abs(day - today) > DUE_WINDOW:
+        return "within two years of today"
+    return None
+
+
 def day_bounds(day: dt.date) -> tuple[dt.datetime, dt.datetime]:
     """The IST day as a half-open instant range [start, end)."""
     start = dt.datetime.combine(day, dt.time(0, 0), tzinfo=IST)

@@ -10,7 +10,7 @@ the document the frontend track builds against. They say what the endpoint is
 from __future__ import annotations
 
 import datetime as dt
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, status
 from fastapi.responses import JSONResponse
@@ -62,7 +62,7 @@ async def list_products(
         description="Matches anywhere in the description, ignoring case.")] = None,
     category: Annotated[str | None, Query(max_length=50,
                                           description="A product category code.")] = None,
-    quotation_category: Annotated[str | None, Query(
+    quotation_category: Annotated[Literal["head", "field", "both"] | None, Query(
         description="head, field or both. Filter the picker to the block being filled.")] = None,
     active: Annotated[bool | None, Query(description="Leave unset to list both.")] = True,
     as_of: AsOfQuery = None,

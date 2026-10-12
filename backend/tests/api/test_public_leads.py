@@ -299,3 +299,41 @@ async def test_a_dealer_reads_qr_codes_but_never_writes_them_nor_reads_approval_
         assert (await client.get(f"{V1}/approvals/thresholds", headers=ho)).status_code == 200
     finally:
         await _forget(sessions, mobile)
+
+
+async def test_a_qr_codes_active_campaign_reaches_the_lead(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions, mobiles: list[str]) -> None:
+    """Release review A-2: a QR lead carries its code's campaign while the campaign is active."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    r = await client.post(f"{V1}/lead-qr-codes", headers={**ho, **_key()},
+                          json={"label": "Mela stall", "territory_id": shop.district})
+    assert r.status_code == 201, r.text
+    qr = r.json()["data"]
+    s = sessions()
+    campaign = str((await s.execute(text(
+        "INSERT INTO campaign (name, type, start_date) VALUES (:n, 'other', CURRENT_DATE) RETURNING id"),
+        {"n": f"QR campaign {qr['code']}"})).scalar_one())
+    await s.execute(text("UPDATE lead_qr_code SET campaign_id = CAST(:c AS uuid) WHERE id = CAST(:q AS uuid)"),
+                    {"c": campaign, "q": qr["id"]})
+    await s.commit()
+    await s.close()
+    try:
+        m = _mobile(mobiles)
+        await client.post("/public/leads/verify", json={"mobile": m})
+        r = await client.post("/public/leads", json=_body(shop, m, await _code(sessions, m), qr=qr["code"]))
+        assert r.status_code == 201, r.text
+        c = sessions()
+        got = (await c.execute(text("SELECT campaign_id::text FROM lead WHERE inquiry_no = :n"),
+                               {"n": r.json()["data"]["inquiry_no"]})).scalar_one()
+        await c.close()
+        assert got == campaign
+    finally:
+        c = sessions()
+        await c.execute(text("UPDATE lead SET qr_code_id = NULL, campaign_id = NULL WHERE qr_code_id = CAST(:q AS uuid)"),
+                        {"q": qr["id"]})
+        await c.execute(text("DELETE FROM activity_event WHERE entity_id = CAST(:q AS uuid)"), {"q": qr["id"]})
+        await c.execute(text("DELETE FROM lead_qr_code WHERE id = CAST(:q AS uuid)"), {"q": qr["id"]})
+        await c.execute(text("DELETE FROM campaign WHERE id = CAST(:c AS uuid)"), {"c": campaign})
+        await c.commit()
+        await c.close()
+

@@ -661,3 +661,37 @@ async def test_a_tax_rate_is_reported_at_the_precision_its_column_carries(
     assert line["gst_slab"] == "5.000"
     assert line["cgst_rate"] == line["sgst_rate"] == "2.500"
     assert D(line["cgst_rate"]) + D(line["sgst_rate"]) == D(line["gst_slab"])
+
+
+async def test_publishing_never_closes_a_list_in_force_in_the_past(
+        client: httpx.AsyncClient, trader: Admin) -> None:
+    """Release review B H-1: a back-dated successor re-priced what had been quoted since."""
+    h = await _auth(client, trader.user)
+    year = _window()["effective_from"][:4]
+
+    async def make(**body: object) -> str:
+        r = await client.post(f"{V1}/price-lists", headers={**h, **_key()},
+                              json={"name": f"L {uuid.uuid4().hex[:6]}",
+                                    "channel_tier": "farmer", **body})
+        assert r.status_code == 201, r.text
+        return str(r.json()["data"]["id"])
+
+    first = await make(effective_from=f"{year}-01-01")
+    assert (await client.post(f"{V1}/price-lists/{first}/publish", headers={**h, **_key()},
+                              json={"allow_unpriced": True})).status_code == 200
+    back_dated = await make(effective_from=f"{year}-03-01")
+    r = await client.post(f"{V1}/price-lists/{back_dated}/publish", headers={**h, **_key()},
+                          json={"allow_unpriced": True})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "effective_from_in_past", r.text
+
+
+async def test_a_list_cannot_reach_over_its_successor_and_bad_filters_are_422(
+        client: httpx.AsyncClient, trader: Admin) -> None:
+    """Release review B M-2 and M-3."""
+    h = await _auth(client, trader.user)
+    assert (await client.get(f"{V1}/price-lists", headers=h,
+                             params={"channel_tier": "retail"})).status_code == 422
+    assert (await client.get(f"{V1}/price-lists", headers=h,
+                             params={"status": "foo"})).status_code == 422
+    assert (await client.get(f"{V1}/products", headers=h,
+                             params={"quotation_category": "x"})).status_code == 422

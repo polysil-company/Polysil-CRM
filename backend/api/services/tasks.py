@@ -154,9 +154,11 @@ async def list_tasks(db: AsyncSession, caller: Caller, *, assigned_to: str | Non
             where.append(f"t.{col} = CAST(:{col} AS uuid)")
             params[col] = val
     if due_from:
+        due_from = domain.clamp_filter_day(due_from, today_ist())
         where.append("t.due_at >= :df")
         params["df"] = domain.day_bounds(due_from)[0]
     if due_to:
+        due_to = domain.clamp_filter_day(due_to, today_ist())
         where.append("t.due_at < :dt")
         params["dt"] = domain.day_bounds(due_to)[1]
     if overdue:
@@ -282,6 +284,12 @@ async def _meeting_type_active(db: AsyncSession, meeting_type_id: str | None) ->
     if not active:
         raise ValidationFailed("That meeting type is switched off.", code="meeting_type_inactive",
                                fields={"meeting_type_id": "switched off"})
+
+
+def _check_day(day: dt.date) -> None:
+    problem = domain.planner_day_problem(day, today_ist())
+    if problem:
+        raise ValidationFailed(fields={"date": problem})
 
 
 def _refused_field(exc: DBAPIError, lead_id: str | None, partner_id: str | None,
@@ -520,6 +528,7 @@ async def planner(db: AsyncSession, caller: Caller, day: dt.date,
             "SELECT authz_user_assignable('tasks', CAST(:u AS uuid))"), {"u": who})).scalar_one())
         if not allowed:
             raise NotFoundError("No such person in your team.")
+    _check_day(day)
     start, end = domain.day_bounds(day)
     due = await _many(db, "t.assigned_to = CAST(:u AS uuid) AND t.status <> 'cancelled' "
                           "AND t.due_at >= :s AND t.due_at < :e",
@@ -557,6 +566,7 @@ async def team(db: AsyncSession, caller: Caller, day: dt.date, org_unit_id: str 
         name, pid = _decode_team_cursor(cursor)
         where.append("(d.full_name, d.id) > (:cn, CAST(:cid AS uuid))")
         params.update(cn=name, cid=pid)
+    _check_day(day)
     start, end = domain.day_bounds(day)
     window = domain.overdue_window(day, today_ist())
     params.update(s=start, e=end, of=window[0] if window else start, ot=window[1] if window else start)
@@ -620,8 +630,10 @@ async def create_minutes(db: AsyncSession, caller: Caller, body: sch.MinutesCrea
                  "notes": body.notes, "me": caller.user_id})).scalar_one())
     except DBAPIError as exc:
         if _sqlstate(exc) in ("42501", "23503"):
-            raise ValidationFailed(fields={"partner_id" if body.partner_id else "lead_id":
-                                           "not found or not yours"}) from exc
+            msg = str(exc.orig)
+            field = "task_id" if ("task_id" in msg or "minutes_task" in msg) else (
+                "partner_id" if body.partner_id else "lead_id")
+            raise ValidationFailed(fields={field: "not found or not yours"}) from exc
         raise
     await _lead_still_open(db, body.lead_id)
     if body.task_id:
