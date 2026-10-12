@@ -79,6 +79,8 @@ DEAD_BURST = 10
 # Rule 10b: the acknowledgement's per-number lock. 1 is the OTP by number, 2 a
 # closure tree, 3 a session family, 4 the handover and the administrator floor.
 ACK_LOCK_NAMESPACE = 5
+# FS-062: an uploaded sheet is kept seven days, then purged (spec section 3)
+IMPORT_RETENTION = timedelta(days=7)
 
 # FOR UPDATE SKIP LOCKED is what lets more than one worker run without two of them
 # sending the same message. The partial index on (next_attempt_at) WHERE
@@ -387,7 +389,13 @@ async def purge_expired_sessions(ctx: dict[str, Any]) -> int:
             text("SELECT whatsapp_webhook_purge(:cut)"),
             {"cut": now - settings.whatsapp_webhook_retention},
         )).scalar_one()
+        # FS-062: an import's rows hold partners' mobiles and emails
+        imports = (await session.execute(
+            text("SELECT import_batch_purge(:cut)"),
+            {"cut": now - IMPORT_RETENTION},
+        )).scalar_one()
 
     log.info("retention.purged", sessions=sessions, attempts=attempts, idempotency=idem,
-             outbox=outbox, lead_codes=codes, webhook_calls=webhook)
-    return int(sessions) + int(attempts) + int(idem) + int(outbox) + int(codes) + int(webhook)
+             outbox=outbox, lead_codes=codes, webhook_calls=webhook, imports=imports)
+    return (int(sessions) + int(attempts) + int(idem) + int(outbox) + int(codes) + int(webhook)
+            + int(imports))

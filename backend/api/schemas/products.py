@@ -180,6 +180,12 @@ class TaxRateUpsert(BaseModel):
 
 # ── price lists ──────────────────────────────────────────────────────────────
 
+PriceListSalesType = Literal["commercial", "industrial", "subsidised"]
+# Every quotation sale type and order type, so a form can send its own value as is.
+DocumentSalesType = Literal["commercial", "industrial", "subsidised", "export", "sample",
+                            "marketing", "marketing_material", "replacement"]
+
+
 class PriceList(BaseModel):
     id: str
     name: str
@@ -198,6 +204,11 @@ class PriceList(BaseModel):
     unpriced_count: int = Field(
         description="Active products this list holds no rate for. They fall through to a "
                     "less specific list, or the line is refused.")
+    sales_type: PriceListSalesType | None = Field(
+        default=None,
+        description="The sale type this list prices: commercial, industrial or subsidised. "
+                    "Null is a general list, used for every sale type. A list for the "
+                    "document's sale type outranks every general list (FS-061).")
 
 
 class PriceListPage(BaseModel):
@@ -222,6 +233,10 @@ class PriceListCreate(BaseModel):
     effective_to: Annotated[dt.date | None, Field(default=None)]
     source_note: Annotated[str | None, Field(default=None, max_length=500,
                                              description="Where the rates came from.")]
+    sales_type: PriceListSalesType | None = Field(
+        default=None,
+        description="Null for every sale type. Set to price only commercial, industrial or "
+                    "subsidised documents; fixed once published (FS-061).")
 
 
 class PriceListPatch(BaseModel):
@@ -338,6 +353,12 @@ class QuoteLinesRequest(BaseModel):
         description="An export document's stored treatment, so the preview shows the tax it "
                     "will store: export_lut prices every line at 0 % IGST, export_igst at its "
                     "slab, and neither is ever intra-state.")
+    sales_type: DocumentSalesType | None = Field(
+        default=None,
+        description="The quotation's sale type or the order's type, so the preview prices "
+                    "from the same lists the save will. commercial, industrial and subsidised "
+                    "use their own lists first; every other value, and null, use general "
+                    "lists only (FS-061).")
 
 
 class QuoteLine(BaseModel):

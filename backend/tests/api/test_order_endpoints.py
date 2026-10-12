@@ -176,8 +176,11 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
             "DELETE FROM login_attempt WHERE identifier = ANY(CAST(:emails AS citext[]))",
             "DELETE FROM app_user WHERE id = ANY(CAST(:people AS uuid[]))",
             "DELETE FROM channel_partner WHERE id = CAST(:cp AS uuid)",
-            "DELETE FROM price_list_item WHERE price_list_id IN (CAST(:pl AS uuid), CAST(:dl AS uuid))",
-            "DELETE FROM price_list WHERE id IN (CAST(:pl AS uuid), CAST(:dl AS uuid))",
+            # and any list a test scoped to the shop's state (FS-061's typed lists)
+            "DELETE FROM price_list_item WHERE price_list_id IN (CAST(:pl AS uuid), CAST(:dl AS uuid)) "
+            "OR price_list_id IN (SELECT id FROM price_list WHERE state_territory_id = CAST(:s AS uuid))",
+            "DELETE FROM price_list WHERE id IN (CAST(:pl AS uuid), CAST(:dl AS uuid)) "
+            "OR state_territory_id = CAST(:s AS uuid)",
             "DELETE FROM product_hsn WHERE product_id = CAST(:p AS uuid)",
             "DELETE FROM gst_rate WHERE hsn_code = :h",
             "DELETE FROM product WHERE id = CAST(:p AS uuid)",

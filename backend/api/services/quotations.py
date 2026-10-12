@@ -319,13 +319,13 @@ async def _lead_defaults(db: AsyncSession, lead_id: str) -> Any:
 
 async def _price(db: AsyncSession, *, partner_id: str | None, pos_territory_id: str,
                  seller_gstin_id: str | None, as_of: dt.date | None,
-                 specs: list[LineSpec], existing: bool,
+                 specs: list[LineSpec], existing: bool, sales_type: str,
                  treatment: str = "domestic") -> PricedContext:
     try:
         return await pricing.price_document(
             db, partner_id=partner_id, place_of_supply_territory_id=pos_territory_id,
             seller_gstin_id=seller_gstin_id, as_of=as_of, lines=specs, existing=existing,
-            tax_treatment=treatment)
+            sales_type=sales_type, tax_treatment=treatment)
     except ValidationFailed as exc:
         # the pipeline speaks the preview's field name; a quotation's is
         # price_effective_date, and a screen attaches errors by field (PR #10 review)
@@ -833,7 +833,8 @@ async def create_quotation(db: AsyncSession, caller: Caller, body: sch.Quotation
 
     ctx = await _price(db, partner_id=partner_id, pos_territory_id=pos_territory,
                        seller_gstin_id=body.seller_gstin_id, as_of=body.price_effective_date,
-                       specs=_specs_from_body(body.lines), existing=False, treatment=treatment)
+                       specs=_specs_from_body(body.lines), existing=False,
+                       sales_type=sales_type, treatment=treatment)
     _compare(body.lines, ctx)
     arn = await _lut(db, treatment, ctx)
 
@@ -944,7 +945,7 @@ async def patch_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     stored = await _stored_lines(db, row.id)
     ctx = await _price(db, partner_id=partner_id, pos_territory_id=pos_territory,
                        seller_gstin_id=seller, as_of=day, specs=_specs_from_rows(stored),
-                       existing=True, treatment=treatment)
+                       existing=True, sales_type=sales_type, treatment=treatment)
     arn = await _lut(db, treatment, ctx)
     try:
         await db.execute(text("""
@@ -1019,7 +1020,7 @@ async def replace_lines(db: AsyncSession, caller: Caller, quotation_id: str,
                        pos_territory_id=str(row.place_of_supply_territory_id),
                        seller_gstin_id=str(row.seller_gstin_id), as_of=row.price_effective_date,
                        specs=_specs_from_body(body.lines), existing=False,
-                       treatment=row.tax_treatment)
+                       sales_type=row.sales_type, treatment=row.tax_treatment)
     _compare(body.lines, ctx)
     await _write_lines(db, row.id, ctx)
     await _write_header_figures(db, row.id, ctx)
@@ -1082,7 +1083,7 @@ async def send_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                        pos_territory_id=str(row.place_of_supply_territory_id),
                        seller_gstin_id=str(row.seller_gstin_id), as_of=row.price_effective_date,
                        specs=_specs_from_rows(stored), existing=True,
-                       treatment=row.tax_treatment)
+                       sales_type=row.sales_type, treatment=row.tax_treatment)
     _compare_stored(stored, ctx)
     gate: str = (await db.execute(text("SELECT quotation_send_gate(CAST(:q AS uuid))"),
                              {"q": quotation_id})).scalar_one()
@@ -1273,7 +1274,7 @@ async def revise_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                        pos_territory_id=str(src.place_of_supply_territory_id),
                        seller_gstin_id=str(src.seller_gstin_id), as_of=body.price_effective_date,
                        specs=_specs_from_rows(stored), existing=True,
-                       treatment=src.tax_treatment)
+                       sales_type=src.sales_type, treatment=src.tax_treatment)
     # rule 5: the treatment as it was; the ARN looked up again at the new price date
     arn = await _lut(db, src.tax_treatment, ctx)
     try:
