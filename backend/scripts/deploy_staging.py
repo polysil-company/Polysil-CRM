@@ -49,7 +49,8 @@ FRONTEND_SRC = ROOT / "scripts" / "local" / "reviewstaging" / "Frontend"
 # the go-live menu (nav item ids in the frontend's navigation.ts); scripts/seed_prod.py
 # RELEASED is the matching backend scope
 RELEASED_NAV = ("dashboard", "messages", "leads", "quotations", "sales-orders", "approvals",
-                "tasks", "dispatch", "approval-limits", "products", "users")
+                "tasks", "dispatch", "approval-limits", "products", "users",
+                "channel-partners")
 # --source: the code comes from a checkout of the shared repo (its backend/ and
 # Frontend/), the release branch; the client's data files always come from here
 CODE_ROOT = ROOT

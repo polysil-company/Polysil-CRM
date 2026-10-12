@@ -75,6 +75,9 @@ log = structlog.get_logger(__name__)
 
 _ORDERS = SPECS["sales_orders"]
 _MAX_LIMIT = 100
+# FS-061 EC-3: the two sale types that are interchangeable in FS-011 but price from
+# their own lists now.
+TYPED_COMMERCIAL = ("commercial", "industrial")
 _UUID = sa.Uuid()
 _TS = sa.DateTime(timezone=True)
 order_t = sa.table(
@@ -328,14 +331,15 @@ async def _linked_quotations(db: AsyncSession, order_id: str) -> list[str]:
 
 async def _price(db: AsyncSession, *, partner_id: str | None, pos: str, seller: str | None,
                  as_of: dt.date | None, specs: list[LineSpec], existing: bool,
-                 submitting: bool = False, treatment: str = "domestic") -> PricedContext:
+                 order_type: str, submitting: bool = False,
+                 treatment: str = "domestic") -> PricedContext:
     """Rates at the price date, tax at today (rule 3), under the order's stored
-    treatment (FS-042 rule 5)."""
+    treatment (FS-042 rule 5), from the lists for the order's type (FS-061)."""
     try:
         return await pricing.price_document(
             db, partner_id=partner_id, place_of_supply_territory_id=pos, seller_gstin_id=seller,
             as_of=as_of, lines=specs, existing=existing, tax_as_of=today_ist(),
-            tax_treatment=treatment)
+            sales_type=order_type, tax_treatment=treatment)
     except ValidationFailed as exc:
         if exc.fields and "as_of" in exc.fields:
             exc.fields = {("price_effective_date" if k == "as_of" else k): v
@@ -951,6 +955,13 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
         raise ValidationFailed("A subsidised order is made from a subsidised quotation, and "
                                "only it.", code="type_mismatch",
                                fields={"order_type": body.order_type})
+    # FS-061 EC-3: commercial and industrial price from their own lists, so an order
+    # of one is not made from a quotation of the other (GAP-474).
+    if body.order_type in TYPED_COMMERCIAL and any(
+            r.sales_type in TYPED_COMMERCIAL and r.sales_type != body.order_type for r in rows):
+        raise ValidationFailed(f"A {body.order_type} order is made from {body.order_type} "
+                               f"quotations only: the two price from different lists.",
+                               code="type_mismatch", fields={"order_type": body.order_type})
     exports = {r.sales_type == "export" for r in rows}
     if len(exports) > 1 or exports != {body.order_type == "export"} \
             or len({(r.tax_treatment, r.export_country) for r in rows}) > 1:
@@ -1188,7 +1199,7 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
                                    fields={"export_country": "fixed by the quotations"})
         ctx = await _price(db, partner_id=src["partner"], pos=src["pos"], seller=src["seller"],
                            as_of=src["day"], specs=_specs(src["lines"]), existing=True,
-                           treatment=mode.treatment)
+                           order_type=body.order_type, treatment=mode.treatment)
         warnings += _repriced(src["lines"], ctx)
         if body.order_type == domain.SUBSIDISED:
             from_quote = await quotation_subsidy.for_order(db, body.quotation_ids[0], src["lead"])
@@ -1237,7 +1248,7 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
                            specs=_moded([LineSpec(product_id=ln.product_id, qty=ln.qty,
                                                   discounts=ln.discounts) for ln in body.lines],
                                         mode),
-                           existing=False, treatment=mode.treatment)
+                           existing=False, order_type=body.order_type, treatment=mode.treatment)
         _compare_preview(body.lines, ctx)
     await _check_sample(db, body.order_type, ctx)
     await _check_lut(db, mode.treatment, ctx.seller_gstin_id)
@@ -1345,7 +1356,7 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
     ctx = await _price(db, partner_id=partner, pos=pos, seller=seller, as_of=day,
                        specs=_moded(_specs(stored), mode,
                                     was_free=row.sample_pricing == "free"),
-                       existing=True, treatment=mode.treatment)
+                       existing=True, order_type=new_type, treatment=mode.treatment)
     await _check_sample(db, new_type, ctx)
     await _check_lut(db, mode.treatment, ctx.seller_gstin_id)
     sets: dict[str, Any] = {"tt": mode.treatment, "ec": country.strip() if country else None,
@@ -1404,7 +1415,7 @@ async def replace_lines(db: AsyncSession, caller: Caller, order_id: str,
                        as_of=row.price_effective_date,
                        specs=_moded([LineSpec(product_id=ln.product_id, qty=ln.qty,
                                               discounts=ln.discounts) for ln in body.lines], mode),
-                       existing=False, treatment=mode.treatment)
+                       existing=False, order_type=row.order_type, treatment=mode.treatment)
     _compare_preview(body.lines, ctx)
     await _check_sample(db, row.order_type, ctx)
     await _write_lines(db, order_id, ctx)
@@ -1430,7 +1441,7 @@ async def submit_order(db: AsyncSession, caller: Caller, order_id: str,
     ctx = await _price(db, partner_id=str(row.partner_id) if row.partner_id else None,
                        pos=str(row.place_of_supply_territory_id), seller=str(row.seller_gstin_id),
                        as_of=row.price_effective_date, specs=_specs(stored), existing=True,
-                       submitting=True, treatment=row.tax_treatment)
+                       order_type=row.order_type, submitting=True, treatment=row.tax_treatment)
     _compare_stored(stored, ctx)
     _check_staff(caller, row.order_type)
     await _check_sample(db, row.order_type, ctx)

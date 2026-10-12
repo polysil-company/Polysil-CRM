@@ -36,6 +36,10 @@ specific published list in force wins **per product**. So a state list holding
 three corrections sits over a complete base list and overrides only those
 three.
 
+A list may also be scoped to a sale type: commercial, industrial or
+subsidised. A quotation or order of that type prices from it before any
+general list; other sale types never use it (FS-061).
+
 `unpriced_count` is how many active products the list holds no rate for. It is
 the number the publish step refuses on, so show it on the editing screen
 rather than at publish time.
@@ -47,9 +51,10 @@ enforced in the database, so an empty page is an answer, not a failure.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `status` | query | string \| null |  | draft or published. |
+| `status` | query | `draft` \| `published` \| null |  | draft or published. |
 | `state_territory_id` | query | string \| null |  |  |
-| `channel_tier` | query | string \| null |  | distributor, dealer, sub_dealer or farmer. |
+| `channel_tier` | query | `distributor` \| `dealer` \| `sub_dealer` \| `farmer` \| null |  | distributor, dealer, sub_dealer or farmer. |
+| `sales_type` | query | `commercial` \| `industrial` \| `subsidised` \| `general` \| null |  | commercial, industrial or subsidised; general for the lists with no sale type. |
 | `page` | query | integer |  |  |
 | `limit` | query | integer |  |  |
 
@@ -93,6 +98,7 @@ and `channel_tier` null for the base list that applies everywhere.
 | `channel_tier` | `distributor` \| `dealer` \| `sub_dealer` \| `farmer` \| null |  | Null for every tier. `farmer` prices retail. |
 | `effective_to` | date \| null |  |  |
 | `source_note` | string \| null |  | Where the rates came from. |
+| `sales_type` | `commercial` \| `industrial` \| `subsidised` \| null |  | Null for every sale type. Set to price only commercial, industrial or subsidised documents; fixed once published (FS-061). |
 
 **Responses**
 
@@ -334,6 +340,7 @@ base, and nobody has told us which.
 | `partner_id` | string \| null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
 | `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
 | `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
+| `sales_type` | `commercial` \| `industrial` \| `subsidised` \| `export` \| `sample` \| `marketing` \| `marketing_material` \| `replacement` \| null |  | The quotation's sale type or the order's type, so the preview prices from the same lists the save will. commercial, industrial and subsidised use their own lists first; every other value, and null, use general lists only (FS-061). |
 
 **Responses**
 
@@ -410,6 +417,7 @@ base, and nobody has told us which.
 | `is_provisional` | boolean | yes | True while the rates are our stand-ins rather than the client's. |
 | `item_count` | integer | yes |  |
 | `unpriced_count` | integer | yes | Active products this list holds no rate for. They fall through to a less specific list, or the line is refused. |
+| `sales_type` | `commercial` \| `industrial` \| `subsidised` \| null |  | The sale type this list prices: commercial, industrial or subsidised. Null is a general list, used for every sale type. A list for the document's sale type outranks every general list (FS-061). |
 
 **`PriceListCreate`**
 
@@ -421,6 +429,7 @@ base, and nobody has told us which.
 | `channel_tier` | `distributor` \| `dealer` \| `sub_dealer` \| `farmer` \| null |  | Null for every tier. `farmer` prices retail. |
 | `effective_to` | date \| null |  |  |
 | `source_note` | string \| null |  | Where the rates came from. |
+| `sales_type` | `commercial` \| `industrial` \| `subsidised` \| null |  | Null for every sale type. Set to price only commercial, industrial or subsidised documents; fixed once published (FS-061). |
 
 **`PriceListItem`**
 
@@ -534,6 +543,7 @@ base, and nobody has told us which.
 | `partner_id` | string \| null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
 | `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
 | `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
+| `sales_type` | `commercial` \| `industrial` \| `subsidised` \| `export` \| `sample` \| `marketing` \| `marketing_material` \| `replacement` \| null |  | The quotation's sale type or the order's type, so the preview prices from the same lists the save will. commercial, industrial and subsidised use their own lists first; every other value, and null, use general lists only (FS-061). |
 
 **`QuoteLinesResponse`**
 

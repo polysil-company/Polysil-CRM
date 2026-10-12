@@ -798,7 +798,8 @@ async def _replacement_rows(db: AsyncSession, complaint_id: str
     try:
         ctx = await pricing.price_document(
             db, partner_id=None, place_of_supply_territory_id=str(c.territory_id), seller_gstin_id=None,
-            as_of=today_ist(), lines=specs, existing=False, tax_as_of=today_ist())
+            as_of=today_ist(), lines=specs, existing=False, tax_as_of=today_ist(),
+            sales_type="replacement")
     except (ValidationFailed, NotFoundError) as exc:
         fields = getattr(exc, "fields", None) or {"lines": exc.message}
         raise ValidationFailed("A defective product cannot be priced today.",

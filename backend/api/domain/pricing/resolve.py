@@ -64,23 +64,29 @@ def mixed_list_warning(chosen: Mapping[str, Rate]) -> str | None:
     parts = ", ".join(f"{n} from {name!r}" for name, n in
                       sorted(counts.values(), key=lambda c: (-c[1], c[0])))
     return (f"{MIXED}: the lines resolved from more than one price list ({parts}). "
-            "That is correct if a state list is a discount layer over the base and a "
-            "mispricing if it replaces it, which is still an open question.")
+            "That is correct if a state, tier or sale-type list is a layer over a wider "
+            "list and a mispricing if it was meant to replace it, which is still an open "
+            "question.")
 
 
 def applicable(lists: Iterable[PriceList], *, state_territory_id: str | None,
-               tier: str | None) -> list[PriceList]:
-    """The lists whose scope a caller in this state and tier may draw from.
+               tier: str | None, sales_type: str | None = None) -> list[PriceList]:
+    """The lists whose scope a caller in this state and tier, pricing this sale
+    type, may draw from.
 
-    A list scoped to another state or another tier is not applicable, regardless
-    of what the read policy allowed. The policy stops a partner *seeing* a tier
-    above them; this stops anyone *pricing* from a scope that is not theirs.
+    A list scoped to another state, another tier or another sale type is not
+    applicable, regardless of what the read policy allowed. The policy stops a
+    partner *seeing* a tier above them; this stops anyone *pricing* from a scope
+    that is not theirs. `sales_type` is already mapped by `price_sales_type`:
+    `None` draws from general lists only (FS-061 rule 2).
     """
     out = []
     for pl in lists:
         if pl.state_territory_id is not None and pl.state_territory_id != state_territory_id:
             continue
         if pl.channel_tier is not None and pl.channel_tier != tier:
+            continue
+        if pl.sales_type is not None and pl.sales_type != sales_type:
             continue
         out.append(pl)
     return out

@@ -49,7 +49,7 @@ row is theirs.
 |---|---|---|---|---|
 | `q` | query | string \| null |  | Matches anywhere in the description, ignoring case. |
 | `category` | query | string \| null |  | A product category code. |
-| `quotation_category` | query | string \| null |  | head, field or both. Filter the picker to the block being filled. |
+| `quotation_category` | query | `head` \| `field` \| `both` \| null |  | head, field or both. Filter the picker to the block being filled. |
 | `active` | query | boolean \| null |  | true for products on sale, false for switched-off ones. Leave unset to list both. A picker sends true. |
 | `as_of` | query | date \| null |  | Resolve the classification and slab as they were on this date. Today in India by default. |
 | `page` | query | integer |  |  |
