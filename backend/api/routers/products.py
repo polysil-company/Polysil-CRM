@@ -64,7 +64,9 @@ async def list_products(
                                           description="A product category code.")] = None,
     quotation_category: Annotated[Literal["head", "field", "both"] | None, Query(
         description="head, field or both. Filter the picker to the block being filled.")] = None,
-    active: Annotated[bool | None, Query(description="Leave unset to list both.")] = True,
+    active: Annotated[bool | None, Query(
+        description="true for products on sale, false for switched-off ones. Leave unset "
+                    "to list both. A picker sends true.")] = None,
     as_of: AsOfQuery = None,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,

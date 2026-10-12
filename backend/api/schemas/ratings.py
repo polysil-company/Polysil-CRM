@@ -11,6 +11,7 @@ from api.schemas.leads import UUID_RE, PageMeta, PartnerRef, UserRef
 
 Target = Literal["installation", "service", "product"]
 RatedBy = Literal["customer", "dealer"]
+EnteredVia = Literal["staff", "portal", "dealer"]
 
 
 class RatingCreate(BaseModel):
@@ -61,7 +62,12 @@ class Rating(BaseModel):
     comment: str | None = Field(description="Null for a dealer reading a customer's rating "
                                             "(GAP-375), or when none was given.")
     rated_by: RatedBy
-    entered_by: UserRef | None = Field(description="Null for a dealer reading a customer's rating.")
+    entered_by: UserRef | None = Field(
+        description="Null for a dealer reading a customer's rating, and for a rating "
+                    "the farmer entered from the portal.")
+    entered_via: EnteredVia = Field(
+        description="staff: an officer recorded it; portal: the farmer rated it himself "
+                    "(FS-060); dealer: a dealer's portal user.")
     partner: PartnerRef | None
     lead: RatingLead | None
     order: RatingDoc | None

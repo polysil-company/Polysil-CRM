@@ -2305,8 +2305,8 @@ def f_ratings() -> None:
     _columns(
         "56-ratings", "Ratings",
         "Feedback entered on installations, service and products; a dealer rating derived from payments.",
-        "BUILT. FS-043: migration 051, /ratings, /partners/{id}/dealer-rating.",
-        [("s1", "POST /ratings: staff record the farmer's\n(customer); a dealer's user its own (dealer)", GREY),
+        "BUILT. FS-043: migration 051, /ratings, /partners/{id}/dealer-rating. FS-060: 057, /portal/ratings.",
+        [("s1", "POST /ratings: staff record the farmer's\n(customer); a dealer's user its own (dealer);\nPOST /portal/ratings: the farmer himself (057)", GREY),
          ("s2", "rating_record(): user_type decides the rater;\nshipped / dispatched product / complaint closed", BLUE),
          ("s3", "one per target per kind of rater, never edited;\nrating.recorded on the order or complaint", GREEN),
          ("s4", "GET /partners/{id}/dealer-rating:\n047's gate, then one set-based query", BLUE),
@@ -2316,7 +2316,9 @@ def f_ratings() -> None:
         [("n1", "SAME FIGURES FOR EVERY READER\n\norder_paid_at() answers per caller: through it, a\nfield officer would see a worse rating than Accounts.\ndealer_rating() reads payments itself.", RED),
          ("n2", "A DEALER SEES A SCORE, NOT A COMMENT\n\nA farmer's comment and the staff name never reach the\ndealer: null in the row, no actor on any timeline.", RED),
          ("n3", "Left out of payment days: orders owing nothing,\nclosed-short orders, unpaid orders younger than the\nfirst band. Never below 0 days.", RED),
-         ("n4", "Ours: 1-5 stars, never edited, the formula and bands,\nscore-only for dealers (GAP-372 to GAP-377).", YELLOW)])
+         ("n4", "Ours: 1-5 stars, never edited, the formula and bands,\nscore-only for dealers (GAP-372 to GAP-377).", YELLOW),
+         ("n5", "A FARMER RATES ONLY WHAT HIS PORTAL LISTS\n\nrating_record()'s consumer arm checks portal_rating_docs()\nbefore any staff check: another farmer's number is 404.\nentered_via is stored: staff cannot read his account.", RED),
+         ("n6", "Ours: installation and service only, one customer\nrating per document, it counts for the dealer\n(GAP-381 to GAP-384).", YELLOW)])
 
 def f_subsidised_orders() -> None:
     _columns(

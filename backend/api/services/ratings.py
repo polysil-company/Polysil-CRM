@@ -49,7 +49,7 @@ def _refusal(exc: DBAPIError, *, card: bool = False) -> Exception:
 
 
 _SELECT = """
-SELECT r.id::text AS id, r.target, r.score, r.comment, r.rated_by, r.entered_by,
+SELECT r.id::text AS id, r.target, r.score, r.comment, r.rated_by, r.entered_by, r.entered_via,
        r.partner_id, r.lead_id, l.inquiry_no::text AS inquiry_no,
        r.sales_order_id, o.order_no::text AS order_no, o.status::text AS order_status,
        r.complaint_id, c.complaint_no::text AS complaint_no, c.status::text AS complaint_status,
@@ -67,7 +67,11 @@ def _out(r: Any, names: people.Names, *, portal: bool) -> sch.Rating:
     hide = portal and r.rated_by == "customer"
     return sch.Rating(
         id=r.id, target=r.target, score=r.score, comment=None if hide else r.comment,
-        rated_by=r.rated_by, entered_by=None if hide else names.user(r.entered_by, None),
+        rated_by=r.rated_by,
+        # a farmer's portal account is not a person staff can open (FS-060 EC-4)
+        entered_by=(None if hide or r.entered_via == "portal"
+                    else names.user(r.entered_by, None)),
+        entered_via=r.entered_via,
         partner=names.partner(r.partner_id, None, None),
         lead=sch.RatingLead(id=str(r.lead_id), inquiry_no=r.inquiry_no) if r.lead_id else None,
         order=(sch.RatingDoc(id=str(r.sales_order_id), number=r.order_no,

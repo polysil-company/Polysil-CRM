@@ -560,6 +560,26 @@ async def test_a_classification_dated_before_a_later_one_is_bounded_too(
     assert rows["2022-01-01"]["effective_to"] is None
 
 
+async def test_the_catalogue_lists_switched_off_products_unless_asked_for_active(
+        client: httpx.AsyncClient, trader: Admin, catalogue: Catalogue) -> None:
+    """The catalogue's "All" leaves `active` unset and must see a switched-off
+    product; the picker sends `active=true` and must not."""
+    h = await _auth(client, trader.user)
+    off = await client.patch(f"{V1}/products/{catalogue.product_id}", json={"is_active": False},
+                             headers={**h, **_key()})
+    assert off.status_code == 200, off.text
+
+    async def total(**params: str) -> int:
+        r = await client.get(f"{V1}/products", headers=h,
+                             params={"q": catalogue.description, **params})
+        assert r.status_code == 200, r.text
+        return int(r.json()["meta"]["total"])
+
+    assert await total() == 1
+    assert await total(active="false") == 1
+    assert await total(active="true") == 0
+
+
 async def test_a_product_no_longer_sold_is_refused_on_a_new_line(
         client: httpx.AsyncClient, trader: Admin, catalogue: Catalogue) -> None:
     """The mechanism a review named as deletable with the suite staying green.

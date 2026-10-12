@@ -1,0 +1,2711 @@
+{
+  "CG/drip": {
+    "component_rates": [],
+    "quantities": null,
+    "example": {
+      "input": {
+        "crops": [
+          {
+            "crop": null,
+            "area": "0.4",
+            "lateral_spacing": "1.2",
+            "lines": [
+              {
+                "description": "PLASTIC DISC FILTER WITHASSEMBLY 2.00\" 25 m3/HR",
+                "uom": "Nos",
+                "rate": "6075.3",
+                "qty": "1"
+              },
+              {
+                "description": "PLASTIC HYDROCYCLONE FILTER 2.0\" 20 m3/HR",
+                "uom": "Nos",
+                "rate": "7336.35",
+                "qty": "0"
+              },
+              {
+                "description": "NON RETURN VALVE 2.00\"",
+                "uom": "Nos",
+                "rate": "819.63",
+                "qty": "1"
+              },
+              {
+                "description": "3/4\" VENTURY / FERTILIZERINJECTOR",
+                "uom": "Nos",
+                "rate": "1807.05",
+                "qty": "1"
+              },
+              {
+                "description": "AIR VALVE : 1.0\" (25 MM)",
+                "uom": "Nos",
+                "rate": "374.02",
+                "qty": "1"
+              },
+              {
+                "description": "2.5\" GLYCERINE  FILLED PRESSURE GAUGE",
+                "uom": "Nos",
+                "rate": "481.95",
+                "qty": "2"
+              },
+              {
+                "description": "63 MM X  4.0 KG X 6 MTR RIGID PVC PIPE ISI",
+                "uom": "Mtrs",
+                "rate": "66.01",
+                "qty": "120"
+              },
+              {
+                "description": "50 MM X 6.0 KG X 6 MTR RIGID PVC PIPE ISI",
+                "uom": "Mtrs",
+                "rate": "74.68",
+                "qty": "0"
+              },
+              {
+                "description": "DRIP 2.00\" PP BALL VALVE PLAIN TYPE",
+                "uom": "Nos",
+                "rate": "341.2",
+                "qty": "4"
+              },
+              {
+                "description": "FLUSH VALVE :  63 MM / 50 MM",
+                "uom": "Nos",
+                "rate": "89.51",
+                "qty": "2"
+              },
+              {
+                "description": "16 MM PLAIN LATERAL CL-2",
+                "uom": "Mtrs",
+                "rate": "13.23",
+                "qty": "100"
+              },
+              {
+                "description": "16 MM 2LPH (0.30MTR ) CL-2  DRIPLINE",
+                "uom": "Mtrs",
+                "rate": "14.02",
+                "qty": "3000"
+              },
+              {
+                "description": "RUBBER GROMETT 12/16 MM",
+                "uom": "Nos",
+                "rate": "4.2",
+                "qty": "100"
+              },
+              {
+                "description": "16 MM  START NIPPLE",
+                "uom": "Nos",
+                "rate": "2.1",
+                "qty": "100"
+              },
+              {
+                "description": "16 MM JOINER",
+                "uom": "Nos",
+                "rate": "2.1",
+                "qty": "100"
+              },
+              {
+                "description": "16 MM DRIP LATERAL END",
+                "uom": "Nos",
+                "rate": "2.1",
+                "qty": "100"
+              }
+            ]
+          }
+        ],
+        "head_lines": [],
+        "group_total_area": null,
+        "installation_rate_per_ha": "0",
+        "sump_rate_per_ha": "0",
+        "nozzle": null,
+        "pipe_size_mm": null,
+        "spacing_label": "1.2 x 0.60",
+        "hydrocyclone_m3": "0",
+        "gravel_filter_m3": "0",
+        "head_unit_existing": false,
+        "pvc_existing": false
+      },
+      "category": "small",
+      "expected": {
+        "total_incl_gst": "66495.4368",
+        "unit_cost": "65827",
+        "subsidy": "36204.85",
+        "farmer_share": "31293.5868"
+      }
+    },
+    "source": "cg/CG-Drip-Quotation-Format.xlsx"
+  },
+  "CG/sprinkler": {
+    "component_rates": [
+      {
+        "code": "nozzle",
+        "description": "Sprinkler Nozzles (1.7 to 2.8 Kg/cm2)  5 to 40 Litres/Minute Capacity20mm-Brass",
+        "uom": "No.",
+        "rate": "312.24",
+        "pipe_size_mm": null,
+        "nozzle": "brass"
+      },
+      {
+        "code": "nozzle",
+        "description": "Sprinkler Nozzles (1.7 to 2.8 Kg/cm2)  5 to 40 Litres/Minute Capacity20mm-Plastic",
+        "uom": "No.",
+        "rate": "101.5",
+        "pipe_size_mm": null,
+        "nozzle": "plastic"
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler63mm",
+        "uom": "No.",
+        "rate": "95.93",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler75mm",
+        "uom": "No.",
+        "rate": "117.21",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler90mm",
+        "uom": "No.",
+        "rate": "134.34",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler63mm",
+        "uom": "No.",
+        "rate": "271.64",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler75mm",
+        "uom": "No.",
+        "rate": "320.84",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler90mm",
+        "uom": "No.",
+        "rate": "359.35",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 63mm",
+        "uom": "No.",
+        "rate": "566.53",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 75mm",
+        "uom": "No.",
+        "rate": "621.93",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 90mm",
+        "uom": "No.",
+        "rate": "735.16",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action63mm",
+        "uom": "No.",
+        "rate": "384.94",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action75mm",
+        "uom": "No.",
+        "rate": "413.52",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action90mm",
+        "uom": "No.",
+        "rate": "433.31",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler63mm",
+        "uom": "No.",
+        "rate": "223.88",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler75mm",
+        "uom": "No.",
+        "rate": "298.53",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler90mm",
+        "uom": "No.",
+        "rate": "311.29",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action63mm",
+        "uom": "No.",
+        "rate": "219.54",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action75mm",
+        "uom": "No.",
+        "rate": "236.08",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action90mm",
+        "uom": "No.",
+        "rate": "320.02",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "transport",
+        "description": "Secondary Transportation",
+        "uom": "Ha",
+        "rate": "0",
+        "pipe_size_mm": null,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      }
+    ],
+    "quantities": {
+      "areas": [
+        "0.4",
+        "0.6",
+        "0.8",
+        "1",
+        "1.2",
+        "1.4",
+        "1.6",
+        "1.8",
+        "2",
+        "2.01",
+        "2.2",
+        "2.4",
+        "2.6",
+        "2.8",
+        "3",
+        "3.2",
+        "3.4",
+        "3.6",
+        "3.8",
+        "4",
+        "4.2",
+        "4.4",
+        "4.6",
+        "4.8",
+        "5"
+      ],
+      "rows": {
+        "pipe": {
+          "0.4": "18",
+          "0.6": "19",
+          "0.8": "24",
+          "1": "30",
+          "1.2": "33",
+          "1.4": "35",
+          "1.6": "37",
+          "1.8": "39",
+          "2": "41",
+          "2.01": "34",
+          "2.2": "36",
+          "2.4": "38",
+          "2.6": "38",
+          "2.8": "39",
+          "3": "41",
+          "3.2": "44",
+          "3.4": "45",
+          "3.6": "47",
+          "3.8": "48",
+          "4": "52",
+          "4.2": "53",
+          "4.4": "54",
+          "4.6": "55",
+          "4.8": "56",
+          "5": "58"
+        },
+        "coupler": {
+          "0.4": "3",
+          "0.6": "5",
+          "0.8": "5",
+          "1": "5",
+          "1.2": "5",
+          "1.4": "6",
+          "1.6": "7",
+          "1.8": "8",
+          "2": "9",
+          "2.01": "9",
+          "2.2": "9",
+          "2.4": "9",
+          "2.6": "10",
+          "2.8": "11",
+          "3": "11",
+          "3.2": "11",
+          "3.4": "12",
+          "3.6": "13",
+          "3.8": "14",
+          "4": "14",
+          "4.2": "14",
+          "4.4": "15",
+          "4.6": "15",
+          "4.8": "16",
+          "5": "16"
+        },
+        "nozzle_brass": {
+          "0.4": "3",
+          "0.6": "5",
+          "0.8": "5",
+          "1": "5",
+          "1.2": "5",
+          "1.4": "6",
+          "1.6": "7",
+          "1.8": "8",
+          "2": "9",
+          "2.01": "9",
+          "2.2": "9",
+          "2.4": "9",
+          "2.6": "10",
+          "2.8": "11",
+          "3": "11",
+          "3.2": "11",
+          "3.4": "12",
+          "3.6": "13",
+          "3.8": "14",
+          "4": "14",
+          "4.2": "14",
+          "4.4": "15",
+          "4.6": "15",
+          "4.8": "16",
+          "5": "16"
+        },
+        "riser": {
+          "0.4": "3",
+          "0.6": "5",
+          "0.8": "5",
+          "1": "5",
+          "1.2": "5",
+          "1.4": "6",
+          "1.6": "7",
+          "1.8": "8",
+          "2": "9",
+          "2.01": "9",
+          "2.2": "9",
+          "2.4": "9",
+          "2.6": "10",
+          "2.8": "11",
+          "3": "11",
+          "3.2": "11",
+          "3.4": "12",
+          "3.6": "13",
+          "3.8": "14",
+          "4": "14",
+          "4.2": "14",
+          "4.4": "15",
+          "4.6": "15",
+          "4.8": "16",
+          "5": "16"
+        },
+        "pcn": {
+          "0.4": "1",
+          "0.6": "1",
+          "0.8": "1",
+          "1": "1",
+          "1.2": "1",
+          "1.4": "1",
+          "1.6": "1",
+          "1.8": "1",
+          "2": "1",
+          "2.01": "1",
+          "2.2": "1",
+          "2.4": "1",
+          "2.6": "1",
+          "2.8": "1",
+          "3": "1",
+          "3.2": "1",
+          "3.4": "1",
+          "3.6": "1",
+          "3.8": "1",
+          "4": "1",
+          "4.2": "1",
+          "4.4": "1",
+          "4.6": "1",
+          "4.8": "1",
+          "5": "1"
+        },
+        "bend": {
+          "0.4": "1",
+          "0.6": "1",
+          "0.8": "1",
+          "1": "1",
+          "1.2": "1",
+          "1.4": "1",
+          "1.6": "1",
+          "1.8": "1",
+          "2": "1",
+          "2.01": "2",
+          "2.2": "2",
+          "2.4": "2",
+          "2.6": "2",
+          "2.8": "2",
+          "3": "2",
+          "3.2": "2",
+          "3.4": "2",
+          "3.6": "2",
+          "3.8": "2",
+          "4": "2",
+          "4.2": "2",
+          "4.4": "2",
+          "4.6": "2",
+          "4.8": "2",
+          "5": "2"
+        },
+        "tee": {
+          "0.4": "1",
+          "0.6": "1",
+          "0.8": "1",
+          "1": "1",
+          "1.2": "1",
+          "1.4": "1",
+          "1.6": "1",
+          "1.8": "1",
+          "2": "1",
+          "2.01": "1",
+          "2.2": "1",
+          "2.4": "1",
+          "2.6": "1",
+          "2.8": "1",
+          "3": "1",
+          "3.2": "1",
+          "3.4": "1",
+          "3.6": "1",
+          "3.8": "1",
+          "4": "1",
+          "4.2": "1",
+          "4.4": "1",
+          "4.6": "1",
+          "4.8": "1",
+          "5": "1"
+        },
+        "end_plug": {
+          "0.4": "1",
+          "0.6": "2",
+          "0.8": "2",
+          "1": "2",
+          "1.2": "2",
+          "1.4": "2",
+          "1.6": "2",
+          "1.8": "2",
+          "2": "2",
+          "2.01": "2",
+          "2.2": "2",
+          "2.4": "2",
+          "2.6": "2",
+          "2.8": "2",
+          "3": "2",
+          "3.2": "2",
+          "3.4": "2",
+          "3.6": "2",
+          "3.8": "2",
+          "4": "2",
+          "4.2": "2",
+          "4.4": "2",
+          "4.6": "2",
+          "4.8": "2",
+          "5": "2"
+        },
+        "transport": {
+          "0.4": "0.4",
+          "0.6": "0.6",
+          "0.8": "0.8",
+          "1": "1",
+          "1.2": "1.2",
+          "1.4": "1.4",
+          "1.6": "1.6",
+          "1.8": "1.8",
+          "2": "2",
+          "2.01": "2.01",
+          "2.2": "2.2",
+          "2.4": "2.4",
+          "2.6": "2.6",
+          "2.8": "2.8",
+          "3": "3",
+          "3.2": "3.2",
+          "3.4": "3.4",
+          "3.6": "3.6",
+          "3.8": "3.8",
+          "4": "4",
+          "4.2": "4.2",
+          "4.4": "4.4",
+          "4.6": "4.6",
+          "4.8": "4.8",
+          "5": "5"
+        }
+      }
+    },
+    "example": {
+      "input": {
+        "crops": [
+          {
+            "crop": null,
+            "area": "1.4",
+            "lateral_spacing": null,
+            "lines": []
+          }
+        ],
+        "head_lines": [],
+        "group_total_area": null,
+        "installation_rate_per_ha": "0",
+        "sump_rate_per_ha": "0",
+        "nozzle": "brass",
+        "pipe_size_mm": 75,
+        "spacing_label": null,
+        "hydrocyclone_m3": "0",
+        "gravel_filter_m3": "0",
+        "head_unit_existing": false,
+        "pvc_existing": false
+      },
+      "category": "small",
+      "expected": {
+        "total_incl_gst": "27776.34",
+        "unit_cost": "28379.2",
+        "subsidy": "15276.987",
+        "farmer_share": "12794.353"
+      }
+    },
+    "source": "cg/CG-Sprinkler-Quotation-Format.xlsx"
+  },
+  "RJ/drip": {
+    "component_rates": [
+      {
+        "code": "hydrocyclone",
+        "description": "Hydrocyclone filter 20 m3",
+        "uom": "No.",
+        "rate": "4025",
+        "pipe_size_mm": 20,
+        "nozzle": null
+      },
+      {
+        "code": "hydrocyclone",
+        "description": "Hydrocyclone filter 25 m3",
+        "uom": "No.",
+        "rate": "4600",
+        "pipe_size_mm": 25,
+        "nozzle": null
+      },
+      {
+        "code": "hydrocyclone",
+        "description": "Hydrocyclone filter 30 m3",
+        "uom": "No.",
+        "rate": "6325",
+        "pipe_size_mm": 30,
+        "nozzle": null
+      },
+      {
+        "code": "gravel_filter",
+        "description": "Gravel filter 10 m3",
+        "uom": "No.",
+        "rate": "9775",
+        "pipe_size_mm": 10,
+        "nozzle": null
+      },
+      {
+        "code": "gravel_filter",
+        "description": "Gravel filter 20 m3",
+        "uom": "No.",
+        "rate": "13225",
+        "pipe_size_mm": 20,
+        "nozzle": null
+      },
+      {
+        "code": "gravel_filter",
+        "description": "Gravel filter 25 m3",
+        "uom": "No.",
+        "rate": "16100",
+        "pipe_size_mm": 25,
+        "nozzle": null
+      },
+      {
+        "code": "gravel_filter",
+        "description": "Gravel filter 30 m3",
+        "uom": "No.",
+        "rate": "18400",
+        "pipe_size_mm": 30,
+        "nozzle": null
+      },
+      {
+        "code": "pvc_deduction",
+        "description": "63 mm, 60 m at 90",
+        "uom": "Rs",
+        "rate": "5400",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "pvc_deduction",
+        "description": "75 mm, 60 m at 120",
+        "uom": "Rs",
+        "rate": "7200",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "pvc_deduction",
+        "description": "90 mm, 60 m at 170",
+        "uom": "Rs",
+        "rate": "10200",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      }
+    ],
+    "quantities": null,
+    "example": {
+      "input": {
+        "crops": [
+          {
+            "crop": null,
+            "area": "0.5",
+            "lateral_spacing": "1.2",
+            "lines": [
+              {
+                "description": "PVC pipeMain Line (4kg/cm2)main BIS:4985",
+                "uom": "M",
+                "rate": "101.6",
+                "qty": "180"
+              },
+              {
+                "description": "Pvc pipe Main(4kg/cm2)submain BIS:4985",
+                "uom": "M",
+                "rate": "82.55",
+                "qty": "120"
+              },
+              {
+                "description": "HDPE pipe SubMain(4kg/cm2)submain BIS:4984",
+                "uom": "M",
+                "rate": "101.6",
+                "qty": "0"
+              },
+              {
+                "description": "Control Valve 63MM",
+                "uom": "No.",
+                "rate": "460.8576",
+                "qty": "3"
+              },
+              {
+                "description": "Flush Valve 63MM",
+                "uom": "NOS",
+                "rate": "75.4253",
+                "qty": "3"
+              },
+              {
+                "description": "Plain Leteral BIS:12786",
+                "uom": "M",
+                "rate": "11.176",
+                "qty": "200"
+              },
+              {
+                "description": "Emmitting Pipe 16-4-30 LPH BIS :13488",
+                "uom": "M",
+                "rate": "9.62",
+                "qty": "0"
+              },
+              {
+                "description": "Online Dripper BIS:143487",
+                "uom": "NOS",
+                "rate": "2.4003",
+                "qty": "0"
+              },
+              {
+                "description": "Grommet",
+                "uom": "NOS",
+                "rate": "3.9116",
+                "qty": "200"
+              },
+              {
+                "description": "Take Off/Start Connecter",
+                "uom": "NOS",
+                "rate": "2.1463",
+                "qty": "200"
+              },
+              {
+                "description": "Joiner",
+                "uom": "NOS",
+                "rate": "2.286",
+                "qty": "200"
+              },
+              {
+                "description": "End Cap/Lateral Cock",
+                "uom": "NOS",
+                "rate": "1.6256",
+                "qty": "200"
+              },
+              {
+                "description": "Lbow",
+                "uom": "No.",
+                "rate": "54",
+                "qty": "0"
+              },
+              {
+                "description": "Tee",
+                "uom": "No.",
+                "rate": "81",
+                "qty": "0"
+              },
+              {
+                "description": "Solvent",
+                "uom": "No.",
+                "rate": "472.5",
+                "qty": "0"
+              },
+              {
+                "description": "Labour Charges",
+                "uom": "No.",
+                "rate": "2700",
+                "qty": "0"
+              }
+            ]
+          }
+        ],
+        "head_lines": [
+          {
+            "description": "Disc Filter 3\" BIS:12785",
+            "uom": "Nos.",
+            "rate": "5397.5",
+            "qty": "1"
+          },
+          {
+            "description": "Hydrocyclone Filter 3\" BIS:14743",
+            "uom": "Nos.",
+            "rate": "6571.25",
+            "qty": "1"
+          },
+          {
+            "description": "Sand Filter 3\" BIS:14606",
+            "uom": "Nos.",
+            "rate": "34925",
+            "qty": "0"
+          },
+          {
+            "description": "Ventury 2\" BIS :14483",
+            "uom": "Nos.",
+            "rate": "2636.8375",
+            "qty": "1"
+          },
+          {
+            "description": "NRV 3\"",
+            "uom": "Nos.",
+            "rate": "809.625",
+            "qty": "0"
+          },
+          {
+            "description": "Intet manifold 3\"",
+            "uom": "Nos.",
+            "rate": "754.0625",
+            "qty": "1"
+          },
+          {
+            "description": "Outlet manifold 3\"",
+            "uom": "Nos.",
+            "rate": "754.0625",
+            "qty": "1"
+          },
+          {
+            "description": "Butter Fly Valve 3\"",
+            "uom": "Nos.",
+            "rate": "1182.6875",
+            "qty": "1"
+          },
+          {
+            "description": "Air Release Valve 1\"",
+            "uom": "Nos.",
+            "rate": "95.25",
+            "qty": "1"
+          },
+          {
+            "description": "Pressure Gauge 2\"",
+            "uom": "Nos.",
+            "rate": "298.1325",
+            "qty": "2"
+          }
+        ],
+        "group_total_area": null,
+        "installation_rate_per_ha": "0",
+        "sump_rate_per_ha": "0",
+        "nozzle": null,
+        "pipe_size_mm": null,
+        "spacing_label": "1.5x0.30",
+        "hydrocyclone_m3": "20",
+        "gravel_filter_m3": "10",
+        "head_unit_existing": false,
+        "pvc_existing": false
+      },
+      "category": "others",
+      "expected": {
+        "total_incl_gst": "54620.856885",
+        "unit_cost": "73818.5",
+        "subsidy": "51672.95",
+        "farmer_share": "2947.906885"
+      }
+    },
+    "source": "rj/RJ-Drip-Quotation-Format.xlsx"
+  },
+  "RJ/mini_sprinkler": {
+    "component_rates": [
+      {
+        "code": "hydrocyclone",
+        "description": "Hydrocyclone filter 20 m3",
+        "uom": "No.",
+        "rate": "4025",
+        "pipe_size_mm": 20,
+        "nozzle": null
+      },
+      {
+        "code": "hydrocyclone",
+        "description": "Hydrocyclone filter 25 m3",
+        "uom": "No.",
+        "rate": "4600",
+        "pipe_size_mm": 25,
+        "nozzle": null
+      },
+      {
+        "code": "hydrocyclone",
+        "description": "Hydrocyclone filter 30 m3",
+        "uom": "No.",
+        "rate": "6325",
+        "pipe_size_mm": 30,
+        "nozzle": null
+      },
+      {
+        "code": "gravel_filter",
+        "description": "Gravel filter 10 m3",
+        "uom": "No.",
+        "rate": "9775",
+        "pipe_size_mm": 10,
+        "nozzle": null
+      },
+      {
+        "code": "gravel_filter",
+        "description": "Gravel filter 20 m3",
+        "uom": "No.",
+        "rate": "13225",
+        "pipe_size_mm": 20,
+        "nozzle": null
+      },
+      {
+        "code": "gravel_filter",
+        "description": "Gravel filter 25 m3",
+        "uom": "No.",
+        "rate": "16100",
+        "pipe_size_mm": 25,
+        "nozzle": null
+      },
+      {
+        "code": "gravel_filter",
+        "description": "Gravel filter 30 m3",
+        "uom": "No.",
+        "rate": "18400",
+        "pipe_size_mm": 30,
+        "nozzle": null
+      },
+      {
+        "code": "pvc_deduction",
+        "description": "63 mm, 60 m at 90",
+        "uom": "Rs",
+        "rate": "5400",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "pvc_deduction",
+        "description": "75 mm, 60 m at 120",
+        "uom": "Rs",
+        "rate": "7200",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "pvc_deduction",
+        "description": "90 mm, 60 m at 170",
+        "uom": "Rs",
+        "rate": "10200",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      }
+    ],
+    "quantities": null,
+    "example": {
+      "input": {
+        "crops": [
+          {
+            "crop": null,
+            "area": "5",
+            "lateral_spacing": "1.2",
+            "lines": [
+              {
+                "description": "PVC pipeMain Line (4kg/cm2)main BIS:4985",
+                "uom": "M",
+                "rate": "101.6",
+                "qty": "180"
+              },
+              {
+                "description": "Pvc pipe Main(4kg/cm2)submain BIS:4985",
+                "uom": "M",
+                "rate": "82.55",
+                "qty": "120"
+              },
+              {
+                "description": "HDPE pipe SubMain(4kg/cm2)submain BIS:4984",
+                "uom": "M",
+                "rate": "101.6",
+                "qty": "0"
+              },
+              {
+                "description": "Control Valve 63MM",
+                "uom": "No.",
+                "rate": "460.8576",
+                "qty": "3"
+              },
+              {
+                "description": "Flush Valve 63MM",
+                "uom": "NOS",
+                "rate": "75.4253",
+                "qty": "3"
+              },
+              {
+                "description": "PLAIN LATERAL 32MM CL-2 (100MTR)",
+                "uom": "M",
+                "rate": "11.176",
+                "qty": "200"
+              },
+              {
+                "description": "MAIN NOZZLE FOR MINI SPRINKLER",
+                "uom": "M",
+                "rate": "9.62",
+                "qty": "0"
+              },
+              {
+                "description": "Mini Sprinkler Item-2",
+                "uom": "NOS",
+                "rate": "2.4003",
+                "qty": "0"
+              },
+              {
+                "description": "Mini Sprinkler Item-3",
+                "uom": "NOS",
+                "rate": "3.9116",
+                "qty": "200"
+              },
+              {
+                "description": "Mini Sprinkler Item-9",
+                "uom": "NOS",
+                "rate": "2.1463",
+                "qty": "200"
+              },
+              {
+                "description": "Mini Sprinkler Item-10",
+                "uom": "NOS",
+                "rate": "2.286",
+                "qty": "200"
+              },
+              {
+                "description": "Mini Sprinkler Item-11",
+                "uom": "NOS",
+                "rate": "1.6256",
+                "qty": "200"
+              },
+              {
+                "description": "Lbow",
+                "uom": "No.",
+                "rate": "54",
+                "qty": "0"
+              },
+              {
+                "description": "Tee",
+                "uom": "No.",
+                "rate": "81",
+                "qty": "0"
+              },
+              {
+                "description": "Solvent",
+                "uom": "No.",
+                "rate": "472.5",
+                "qty": "0"
+              },
+              {
+                "description": "Labour Charges",
+                "uom": "No.",
+                "rate": "2700",
+                "qty": "0"
+              }
+            ]
+          }
+        ],
+        "head_lines": [
+          {
+            "description": "Disc Filter 3\" BIS:12785",
+            "uom": "Nos.",
+            "rate": "5397.5",
+            "qty": "1"
+          },
+          {
+            "description": "Hydrocyclone Filter 3\" BIS:14743",
+            "uom": "Nos.",
+            "rate": "6571.25",
+            "qty": "1"
+          },
+          {
+            "description": "Sand Filter 3\" BIS:14606",
+            "uom": "Nos.",
+            "rate": "34925",
+            "qty": "0"
+          },
+          {
+            "description": "Ventury 2\" BIS :14483",
+            "uom": "Nos.",
+            "rate": "2636.8375",
+            "qty": "1"
+          },
+          {
+            "description": "NRV 3\"",
+            "uom": "Nos.",
+            "rate": "809.625",
+            "qty": "0"
+          },
+          {
+            "description": "Intet manifold 3\"",
+            "uom": "Nos.",
+            "rate": "754.0625",
+            "qty": "1"
+          },
+          {
+            "description": "Outlet manifold 3\"",
+            "uom": "Nos.",
+            "rate": "754.0625",
+            "qty": "1"
+          },
+          {
+            "description": "Butter Fly Valve 3\"",
+            "uom": "Nos.",
+            "rate": "1182.6875",
+            "qty": "1"
+          },
+          {
+            "description": "Air Release Valve 1\"",
+            "uom": "Nos.",
+            "rate": "95.25",
+            "qty": "1"
+          },
+          {
+            "description": "Pressure Gauge 2\"",
+            "uom": "Nos.",
+            "rate": "298.1325",
+            "qty": "2"
+          }
+        ],
+        "group_total_area": null,
+        "installation_rate_per_ha": "0",
+        "sump_rate_per_ha": "0",
+        "nozzle": null,
+        "pipe_size_mm": null,
+        "spacing_label": "8x8",
+        "hydrocyclone_m3": "20",
+        "gravel_filter_m3": "10",
+        "head_unit_existing": false,
+        "pvc_existing": false
+      },
+      "category": "others",
+      "expected": {
+        "total_incl_gst": "54620.856885",
+        "unit_cost": "483690",
+        "subsidy": "338583",
+        "farmer_share": "0"
+      }
+    },
+    "source": "rj/RJ-Mini-Sprinkler-Quotation-Format.xlsx"
+  },
+  "RJ/sprinkler": {
+    "component_rates": [
+      {
+        "code": "nozzle",
+        "description": "Sprinkler Nozzles (1.7 to 2.8 Kg/cm2)  5 to 40 Litres/Minute Capacity20mm-Brass",
+        "uom": "No.",
+        "rate": "312.24",
+        "pipe_size_mm": null,
+        "nozzle": "brass"
+      },
+      {
+        "code": "nozzle",
+        "description": "Sprinkler Nozzles (1.7 to 2.8 Kg/cm2)  5 to 40 Litres/Minute Capacity20mm-Plastic",
+        "uom": "No.",
+        "rate": "101.5",
+        "pipe_size_mm": null,
+        "nozzle": "plastic"
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler63mm",
+        "uom": "No.",
+        "rate": "95.93",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler75mm",
+        "uom": "No.",
+        "rate": "117.21",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler90mm",
+        "uom": "No.",
+        "rate": "134.34",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler63mm",
+        "uom": "No.",
+        "rate": "271.64",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler75mm",
+        "uom": "No.",
+        "rate": "320.84",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler90mm",
+        "uom": "No.",
+        "rate": "359.35",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 63mm",
+        "uom": "No.",
+        "rate": "566.53",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 75mm",
+        "uom": "No.",
+        "rate": "621.93",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 90mm",
+        "uom": "No.",
+        "rate": "735.16",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action63mm",
+        "uom": "No.",
+        "rate": "384.94",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action75mm",
+        "uom": "No.",
+        "rate": "413.52",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action90mm",
+        "uom": "No.",
+        "rate": "433.31",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler63mm",
+        "uom": "No.",
+        "rate": "223.88",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler75mm",
+        "uom": "No.",
+        "rate": "298.53",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler90mm",
+        "uom": "No.",
+        "rate": "311.29",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action63mm",
+        "uom": "No.",
+        "rate": "219.54",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action75mm",
+        "uom": "No.",
+        "rate": "236.08",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action90mm",
+        "uom": "No.",
+        "rate": "320.02",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "transport",
+        "description": "Secondary Transportation",
+        "uom": "Ha",
+        "rate": "0",
+        "pipe_size_mm": null,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      }
+    ],
+    "quantities": {
+      "areas": [
+        "0.4",
+        "0.6",
+        "0.8",
+        "1",
+        "1.2",
+        "1.4",
+        "1.6",
+        "1.8",
+        "2",
+        "2.01",
+        "2.2",
+        "2.4",
+        "2.6",
+        "2.8",
+        "3",
+        "3.2",
+        "3.4",
+        "3.6",
+        "3.8",
+        "4",
+        "4.2",
+        "4.4",
+        "4.6",
+        "4.8",
+        "5"
+      ],
+      "rows": {
+        "pipe": {
+          "0.4": "18",
+          "0.6": "19",
+          "0.8": "24",
+          "1": "30",
+          "1.2": "33",
+          "1.4": "35",
+          "1.6": "37",
+          "1.8": "39",
+          "2": "41",
+          "2.01": "34",
+          "2.2": "36",
+          "2.4": "38",
+          "2.6": "38",
+          "2.8": "39",
+          "3": "41",
+          "3.2": "44",
+          "3.4": "45",
+          "3.6": "47",
+          "3.8": "48",
+          "4": "52",
+          "4.2": "53",
+          "4.4": "54",
+          "4.6": "55",
+          "4.8": "56",
+          "5": "58"
+        },
+        "coupler": {
+          "0.4": "3",
+          "0.6": "5",
+          "0.8": "5",
+          "1": "5",
+          "1.2": "5",
+          "1.4": "6",
+          "1.6": "7",
+          "1.8": "8",
+          "2": "9",
+          "2.01": "9",
+          "2.2": "9",
+          "2.4": "9",
+          "2.6": "10",
+          "2.8": "11",
+          "3": "11",
+          "3.2": "11",
+          "3.4": "12",
+          "3.6": "13",
+          "3.8": "14",
+          "4": "14",
+          "4.2": "14",
+          "4.4": "15",
+          "4.6": "15",
+          "4.8": "16",
+          "5": "16"
+        },
+        "nozzle_brass": {
+          "0.4": "3",
+          "0.6": "5",
+          "0.8": "5",
+          "1": "5",
+          "1.2": "5",
+          "1.4": "6",
+          "1.6": "7",
+          "1.8": "8",
+          "2": "9",
+          "2.01": "9",
+          "2.2": "9",
+          "2.4": "9",
+          "2.6": "10",
+          "2.8": "11",
+          "3": "11",
+          "3.2": "11",
+          "3.4": "12",
+          "3.6": "13",
+          "3.8": "14",
+          "4": "14",
+          "4.2": "14",
+          "4.4": "15",
+          "4.6": "15",
+          "4.8": "16",
+          "5": "16"
+        },
+        "riser": {
+          "0.4": "3",
+          "0.6": "5",
+          "0.8": "5",
+          "1": "5",
+          "1.2": "5",
+          "1.4": "6",
+          "1.6": "7",
+          "1.8": "8",
+          "2": "9",
+          "2.01": "9",
+          "2.2": "9",
+          "2.4": "9",
+          "2.6": "10",
+          "2.8": "11",
+          "3": "11",
+          "3.2": "11",
+          "3.4": "12",
+          "3.6": "13",
+          "3.8": "14",
+          "4": "14",
+          "4.2": "14",
+          "4.4": "15",
+          "4.6": "15",
+          "4.8": "16",
+          "5": "16"
+        },
+        "pcn": {
+          "0.4": "1",
+          "0.6": "1",
+          "0.8": "1",
+          "1": "1",
+          "1.2": "1",
+          "1.4": "1",
+          "1.6": "1",
+          "1.8": "1",
+          "2": "1",
+          "2.01": "1",
+          "2.2": "1",
+          "2.4": "1",
+          "2.6": "1",
+          "2.8": "1",
+          "3": "1",
+          "3.2": "1",
+          "3.4": "1",
+          "3.6": "1",
+          "3.8": "1",
+          "4": "1",
+          "4.2": "1",
+          "4.4": "1",
+          "4.6": "1",
+          "4.8": "1",
+          "5": "1"
+        },
+        "bend": {
+          "0.4": "1",
+          "0.6": "1",
+          "0.8": "1",
+          "1": "1",
+          "1.2": "1",
+          "1.4": "1",
+          "1.6": "1",
+          "1.8": "1",
+          "2": "1",
+          "2.01": "2",
+          "2.2": "2",
+          "2.4": "2",
+          "2.6": "2",
+          "2.8": "2",
+          "3": "2",
+          "3.2": "2",
+          "3.4": "2",
+          "3.6": "2",
+          "3.8": "2",
+          "4": "2",
+          "4.2": "2",
+          "4.4": "2",
+          "4.6": "2",
+          "4.8": "2",
+          "5": "2"
+        },
+        "tee": {
+          "0.4": "1",
+          "0.6": "1",
+          "0.8": "1",
+          "1": "1",
+          "1.2": "1",
+          "1.4": "1",
+          "1.6": "1",
+          "1.8": "1",
+          "2": "1",
+          "2.01": "1",
+          "2.2": "1",
+          "2.4": "1",
+          "2.6": "1",
+          "2.8": "1",
+          "3": "1",
+          "3.2": "1",
+          "3.4": "1",
+          "3.6": "1",
+          "3.8": "1",
+          "4": "1",
+          "4.2": "1",
+          "4.4": "1",
+          "4.6": "1",
+          "4.8": "1",
+          "5": "1"
+        },
+        "end_plug": {
+          "0.4": "1",
+          "0.6": "2",
+          "0.8": "2",
+          "1": "2",
+          "1.2": "2",
+          "1.4": "2",
+          "1.6": "2",
+          "1.8": "2",
+          "2": "2",
+          "2.01": "2",
+          "2.2": "2",
+          "2.4": "2",
+          "2.6": "2",
+          "2.8": "2",
+          "3": "2",
+          "3.2": "2",
+          "3.4": "2",
+          "3.6": "2",
+          "3.8": "2",
+          "4": "2",
+          "4.2": "2",
+          "4.4": "2",
+          "4.6": "2",
+          "4.8": "2",
+          "5": "2"
+        },
+        "transport": {
+          "0.4": "0.4",
+          "0.6": "0.6",
+          "0.8": "0.8",
+          "1": "1",
+          "1.2": "1.2",
+          "1.4": "1.4",
+          "1.6": "1.6",
+          "1.8": "1.8",
+          "2": "2",
+          "2.01": "2.01",
+          "2.2": "2.2",
+          "2.4": "2.4",
+          "2.6": "2.6",
+          "2.8": "2.8",
+          "3": "3",
+          "3.2": "3.2",
+          "3.4": "3.4",
+          "3.6": "3.6",
+          "3.8": "3.8",
+          "4": "4",
+          "4.2": "4.2",
+          "4.4": "4.4",
+          "4.6": "4.6",
+          "4.8": "4.8",
+          "5": "5"
+        }
+      }
+    },
+    "example": {
+      "input": {
+        "crops": [
+          {
+            "crop": null,
+            "area": "0.4",
+            "lateral_spacing": null,
+            "lines": []
+          }
+        ],
+        "head_lines": [],
+        "group_total_area": null,
+        "installation_rate_per_ha": "0",
+        "sump_rate_per_ha": "0",
+        "nozzle": "brass",
+        "pipe_size_mm": 63,
+        "spacing_label": null,
+        "hydrocyclone_m3": "0",
+        "gravel_filter_m3": "0",
+        "head_unit_existing": false,
+        "pvc_existing": false
+      },
+      "category": "others",
+      "expected": {
+        "total_incl_gst": "14287.3625",
+        "unit_cost": "13211",
+        "subsidy": "9247.7",
+        "farmer_share": "5039.6625"
+      }
+    },
+    "source": "rj/RJ-Sprinkler-Quotation-Format.xlsx"
+  },
+  "UP/drip": {
+    "component_rates": [],
+    "quantities": null,
+    "example": {
+      "input": {
+        "crops": [
+          {
+            "crop": null,
+            "area": "1",
+            "lateral_spacing": "1.2",
+            "lines": [
+              {
+                "description": "UPVC PIPE 90 MM 4 KG/CM2 CLASS - 2 IS: 4985",
+                "uom": "Mtr.",
+                "rate": "115.81",
+                "qty": "0"
+              },
+              {
+                "description": "UPVC PIPE 75 MM 4 KG/CM2 CLASS - 2 IS: 4985",
+                "uom": "Mtr.",
+                "rate": "81.93",
+                "qty": "90"
+              },
+              {
+                "description": "HDPE 17425 SPRINKLER PIPE 75 MM X 2.5 KG WITH SS C CLAMP COUPLER",
+                "uom": "Nos.",
+                "rate": "621.93",
+                "qty": "0"
+              },
+              {
+                "description": "HDPE PCN FEMALE COUPLER C' CLAMP WITH FLANGED 75MM",
+                "uom": "Nos.",
+                "rate": "236.08",
+                "qty": "0"
+              },
+              {
+                "description": "SPRINKLER END PLUG 75MM (FOR SPR. C CLAMP PIPE)",
+                "uom": "Nos.",
+                "rate": "117.21",
+                "qty": "0"
+              },
+              {
+                "description": "PP BALL VALVE SOLID SEAL P/E 2.5\" (75MM)",
+                "uom": "Nos.",
+                "rate": "840",
+                "qty": "1"
+              },
+              {
+                "description": "PLASTIC BUTTERFLY VALVE 2.5\"",
+                "uom": "Nos.",
+                "rate": "1161.76",
+                "qty": "0"
+              },
+              {
+                "description": "PVC FLUSH VALVE 75MM",
+                "uom": "Nos.",
+                "rate": "88.5",
+                "qty": "1"
+              },
+              {
+                "description": "LLDPE PLAIN LATERAL PIPE 16 MM  CLASS - II",
+                "uom": "Mtr.",
+                "rate": "8.96",
+                "qty": "100"
+              },
+              {
+                "description": "EMMITING DRIP XIT PIPE CL-II 16 X 40 CM 2 LPH",
+                "uom": "Nos.",
+                "rate": "12.74",
+                "qty": "2000"
+              },
+              {
+                "description": "16MM START CONNECTOR/TAKE OFF ( E )",
+                "uom": "Mtr.",
+                "rate": "1.79",
+                "qty": "100"
+              },
+              {
+                "description": "RUBBER GROMMET FOR 12 MM, 16 MM & 20 MM(E)",
+                "uom": "Mtr.",
+                "rate": "2.37",
+                "qty": "100"
+              },
+              {
+                "description": "16MM LINE END CAP ( E )",
+                "uom": "Nos.",
+                "rate": "1.63",
+                "qty": "100"
+              },
+              {
+                "description": "16MM STRAIGHT CONNECTOR/JOINER (N )",
+                "uom": "Nos.",
+                "rate": "1.79",
+                "qty": "100"
+              },
+              {
+                "description": "PVC / HDPE Fittings  L.S.",
+                "uom": "Hac",
+                "rate": "1702.71",
+                "qty": "1"
+              },
+              {
+                "description": "Secondary Transportation",
+                "uom": "Hac",
+                "rate": "0",
+                "qty": "1"
+              }
+            ]
+          }
+        ],
+        "head_lines": [
+          {
+            "description": "3\" INLET MANIFOLD FOR 3\" PP HEADER ASSEMBLY(A)",
+            "uom": "Nos.",
+            "rate": "1131.4",
+            "qty": "1"
+          },
+          {
+            "description": "3\" OUTLET MANIFOLD FOR 3\" PP HEADER ASSEMBLY(A)",
+            "uom": "Nos.",
+            "rate": "876.22",
+            "qty": "1"
+          },
+          {
+            "description": "PLASTIC HYDROCYLONE FILTER 50M3 X 3\" W/ BEND(A)",
+            "uom": "Nos.",
+            "rate": "4528.6",
+            "qty": "0"
+          },
+          {
+            "description": "PLASTIC SCREEN FILTER 50M3/HR X 3\" FLANGEND(A)",
+            "uom": "Nos.",
+            "rate": "2940.42",
+            "qty": "1"
+          },
+          {
+            "description": "PLASTIC BUTTERFLY VALVE 3\"",
+            "uom": "Nos.",
+            "rate": "1306.98",
+            "qty": "2"
+          },
+          {
+            "description": "PRESSURE GAUGE 2\" (GLYCERINE)",
+            "uom": "Nos.",
+            "rate": "254.14",
+            "qty": "2"
+          },
+          {
+            "description": "VENTURY (1\") WITH COMPLETE ASSEMBLY",
+            "uom": "Nos.",
+            "rate": "1532.29",
+            "qty": "1"
+          },
+          {
+            "description": "Air Release Valve 1\"",
+            "uom": "Nos.",
+            "rate": "40.63",
+            "qty": "1"
+          },
+          {
+            "description": "3\" BYPASS TEE FOR 3\" PP HEADER ASSEMBLY(A)",
+            "uom": "Nos.",
+            "rate": "628.55",
+            "qty": "1"
+          },
+          {
+            "description": "PP BALL VALVE FLANGED END 3\" 'D' TABLE",
+            "uom": "Nos.",
+            "rate": "1327.2",
+            "qty": "0"
+          },
+          {
+            "description": "GI Fittings",
+            "uom": "Hac",
+            "rate": "0",
+            "qty": "1"
+          }
+        ],
+        "group_total_area": "1.47",
+        "installation_rate_per_ha": "1447.98",
+        "sump_rate_per_ha": "0",
+        "nozzle": null,
+        "pipe_size_mm": null,
+        "spacing_label": null,
+        "hydrocyclone_m3": "0",
+        "gravel_filter_m3": "0",
+        "head_unit_existing": false,
+        "pvc_existing": false
+      },
+      "category": "big",
+      "expected": {
+        "total_incl_gst": "48184.63",
+        "unit_cost": "146626.15",
+        "subsidy": "38547.704",
+        "farmer_share": "9636.926"
+      }
+    },
+    "source": "up/UP-Drip-Quotation-Format.xlsx"
+  },
+  "UP/mini_sprinkler": {
+    "component_rates": [],
+    "quantities": null,
+    "example": {
+      "input": {
+        "crops": [
+          {
+            "crop": null,
+            "area": "1",
+            "lateral_spacing": "9.99",
+            "lines": [
+              {
+                "description": "UPVC PIPE 110 MM 4 KG/CM2 CLASS - 2 IS: 4985",
+                "uom": "Mtr.",
+                "rate": "165.85",
+                "qty": "186"
+              },
+              {
+                "description": "UPVC PIPE 90 MM 4 KG/CM2 CLASS - 2 IS: 4985",
+                "uom": "Mtr.",
+                "rate": "115.81",
+                "qty": "0"
+              },
+              {
+                "description": "UPVC PIPE 75 MM 4 KG/CM2 CLASS - 2 IS: 4985",
+                "uom": "Mtr.",
+                "rate": "81.93",
+                "qty": "0"
+              },
+              {
+                "description": "HDPE 17425 SPRINKLER PIPE 75 MM X 2.5 KG WITH SS C CLAMP COUPLER",
+                "uom": "Mtr.",
+                "rate": "621.93",
+                "qty": "0"
+              },
+              {
+                "description": "HDPE PCN FEMALE COUPLER C' CLAMP WITH FLANGED 75MM",
+                "uom": "Nos.",
+                "rate": "236.08",
+                "qty": "0"
+              },
+              {
+                "description": "SPRINKLER END PLUG 75MM (FOR SPR. C CLAMP PIPE)",
+                "uom": "Nos.",
+                "rate": "117.21",
+                "qty": "0"
+              },
+              {
+                "description": "UPVC PIPE 32 MM 10 KG/CM2 CLASS - 5 IS: 4985",
+                "uom": "Mtr.",
+                "rate": "32.79",
+                "qty": "36"
+              },
+              {
+                "description": "PP SERVICE SADDLE 90 MM X 1\"",
+                "uom": "Nos.",
+                "rate": "121.53",
+                "qty": "35"
+              },
+              {
+                "description": "PP SERVICE SADDLE 75 MM X 1\"",
+                "uom": "Nos.",
+                "rate": "107.94",
+                "qty": "0"
+              },
+              {
+                "description": "PVC DOUBLE NOZZLE FULL CIRCLE-R1",
+                "uom": "Nos.",
+                "rate": "78.76",
+                "qty": "131"
+              },
+              {
+                "description": "PVC SINGLE NOZZLE - ADJUSTABLE ARC AND FULL CIRCLE",
+                "uom": "Nos.",
+                "rate": "146.02",
+                "qty": "0"
+              },
+              {
+                "description": "PVC M/F ADAPTER 1/2\"-R1",
+                "uom": "Nos.",
+                "rate": "17.62",
+                "qty": "131"
+              },
+              {
+                "description": "PVC M/F CONNECTOR (9/12 MM)-R1",
+                "uom": "Nos.",
+                "rate": "11.75",
+                "qty": "262"
+              },
+              {
+                "description": "INSTALLATION STAKE 1.2 M LONG (8MM DIA)-R1",
+                "uom": "Nos.",
+                "rate": "69.72",
+                "qty": "131"
+              },
+              {
+                "description": "PVC EXTENSION TUBE 13 MM (1.2 M LONG)",
+                "uom": "Mtr.",
+                "rate": "22.59",
+                "qty": "131"
+              },
+              {
+                "description": "PVC PLUG 9/12 MM",
+                "uom": "Nos.",
+                "rate": "8.82",
+                "qty": "131"
+              },
+              {
+                "description": "LLDPE PLAIN LATERAL PIPE 32 MM  CLASS - II",
+                "uom": "Mtr.",
+                "rate": "35.58",
+                "qty": "1070"
+              },
+              {
+                "description": "PP COUPLER/JOINER 32 MM",
+                "uom": "Nos.",
+                "rate": "55.94",
+                "qty": "10"
+              },
+              {
+                "description": "PP MALE THREADED ADOPTER 32 MM X 1 \"",
+                "uom": "Nos.",
+                "rate": "60.8",
+                "qty": "0"
+              },
+              {
+                "description": "PP TEE 32 MM X 1\" X 32 MM",
+                "uom": "Nos.",
+                "rate": "72.45",
+                "qty": "0"
+              },
+              {
+                "description": "PP THREADED ELBOW 32 MM X 1 \"",
+                "uom": "Nos.",
+                "rate": "55.27",
+                "qty": "35"
+              },
+              {
+                "description": "PP Ball Valve (S/E) 32mm",
+                "uom": "Nos.",
+                "rate": "201",
+                "qty": "35"
+              },
+              {
+                "description": "PP END CAP 32 MM",
+                "uom": "Nos.",
+                "rate": "35.59",
+                "qty": "35"
+              },
+              {
+                "description": "AIR RELEASE VALVE 1\"",
+                "uom": "Nos.",
+                "rate": "40.63",
+                "qty": "0"
+              },
+              {
+                "description": "PLASTIC BUTTERFLY VALVE 4\"",
+                "uom": "Nos.",
+                "rate": "1597.41",
+                "qty": "1"
+              },
+              {
+                "description": "PVC FLUSH VALVE 90 MM",
+                "uom": "Nos./Mtr.",
+                "rate": "125.24",
+                "qty": "1"
+              },
+              {
+                "description": "PVC / HDPE Fittings  L.S.",
+                "uom": "Hac",
+                "rate": "1702.71",
+                "qty": "1"
+              },
+              {
+                "description": "Secondary Transportation",
+                "uom": "Hac",
+                "rate": "0",
+                "qty": "1"
+              }
+            ]
+          }
+        ],
+        "head_lines": [
+          {
+            "description": "3\" INLET MANIFOLD FOR 3\" PP HEADER ASSEMBLY(A)",
+            "uom": "Nos.",
+            "rate": "1131.4",
+            "qty": "1"
+          },
+          {
+            "description": "3\" OUTLET MANIFOLD FOR 3\" PP HEADER ASSEMBLY(A)",
+            "uom": "Nos.",
+            "rate": "876.22",
+            "qty": "1"
+          },
+          {
+            "description": "PLASTIC HYDROCYLONE FILTER 50M3 X 3\" W/ BEND(A)",
+            "uom": "Nos.",
+            "rate": "4528.6",
+            "qty": "1"
+          },
+          {
+            "description": "PLASTIC DISC FILTER 50M3/HR X 3\" FLANGED(A)",
+            "uom": "Nos.",
+            "rate": "7106.63",
+            "qty": "1"
+          },
+          {
+            "description": "PLASTIC BUTTERFLY VALVE 3\"",
+            "uom": "Nos.",
+            "rate": "1306.98",
+            "qty": "2"
+          },
+          {
+            "description": "PRESSURE GAUGE 2\" (GLYCERINE)",
+            "uom": "Nos.",
+            "rate": "254.14",
+            "qty": "2"
+          },
+          {
+            "description": "FERTILIZER INJECTOR 2\" WITH ASSLY FOR PP HEADER-A",
+            "uom": "Nos.",
+            "rate": "3617",
+            "qty": "1"
+          },
+          {
+            "description": "AIR RELEASE VALVE 1 1/2\"",
+            "uom": "Nos.",
+            "rate": "304.95",
+            "qty": "1"
+          },
+          {
+            "description": "3\" BYPASS TEE FOR 3\" PP HEADER ASSEMBLY(A)",
+            "uom": "Nos.",
+            "rate": "628.55",
+            "qty": "1"
+          },
+          {
+            "description": "PP BALL VALVE FLANGED END 3\" 'D' TABLE",
+            "uom": "Nos.",
+            "rate": "1327.2",
+            "qty": "0"
+          },
+          {
+            "description": "GI Fittings",
+            "uom": "Hac",
+            "rate": "0",
+            "qty": "0"
+          }
+        ],
+        "group_total_area": "1",
+        "installation_rate_per_ha": "1447.98",
+        "sump_rate_per_ha": "0",
+        "nozzle": null,
+        "pipe_size_mm": null,
+        "spacing_label": null,
+        "hydrocyclone_m3": "0",
+        "gravel_filter_m3": "0",
+        "head_unit_existing": false,
+        "pvc_existing": false
+      },
+      "category": "small",
+      "expected": {
+        "total_incl_gst": "148230.8",
+        "unit_cost": "108310.09925",
+        "subsidy": "97479.089325",
+        "farmer_share": "50751.710675"
+      }
+    },
+    "source": "up/UP-Mini-Sprinkler-Quotation-Format.xlsx"
+  },
+  "UP/sprinkler": {
+    "component_rates": [
+      {
+        "code": "nozzle",
+        "description": "Sprinkler Nozzles (1.7 to 2.8 Kg/cm2)  5 to 40 Litres/Minute Capacity20mm-Brass",
+        "uom": "No.",
+        "rate": "312.24",
+        "pipe_size_mm": null,
+        "nozzle": "brass"
+      },
+      {
+        "code": "nozzle",
+        "description": "Sprinkler Nozzles (1.7 to 2.8 Kg/cm2)  5 to 40 Litres/Minute Capacity20mm-Plastic",
+        "uom": "No.",
+        "rate": "101.5",
+        "pipe_size_mm": null,
+        "nozzle": "plastic"
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler63mm",
+        "uom": "No.",
+        "rate": "95.93",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler75mm",
+        "uom": "No.",
+        "rate": "117.21",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler90mm",
+        "uom": "No.",
+        "rate": "134.34",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "end_plug",
+        "description": "End Plug with Quick Action Coupler110mm",
+        "uom": "No.",
+        "rate": "238",
+        "pipe_size_mm": 110,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler63mm",
+        "uom": "No.",
+        "rate": "271.64",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler75mm",
+        "uom": "No.",
+        "rate": "320.84",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler90mm",
+        "uom": "No.",
+        "rate": "359.35",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "tee",
+        "description": "Tee with Quick Action coupler110mm",
+        "uom": "No.",
+        "rate": "675",
+        "pipe_size_mm": 110,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 63mm",
+        "uom": "No.",
+        "rate": "566.53",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 75mm",
+        "uom": "No.",
+        "rate": "621.93",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 90mm",
+        "uom": "No.",
+        "rate": "735.16",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "pipe",
+        "description": "HDPE Pipes with Quick Action Coupler ( 6 m Long) 110mm",
+        "uom": "No.",
+        "rate": "1336",
+        "pipe_size_mm": 110,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action63mm",
+        "uom": "No.",
+        "rate": "384.94",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action75mm",
+        "uom": "No.",
+        "rate": "413.52",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action90mm",
+        "uom": "No.",
+        "rate": "433.31",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "coupler",
+        "description": "Sprinkler Coupler with Foot Batten Assembly Quick Action110mm",
+        "uom": "No.",
+        "rate": "904",
+        "pipe_size_mm": 110,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler63mm",
+        "uom": "No.",
+        "rate": "223.88",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler75mm",
+        "uom": "No.",
+        "rate": "298.53",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler90mm",
+        "uom": "No.",
+        "rate": "311.29",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "bend",
+        "description": "Bend with Quick Action coupler110mm",
+        "uom": "No.",
+        "rate": "556",
+        "pipe_size_mm": 110,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action63mm",
+        "uom": "No.",
+        "rate": "219.54",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action75mm",
+        "uom": "No.",
+        "rate": "236.08",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action90mm",
+        "uom": "No.",
+        "rate": "320.02",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "pcn",
+        "description": "Pump Conecting Coupler/Nipple with Quick Action110mm",
+        "uom": "No.",
+        "rate": "593",
+        "pipe_size_mm": 110,
+        "nozzle": null
+      },
+      {
+        "code": "transport",
+        "description": "Secondary Transportation",
+        "uom": "Ha",
+        "rate": "0",
+        "pipe_size_mm": null,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 63,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 75,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 90,
+        "nozzle": null
+      },
+      {
+        "code": "riser",
+        "description": "Riser Pipe 20mm Diameter x 75 cm Long",
+        "uom": "No.",
+        "rate": "94.06",
+        "pipe_size_mm": 110,
+        "nozzle": null
+      }
+    ],
+    "quantities": {
+      "areas": [
+        "0.4",
+        "0.6",
+        "0.8",
+        "1",
+        "1.2",
+        "1.4",
+        "1.6",
+        "1.8",
+        "2",
+        "2.01",
+        "2.2",
+        "2.4",
+        "2.6",
+        "2.8",
+        "3",
+        "3.2",
+        "3.4",
+        "3.6",
+        "3.8",
+        "4",
+        "4.2",
+        "4.4",
+        "4.6",
+        "4.8",
+        "5"
+      ],
+      "rows": {
+        "pipe": {
+          "0.4": "14",
+          "0.6": "19",
+          "0.8": "24",
+          "1": "30",
+          "1.2": "33",
+          "1.4": "35",
+          "1.6": "37",
+          "1.8": "39",
+          "2": "41",
+          "2.01": "34",
+          "2.2": "36",
+          "2.4": "38",
+          "2.6": "38",
+          "2.8": "39",
+          "3": "41",
+          "3.2": "44",
+          "3.4": "45",
+          "3.6": "47",
+          "3.8": "48",
+          "4": "52",
+          "4.2": "53",
+          "4.4": "54",
+          "4.6": "55",
+          "4.8": "56",
+          "5": "58"
+        },
+        "coupler": {
+          "0.4": "5",
+          "0.6": "5",
+          "0.8": "5",
+          "1": "5",
+          "1.2": "5",
+          "1.4": "6",
+          "1.6": "7",
+          "1.8": "8",
+          "2": "9",
+          "2.01": "9",
+          "2.2": "9",
+          "2.4": "9",
+          "2.6": "10",
+          "2.8": "11",
+          "3": "11",
+          "3.2": "11",
+          "3.4": "12",
+          "3.6": "13",
+          "3.8": "14",
+          "4": "14",
+          "4.2": "14",
+          "4.4": "15",
+          "4.6": "15",
+          "4.8": "16",
+          "5": "16"
+        },
+        "nozzle_brass": {
+          "0.4": "5",
+          "0.6": "5",
+          "0.8": "5",
+          "1": "5",
+          "1.2": "5",
+          "1.4": "6",
+          "1.6": "7",
+          "1.8": "8",
+          "2": "9",
+          "2.01": "9",
+          "2.2": "9",
+          "2.4": "9",
+          "2.6": "10",
+          "2.8": "11",
+          "3": "11",
+          "3.2": "11",
+          "3.4": "12",
+          "3.6": "13",
+          "3.8": "14",
+          "4": "14",
+          "4.2": "14",
+          "4.4": "15",
+          "4.6": "15",
+          "4.8": "16",
+          "5": "16"
+        },
+        "riser": {
+          "0.4": "5",
+          "0.6": "5",
+          "0.8": "5",
+          "1": "5",
+          "1.2": "5",
+          "1.4": "6",
+          "1.6": "7",
+          "1.8": "8",
+          "2": "9",
+          "2.01": "9",
+          "2.2": "9",
+          "2.4": "9",
+          "2.6": "10",
+          "2.8": "11",
+          "3": "11",
+          "3.2": "11",
+          "3.4": "12",
+          "3.6": "13",
+          "3.8": "14",
+          "4": "14",
+          "4.2": "14",
+          "4.4": "15",
+          "4.6": "15",
+          "4.8": "16",
+          "5": "16"
+        },
+        "pcn": {
+          "0.4": "1",
+          "0.6": "1",
+          "0.8": "1",
+          "1": "1",
+          "1.2": "1",
+          "1.4": "1",
+          "1.6": "1",
+          "1.8": "1",
+          "2": "1",
+          "2.01": "1",
+          "2.2": "1",
+          "2.4": "1",
+          "2.6": "1",
+          "2.8": "1",
+          "3": "1",
+          "3.2": "1",
+          "3.4": "1",
+          "3.6": "1",
+          "3.8": "1",
+          "4": "1",
+          "4.2": "1",
+          "4.4": "1",
+          "4.6": "1",
+          "4.8": "1",
+          "5": "1"
+        },
+        "bend": {
+          "0.4": "1",
+          "0.6": "1",
+          "0.8": "1",
+          "1": "1",
+          "1.2": "1",
+          "1.4": "1",
+          "1.6": "1",
+          "1.8": "1",
+          "2": "1",
+          "2.01": "2",
+          "2.2": "2",
+          "2.4": "2",
+          "2.6": "2",
+          "2.8": "2",
+          "3": "2",
+          "3.2": "2",
+          "3.4": "2",
+          "3.6": "2",
+          "3.8": "2",
+          "4": "2",
+          "4.2": "2",
+          "4.4": "2",
+          "4.6": "2",
+          "4.8": "2",
+          "5": "2"
+        },
+        "tee": {
+          "0.4": "1",
+          "0.6": "1",
+          "0.8": "1",
+          "1": "1",
+          "1.2": "1",
+          "1.4": "1",
+          "1.6": "1",
+          "1.8": "1",
+          "2": "1",
+          "2.01": "1",
+          "2.2": "1",
+          "2.4": "1",
+          "2.6": "1",
+          "2.8": "1",
+          "3": "1",
+          "3.2": "1",
+          "3.4": "1",
+          "3.6": "1",
+          "3.8": "1",
+          "4": "1",
+          "4.2": "1",
+          "4.4": "1",
+          "4.6": "1",
+          "4.8": "1",
+          "5": "1"
+        },
+        "end_plug": {
+          "0.4": "2",
+          "0.6": "2",
+          "0.8": "2",
+          "1": "2",
+          "1.2": "2",
+          "1.4": "2",
+          "1.6": "2",
+          "1.8": "2",
+          "2": "2",
+          "2.01": "2",
+          "2.2": "2",
+          "2.4": "2",
+          "2.6": "2",
+          "2.8": "2",
+          "3": "2",
+          "3.2": "2",
+          "3.4": "2",
+          "3.6": "2",
+          "3.8": "2",
+          "4": "2",
+          "4.2": "2",
+          "4.4": "2",
+          "4.6": "2",
+          "4.8": "2",
+          "5": "2"
+        },
+        "transport": {
+          "0.4": "0.4",
+          "0.6": "0.6",
+          "0.8": "0.8",
+          "1": "1",
+          "1.2": "1.2",
+          "1.4": "1.4",
+          "1.6": "1.6",
+          "1.8": "1.8",
+          "2": "2",
+          "2.01": "2.01",
+          "2.2": "2.2",
+          "2.4": "2.4",
+          "2.6": "2.6",
+          "2.8": "2.8",
+          "3": "3",
+          "3.2": "3.2",
+          "3.4": "3.4",
+          "3.6": "3.6",
+          "3.8": "3.8",
+          "4": "4",
+          "4.2": "4.2",
+          "4.4": "4.4",
+          "4.6": "4.6",
+          "4.8": "4.8",
+          "5": "5"
+        }
+      }
+    },
+    "example": {
+      "input": {
+        "crops": [
+          {
+            "crop": null,
+            "area": "1",
+            "lateral_spacing": null,
+            "lines": []
+          }
+        ],
+        "head_lines": [],
+        "group_total_area": null,
+        "installation_rate_per_ha": "0",
+        "sump_rate_per_ha": "0",
+        "nozzle": "brass",
+        "pipe_size_mm": 90,
+        "spacing_label": null,
+        "hydrocyclone_m3": "0",
+        "gravel_filter_m3": "0",
+        "head_unit_existing": false,
+        "pvc_existing": false
+      },
+      "category": "small",
+      "expected": {
+        "total_incl_gst": "29123.7995",
+        "unit_cost": "27823",
+        "subsidy": "20867.25",
+        "farmer_share": "8256.5495"
+      }
+    },
+    "source": "up/UP-Sprinkler-Quotation-Format.xlsx"
+  }
+}

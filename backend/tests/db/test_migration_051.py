@@ -52,9 +52,10 @@ async def test_app_role_reads_ratings_and_writes_them_only_through_the_definer(d
 
 
 async def test_a_rating_names_exactly_the_columns_of_its_target(db: AsyncSession) -> None:
-    ins = ("INSERT INTO rating (target, sales_order_id, complaint_id, product_id, rated_by, score, entered_by) "
+    # entered_via: NOT NULL since 057 (FS-060)
+    ins = ("INSERT INTO rating (target, sales_order_id, complaint_id, product_id, rated_by, score, entered_by, entered_via) "
            "VALUES (:t, CAST(:o AS uuid), CAST(:c AS uuid), CAST(:p AS uuid), 'customer', 3, "
-           "(SELECT id FROM app_user LIMIT 1))")
+           "(SELECT id FROM app_user LIMIT 1), 'staff')")
     some = "00000000-0000-0000-0000-000000000001"
     await _refused(db, ins, {"t": "installation", "o": None, "c": some, "p": None}, "ck_rating_target")
     await _refused(db, ins, {"t": "service", "o": some, "c": None, "p": None}, "ck_rating_target")
