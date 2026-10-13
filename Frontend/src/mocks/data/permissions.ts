@@ -63,8 +63,11 @@ function manager(scope: Scope): MockModulePermission[] {
       (entry) =>
         entry.module !== "quotations" &&
         entry.module !== "sales_orders" &&
-        entry.module !== "complaints",
+        entry.module !== "complaints" &&
+        entry.module !== "partners",
     ),
+    // District and State Managers add and correct partners in their area (RBAC.md §6.1).
+    grant("partners", ["view", "create", "edit"], scope),
     // Managers check complaints before QC (RBAC.md §6.1: complaints CEA).
     grant("complaints", ["view", "create", "edit", "approve"], scope),
     // Managers approve orders and quotation discounts (RBAC.md §6.1).
@@ -96,8 +99,12 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
     case "regional_manager":
       // Regional Managers watch subsidy applications but don't change them (handover).
       return [
-        ...manager("territory").filter((entry) => entry.module !== "subsidy"),
+        ...manager("territory").filter(
+          (entry) => entry.module !== "subsidy" && entry.module !== "partners",
+        ),
         grant("subsidy", ["view"], "territory"),
+        // Regional Managers read partners only (RBAC.md §6.1).
+        grant("partners", ["view"], "territory"),
       ];
     case "admin":
       return MODULE_CODES.map((module) => grant(module, PERMISSION_ACTIONS, "global"));

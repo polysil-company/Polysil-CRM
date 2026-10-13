@@ -43,6 +43,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
+| [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #112, stacked on PR #111 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -414,6 +415,36 @@ Screens:
 
 In the mock, any `.xlsx` gets a sample workbook (the mock reads CSV only). The backend reads both.
 
+## Channel partners
+
+Channel → **Channel partners** (`/partners`), for staff who read partners (`backend/docs/api/partners.md`). Admin-Sales and the MD do everything. District and State Managers add, edit, close and reopen in their area. Field officers and Regional Managers read only. Partner users have no menu item and are refused the page. Walked through in the mock at desktop light and phone dark; axe found nothing. Not yet checked on staging.
+
+Screens:
+
+- Desktop, light: [the list](screenshots/partners/partners-list-desktop-light.jpg), [a distributor](screenshots/partners/partner-detail-desktop-light.jpg), [a new dealer's missing fields](screenshots/partners/partner-new-errors-desktop-light.jpg), [added](screenshots/partners/partner-added-desktop-light.jpg), [close](screenshots/partners/partner-close-desktop-light.jpg), [import: match](screenshots/partners/partners-import-match-desktop-light.jpg), [import: review](screenshots/partners/partners-import-review-desktop-light.jpg).
+- Phone, dark: [the list](screenshots/partners/partners-list-phone-dark.jpg), [a dealer](screenshots/partners/partner-detail-phone-dark.jpg), [edit](screenshots/partners/partner-edit-phone-dark.jpg).
+
+- **CHNL-001 · Find a partner.**
+  - The list is newest first with a total: type, code, the partner above, territory, contact and active users.
+  - Search by name, code or contact person. Filter by type, and by Open (the default), Closed, or both.
+  - From a partner's page, "See the dealers under it" opens the list filtered to that partner, named in an "Under …" chip.
+  - Download Excel exports the filtered list. Empty and filtered-empty each say what to do.
+  - A partner's page has four cards: Where it sits, Business, Contact, and Credit terms (staff only). 🧪 👀
+- **CHNL-002 · Add a partner.**
+  - Pick Distributor, Dealer or Sub-dealer. A dealer then asks for its distributor, and a sub-dealer for its dealer, from the open ones.
+  - Then the territory, code, business name, optional GSTIN, PAN and GST registration, contact details and credit terms.
+  - Missing or misshapen fields are named before sending. A used code comes back on its field.
+  - **Add a dealer** on a distributor's page starts the form under it, in its territory. 🧪 👀
+- **CHNL-003 · Correct a partner.** Only what changed is sent, and the form says "Nothing changed yet" until something does. The code, type and parent are fixed; payment terms take 0 to 365 days. 🧪 👀
+- **CHNL-004 · Close or reopen.** Close says how many users will be signed out and deactivated. Reopen says they stay deactivated until reactivated in Users & roles. A closed partner can't be edited until reopened. 🧪 👀
+- **CHNL-005 · Import partners from Excel.**
+  - The same import dialog as price lists. A dealer names its distributor's code, which may be a row in the same file.
+  - The review gives each bad row's reason, such as "no district 'Nowhere' in Gujarat", "CP-002 is already in use" or a wrong-type parent.
+  - The preview shows the territory the backend worked out.
+  - **Import good rows only** adds the rest, parents first. 🧪 👀
+
+Open with the client: whether distributors and dealers should add their own dealers and sub-dealers from the portal, as the backend allows.
+
 ## Not built yet
 
 The backend serves these, and the frontend has no screen for them — in the order of [Plan.md §9.3](Plan.md):
@@ -421,4 +452,4 @@ The backend serves these, and the frontend has no screen for them — in the ord
 1. A consolidated order from several quotations on leads of one dealer.
 2. Complaint types, with the other lookups in the admin masters. Everything else in complaints is in PR #57 and PR #58.
 3. The subsidy masters and their revisions (categories, parameters, rates, crop spacings, matrices).
-4. Admin masters: offices, territories, partners. Users and roles are in PR #90; products, price lists and tax rates in PR #95.
+4. Admin masters: offices and territories. Users and roles are in PR #90; products, price lists and tax rates in PR #95; channel partners in PR #112.
