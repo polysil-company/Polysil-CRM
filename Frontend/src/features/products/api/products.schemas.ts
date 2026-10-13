@@ -24,6 +24,15 @@ export const GST_SLABS = ["0", "0.25", "3", "5", "12", "18", "28"] as const;
 export const CHANNEL_TIERS = ["distributor", "dealer", "sub_dealer", "farmer"] as const;
 export type ChannelTier = (typeof CHANNEL_TIERS)[number];
 
+/**
+ * MSTR-008 · The sale types a price list may be for (FS-061). A quotation or order of that type
+ * prices from it before any general list; a list with none is general and prices every type.
+ */
+export const PRICE_LIST_SALES_TYPES = ["commercial", "industrial", "subsidised"] as const;
+export type PriceListSalesType = (typeof PRICE_LIST_SALES_TYPES)[number];
+/** The list filter: one sale type, or `general` for the lists with none. */
+export type PriceListSalesTypeFilter = PriceListSalesType | "general";
+
 const offsetMetaSchema = z.object({
   page: z.number().int().positive(),
   limit: z.number().int().positive(),
@@ -210,6 +219,8 @@ const priceListWireSchema = z.object({
   is_provisional: z.boolean(),
   item_count: z.number().int().nonnegative(),
   unpriced_count: z.number().int().nonnegative(),
+  /** MSTR-008 · Null (or absent, before FS-061): a general list. */
+  sales_type: z.enum(PRICE_LIST_SALES_TYPES).nullish(),
 });
 
 export type PriceListWire = z.input<typeof priceListWireSchema>;
@@ -228,6 +239,8 @@ export interface PriceList {
   readonly provisional: boolean;
   readonly itemCount: number;
   readonly unpricedCount: number;
+  /** Null: a general list, for every sale type. Fixed once created. */
+  readonly salesType: PriceListSalesType | null;
 }
 
 function toPriceList(wire: z.output<typeof priceListWireSchema>): PriceList {
@@ -243,6 +256,7 @@ function toPriceList(wire: z.output<typeof priceListWireSchema>): PriceList {
     provisional: wire.is_provisional,
     itemCount: wire.item_count,
     unpricedCount: wire.unpriced_count,
+    salesType: wire.sales_type ?? null,
   };
 }
 
@@ -307,6 +321,8 @@ export interface CreatePriceListRequest {
   readonly channel_tier: ChannelTier | null;
   readonly effective_to: string | null;
   readonly source_note: string | null;
+  /** MSTR-008 · Null for every sale type. */
+  readonly sales_type: PriceListSalesType | null;
 }
 
 export const publishResultSchema = z

@@ -7,10 +7,15 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-44 changes, newest first. Each title opens its entry.
+48 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-13 | [Documents on leads, quotations, orders and dispatches](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md) | `feature` | `DOC-001` `DOC-002` `DOC-003` |
+| 2026-10-13 | [Channel partners: list, add, correct, close and import](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md) | `feature` | `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` |
+| 2026-10-13 | [Excel import with column matching, and price lists by sale type](changelog/entries/2026-10-13--feature--MSTR-007--excel-import-with-column-matching-and-price-lists-by-sale.md) | `feature` | `MSTR-007` `MSTR-008` |
+| 2026-10-12 | [A frontend handover: the build process, step by step, and everything left](changelog/entries/2026-10-12--docs--REPO-001--a-frontend-handover-the-build-process-step-by-step-and.md) | `docs` | `REPO-001` |
+| 2026-10-12 | [Go-live fixes from the 10 Oct staging walk](changelog/entries/2026-10-12--fix--APP-006--go-live-fixes-from-the-10-oct-walk.md) | `fix` | `APP-006` `APP-003` `LEAD-003` `LEAD-005` `LEAD-008` `LEAD-013` `LEAD-014` `APPR-001` `APPR-002` `QUOT-002` `SO-002` `CMPL-003` `AUTH-001` |
 | 2026-10-11 | [Products and prices: the catalogue, GST by HSN code, and price lists](changelog/entries/2026-10-11--feature--MSTR-004--products-and-prices-the-catalogue-gst-by-hsn-code-and-price.md) | `feature` | `MSTR-004` `MSTR-005` `MSTR-006` |
 | 2026-10-10 | [Demo 2: the new flows, click by click](changelog/entries/2026-10-10--docs--APP-001--demo-2-the-new-flows-click-by-click.md) | `docs` | `APP-001` |
 | 2026-10-10 | [Users and roles: people, accounts and leavers](changelog/entries/2026-10-10--feature--ADMN-001--users-and-roles-people-accounts-and-leavers.md) | `feature` | `ADMN-001` `ADMN-002` `ADMN-003` `ADMN-004` `ADMN-005` `ADMN-006` |
@@ -55,6 +60,370 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 13 October 2026
+
+### Documents on leads, quotations, orders and dispatches
+
+`feature` · `DOC-001` `DOC-002` `DOC-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md)
+
+#### Before
+
+The client handles purchase orders, payment slips, invoices and transport receipts outside the app. The backend now keeps them on the record they belong to (FS-050, `backend/docs/api/documents.md`, handover `documents-and-replacement-chain.md`). The frontend had no screen for it, so a bill or PO PDF could not be attached anywhere.
+
+#### Now
+
+- **A Documents card** on the lead, quotation and order pages, and a Documents section on each dispatch on the order page.
+  - The list is newest first. Each row shows the document's name (or its type), the type, the file name and size, and who added it and when.
+  - **Open** uses the backend's ten-minute link, which is renewed before it runs out and is never fetched with the bearer token. A HEIC photo, which browsers can't show, is offered as **Download** instead.
+- **On the lead**, the card shows everything on the lead and on what came from it: its quotations, their orders, those orders' dispatches, and leads merged into it. Each row names its record, such as "Quotation QT/GJ/…" or "Order SO/GJ/…", linked where the record has a page.
+- **Attach a file** (DOC-002).
+  - **The form.** Pick what it is from the backend's types, then give a name for "Other" (a note otherwise, up to 80 characters), then choose one file.
+  - **Checks before sending.** A missing type or file, a missing name for "Other", a file over 10 MB, and a file that isn't JPEG, PNG, WebP, HEIC or PDF are each named first.
+  - **Refusals.** Each backend refusal has its sentence: 413; `attachment_type`; `too_many_documents` at 50; `record_closed` on a merged lead or a voided dispatch; `storage_unavailable`; 403; 404.
+  - **The same file again.** It answers with the one already there, and the toast says so.
+- **Remove** (DOC-003) asks first. It's offered to whoever added the document, and to staff who may add to the record it sits on (on a lead, the lead's own documents).
+- **Who adds**, from the handover:
+  - Leads: whoever edits them, a dealer on their own leads.
+  - Quotations: staff who edit quotations.
+  - Orders: whoever edits them.
+  - Dispatches: Dispatch, or the order's editor.
+  - A merged lead and a voided dispatch take none.
+- Checked on a phone in dark mode and a desktop in light mode. axe found nothing.
+
+#### Discussion
+
+- **One component, two shapes.** It's a card on a page. On the order page each dispatch gets a section, named after its number ("Documents on D/SO/…") so the lists and buttons on that page stay distinct.
+- **Links are fetched one per document and renewed every nine minutes**, as the complaint and subsidy files do. A list holds 50 documents at most.
+- **The type picker shows every type the backend lists.** That includes the five a dealer application uses (GST certificate, PAN card…). BE-025 asks for a `record_type` filter rather than the frontend hard-coding which types to hide.
+- **Payments aren't built here.** The backend takes documents on payments (Accounts). There is no payments screen yet, so none is offered.
+- **Stacked on #111** for its upload plumbing: the multipart reader in the mock, multipart in jsdom tests, and `formatFileSize`.
+
+#### Files changed
+
+- `src/features/documents/` — new: the contract, calls, queries, mutations and tests; refusal messages; the `RecordDocuments` card with its attach and remove dialogs, and its tests.
+- `src/features/leads/components/lead-detail.tsx` — the lead's documents card.
+- `src/features/quotations/components/quotation-detail.tsx` — the quotation's documents card.
+- `src/features/orders/components/order-detail.tsx`, `order-dispatches.tsx` — the order's card, and a section per dispatch.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — the DOC domain; DOC-001 to DOC-003.
+- `src/mocks/data/documents.ts`, `src/mocks/handlers/documents.ts` — new: the types, a seeded story, and the endpoints with the backend's rules. Also `db.ts`, `handlers/index.ts` and `data/reference.ts`.
+- `../docs/Backend-Tasks.md` — BE-025.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/documents/` — records and screens.
+
+#### Tests
+
+- `src/features/documents/api/documents.test.ts`:
+  - `[DOC-001]`: types; one record's list; a lead's whole story with labels; the link; 404.
+  - `[DOC-002]`: attach, and the same file again; Other unnamed; a wrong type; over 10 MB; quotations staff only; a merged lead; a voided dispatch.
+  - `[DOC-003]`: remove; a partner refused someone else's.
+- `src/features/documents/components/record-documents.test.tsx`:
+  - The order's list, with Open and Download.
+  - The lead's story, with record links.
+  - Nothing to add on a closed record.
+  - Attach, with its missing fields, the name for Other, and success.
+  - A bad file refused before sending.
+  - Remove.
+- Walked through in the mock:
+  - On the desktop in light mode: the lead, the order (with a dispatch's section) and the quotation; attach and remove on the order.
+  - On a phone in dark mode: the lead's card and the attach dialog.
+  - As a dealer on its lead: Attach is offered, but not Remove on Polysil's files.
+### Channel partners: list, add, correct, close and import
+
+`feature` · `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md)
+
+#### Before
+
+"Channel partners" in the menu said "Soon". The backend serves the partner admin (`backend/docs/api/partners.md`) and the partner Excel import (`imports.md`, `kind=partners`) on `integration`. Without a screen, the client had no way to add a distributor, or a dealer or sub-dealer under one, before quoting through them.
+
+#### Now
+
+- **Channel partners** (`/partners`) is live for staff who read partners.
+  - The list is newest first, with a total. Each row shows the type, code, the partner above, territory, contact and active users.
+  - Search by name, code or contact person. Filter by type and by Open, Closed, or both (open by default). A partner's page links to the partners under it, which arrive as an "Under …" filter chip.
+  - **Download Excel** exports the filtered list. **Show more** pages on, and keeps the rows already shown if the next page fails.
+- **A partner's page** has four cards:
+  - Where it sits: its type and price tier, the partner above it (linked), its territory, and a link to those under it.
+  - Business: GSTIN, PAN, GST registration, active users, and when it was added.
+  - Contact.
+  - Credit terms, shown to staff only.
+  - Actions: **Edit**; **Close** or **Reopen**; **Add a dealer** (or **Add a sub-dealer**) under it. A closed partner says what closing means.
+- **New partner** (CHNL-002).
+  - Choose Distributor, Dealer or Sub-dealer first. A dealer then asks for its distributor, and a sub-dealer for its dealer, from the open partners of that type.
+  - Then the territory, code, business name, GSTIN, PAN, GST registration, contact details and credit terms.
+  - The form names what is missing or misshapen before sending. A refusal returns to its field, such as "Already in use." for a used code.
+  - Opened from a partner's page, the form starts as the next type down under that partner, in that partner's territory.
+- **Edit** (CHNL-003) sends only what changed and says "Nothing changed yet" until something does. A cleared optional field is sent as null. The code, the type and the parent are shown but fixed, and only staff see the territory and credit terms.
+- **Close** (CHNL-004) says how many users will be signed out and deactivated. **Reopen** says the partner's users stay deactivated until each is reactivated in Users & roles.
+- **Import from Excel** (CHNL-005) reuses the import dialog from MSTR-007.
+  - A dealer names its distributor's code, which may be a row in the same file.
+  - The review shows each bad row's reason as the backend words it. The preview shows the territory the backend worked out from the state and district.
+  - **Import good rows only** adds the rest, parents first.
+- **Who sees it.** Admin-Sales and the MD do everything. District and State Managers add, edit, close and reopen partners in their area (`partners.edit`). Field officers and Regional Managers read only. Partner users get no menu item, and the page is closed to them (APP-006).
+- Checked on a phone in dark mode and on a desktop in light mode. axe found nothing.
+
+#### Discussion
+
+- **Staff only for now.** The backend also lets a distributor or dealer add the next type down under itself from the portal, with no credit terms. That needs a portal menu item and the partner's own id as the parent. Both wait on the client's word: `TODO(CHNL-002)` sits on the nav item, and the question is in the pull request.
+- **Credit terms are recorded, not enforced.** The contract says so (H12), and the form's help text says so too.
+- **Closing is staff only.** It needs `partners.edit`, and the backend refuses a partner user even with it.
+- **Mock changes.**
+  - The mock's partners live in `mockDb.partners`, seeded from the shared `MOCK_PARTNERS`, so leads, orders and users still point at the same ids.
+  - `/lookups/partners` now reads the same table, so a partner added here can be picked on a lead.
+  - District and State Managers gain `partners.create` and `edit` in the mock, as in RBAC.md §6.1. Regional Managers keep view.
+- **Import mock.** The mock's partner fields are now the backend's, `GST registered` included. Its row rules follow `domain/imports/rows.py` (`parse_partners`, `finish_partners`): type words, state by name or code, district in that state, codes in use, repeated codes, and parents in the file or already added.
+
+#### Files changed
+
+- `src/features/partners/` — new: the contract, calls, queries, mutations and tests; labels; list URL state; the list, detail, form, parent picker and new and edit pages.
+- `src/app/(app)/partners/` — new routes: the list, a partner, new and edit.
+- `src/components/layout/navigation.ts` — Channel partners is live, staff only.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — CHNL-001 to CHNL-005.
+- `src/mocks/data/partners.ts`, `src/mocks/handlers/partners.ts` — new: the partners and their endpoints. Also `db.ts` and `handlers/index.ts`.
+- `src/mocks/handlers/imports.ts`, `src/mocks/data/imports.ts` — the partner import's rows and commit.
+- `src/mocks/handlers/lookups.ts` — the partner picker reads the partners table.
+- `src/mocks/data/permissions.ts` — managers' partner permissions.
+- `src/components/layout/navigation.test.ts` — the `/partners` route guard.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/partners/` — records and screens.
+
+#### Tests
+
+- `src/features/partners/api/partners.test.ts` — five suites:
+  - `[CHNL-001]`: filters, detail, credit terms by permission, parent search.
+  - `[CHNL-002]`: create; used code; wrong parent; GSTIN required; shapes; 403.
+  - `[CHNL-003]`: only what changed, null clears, a rename reaches the dealers; an empty change is refused.
+  - `[CHNL-004]`: close deactivates users, reopen leaves them; 403 for a partner.
+  - `[CHNL-005]`: the import, row by row, then the commit under file and existing parents.
+- `src/features/partners/components/partners-ui.test.tsx`:
+  - The list, the URL filters, the parent chip and empty state, and the actions by role.
+  - New partner: the missing fields, the start from a parent, a GSTIN shape, a used code back on its field, no permission.
+  - Edit: fixed fields, "Nothing changed yet", a payment-terms check, the save.
+  - Detail: the cards, close and reopen with their messages, and a field officer's read-only view.
+- `src/components/layout/navigation.test.ts` — `[APP-006]`: `/partners` is open to staff who read partners, and closed to partners and to QA.
+- Walked through in the mock at desktop light and phone dark: list, detail, a dealer added under a distributor, close, the import, edit. Also checked: a field officer's list, and a dealer refused at `/partners`.
+
+### Excel import with column matching, and price lists by sale type
+
+`feature` · `MSTR-007` `MSTR-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--MSTR-007--excel-import-with-column-matching-and-price-lists-by-sale.md)
+
+#### Before
+
+The backend's Excel import (FS-062, `backend/docs/api/imports.md`) and price lists by sale type (FS-061) had reached `integration` with no screens. A draft price list's rates were typed in one by one. A quotation's or order's items were added row by row. A price list had no sale type, and the builders priced every line from the general list whatever the quotation's sale type.
+
+#### Now
+
+- **One import dialog for every kind (MSTR-007).** Four steps, shown as a trail: **Upload** (`.xlsx` or `.csv`, up to 10 MB, checked before it is sent), **Match columns**, **Review**, **Done**.
+  - Match: every column in the file is listed with its five sample values and a picker. The pick is "Skip this column" or one of the import's fields, with "(required)" marked and each field's help line. The backend's suggested match is filled in. "Still to match: Rate" names what is missing. A workbook's sheet is picked from a list, and the row that holds the column names can be changed and read again. Both are a new upload of the same file.
+  - Review: "N ready" and "N with errors" badges. A table of the bad rows gives row number, column and reason. The first 20 good rows show as they will be saved. Column warnings come from the backend.
+  - Two ways out: **Import good rows only**, or **Import N rates**, which is all or nothing. Going **Back to matching** keeps the upload.
+  - A rejected mapping is shown on its field. If rows changed since the check, the commit refusal names them. A published list, a finished import, a file too big or unreadable, and no permission each get one plain sentence. An upload closed without committing is discarded.
+  - Keyboard: the long tables scroll inside regions that take focus.
+- **Rates into a draft price list.** **Import from Excel** on a draft's sheet. Pick **Replace** (the file becomes the whole list) or **Merge** (rates not in the file stay). Done says "3 rates written, 2 skipped." and the sheet reloads. The button is off while typed rates are unsaved, so an import never lands on top of unsaved edits.
+- **Items into a quotation or order.** **Import from Excel** on the Items card checks the file's lines and adds the good ones with "Add to quotation: the 2 good items" (or "to order"). Each added line takes its product, quantity and up to three discounts, then prices live like any other line. An untouched empty row gives way to the imported lines.
+- **Price lists by sale type (MSTR-008).**
+  - A list is for one sale type (Commercial, Industrial or Subsidy) or for all.
+  - The new-list form asks for it. The list row and the sheet header show it.
+  - A **Sale type** filter on Price lists has an "All sale types (general)" choice.
+  - A copy keeps the sale type.
+  - The quotation builder sends the quotation's sale type with every price preview. The order builder sends its order type the same way. A Subsidy quotation is priced from the Subsidy list where one is in force.
+- Phone and desktop, light and dark. On a phone the dialog takes the screen's width and scrolls. Every step has its loading state on the button that started it.
+
+#### Discussion
+
+- **One dialog, three imports.** The backend serves partners, price-list rates and lines from one set of endpoints. The dialog takes the kind and a noun ("rates", "partners", "items"), so partners (CHNL, next pull request) reuse it unchanged.
+- **Lines have no commit.** As the contract says, a `lines` import ends at the check. The good rows go into the builder's form and are saved with the quotation or order, so nothing is written until the person saves.
+- **Multipart in tests.** jsdom's `fetch` can't send a `FormData` body to MSW, so `src/test/multipart-fetch.ts` encodes it in tests only. The mock reads multipart itself (`readMultipart`).
+- **The mock reads CSV only.** It has no Excel reader, so any `.xlsx` gets a sample workbook for its kind, with a second sheet so the sheet picker shows. The backend reads both.
+- **The review shows what the backend worked out.**
+  - The backend's preview values for rates and lines are the product it found (`product`, `product_id`), not the item code or description typed. For partners, the preview gives the `territory` built from the state and district.
+  - The review table therefore adds these values after the matched columns, and leaves out ids.
+  - The mock now previews and words its reasons as the backend does (`domain/imports/rows.py`), for example "no product with item code PL-9999".
+- **Imported lines name no unit.** The `lines` check returns the product but not its unit, so the quantity box takes its unit from the price preview once it arrives.
+- **Fixed on the way:** "Indicative rate" on a priced line sat in a `<dl>` without a term (axe `definition-list`). It now has a visually hidden "Rate status" term.
+- **A flaky smoke test, fixed on the way.** The sign-in page fades in, and on a slow CI runner axe once measured the Sign in button at 97% opacity: 4.34:1 instead of the token's 4.58:1. The axe helper in `e2e/smoke.spec.ts` now waits for entrance animations to finish (endless ones, such as spinners, are left running).
+- **Not checked on staging yet.** The import endpoints are on `integration` (backend). The 🔌 check is in the PR's test plan.
+
+#### Files changed
+
+- `src/features/imports/` — new: the contract (`imports.schemas.ts`), calls (`imports.api.ts`), mutations, refusal messages (`lib/import-refusals.ts`), the four-step `ImportDialog`, and API tests.
+- `src/features/products/api/` — `sales_type` on price lists, the list filter, and the copy keeps it.
+- `src/features/products/components/price-lists-panel.tsx` — the Sale type filter, the form field, and the row label.
+- `src/features/products/components/price-list-sheet.tsx` — sale type in the header; **Import from Excel** on a draft.
+- `src/features/products/lib/product-labels.ts` — sale type labels.
+- `src/features/quotations/` — `sales_type` in price previews; `draftLinesFromImport`; `addLines`; **Import from Excel** on the Items card; the unit from the preview; the `dl` fix.
+- `src/features/orders/components/order-builder.tsx` — the order type in price previews; import on the Items card.
+- `src/lib/format/number.ts` — `formatFileSize`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — MSTR-007, MSTR-008.
+- `src/mocks/` — the import fields, sample workbooks, CSV reader and handlers. Price lists filter by sale type. Shared: `readMultipart`.
+- `src/test/multipart-fetch.ts`, `vitest.setup.ts` — multipart bodies in jsdom.
+- `e2e/smoke.spec.ts` — the axe helper waits for entrance animations.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/imports/` — records and screens.
+
+#### Tests
+
+- `src/features/imports/api/imports.test.ts` — `[MSTR-007] Excel import — price list rates`: headers and suggestions, every row checked, all-or-nothing, good rows only, a finished import, a mapping refusal on its field, unreadable, too big, a published list, no `pricing.edit`, workbook sheets, discard. `[MSTR-007] … order and quotation lines`: good rows returned, no commit.
+- `src/features/products/components/products-ui.test.tsx` — `[MSTR-008] Price lists by sale type` (create with a sale type, filter, label) and `[MSTR-007] Import rates from Excel` (the whole flow through the dialog, a mapping problem on its field and a discard on close, no import on a published list).
+- `src/features/quotations/components/quotation-builder.test.tsx` — `[MSTR-007] Items from Excel`.
+- `src/features/quotations/lib/builder-lines.test.ts` — the sale type in previews; `draftLinesFromImport`.
+- `src/lib/format/format.test.ts` — `formatFileSize`.
+- Walked through in the mock: new list with a sale type, filter, a rate import at desktop light and phone dark, items into a quotation. axe found nothing on the dialog's four steps.
+
+## 12 October 2026
+
+### A frontend handover: the build process, step by step, and everything left
+
+`docs` · `REPO-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-12--docs--REPO-001--a-frontend-handover-the-build-process-step-by-step-and.md)
+
+#### Before
+
+The way the frontend was built lived only in one long working session:
+
+- how a feature goes from a backend handover to a merged PR;
+- the browser walks, screenshots and axe checks;
+- how PRs are split and stacked;
+- the traps already hit.
+
+`AGENTS.md` holds the rules but not the working loop. `Docs/Plan.md` and `docs/PendingFeatures.md` list what is left, but the second dates from 3 October. A new developer or AI session would have had to rediscover all of it.
+
+#### Now
+
+`Docs/Frontend-Handover.md`, linked from the "Read these first" table in `AGENTS.md`, covers:
+
+- **§0–3:**
+  - where to start;
+  - the project in one page;
+  - the user's standing rules for replies, code, security and commits;
+  - the toolchain: commands, the mock dev server, Chromium, and CI blocked by billing.
+- **§4: the loop every feature followed:**
+  - pick and read the contract;
+  - branch;
+  - Data IDs;
+  - permissions;
+  - the API layer;
+  - a mock with the backend's rules;
+  - the UI patterns;
+  - the browser walk, including the Playwright and axe helper to paste (the sign-in comes from environment variables);
+  - API and UI tests;
+  - the records (changelog, Plan §9, Tested-Features, Backend-Tasks, screenshots);
+  - the final checks;
+  - commit, push and PR;
+  - resolving conflicts by merging `integration`.
+- **§5–8:**
+  - how work was split into PRs and stacked (the subsidy stack as the example);
+  - why no subagents were used;
+  - a map of the codebase;
+  - the traps already hit.
+- **§9:** what is built, by area, with its PRs.
+- **§10: everything left, in order:**
+  - **P0:** the go-live fixes for leads, quotations and orders from the 10 Oct walk.
+  - **P1:** backend pick-ups: BE-021, BE-022 with payments, BE-023 and BE-024 when ticked, subsidised orders, subsidy completion.
+  - **P2:** 22 modules the backend serves with no screens, each with its handover file, plus the dealer-portal walk.
+  - **The measured gap:** every endpoint in `backend/docs/api` (372) compared with every endpoint the frontend's mock serves (178). That is a built/total table per module, the missing pieces of modules otherwise built (orders amend and subsidy, subsidised quotations, group chats, lookups admin, reopen actions…), and new fields on built screens (dashboard charts, order filters, land in hectares).
+- **§12:** all 194 endpoints without a frontend, and the script to measure the gap again.
+- **§11:** a first message for the next session.
+
+#### Discussion
+
+- **One file, in `Docs/`, beside the other records.** The next session reads `AGENTS.md` first, so the link there is how it finds the handover.
+- **No credentials in it.** The walk helper reads the demo sign-in from environment variables, and points to `Docs/Tested-Features.md` for the mock fixture. Real staging logins come from the user.
+- **The P0 items summarise the backend's walk-fix handovers.** The file says to read those first, since they are the source.
+- **The gap was measured, not guessed.** The first draft listed whole modules by their handover names and missed the half-built ones. The comparison against the mock catches every unused endpoint; the field-level changes come from reading the recent handovers.
+- **Status is pinned to `integration` at `ed010e1`** (11 October 2026). The file says to check `git log` and `docs/Backend-Tasks.md` for anything newer.
+
+#### Files changed
+
+- `Docs/Frontend-Handover.md`: new.
+- `AGENTS.md`: a "Continue the build" row in "Read these first".
+
+#### Tests
+
+None: documentation only. Checked by hand:
+
+- every file and folder the handover names exists, including `backend/docs/architecture/RBAC.md`, the handover files and the API docs;
+- the commands match `package.json`;
+- the open asks match `docs/Backend-Tasks.md`;
+- the open PRs match GitHub on 11 October.
+
+### Go-live fixes from the 10 Oct staging walk
+
+`fix` · `APP-006` `APP-003` `LEAD-003` `LEAD-005` `LEAD-008` `LEAD-013` `LEAD-014` `APPR-001` `APPR-002` `QUOT-002` `SO-002` `CMPL-003` `AUTH-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-12--fix--APP-006--go-live-fixes-from-the-10-oct-walk.md)
+
+#### Before
+
+The 10 Oct staging walk of leads, quotations and orders (handovers `walk-fixes-10-oct.md` and `walk-fixes-10-oct-whatsapp-history-approvals.md`, "Yours (frontend)") found these on the frontend. The backend side of each was already done.
+
+- **F-1:** a dealer saw the lead score, the duplicates box and the "Possible duplicates" button.
+- **F-8:** a dealer could open `/approval-limits`, `/qr-codes` and `/dispatch` by typing the address. The empty approval limits said "Ask the backend team to seed them".
+- **F-9:** the channel-partner box held "No channel partner" as text, so typing searched `q=No channel partnerBhavesh`.
+- **F-11:** a step nobody of its role could decide still read "Waiting now" on an order's or refund's trail, and "Waiting for a District Manager…" on a quotation.
+- **F-13:** the first click on a page that had just opened was lost on `/tasks`, `/leads`, the lead page and `/approvals`; the next Approve after a decision took several clicks.
+- **F-14:** "Preparing the PDF" stayed after Send until a reload when the tab was in the background.
+- **F-16:** the timeline said "merged another lead", "Asha Patel flagged 6 possible duplicates", "Quotation discount approved Draft", "the customer · Quotation opened by the customer", and gave a discount decision two lines.
+- **F-17:** access-denied pages showed "REF TASK-001 · <uuid>" under the page's own header and filters.
+- **F-19:** "by SMS" on the dealer sign-in; the QR code's internal label and "Loading…" on the farmer's enquiry form; an em dash on QR codes; "Your territory at a glance" for the admin and MD; quotation-only copy on orders typed in directly; "10.00 defective of 100.00 NOS"; no confirmation before a complaint submit, which messages the contact; the Reason box red as soon as its list opened.
+- **Changed responses:** the score is now a whole number sent as `"28.00"`; an assign that changes the partner re-prices the lead's drafts; leads take land in hectares (FS-052).
+
+#### Now
+
+- **Route guards (APP-006, F-8).** A page whose menu item the user can't see can't be opened by its address either: the shell shows "You don't have access to this page" with **Back to the dashboard**, and the top bar says "Polysil CRM" instead of the page's title. The page itself, its header, filters and skeleton are never drawn. One rule, the nav's, covers every page; `/leads/duplicates` is staff only too. Approval limits is now a staff-only menu item, as its endpoint is.
+- **No reference on a 403 (F-17).** Nothing failed, so `ErrorState` shows no "Ref" for a 403 anywhere.
+- **Dealers (F-1, F-8).** No score, no possible-duplicates notice and no "Possible duplicates" button for a partner user. On QR codes, New QR code, Edit and Switch off are staff only, even if the page is opened.
+- **Approval limits, empty:** "No approval limits are set." and why it matters, nothing more.
+- **Channel partner box (F-9).** "No channel partner" (and "Unassigned" for the owner) is the placeholder; typing starts a fresh search. Choosing nobody empties the box.
+- **Stalled steps (F-11).** The step waiting now reads "No District Manager to decide. With the next manager up." on an order's trail, a complaint refund's trail and a quotation's discount notice.
+- **First click (F-13).** Only the page being left animates now: it slides and fades out over the new page, which takes clicks at once. The approval decision dialog closes as soon as the decision is saved (the toast confirms it), so the next row takes the next click.
+- **PDF (F-14).** The quotation, order and customer-link pages keep checking while the tab is in the background.
+- **Timeline (F-16).**
+  - "Asha Patel merged POL/GJ/2026-27/00094 into this lead", each number a link.
+  - "6 possible duplicates found: 00083, 00088, …", with no person's name: the system found them.
+  - "Asha Patel marked 00083 as not a duplicate."
+  - "The customer opened QT/…", on the lead and as "Opened by the customer" alone on the quotation.
+  - A draft is "draft quotation v1" or "draft order".
+  - A discount decision is one line, on the lead and on the quotation's history.
+- **Copy (F-19).** "a 6-digit code is on its way on WhatsApp"; no QR label and no "Loading…" before a state on the enquiry form; no em dash on QR codes; the dashboard reads "Leads, quotations, orders and service at a glance."; delivery, delete and cancel dialogs on a direct order don't mention quotations; "10 defective of 100 NOS".
+- **Complaint submit (F-19, F-3).** Submit asks first: "Submit for the manager's check?", naming the contact and their mobile, who "gets a WhatsApp at each step, once messages are switched on". A refusal stays in the dialog. The form's hint says the same.
+- **Reason box (F-19).** A list field no longer turns red when its list opens; only when it is closed or left without a choice, or on submit. This is the shared `LookupSelect`, so the lost reason and every other admin list behave the same.
+- **Leads.** The score is a whole number. A partner change refreshes the quotations, so a draft shows its new prices. The New lead and Edit forms ask for land in hectares and send `land_hectares`; the lead page shows "1.8 hectares (4.45 acres)".
+- **Theme (F-20).** Checked by eye: with the computer in dark mode, choosing Light gives a light page.
+- **Checked** on a phone in dark mode and a desktop in light mode, as a dealer and as staff. axe found nothing.
+
+#### Discussion
+
+- **F-13's cause.** Reproduced in Chromium: going to Tasks from the menu and clicking New task as soon as it showed sent the click to `<main>` every time. The arriving page was captured into the view transition, and Chrome doesn't hit-test a captured element until the transition ends (about 350 to 500 ms). `::view-transition { pointer-events: none }` was already set, and doesn't help with this. Animating only the leaving page keeps the direction cue and never captures the page people are about to use. The rejected option was skipping the transition on pointer-down: the click is already aimed at `<main>` by then. The e2e test `[APP-003] Page transitions` fails on the old code and passes now.
+- **The approvals clicks.** In the mock the next row responded once the dialog had gone; the lost clicks landed on the dialog's overlay during the 600 ms it stayed open to show its tick, while the list behind already showed the next row. On staging the wait is longer. The inbox is used many times a day, so the dialog now closes at once.
+- **`/qr-codes` for a dealer.** The walk asks for a route guard; the backend note describes a read-only dealer view. The page isn't in a dealer's menu, so the guard applies, and the page also hides its writes from partners. **Open question for the user:** should dealers get QR codes in their menu, read-only?
+- **F-19, menus.** A field officer's Assign, QR codes, Dispatch queue and Complaint targets all follow from the role table (RBAC.md §6.1: `leads` V:own CE, `dispatch` V:own, `complaints` V:own CE; the backend lets a field officer set the partner, not the owner, and the dialog says so). Nothing changed; **open question for the user** whether the client wants them out of the menu.
+- **F-19, the sixth digit.** The enquiry form and the dealer sign-in already submit on the sixth digit; unchanged.
+- **F-12** (no files on a complaint after the QC verdict) is the backend's rule; **open question for the user** to confirm with the client. Nothing changed.
+- **Not done here:** a "Deleted leads" view (`deleted=true`, optional in the handover), and the mock's quotation pricing for products added in Products & prices (mock-only polish). Both stay in the handover's §10.
+- **Land.** The backend stores hectares and returns acres beside them (FS-052). A lead with only acres keeps them: the edit form sends land only when it changes.
+- **`EmptyState` and `EmptyTitle` take a `level`** (2 or 3, default 3), as `CardTitle` does, so a page-sized empty state (access denied, not found) sits under the top bar's h1 without skipping a level.
+
+#### Files changed
+
+- `src/components/layout/`: `route-guard.tsx` (new), `app-shell.tsx`, `app-header.tsx`, `navigation.ts` (`canOpenPath`, Approval limits staff only, dashboard description), `page-transition.tsx`.
+- `src/components/patterns/`: `access-denied.tsx` and its story (new), `empty-state.tsx`; `src/components/ui/empty.tsx`; `src/app/(app)/not-found.tsx`.
+- `src/lib/api/error-messages.ts`: no reference on a 403. `src/lib/data-ids/registry.ts` and `Docs/Data-IDs.md`: APP-006.
+- `src/styles/tokens.css`, `Docs/Design-System.md`: page transitions animate the leaving page only.
+- `src/features/leads/`: `lead-detail.tsx`, `leads-toolbar.tsx`, `lead-assign-dialog.tsx`, `lead-timeline.tsx`, `lib/timeline-entries.ts`, `lib/lead-labels.ts` (`formatScore`, `landText`), `lead-fields.tsx`, `new-lead-dialog.tsx`, `lead-edit-dialog.tsx`, `lib/create-lead-errors.ts`, `api/leads.schemas.ts`, `api/leads.mutations.ts`.
+- `src/features/orders/`: `api/orders.schemas.ts`, `api/orders.queries.ts`, `components/order-approval.tsx`, `components/order-action-dialog.tsx`, `lib/order-labels.ts`.
+- `src/features/quotations/`: `api/quotations.schemas.ts`, `api/quotations.queries.ts`, `lib/quotation-lifecycle.ts`, `components/quotation-history.tsx`.
+- `src/features/approvals/components/`: `approval-decision-dialog.tsx`, `approval-limits.tsx`.
+- `src/features/complaints/components/`: `complaint-actions.tsx`, `complaint-detail.tsx`, `complaint-form.tsx`.
+- `src/features/lead-capture/components/`: `qr-codes.tsx`, `enquiry-form.tsx`. `src/features/auth/components/mobile-sign-in.tsx`. `src/features/lookups/components/lookup-select.tsx`. `src/features/session/hooks/use-session.ts` (`useIsStaff`).
+- `src/mocks/`: partner users get 403 on QR writes and approval limits, no score, lost reason or duplicates; stalled order steps; inquiry numbers in timeline payloads; land in hectares.
+- `e2e/smoke.spec.ts`; `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/Frontend-Handover.md` §10; `Docs/screenshots/go-live-fixes/`.
+
+#### Tests
+
+- `components/layout/route-guard.test.tsx` (new): a dealer at each guarded page gets access denied, no Ref; admin and dealer pages render.
+- `components/layout/navigation.test.ts`: `canOpenPath` for dealers, staff with and without the permission, and pages outside the nav.
+- `lib/api/url-and-errors.test.ts`: a 403 has no reference, a 500 keeps one.
+- `features/leads/`: `lead-activity.test.tsx` (the F-16 sentences, one line per discount decision; a whole score for staff; no score or duplicates for a dealer), `lead-assign.test.tsx` (the placeholder and a clean search; the quotations refresh), `lead-stage.test.tsx` (the Reason isn't red when its list opens; fails without the fix), `lib/timeline-entries.test.ts`, `lib/lead-labels.test.ts`, `api/leads.test.ts`, `leads-ui.test.tsx` (hectares).
+- `features/orders/components/orders-ui.test.tsx`: the stalled step on the trail. `features/quotations/lib/quotation-lifecycle.test.ts`: the stalled discount notice, one history line per decision. `features/quotations/api/quotations.queries.test.ts` (new): the PDF polls run in the background.
+- `features/approvals/`: the dialog closes at once after a decision; "No approval limits are set." with no ask of the backend team.
+- `features/complaints/components/complaints-ui.test.tsx`: submit asks first, and a refusal shows in the dialog. `features/lead-capture/components/lead-capture-ui.test.tsx`: QR codes read-only for a dealer; no label and no "Loading…" on the enquiry form. `features/auth/components/mobile-sign-in.test.tsx`: WhatsApp, not SMS.
+- `e2e/smoke.spec.ts` `[APP-003] Page transitions`: a click on New task the moment it appears opens the dialog (fails on the old transition).
+- **By hand,** in Chromium on the mock: as a dealer (partner sign-in) on every guarded page, the menu and a lead; as staff, a lead, Assign, Mark as lost, a merged lead's and a duplicate's timeline, a stalled order, a complaint submit, the theme and the enquiry form. Desktop light and phone dark; axe found nothing. Not yet checked on staging.
 
 ## 11 October 2026
 

@@ -9,7 +9,7 @@ import {
   listProducts,
   listTaxRates,
 } from "./products.api";
-import type { ProductListParams } from "./products.schemas";
+import type { PriceListSalesTypeFilter, ProductListParams } from "./products.schemas";
 
 /**
  * Query keys for the product master. A product, a code's slab or a list's rates change what
@@ -24,8 +24,11 @@ export const productKeys = {
   hsn: (productId: string) => [...productKeys.all, "hsn", productId] as const,
   taxRates: (hsnCode: string | null, inForce: boolean, page: number) =>
     [...productKeys.all, "tax-rates", hsnCode, inForce, page] as const,
-  priceLists: (status: "draft" | "published" | null, page: number) =>
-    [...productKeys.all, "price-lists", status, page] as const,
+  priceLists: (
+    status: "draft" | "published" | null,
+    salesType: PriceListSalesTypeFilter | null,
+    page: number,
+  ) => [...productKeys.all, "price-lists", status, salesType, page] as const,
   priceList: (listId: string) => [...productKeys.all, "price-list", listId] as const,
   items: (listId: string, q: string, unpriced: boolean, page: number) =>
     [...productKeys.all, "items", listId, q, unpriced, page] as const,
@@ -71,10 +74,14 @@ export function taxRateListQueryOptions(hsnCode: string | null, inForce: boolean
 }
 
 /** MSTR-006 · A page of price lists. */
-export function priceListListQueryOptions(status: "draft" | "published" | null, page: number) {
+export function priceListListQueryOptions(
+  status: "draft" | "published" | null,
+  salesType: PriceListSalesTypeFilter | null,
+  page: number,
+) {
   return queryOptions({
-    queryKey: productKeys.priceLists(status, page),
-    queryFn: ({ signal }) => listPriceLists({ status, page }, signal),
+    queryKey: productKeys.priceLists(status, salesType, page),
+    queryFn: ({ signal }) => listPriceLists({ status, salesType, page }, signal),
     placeholderData: keepPreviousData,
     meta: { dataId: "MSTR-006" },
   });

@@ -42,15 +42,17 @@ describe("[AUTH-001] MobileSignIn", () => {
     expect(screen.queryByLabelText("6-digit code")).not.toBeInTheDocument();
   });
 
-  it("signs in with the code from the SMS, without claiming the number is registered", async () => {
+  it("signs in with the code from WhatsApp, without claiming the number is registered", async () => {
     const { user, requestCode, onSignedIn } = renderSignIn();
 
     const codeInput = await requestCode();
 
     expect(screen.getByText("+91 98765 43210")).toBeInTheDocument();
     expect(
-      screen.getByText(/is registered with Polysil, a 6-digit code is on its way/),
+      screen.getByText(/is registered with Polysil, a 6-digit code is on its way on WhatsApp/),
     ).toBeInTheDocument();
+    // F-19 · The code comes on WhatsApp, never by SMS.
+    expect(screen.queryByText(/SMS/)).not.toBeInTheDocument();
     // The step moves focus in an effect just after the field appears; wait for it.
     await waitFor(() => {
       expect(codeInput).toHaveFocus();

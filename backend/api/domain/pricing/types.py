@@ -43,20 +43,37 @@ class PriceList:
     effective_from: dt.date
     effective_to: dt.date | None
     is_provisional: bool
+    sales_type: str | None = None
 
     @property
     def specificity(self) -> int:
         """Rule 3's precedence, as a number. State outranks tier: a tier list is
         far more likely a discount layer than a wholesale replacement, and the
         other order would silently override every state's own rates the day one
-        tier list arrives (GAP-087)."""
+        tier list arrives (GAP-087).
+
+        A list for one sale type outranks every general list, whatever their state
+        or tier (FS-061 rule 3, GAP-475): a separate commercial or subsidy list is
+        the price meant for that sale."""
+        rank = 4 if self.sales_type is not None else 0
         if self.state_territory_id is not None and self.channel_tier is not None:
-            return 3
+            return rank + 3
         if self.state_territory_id is not None:
-            return 2
+            return rank + 2
         if self.channel_tier is not None:
-            return 1
-        return 0
+            return rank + 1
+        return rank
+
+
+# FS-061: the sale types a price list may be scoped to. Every other quotation sale
+# type and order type prices from general lists only (GAP-469).
+PRICE_LIST_SALES_TYPES: tuple[str, ...] = ("commercial", "industrial", "subsidised")
+
+
+def price_sales_type(kind: str | None) -> str | None:
+    """The price-list sale type a quotation sale type or an order type prices from.
+    `None` means general lists only."""
+    return kind if kind in PRICE_LIST_SALES_TYPES else None
 
 
 @dataclass(frozen=True)

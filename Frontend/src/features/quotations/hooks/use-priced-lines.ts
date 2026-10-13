@@ -42,6 +42,8 @@ export interface PricedLines {
   readonly changeLine: (next: DraftLine) => void;
   readonly removeLine: (key: string) => void;
   readonly addLine: () => void;
+  /** MSTR-007 · Rows from an Excel import, after the rows already filled in. */
+  readonly addLines: (next: readonly DraftLine[]) => void;
   /** Refusals from a save, by row key. */
   readonly lineErrors: Readonly<Record<string, string>>;
   readonly setLineErrors: (errors: Readonly<Record<string, string>>) => void;
@@ -118,6 +120,14 @@ export function usePricedLines(
     },
     addLine: () => {
       setLines((current) => [...current, emptyLine()]);
+    },
+    addLines: (next) => {
+      if (next.length === 0) return;
+      // An untouched empty row gives way to the imported ones.
+      setLines((current) => [
+        ...current.filter((line) => line.product !== null || line.qty.trim() !== ""),
+        ...next,
+      ]);
     },
     lineErrors,
     setLineErrors,

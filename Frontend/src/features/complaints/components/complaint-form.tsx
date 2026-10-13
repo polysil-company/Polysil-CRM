@@ -535,7 +535,7 @@ export function ComplaintForm({ complaint, about }: ComplaintFormProps): React.J
               type="tel"
               inputMode="tel"
               placeholder="98123 45678"
-              hint="They get a WhatsApp at each step."
+              hint="They get a WhatsApp at each step, once messages are switched on."
             />
             <Controller
               control={form.control}

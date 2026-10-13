@@ -9,9 +9,11 @@ import { RelativeDate } from "@/components/patterns/relative-date";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RecordDocuments } from "@/features/documents/components/record-documents";
 import type { Dispatch, Order } from "@/features/orders/api/orders.schemas";
 import { useOrderActions } from "@/features/orders/hooks/use-order-actions";
 import { formatOrderQty } from "@/features/orders/lib/order-labels";
+import { useCan } from "@/features/session/hooks/use-session";
 import { EMPTY_VALUE, formatFullDate, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +86,10 @@ function DispatchItem({
   onVoid: () => void;
 }): React.JSX.Element {
   const voided = dispatch.voidedAt !== null;
+  // Dispatch, or whoever edits the order (handover documents-and-replacement-chain.md).
+  const canDispatch = useCan("dispatch", "create");
+  const canEditOrder = useCan("sales_orders", "edit");
+  const canAddDocuments = canDispatch || canEditOrder;
   return (
     <li
       className={cn(
@@ -153,6 +159,14 @@ function DispatchItem({
           {dispatch.voidRemark === null ? null : `: “${dispatch.voidRemark}”`}
         </p>
       ) : null}
+      {/* DOC-001 · The challan, the LR and the invoice for this consignment. */}
+      <RecordDocuments
+        scope={{ kind: "record", recordType: "dispatch", recordId: dispatch.id }}
+        canAdd={canAddDocuments}
+        closed={voided}
+        variant="section"
+        recordName={dispatch.dispatchNo}
+      />
     </li>
   );
 }

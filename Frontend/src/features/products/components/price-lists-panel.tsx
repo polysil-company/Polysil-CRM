@@ -9,6 +9,7 @@ import type * as React from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/patterns/empty-state";
+import { SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,14 +43,18 @@ import { useCopyPriceList, useCreatePriceList } from "@/features/products/api/pr
 import { priceListListQueryOptions } from "@/features/products/api/products.queries";
 import {
   CHANNEL_TIERS,
+  PRICE_LIST_SALES_TYPES,
   type ChannelTier,
   type CreatePriceListRequest,
   type PriceList,
+  type PriceListSalesTypeFilter,
 } from "@/features/products/api/products.schemas";
 import { Pager } from "@/features/products/components/pager";
 import {
   PHASE_LABELS,
+  PRICE_LIST_SALES_TYPE_LABELS,
   phaseOf,
+  salesTypeOf,
   scopeOf,
   TIER_LABELS,
   windowOf,
@@ -88,6 +93,25 @@ const TIER_ITEMS = [
   ...CHANNEL_TIERS.map((value) => ({ value, label: TIER_LABELS[value] })),
 ];
 
+/** MSTR-008 · The sale type Select's "every sale type" choice: a general list. */
+const ALL_SALES_TYPES = "all";
+const SALES_TYPE_ITEMS = [
+  { value: ALL_SALES_TYPES, label: "All sale types" },
+  ...PRICE_LIST_SALES_TYPES.map((value) => ({
+    value,
+    label: PRICE_LIST_SALES_TYPE_LABELS[value],
+  })),
+];
+
+/** MSTR-008 · The list filter: a sale type, or the general lists. */
+const SALES_TYPE_FILTERS: readonly { value: PriceListSalesTypeFilter; label: string }[] = [
+  ...PRICE_LIST_SALES_TYPES.map((value) => ({
+    value,
+    label: PRICE_LIST_SALES_TYPE_LABELS[value],
+  })),
+  { value: "general", label: "All sale types (general)" },
+];
+
 /**
  * MSTR-006 · Price lists: each sets a rate per product for a state and a channel tier (or all
  * of them) from a date. A draft is filled and then published; a published list never changes,
@@ -95,30 +119,44 @@ const TIER_ITEMS = [
  */
 export function PriceListsPanel({ canEdit }: { canEdit: boolean }): React.JSX.Element {
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [salesType, setSalesType] = useState<PriceListSalesTypeFilter | null>(null);
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
-  const query = useQuery(priceListListQueryOptions(status === "all" ? null : status, page));
+  const query = useQuery(
+    priceListListQueryOptions(status === "all" ? null : status, salesType, page),
+  );
 
   return (
     <section aria-label="Price lists" className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <ToggleGroup
-          aria-label="Which price lists"
-          value={[status]}
-          onValueChange={(next) => {
-            const chosen = STATUS_FILTERS.find((value) => value === next[0]);
-            if (chosen !== undefined) {
-              setStatus(chosen);
+        <div className="flex flex-wrap items-center gap-2">
+          <ToggleGroup
+            aria-label="Which price lists"
+            value={[status]}
+            onValueChange={(next) => {
+              const chosen = STATUS_FILTERS.find((value) => value === next[0]);
+              if (chosen !== undefined) {
+                setStatus(chosen);
+                setPage(1);
+              }
+            }}
+          >
+            {STATUS_FILTERS.map((value) => (
+              <ToggleGroupItem key={value} value={value}>
+                {STATUS_FILTER_LABELS[value]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <SingleFilterPill
+            label="Sale type"
+            options={SALES_TYPE_FILTERS}
+            selected={salesType}
+            onChange={(next) => {
+              setSalesType(next);
               setPage(1);
-            }
-          }}
-        >
-          {STATUS_FILTERS.map((value) => (
-            <ToggleGroupItem key={value} value={value}>
-              {STATUS_FILTER_LABELS[value]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+            }}
+          />
+        </div>
         {canEdit ? (
           <Button
             onClick={() => {
@@ -139,11 +177,13 @@ export function PriceListsPanel({ canEdit }: { canEdit: boolean }): React.JSX.El
           <EmptyState
             icon={DiscountTag01Icon}
             title={
-              status === "draft"
-                ? "No drafts"
-                : status === "published"
-                  ? "Nothing published yet"
-                  : "No price lists yet"
+              salesType !== null
+                ? "No price lists for this sale type"
+                : status === "draft"
+                  ? "No drafts"
+                  : status === "published"
+                    ? "Nothing published yet"
+                    : "No price lists yet"
             }
             description={
               canEdit
@@ -215,6 +255,7 @@ function PriceListRow({ list }: { list: PriceList }): React.JSX.Element {
         </span>
         <span className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
           <span>{scopeOf(list)}</span>
+          <span>{salesTypeOf(list)}</span>
           <span>{windowOf(list.from, list.to)}</span>
           <span className="tabular-nums">
             {formatCount(list.itemCount)} {list.itemCount === 1 ? "rate" : "rates"}
@@ -248,6 +289,7 @@ export function PriceListForm({
   const [from, setFrom] = useState(todayInIndia);
   const [state, setState] = useState<TerritoryChoice | null>(null);
   const [tier, setTier] = useState<string>(EVERY_TIER);
+  const [salesType, setSalesType] = useState<string>(ALL_SALES_TYPES);
   const [note, setNote] = useState("");
   const [shown, setShown] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -278,6 +320,7 @@ export function PriceListForm({
         channel_tier: chosenTier,
         effective_to: null,
         source_note: sourceNote,
+        sales_type: PRICE_LIST_SALES_TYPES.find((value) => value === salesType) ?? null,
       };
       return create.mutateAsync({ body, idempotencyKey: createKey.keyFor(body) });
     },
@@ -311,7 +354,7 @@ export function PriceListForm({
         <DialogDescription>
           {source === null
             ? "It starts as a draft: fill in its rates, then publish it."
-            : `Same scope (${scopeOf(source)}) and every rate copied, as a draft to change and publish.`}
+            : `Same scope (${scopeOf(source)} · ${salesTypeOf(source)}) and every rate copied, as a draft to change and publish.`}
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
@@ -391,6 +434,35 @@ export function PriceListForm({
                     ))}
                   </SelectContent>
                 </Select>
+              </Field>
+              <Field className="sm:col-span-2">
+                <FieldLabel htmlFor="list-sales-type">Sale type</FieldLabel>
+                <Select
+                  items={SALES_TYPE_ITEMS}
+                  value={salesType}
+                  onValueChange={(next) => {
+                    setSalesType(typeof next === "string" ? next : ALL_SALES_TYPES);
+                  }}
+                >
+                  <SelectTrigger
+                    id="list-sales-type"
+                    className="w-full"
+                    aria-describedby="list-sales-type-help"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SALES_TYPE_ITEMS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription id="list-sales-type-help">
+                  A list for one sale type prices those quotations and orders before any general
+                  list. It can&apos;t be changed once the list is started.
+                </FieldDescription>
               </Field>
             </div>
           ) : null}

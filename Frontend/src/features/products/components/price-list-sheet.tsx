@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowLeft01Icon, DiscountTag01Icon } from "@hugeicons/core-free-icons";
-import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft01Icon, DiscountTag01Icon, FileImportIcon } from "@hugeicons/core-free-icons";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useState } from "react";
@@ -30,6 +30,7 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImportDialog } from "@/features/imports/components/import-dialog";
 import { RATE_SHEET_PAGE_SIZE } from "@/features/products/api/products.api";
 import {
   useClosePriceList,
@@ -39,6 +40,7 @@ import {
 import {
   priceListItemsQueryOptions,
   priceListQueryOptions,
+  productKeys,
 } from "@/features/products/api/products.queries";
 import type { PriceList, PriceListItem } from "@/features/products/api/products.schemas";
 import { Pager } from "@/features/products/components/pager";
@@ -48,6 +50,7 @@ import {
   PHASE_LABELS,
   phaseOf,
   rateProblem,
+  salesTypeOf,
   scopeInSentence,
   scopeOf,
   windowOf,
@@ -96,11 +99,17 @@ function SheetView({ list }: { list: PriceList }): React.JSX.Element {
   const [page, setPage] = useState(1);
   const [edits, setEdits] = useState<ReadonlyMap<string, string>>(new Map());
   const [opened, setOpened] = useState<Opened>(null);
+  // The import is its own dialog, not one of the shared dialog's forms.
+  const [importing, setImporting] = useState(false);
   const items = useQuery(priceListItemsQueryOptions(list.id, q, unpriced, page));
   const save = useSaveRates();
   const idempotency = useIdempotencyKey();
   const phase = phaseOf(list);
   const editable = canEdit && list.status === "draft";
+  const queryClient = useQueryClient();
+  const refreshList = (): void => {
+    void queryClient.invalidateQueries({ queryKey: productKeys.all });
+  };
   const problems = [...edits.values()].filter((value) => rateProblem(value) !== null).length;
 
   const saveRates = useAsyncAction({
@@ -158,7 +167,7 @@ function SheetView({ list }: { list: PriceList }): React.JSX.Element {
             {list.provisional ? <Badge variant="warning">Stand-in rates</Badge> : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            {scopeOf(list)} · {windowOf(list.from, list.to)}
+            {scopeOf(list)} · {salesTypeOf(list)} · {windowOf(list.from, list.to)}
             {list.publishedAt === null
               ? ""
               : ` · published ${dayText(list.publishedAt.slice(0, 10))}`}
@@ -173,14 +182,27 @@ function SheetView({ list }: { list: PriceList }): React.JSX.Element {
         {canEdit ? (
           <div className="flex flex-wrap gap-2">
             {list.status === "draft" ? (
-              <Button
-                disabled={edits.size > 0}
-                onClick={() => {
-                  setOpened("publish");
-                }}
-              >
-                Publish
-              </Button>
+              <>
+                {/* MSTR-007 · Typed edits would be lost under an import: save or discard first. */}
+                <Button
+                  variant="outline"
+                  disabled={edits.size > 0}
+                  onClick={() => {
+                    setImporting(true);
+                  }}
+                >
+                  <Icon icon={FileImportIcon} />
+                  Import from Excel
+                </Button>
+                <Button
+                  disabled={edits.size > 0}
+                  onClick={() => {
+                    setOpened("publish");
+                  }}
+                >
+                  Publish
+                </Button>
+              </>
             ) : null}
             {list.status === "published" && phase !== "ended" ? (
               <Button
@@ -205,8 +227,31 @@ function SheetView({ list }: { list: PriceList }): React.JSX.Element {
       </div>
       {list.status === "draft" && canEdit && edits.size > 0 ? (
         <p role="note" className="text-sm text-muted-foreground">
-          Save your rates before publishing.
+          Save your rates before importing or publishing.
         </p>
+      ) : null}
+      {editable ? (
+        <ImportDialog
+          kind="price_list_items"
+          targetId={list.id}
+          open={importing}
+          onOpenChange={setImporting}
+          title="Import rates from Excel"
+          description={`Rates for ${list.name}, from a sheet with a product (item code or description) and a rate on each row.`}
+          noun={{ one: "rate", many: "rates" }}
+          onCommitted={(result) => {
+            refreshList();
+            toast.success(
+              `${formatCount(result.created)} ${result.created === 1 ? "rate" : "rates"} imported`,
+              {
+                description:
+                  result.skipped > 0
+                    ? `${formatCount(result.skipped)} ${result.skipped === 1 ? "row" : "rows"} skipped.`
+                    : "Check the sheet, then publish.",
+              },
+            );
+          }}
+        />
       ) : null}
       {list.status === "published" ? (
         <p role="note" className="rounded-md bg-muted p-3 text-sm text-muted-foreground">

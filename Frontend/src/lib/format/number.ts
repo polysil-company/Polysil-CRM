@@ -29,6 +29,18 @@ export function formatCount(value: number, options: { atLeast?: boolean } = {}):
   return `${formatNumber(value)}${options.atLeast ? "+" : ""}`;
 }
 
+/**
+ * A file's size as people read it: 512 → "512 bytes", 84_000 → "82 KB", 2_400_000 → "2.3 MB".
+ * Powers of 1,024, as file pickers show them.
+ */
+export function formatFileSize(bytes: number): string {
+  if (!isFiniteNumber(bytes) || bytes < 0) return EMPTY_VALUE;
+  if (bytes < 1024) return `${formatNumber(bytes)} ${bytes === 1 ? "byte" : "bytes"}`;
+  if (bytes < 1024 * 1024) return `${formatNumber(Math.round(bytes / 1024))} KB`;
+  const megabytes = bytes / (1024 * 1024);
+  return `${formatNumber(megabytes, megabytes < 10 ? 1 : 0)} MB`;
+}
+
 /** 42 → "42%". Input is a percentage (0–100), not a ratio. */
 export function formatPercent(value: number | null | undefined, decimals = 0): string {
   if (!isFiniteNumber(value)) {

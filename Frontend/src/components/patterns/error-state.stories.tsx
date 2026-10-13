@@ -70,6 +70,7 @@ export const ContractViolation: Story = {
   args: { error: contractViolation },
 };
 
+/** A 403: no retry, and no reference, since nothing failed (walk F-17). */
 export const NoPermission: Story = {
   args: { error: forbidden },
 };

@@ -7,6 +7,8 @@ import {
   type UseMutationResult,
 } from "@tanstack/react-query";
 
+import { quotationKeys } from "@/features/quotations/api/quotations.queries";
+
 import {
   addLeadNote,
   assignLead,
@@ -129,8 +131,12 @@ export function useAssignLead(): UseMutationResult<Lead, Error, AssignLeadInput>
     mutationKey: [...leadKeys.all, "assign"],
     mutationFn: assignLead,
     meta: { dataId: "LEAD-008" },
-    onSuccess: (lead) => {
+    onSuccess: (lead, { body }) => {
       applyLeadChange(queryClient, lead);
+      if (body.assigned_partner_id !== undefined) {
+        // The lead's draft quotations take the new partner and its tier's prices (walk 10 Oct).
+        void queryClient.invalidateQueries({ queryKey: quotationKeys.all });
+      }
     },
     onError: (_error, { leadId }) => {
       void queryClient.invalidateQueries({ queryKey: leadKeys.detail(leadId) });

@@ -19,7 +19,7 @@ import {
   LEAD_STAGE_LABELS,
 } from "@/features/leads/lib/lead-labels";
 import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
-import { useCan } from "@/features/session/hooks/use-session";
+import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
 import { createLogger } from "@/lib/logger";
 
 import { LeadAreaFilter } from "./lead-area-filter";
@@ -57,7 +57,10 @@ function sourcesMessage(isPending: boolean, isError: boolean): string {
  */
 export function LeadsToolbar(): React.JSX.Element {
   const { params, setFilters, resetFilters, activeFilterCount } = useLeadListParams();
+  // Duplicate review is staff work: a partner user gets an empty queue (walk F-1).
   const canEdit = useCan("leads", "edit");
+  const staff = useIsStaff();
+  const canReviewDuplicates = canEdit && staff;
   const sources = useQuery(lookupListQueryOptions("lead-sources"));
   const canCreate = useCan("leads", "create");
 
@@ -118,7 +121,7 @@ export function LeadsToolbar(): React.JSX.Element {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {canEdit ? (
+        {canReviewDuplicates ? (
           <Link href="/leads/duplicates" className={buttonVariants({ variant: "ghost" })}>
             Possible duplicates
           </Link>

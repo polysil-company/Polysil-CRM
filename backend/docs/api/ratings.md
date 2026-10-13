@@ -240,7 +240,8 @@ the ratings the caller can see. Lowest average first.
 | `score` | integer | yes |  |
 | `comment` | string \| null | yes | Null for a dealer reading a customer's rating (GAP-375), or when none was given. |
 | `rated_by` | `customer` \| `dealer` | yes |  |
-| `entered_by` | UserRef \| null | yes | Null for a dealer reading a customer's rating. |
+| `entered_by` | UserRef \| null | yes | Null for a dealer reading a customer's rating, and for a rating the farmer entered from the portal. |
+| `entered_via` | `staff` \| `portal` \| `dealer` | yes | staff: an officer recorded it; portal: the farmer rated it himself (FS-060); dealer: a dealer's portal user. |
 | `partner` | api__schemas__leads__PartnerRef \| null | yes |  |
 | `lead` | RatingLead \| null | yes |  |
 | `order` | RatingDoc \| null | yes |  |

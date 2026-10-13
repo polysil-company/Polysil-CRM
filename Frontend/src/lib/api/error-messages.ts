@@ -3,7 +3,7 @@ import { isApiError } from "./errors";
 export interface UserFacingError {
   readonly title: string;
   readonly description: string;
-  /** "LEAD-001 · 3f2a…" when the error came from an API call. */
+  /** "LEAD-001 · 3f2a…" when an API call failed; none for a 403, which is not a failure. */
   readonly reference: string | undefined;
   readonly retryable: boolean;
 }
@@ -68,10 +68,11 @@ function httpError(status: number | undefined, reference: string): UserFacingErr
         retryable: false,
       };
     case 403:
+      // Nothing failed, so there is nothing for support to trace (walk F-17).
       return {
         title: "You don't have access to this",
         description: "Ask your manager or an admin if you need access.",
-        reference,
+        reference: undefined,
         retryable: false,
       };
     case 404:

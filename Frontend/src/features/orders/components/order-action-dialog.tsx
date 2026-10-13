@@ -267,7 +267,10 @@ function HeaderForm({ order, onClose }: FormProps): React.JSX.Element {
       <DialogHeader>
         <DialogTitle>Delivery and terms</DialogTitle>
         <DialogDescription>
-          The items and prices come from the quotations, so they stay as they are.
+          {/* An order typed in directly has no quotations to take its items from (walk F-19). */}
+          {order.quotations.length > 0
+            ? "The items and prices come from the quotations, so they stay as they are."
+            : "Where it goes, how it is paid, and any remarks. Change the items with Edit items."}
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
@@ -362,7 +365,10 @@ function DeleteForm({ order, onClose }: FormProps): React.JSX.Element {
     dataId: "SO-003",
     onSuccess: () => {
       toast.success("Draft deleted", {
-        description: `${order.party.name} · its quotations can be ordered again`,
+        description:
+          order.quotations.length > 0
+            ? `${order.party.name} · its quotations can be ordered again`
+            : order.party.name,
       });
       router.push(order.lead === null ? "/sales-orders" : `/leads/${order.lead.id}`);
     },
@@ -501,7 +507,9 @@ function RemarkForm({
 
   const explain =
     action === "cancel"
-      ? "The order stays on record, marked cancelled, and its quotations can be ordered again. The reason is kept on its history."
+      ? order.quotations.length > 0
+        ? "The order stays on record, marked cancelled, and its quotations can be ordered again. The reason is kept on its history."
+        : "The order stays on record, marked cancelled. The reason is kept on its history."
       : action === "close-short"
         ? "Every quantity still open becomes short, and nothing more ships against this order. What has left stays as it is."
         : `${dispatch?.dispatchNo ?? "The dispatch"} stays on record, marked void, and its quantities are open again.`;

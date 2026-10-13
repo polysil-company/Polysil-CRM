@@ -23,14 +23,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RelatedComplaints } from "@/features/complaints/components/related-complaints";
+import { RecordDocuments } from "@/features/documents/components/record-documents";
 import { leadDetailQueryOptions } from "@/features/leads/api/leads.queries";
 import type { Lead, LeadStage } from "@/features/leads/api/leads.schemas";
 import {
   DUPLICATE_SIGNAL_LABELS,
-  formatAcres,
+  formatScore,
   LEAD_INQUIRY_TYPE_LABELS,
   LEAD_PRIORITY_BADGE,
   LEAD_PRIORITY_LABELS,
+  landText,
   partnerTypeLabel,
 } from "@/features/leads/lib/lead-labels";
 import { LookupName } from "@/features/lookups/components/lookup-name";
@@ -121,8 +123,17 @@ function LeadNotice({ children }: { children: React.ReactNode }): React.JSX.Elem
   );
 }
 
-function LeadNotices({ lead }: { lead: Lead }): React.JSX.Element | null {
-  const pending = lead.duplicates.filter((duplicate) => duplicate.state === "pending");
+/** Possible duplicates are staff work: a partner user is never shown them (walk F-1). */
+function LeadNotices({
+  lead,
+  showDuplicates,
+}: {
+  lead: Lead;
+  showDuplicates: boolean;
+}): React.JSX.Element | null {
+  const pending = showDuplicates
+    ? lead.duplicates.filter((duplicate) => duplicate.state === "pending")
+    : [];
 
   if (lead.mergedInto) {
     return (
@@ -179,7 +190,8 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
   const canSeeQuotations = useCan("quotations");
   const canOrder = useCan("sales_orders", "create");
   const canDelete = useCan("leads", "delete");
-  const canSeeTasks = useCan("tasks") && session?.userType === "staff";
+  const staff = session?.userType === "staff";
+  const canSeeTasks = useCan("tasks") && staff;
   const whatsappNumber = lead.phone.replace(/\D/g, "");
   const lost = lead.stage === "lost";
 
@@ -254,7 +266,7 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
         </div>
       </div>
 
-      <LeadNotices lead={lead} />
+      <LeadNotices lead={lead} showDuplicates={staff} />
 
       <div className="flex min-w-0 flex-col gap-4">
         <Card>
@@ -296,10 +308,13 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
                   ? `${lead.channelPartner.name} · ${partnerTypeLabel(lead.channelPartner.partnerType)}`
                   : EMPTY_VALUE}
               </DetailItem>
-              <DetailItem label="Score">{lead.score ?? EMPTY_VALUE}</DetailItem>
-              <DetailItem label="Land">
-                {lead.landAcres === null ? EMPTY_VALUE : `${formatAcres(lead.landAcres)} acres`}
-              </DetailItem>
+              {/* The backend sends a partner user no score (walk F-1). */}
+              {staff ? (
+                <DetailItem label="Score">
+                  {lead.score === null ? EMPTY_VALUE : formatScore(lead.score)}
+                </DetailItem>
+              ) : null}
+              <DetailItem label="Land">{landText(lead)}</DetailItem>
               <DetailItem label="Crops">
                 {lead.crops.length === 0 ? (
                   EMPTY_VALUE
@@ -362,6 +377,13 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
 
         {/* CMPL-001 · Complaints about this lead, and raising one. */}
         <RelatedComplaints about={{ leadId: lead.id }} readOnly={lead.stage === "merged"} />
+
+        {/* DOC-001 · Its documents, and those on its quotations, orders and dispatches. */}
+        <RecordDocuments
+          scope={{ kind: "lead", leadId: lead.id }}
+          canAdd={canEdit}
+          closed={lead.stage === "merged"}
+        />
 
         {/* TASK-003, TASK-007 · Calls, visits and meetings about this lead, and their minutes. */}
         {canSeeTasks ? (

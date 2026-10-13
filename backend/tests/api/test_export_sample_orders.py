@@ -321,8 +321,8 @@ async def _accepted_export(client: httpx.AsyncClient, shop: Shop, h: dict[str, s
 async def test_an_export_order_is_made_from_export_quotations_only(
         client: httpx.AsyncClient, fx: Fx) -> None:
     """Rule 17: the order takes the quotation's treatment and country; a commercial
-    order from an export quotation is refused, and commercial quotations still make
-    an industrial order as before."""
+    order from an export quotation is refused, and so is an industrial order from a
+    commercial quotation (FS-061)."""
     await fx.setting("export_tax_treatment", "igst")
     ho = await endpoints._as(client, fx.shop, "field_officer")
     q = await _accepted_export(client, fx.shop, ho)
@@ -341,9 +341,12 @@ async def test_an_export_order_is_made_from_export_quotations_only(
                            headers={**ho, **_key()})
     assert r.status_code == 422 and _code(r) == "quotations_disagree", r.text
 
+    # FS-061 EC-3 (GAP-474): commercial and industrial now price from their own lists,
+    # so an industrial order from a commercial quotation is refused too
     plain = await endpoints._accepted_quotation(client, fx.shop, ho)
-    ind = await endpoints._create(client, ho, {"order_type": "industrial", "quotation_ids": [plain["id"]]})
-    assert ind["order_type"] == "industrial"
+    r = await client.post(f"{V1}/orders", json={"order_type": "industrial", "quotation_ids": [plain["id"]]},
+                          headers={**ho, **_key()})
+    assert r.status_code == 422 and _code(r) == "type_mismatch", r.text
 
 
 # ── seller GSTINs and LUTs ───────────────────────────────────────────────────

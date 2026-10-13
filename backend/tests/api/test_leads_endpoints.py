@@ -211,10 +211,14 @@ async def test_create_needs_a_coded_state(
         client: httpx.AsyncClient, staff: Staff, env: Env, sessions) -> None:
     """A territory with no coded state ancestor refuses rather than allocating under
     a made-up code (rule 3)."""
-    lone = (await sessions().execute(text(
+    # one session: committing a second, empty one left the territory unwritten, and
+    # the test passed only because a missing territory was refused the same way
+    made = sessions()
+    lone = (await made.execute(text(
         "INSERT INTO territory (level, name) VALUES ('district', :n) RETURNING id"),
         {"n": "orphan_" + uuid.uuid4().hex[:8]})).scalar_one()
-    await sessions().commit()
+    await made.commit()
+    await made.close()
     try:
         h = await _auth(client, staff)
         r = await client.post(f"{V1}/leads", json=_body(env, territory_id=str(lone)),
@@ -1132,3 +1136,19 @@ async def test_the_count_stops_at_the_ceiling_and_says_so(
     body = (await client.get(f"{V1}/leads?include_total=true", headers=h)).json()
     assert body["meta"]["total"] == 2, "the count stops at the ceiling"
     assert body["meta"]["total_capped"] is True, "and admits that it stopped"
+
+
+async def test_an_unknown_territory_is_a_422_on_create_and_edit(
+        client: httpx.AsyncClient, staff: Staff, env: Env) -> None:
+    """Release review A: an id that is no territory reached the foreign key, a 500."""
+    h = await _auth(client, staff)
+    nowhere = "00000000-0000-4000-8000-000000000000"
+    r = await client.post(f"{V1}/leads", json=_body(env, territory_id=nowhere),
+                          headers={**h, **_key()})
+    assert r.status_code == 422 and "territory_id" in r.json()["error"]["fields"], r.text
+    r = await client.post(f"{V1}/leads", json=_body(env), headers={**h, **_key()})
+    assert r.status_code == 201, r.text
+    lead = r.json()["data"]
+    r = await client.patch(f"{V1}/leads/{lead['id']}", json={"territory_id": nowhere},
+                           headers={**h, **_key()})
+    assert r.status_code == 422 and "territory_id" in r.json()["error"]["fields"], r.text

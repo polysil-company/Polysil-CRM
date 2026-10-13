@@ -212,6 +212,17 @@ async def put_threshold(db: AsyncSession, caller: Caller, body: sch.ThresholdPut
     if body.doc_type == "quotation" and body.max_amount is None and body.role != "admin_sales":
         # no limit below the top would switch the gate off for that role (OCR review)
         raise ValidationFailed(fields={"max_amount": "only Admin-Sales may have no limit"})
+    if body.doc_type != "quotation" and body.max_amount is None:
+        # release review B M-3: an unlimited lower manager ends every chain there, so the
+        # managers above never see a large order; only the top role may be unlimited
+        top = max(levels[r] for r in group if r in levels)
+        if levels[body.role] < top:
+            raise ValidationFailed(fields={"max_amount": "only the highest role may have no limit"})
+    if body.territory_id is not None and (await db.execute(text(
+            "SELECT 1 FROM territory WHERE id = CAST(:t AS uuid) AND deleted_at IS NULL"),
+            {"t": body.territory_id})).first() is None:
+        # release review B M-2: the foreign key failed later, a 500
+        raise ValidationFailed(fields={"territory_id": "not a known territory"})
     ordered = sorted(((levels[r], a) for r, a in group.items() if r in levels))
     ceilings = [a for _, a in ordered if a is not None]
     if ceilings != sorted(ceilings) or len(set(ceilings)) != len(ceilings):

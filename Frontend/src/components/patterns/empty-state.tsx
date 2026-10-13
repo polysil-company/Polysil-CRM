@@ -15,6 +15,8 @@ export interface EmptyStateProps {
   /** Say why it is empty and what to do next. */
   description?: React.ReactNode;
   action?: React.ReactNode;
+  /** The title's heading level: 2 when the state fills the page, 3 (default) inside a section. */
+  level?: 2 | 3;
   className?: string;
 }
 
@@ -24,6 +26,7 @@ export function EmptyState({
   title,
   description,
   action,
+  level = 3,
   className,
 }: EmptyStateProps): React.JSX.Element {
   return (
@@ -32,7 +35,7 @@ export function EmptyState({
         <Icon icon={icon} />
       </EmptyMedia>
       <div className="flex flex-col items-center gap-1">
-        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyTitle level={level}>{title}</EmptyTitle>
         {description ? <EmptyDescription>{description}</EmptyDescription> : null}
       </div>
       {action ? <EmptyContent>{action}</EmptyContent> : null}

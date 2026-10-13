@@ -1,0 +1,197 @@
+# Production on one box (the Hostinger KVM): PostgreSQL, PgBouncer, Redis, the API,
+# the worker, the frontend and Caddy for HTTPS. Self-contained, unlike staging,
+# which borrows another project's database and proxy.
+#
+#   python scripts/deploy_staging.py --target prod <step>
+#
+# Configuration: infra/.env.prod (see infra/.env.prod.example). Nothing here is a
+# secret; every secret comes from that file, written to the box with mode 600.
+
+name: polysil-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app-env: &app-env
+  ENVIRONMENT: production
+  DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@pgbouncer:6432/${DB_NAME}
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+  DB_ANON_ROLE: ${DB_ANON_ROLE:-app_anon}
+  DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
+  WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:?set WHATSAPP_PROVIDER}
+  WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+  WHATSAPP_ORIGIN_WEBSITE: ${WHATSAPP_ORIGIN_WEBSITE:-}
+  PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?set PUBLIC_WEB_URL}
+  GST_PROVIDER: ${GST_PROVIDER:-none}
+  GSTINAPI_KEY: ${GSTINAPI_KEY:-}
+  WHATSAPP_TEMPLATE_QUOTATION_SHARE: ${WHATSAPP_TEMPLATE_QUOTATION_SHARE:-}
+  R2_ENDPOINT: ${R2_ENDPOINT:-}
+  R2_BUCKET: ${R2_BUCKET:-}
+  R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+  R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+  TZ: UTC
+  TRUSTED_PROXY_HOPS: "1"
+  TRUSTED_PROXY_PEERS: ${TRUSTED_PROXY_PEERS:-172.16.0.0/12}
+  REFRESH_COOKIE_SAMESITE: lax
+  CORS_ALLOW_LOCALHOST: "false"
+  CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: polysil-prod-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_SUPERUSER:?set PG_SUPERUSER}
+      POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD:?set PG_SUPERUSER_PASSWORD}
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_SUPERUSER}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    container_name: polysil-prod-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:?set DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+      DB_NAME: ${DB_NAME:?set DB_NAME}
+      LISTEN_PORT: 6432
+      LISTEN_ADDR: 0.0.0.0
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 0
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits,options
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 6432 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: polysil-prod-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb",
+              "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: runtime
+    image: polysil-api:prod
+    # the frontend's server-side proxy targets this name (infra/frontend/Dockerfile)
+    container_name: polysil-api
+    restart: unless-stopped
+    depends_on:
+      pgbouncer: { condition: service_healthy }
+      redis:     { condition: service_healthy }
+    environment: *app-env
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-8100}:8000"
+    logging: *logging
+
+  worker:
+    image: polysil-api:prod
+    container_name: polysil-prod-worker
+    restart: unless-stopped
+    command: ["arq", "worker.main.WorkerSettings"]
+    healthcheck:
+      disable: true
+    depends_on:
+      pgbouncer: { condition: service_healthy }
+      redis:     { condition: service_healthy }
+    environment: *app-env
+    logging: *logging
+
+  tools:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: tools
+    image: polysil-tools:prod
+    profiles: ["tools"]
+    depends_on:
+      pgbouncer: { condition: service_healthy }
+    environment:
+      <<: *app-env
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      # scripts/seed_prod.py: the first administrator
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_MUST_CHANGE_PASSWORD: ${ADMIN_MUST_CHANGE_PASSWORD:-true}
+    volumes:
+      - ../data:/app/data:ro
+      - ../tests/fixtures/subsidy:/app/tests/fixtures/subsidy:ro
+    logging: *logging
+
+  frontend:
+    build:
+      context: ../frontend-src
+      dockerfile: Dockerfile.polysil
+      args:
+        RELEASE: ${RELEASE:-prod}
+    image: polysil-frontend:prod
+    container_name: polysil-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/sign-in').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: polysil-prod-caddy
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - api
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    logging: *logging
+
+volumes:
+  pgdata:
+  redisdata:
+  caddydata:
+  caddyconfig:

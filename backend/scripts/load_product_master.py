@@ -231,9 +231,10 @@ class Loader:
     def products(self, rows: list[dict[str, Any]]) -> None:
         categories = dict(self._all("SELECT code::text, id FROM product_category"))
         uoms = dict(self._all("SELECT code::text, id FROM uom"))
-        live = {d.casefold(): (pid, list(pf or []))
-                for d, pid, pf in self._all(
-                    "SELECT description::text, id, provisional_fields FROM product")}
+        live = {d.casefold(): (pid, list(pf or []), edited)
+                for d, pid, pf, edited in self._all(
+                    "SELECT description::text, id, provisional_fields, updated_by IS NOT NULL "
+                    "FROM product")}
 
         written = updated = 0
         for row in rows:
@@ -254,7 +255,10 @@ class Loader:
                 written += 1
                 continue
             # A rerun corrects what the client gave us and leaves alone anything
-            # they have since confirmed: only a still-provisional field is ours.
+            # they have since confirmed: only a still-provisional field is ours, and a
+            # product an administrator has edited is theirs (release review B M-4).
+            if existing[2]:
+                continue
             self._write(
                 "UPDATE product SET product_category_id = %s, quotation_category = "
                 "%s::quotation_category, uom_id = %s, is_subsidy_eligible = %s, "

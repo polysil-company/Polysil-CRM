@@ -196,3 +196,43 @@ describe("[QUOT-004] EditQuotation", () => {
     expect(await screen.findByText(/ was sent$/)).toBeInTheDocument();
   });
 });
+
+describe("[MSTR-007] Items from Excel", () => {
+  afterEach(() => {
+    push.mockReset();
+    resetMockDb();
+  });
+
+  it("adds a sheet's good rows as items, then prices them as usual", PRICING_TEST, async () => {
+    signInAsAdmin();
+    const user = showNew(leadAt("qualified"));
+    await screen.findByRole("form", { name: "New quotation" });
+
+    await user.click(screen.getByRole("button", { name: "Import from Excel" }));
+    const dialog = await screen.findByRole("dialog", { name: "Import items from Excel" });
+    await user.upload(
+      within(dialog).getByTestId("import-file-input"),
+      new File(
+        [["Particulars,Qty,Disc %", "INLINE DRIPPER 4 LPH,120,5", "NOT A PRODUCT,2,"].join("\n")],
+        "order.csv",
+        { type: "text/csv" },
+      ),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Upload" }));
+    await within(dialog).findByRole("list", { name: "Columns in your file" });
+    await user.click(within(dialog).getByRole("button", { name: "Check the rows" }));
+
+    expect(await within(dialog).findByText("1 ready")).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add to quotation: the 1 good item" }),
+    );
+
+    expect(await screen.findByText("1 item added")).toBeInTheDocument();
+    // The empty first row gave way to the imported one.
+    const items = screen.getByRole("list", { name: "Items" });
+    expect(within(items).getAllByRole("listitem")).toHaveLength(1);
+    const item = within(items).getByRole("listitem", { name: "Item 1" });
+    expect(within(item).getByLabelText("Quantity")).toHaveValue("120");
+    expect(await within(item).findByText("Rate", {}, PRICED)).toBeInTheDocument();
+  });
+});

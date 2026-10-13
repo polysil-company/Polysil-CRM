@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Lead } from "@/features/leads/api/leads.schemas";
 
-import { describeCreatedLead } from "./lead-labels";
+import { describeCreatedLead, formatScore, landText } from "./lead-labels";
 
 type Duplicate = Lead["duplicates"][number];
 
@@ -23,5 +23,21 @@ describe("[LEAD-002] describeCreatedLead", () => {
     expect(describeCreatedLead(lead([duplicate("A"), duplicate("B"), duplicate("C")]))).toBe(
       "Ramesh Patel · POL/GJ/2026-27/00123. 3 possible duplicates (A, B and C), flagged for review.",
     );
+  });
+});
+
+describe("[LEAD-003] formatScore", () => {
+  it("shows the score as the whole number the backend now sends (walk 10 Oct)", () => {
+    expect(formatScore("28.00")).toBe("28");
+    expect(formatScore("100.00")).toBe("100");
+  });
+});
+
+describe("[LEAD-003] landText", () => {
+  it("says the land in hectares, with acres beside them (FS-052)", () => {
+    expect(landText({ landHectares: "1.82", landAcres: "4.50" })).toBe("1.82 hectares (4.5 acres)");
+    expect(landText({ landHectares: "2.00", landAcres: null })).toBe("2 hectares");
+    expect(landText({ landHectares: null, landAcres: "4.50" })).toBe("4.5 acres");
+    expect(landText({ landHectares: null, landAcres: null })).toBe("—");
   });
 });

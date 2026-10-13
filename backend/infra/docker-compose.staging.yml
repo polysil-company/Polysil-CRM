@@ -242,6 +242,8 @@ services:
       # The client's workbooks, read by load_subsidy_masters and
       # load_product_master. Mounted rather than baked into the image.
       - ../data:/app/data:ro
+      # FS-056: the state scheme fixtures, read by load_state_masters
+      - ../tests/fixtures/subsidy:/app/tests/fixtures/subsidy:ro
     logging: *logging
     mem_limit: 512m
 

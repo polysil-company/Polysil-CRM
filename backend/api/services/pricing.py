@@ -58,6 +58,7 @@ from api.domain.pricing.types import (
     Rate,
     TaxRate,
     Tier,
+    price_sales_type,
 )
 from api.errors import ConflictError, NotFoundError, ValidationFailed
 from api.schemas import products as sch
@@ -217,20 +218,24 @@ async def load_products(db: AsyncSession, product_ids: Sequence[str],
 
 
 async def load_rates(db: AsyncSession, product_ids: Sequence[str], *, as_of: dt.date,
-                     state_territory_id: str, tier: str) -> dict[str, list[Rate]]:
+                     state_territory_id: str, tier: str,
+                     sales_type: str | None) -> dict[str, list[Rate]]:
     """Every rate every applicable published list holds for these products, in one
-    statement, so the whole document reads one snapshot."""
+    statement, so the whole document reads one snapshot. `sales_type` is already
+    mapped by `price_sales_type`: `None` reads general lists only (FS-061)."""
     rows = (await db.execute(text(
         "SELECT i.product_id::text, i.id::text, i.rate, "
         "       l.id::text, l.name, l.state_territory_id::text, l.channel_tier::text, "
-        "       l.effective_from, l.effective_to, l.is_provisional "
+        "       l.effective_from, l.effective_to, l.is_provisional, l.sales_type "
         "FROM price_list_item i JOIN price_list l ON l.id = i.price_list_id "
         "WHERE i.product_id = ANY(CAST(:ids AS uuid[])) "
         "AND l.status = 'published' AND l.deleted_at IS NULL "
         "AND daterange(l.effective_from, l.effective_to, '[)') @> CAST(:d AS date) "
         "AND (l.state_territory_id IS NULL OR l.state_territory_id = CAST(:s AS uuid)) "
-        "AND (l.channel_tier IS NULL OR l.channel_tier = CAST(:t AS channel_tier))"),
-        {"ids": list(product_ids), "d": as_of, "s": state_territory_id, "t": tier})).all()
+        "AND (l.channel_tier IS NULL OR l.channel_tier = CAST(:t AS channel_tier)) "
+        "AND (l.sales_type IS NULL OR l.sales_type = CAST(:st AS text))"),
+        {"ids": list(product_ids), "d": as_of, "s": state_territory_id, "t": tier,
+         "st": sales_type})).all()
 
     lists: dict[str, PriceList] = {}
     out: dict[str, list[Rate]] = {}
@@ -238,14 +243,16 @@ async def load_rates(db: AsyncSession, product_ids: Sequence[str], *, as_of: dt.
         if r[3] not in lists:
             lists[r[3]] = PriceList(id=r[3], name=r[4], state_territory_id=r[5],
                                     channel_tier=Tier(r[6]) if r[6] else None,
-                                    effective_from=r[7], effective_to=r[8], is_provisional=r[9])
+                                    effective_from=r[7], effective_to=r[8], is_provisional=r[9],
+                                    sales_type=r[10])
         out.setdefault(r[0], []).append(Rate(price_list_item_id=r[1], price_list=lists[r[3]],
                                              rate=_dec(r[2])))
     # The scope filter above and this one say the same thing twice, on purpose: the
     # query narrows what is read, and the domain decides what may be priced from.
     for rates in out.values():
         allowed = {pl.id for pl in applicable([r.price_list for r in rates],
-                                              state_territory_id=state_territory_id, tier=tier)}
+                                              state_territory_id=state_territory_id, tier=tier,
+                                              sales_type=sales_type)}
         rates[:] = [r for r in rates if r.price_list.id in allowed]
     return out
 
@@ -301,6 +308,7 @@ class PricedContext:
 async def price_document(db: AsyncSession, *, partner_id: str | None,
                          place_of_supply_territory_id: str, seller_gstin_id: str | None,
                          as_of: dt.date | None, lines: Sequence[LineSpec],
+                         sales_type: str | None,
                          existing: bool = False,
                          tax_as_of: dt.date | None = None,
                          tax_treatment: str = "domestic") -> PricedContext:
@@ -328,6 +336,11 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
     supply says (IGST Act s.7(5)(a)); under a LUT each line is priced at slab 0
     but keeps its product's slab and rate id, so the figures can be rebuilt if
     the client turns out to pay IGST and claim a refund (rule 2a).
+
+    `sales_type` is the document's sale type or order type, unmapped. It is
+    required, with no default, so no caller prices from general lists by
+    forgetting it (FS-061). Export, sample, replacement and `None` map to general
+    lists only.
     """
     if tax_treatment not in TAX_TREATMENTS:
         raise ValidationFailed(fields={"tax_treatment": f"One of {', '.join(TAX_TREATMENTS)}."})
@@ -349,7 +362,8 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
 
     ids = [ln.product_id for ln in lines]
     products = await load_products(db, ids, tax_day)
-    rates = await load_rates(db, ids, as_of=day, state_territory_id=pos_state, tier=tier)
+    rates = await load_rates(db, ids, as_of=day, state_territory_id=pos_state, tier=tier,
+                             sales_type=price_sales_type(sales_type))
 
     missing = {f"lines[{i}].product_id": "No such product."
                for i, ln in enumerate(lines) if ln.product_id not in products}
@@ -445,7 +459,7 @@ async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.Quot
         seller_gstin_id=body.seller_gstin_id, as_of=body.as_of,
         lines=[LineSpec(product_id=ln.product_id, qty=ln.qty, discounts=ln.discounts)
                for ln in body.lines],
-        tax_treatment=body.tax_treatment)
+        sales_type=body.sales_type, tax_treatment=body.tax_treatment)
     return _quote_response(ctx.document, as_of=ctx.as_of, gstin_id=ctx.seller_gstin_id,
                            seller_code=ctx.seller_code, pos_code=ctx.place_of_supply_code)
 
@@ -825,6 +839,7 @@ SELECT l.id::text AS id, l.name AS name, l.status::text AS status,
        l.published_at AS published_at, l.effective_from AS effective_from,
        l.effective_to AS effective_to, l.is_active AS is_active,
        l.is_provisional AS is_provisional, l.channel_tier::text AS channel_tier,
+       l.sales_type AS sales_type,
        t.id::text AS state_id, t.name AS state_name, t.code::text AS state_code,
        (SELECT count(*) FROM price_list_item i WHERE i.price_list_id = l.id) AS item_count,
        (SELECT count(*) FROM product p WHERE p.is_active AND p.deleted_at IS NULL
@@ -844,21 +859,27 @@ def _price_list(r: Any) -> sch.PriceList:
         published_at=r.published_at.isoformat() if r.published_at else None,
         effective_from=r.effective_from, effective_to=r.effective_to,
         is_active=r.is_active, is_provisional=r.is_provisional,
-        item_count=int(r.item_count), unpriced_count=int(r.unpriced_count))
+        item_count=int(r.item_count), unpriced_count=int(r.unpriced_count),
+        sales_type=r.sales_type)
 
 
 async def list_price_lists(db: AsyncSession, *, status: str | None, state_territory_id: str | None,
-                           channel_tier: str | None, page: int, limit: int) -> sch.PriceListPage:
+                           channel_tier: str | None, page: int, limit: int,
+                           sales_type: str | None = None) -> sch.PriceListPage:
     """What a partner sees here is already narrowed by the restrictive tier policy
     in migration 010. Nothing is filtered a second time in Python."""
     params: dict[str, Any] = {"st": status, "state": state_territory_id, "tier": channel_tier,
-                              "limit": limit, "offset": (page - 1) * limit}
+                              "stype": sales_type, "limit": limit, "offset": (page - 1) * limit}
     rows = (await db.execute(text(_LIST_SELECT.replace(
         "SELECT l.id::text AS id", "SELECT count(*) OVER () AS total, l.id::text AS id", 1) + """
 WHERE l.deleted_at IS NULL
+  AND (l.status = 'published' OR (SELECT app_current_partner()) IS NULL)
   AND (CAST(:st AS text) IS NULL OR l.status = CAST(:st AS price_list_status))
   AND (CAST(:state AS text) IS NULL OR l.state_territory_id = CAST(:state AS uuid))
   AND (CAST(:tier AS text) IS NULL OR l.channel_tier = CAST(:tier AS channel_tier))
+  AND (CAST(:stype AS text) IS NULL
+       OR (CAST(:stype AS text) = 'general' AND l.sales_type IS NULL)
+       OR l.sales_type = CAST(:stype AS text))
 ORDER BY l.effective_from DESC, l.name, l.id
 LIMIT :limit OFFSET :offset"""), params)).all()
     total = int(rows[0].total) if rows else 0
@@ -890,7 +911,8 @@ async def _raw_list(db: AsyncSession, list_id: str, *, for_update: bool = False)
     """
     row = (await db.execute(text(
         "SELECT id::text AS id, name, status::text AS status, effective_from, effective_to, "
-        "       state_territory_id::text AS state_id, channel_tier::text AS tier "
+        "       state_territory_id::text AS state_id, channel_tier::text AS tier, "
+        "       sales_type "
         "FROM price_list WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL"
         + (" FOR UPDATE" if for_update else "")),
         {"id": list_id})).one_or_none()
@@ -935,12 +957,13 @@ async def create_price_list(db: AsyncSession, body: sch.PriceListCreate) -> sch.
         raise ValidationFailed(fields={"effective_to": "Must be later than effective_from."})
 
     new_id: Any = (await db.execute(text(
-        "INSERT INTO price_list (name, state_territory_id, channel_tier, effective_from, "
-        "  effective_to, source_note, created_by) "
-        "VALUES (:name, CAST(:state AS uuid), CAST(:tier AS channel_tier), CAST(:start AS date), "
-        "  CAST(:finish AS date), :note, app_current_user_id()) RETURNING id::text"),
+        "INSERT INTO price_list (name, state_territory_id, channel_tier, sales_type, "
+        "  effective_from, effective_to, source_note, created_by) "
+        "VALUES (:name, CAST(:state AS uuid), CAST(:tier AS channel_tier), :stype, "
+        "  CAST(:start AS date), CAST(:finish AS date), :note, app_current_user_id()) "
+        "RETURNING id::text"),
         {"name": body.name, "state": body.state_territory_id, "tier": body.channel_tier,
-         "start": body.effective_from, "finish": body.effective_to,
+         "stype": body.sales_type, "start": body.effective_from, "finish": body.effective_to,
          "note": body.source_note})).scalar_one()
     return await get_price_list(db, str(new_id))
 
@@ -958,11 +981,43 @@ async def patch_price_list(db: AsyncSession, list_id: str,
         raise ValidationFailed(code="effective_to_not_forward", fields={
             "effective_to": "Must not be in the past: closing a list retrospectively would "
                             "change what past documents were priced from."})
-    await db.execute(text(
-        "UPDATE price_list SET effective_to = CAST(:d AS date), "
-        "updated_by = app_current_user_id() WHERE id = CAST(:id AS uuid)"),
-        {"d": body.effective_to, "id": list_id})
+    if row.effective_to is not None and body.effective_to > row.effective_to:
+        # release review B M-3: a later end re-opens dates a successor may price
+        later = (await db.execute(text(
+            "SELECT name FROM price_list WHERE id <> CAST(:id AS uuid) AND status = 'published' "
+            "AND deleted_at IS NULL AND state_territory_id IS NOT DISTINCT FROM CAST(:s AS uuid) "
+            "AND channel_tier IS NOT DISTINCT FROM CAST(:t AS channel_tier) "
+            # FS-061 plan review C-1: only a list of the same sale type is in the way
+            "AND sales_type IS NOT DISTINCT FROM CAST(:stype AS text) "
+            "AND daterange(effective_from, effective_to, '[)') && "
+            "    daterange(CAST(:f AS date), CAST(:to AS date), '[)') LIMIT 1"),
+            # `_raw_list` names these state_id and tier; the old names were a 500 (ISS-208)
+            {"id": list_id, "s": row.state_id, "t": row.tier, "stype": row.sales_type,
+             "f": row.effective_to, "to": body.effective_to})).scalar_one_or_none()
+        if later is not None:
+            raise ConflictError(f"{later!r} prices those dates; a list cannot reach over it.",
+                                code="price_list_overlaps",
+                                fields={"effective_to": "overlaps a published list"})
+    try:
+        async with db.begin_nested():
+            await db.execute(text(
+                "UPDATE price_list SET effective_to = CAST(:d AS date), "
+                "updated_by = app_current_user_id() WHERE id = CAST(:id AS uuid)"),
+                {"d": body.effective_to, "id": list_id})
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) == "23P01" or "23P01" in str(exc.orig):
+            raise ConflictError("Another published list prices those dates.",
+                                code="price_list_overlaps",
+                                fields={"effective_to": "overlaps a published list"}) from exc
+        raise
     return await get_price_list(db, list_id)
+
+
+async def _published_or_staff(db: AsyncSession, row: Any) -> None:
+    """Release review B M-1: a dealer reads a list once it is published, not its draft."""
+    if row.status != "published" and (await db.execute(text(
+            "SELECT app_current_partner() IS NOT NULL"))).scalar_one():
+        raise NotFoundError("No such price list.")
 
 
 async def list_items(db: AsyncSession, list_id: str, *, q: str | None, unpriced: bool,
@@ -973,7 +1028,7 @@ async def list_items(db: AsyncSession, list_id: str, *, q: str | None, unpriced:
     the screen's job is filling the gaps: "which of the 1,092 has no rate yet" is
     the question, and a list of what is already there cannot answer it.
     """
-    await _raw_list(db, list_id)
+    await _published_or_staff(db, await _raw_list(db, list_id))
     params: dict[str, Any] = {"id": list_id, "q": _like(q) if q else None,
                               "unpriced": unpriced, "limit": limit, "offset": (page - 1) * limit}
     rows = (await db.execute(text(r"""
@@ -1081,10 +1136,12 @@ async def publish(db: AsyncSession, list_id: str, body: sch.PublishRequest) -> s
         "WHERE status = 'published' AND deleted_at IS NULL AND id <> CAST(:id AS uuid) "
         "AND state_territory_id IS NOT DISTINCT FROM CAST(:state AS uuid) "
         "AND channel_tier IS NOT DISTINCT FROM CAST(:tier AS channel_tier) "
+        # FS-061 EC-1: a typed list never supersedes a general one, or the reverse.
+        "AND sales_type IS NOT DISTINCT FROM CAST(:stype AS text) "
         "AND daterange(effective_from, effective_to, '[)') "
         "    && daterange(CAST(:start AS date), CAST(:finish AS date), '[)') "
         "ORDER BY effective_from"),
-        {"id": list_id, "state": row.state_id, "tier": row.tier,
+        {"id": list_id, "state": row.state_id, "tier": row.tier, "stype": row.sales_type,
          "start": row.effective_from, "finish": row.effective_to})).all()
 
     if len(overlapping) > 1:
@@ -1124,6 +1181,14 @@ async def publish(db: AsyncSession, list_id: str, body: sch.PublishRequest) -> s
                 f"covering the rest of that period first.",
                 code="price_list_gap",
                 fields={"effective_to": f"would strand the scope after {row.effective_to}"})
+        if row.effective_from < today_ist():
+            # release review B H-1: closing the predecessor before today re-prices what
+            # was quoted from it since; patch refuses the same thing (effective_to)
+            raise ConflictError(
+                f"{other.name!r} has priced documents since {row.effective_from}. Start this list "
+                f"today or later; closing the other one in the past would change those prices.",
+                code="effective_from_in_past",
+                fields={"effective_from": "today or later, to supersede a list in force"})
         await db.execute(text(
             "UPDATE price_list SET effective_to = CAST(:d AS date), "
             "updated_by = app_current_user_id() WHERE id = CAST(:id AS uuid)"),

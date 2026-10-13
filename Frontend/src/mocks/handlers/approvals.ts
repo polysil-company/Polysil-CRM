@@ -10,6 +10,7 @@ import {
 } from "@/features/approvals/api/approvals.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
+import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { stepIsOpen, stepVisibleTo, type MockApprovalStep } from "@/mocks/data/approvals";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
@@ -29,7 +30,7 @@ import { decodeCursor, encodeCursor, errorResponse } from "./shared";
  * self_approval, step_already_decided, request_closed, figures_changed, remark_required (to
  * return, and on every Accounts decision).
  *
- * APPR-002 · The approval limits: anyone signed in reads them; `masters.edit` sets one role's
+ * APPR-002 · The approval limits: staff read them (a partner user gets 403); `masters.edit` sets one role's
  * limit, company-wide or for a territory, as long as each level stays above the one below
  * (`thresholds_not_increasing`). A new limit decides the next order's chain here too.
  */
@@ -85,6 +86,10 @@ export const approvalHandlers = [
   http.get(buildApiUrl("/approvals/thresholds"), async () => {
     const { failure } = await applyScenario();
     if (failure) return failure;
+    // Staff only since the 10 Oct walk (F-8): a partner user used to get an empty list.
+    if (isPartnerRole(readMockRole())) {
+      return errorResponse(403, "forbidden", "Approval limits are for staff.");
+    }
     return HttpResponse.json({ data: mockDb.thresholds });
   }),
 

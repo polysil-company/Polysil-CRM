@@ -72,10 +72,9 @@ export function ApprovalLimits(): React.JSX.Element {
       isEmpty={(rows) => rows.length === 0}
       empty={
         <Notice tone="warning">
-          <p className="font-medium">No approval limits are set</p>
+          <p className="font-medium">No approval limits are set.</p>
           <p className="text-muted-foreground">
-            Until they are, orders and discounts can&apos;t find an approver. Ask the backend team
-            to seed them.
+            Until they are, orders and discounts can&apos;t find an approver.
           </p>
         </Notice>
       }

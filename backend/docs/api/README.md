@@ -19,6 +19,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
 | Documents | 6 | [`documents.md`](documents.md) |
 | Holidays | 3 | [`holidays.md`](holidays.md) |
+| Imports | 5 | [`imports.md`](imports.md) |
 | Leads | 20 | [`leads.md`](leads.md) |
 | Lookups | 23 | [`lookups.md`](lookups.md) |
 | Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
@@ -28,7 +29,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Org Units | 6 | [`org-units.md`](org-units.md) |
 | Partners | 7 | [`partners.md`](partners.md) |
 | Payments | 8 | [`payments.md`](payments.md) |
-| Portal | 6 | [`portal.md`](portal.md) |
+| Portal | 8 | [`portal.md`](portal.md) |
 | Pricing | 8 | [`pricing.md`](pricing.md) |
 | Products | 8 | [`products.md`](products.md) |
 | Public | 6 | [`public.md`](public.md) |

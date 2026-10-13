@@ -17,11 +17,14 @@ import type { OfficeWire } from "@/features/users/api/users.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
+import { seedDocuments, type MockDocument } from "./data/documents";
+import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
 import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
+import { seedPartners, type MockPartnerRecord } from "./data/partners";
 import {
   seedHsnHistory,
   seedPriceLists,
@@ -133,12 +136,22 @@ export interface MockDb {
   taxRates: TaxRateWire[];
   /** Price lists with their rates (MSTR-006). */
   priceLists: MockPriceList[];
+  /** Excel imports by id, as uploaded, checked and committed (MSTR-007). */
+  imports: Map<string, MockImportBatch>;
+  /** Documents on leads, quotations, orders and dispatches, newest first (DOC-001…003). */
+  documents: MockDocument[];
+  /** Uploaded document files, by document id, served back as object URLs. */
+  documentFiles: Map<string, Blob>;
   /** Staff and partner users, deleted ones kept with `deleted_at` (ADMN-001…006). */
   users: MockUserRecord[];
   /** The offices a staff member is anchored on (`GET /org-units`). */
   offices: OfficeWire[];
   /** POST /users replays: Idempotency-Key → the request and the person made. */
   userWrites: Map<string, { body: string; userId: string }>;
+  /** Channel partners, newest first (CHNL-001…005). */
+  partners: MockPartnerRecord[];
+  /** POST /partners replays: Idempotency-Key → the request and the partner made. */
+  partnerWrites: Map<string, { body: string; partnerId: string }>;
 }
 
 function createMockDb(): MockDb {
@@ -207,9 +220,14 @@ function createMockDb(): MockDb {
     hsnHistory: seedHsnHistory(products),
     taxRates: seedTaxRates(),
     priceLists: seedPriceLists(products),
+    imports: new Map(),
+    documents: seedDocuments(leads, quotations, orders),
+    documentFiles: new Map(),
     users: seedUsers(),
     offices: seedOffices(),
     userWrites: new Map(),
+    partners: seedPartners(),
+    partnerWrites: new Map(),
   };
 }
 

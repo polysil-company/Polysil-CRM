@@ -79,6 +79,19 @@ describe("[LEAD-013] QrCodes", () => {
     expect(await screen.findByText("Code switched off")).toBeInTheDocument();
     expect(mockDb.qrCodes.find((row) => row.id === on.id)?.is_active).toBe(false);
   });
+
+  it("shows a dealer their codes read-only: no new code, edit or switch (F-8)", async () => {
+    signInAs("dealer");
+    show(<QrCodes />);
+
+    const list = await screen.findByRole("list", { name: "QR codes" });
+    expect(within(list).getAllByRole("listitem").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "New QR code" })).not.toBeInTheDocument();
+    expect(within(list).queryByRole("button", { name: /^Edit / })).not.toBeInTheDocument();
+    expect(
+      within(list).queryByRole("button", { name: /^Switch (off|on) / }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("[LEAD-014] EnquiryPage", () => {
@@ -96,9 +109,11 @@ describe("[LEAD-014] EnquiryPage", () => {
     const user = show(<EnquiryPage qr={code.code} />);
 
     expect(
-      await screen.findByText(`Enquiry through ${code.partner?.name ?? ""}`),
+      await screen.findByText("Your area comes from the code you scanned."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Your area comes from the code you scanned.")).toBeInTheDocument();
+    // F-19 · The code's label is for staff: the farmer never reads it.
+    expect(screen.queryByText(code.label, { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Enquiry through/)).not.toBeInTheDocument();
     await fillDetails(user);
     await user.click(screen.getByRole("button", { name: /Send me a code on WhatsApp/ }));
 
@@ -114,6 +129,9 @@ describe("[LEAD-014] EnquiryPage", () => {
 
   it("asks for the district when no code chose the area", async () => {
     const user = show(<EnquiryPage qr={null} />);
+    // F-19 · Before a state is picked, the district waits; it is not "Loading…".
+    expect(await screen.findByText("Choose your district")).toBeInTheDocument();
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
     await fillDetails(user);
     await user.click(screen.getByRole("button", { name: /Send me a code on WhatsApp/ }));
 

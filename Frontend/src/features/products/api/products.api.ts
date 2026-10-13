@@ -17,6 +17,7 @@ import {
   type OffsetPage,
   type PatchProductRequest,
   type PriceList,
+  type PriceListSalesTypeFilter,
   type PriceListItemsPage,
   type Product,
   type ProductListParams,
@@ -238,7 +239,12 @@ export function setTaxRate({
 
 /** MSTR-006 · GET /price-lists — newest first, optionally drafts or published ones. */
 export function listPriceLists(
-  params: { status: "draft" | "published" | null; page: number },
+  params: {
+    status: "draft" | "published" | null;
+    /** MSTR-008 · One sale type, `general` for the lists with none, or null for every list. */
+    salesType: PriceListSalesTypeFilter | null;
+    page: number;
+  },
   signal?: AbortSignal,
 ): Promise<OffsetPage<PriceList>> {
   return apiRequest({
@@ -246,7 +252,12 @@ export function listPriceLists(
     logger: log,
     fn: "listPriceLists",
     path: "/price-lists",
-    query: { status: params.status ?? undefined, page: params.page, limit: PRODUCT_PAGE_SIZE },
+    query: {
+      status: params.status ?? undefined,
+      sales_type: params.salesType ?? undefined,
+      page: params.page,
+      limit: PRODUCT_PAGE_SIZE,
+    },
     schema: priceListPageSchema,
     signal,
   });

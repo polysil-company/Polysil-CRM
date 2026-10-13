@@ -17,6 +17,17 @@ const MOCK_STAFF_PASSWORD = "polysil-demo";
 const MOCK_OTP_CODE = "123456";
 
 async function expectNoAccessibilityViolations(page: Page): Promise<void> {
+  // Let entrance fades finish first: axe measures contrast on the colours it
+  // sees, and a button at 97% opacity reads as failing. Endless ones (spinners,
+  // shimmer) never finish, so they're left running.
+  await page.evaluate(async () => {
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
   const results = await new AxeBuilder({ page })
     .withTags(WCAG_TAGS)
     // Development-only overlays: the Next.js dev tools and the TanStack Query devtools.
@@ -294,5 +305,26 @@ test.describe("[MSG-002] Messages", () => {
     await expect(page.getByText(/Meera Iyer has left Polysil/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Send message" })).toHaveCount(0);
     await expectNoAccessibilityViolations(page);
+  });
+});
+
+test.describe("[APP-003] Page transitions", () => {
+  test("the first click on a page that has just arrived lands (walk F-13)", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "The sidebar is a desktop navigation.");
+    await signIn(page, "/dashboard");
+
+    await page.getByRole("navigation").getByRole("link", { name: "Tasks" }).click();
+    const newTask = page.getByRole("button", { name: /New task/ }).first();
+    await newTask.waitFor();
+    // A person's click, at once and without waiting for the element to settle: the arriving
+    // page used to be captured by the view transition, so this went to <main>.
+    const box = await newTask.boundingBox();
+    if (box === null) throw new Error("The New task button has no box");
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 2000 });
   });
 });

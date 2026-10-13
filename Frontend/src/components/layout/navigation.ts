@@ -68,7 +68,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "dashboard",
         label: "Dashboard",
-        description: "Your territory at a glance.",
+        description: "Leads, quotations, orders and service at a glance.",
         icon: DashboardSquare02Icon,
         module: null,
         dataId: "RPT-001",
@@ -186,9 +186,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "channel-partners",
         label: "Channel partners",
+        description: "Distributors, their dealers and the dealers' sub-dealers.",
         icon: Store01Icon,
         module: "partners",
+        // TODO(CHNL-002): a distributor or dealer may add the next type down from the portal
+        // (partners.md); the screens are staff only until that is agreed with the client.
+        audience: "staff",
         dataId: "CHNL-001",
+        href: "/partners",
       },
       {
         id: "marketing",
@@ -246,6 +251,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         description: "How much each role may approve: an order's value and a quotation's discount.",
         icon: SlidersHorizontalIcon,
         module: "masters",
+        // GET /approvals/thresholds is 403 for anyone who is not staff (walk F-8).
+        audience: "staff",
         dataId: "APPR-002",
         href: "/approval-limits",
       },
@@ -326,6 +333,32 @@ export function visibleNavSections(
     ...section,
     items: section.items.filter((item) => canSeeNavItem(item, permissions, userType)),
   })).filter((section) => section.items.length > 0);
+}
+
+/**
+ * Pages below a nav item that are for staff even when the item is not: a partner user sees
+ * no possible duplicates (the backend sends none and refuses to dismiss one, walk F-1).
+ */
+const STAFF_ONLY_PATHS: readonly string[] = ["/leads/duplicates"];
+
+/**
+ * APP-006 · Whether the user may open a page, by the same rule that shows its nav item, so a
+ * page left out of someone's menu cannot be opened by typing its address either (walk F-8).
+ * Pages outside the nav map are open to everyone signed in. A courtesy: the backend enforces.
+ */
+export function canOpenPath(
+  pathname: string,
+  permissions: readonly ModulePermission[],
+  userType: string | null = null,
+): boolean {
+  const staffOnly = STAFF_ONLY_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+  if (staffOnly && userType !== "staff") {
+    return false;
+  }
+  const item = findActiveNavItem(pathname);
+  return item === undefined || canSeeNavItem(item, permissions, userType);
 }
 
 export function isNavItemActive(item: NavItem, pathname: string): boolean {

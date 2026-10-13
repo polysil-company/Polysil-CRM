@@ -13,7 +13,7 @@ Two gates matter here and are worth stating in one place:
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, status
 from fastapi.responses import JSONResponse
@@ -60,11 +60,14 @@ ListId = Annotated[str, Path(pattern=UUID_RE)]
 @price_lists.get("", response_model=PriceListPage)
 async def list_price_lists(
     db: DbSession,
-    status_: Annotated[str | None, Query(alias="status",
-                                         description="draft or published.")] = None,
+    status_: Annotated[Literal["draft", "published"] | None,
+                       Query(alias="status", description="draft or published.")] = None,
     state_territory_id: Annotated[str | None, Query(pattern=UUID_RE)] = None,
-    channel_tier: Annotated[str | None, Query(
-        description="distributor, dealer, sub_dealer or farmer.")] = None,
+    channel_tier: Annotated[Literal["distributor", "dealer", "sub_dealer", "farmer"] | None,
+                            Query(description="distributor, dealer, sub_dealer or farmer.")] = None,
+    sales_type: Annotated[Literal["commercial", "industrial", "subsidised", "general"] | None,
+                          Query(description="commercial, industrial or subsidised; general for "
+                                            "the lists with no sale type.")] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> PriceListPage:
@@ -75,6 +78,10 @@ async def list_price_lists(
     three corrections sits over a complete base list and overrides only those
     three.
 
+    A list may also be scoped to a sale type: commercial, industrial or
+    subsidised. A quotation or order of that type prices from it before any
+    general list; other sale types never use it (FS-061).
+
     `unpriced_count` is how many active products the list holds no rate for. It is
     the number the publish step refuses on, so show it on the editing screen
     rather than at publish time.
@@ -84,7 +91,8 @@ async def list_price_lists(
     """
     return await service.list_price_lists(db, status=status_,
                                           state_territory_id=state_territory_id,
-                                          channel_tier=channel_tier, page=page, limit=limit)
+                                          channel_tier=channel_tier, page=page, limit=limit,
+                                          sales_type=sales_type)
 
 
 @price_lists.get("/{list_id}", response_model=Envelope[PriceList],

@@ -151,7 +151,7 @@ async def _create(db: AsyncSession, challenge_id: str | None, body: sch.PublicLe
                    territory_id=body.territory_id, village=body.village,
                    mis_system=body.mis_system, inquiry_type=body.inquiry_type,
                    note=body.note, source="qr_code" if qr else "website",
-                   email=None, estimated_value=None, campaign_id=None),
+                   email=None, estimated_value=None, campaign_id=qr[2] if qr else None),
         intake=True, intake_partner_id=qr[1] if qr else None,
         qr_code_id=qr[0] if qr else None)
     await _record(db, challenge_id, lead.id)
@@ -163,20 +163,25 @@ async def _record(db: AsyncSession, challenge_id: str | None, lead_id: str) -> N
                      {"c": challenge_id, "l": lead_id})
 
 
-async def _qr(db: AsyncSession, code: str | None) -> tuple[str, str | None] | None:
-    """The code's id and partner. An unknown or inactive code, or one whose
-    partner closed, is ignored: the lead is still captured, as `website` (rule 2)."""
+async def _qr(db: AsyncSession,
+              code: str | None) -> tuple[str, str | None, str | None] | None:
+    """The code's id, partner and campaign. An unknown or inactive code, or one whose
+    partner closed, is ignored: the lead is still captured, as `website` (rule 2).
+    The campaign comes only while it is active, so a closed campaign never refuses
+    a farmer's form (FS-040 rule 3)."""
     if not code:
         return None
     row = (await db.execute(text(
-        "SELECT q.id, q.partner_id FROM lead_qr_code q "
+        "SELECT q.id, q.partner_id, cmp.id AS campaign_id FROM lead_qr_code q "
         "LEFT JOIN channel_partner cp ON cp.id = q.partner_id "
+        "LEFT JOIN campaign cmp ON cmp.id = q.campaign_id AND cmp.is_active "
         "WHERE q.code = CAST(:c AS citext) AND q.is_active "
         "AND (q.partner_id IS NULL OR (cp.is_active AND cp.deleted_at IS NULL))"),
         {"c": code.strip().upper()})).one_or_none()
     if row is None:
         return None
-    return str(row.id), str(row.partner_id) if row.partner_id else None
+    return (str(row.id), str(row.partner_id) if row.partner_id else None,
+            str(row.campaign_id) if row.campaign_id else None)
 
 
 # ── staff: the printed codes ──────────────────────────────────────────────────

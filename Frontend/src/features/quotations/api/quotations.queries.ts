@@ -63,6 +63,8 @@ export function quotationDetailQueryOptions(quotationId: string) {
       if (quotation?.approval?.status === "pending") return APPROVAL_PENDING_POLL_MS;
       return false;
     },
+    // Someone who sends, then switches to WhatsApp, comes back to "Open PDF" (walk F-14).
+    refetchIntervalInBackground: true,
     meta: { dataId: "QUOT-002" },
   });
 }
@@ -127,6 +129,7 @@ export function publicQuotationQueryOptions(token: string) {
     queryKey: quotationKeys.shared(token),
     queryFn: ({ signal }) => getPublicQuotation(token, signal),
     refetchInterval: (query) => (query.state.data?.pdfReady === false ? PUBLIC_PDF_POLL_MS : false),
+    refetchIntervalInBackground: true,
     retry: false,
     meta: { dataId: "QUOT-012" },
   });

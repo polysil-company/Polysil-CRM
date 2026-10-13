@@ -2305,8 +2305,8 @@ def f_ratings() -> None:
     _columns(
         "56-ratings", "Ratings",
         "Feedback entered on installations, service and products; a dealer rating derived from payments.",
-        "BUILT. FS-043: migration 051, /ratings, /partners/{id}/dealer-rating.",
-        [("s1", "POST /ratings: staff record the farmer's\n(customer); a dealer's user its own (dealer)", GREY),
+        "BUILT. FS-043: migration 051, /ratings, /partners/{id}/dealer-rating. FS-060: 057, /portal/ratings.",
+        [("s1", "POST /ratings: staff record the farmer's\n(customer); a dealer's user its own (dealer);\nPOST /portal/ratings: the farmer himself (057)", GREY),
          ("s2", "rating_record(): user_type decides the rater;\nshipped / dispatched product / complaint closed", BLUE),
          ("s3", "one per target per kind of rater, never edited;\nrating.recorded on the order or complaint", GREEN),
          ("s4", "GET /partners/{id}/dealer-rating:\n047's gate, then one set-based query", BLUE),
@@ -2316,7 +2316,9 @@ def f_ratings() -> None:
         [("n1", "SAME FIGURES FOR EVERY READER\n\norder_paid_at() answers per caller: through it, a\nfield officer would see a worse rating than Accounts.\ndealer_rating() reads payments itself.", RED),
          ("n2", "A DEALER SEES A SCORE, NOT A COMMENT\n\nA farmer's comment and the staff name never reach the\ndealer: null in the row, no actor on any timeline.", RED),
          ("n3", "Left out of payment days: orders owing nothing,\nclosed-short orders, unpaid orders younger than the\nfirst band. Never below 0 days.", RED),
-         ("n4", "Ours: 1-5 stars, never edited, the formula and bands,\nscore-only for dealers (GAP-372 to GAP-377).", YELLOW)])
+         ("n4", "Ours: 1-5 stars, never edited, the formula and bands,\nscore-only for dealers (GAP-372 to GAP-377).", YELLOW),
+         ("n5", "A FARMER RATES ONLY WHAT HIS PORTAL LISTS\n\nrating_record()'s consumer arm checks portal_rating_docs()\nbefore any staff check: another farmer's number is 404.\nentered_via is stored: staff cannot read his account.", RED),
+         ("n6", "Ours: installation and service only, one customer\nrating per document, it counts for the dealer\n(GAP-381 to GAP-384).", YELLOW)])
 
 def f_subsidised_orders() -> None:
     _columns(
@@ -2416,6 +2418,47 @@ def f_subsidised_quotations() -> None:
          ("n4", "Open: dealer pricing, a stale revision, the\napplication's own figures (GAP-463 to 465).", YELLOW)])
 
 
+def f_price_lists_by_sale_type() -> None:
+    _columns(
+        "68-price-lists-by-sale-type", "Price lists by sale type",
+        "A commercial, industrial or subsidy list prices its own sale type first.",
+        "BUILT. FS-061: migration 073, price_list.sales_type.",
+        [("p1", "POST /price-lists sales_type=commercial | industrial\n| subsidised | null (general)", BLUE),
+         ("p2", "fill the draft: PUT items, or an Excel import (FS-062)", GREY),
+         ("p3", "publish: supersedes only a list with the same\nstate, tier AND sale type", GREEN),
+         ("p4", "quotation / order: price_document(sales_type=...)\nrequired, no default", GREEN),
+         ("p5", "load_rates: lists for this sale type OR general;\nanother type's list never applies", GREEN),
+         ("p6", "pick: sale type first, then state + tier, then\nlater start, then id", BLUE)],
+        [("d1", "export, sample, marketing, replacement:\ngeneral lists only (GAP-469)", YELLOW),
+         ("d2", "order from quotations: commercial <-> industrial\nrefused, type_mismatch (GAP-474)", YELLOW),
+         ("d3", "PATCH a draft's sale type: repriced from\nthe new type's lists", GREY)],
+        [("n1", "PUBLISH MATCHED STATE AND TIER ONLY\n\nBefore 073 a commercial list closed the general one,\nand every other sale type lost its prices (EC-1).", RED),
+         ("n2", "NO ENUM CAST IN AN EXCLUSION\n\nchannel_tier::text is not immutable. Two exclusions,\nsplit on the tier; coalesce for state and sale type.", RED),
+         ("n3", "PUBLISHING A TYPED LIST: OPEN DRAFTS OF THAT\nTYPE ASK TO BE SAVED AGAIN (rate_changed, EC-4)", YELLOW),
+         ("n4", "A typed list beats a state list for its type\n(GAP-475). Existing lists stay general (GAP-470).", YELLOW)])
+
+
+def f_excel_import() -> None:
+    _columns(
+        "69-excel-import", "Excel import with column matching",
+        "Partners, a draft list's rates, or order lines. Nothing is saved before the check.",
+        "BUILT. FS-062: migration 074, /imports.",
+        [("i1", "POST /imports (multipart): kind, file, target_id?\n.xlsx or .csv, 10 MB, 5,000 rows", BLUE),
+         ("i2", "read: caps checked BEFORE openpyxl; rows stored\nas text in import_batch (owner only)", GREEN),
+         ("i3", "answer: headers, sample, fields,\nsuggested_mapping (your last, then common names)", GREY),
+         ("i4", "POST /imports/{id}/check {mapping}\nevery row, every error, sheet row numbers", BLUE),
+         ("i5", "POST /imports/{id}/commit: re-check in the\ntransaction; all or nothing, or skip_invalid", GREEN),
+         ("i6", "partners: one INSERT per type tier, parents first;\nrates: delete + insert into the DRAFT list", BLUE)],
+        [("d1", "lines: the check returns them; the order or\nquotation form saves them. No commit.", GREY),
+         ("d2", "area: a placeholder insert per territory in a\nsavepoint asks the real policy (42501 = outside)", YELLOW),
+         ("d3", "codes: partner_codes_taken() sees hidden partners", YELLOW),
+         ("d4", "purge after 7 days: import_batch_purge(),\nsystem principal only", GREY)],
+        [("n1", "NO LOGIN IS CREATED\n\nEvery dealer can be a record. Portal access is a\nseparate POST /users per dealer.", RED),
+         ("n2", "FLOATS ARE NOT MONEY\n\nrepr -> Decimal, 9 places, no exponent. A % cell is read\nas shown. More than 2 decimals on a rate is refused.", RED),
+         ("n3", "A CHILD OF A BAD ROW IS A BAD ROW\n\nSkipping a distributor strands its dealers; the check\nsays so before commit (EC-12).", RED),
+         ("n4", "Not yet: updating partners, a template file,\nfuzzy product match (GAP-471 to 473, 476).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2429,4 +2472,5 @@ if __name__ == "__main__":
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
     f_export_sample_orders(); f_ratings(); f_warranty()
     f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
+    f_price_lists_by_sale_type(); f_excel_import()
     print(f"\nwrote to {OUT}")

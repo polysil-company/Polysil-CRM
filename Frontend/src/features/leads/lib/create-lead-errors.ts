@@ -14,7 +14,7 @@ const FORM_FIELD_BY_REQUEST_FIELD: Readonly<Record<keyof CreateLeadRequest, Crea
     source: "source",
     estimated_value: "estimatedValue",
     crops: "crops",
-    land_acres: "landAcres",
+    land_hectares: "landHectares",
     note: "note",
   };
 

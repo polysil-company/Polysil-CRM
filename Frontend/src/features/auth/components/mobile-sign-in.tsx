@@ -269,7 +269,7 @@ function OtpCodeStep({
           <span className="font-medium whitespace-nowrap text-foreground tabular-nums">
             {formatIndianPhone(`+${challenge.mobile}`)}
           </span>{" "}
-          is registered with Polysil, a {OTP_LENGTH}-digit code is on its way by SMS.
+          is registered with Polysil, a {OTP_LENGTH}-digit code is on its way on WhatsApp.
         </p>
         <Button
           type="button"

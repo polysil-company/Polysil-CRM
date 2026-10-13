@@ -30,8 +30,11 @@ import type { LeadStage, TimelineEvent } from "@/features/leads/api/leads.schema
 import { LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
 import {
   assignmentSentence,
+  isShownOnTimeline,
   joinFields,
+  shortInquiryNumber,
   toTimelineEntry,
+  type LeadRef,
   type TimelineDocument,
   type TimelineEntry,
 } from "@/features/leads/lib/timeline-entries";
@@ -73,7 +76,9 @@ export function LeadTimeline({ leadId }: LeadTimelineProps): React.JSX.Element {
     <QueryView
       query={query}
       pending={<LeadTimelineSkeleton />}
-      isEmpty={(data) => data.pages.every((page) => page.items.length === 0)}
+      isEmpty={(data) =>
+        data.pages.every((page) => page.items.filter(isShownOnTimeline).length === 0)
+      }
       empty={
         <EmptyState
           icon={Clock01Icon}
@@ -86,9 +91,9 @@ export function LeadTimeline({ leadId }: LeadTimelineProps): React.JSX.Element {
         <div className="flex flex-col gap-4">
           <ol aria-label="Lead activity, newest first" className="flex flex-col">
             {data.pages.flatMap((page) =>
-              page.items.map((event) => (
-                <TimelineItem key={event.id} event={event} leadId={leadId} />
-              )),
+              page.items
+                .filter(isShownOnTimeline)
+                .map((event) => <TimelineItem key={event.id} event={event} leadId={leadId} />),
             )}
           </ol>
           {query.hasNextPage ? (
@@ -145,7 +150,11 @@ function TimelineItem({
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
         <p className="text-sm text-foreground">
-          <span className="font-medium">{event.actor?.name ?? "Polysil"}</span>{" "}
+          {SAID_WITHOUT_ACTOR.has(entry.type) ? null : (
+            <>
+              <span className="font-medium">{event.actor?.name ?? "Polysil"}</span>{" "}
+            </>
+          )}
           <EntrySentence entry={entry} />
         </p>
         <RelativeDate value={event.occurredAt} className="text-xs text-muted-foreground" />
@@ -154,6 +163,16 @@ function TimelineItem({
     </li>
   );
 }
+
+/**
+ * Entries whose sentence names its own subject: the system finds duplicates, and the customer
+ * opens a quotation; "Asha Patel flagged …" or "the customer · Quotation opened by the
+ * customer" misread them (walk F-16).
+ */
+const SAID_WITHOUT_ACTOR: ReadonlySet<TimelineEntry["type"]> = new Set([
+  "duplicate-flagged",
+  "customer-opened",
+]);
 
 /** Red for lost, green for won, blue for every other move. */
 function stageTone(to: LeadStage | null): Tone {
@@ -197,6 +216,7 @@ function appearanceOf(entry: TimelineEntry): { icon: IconGlyph; tone: Tone } {
               ? "danger"
               : "neutral",
       };
+    case "customer-opened":
     case "document":
       return { icon: Invoice03Icon, tone: "neutral" };
     case "other":
@@ -225,6 +245,56 @@ function DocumentLink({ document }: { document: TimelineDocument }): React.JSX.E
     >
       {document.title}
     </Link>
+  );
+}
+
+function LeadLink({
+  leadId,
+  children,
+}: {
+  leadId: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <Link
+      href={`/leads/${leadId}`}
+      className="font-mono text-primary-text underline-offset-4 hover:underline"
+    >
+      {children}
+    </Link>
+  );
+}
+
+/** "00083", linked to its lead when the reader may open it. */
+function LeadRefLink({ lead }: { lead: LeadRef }): React.JSX.Element {
+  const label = lead.number === null ? "a lead" : shortInquiryNumber(lead.number);
+  return lead.leadId === null ? (
+    <span className="font-mono">{label}</span>
+  ) : (
+    <LeadLink leadId={lead.leadId}>{label}</LeadLink>
+  );
+}
+
+/** "6 possible duplicates found: 00083, 00088, …" — the system found them, nobody flagged them. */
+function DuplicatesFound({ matches }: { matches: readonly LeadRef[] }): React.JSX.Element {
+  const named = matches.filter((match) => match.number !== null);
+  const heading =
+    matches.length === 1
+      ? "A possible duplicate found"
+      : `${formatNumber(matches.length)} possible duplicates found`;
+  if (named.length === 0) {
+    return <>{heading}</>;
+  }
+  return (
+    <>
+      {heading}:{" "}
+      {named.map((match, index) => (
+        <span key={match.leadId ?? match.number ?? index}>
+          {index === 0 ? null : ", "}
+          <LeadRefLink lead={match} />
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -267,37 +337,35 @@ function EntrySentence({ entry }: { entry: TimelineEntry }): React.JSX.Element {
       ) : (
         <>changed the {joinFields(entry.fields)}</>
       );
-    case "merged":
+    case "merged": {
+      const other = (
+        <LeadLink leadId={entry.otherLeadId}>
+          {entry.otherNumber === null ? "another lead" : entry.otherNumber}
+        </LeadLink>
+      );
       return entry.role === "survivor" ? (
-        <>
-          merged{" "}
-          <Link
-            href={`/leads/${entry.otherLeadId}`}
-            className="text-primary-text underline-offset-4 hover:underline"
-          >
-            another lead
-          </Link>{" "}
-          into this one
-        </>
+        <>merged {other} into this lead</>
       ) : (
-        <>
-          merged this lead into{" "}
-          <Link
-            href={`/leads/${entry.otherLeadId}`}
-            className="text-primary-text underline-offset-4 hover:underline"
-          >
-            another lead
-          </Link>
-        </>
+        <>merged this lead into {other}</>
       );
+    }
     case "duplicate-flagged":
-      return entry.count === 1 ? (
-        <>flagged a possible duplicate</>
-      ) : (
-        <>flagged {formatNumber(entry.count)} possible duplicates</>
-      );
+      return <DuplicatesFound matches={entry.matches} />;
     case "duplicate-dismissed":
-      return <>dismissed a possible duplicate</>;
+      return entry.other === null || entry.other.number === null ? (
+        <>dismissed a possible duplicate</>
+      ) : (
+        <>
+          marked <LeadRefLink lead={entry.other} /> as not a duplicate
+        </>
+      );
+    case "customer-opened":
+      return (
+        <>
+          The customer opened{" "}
+          {entry.document === null ? "the quotation" : <DocumentLink document={entry.document} />}
+        </>
+      );
     case "deleted":
       return <>deleted the lead</>;
     case "approval":

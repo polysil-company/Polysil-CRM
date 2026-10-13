@@ -47,6 +47,8 @@ _LIMITS: list[tuple[re.Pattern[str], frozenset[str] | None, int, str]] = [
                 r"|visits/[^/]+/photos)/?$"), frozenset({"POST"}), BODY_LIMIT, _UPLOAD_MESSAGE),
     # FS-050: documents on records
     (re.compile(r"^/api/v1/documents/?$"), frozenset({"POST"}), BODY_LIMIT, _UPLOAD_MESSAGE),
+    # FS-062: Excel imports
+    (re.compile(r"^/api/v1/imports/?$"), frozenset({"POST"}), BODY_LIMIT, _UPLOAD_MESSAGE),
     # FS-051: the applicant's documents, on both public mounts
     (re.compile(r"^(/api/v1)?/public/dealer-apply/[^/]+/documents/?$"), frozenset({"POST"}),
      BODY_LIMIT, _UPLOAD_MESSAGE),

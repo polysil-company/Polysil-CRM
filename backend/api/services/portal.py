@@ -79,3 +79,29 @@ async def orders(db: AsyncSession, caller: Caller) -> list[sch.PortalOrder]:
 async def complaints(db: AsyncSession, caller: Caller) -> list[sch.PortalComplaint]:
     await _customer(db, caller)
     return [sch.PortalComplaint(**x) for x in await _json(db, "portal_complaints")]
+
+
+async def ratings(db: AsyncSession, caller: Caller) -> list[sch.PortalRating]:
+    """The customer ratings on his own orders and complaints (FS-060)."""
+    await _customer(db, caller)
+    raw: Any = (await db.execute(text("SELECT portal_ratings(NULL)"))).scalar_one()
+    rows = json.loads(raw) if isinstance(raw, str) else raw
+    return [sch.PortalRating(**x) for x in rows]
+
+
+async def rate(db: AsyncSession, caller: Caller, body: sch.PortalRatingCreate) -> sch.PortalRating:
+    """Record his rating. Refusals are the staff route's, by the same codes (FS-060 §4)."""
+    from api.services.ratings import _refusal
+    await _customer(db, caller)
+    try:
+        async with db.begin_nested():
+            raw: Any = (await db.execute(text(
+                "SELECT portal_rate(:t, :o, :c, :s, :m)"),
+                {"t": body.target, "o": body.order_no, "c": body.complaint_no,
+                 "s": body.score, "m": body.comment})).scalar_one()
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) == "42501":
+            raise ForbiddenError("The portal is switched off.", code="portal_off") from exc
+        raise _refusal(exc) from exc
+    row = json.loads(raw) if isinstance(raw, str) else raw
+    return sch.PortalRating(**row)

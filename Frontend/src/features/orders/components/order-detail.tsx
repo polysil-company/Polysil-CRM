@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RelatedComplaints } from "@/features/complaints/components/related-complaints";
+import { RecordDocuments } from "@/features/documents/components/record-documents";
 import { partnerTypeLabel } from "@/features/leads/lib/lead-labels";
 import { orderDetailQueryOptions } from "@/features/orders/api/orders.queries";
 import type { Order, OrderLine } from "@/features/orders/api/orders.schemas";
@@ -28,6 +29,7 @@ import {
   stepRoleLabel,
 } from "@/features/orders/lib/order-labels";
 import { formatRate, parseWarnings } from "@/features/quotations/lib/quotation-labels";
+import { useCan } from "@/features/session/hooks/use-session";
 import { isApiError } from "@/lib/api/errors";
 import {
   EMPTY_VALUE,
@@ -69,6 +71,8 @@ function shippedPercent(lines: readonly OrderLine[]): number {
 
 function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
   const shipping = order.approvedAt !== null && order.status !== "cancelled";
+  // Whoever edits the order adds to it, a dealer on their own (handover documents-…-chain.md).
+  const canAddDocuments = useCan("sales_orders", "edit");
 
   return (
     <div className="flex flex-col gap-5">
@@ -142,6 +146,12 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
       {shipping ? <OrderDispatches order={order} /> : null}
 
       {order.status === "draft" ? null : <RelatedComplaints about={{ orderId: order.id }} />}
+
+      {/* DOC-001 · The purchase order, payment slips, the invoice and anything else on it. */}
+      <RecordDocuments
+        scope={{ kind: "record", recordType: "sales_order", recordId: order.id }}
+        canAdd={canAddDocuments}
+      />
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4">

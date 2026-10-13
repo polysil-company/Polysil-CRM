@@ -23,7 +23,9 @@ import {
 } from "@/features/leads/api/leads.schemas";
 import { summarizeSchemaIssues } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
+import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
+import { mockLand } from "@/mocks/data/leads";
 import { mockLookupRows } from "@/mocks/data/lookups";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
@@ -106,9 +108,18 @@ function sortLeads(leads: readonly LeadWire[], sort: string, direction: 1 | -1):
   });
 }
 
+/**
+ * What a partner user reads of a lead since the 10 Oct walk (F-1): no score, no lost reason
+ * or note, and no duplicates. Staff read it whole.
+ */
+function forReader(lead: LeadWire): LeadWire {
+  if (!isPartnerRole(readMockRole())) return lead;
+  return { ...lead, score: null, lost_reason: null, lost_note: null, duplicates: [] };
+}
+
 /** The list omits duplicate links; only the detail endpoint carries them. */
 function toListRow(lead: LeadWire): LeadWire {
-  return { ...lead, duplicates: [] };
+  return { ...forReader(lead), duplicates: [] };
 }
 
 /**
@@ -260,7 +271,7 @@ export function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
       name: activeCrops.find((crop) => crop.code === code)?.name ?? code,
       is_active: true,
     })),
-    land_acres: body.land_acres === null ? null : Number(body.land_acres).toFixed(2),
+    ...mockLand(body.land_hectares),
     lost_reason: null,
     lost_note: null,
     reopen_count: 0,
@@ -531,7 +542,8 @@ export const leadHandlers = [
     const cursor = url.searchParams.get("cursor");
     const offset = cursor === null ? 0 : decodeCursor(cursor);
     if (offset === null) return validationError({ cursor: "malformed cursor" });
-    const pairs = scenario === "empty" ? [] : pendingPairs();
+    // A partner user reviews no duplicates (walk F-1).
+    const pairs = scenario === "empty" || isPartnerRole(readMockRole()) ? [] : pendingPairs();
     const body: DuplicatePageWire = {
       data: pairs.slice(offset, offset + limit),
       meta: {
@@ -551,14 +563,21 @@ export const leadHandlers = [
     const linkId = String(params.linkId);
     const idempotency = replayStageChange(request, linkId, null);
     if (idempotency.kind === "respond") return idempotency.response;
-    if (!mayDo("edit")) return errorResponse(403, "forbidden", "You may not review duplicates.");
+    if (!mayDo("edit") || isPartnerRole(readMockRole())) {
+      return errorResponse(403, "forbidden", "You may not review duplicates.");
+    }
     const pair = pendingPairs().find((item) => item.link_id === linkId);
     if (pair === undefined) return errorResponse(404, "not_found", "No such pending pair.");
     settleLink(linkId, "dismissed");
     for (const id of [pair.lead_a.id, pair.lead_b.id]) {
       const lead = mockDb.leads.find((item) => item.id === id);
+      const other = id === pair.lead_a.id ? pair.lead_b : pair.lead_a;
       if (lead !== undefined)
-        recordLeadEvent(lead, "lead.duplicate_dismissed", { link_id: linkId });
+        recordLeadEvent(lead, "lead.duplicate_dismissed", {
+          link_id: linkId,
+          other_lead_id: other.id,
+          other_inquiry_no: other.inquiry_no,
+        });
     }
     mockDb.stageChanges.set(idempotency.key, {
       body: idempotency.serialized,
@@ -575,7 +594,7 @@ export const leadHandlers = [
     if (!lead) {
       return errorResponse(404, "not_found", "No such lead.");
     }
-    const body: LeadResponseWire = { data: lead };
+    const body: LeadResponseWire = { data: forReader(lead) };
     return HttpResponse.json(body);
   }),
 
@@ -932,13 +951,11 @@ export const leadHandlers = [
           : body.estimated_value === null
             ? null
             : Number(body.estimated_value).toFixed(2),
-      land_acres:
-        body.land_acres === undefined
-          ? undefined
-          : body.land_acres === null
-            ? null
-            : Number(body.land_acres).toFixed(2),
     } as const;
+    if (body.land_hectares !== undefined) {
+      Object.assign(lead, mockLand(body.land_hectares));
+      changed.land_hectares = body.land_hectares;
+    }
     for (const [key, value] of Object.entries(scalar)) {
       if (value === undefined) continue;
       Object.assign(lead, { [key]: value });
@@ -998,7 +1015,12 @@ export const leadHandlers = [
     }
     loser.stage = "merged";
     loser.merged_into = { id: survivor.id, inquiry_no: survivor.inquiry_no };
-    const payload = { loser: loser.id, survivor: survivor.id };
+    const payload = {
+      loser: loser.id,
+      survivor: survivor.id,
+      loser_inquiry_no: loser.inquiry_no,
+      survivor_inquiry_no: survivor.inquiry_no,
+    };
     recordLeadEvent(survivor, "lead.merged", payload);
     recordLeadEvent(loser, "lead.merged", payload);
     mockDb.stageChanges.set(idempotency.key, {

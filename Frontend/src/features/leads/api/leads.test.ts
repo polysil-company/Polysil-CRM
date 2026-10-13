@@ -67,7 +67,7 @@ const NEW_LEAD: CreateLeadRequest = {
   source: null,
   estimated_value: "150000",
   crops: ["cotton", "groundnut"],
-  land_acres: "4.50",
+  land_hectares: "1.82",
   note: null,
 };
 
@@ -454,7 +454,7 @@ describe("[LEAD-002] New lead form schema", () => {
     source: null,
     estimatedValue: "125000.50",
     crops: ["cotton"],
-    landAcres: " 4.5 ",
+    landHectares: " 1.8 ",
     note: "",
   };
 
@@ -472,7 +472,7 @@ describe("[LEAD-002] New lead form schema", () => {
       source: null,
       estimated_value: "125000.50",
       crops: ["cotton"],
-      land_acres: "4.5",
+      land_hectares: "1.8",
       note: null,
     });
     expect(createLeadRequestSchema.safeParse(body).success).toBe(true);
@@ -487,7 +487,7 @@ describe("[LEAD-002] New lead form schema", () => {
       territory: null,
       misSystem: undefined,
       estimatedValue: "1,25,000",
-      landAcres: "0",
+      landHectares: "0",
       crops: Array.from({ length: 11 }, (_, index) => `crop-${String(index)}`),
     });
 
@@ -501,7 +501,7 @@ describe("[LEAD-002] New lead form schema", () => {
         "Choose where the farmer is.",
         "Choose the irrigation system.",
         "Enter an amount in rupees, e.g. 125000.",
-        "Enter the land in acres, e.g. 4.5.",
+        "Enter the land in hectares, e.g. 1.8.",
         "Choose at most 10 crops.",
       ]),
     );

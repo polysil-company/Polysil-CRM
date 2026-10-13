@@ -176,8 +176,11 @@ async def shop(sessions: Callable[[], AsyncSession]) -> AsyncIterator[Shop]:
             "DELETE FROM login_attempt WHERE identifier = ANY(CAST(:emails AS citext[]))",
             "DELETE FROM app_user WHERE id = ANY(CAST(:people AS uuid[]))",
             "DELETE FROM channel_partner WHERE id = CAST(:cp AS uuid)",
-            "DELETE FROM price_list_item WHERE price_list_id IN (CAST(:pl AS uuid), CAST(:dl AS uuid))",
-            "DELETE FROM price_list WHERE id IN (CAST(:pl AS uuid), CAST(:dl AS uuid))",
+            # and any list a test scoped to the shop's state (FS-061's typed lists)
+            "DELETE FROM price_list_item WHERE price_list_id IN (CAST(:pl AS uuid), CAST(:dl AS uuid)) "
+            "OR price_list_id IN (SELECT id FROM price_list WHERE state_territory_id = CAST(:s AS uuid))",
+            "DELETE FROM price_list WHERE id IN (CAST(:pl AS uuid), CAST(:dl AS uuid)) "
+            "OR state_territory_id = CAST(:s AS uuid)",
             "DELETE FROM product_hsn WHERE product_id = CAST(:p AS uuid)",
             "DELETE FROM gst_rate WHERE hsn_code = :h",
             "DELETE FROM product WHERE id = CAST(:p AS uuid)",
@@ -512,6 +515,20 @@ async def test_thresholds_must_rise_with_the_level(client: httpx.AsyncClient, sh
     r = await client.put(f"{V1}/approvals/thresholds", headers={**ha, **_key()}, json={
         "role": "state_manager", "territory_id": shop.state, "max_amount": "50000"})
     assert r.status_code == 422 and r.json()["error"]["code"] == "thresholds_not_increasing"
+
+
+async def test_a_lower_manager_cannot_be_unlimited_and_a_territory_must_exist(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    """Release review B M-2, M-3: an unlimited District Manager ended every chain there;
+    an unknown territory reached the foreign key, a 500."""
+    ha = await _as(client, shop, "admin_sales")
+    r = await client.put(f"{V1}/approvals/thresholds", headers={**ha, **_key()}, json={
+        "role": "district_manager", "territory_id": None, "max_amount": None})
+    assert r.status_code == 422 and "max_amount" in r.json()["error"]["fields"], r.text
+    r = await client.put(f"{V1}/approvals/thresholds", headers={**ha, **_key()}, json={
+        "role": "district_manager", "territory_id": "00000000-0000-4000-8000-000000000000",
+        "max_amount": "100000"})
+    assert r.status_code == 422 and "territory_id" in r.json()["error"]["fields"], r.text
 
 
 async def test_the_order_list_takes_several_statuses(client: httpx.AsyncClient, shop: Shop) -> None:

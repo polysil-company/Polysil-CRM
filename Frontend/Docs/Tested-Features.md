@@ -35,12 +35,16 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 👀 | `integration` |
 | [Approvals](#approvals) | 5 | 🧪 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 👀 | PR #34; the Dispatch queue in PR #56 |
+| [Documents on records](#documents-on-records) | 4 | 🧪 👀 | PR #113, stacked on PR #111 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
 | [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79 |
 | [Users and roles](#users-and-roles) | 6 | 🧪 👀 | PR #90 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
+| [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
+| [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
+| [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #112, stacked on PR #111 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -157,6 +161,28 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-30--feature--S
 - **DISP-002 · Void a dispatch** with a reason — it stays on record, struck through, and its quantities are open again — and **close the rest short** with a reason. Managers see neither. When someone else moved the order first, the dialog closes, a toast says what happened, and the page shows the latest. 🧪 👀
 - **DISP-001 · The Dispatch queue** (Dispatch, or anyone with `dispatch`; PR #56; screens: [to ship](screenshots/dispatch/to-ship-desktop-light.jpg), [to ship, phone dark](screenshots/dispatch/to-ship-phone-dark.jpg), [record from the queue](screenshots/dispatch/record-from-queue-desktop-light.jpg)): **To ship** lists every approved order still waiting to leave, partly sent ones with how much has gone ("46% sent"), with the count. **Record a dispatch** opens the order with the form already open (`?record=dispatch`); someone who may only look sees no button, and the link does nothing for them. States: skeleton, "Nothing waiting to ship", an error, a later page failing. 🧪 👀
 - **DISP-001 · The dispatch log** (PR #56; screens: [desktop](screenshots/dispatch/dispatched-desktop-light.jpg), [phone, dark](screenshots/dispatch/dispatched-phone-dark.jpg)): **Dispatched** lists what left, newest first — dispatch number, the order (linked) and party, items, challan, invoice, transporter and vehicle, who recorded it — voided ones marked with their reason. Between two days (in the URL), or any day; "Nothing sent on these days" otherwise. The **Accounts queue** waits on the backend (BE-022); Accounts' steps are in their Approvals inbox meanwhile. 🧪 👀
+
+## Documents on records
+
+Purchase orders, payment slips, invoices, transport receipts and photos, kept on the record they belong to (FS-050, `backend/docs/api/documents.md`). Walked through in the mock at desktop light and phone dark; axe found nothing. Not yet checked on staging.
+
+Screens:
+
+- Desktop, light: [a lead's documents](screenshots/documents/lead-documents-desktop-light.jpg), [an order, with a dispatch's](screenshots/documents/order-documents-desktop-light.jpg), [a quotation's](screenshots/documents/quotation-documents-desktop-light.jpg), [attach: what's missing](screenshots/documents/attach-errors-desktop-light.jpg), [attach: ready](screenshots/documents/attach-ready-desktop-light.jpg), [remove](screenshots/documents/remove-desktop-light.jpg).
+- Phone, dark: [a lead's documents](screenshots/documents/lead-documents-phone-dark.jpg), [attach](screenshots/documents/attach-phone-dark.jpg).
+
+- **DOC-001 · See a record's documents.**
+  - The lead, quotation and order pages have a Documents card, and each dispatch on the order page has a Documents section.
+  - Each row shows its name or type, the type, the file name and size, and who added it and when.
+  - **Open** uses a ten-minute link. A HEIC photo offers **Download**.
+  - On the lead, everything made from it shows too. Each row names its record (Quotation, Order, Dispatch, with the number), linked where the record has a page. 🧪 👀
+- **DOC-002 · Attach a file.**
+  - Choose what it is, a name for "Other" (a note otherwise), and one JPEG, PNG, WebP, HEIC or PDF up to 10 MB.
+  - Anything missing or wrong is named before sending. The backend's refusals each get a sentence. The same file again says it's already attached.
+  - Who: a lead's or order's editor (a dealer on its own); staff for quotations; Dispatch or the order's editor for a dispatch.
+  - A merged lead and a voided dispatch take none. 🧪 👀
+- **DOC-003 · Remove a document.** It asks first. Remove is offered to whoever added the document, and to staff who may add to its record. A dealer can't remove Polysil's files. 🧪 👀
+- **Not offered:** documents on payments (no payments screen yet), and a type list fitted to each record (BE-025).
 
 ## Tasks and the day planner
 
@@ -374,6 +400,74 @@ Admin → **Products & prices** (`/products`), one tab each, the tab in the URL.
 
 In the mock, quotations still price only the six products they always had: a product added here lists and can be priced in a list, but the quotation builder's live pricing doesn't know it. Against the backend, both read the same catalogue.
 
+## Go-live fixes from the 10 Oct walk
+
+What changed for leads, quotations and orders after the 10 Oct staging walk (backend handovers `walk-fixes-10-oct.md` and `walk-fixes-10-oct-whatsapp-history-approvals.md`; each finding by its walk ID). Walked through in the mock as a dealer (partner sign-in) and as staff, on a phone in dark mode and a desktop in light mode; axe found nothing. Not yet checked on staging. Screens: [a dealer at Approval limits](screenshots/go-live-fixes/dealer-approval-limits-denied-desktop-light.jpg), [a dealer at QR codes, phone](screenshots/go-live-fixes/dealer-qr-codes-denied-phone-dark.jpg), [a dealer's lead](screenshots/go-live-fixes/dealer-lead-desktop-light.jpg), [a staff lead](screenshots/go-live-fixes/staff-lead-desktop-light.jpg), [no channel partner, phone](screenshots/go-live-fixes/assign-partner-placeholder-phone-dark.jpg), [a partner search, phone](screenshots/go-live-fixes/assign-partner-search-phone-dark.jpg), [Reason with its list open, phone](screenshots/go-live-fixes/lost-reason-open-phone-dark.jpg), [a merged lead's timeline](screenshots/go-live-fixes/timeline-merged-desktop-light.jpg), [duplicates found](screenshots/go-live-fixes/timeline-duplicates-desktop-light.jpg), [a stalled step](screenshots/go-live-fixes/order-stalled-step-desktop-light.jpg), [complaint submit](screenshots/go-live-fixes/complaint-submit-confirm-desktop-light.jpg), [Light on a dark computer](screenshots/go-live-fixes/theme-light-chosen-on-dark-os-desktop.jpg), [the enquiry form, phone](screenshots/go-live-fixes/enquiry-phone-light.jpg), [the dealer sign-in code, phone](screenshots/go-live-fixes/partner-sign-in-code-phone-dark.jpg).
+
+- **APP-006 · A page outside your menu stays closed (F-8, F-17).** A dealer who types `/approval-limits`, `/qr-codes`, `/dispatch`, `/tasks` or `/leads/duplicates` sees "You don't have access to this page" and **Back to the dashboard**, with "Polysil CRM" in the top bar: no page, header, filters or "Ref" behind it. Staff without the permission get the same; a 403 anywhere shows no reference. 🧪 👀
+- **LEAD-003 · A dealer's lead (F-1).** No score, no possible-duplicates notice, no "Possible duplicates" button. Staff see the score as a whole number ("79"). 🧪 👀
+- **LEAD-013 · QR codes for a dealer (F-8).** No New QR code, Edit or Switch off for a partner user. The approval limits with none set say "No approval limits are set." 🧪 👀
+- **LEAD-008 · Assign (F-9).** "No channel partner" and "Unassigned" are placeholders; typing searches only what was typed. A new partner refreshes the lead's quotations, so a draft shows its new tier's prices. 🧪 👀
+- **APPR-001 · A step nobody can decide (F-11).** "No District Manager to decide. With the next manager up." on the order's trail, a complaint refund's trail and the quotation's discount notice. After a decision in the inbox the dialog closes at once, and the next row takes the next click (F-13). 🧪 👀
+- **APP-003 · The first click on a new page lands (F-13).** Only the page being left animates; the arriving page takes clicks at once. Checked by clicking New task the instant Tasks opens from the menu. 🧪 🌐 👀
+- **LEAD-005 · Timeline sentences (F-16).** "merged POL/GJ/2026-27/00094 into this lead", "6 possible duplicates found: 00083, 00088" (no person's name), "marked 00083 as not a duplicate", "The customer opened QT/…", "draft quotation v1", and one line per discount decision, on the lead and on the quotation's history. 🧪 👀
+- **QUOT-002, SO-002 · Open PDF after Send (F-14).** The page keeps checking while the tab is in the background. 🧪
+- **Copy and forms (F-19, FS-052).** The dealer code comes "on WhatsApp"; the farmer's enquiry form shows no QR label and no "Loading…" before a state; the dashboard reads "Leads, quotations, orders and service at a glance."; a direct order's dialogs don't mention quotations; "10 defective of 100 NOS"; a complaint submit asks first and names who gets the WhatsApp, "once messages are switched on"; a list field (the lost Reason) isn't red when its list opens; land is asked and shown in hectares, with acres beside them. Light on a dark computer gives a light page (F-20). 🧪 👀
+
+Open with the user: whether dealers should have QR codes (read-only) in their menu; whether a field officer should lose Assign, QR codes, Dispatch queue or Complaint targets from the menu (each follows RBAC.md §6.1 today); and F-12, no files on a complaint after the QC verdict.
+
+## Excel import and price lists by sale type
+
+The backend's Excel import (FS-062, `backend/docs/api/imports.md`) and price lists by sale type (FS-061). Walked through in the mock at desktop light and phone dark. axe found nothing on the import's four steps. Not yet checked on staging.
+
+Screens:
+
+- Price lists: [a new list's sale type](screenshots/imports/new-list-sale-type-desktop-light.jpg), [filtered by sale type](screenshots/imports/price-lists-filtered-desktop-light.jpg).
+- Rate import, desktop: [upload](screenshots/imports/import-upload-desktop-light.jpg), [match columns](screenshots/imports/import-match-desktop-light.jpg), [review](screenshots/imports/import-review-desktop-light.jpg), [done](screenshots/imports/import-done-desktop-light.jpg).
+- Rate import, phone: [match](screenshots/imports/import-match-phone-dark.jpg), [review](screenshots/imports/import-review-phone-dark.jpg).
+- Items into a quotation: [review](screenshots/imports/lines-review-desktop-light.jpg), [added](screenshots/imports/lines-added-desktop-light.jpg).
+
+- **MSTR-008 · A price list for one sale type.** Admin-Sales and the MD (`pricing.edit`) give a new list a sale type (Commercial, Industrial, Subsidy) or leave it for all. The list row and the draft's header say which. **Sale type** filters the lists, with "All sale types (general)". A copy keeps it. A quotation's sale type, or an order's type, goes with every price preview, so a Subsidy quotation prices from the Subsidy list. 🧪 👀
+- **MSTR-007 · Rates from Excel into a draft list.** **Import from Excel** on a draft (`pricing.edit`; off while typed rates are unsaved, absent on a published list).
+  - Upload `.xlsx` or `.csv` up to 10 MB. Match each column to a field or skip it, starting from the suggested match; required fields are named until matched. Pick the sheet and the row holding the column names.
+  - Replace or Merge the list's rates. **Check the rows**: "3 ready · 2 with errors", each bad row with its column and reason, and the first good rows as they will be saved.
+  - **Import good rows only**, or all or nothing. Done says "3 rates written, 2 skipped."
+  - A file too big or unreadable, a mapping refused on a field, rows changed since the check, a published list, and no permission each say what to do. Closing before importing discards the upload. 🧪 👀
+- **MSTR-007 · Items from Excel into a quotation or order.** **Import from Excel** on the Items card. Upload, match and check as above, then **Add to quotation** (or order) adds the good rows as lines with quantity and discounts, priced live. Nothing is saved until the quotation or order is. 🧪 👀
+- **MSTR-007 · Keyboard and screen readers.** The step trail names the current step. The error and preview tables scroll in regions that take focus. Every async button shows working, then done or failed. 🧪 👀
+
+In the mock, any `.xlsx` gets a sample workbook (the mock reads CSV only). The backend reads both.
+
+## Channel partners
+
+Channel → **Channel partners** (`/partners`), for staff who read partners (`backend/docs/api/partners.md`). Admin-Sales and the MD do everything. District and State Managers add, edit, close and reopen in their area. Field officers and Regional Managers read only. Partner users have no menu item and are refused the page. Walked through in the mock at desktop light and phone dark; axe found nothing. Not yet checked on staging.
+
+Screens:
+
+- Desktop, light: [the list](screenshots/partners/partners-list-desktop-light.jpg), [a distributor](screenshots/partners/partner-detail-desktop-light.jpg), [a new dealer's missing fields](screenshots/partners/partner-new-errors-desktop-light.jpg), [added](screenshots/partners/partner-added-desktop-light.jpg), [close](screenshots/partners/partner-close-desktop-light.jpg), [import: match](screenshots/partners/partners-import-match-desktop-light.jpg), [import: review](screenshots/partners/partners-import-review-desktop-light.jpg).
+- Phone, dark: [the list](screenshots/partners/partners-list-phone-dark.jpg), [a dealer](screenshots/partners/partner-detail-phone-dark.jpg), [edit](screenshots/partners/partner-edit-phone-dark.jpg).
+
+- **CHNL-001 · Find a partner.**
+  - The list is newest first with a total: type, code, the partner above, territory, contact and active users.
+  - Search by name, code or contact person. Filter by type, and by Open (the default), Closed, or both.
+  - From a partner's page, "See the dealers under it" opens the list filtered to that partner, named in an "Under …" chip.
+  - Download Excel exports the filtered list. Empty and filtered-empty each say what to do.
+  - A partner's page has four cards: Where it sits, Business, Contact, and Credit terms (staff only). 🧪 👀
+- **CHNL-002 · Add a partner.**
+  - Pick Distributor, Dealer or Sub-dealer. A dealer then asks for its distributor, and a sub-dealer for its dealer, from the open ones.
+  - Then the territory, code, business name, optional GSTIN, PAN and GST registration, contact details and credit terms.
+  - Missing or misshapen fields are named before sending. A used code comes back on its field.
+  - **Add a dealer** on a distributor's page starts the form under it, in its territory. 🧪 👀
+- **CHNL-003 · Correct a partner.** Only what changed is sent, and the form says "Nothing changed yet" until something does. The code, type and parent are fixed; payment terms take 0 to 365 days. 🧪 👀
+- **CHNL-004 · Close or reopen.** Close says how many users will be signed out and deactivated. Reopen says they stay deactivated until reactivated in Users & roles. A closed partner can't be edited until reopened. 🧪 👀
+- **CHNL-005 · Import partners from Excel.**
+  - The same import dialog as price lists. A dealer names its distributor's code, which may be a row in the same file.
+  - The review gives each bad row's reason, such as "no district 'Nowhere' in Gujarat", "CP-002 is already in use" or a wrong-type parent.
+  - The preview shows the territory the backend worked out.
+  - **Import good rows only** adds the rest, parents first. 🧪 👀
+
+Open with the client: whether distributors and dealers should add their own dealers and sub-dealers from the portal, as the backend allows.
+
 ## Not built yet
 
 The backend serves these, and the frontend has no screen for them — in the order of [Plan.md §9.3](Plan.md):
@@ -381,4 +475,4 @@ The backend serves these, and the frontend has no screen for them — in the ord
 1. A consolidated order from several quotations on leads of one dealer.
 2. Complaint types, with the other lookups in the admin masters. Everything else in complaints is in PR #57 and PR #58.
 3. The subsidy masters and their revisions (categories, parameters, rates, crop spacings, matrices).
-4. Admin masters: offices, territories, partners. Users and roles are in PR #90; products, price lists and tax rates in PR #95.
+4. Admin masters: offices and territories. Users and roles are in PR #90; products, price lists and tax rates in PR #95; channel partners in PR #112.

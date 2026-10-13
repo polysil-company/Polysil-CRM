@@ -355,11 +355,12 @@ describe("[LEAD-002] NewLeadDialog", () => {
     expect(within(dialog).getByRole("combobox", { name: /Crops/ })).toHaveTextContent(
       "Cotton, Groundnut",
     );
-    await user.type(within(dialog).getByLabelText(/Land/), "4.5");
+    // FS-052 · The client measures land in hectares.
+    await user.type(within(dialog).getByLabelText(/Land/), "1.8");
     await user.click(within(dialog).getByRole("button", { name: "Create lead" }));
 
     await waitFor(() => {
-      expect(sent).toMatchObject({ crops: ["cotton", "groundnut"], land_acres: "4.5" });
+      expect(sent).toMatchObject({ crops: ["cotton", "groundnut"], land_hectares: "1.8" });
     });
   });
 });

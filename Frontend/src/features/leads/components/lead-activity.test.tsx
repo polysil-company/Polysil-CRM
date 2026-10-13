@@ -7,6 +7,7 @@ import { addLeadNote } from "@/features/leads/api/leads.api";
 import { TIMELINE_PAGE_SIZE } from "@/features/leads/api/leads.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import type { Role } from "@/lib/auth/roles";
+import { writeMockRole } from "@/lib/dev/mock-settings";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
@@ -166,6 +167,95 @@ describe("[LEAD-005] LeadTimeline", () => {
     expect(screen.getByText("D/SO/GJ/2026-27/00041/1")).toBeInTheDocument();
   });
 
+  it("names the leads a merge or a duplicate is about, and says each thing once (F-16)", async () => {
+    const at = "2026-10-10T10:00:00Z";
+    const actor = { id: "usr-2", full_name: "Asha Patel" };
+    const customer = { id: "usr-sys", full_name: "the customer" };
+    server.use(
+      http.get(buildApiUrl("/leads/:leadId/timeline"), () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: "e1",
+              kind: "lead.merged",
+              occurred_at: at,
+              actor,
+              payload: {
+                survivor: "lead-x",
+                loser: "lead-94",
+                survivor_inquiry_no: "POL/GJ/2026-27/00090",
+                loser_inquiry_no: "POL/GJ/2026-27/00094",
+              },
+            },
+            {
+              id: "e2",
+              kind: "lead.duplicate_flagged",
+              occurred_at: at,
+              actor,
+              payload: {
+                matches: [
+                  { lead_id: "lead-83", inquiry_no: "POL/GJ/2026-27/00083" },
+                  { lead_id: "lead-88", inquiry_no: "POL/GJ/2026-27/00088" },
+                ],
+              },
+            },
+            {
+              id: "e3",
+              kind: "lead.duplicate_dismissed",
+              occurred_at: at,
+              actor,
+              payload: { other_lead_id: "lead-83", other_inquiry_no: "POL/GJ/2026-27/00083" },
+            },
+            {
+              id: "e4",
+              kind: "quotation.viewed",
+              occurred_at: at,
+              actor: customer,
+              payload: { quotation_id: "q-3", quote_no: "QT/GJ/2026-27/00003", version: 1 },
+            },
+            {
+              id: "e5",
+              kind: "approval.decided",
+              occurred_at: at,
+              actor,
+              payload: { role: "district_manager", decision: "approve", quotation_id: "q-1" },
+            },
+            {
+              id: "e6",
+              kind: "quotation.approval_approved",
+              occurred_at: at,
+              actor,
+              payload: { quotation_id: "q-1", quote_no: null, version: 1 },
+            },
+          ],
+          meta: { limit: 20, next_cursor: null },
+        }),
+      ),
+    );
+    renderWithProviders(<LeadTimeline leadId="lead-x" />);
+
+    const list = await screen.findByRole("list", { name: "Lead activity, newest first" });
+    expect(within(list).getByRole("link", { name: "POL/GJ/2026-27/00094" })).toHaveAttribute(
+      "href",
+      "/leads/lead-94",
+    );
+    // Each entry's sentence, as read: a "found" or "opened" entry starts with no person's name.
+    const sentences = within(list)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent);
+    expect(sentences).toEqual([
+      expect.stringMatching(/^Asha Patel merged POL\/GJ\/2026-27\/00094 into this lead/),
+      expect.stringMatching(/^2 possible duplicates found: 00083, 00088/),
+      expect.stringMatching(/^Asha Patel marked 00083 as not a duplicate/),
+      expect.stringMatching(/^The customer opened QT\/GJ\/2026-27\/00003/),
+      expect.stringMatching(/^Asha Patel · Quotation discount approved draft quotation v1/),
+    ]);
+    // A draft has no number; one line for the discount decision, not the step too.
+    expect(within(list).getByRole("link", { name: "draft quotation v1" })).toBeInTheDocument();
+    expect(within(list).queryByText(/approved the District Manager step/)).not.toBeInTheDocument();
+    expect(within(list).getAllByRole("listitem")).toHaveLength(5);
+  });
+
   it("shows an error with a retry when the history cannot load", async () => {
     server.use(
       http.get(buildApiUrl("/leads/:leadId/timeline"), () =>
@@ -323,21 +413,51 @@ describe("[LEAD-006] LeadDetail activity", () => {
 describe("[LEAD-003] LeadDetail details", () => {
   afterEach(() => {
     resetMockDb();
+    writeMockRole("admin");
   });
 
   it("shows the lead's crops and land, and no win probability or engagement cards", async () => {
     signInAs("employee");
     const lead = mockLead(
       (item) =>
-        item.stage === "qualified" && (item.crops ?? []).length > 0 && item.land_acres != null,
+        item.stage === "qualified" && (item.crops ?? []).length > 0 && item.land_hectares != null,
     );
     renderWithProviders(<LeadDetail leadId={lead.id} />);
 
     const firstCrop = lead.crops?.[0]?.name ?? "";
     expect(await screen.findByText(firstCrop)).toBeInTheDocument();
-    expect(screen.getByText(/acres$/)).toBeInTheDocument();
+    // FS-052 · Hectares first, with acres beside them.
+    expect(screen.getByText(/^[\d.]+ hectares \([\d.]+ acres\)$/)).toBeInTheDocument();
     expect(screen.queryByText("Win probability")).not.toBeInTheDocument();
     expect(screen.queryByText("Engagement")).not.toBeInTheDocument();
+  });
+
+  it("shows staff the score as a whole number, and the possible duplicates (F-1)", async () => {
+    signInAs("employee");
+    const lead = mockLead((item) => item.score !== null && item.stage === "qualified");
+    lead.score = "28.00";
+    renderWithProviders(<LeadDetail leadId={lead.id} />);
+
+    expect(await screen.findByText("Score")).toBeInTheDocument();
+    expect(screen.getByText("28")).toBeInTheDocument();
+  });
+
+  it("shows a dealer no score and no possible duplicates (F-1)", async () => {
+    signInAs("dealer");
+    writeMockRole("dealer");
+    const lead = mockLead(
+      (item) =>
+        (item.duplicates ?? []).some((link) => link.state === "pending") && item.score !== null,
+    );
+    renderWithProviders(<LeadDetail leadId={lead.id} />);
+
+    expect(
+      await screen.findByRole("heading", { level: 2, name: lead.farmer_name }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Channel partner")).toBeInTheDocument();
+    expect(screen.queryByText("Score")).not.toBeInTheDocument();
+    expect(screen.queryByText(/possible duplicate/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Review and merge" })).not.toBeInTheDocument();
   });
 
   it("drops the hot, warm or cold tag once a lead is won", async () => {

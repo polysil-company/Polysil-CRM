@@ -6,6 +6,7 @@ import type {
   QrCodeWire,
 } from "@/features/lead-capture/api/lead-capture.schemas";
 import { buildApiUrl } from "@/lib/api/url";
+import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { normalizeIndianMobile } from "@/lib/format";
 import { mockEnquiryUrl, mockQrCode } from "@/mocks/data/lead-capture";
@@ -86,7 +87,10 @@ export const leadCaptureHandlers = [
   http.post(buildApiUrl("/lead-qr-codes"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
-    if (!may("create")) return errorResponse(403, "forbidden", "You may not make QR codes.");
+    // Staff only: a partner user reads their codes but never makes one (walk F-8).
+    if (!may("create") || isPartnerRole(readMockRole())) {
+      return errorResponse(403, "forbidden", "You may not make QR codes.");
+    }
     const parsed = qrBodySchema.safeParse(await request.json());
     if (!parsed.success) {
       return errorResponse(422, "validation_error", "Some fields need correcting.", {
@@ -127,7 +131,9 @@ export const leadCaptureHandlers = [
   http.patch(buildApiUrl("/lead-qr-codes/:qrId"), async ({ params, request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
-    if (!may("edit")) return errorResponse(403, "forbidden", "You may not change QR codes.");
+    if (!may("edit") || isPartnerRole(readMockRole())) {
+      return errorResponse(403, "forbidden", "You may not change QR codes.");
+    }
     const row = mockDb.qrCodes.find((item) => item.id === params.qrId);
     if (row === undefined) return errorResponse(404, "not_found", "Not yours.");
     const parsed = qrPatchSchema.safeParse(await request.json());
@@ -283,7 +289,7 @@ export const leadCaptureHandlers = [
       source: row === undefined ? "website" : "qr_code",
       estimated_value: null,
       crops: [],
-      land_acres: null,
+      land_hectares: null,
       note: body.note ?? null,
     });
     if (lead instanceof Response) return lead;

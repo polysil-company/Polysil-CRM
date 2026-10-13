@@ -138,6 +138,67 @@ Quotations sent to the farmer, the current version of each.
 
 ---
 
+## `GET /api/v1/portal/ratings`
+
+**Ratings**
+
+His ratings on his own orders and complaints, newest first: the ones he gave
+here and the ones an officer recorded for him. Show "Rated" and the stars beside
+the order or complaint with that number and target; offer "Rate" on the others
+once an order has a dispatch or a complaint is closed. A complaint listed as
+closed may have been cancelled or rejected: rating it answers `422 not_rateable`,
+and the button should go away.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_PortalRating__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in, or the portal was switched off: sign in again. |
+| `403` | `ErrorResponse` | `not_a_consumer`: staff and dealers use the main app. `portal_off`: the portal is switched off. |
+
+---
+
+## `POST /api/v1/portal/ratings`
+
+**Rate**
+
+Rate an installation (an order with a dispatch) or a service visit (a closed
+complaint), 1 to 5 stars with an optional comment. Once only; it cannot be
+changed. Send the number from the orders or complaints list.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`PortalRatingCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `target` | `installation` \| `service` | yes | installation: a dispatched order; service: a closed complaint. |
+| `order_no` | string \| null |  | Installation: the order's number, as the orders list gives it. |
+| `complaint_no` | string \| null |  | Service: the complaint's number. |
+| `score` | integer | yes | 1 to 5 stars. |
+| `comment` | string \| null |  | Optional. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_PortalRating_` | Successful Response |
+| `400` | `ErrorResponse` | No Idempotency-Key. |
+| `401` | `ErrorResponse` | Not signed in, or the portal was switched off: sign in again. |
+| `403` | `ErrorResponse` | `not_a_consumer`: staff and dealers use the main app. `portal_off`: the portal is switched off. |
+| `404` | `ErrorResponse` | No such order or complaint among his own. |
+| `409` | `ErrorResponse` | `rating_exists`: rated already, by him or by an officer for him. |
+| `422` | `ErrorResponse` | `not_rateable`: nothing has shipped, or the complaint is not closed. Otherwise a field. |
+
+---
+
 ## Models
 
 **`Envelope_PortalMe_`**
@@ -145,6 +206,12 @@ Quotations sent to the farmer, the current version of each.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | PortalMe | yes |  |
+
+**`Envelope_PortalRating_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PortalRating | yes |  |
 
 **`Envelope_list_PortalComplaint__`**
 
@@ -169,6 +236,12 @@ Quotations sent to the farmer, the current version of each.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | PortalQuotation[] | yes |  |
+
+**`Envelope_list_PortalRating__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PortalRating[] | yes |  |
 
 **`ErrorBody`**
 
@@ -252,6 +325,28 @@ Quotations sent to the farmer, the current version of each.
 | `sent_at` | string \| null | yes |  |
 | `valid_until` | string \| null | yes |  |
 | `link` | string \| null | yes | The page the farmer was sent; null on a dealer's quotation. |
+
+**`PortalRating`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `target` | `installation` \| `service` | yes |  |
+| `order_no` | string \| null | yes | Installation: the order rated. |
+| `complaint_no` | string \| null | yes | Service: the complaint rated. |
+| `score` | integer | yes | 1 to 5 stars. |
+| `comment` | string \| null | yes | His own words; null when an officer recorded the rating for him. |
+| `entered_via` | `portal` \| `staff` | yes | portal: he rated it here; staff: an officer recorded it for him. |
+| `created_at` | string | yes | IST, +05:30. |
+
+**`PortalRatingCreate`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `target` | `installation` \| `service` | yes | installation: a dispatched order; service: a closed complaint. |
+| `order_no` | string \| null |  | Installation: the order's number, as the orders list gives it. |
+| `complaint_no` | string \| null |  | Service: the complaint's number. |
+| `score` | integer | yes | 1 to 5 stars. |
+| `comment` | string \| null |  | Optional. |
 
 **`ValidationError`**
 
