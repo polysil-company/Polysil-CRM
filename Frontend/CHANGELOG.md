@@ -7,10 +7,12 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-47 changes, newest first. Each title opens its entry.
+48 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-13 | [Documents on leads, quotations, orders and dispatches](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md) | `feature` | `DOC-001` `DOC-002` `DOC-003` |
+| 2026-10-13 | [Channel partners: list, add, correct, close and import](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md) | `feature` | `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` |
 | 2026-10-13 | [Excel import with column matching, and price lists by sale type](changelog/entries/2026-10-13--feature--MSTR-007--excel-import-with-column-matching-and-price-lists-by-sale.md) | `feature` | `MSTR-007` `MSTR-008` |
 | 2026-10-12 | [A frontend handover: the build process, step by step, and everything left](changelog/entries/2026-10-12--docs--REPO-001--a-frontend-handover-the-build-process-step-by-step-and.md) | `docs` | `REPO-001` |
 | 2026-10-12 | [Go-live fixes from the 10 Oct staging walk](changelog/entries/2026-10-12--fix--APP-006--go-live-fixes-from-the-10-oct-walk.md) | `fix` | `APP-006` `APP-003` `LEAD-003` `LEAD-005` `LEAD-008` `LEAD-013` `LEAD-014` `APPR-001` `APPR-002` `QUOT-002` `SO-002` `CMPL-003` `AUTH-001` |
@@ -60,6 +62,144 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
 
 ## 13 October 2026
+
+### Documents on leads, quotations, orders and dispatches
+
+`feature` · `DOC-001` `DOC-002` `DOC-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md)
+
+#### Before
+
+The client handles purchase orders, payment slips, invoices and transport receipts outside the app. The backend now keeps them on the record they belong to (FS-050, `backend/docs/api/documents.md`, handover `documents-and-replacement-chain.md`). The frontend had no screen for it, so a bill or PO PDF could not be attached anywhere.
+
+#### Now
+
+- **A Documents card** on the lead, quotation and order pages, and a Documents section on each dispatch on the order page.
+  - The list is newest first. Each row shows the document's name (or its type), the type, the file name and size, and who added it and when.
+  - **Open** uses the backend's ten-minute link, which is renewed before it runs out and is never fetched with the bearer token. A HEIC photo, which browsers can't show, is offered as **Download** instead.
+- **On the lead**, the card shows everything on the lead and on what came from it: its quotations, their orders, those orders' dispatches, and leads merged into it. Each row names its record, such as "Quotation QT/GJ/…" or "Order SO/GJ/…", linked where the record has a page.
+- **Attach a file** (DOC-002).
+  - **The form.** Pick what it is from the backend's types, then give a name for "Other" (a note otherwise, up to 80 characters), then choose one file.
+  - **Checks before sending.** A missing type or file, a missing name for "Other", a file over 10 MB, and a file that isn't JPEG, PNG, WebP, HEIC or PDF are each named first.
+  - **Refusals.** Each backend refusal has its sentence: 413; `attachment_type`; `too_many_documents` at 50; `record_closed` on a merged lead or a voided dispatch; `storage_unavailable`; 403; 404.
+  - **The same file again.** It answers with the one already there, and the toast says so.
+- **Remove** (DOC-003) asks first. It's offered to whoever added the document, and to staff who may add to the record it sits on (on a lead, the lead's own documents).
+- **Who adds**, from the handover:
+  - Leads: whoever edits them, a dealer on their own leads.
+  - Quotations: staff who edit quotations.
+  - Orders: whoever edits them.
+  - Dispatches: Dispatch, or the order's editor.
+  - A merged lead and a voided dispatch take none.
+- Checked on a phone in dark mode and a desktop in light mode. axe found nothing.
+
+#### Discussion
+
+- **One component, two shapes.** It's a card on a page. On the order page each dispatch gets a section, named after its number ("Documents on D/SO/…") so the lists and buttons on that page stay distinct.
+- **Links are fetched one per document and renewed every nine minutes**, as the complaint and subsidy files do. A list holds 50 documents at most.
+- **The type picker shows every type the backend lists.** That includes the five a dealer application uses (GST certificate, PAN card…). BE-025 asks for a `record_type` filter rather than the frontend hard-coding which types to hide.
+- **Payments aren't built here.** The backend takes documents on payments (Accounts). There is no payments screen yet, so none is offered.
+- **Stacked on #111** for its upload plumbing: the multipart reader in the mock, multipart in jsdom tests, and `formatFileSize`.
+
+#### Files changed
+
+- `src/features/documents/` — new: the contract, calls, queries, mutations and tests; refusal messages; the `RecordDocuments` card with its attach and remove dialogs, and its tests.
+- `src/features/leads/components/lead-detail.tsx` — the lead's documents card.
+- `src/features/quotations/components/quotation-detail.tsx` — the quotation's documents card.
+- `src/features/orders/components/order-detail.tsx`, `order-dispatches.tsx` — the order's card, and a section per dispatch.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — the DOC domain; DOC-001 to DOC-003.
+- `src/mocks/data/documents.ts`, `src/mocks/handlers/documents.ts` — new: the types, a seeded story, and the endpoints with the backend's rules. Also `db.ts`, `handlers/index.ts` and `data/reference.ts`.
+- `../docs/Backend-Tasks.md` — BE-025.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/documents/` — records and screens.
+
+#### Tests
+
+- `src/features/documents/api/documents.test.ts`:
+  - `[DOC-001]`: types; one record's list; a lead's whole story with labels; the link; 404.
+  - `[DOC-002]`: attach, and the same file again; Other unnamed; a wrong type; over 10 MB; quotations staff only; a merged lead; a voided dispatch.
+  - `[DOC-003]`: remove; a partner refused someone else's.
+- `src/features/documents/components/record-documents.test.tsx`:
+  - The order's list, with Open and Download.
+  - The lead's story, with record links.
+  - Nothing to add on a closed record.
+  - Attach, with its missing fields, the name for Other, and success.
+  - A bad file refused before sending.
+  - Remove.
+- Walked through in the mock:
+  - On the desktop in light mode: the lead, the order (with a dispatch's section) and the quotation; attach and remove on the order.
+  - On a phone in dark mode: the lead's card and the attach dialog.
+  - As a dealer on its lead: Attach is offered, but not Remove on Polysil's files.
+### Channel partners: list, add, correct, close and import
+
+`feature` · `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md)
+
+#### Before
+
+"Channel partners" in the menu said "Soon". The backend serves the partner admin (`backend/docs/api/partners.md`) and the partner Excel import (`imports.md`, `kind=partners`) on `integration`. Without a screen, the client had no way to add a distributor, or a dealer or sub-dealer under one, before quoting through them.
+
+#### Now
+
+- **Channel partners** (`/partners`) is live for staff who read partners.
+  - The list is newest first, with a total. Each row shows the type, code, the partner above, territory, contact and active users.
+  - Search by name, code or contact person. Filter by type and by Open, Closed, or both (open by default). A partner's page links to the partners under it, which arrive as an "Under …" filter chip.
+  - **Download Excel** exports the filtered list. **Show more** pages on, and keeps the rows already shown if the next page fails.
+- **A partner's page** has four cards:
+  - Where it sits: its type and price tier, the partner above it (linked), its territory, and a link to those under it.
+  - Business: GSTIN, PAN, GST registration, active users, and when it was added.
+  - Contact.
+  - Credit terms, shown to staff only.
+  - Actions: **Edit**; **Close** or **Reopen**; **Add a dealer** (or **Add a sub-dealer**) under it. A closed partner says what closing means.
+- **New partner** (CHNL-002).
+  - Choose Distributor, Dealer or Sub-dealer first. A dealer then asks for its distributor, and a sub-dealer for its dealer, from the open partners of that type.
+  - Then the territory, code, business name, GSTIN, PAN, GST registration, contact details and credit terms.
+  - The form names what is missing or misshapen before sending. A refusal returns to its field, such as "Already in use." for a used code.
+  - Opened from a partner's page, the form starts as the next type down under that partner, in that partner's territory.
+- **Edit** (CHNL-003) sends only what changed and says "Nothing changed yet" until something does. A cleared optional field is sent as null. The code, the type and the parent are shown but fixed, and only staff see the territory and credit terms.
+- **Close** (CHNL-004) says how many users will be signed out and deactivated. **Reopen** says the partner's users stay deactivated until each is reactivated in Users & roles.
+- **Import from Excel** (CHNL-005) reuses the import dialog from MSTR-007.
+  - A dealer names its distributor's code, which may be a row in the same file.
+  - The review shows each bad row's reason as the backend words it. The preview shows the territory the backend worked out from the state and district.
+  - **Import good rows only** adds the rest, parents first.
+- **Who sees it.** Admin-Sales and the MD do everything. District and State Managers add, edit, close and reopen partners in their area (`partners.edit`). Field officers and Regional Managers read only. Partner users get no menu item, and the page is closed to them (APP-006).
+- Checked on a phone in dark mode and on a desktop in light mode. axe found nothing.
+
+#### Discussion
+
+- **Staff only for now.** The backend also lets a distributor or dealer add the next type down under itself from the portal, with no credit terms. That needs a portal menu item and the partner's own id as the parent. Both wait on the client's word: `TODO(CHNL-002)` sits on the nav item, and the question is in the pull request.
+- **Credit terms are recorded, not enforced.** The contract says so (H12), and the form's help text says so too.
+- **Closing is staff only.** It needs `partners.edit`, and the backend refuses a partner user even with it.
+- **Mock changes.**
+  - The mock's partners live in `mockDb.partners`, seeded from the shared `MOCK_PARTNERS`, so leads, orders and users still point at the same ids.
+  - `/lookups/partners` now reads the same table, so a partner added here can be picked on a lead.
+  - District and State Managers gain `partners.create` and `edit` in the mock, as in RBAC.md §6.1. Regional Managers keep view.
+- **Import mock.** The mock's partner fields are now the backend's, `GST registered` included. Its row rules follow `domain/imports/rows.py` (`parse_partners`, `finish_partners`): type words, state by name or code, district in that state, codes in use, repeated codes, and parents in the file or already added.
+
+#### Files changed
+
+- `src/features/partners/` — new: the contract, calls, queries, mutations and tests; labels; list URL state; the list, detail, form, parent picker and new and edit pages.
+- `src/app/(app)/partners/` — new routes: the list, a partner, new and edit.
+- `src/components/layout/navigation.ts` — Channel partners is live, staff only.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — CHNL-001 to CHNL-005.
+- `src/mocks/data/partners.ts`, `src/mocks/handlers/partners.ts` — new: the partners and their endpoints. Also `db.ts` and `handlers/index.ts`.
+- `src/mocks/handlers/imports.ts`, `src/mocks/data/imports.ts` — the partner import's rows and commit.
+- `src/mocks/handlers/lookups.ts` — the partner picker reads the partners table.
+- `src/mocks/data/permissions.ts` — managers' partner permissions.
+- `src/components/layout/navigation.test.ts` — the `/partners` route guard.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/partners/` — records and screens.
+
+#### Tests
+
+- `src/features/partners/api/partners.test.ts` — five suites:
+  - `[CHNL-001]`: filters, detail, credit terms by permission, parent search.
+  - `[CHNL-002]`: create; used code; wrong parent; GSTIN required; shapes; 403.
+  - `[CHNL-003]`: only what changed, null clears, a rename reaches the dealers; an empty change is refused.
+  - `[CHNL-004]`: close deactivates users, reopen leaves them; 403 for a partner.
+  - `[CHNL-005]`: the import, row by row, then the commit under file and existing parents.
+- `src/features/partners/components/partners-ui.test.tsx`:
+  - The list, the URL filters, the parent chip and empty state, and the actions by role.
+  - New partner: the missing fields, the start from a parent, a GSTIN shape, a used code back on its field, no permission.
+  - Edit: fixed fields, "Nothing changed yet", a payment-terms check, the save.
+  - Detail: the cards, close and reopen with their messages, and a field officer's read-only view.
+- `src/components/layout/navigation.test.ts` — `[APP-006]`: `/partners` is open to staff who read partners, and closed to partners and to QA.
+- Walked through in the mock at desktop light and phone dark: list, detail, a dealer added under a distributor, close, the import, edit. Also checked: a field officer's list, and a dealer refused at `/partners`.
 
 ### Excel import with column matching, and price lists by sale type
 

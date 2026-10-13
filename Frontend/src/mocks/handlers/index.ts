@@ -4,6 +4,7 @@ import { approvalHandlers } from "./approvals";
 import { authHandlers } from "./auth";
 import { complaintHandlers } from "./complaints";
 import { dashboardHandlers } from "./dashboard";
+import { documentHandlers } from "./documents";
 import { importHandlers } from "./imports";
 import { leadCaptureHandlers } from "./lead-capture";
 import { leadHandlers } from "./leads";
@@ -11,6 +12,7 @@ import { lookupHandlers } from "./lookups";
 import { messageHandlers } from "./messages";
 import { notificationHandlers } from "./notifications";
 import { orderHandlers } from "./orders";
+import { partnerHandlers } from "./partners";
 import { productHandlers } from "./products";
 import { quotationHandlers } from "./quotations";
 import { subsidyHandlers } from "./subsidy";
@@ -43,6 +45,7 @@ export const handlers: readonly HttpHandler[] = [
   ...quotationHandlers,
   ...productHandlers,
   ...importHandlers,
+  ...documentHandlers,
   ...orderHandlers,
   ...dashboardHandlers,
   ...notificationHandlers,
@@ -50,6 +53,7 @@ export const handlers: readonly HttpHandler[] = [
   ...taskHandlers,
   ...complaintHandlers,
   ...userHandlers,
+  ...partnerHandlers,
   ...subsidyHandlers,
   ...subsidyApplicationHandlers,
   ...subsidyReportHandlers,

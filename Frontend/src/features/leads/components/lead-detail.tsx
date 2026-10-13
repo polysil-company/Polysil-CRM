@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RelatedComplaints } from "@/features/complaints/components/related-complaints";
+import { RecordDocuments } from "@/features/documents/components/record-documents";
 import { leadDetailQueryOptions } from "@/features/leads/api/leads.queries";
 import type { Lead, LeadStage } from "@/features/leads/api/leads.schemas";
 import {
@@ -376,6 +377,13 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
 
         {/* CMPL-001 · Complaints about this lead, and raising one. */}
         <RelatedComplaints about={{ leadId: lead.id }} readOnly={lead.stage === "merged"} />
+
+        {/* DOC-001 · Its documents, and those on its quotations, orders and dispatches. */}
+        <RecordDocuments
+          scope={{ kind: "lead", leadId: lead.id }}
+          canAdd={canEdit}
+          closed={lead.stage === "merged"}
+        />
 
         {/* TASK-003, TASK-007 · Calls, visits and meetings about this lead, and their minutes. */}
         {canSeeTasks ? (

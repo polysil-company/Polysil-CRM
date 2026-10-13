@@ -186,9 +186,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "channel-partners",
         label: "Channel partners",
+        description: "Distributors, their dealers and the dealers' sub-dealers.",
         icon: Store01Icon,
         module: "partners",
+        // TODO(CHNL-002): a distributor or dealer may add the next type down from the portal
+        // (partners.md); the screens are staff only until that is agreed with the client.
+        audience: "staff",
         dataId: "CHNL-001",
+        href: "/partners",
       },
       {
         id: "marketing",
