@@ -99,6 +99,7 @@ The backend's Excel import (FS-062, `backend/docs/api/imports.md`) and price lis
   - The mock now previews and words its reasons as the backend does (`domain/imports/rows.py`), for example "no product with item code PL-9999".
 - **Imported lines name no unit.** The `lines` check returns the product but not its unit, so the quantity box takes its unit from the price preview once it arrives.
 - **Fixed on the way:** "Indicative rate" on a priced line sat in a `<dl>` without a term (axe `definition-list`). It now has a visually hidden "Rate status" term.
+- **A flaky smoke test, fixed on the way.** The sign-in page fades in, and on a slow CI runner axe once measured the Sign in button at 97% opacity: 4.34:1 instead of the token's 4.58:1. The axe helper in `e2e/smoke.spec.ts` now waits for entrance animations to finish (endless ones, such as spinners, are left running).
 - **Not checked on staging yet.** The import endpoints are on `integration` (backend). The 🔌 check is in the PR's test plan.
 
 #### Files changed
@@ -114,6 +115,7 @@ The backend's Excel import (FS-062, `backend/docs/api/imports.md`) and price lis
 - `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — MSTR-007, MSTR-008.
 - `src/mocks/` — the import fields, sample workbooks, CSV reader and handlers. Price lists filter by sale type. Shared: `readMultipart`.
 - `src/test/multipart-fetch.ts`, `vitest.setup.ts` — multipart bodies in jsdom.
+- `e2e/smoke.spec.ts` — the axe helper waits for entrance animations.
 - `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/imports/` — records and screens.
 
 #### Tests
