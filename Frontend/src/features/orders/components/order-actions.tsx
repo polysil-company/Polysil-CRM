@@ -6,6 +6,7 @@ import {
   Delete02Icon,
   DeliveryTruck01Icon,
   Edit02Icon,
+  FileEditIcon,
   MoreVerticalIcon,
   PackageRemoveIcon,
   SentIcon,
@@ -38,9 +39,10 @@ const log = createLogger({
 });
 
 /**
- * SO-002 … SO-004, DISP-002 · The order's actions, by its status and the user's permissions.
- * A draft is edited and submitted; an approved order opens its PDF, and Dispatch records what
- * leaves or closes the rest short. Cancelling and deleting sit in the "more" menu.
+ * SO-002 … SO-004, SO-007, DISP-002 · The order's actions, by its status and the user's
+ * permissions. A draft is edited and submitted; an approved order opens its PDF, and Dispatch
+ * records what leaves or closes the rest short. Amending, cancelling and deleting sit in the
+ * "more" menu.
  * `?record=dispatch` opens "Record a dispatch" at once — the Dispatch queue links here so.
  */
 export function OrderActions({ order }: { order: Order }): React.JSX.Element {
@@ -50,7 +52,7 @@ export function OrderActions({ order }: { order: Order }): React.JSX.Element {
   // A link's request counts only where the user may record one, on an order that can ship.
   const dialog: OrderDialog | null =
     chosen ?? (record === "dispatch" && actions.recordDispatch ? { kind: "dispatch" } : null);
-  const hasMore = actions.closeShort || actions.cancel || actions.delete;
+  const hasMore = actions.closeShort || actions.amend || actions.cancel || actions.delete;
   const open = (next: OrderDialog): void => {
     setDialog(next);
   };
@@ -122,6 +124,16 @@ export function OrderActions({ order }: { order: Order }): React.JSX.Element {
               >
                 <Icon icon={PackageRemoveIcon} />
                 Close short…
+              </DropdownMenuItem>
+            ) : null}
+            {actions.amend ? (
+              <DropdownMenuItem
+                onClick={() => {
+                  open({ kind: "amend" });
+                }}
+              >
+                <Icon icon={FileEditIcon} />
+                Amend order…
               </DropdownMenuItem>
             ) : null}
             {actions.cancel ? (

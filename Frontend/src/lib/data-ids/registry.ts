@@ -487,6 +487,15 @@ export const DATA_IDS = {
     endpoints: ["GET /orders/export"],
     notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
   },
+  "SO-007": {
+    domain: "SO",
+    title: "Amend an approved order",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders/{orderId}/amend"],
+    notes:
+      "Staff only, before anything ships or is paid: back to draft under its number, with a remark (FS-036).",
+  },
   "APPR-001": {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",

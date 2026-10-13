@@ -6,9 +6,11 @@ import {
   ORDER_STATUSES,
   type OrderLine,
   type OrderStatus,
+  type OrderType,
 } from "@/features/orders/api/orders.schemas";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
+import { formatInr } from "@/lib/format";
 
 import { ORDER_STATUS_LABELS, stepRoleLabel } from "./order-labels";
 
@@ -26,6 +28,8 @@ export interface OrderPermissions {
   readonly editDispatch: boolean;
   /** The signed-in user owns the order: an owner cancels their own draft or submitted order. */
   readonly isOwner: boolean;
+  /** Polysil staff rather than a partner user: only staff amend an approved order (SO-007). */
+  readonly isStaff: boolean;
 }
 
 export interface OrderActions {
@@ -38,6 +42,8 @@ export interface OrderActions {
   readonly recordDispatch: boolean;
   readonly closeShort: boolean;
   readonly voidDispatch: boolean;
+  /** SO-007 · Take an approved order back to draft, before anything ships. */
+  readonly amend: boolean;
 }
 
 const SHIPPABLE: readonly OrderStatus[] = ["approved", "partially_dispatched"];
@@ -49,6 +55,8 @@ export interface OrderState {
   readonly status: OrderStatus;
   readonly orderNo: string | null;
   readonly lines: readonly Pick<OrderLine, "qtyDispatched">[];
+  /** A replacement order follows its complaint and is never amended (422 order_type_fixed). */
+  readonly orderType?: OrderType;
 }
 
 function nothingShipped(order: OrderState): boolean {
@@ -73,6 +81,13 @@ export function orderActions(order: OrderState, can: OrderPermissions): OrderAct
     recordDispatch: shippable && can.recordDispatch,
     closeShort: shippable && can.editDispatch,
     voidDispatch: VOIDABLE.includes(order.status) && can.editDispatch,
+    // The backend also refuses once money is allocated, or a dispatch was voided; it says so.
+    amend:
+      order.status === "approved" &&
+      nothingShipped(order) &&
+      order.orderType !== "replacement" &&
+      can.isStaff &&
+      (can.editOrders || can.isOwner),
   };
 }
 
@@ -122,8 +137,26 @@ export function orderRefusal(error: unknown): OrderRefusal {
     case "order_dispatched":
       return {
         title: "Something has shipped",
-        message: "An order with a dispatch can't be cancelled. Close it short instead.",
+        message: "An order with a dispatch can't be cancelled or amended. Close it short instead.",
         stale: true,
+      };
+    case "voided_dispatch_holds_lines":
+      return {
+        title: "This order had a dispatch voided",
+        message: "Its items can't change now. Cancel it and create a new one.",
+        stale: false,
+      };
+    case "order_has_payments":
+      return {
+        title: "Money is allocated to this order",
+        message: "Accounts must take the payment off it before it can be amended.",
+        stale: false,
+      };
+    case "order_type_fixed":
+      return {
+        title: "A replacement order can't be amended",
+        message: "It follows its complaint. Change it through the complaint's remedy instead.",
+        stale: false,
       };
     case "order_not_cancellable":
       return { title: "This order can't be cancelled now", message: error.message, stale: true };
@@ -277,6 +310,16 @@ export function orderHistoryEntry(event: TimelineEvent): OrderHistoryEntry {
       return { title: "Closed short", detail: remark, tone: "warning" };
     case "order.cancelled":
       return { title: "Cancelled", detail: remark, tone: "danger" };
+    case "order.amended": {
+      // The reason stays off the event (a partner reads this history); the total is safe to show.
+      const fromTotal = text.parse(payload.from_total) ?? null;
+      return {
+        title: "Amended: back to draft",
+        detail:
+          fromTotal === null ? null : `It was approved at ${formatInr(fromTotal, { paise: true })}`,
+        tone: "warning",
+      };
+    }
     case "order.deleted":
       return { title: "Deleted", detail: null, tone: "danger" };
     default:
