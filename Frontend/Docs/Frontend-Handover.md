@@ -672,7 +672,7 @@ Each has a handover in `backend/docs/handover/` and an API file in `backend/docs
 | 8 | **Reward points; dealer commission and TOD** | `rewards-contract.md`, `dealer-commission-contract.md` | — |
 | 9 | **Marketing material ordering; campaigns** | `marketing-material-contract.md`, `campaigns.md` | Channel → Marketing (MKT-001, "Soon") |
 | 10 | **Stock:** warehouses, availability on the order form, the stock list | `stock-contract.md` | — |
-| 11 | **Documents on records; the replacement order's approvers** | `documents-and-replacement-chain.md` | — |
+| 11 | **Documents on records** (built in PR #113: lead, quotation, order, dispatch); the replacement order's approvers (nothing to build) | `documents-and-replacement-chain.md` | — |
 | 12 | **Warranty tracking** | `warranty.md` | — |
 | 13 | **Group chats** | `group-chat.md` | Messages |
 | 14 | **Export and sample orders**, with the seller GSTINs and their LUTs (`/seller-gstins`) | `export-sample-orders-contract.md`, `backend/docs/api/seller-gstins.md` | — |

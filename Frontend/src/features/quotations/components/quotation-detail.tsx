@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RecordDocuments } from "@/features/documents/components/record-documents";
 import { partnerTypeLabel } from "@/features/leads/lib/lead-labels";
 import { quotationDetailQueryOptions } from "@/features/quotations/api/quotations.queries";
 import type { Quotation, QuotationLine } from "@/features/quotations/api/quotations.schemas";
@@ -27,6 +28,7 @@ import {
   quotationTitle,
 } from "@/features/quotations/lib/quotation-labels";
 import { draftSendNotice } from "@/features/quotations/lib/quotation-lifecycle";
+import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { isApiError } from "@/lib/api/errors";
 import {
@@ -65,6 +67,10 @@ export function QuotationDetail({ quotationId }: { quotationId: string }): React
 
 function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX.Element {
   const sent = quotation.status !== "draft";
+  // Documents on a quotation are staff's to add (handover documents-and-replacement-chain.md).
+  const staff = useIsStaff();
+  const canEditQuotations = useCan("quotations", "edit");
+  const canAddDocuments = staff && canEditQuotations;
 
   return (
     <div className="flex flex-col gap-5">
@@ -128,6 +134,12 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
           <TotalsBlock quotation={quotation} />
         </CardContent>
       </Card>
+
+      {/* DOC-001 · The signed quotation, the purchase order and anything else on it. */}
+      <RecordDocuments
+        scope={{ kind: "record", recordType: "quotation", recordId: quotation.id }}
+        canAdd={canAddDocuments}
+      />
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4">

@@ -23,6 +23,7 @@ ID tells you *which functionality*, and the request ID tells you *which request*
 | `SO` | Sales orders |
 | `APPR` | Approvals — amount-based escalation |
 | `CMPL` | Complaints and QA review |
+| `DOC` | Documents on records — purchase orders, payment slips, invoices, photos |
 | `TASK` | Tasks and daily work |
 | `CHNL` | Channel partners — distributor, dealer, sub-dealer |
 | `MKT` | Marketing and promotional offers |
@@ -202,6 +203,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-006 | Price lists — draft, fill the rate sheet, publish, close (`/price-lists*`) | shared | in-progress |
 | MSTR-007 | Excel import with column matching — price list rates, partners, order and quotation lines (`/imports*`) | shared | in-progress |
 | MSTR-008 | Price lists by sale type — commercial, industrial or subsidised (`sales_type` on `/price-lists`, `/pricing/quote-lines`) | shared | in-progress |
+| DOC-001 | Documents on a lead, quotation, order or dispatch — the list, the types and opening one (`GET /documents`, `/leads/{id}/documents`, `/documents/types`, `/documents/{id}/link`) | shared | in-progress |
+| DOC-002 | Attach a document to a record (`POST /documents`) | shared | in-progress |
+| DOC-003 | Remove a document (`DELETE /documents/{id}`) | shared | in-progress |
 | SUBS-001 | Subsidy forms and case status | shared | planned |
 | SUBS-002 | Subsidy calculator — the scheme's cost blocks and every farmer category's share (`POST /subsidy/calculate`) | shared | in-progress |
 | SUBS-003 | Subsidy scheme lookups — what each system accepts, the crops and the categories (`GET /subsidy/config`, `GET /subsidy/crops`, `GET /subsidy/categories`) | shared | in-progress |

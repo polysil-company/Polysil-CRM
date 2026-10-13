@@ -17,6 +17,7 @@ import type { OfficeWire } from "@/features/users/api/users.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
+import { seedDocuments, type MockDocument } from "./data/documents";
 import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
 import { generateLeads } from "./data/leads";
@@ -137,6 +138,10 @@ export interface MockDb {
   priceLists: MockPriceList[];
   /** Excel imports by id, as uploaded, checked and committed (MSTR-007). */
   imports: Map<string, MockImportBatch>;
+  /** Documents on leads, quotations, orders and dispatches, newest first (DOC-001…003). */
+  documents: MockDocument[];
+  /** Uploaded document files, by document id, served back as object URLs. */
+  documentFiles: Map<string, Blob>;
   /** Staff and partner users, deleted ones kept with `deleted_at` (ADMN-001…006). */
   users: MockUserRecord[];
   /** The offices a staff member is anchored on (`GET /org-units`). */
@@ -216,6 +221,8 @@ function createMockDb(): MockDb {
     taxRates: seedTaxRates(),
     priceLists: seedPriceLists(products),
     imports: new Map(),
+    documents: seedDocuments(leads, quotations, orders),
+    documentFiles: new Map(),
     users: seedUsers(),
     offices: seedOffices(),
     userWrites: new Map(),

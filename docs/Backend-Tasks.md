@@ -83,6 +83,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-024** · List the product categories and units: `GET /lookups/product-categories`, `GET /lookups/uoms` · MSTR-004 · normal
 
+**Documents** — added as the documents on records are built (DOC-001…003).
+
+- [ ] **BE-025** · Offer only the document types a record takes: `record_type` on `GET /documents/types` · DOC-002 · low
+
 ---
 
 ## Details
@@ -486,3 +490,16 @@ in the same shape. Never renumber or reuse a number.
   form opens.
 - **Done when:** both endpoints answer for anyone who may view `products`, and the form offers
   every code, used or not.
+
+### BE-025 · Offer only the document types a record takes: `record_type` on `GET /documents/types`
+
+- **Status:** ⬜ Open
+- **Asked:** 13 Oct 2026 · DOC-002
+- **What:** `GET /documents/types?record_type=lead` (and the other record types) answers only the
+  types that belong on that record. Without the filter, the answer stays as today: every type.
+- **Why:** the list has 15 types. The last five (GST certificate, PAN card, cancelled cheque, shop
+  photo, shop licence, FS-051) are a dealer application's. They show in the type picker on a lead,
+  a quotation, an order and a dispatch, where nobody should choose them. The frontend builds the
+  picker from this list as the handover says, and won't hard-code which types to hide.
+- **Done when:** the filter answers the record's types only. The frontend will send the record's
+  type and drop nothing itself.
