@@ -366,7 +366,11 @@ describe("[MSTR-007] Import rates from Excel", () => {
     expect(await within(dialog).findByText("2 ready")).toBeInTheDocument();
     expect(within(dialog).getByText("1 with errors")).toBeInTheDocument();
     const errors = within(dialog).getByRole("table", { name: /Rows with errors/ });
-    expect(within(errors).getByText("no product with this item code")).toBeInTheDocument();
+    expect(within(errors).getByText("no product with item code PL-9999")).toBeInTheDocument();
+    // The preview names the product the code found, as the backend sends it, and no ids.
+    const preview = within(dialog).getByRole("table", { name: /Ready rows/ });
+    expect(within(preview).getByRole("columnheader", { name: "Product" })).toBeInTheDocument();
+    expect(within(preview).queryByRole("columnheader", { name: /id$/i })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Import 2 rates" })).toBeDisabled();
 
     await user.click(within(dialog).getByRole("button", { name: "Import good rows only" }));

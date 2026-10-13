@@ -724,8 +724,14 @@ function MatchStep({
 
 // ── step 3 · review ─────────────────────────────────────────────────────────
 
+/** "territory" → "Territory": a value the backend works out, not a field of the sheet. */
+function humanize(key: string): string {
+  const words = key.replace(/_/g, " ");
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+}
+
 function labelOf(fields: readonly ImportField[], key: string): string {
-  return fields.find((field) => field.key === key)?.label ?? key;
+  return fields.find((field) => field.key === key)?.label ?? humanize(key);
 }
 
 function ReviewStep({
@@ -742,11 +748,17 @@ function ReviewStep({
   const problems = check.errorRows.flatMap((row) =>
     Object.entries(row.errors).map(([field, reason]) => ({ row: row.row, field, reason })),
   );
-  // The preview's columns: the matched fields, in the file's column order.
-  const columns = Object.entries(mapping)
+  // The preview's columns: the matched fields, in the file's column order, then what the
+  // backend worked out from them (the product a code names, a partner's territory), less ids.
+  const matched = Object.entries(mapping)
     .sort(([, a], [, b]) => a - b)
     .map(([key]) => key)
     .filter((key) => check.preview.some((row) => key in row.values));
+  const fieldKeys = new Set(batch.fields.map((field) => field.key));
+  const derived = [...new Set(check.preview.flatMap((row) => Object.keys(row.values)))].filter(
+    (key) => !fieldKeys.has(key) && !/_(id|row)$/.test(key),
+  );
+  const columns = [...matched, ...derived];
   const warnings = Object.entries(check.columnWarnings);
   const headCell = "px-3 py-2 text-left text-xs font-medium text-muted-foreground";
   const cell = "px-3 py-2 align-top text-sm";

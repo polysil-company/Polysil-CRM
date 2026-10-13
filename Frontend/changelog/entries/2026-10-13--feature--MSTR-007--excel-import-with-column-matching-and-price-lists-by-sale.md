@@ -37,6 +37,10 @@ The backend's Excel import (FS-062, `backend/docs/api/imports.md`) and price lis
 - **Lines have no commit.** As the contract says, a `lines` import ends at the check. The good rows go into the builder's form and are saved with the quotation or order, so nothing is written until the person saves.
 - **Multipart in tests.** jsdom's `fetch` can't send a `FormData` body to MSW, so `src/test/multipart-fetch.ts` encodes it in tests only. The mock reads multipart itself (`readMultipart`).
 - **The mock reads CSV only.** It has no Excel reader, so any `.xlsx` gets a sample workbook for its kind, with a second sheet so the sheet picker shows. The backend reads both.
+- **The review shows what the backend worked out.**
+  - The backend's preview values for rates and lines are the product it found (`product`, `product_id`), not the item code or description typed. For partners, the preview gives the `territory` built from the state and district.
+  - The review table therefore adds these values after the matched columns, and leaves out ids.
+  - The mock now previews and words its reasons as the backend does (`domain/imports/rows.py`), for example "no product with item code PL-9999".
 - **Imported lines name no unit.** The `lines` check returns the product but not its unit, so the quantity box takes its unit from the price preview once it arrives.
 - **Fixed on the way:** "Indicative rate" on a priced line sat in a `<dl>` without a term (axe `definition-list`). It now has a visually hidden "Rate status" term.
 - **Not checked on staging yet.** The import endpoints are on `integration` (backend). The 🔌 check is in the PR's test plan.

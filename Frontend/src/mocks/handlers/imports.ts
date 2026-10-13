@@ -121,15 +121,20 @@ function productFor(code: string, description: string): MockProductRecord | unde
   );
 }
 
+/** The backend's reasons (`domain/imports/rows.py`), word for word. */
 function productProblem(code: string, description: string): Record<string, string> | null {
-  if (code === "" && description === "")
-    return { item_code: "give the item code or the description" };
+  if (code === "" && description === "") return { item_code: "required" };
   if (productFor(code, description) === undefined) {
     return code === ""
-      ? { description: "no product with this description" }
-      : { item_code: "no product with this item code" };
+      ? { description: `no product '${description}'` }
+      : { item_code: `no product with item code ${code}` };
   }
   return null;
+}
+
+/** What the backend previews for a product: its id and its description, as found. */
+function productValues(product: MockProductRecord | undefined): Record<string, string | null> {
+  return product === undefined ? {} : { product_id: product.id, product: product.description };
 }
 
 function percent(value: string): string | null {
@@ -152,8 +157,7 @@ const EVALUATE: Partial<Record<ImportKind, Evaluate>> = {
       return {
         errors,
         values: {
-          item_code: product?.item_code ?? (code === "" ? null : code),
-          description: product?.description ?? description,
+          ...productValues(product),
           rate: errors.rate === undefined ? Number(rate).toFixed(2) : rate,
         },
       };
@@ -173,7 +177,7 @@ const EVALUATE: Partial<Record<ImportKind, Evaluate>> = {
       });
       const product = productFor(code, description);
       const values = {
-        description: product?.description ?? description,
+        ...productValues(product),
         qty,
         discount_pct: discounts[0] ?? "",
         discount2_pct: discounts[1] ?? "",
@@ -235,9 +239,9 @@ const COMMIT: Partial<
     const rates =
       batch.options.mode === "replace" ? new Map<string, string>() : new Map(list.rates);
     for (const { values } of good) {
-      const product = productFor(values.item_code ?? "", values.description ?? "");
+      const productId = values.product_id;
       const rate = values.rate;
-      if (product !== undefined && typeof rate === "string") rates.set(product.id, rate);
+      if (typeof productId === "string" && typeof rate === "string") rates.set(productId, rate);
     }
     list.rates = rates;
     mockDb.priceLists = mockDb.priceLists.map((item) => withCounts(item, mockDb.products));

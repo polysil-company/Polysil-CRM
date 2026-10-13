@@ -83,9 +83,13 @@ describe("[MSTR-007] Excel import — price list rates", () => {
     expect(check).toMatchObject({ total: 4, ok: 2, errors: 2 });
     expect(check.errorRows).toEqual([
       { row: 3, errors: { rate: "at most two decimals" } },
-      { row: 4, errors: { item_code: "no product with this item code" } },
+      { row: 4, errors: { item_code: "no product with item code PL-9999" } },
     ]);
-    expect(check.preview[0]?.values).toMatchObject({ item_code: "PL-1001", rate: "15.20" });
+    // As the backend previews it: the product found, its id, and the rate as it will be saved.
+    expect(check.preview[0]?.values).toMatchObject({
+      product: mockDb.products.find((item) => item.item_code === "PL-1001")?.description,
+      rate: "15.20",
+    });
 
     // All or nothing: a bad row refuses the whole import, naming it.
     const refused = await commitImport({
@@ -96,7 +100,7 @@ describe("[MSTR-007] Excel import — price list rates", () => {
     expect(importRefusal(refused).rows).toContainEqual({
       row: 4,
       field: "item_code",
-      reason: "no product with this item code",
+      reason: "no product with item code PL-9999",
     });
 
     const before = mockDb.priceLists.find((item) => item.id === listId)?.rates.size ?? 0;
