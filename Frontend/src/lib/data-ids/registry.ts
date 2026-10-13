@@ -940,9 +940,14 @@ export const DATA_IDS = {
     domain: "ACCT",
     title: "Accounts work queue",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
+    endpoints: [
+      "GET /orders?waiting_on=account_manager",
+      "GET /orders/stats",
+      "GET /orders/export",
+    ],
     notes:
-      "Waits on BE-022: GET /orders cannot filter on approval_waiting_on, and there is no payments API. Accounts' steps are in the Approvals inbox meanwhile.",
+      "BE-022: submitted orders whose next step is Accounts', decided in Approvals; the badge is stats waiting_on.account_manager. Recording payments comes with the payments screens.",
   },
   "DISP-002": {
     domain: "DISP",

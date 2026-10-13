@@ -161,7 +161,8 @@ function replayWrite(
 /**
  * SO-001, SO-006 · The orders a list or its export asks for: statuses, type, owner, lead,
  * quotation, search, areas (an order sits in an area when its territory or any above it is
- * one) and an office (the order's office, or any office above it, is the one asked for).
+ * one), an office (the order's office, or any office above it, is the one asked for) and
+ * `waiting_on`, the role whose approval step is next (BE-022).
  */
 function filteredOrders(params: URLSearchParams, statuses?: readonly string[]): OrderWire[] {
   const wanted =
@@ -178,6 +179,7 @@ function filteredOrders(params: URLSearchParams, statuses?: readonly string[]): 
       .filter((id) => id !== ""),
   );
   const officeId = params.get("owner_org_unit_id");
+  const waitingOn = params.get("waiting_on");
   return mockDb.orders.filter(
     (order) =>
       (wanted.length === 0 || wanted.includes(order.status)) &&
@@ -189,6 +191,9 @@ function filteredOrders(params: URLSearchParams, statuses?: readonly string[]): 
       (areas.size === 0 ||
         mockTerritoryLineage(order.territory.id).some((territory) => areas.has(territory.id))) &&
       (officeId === null || officeId === "" || inOfficeTree(order.owner_org_unit.id, officeId)) &&
+      (waitingOn === null ||
+        waitingOn === "" ||
+        toOrderSummary(order).approval_waiting_on === waitingOn) &&
       matchesSearch(order, q),
   );
 }
@@ -617,6 +622,22 @@ export const orderHandlers = [
       },
     };
     return HttpResponse.json(body);
+  }),
+
+  /** ACCT-001 · Counts by status, and submitted orders by whose step is next. Before :orderId. */
+  http.get(buildApiUrl("/orders/stats"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const matches = scenario === "empty" ? [] : filteredOrders(new URL(request.url).searchParams);
+    const byStatus = Object.fromEntries(ORDER_STATUSES.map((status) => [status, 0]));
+    const waitingOn: Record<string, number> = {};
+    for (const order of matches) {
+      byStatus[order.status] = (byStatus[order.status] ?? 0) + 1;
+      const role = toOrderSummary(order).approval_waiting_on;
+      if (role !== null) waitingOn[role] = (waitingOn[role] ?? 0) + 1;
+    }
+    return HttpResponse.json({ total: matches.length, by_status: byStatus, waiting_on: waitingOn });
   }),
 
   /** SO-006 · The list as a file. Before /orders/:orderId. */

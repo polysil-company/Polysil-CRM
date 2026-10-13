@@ -133,7 +133,27 @@ export interface OrderListParams {
   readonly areas: readonly string[];
   /** An office and the offices under it (`owner_org_unit_id`). */
   readonly officeId: string | null;
+  /** ACCT-001: orders whose next approval step is this role's, e.g. `account_manager`. */
+  readonly waitingOn?: string | null;
 }
+
+/** ACCT-001 · GET /orders/stats: counts by status, and submitted orders by whose step is next. */
+export const orderStatsSchema = z
+  .object({
+    total: z.number().int().nonnegative(),
+    by_status: z.record(z.string(), z.number().int().nonnegative()),
+    waiting_on: z.record(z.string(), z.number().int().nonnegative()),
+  })
+  .transform((wire) => ({
+    total: wire.total,
+    byStatus: wire.by_status,
+    waitingOn: wire.waiting_on,
+  }));
+
+export type OrderStats = z.output<typeof orderStatsSchema>;
+
+/** The role whose step is the Accounts queue (BE-022). */
+export const ACCOUNTS_ROLE = "account_manager";
 
 // ── the document (SO-002) ─────────────────────────────────────────────────────────
 

@@ -17,6 +17,7 @@ import {
   createOrder,
   deleteOrder,
   getOrder,
+  getOrderStats,
   getOrderTimeline,
   listDispatches,
   listOrders,
@@ -192,6 +193,33 @@ describe("[SO-001] listOrders", () => {
     expect(
       shares.some(([status, pct]) => status === "partially_dispatched" && pct > 0 && pct < 100),
     ).toBe(true);
+  });
+});
+
+describe("[ACCT-001] Order stats and the Accounts queue", () => {
+  afterEach(reset);
+
+  it("counts every status, and submitted orders by whose step is next", async () => {
+    const stats = await getOrderStats();
+    expect(stats.total).toBe(mockDb.orders.length);
+    expect(Object.keys(stats.byStatus).sort()).toEqual([...ORDER_STATUSES].sort());
+    expect(stats.byStatus.submitted).toBe(
+      mockDb.orders.filter((order) => order.status === "submitted").length,
+    );
+    expect(stats.waitingOn.account_manager).toBe(1);
+  });
+
+  it("lists only the orders whose next step is Accounts'", async () => {
+    let sent: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/orders"), ({ request }) => {
+        sent = new URL(request.url);
+      }),
+    );
+    const queue = await listOrders({ ...ALL, status: ["submitted"], waitingOn: "account_manager" });
+    expect(sent?.searchParams.get("waiting_on")).toBe("account_manager");
+    expect(queue.items).toHaveLength(1);
+    expect(queue.items[0]?.waitingOn).toBe("account_manager");
   });
 });
 
