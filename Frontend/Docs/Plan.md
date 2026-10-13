@@ -334,6 +334,8 @@ LEAD-005…008, QUOT-001…012, APPR-001…002, TASK-001…008, SO-001…004, DI
 
 **`/leads/summary` is gone.** It was a guessed contract the backend never served. The count first moved to `GET /leads?limit=1&include_total=true` (PR #8), then to `GET /leads/stats` (PR #18). The stats are not a one-to-one replacement:
 | Products & prices — the catalogue (search, category, block and status filters, add, correct, switch off; stand-in figures shown per field), each product's HSN code from a date, GST slabs by HSN code, price lists (new, copy, fill a draft's rates, publish with or without every product priced, close from a date). Categories and units come from the catalogue until BE-024 | MSTR-004, MSTR-005, MSTR-006 | `GET/POST /products`, `GET/PATCH /products/{id}`, `GET/PUT /products/{id}/hsn`, `GET /tax-rates`, `PUT /tax-rates/{hsn}`, `GET/POST /price-lists`, `GET/PATCH /price-lists/{id}`, `GET/PUT /price-lists/{id}/items`, `POST /price-lists/{id}/publish` |
+| Excel import with column matching — rates into a draft price list (replace or merge), items into a quotation or order; upload, match, check, import good rows only or all | MSTR-007 | `POST /imports`, `POST /imports/{id}/check`, `POST /imports/{id}/commit`, `DELETE /imports/{id}` |
+| Price lists by sale type — the field, the filter and the label; the quotation's sale type and the order's type on price previews | MSTR-008 | `sales_type` on `GET/POST /price-lists` and `POST /pricing/quote-lines` |
 
 | Old `/leads/summary` (guessed) | `GET /leads/stats` (real) |
 |---|---|
