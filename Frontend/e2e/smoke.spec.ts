@@ -17,6 +17,17 @@ const MOCK_STAFF_PASSWORD = "polysil-demo";
 const MOCK_OTP_CODE = "123456";
 
 async function expectNoAccessibilityViolations(page: Page): Promise<void> {
+  // Let entrance fades finish first: axe measures contrast on the colours it
+  // sees, and a button at 97% opacity reads as failing. Endless ones (spinners,
+  // shimmer) never finish, so they're left running.
+  await page.evaluate(async () => {
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
   const results = await new AxeBuilder({ page })
     .withTags(WCAG_TAGS)
     // Development-only overlays: the Next.js dev tools and the TanStack Query devtools.

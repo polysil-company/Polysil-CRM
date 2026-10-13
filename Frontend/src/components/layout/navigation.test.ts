@@ -134,6 +134,13 @@ describe("[APP-006] route guards", () => {
     expect(canOpenPath("/approvals", mockPermissionsFor("employee"), "staff")).toBe(false);
   });
 
+  it("opens Channel partners and the pages under it to staff who read partners only (CHNL-001)", () => {
+    expect(canOpenPath("/partners", mockPermissionsFor("employee"), "staff")).toBe(true);
+    expect(canOpenPath("/partners/new", admin, "staff")).toBe(true);
+    expect(canOpenPath("/partners/p-1/edit", dealer, "partner_user")).toBe(false);
+    expect(canOpenPath("/partners", mockPermissionsFor("qa_manager"), "staff")).toBe(false);
+  });
+
   it("leaves pages outside the nav map open", () => {
     expect(canOpenPath("/account", [], "partner_user")).toBe(true);
   });

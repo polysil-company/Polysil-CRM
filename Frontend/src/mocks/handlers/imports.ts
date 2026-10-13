@@ -6,10 +6,12 @@ import {
   type ImportKind,
   IMPORT_KINDS,
 } from "@/features/imports/api/imports.schemas";
+import { PARTNER_TYPES, type PartnerType } from "@/features/partners/api/partners.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can, type ModuleCode, type PermissionAction } from "@/lib/auth/permissions";
 import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
+import { normalizeIndianMobile } from "@/lib/format";
 import {
   MOCK_IMPORT_FIELDS,
   MOCK_SAMPLE_WORKBOOKS,
@@ -24,8 +26,10 @@ import {
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { withCounts, type MockProductRecord } from "@/mocks/data/products";
 import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
+import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { mockDb } from "@/mocks/db";
 
+import { addMockPartner } from "./partners";
 import { applyScenario } from "./scenario";
 import { errorResponse, readMultipart } from "./shared";
 
@@ -90,9 +94,22 @@ function readSheet(
 // ── what each row means, per kind ─────────────────────────────────────────────
 
 interface RowResult {
-  readonly values: Record<string, string | null>;
+  readonly values: Record<string, string | boolean | null>;
   readonly errors: Record<string, string>;
   readonly line?: NonNullable<ImportCheckWire["lines"]>[number];
+  /** A partner row's place, kept for the commit and never previewed (CHNL-005). */
+  readonly partner?: PartnerPlace;
+}
+
+interface PartnerPlace {
+  readonly row: number;
+  readonly type: PartnerType;
+  /** Null while the row's state or district has an error. */
+  readonly territoryId: string | null;
+  /** An existing partner the row goes under. */
+  parentId: string | null;
+  /** A row of this file the row goes under. */
+  parentRow: number | null;
 }
 
 type Evaluate = (
@@ -142,7 +159,252 @@ function percent(value: string): string | null {
   return /^\d+(\.\d+)?$/.test(value) && Number(value) <= 100 ? String(Number(value)) : null;
 }
 
+// ── partners (CHNL-005), as backend `domain/imports/rows.py` parse_partners and finish_partners
+
+const PARTNER_TYPE_WORDS: Readonly<Record<string, PartnerType>> = {
+  distributor: "distributor",
+  dist: "distributor",
+  d: "distributor",
+  dealer: "dealer",
+  subdealer: "sub_dealer",
+  sd: "sub_dealer",
+  sub: "sub_dealer",
+  retailer: "sub_dealer",
+};
+
+const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+
+function wrongType(type: PartnerType): string {
+  return type === "distributor"
+    ? "a distributor has no parent"
+    : "wrong type for this parent: the order is distributor > dealer > sub-dealer";
+}
+
+function yesNo(text: string): boolean | null {
+  const word = headerKey(text);
+  if (["yes", "y", "true", "1"].includes(word)) return true;
+  if (["no", "n", "false", "0"].includes(word)) return false;
+  return null;
+}
+
+function evaluatePartners(
+  rows: MockImportBatch["rows"],
+  mapping: Readonly<Record<string, number>>,
+): RowResult[] {
+  const states = MOCK_TERRITORIES.filter((territory) => territory.level === "state");
+  const results = rows.map(({ row, cells }): RowResult => {
+    const get = (key: string): string => cellOf(cells, mapping, key);
+    const errors: Record<string, string> = {};
+    const rawType = get("partner_type");
+    const type = PARTNER_TYPE_WORDS[headerKey(rawType)] ?? null;
+    if (rawType === "") errors.partner_type = "required";
+    else if (type === null) {
+      errors.partner_type = `'${rawType}' is not distributor, dealer or sub-dealer`;
+    }
+    const code = get("code");
+    if (code === "") errors.code = "required";
+    const name = get("name");
+    if (name === "") errors.name = "required";
+    const stateText = get("state");
+    const state = states.find(
+      (item) =>
+        headerKey(item.name) === headerKey(stateText) ||
+        headerKey(item.code ?? "") === headerKey(stateText),
+    );
+    if (stateText === "") errors.state = "required";
+    else if (state === undefined) errors.state = `no state '${stateText}'`;
+    const districtText = get("district");
+    const district =
+      districtText === "" || state === undefined
+        ? undefined
+        : MOCK_TERRITORIES.find(
+            (item) =>
+              item.level === "district" &&
+              item.parent?.id === state.id &&
+              headerKey(item.name) === headerKey(districtText),
+          );
+    if (districtText !== "" && state !== undefined && district === undefined) {
+      errors.district = `no district '${districtText}' in ${state.name}`;
+    }
+    const mobileText = get("mobile");
+    const mobile = mobileText === "" ? null : (normalizeIndianMobile(mobileText)?.slice(1) ?? null);
+    if (mobileText !== "" && mobile === null) errors.mobile = "not an Indian mobile number";
+    const email = get("email").toLowerCase();
+    if (email !== "" && !z.email().safeParse(email).success) errors.email = "not an email";
+    const gstin = get("gstin").toUpperCase().replace(/ /g, "");
+    if (gstin !== "" && !GSTIN_PATTERN.test(gstin)) errors.gstin = "not a GSTIN";
+    const pan = get("pan").toUpperCase().replace(/ /g, "");
+    if (pan !== "" && !PAN_PATTERN.test(pan)) errors.pan = "not a PAN";
+    const registeredText = get("is_gst_registered");
+    const registered = registeredText === "" ? gstin !== "" : yesNo(registeredText);
+    if (registered === null) errors.is_gst_registered = "yes or no";
+    else if (registered && gstin === "") errors.gstin = "required when GST registered";
+    const credit = get("credit_limit").replace(/,/g, "");
+    if (credit !== "" && !/^\d+(\.\d{1,2})?$/.test(credit)) {
+      errors.credit_limit = "at most two decimals, 0 or more";
+    }
+    const terms = get("payment_terms_days");
+    if (terms !== "" && (!/^\d+$/.test(terms) || Number(terms) > 365)) {
+      errors.payment_terms_days = "a whole number from 0 to 365";
+    }
+    const place = district ?? state;
+    const territory =
+      district !== undefined && state !== undefined
+        ? `${district.name}, ${state.name}`
+        : (state?.name ?? null);
+    const values: Record<string, string | boolean | null> = {
+      partner_type: type,
+      code,
+      name,
+      territory,
+      parent_code: get("parent_code") === "" ? null : get("parent_code"),
+      contact_name: get("contact_name") === "" ? null : get("contact_name"),
+      address: get("address") === "" ? null : get("address"),
+      mobile,
+      email: email === "" ? null : email,
+      gstin: gstin === "" ? null : gstin,
+      pan: pan === "" ? null : pan,
+      is_gst_registered: registered ?? false,
+      credit_limit:
+        credit === "" || errors.credit_limit !== undefined ? null : Number(credit).toFixed(2),
+      payment_terms_days: terms === "" ? null : terms,
+    };
+    return {
+      errors,
+      values,
+      ...(type === null
+        ? {}
+        : {
+            partner: {
+              row,
+              type,
+              territoryId: place?.id ?? null,
+              parentId: null,
+              parentRow: null,
+            },
+          }),
+    };
+  });
+
+  // A code repeated in the file is wrong on every row that has it: which one was meant?
+  const byCode = new Map<string, number[]>();
+  rows.forEach(({ row }, index) => {
+    const code = String(results[index]?.values.code ?? "").toLowerCase();
+    if (code !== "") byCode.set(code, [...(byCode.get(code) ?? []), row]);
+  });
+  rows.forEach(({ row }, index) => {
+    const result = results[index];
+    const code = String(result?.values.code ?? "").toLowerCase();
+    const same = byCode.get(code) ?? [];
+    const other = same.find((item) => item !== row);
+    if (result !== undefined && other !== undefined)
+      result.errors.code ??= `also on row ${String(other)}`;
+  });
+
+  // A code in use is an error, never an update of that partner (GAP-471).
+  for (const result of results) {
+    const code = String(result.values.code ?? "");
+    if (
+      code !== "" &&
+      mockDb.partners.some((partner) => partner.code.toLowerCase() === code.toLowerCase())
+    ) {
+      result.errors.code ??= `${code} is already in use`;
+    }
+  }
+
+  // Parents, settled in type order so a dealer under a distributor with errors has one too.
+  const inFile = new Map<string, RowResult>();
+  for (const result of results) {
+    const code = String(result.values.code ?? "").toLowerCase();
+    if (code !== "" && !inFile.has(code)) inFile.set(code, result);
+  }
+  const rank = (result: RowResult): number =>
+    result.partner === undefined
+      ? PARTNER_TYPES.length
+      : PARTNER_TYPES.indexOf(result.partner.type);
+  for (const result of [...results].sort((a, b) => rank(a) - rank(b))) {
+    const parentCode = String(result.values.parent_code ?? "");
+    const place = result.partner;
+    if (parentCode === "" || place === undefined) continue;
+    const expected = PARTNER_TYPES[PARTNER_TYPES.indexOf(place.type) - 1];
+    const found = inFile.get(parentCode.toLowerCase());
+    if (found === result) {
+      result.errors.parent_code ??= "a partner cannot be its own parent";
+    } else if (found !== undefined) {
+      const above = found.partner;
+      if (above === undefined || above.type !== expected) {
+        result.errors.parent_code ??= wrongType(place.type);
+      } else if (Object.keys(found.errors).length > 0) {
+        result.errors.parent_code ??= `the parent on row ${String(above.row)} has errors`;
+      } else place.parentRow = above.row;
+    } else {
+      const known = mockDb.partners.find(
+        (partner) => partner.code.toLowerCase() === parentCode.toLowerCase(),
+      );
+      if (known === undefined) result.errors.parent_code ??= `no partner with code ${parentCode}`;
+      else if (known.partner_type !== expected) result.errors.parent_code ??= wrongType(place.type);
+      else place.parentId = known.id;
+    }
+  }
+  return results;
+}
+
+/** Adds the good partner rows, parents first, under the partners or rows they name. */
+function commitPartners(good: readonly RowResult[]): number {
+  const made = new Map<number, string>();
+  const ordered = [...good].sort(
+    (a, b) =>
+      PARTNER_TYPES.indexOf(a.partner?.type ?? "sub_dealer") -
+      PARTNER_TYPES.indexOf(b.partner?.type ?? "sub_dealer"),
+  );
+  let created = 0;
+  for (const { values, partner: place } of ordered) {
+    if (place === undefined) continue;
+    const parentId =
+      place.parentId ?? (place.parentRow === null ? null : (made.get(place.parentRow) ?? null));
+    const parent =
+      parentId === null ? undefined : mockDb.partners.find((item) => item.id === parentId);
+    const territory = MOCK_TERRITORIES.find((item) => item.id === place.territoryId);
+    // A good row always has its place; the check names the field otherwise.
+    const text = (key: string): string | null => {
+      const value = values[key];
+      return typeof value === "string" ? value : null;
+    };
+    const id = addMockPartner({
+      code: text("code") ?? "",
+      name: text("name") ?? "",
+      partner_type: place.type,
+      price_tier: place.type,
+      parent_id: parent?.id ?? null,
+      parent:
+        parent === undefined
+          ? null
+          : { id: parent.id, name: parent.name, partner_type: parent.partner_type },
+      territory:
+        territory === undefined
+          ? null
+          : { id: territory.id, name: territory.name, level: territory.level },
+      contact_name: text("contact_name"),
+      mobile: text("mobile"),
+      email: text("email"),
+      address: text("address"),
+      gstin: text("gstin"),
+      pan: text("pan"),
+      is_gst_registered: values.is_gst_registered === true,
+      credit_limit: text("credit_limit"),
+      payment_terms_days:
+        text("payment_terms_days") === null ? null : Number(text("payment_terms_days")),
+      is_active: true,
+    });
+    made.set(place.row, id);
+    created += 1;
+  }
+  return created;
+}
+
 const EVALUATE: Partial<Record<ImportKind, Evaluate>> = {
+  partners: evaluatePartners,
   price_list_items: (rows, mapping) =>
     rows.map(({ cells }) => {
       const code = cellOf(cells, mapping, "item_code");
@@ -233,6 +495,7 @@ function checkOf(batch: MockImportBatch, results: readonly RowResult[]): ImportC
 const COMMIT: Partial<
   Record<ImportKind, (batch: MockImportBatch, good: readonly RowResult[]) => number>
 > = {
+  partners: (_batch, good) => commitPartners(good),
   price_list_items: (batch, good) => {
     const list = mockDb.priceLists.find((item) => item.id === batch.wire.target_id);
     if (list === undefined) return 0;
