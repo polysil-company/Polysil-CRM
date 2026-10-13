@@ -2395,7 +2395,7 @@ def f_state_formulas() -> None:
         [("n1", "THE SAMPLES FILE IS PRICING\n\nstates_samples.json holds the company's price lists.\nThe snapshot withholds it; its tests skip without it.", RED),
          ("n2", "RJ SUBSIDY CAN EXCEED THE COST\n\nThe sheet has no cap at the cost. Kept, with a warning,\nuntil the client answers (GAP-458).", RED),
          ("n3", "OVERLOADED COLUMNS\n\nA size table keeps the size in lateral_spacing; a filter's\nm3 sits in pipe_size_mm (stated limit).", RED),
-         ("n4", "Open: RJ sprinkler's template tables, the PVC\ndeduction, AP's format (GAP-459 to 461, GAP-359).", YELLOW)])
+         ("n4", "Open: RJ sprinkler's template tables, the PVC\ndeduction, (GAP-459 to 461). AP: flow 69a.", YELLOW)])
 
 
 def f_subsidised_quotations() -> None:
@@ -2416,6 +2416,26 @@ def f_subsidised_quotations() -> None:
          ("n2", "THE ORDER'S MATERIAL IS THE CALCULATION\n\nmaterial = total_cost + flat charge, so subsidy and share\nfit whatever the order's lines come to.", RED),
          ("n3", "WRITES ARE DEFINERS ONLY\n\napp_role reads quotation_subsidy; set and copy go\nthrough quotation_subsidy_set / _copy.", RED),
          ("n4", "Open: dealer pricing, a stale revision, the\napplication's own figures (GAP-463 to 465).", YELLOW)])
+
+
+def f_ap_subsidy() -> None:
+    _columns(
+        "69a-ap-subsidy", "Andhra Pradesh subsidy (APMIP)",
+        "Sprinkler calculated from Polysil's sheet; drip taken from the government portal.",
+        "BUILT. FS-063: migration 075, scripts/load_state_masters.py --state AP.",
+        [("s1", "scheme AP: sprinkler and drip,\nboth on cap mode excl_gst", GREY),
+         ("s2", "sprinkler: set size from the input, area table,\nflat 900 transport, no inspection", GREEN),
+         ("s3", "subsidy = MIN(pct x unit cost, pct x cost before GST),\nthen at most 19,000", GREEN),
+         ("s4", "drip (portal_manual): the portal's lines, fittings\namount and guided cost, as typed", BLUE),
+         ("s5", "drip subsidy = 90 % x MIN(guided cost, cost),\nrounded to the rupee", GREEN),
+         ("s6", "farmer pays cost - subsidy + half the GST;\nthe state pays the other half (gst_paid_by_state)", VIOLET)],
+        [("d1", "subsidy + share + state GST = printed total:\nthe state GST is the remainder", GREEN),
+         ("d2", "an order from the quotation: subsidy amount\n= subsidy + state GST; farmer owes his share", YELLOW),
+         ("d3", "no unit cost table for drip:\nmatrix ids null, readiness skips the table", GREY)],
+        [("n1", "THE PORTAL IS THE SOURCE FOR DRIP\n\nThe CRM cannot design an AP drip system or derive the\nguided cost. A typing slip moves the subsidy (GAP-481).", RED),
+         ("n2", "THE LINK AND THE PDF DO NOT ADD UP YET\n\nThey print total, subsidy and share; AP's state GST is\nmissing from them (GAP-482).", RED),
+         ("n3", "LINK THE SCHEME TO THE STATE\n\nThe loader warns when no AP state exists: AP leads then\nfind no scheme.", RED),
+         ("n4", "Open: sprinkler above 2 Ha, the fittings rule, other\npercents, MIN on drip (GAP-477 to 480).", YELLOW)])
 
 
 def f_price_lists_by_sale_type() -> None:
@@ -2472,5 +2492,5 @@ if __name__ == "__main__":
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
     f_export_sample_orders(); f_ratings(); f_warranty()
     f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
-    f_price_lists_by_sale_type(); f_excel_import()
+    f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy()
     print(f"\nwrote to {OUT}")

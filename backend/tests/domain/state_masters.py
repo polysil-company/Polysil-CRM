@@ -38,7 +38,7 @@ needs_state_samples = pytest.mark.skipif(not SAMPLES, reason="the state sample f
 ENTRIES = tuple(PUBLIC)
 FLAGS = {"min_area_prorate", "max_area_scaling", "jantri_guards", "share_floor_zero",
          "pipe_size_from_input", "unit_cost_round_rupee", "zero_above_max_area",
-         "exact_area_match_required"}
+         "exact_area_match_required", "subsidy_round_rupee", "transport_flat"}
 D = Decimal
 
 
@@ -57,8 +57,10 @@ def policy(key: str) -> SystemPolicy:
         **params)
 
 
-def unit_cost(key: str) -> Matrix2D | RowTable:
-    uc = PUBLIC[key]["unit_cost"]
+def unit_cost(key: str) -> Matrix2D | RowTable | dict[Decimal, Decimal]:
+    uc = PUBLIC[key].get("unit_cost")
+    if uc is None:
+        return {}           # FS-063: AP drip has no table; the portal gives the guided cost
     if uc["kind"] == "bilinear_2d":
         return Matrix2D.from_rows(uc["areas"], [(r["spacing"], r["costs"]) for r in uc["rows"]])
     return RowTable({RowTable.key(k): {D(a): D(v) for a, v in row.items()}
@@ -93,7 +95,9 @@ def example(key: str) -> QuotationInput:
         D(inp["group_total_area"]) if inp["group_total_area"] else None,
         D(inp["installation_rate_per_ha"]), inp["nozzle"], inp["pipe_size_mm"],
         inp["spacing_label"], D(inp["hydrocyclone_m3"]), D(inp["gravel_filter_m3"]),
-        inp["head_unit_existing"], inp["pvc_existing"])
+        inp["head_unit_existing"], inp["pvc_existing"],
+        D(inp["guided_cost"]) if inp.get("guided_cost") else None,
+        D(inp["fittings_amount"]) if inp.get("fittings_amount") else None)
 
 
 def run(key: str, q: QuotationInput, m: Masters | None = None,
@@ -106,6 +110,8 @@ def run(key: str, q: QuotationInput, m: Masters | None = None,
         return pipeline.seven_block(q, m, pol)
     if kind == "field_inspection_only" or p["system_type"] == "sprinkler":
         return sprinkler.field_inspection(q, m, pol)
+    if kind == "portal_manual":
+        return state_pipelines.portal_manual(q, m, pol)
     if kind == "gst_inclusive":
         return state_pipelines.gst_inclusive_drip(q, m, pol)
     return state_pipelines.unit_cost_only(q, m, pol)

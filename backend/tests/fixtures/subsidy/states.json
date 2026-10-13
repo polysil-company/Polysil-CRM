@@ -1,4 +1,134 @@
 {
+  "AP/drip": {
+    "scheme": "AP",
+    "system_type": "drip",
+    "system": {
+      "pipeline": "portal_manual",
+      "jantri_variant": "none",
+      "quantity_source": "manual",
+      "cap_mode": "excl_gst",
+      "rounded_blocks": [],
+      "rounded_lines": [],
+      "spacing_rule": "design",
+      "spacing_outside_table": "clamp",
+      "has_head_unit": true,
+      "supports_group": false,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "farmer_gst_fraction": "0.5",
+      "subsidy_round_rupee": "1",
+      "gst_inclusive_rate": "0.05"
+    },
+    "categories": [
+      {
+        "code": "eligible_90",
+        "name": "Eligible 90% (portal)",
+        "pct": "90",
+        "variant": "regular",
+        "sort_order": 1
+      }
+    ],
+    "source": "ap/AP-Drip-Portal-BOQ.xlsx"
+  },
+  "AP/sprinkler": {
+    "scheme": "AP",
+    "system_type": "sprinkler",
+    "system": {
+      "pipeline": "field_inspection_only",
+      "jantri_variant": "size_area_2d",
+      "quantity_source": "area_matrix",
+      "cap_mode": "excl_gst",
+      "rounded_blocks": [],
+      "rounded_lines": [
+        "field",
+        "transport"
+      ],
+      "spacing_rule": "design",
+      "spacing_outside_table": "clamp",
+      "has_head_unit": false,
+      "supports_group": false,
+      "crop_count_max": 1
+    },
+    "parameters": {
+      "pipe_size_from_input": "1",
+      "share_floor_zero": "0",
+      "inspection_floor": "0",
+      "inspection_rate": "0",
+      "gst_material_half": "0.025",
+      "gst_service_half": "0.09",
+      "exact_area_match_required": "0",
+      "subsidy_cap": "19000",
+      "farmer_gst_fraction": "0.5",
+      "transport_flat": "1"
+    },
+    "categories": [
+      {
+        "code": "small",
+        "name": "Small farmer (50%)",
+        "pct": "50",
+        "variant": "regular",
+        "sort_order": 1
+      },
+      {
+        "code": "other",
+        "name": "Other farmer (50%)",
+        "pct": "50",
+        "variant": "regular",
+        "sort_order": 2
+      }
+    ],
+    "unit_cost": {
+      "kind": "rows",
+      "rows": {
+        "63": {
+          "0.4": "21420",
+          "0.6": "21420",
+          "0.8": "21420",
+          "1": "21420",
+          "1.2": "30405",
+          "1.4": "30405",
+          "1.6": "30405",
+          "1.8": "30405",
+          "2": "30405"
+        },
+        "75": {
+          "0.4": "24181",
+          "0.6": "24181",
+          "0.8": "24181",
+          "1": "24181",
+          "1.2": "34185",
+          "1.4": "34185",
+          "1.6": "34185",
+          "1.8": "34185",
+          "2": "34185"
+        },
+        "90": {
+          "0.4": "24194",
+          "0.6": "24194",
+          "0.8": "24194",
+          "1": "24194",
+          "1.2": "34656",
+          "1.4": "34656",
+          "1.6": "34656",
+          "1.8": "34656",
+          "2": "34656"
+        },
+        "110": {
+          "0.4": "24194",
+          "0.6": "24194",
+          "0.8": "24194",
+          "1": "24194",
+          "1.2": "34656",
+          "1.4": "34656",
+          "1.6": "34656",
+          "1.8": "34656",
+          "2": "34656"
+        }
+      }
+    },
+    "source": "ap/AP-Sprinkler-Quotation-Format.xlsx"
+  },
   "CG/drip": {
     "scheme": "CG",
     "system_type": "drip",

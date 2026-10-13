@@ -151,6 +151,15 @@ class CalculateRequest(BaseModel):
                                             description="RJ: the farmer already has a head unit.")
     pvc_existing: bool | None = Field(default=None,
                                       description="RJ: the farmer already has the PVC main line.")
+    # FS-063
+    guided_cost: Decimal | None = Field(
+        default=None, gt=0, max_digits=14, decimal_places=2,
+        description="AP drip: the guided cost from the AP MIP portal's bill of quantities. "
+                    "Required there, refused for every other system.")
+    fittings_amount: Decimal | None = Field(
+        default=None, ge=0, max_digits=14, decimal_places=2,
+        description="AP drip: the portal's 'Fittings and accessories' amount, as printed; 0 for "
+                    "none. Required there, refused for every other system.")
 
     @field_validator("group_total_area")
     @classmethod
@@ -192,10 +201,15 @@ class Blocks(BaseModel):
     total_sgst: str
     total_gst: str
     total_incl_gst: str
+    gst_paid_by_state: str = Field(
+        default="0.00",
+        description="AP: the half of the GST the state pays. The farmer's share leaves it out, "
+                    "so subsidy + farmer share + this = the total incl GST (FS-063).")
 
 
 class JantriOut(BaseModel):
-    regular: str = Field(description="The unit cost per hectare, four decimals.")
+    regular: str = Field(description="The unit cost per hectare, four decimals. For AP drip, "
+                                     "the portal's guided cost: a total, not per hectare (FS-063).")
     regular_with_sump: str = Field(description="Plus the sump rate times the area (rule 9).")
     regular_for_cap: str = Field(
         description="What the subsidy is actually capped on: the figure above, pro-rated for a "
@@ -255,8 +269,11 @@ class SprinklerOut(BaseModel):
 class MastersOut(BaseModel):
     as_of: str
     formula_version: str
-    regular_matrix_id: str
-    seven_year_matrix_id: str
+    regular_matrix_id: str | None = Field(
+        description="The unit cost table used; null for AP drip, which has none (FS-063).")
+    seven_year_matrix_id: str | None = Field(
+        description="The 7-year table used; the regular table's id for a state with none; null "
+                    "for AP drip (FS-063).")
     quantity_matrix_id: str | None
 
 

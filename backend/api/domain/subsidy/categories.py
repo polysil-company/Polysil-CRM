@@ -15,18 +15,22 @@ less the subsidy (floored at 0 where the workbook wraps it in MAX). Then
 `unit_cost_only` (RJ drip): the subsidy is the percent of the unit cost, uncapped,
 and the share MAX(total - subsidy, 0). A flat charge outside the cap (CG's
 inspection) is added to the share in both.
+
+FS-063 adds `excl_gst` (AP): the subsidy caps on MIN(unit cost, cost before GST)
+and an optional rupee ceiling; the farmer pays the cost less the subsidy plus his
+fraction of the GST. The state pays the rest of the GST (`state_gst`).
 """
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from api.domain.subsidy.money import ZERO, as_pct, round2
 from api.domain.subsidy.types import Category, CategoryMoney, CategoryResult, JantriFigures
 
 NOT_APPLICABLE = CategoryMoney(ZERO, ZERO, ZERO, None)
 SEVEN_YEAR_OUTSIDE_WINDOW = "area_outside_7y_window"
-CAP_MODES = ("ggrc", "incl_gst", "unit_cost_only")
+CAP_MODES = ("ggrc", "incl_gst", "unit_cost_only", "excl_gst")
 
 
 def category_rows(categories: tuple[Category, ...], *, cost: Decimal, total_gst: Decimal,
@@ -34,9 +38,20 @@ def category_rows(categories: tuple[Category, ...], *, cost: Decimal, total_gst:
                   seven_year_applicable: bool,
                   gsdma_max_area: Decimal | None, cap_mode: str = "ggrc",
                   share_floor_zero: bool = False,
-                  share_extra: Decimal = ZERO) -> tuple[CategoryResult, ...]:
+                  share_extra: Decimal = ZERO, subsidy_cap: Decimal | None = None,
+                  farmer_gst_fraction: Decimal = Decimal(1),
+                  round_rupee: bool = False) -> tuple[CategoryResult, ...]:
     if cap_mode not in CAP_MODES:
         raise ValueError(f"unknown cap mode {cap_mode!r}")
+    if cap_mode == "excl_gst":
+        if not 0 <= farmer_gst_fraction <= 1:
+            raise ValueError(f"farmer_gst_fraction {farmer_gst_fraction} is outside 0 to 1")
+        return tuple(_excl_gst_row(cat, cost=cost, gst=total_gst, area=area,
+                                   basis=jantri.regular_for_cap, floor=share_floor_zero,
+                                   ceiling=subsidy_cap, fraction=farmer_gst_fraction,
+                                   round_rupee=round_rupee)
+                     for cat in sorted(categories, key=lambda c: c.sort_order)
+                     if cat.variant != "seven_year")
     if cap_mode != "ggrc":
         return tuple(_state_row(cat, total=cost + total_gst, cost=cost, area=area,
                                 basis=jantri.regular_for_cap, cap_mode=cap_mode,
@@ -83,6 +98,45 @@ def _state_row(cat: Category, *, total: Decimal, cost: Decimal, area: Decimal, b
     total2, subsidy2 = round2(total), round2(subsidy)
     money = CategoryMoney(subsidy2, share_of(total2, subsidy2) - extra + round2(extra),
                           round2(subsidy2 / total2 * 100) if total2 else ZERO, None)
+    return CategoryResult(cat.code, cat.name, cat.pct, cat.variant, True, None, exact, money)
+
+
+def state_gst(cost: Decimal, gst: Decimal, fraction: Decimal) -> Decimal:
+    """FS-063 rule 3: the GST the state pays, on paisa figures, taken as the
+    remainder so subsidy + share + state GST = the printed total exactly."""
+    if fraction >= 1:
+        return ZERO
+    return round2(cost + gst) - round2(cost) - round2(gst * fraction)
+
+
+def _excl_gst_row(cat: Category, *, cost: Decimal, gst: Decimal, area: Decimal, basis: Decimal,
+                  floor: bool, ceiling: Decimal | None, fraction: Decimal,
+                  round_rupee: bool) -> CategoryResult:
+    """FS-063 rules 1 to 5. AP sprinkler 'Unit Cost & Calculation'!J8 =
+    MIN(MIN(I6,I7)*I8,19000), K8 = I7 - J8 + I28; AP drip K79 = 90 % x guided cost."""
+    pct = as_pct(cat.pct)
+    candidates = [basis * pct, cost * pct]
+    if cat.per_ha_cap is not None:
+        candidates.append(area * cat.per_ha_cap)
+    if ceiling is not None:
+        candidates.append(ceiling)
+    subsidy = max(min(candidates), ZERO)
+    if round_rupee:
+        subsidy = subsidy.quantize(Decimal(1), rounding=ROUND_HALF_UP)
+
+    def share_of(c: Decimal, s: Decimal, g: Decimal) -> Decimal:
+        rest = c - s + g
+        return max(rest, ZERO) if floor else rest
+
+    farmer_gst = gst * fraction
+    exact = CategoryMoney(subsidy, share_of(cost, subsidy, farmer_gst),
+                          subsidy / cost * 100 if cost else ZERO, None)
+    # the total is printed as round2(cost + gst); the share takes round2(cost) and the
+    # state GST the remainder (state_gst), so the three printed figures add up
+    cost2, subsidy2 = round2(cost), round2(subsidy)
+    farmer_gst2 = round2(cost + gst) - cost2 - state_gst(cost, gst, fraction)
+    money = CategoryMoney(subsidy2, share_of(cost2, subsidy2, farmer_gst2),
+                          round2(subsidy2 / cost2 * 100) if cost2 else ZERO, None)
     return CategoryResult(cat.code, cat.name, cat.pct, cat.variant, True, None, exact, money)
 
 
