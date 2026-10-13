@@ -10,8 +10,10 @@
           @bottom-right { content: string(docno) ", page " counter(page) " of " counter(pages);
                           font-family: "Noto Sans", "DejaVu Sans", sans-serif;
                           font-size: 7.5pt; color: #555; } }
+  /* anywhere, on the body: the remark and the maker's name sit outside any
+     table, and an unbreakable token there left the page (code review F-5) */
   body { font-family: "Noto Sans", "Noto Sans Gujarati", "Noto Sans Devanagari", "DejaVu Sans", sans-serif;
-         font-size: 9pt; color: #111; }
+         font-size: 9pt; color: #111; overflow-wrap: anywhere; }
   .muted { color: #555; }
   /* fixed widths, and long text breaks inside its cell: under auto layout one
      unbreakable token pushes the amounts off the page (edge case 10) */
@@ -26,9 +28,7 @@
   .banner + .party { margin-top: 0; }
   .banner { border: 2px solid #b3402c; color: #b3402c; padding: 1.5mm 3mm; font-weight: 700;
             letter-spacing: .06em; text-transform: uppercase; margin: 2mm 0; font-size: 8.5pt; }
-  .party th { width: 19%; text-align: left; font-weight: 600; background: #f3f3f3; }
-  .party td { width: 31%; }
-  .party .wide { width: auto; }
+  .party th { text-align: left; font-weight: 600; background: #f3f3f3; }
   .docno { string-set: docno content(text); }
   .lines { margin-top: 2.5mm; font-size: 8pt; }
   .lines td { padding: 0.7mm 1.2mm; }
@@ -51,7 +51,10 @@
   .subsidy { margin-top: 3mm; width: 60%; font-size: 8.5pt; }
   .subsidy th { text-align: left; font-weight: 600; background: #f3f3f3; width: 55%; }
   .subsidy caption { text-align: left; font-weight: 700; padding-bottom: 1mm; }
-  .subsidy td { text-align: right; white-space: nowrap; }
+  /* nowrap on the amounts only: a category name ran through its cell's border
+     ("SC+ST (TRIBAL)+Dark Zone Farmer 90 %", code review F-4) */
+  .subsidy td { text-align: right; }
+  .subsidy td.n { white-space: nowrap; }
   .fixed { margin-top: 1.2mm; font-size: 8.5pt; }
   .made { margin-top: 2.5mm; font-weight: 600; }
   .site { margin-top: 2.5mm; text-align: center; font-weight: 700; font-size: 10.5pt; }
@@ -75,9 +78,14 @@
   {% endif %}
 
   <table class="party">
+    <!-- under a fixed layout the first row sets the widths, and the first row is
+         one label and one spanning cell: the columns are declared (F-6) -->
+    <colgroup>
+      <col style="width: 19%"><col style="width: 31%"><col style="width: 19%"><col style="width: 31%">
+    </colgroup>
     <tr>
       <th>Dealer Name and Contact detail</th>
-      <td class="wide" colspan="3">{% if p.dealer_name %}{{ p.dealer_name }}{% if p.dealer_contact %}, {{ p.dealer_contact }}{% endif %}{% if p.dealer_mobile %}, {{ p.dealer_mobile | mobile }}{% endif %}{% endif %}</td>
+      <td colspan="3">{% if p.dealer_name %}{{ p.dealer_name }}{% if p.dealer_contact %}, {{ p.dealer_contact }}{% endif %}{% if p.dealer_mobile %}, {{ p.dealer_mobile | mobile }}{% endif %}{% endif %}</td>
     </tr>
     <tr>
       <th>Farmer/Client Name</th>
@@ -106,7 +114,7 @@
     </tr>
     {% if place_of_supply %}
     <tr>
-      <th>Place of Supply</th><td class="wide" colspan="3">{{ place_of_supply }}</td>
+      <th>Place of Supply</th><td colspan="3">{{ place_of_supply }}</td>
     </tr>
     {% endif %}
   </table>
@@ -153,17 +161,17 @@
   <table class="subsidy">
     <caption>Subsidy and Farmer Share ({{ subsidy.scheme_code }})</caption>
     <tr><th>Farmer Category</th><td>{{ subsidy.category_name }}</td></tr>
-    <tr><th>Cost as calculated</th><td>{{ subsidy.total_cost | rupees }}</td></tr>
-    {% if subsidy_has_flat %}<tr><th>plus inspection</th><td>{{ subsidy.flat_charge | rupees }}</td></tr>{% endif %}
-    <tr><th>Subsidy</th><td>{{ subsidy.subsidy | rupees }}</td></tr>
-    <tr><th>Farmer Share</th><td><strong>{{ subsidy.farmer_share | rupees }}</strong></td></tr>
+    <tr><th>Cost as calculated</th><td class="n">{{ subsidy.total_cost | rupees }}</td></tr>
+    {% if subsidy_has_flat %}<tr><th>plus inspection</th><td class="n">{{ subsidy.flat_charge | rupees }}</td></tr>{% endif %}
+    <tr><th>Subsidy</th><td class="n">{{ subsidy.subsidy | rupees }}</td></tr>
+    <tr><th>Farmer Share</th><td class="n"><strong>{{ subsidy.farmer_share | rupees }}</strong></td></tr>
   </table>
   {% endif %}
 
   <div class="block"><strong>Remark</strong>{% if q.terms %}<br>{{ q.terms }}{% endif %}</div>
 
   {% if valid_days is not none %}
-  <div class="fixed">This quotation is valid for {{ valid_days }} days from its date.</div>
+  <div class="fixed">This quotation is valid for {{ valid_days }} {{ 'day' if valid_days == 1 else 'days' }} from its date.</div>
   {% endif %}
   <div class="fixed">POLYSIL IRRIGATION SYSTEMS LIMITED has the right to change rates, cancel this quotation or make any required changes.</div>
   <div class="fixed">This is a system generated quotation, hence a signature is not required.</div>

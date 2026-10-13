@@ -50,6 +50,21 @@ LINE: dict[str, Any] = {
     "cgst_rate": "2.500", "sgst_rate": "2.500", "igst_rate": "0.000",
     "cgst": "39.70", "sgst": "39.70", "igst": "0.00", "total": "1667.50",
 }
+# a second line with figures of its own, so no line figure equals a document
+# total: with one line the totals rows satisfied every line assertion, and a
+# blank or swapped line cell passed (code review F-1)
+LINE_2: dict[str, Any] = {
+    "line_no": 2, "description": "END PLUG WITH QUICK ACTION COUPLER 90MM",
+    "hsn_code": "3917", "uom": "NOS", "qty": "4.000", "rate": "50.00",
+    "gross": "200.00", "discount_pct": "10.000", "discount1_amt": "20.00",
+    "after_discount1": "180.00", "discount2_pct": "0.000", "discount2_amt": "0.00",
+    "after_discount2": "180.00", "discount3_pct": "0.000", "discount3_amt": "0.00",
+    "discount": "20.00", "taxable": "180.00", "gst_slab": "5.000",
+    "cgst_rate": "2.500", "sgst_rate": "2.500", "igst_rate": "0.000",
+    "cgst": "4.50", "sgst": "4.50", "igst": "0.00", "total": "189.00",
+}
+ROW_1 = "1 UPVC PIPE 90 MM 4 KG/CM2 CLASS - 2 IS: 4985 ₹103.19 ₹88.23 18 MTR ₹269.32 ₹1,588.10"
+ROW_2 = "2 END PLUG WITH QUICK ACTION COUPLER 90MM ₹50.00 ₹45.00 4 NOS ₹20.00 ₹180.00"
 PRINT: dict[str, Any] = {
     "dealer_name": "Shree Agro", "dealer_contact": "Bhavesh Shah", "dealer_mobile": "9876500000",
     "village": "Vadod", "taluka": "Gondal", "district": "Rajkot", "state": "Gujarat",
@@ -58,23 +73,25 @@ PRINT: dict[str, Any] = {
 
 
 def _doc(*, provisional: bool = False, intra: bool = True, party: str = "Rameshbhai Patel",
-         terms: str | None = "Prices ex-works.", lines: int = 1) -> dict:
+         terms: str | None = "Prices ex-works.", lines: int = 2) -> dict:
     return {
         "quotation": {
             "id": "00000000-0000-0000-0000-000000000001", "quote_no": "QT/GJ/2026-27/00001",
             "version": 1, "sales_type": "commercial", "sent_at": "2026-10-01T09:00:00+05:30",
-            "valid_until": "2026-11-15", "price_effective_date": "2026-10-01",
+            "valid_until": "2026-11-15", "price_effective_date": "2026-10-03",
             "is_provisional": provisional, "intra_state": intra, "tax_treatment": "domestic",
             "seller_legal_name": "Polysil Irrigation Systems Pvt Ltd",
             "seller_address": "Rajkot, Gujarat", "seller_gstin_no": "24AAACP1234A1Z5",
             "seller_state_code": "GJ",
-            "party_name": party, "party_address": "Vadod, Anand", "party_mobile": "+919876543210",
+            "party_name": party, "party_address": "Near the dairy, Anand road",
+            "party_mobile": "+919876543210",
             "party_gstin": None, "terms": terms, "export_country": None, "lut_arn": None,
-            "gross": "1857.42", "discount": "269.32", "taxable": "1588.10",
-            "cgst": "39.70", "sgst": "39.70", "igst": "0.00", "total": "1667.50",
+            "gross": "2057.42", "discount": "289.32", "taxable": "1768.10",
+            "cgst": "44.20", "sgst": "44.20", "igst": "0.00", "total": "1856.50",
             "share_token": "t" * 43,
         },
-        "lines": [{**LINE, "line_no": n + 1} for n in range(lines)],
+        "lines": [dict(LINE), dict(LINE_2)][:lines]
+        + [{**LINE, "line_no": n + 1} for n in range(2, lines)],
         "print": copy.deepcopy(PRINT),
     }
 
@@ -111,11 +128,17 @@ def test_every_label_of_the_clients_sheet_prints() -> None:
 def test_the_header_carries_the_print_block_and_the_quotations_own_fields() -> None:
     doc = _doc()
     flat = _flat(doc)
-    assert "Shree Agro, Bhavesh Shah, 9876500000" in flat
-    for value in ("Vadod", "Gondal", "Rajkot", "Gujarat", "Sprinkler", "Rameshbhai Patel",
-                  "QT/GJ/2026-27/00001", "24AAACP1234A1Z5", "01 Oct 2026", "15 Nov 2026",
-                  "Vadod, Anand"):
-        assert value in flat, value
+    # label and value together, each value distinct: a blank or swapped cell
+    # passed while "Vadod" was also in the address and both dates were 1 Oct (F-2)
+    for cell in ("Dealer Name and Contact detail Shree Agro, Bhavesh Shah, 9876500000 Farmer",
+                 "Farmer/Client Name Rameshbhai Patel Near the dairy, Anand road MIS System "
+                 "Sprinkler",
+                 "Village Vadod Contact Number +91 98765 43210",
+                 "Taluka Gondal Quotation No. QT/GJ/2026-27/00001",
+                 "District Rajkot Date 01 Oct 2026",
+                 "State Gujarat Valid Until 15 Nov 2026",
+                 "Effective Rate Date 03 Oct 2026 GSTIN 24AAACP1234A1Z5"):
+        assert cell in flat, cell
     assert "+91 98765 43210" in flat and "+919876543210" not in flat
     assert "(version" not in flat, "version 1 prints no version mark"
     doc["quotation"]["version"] = 2
@@ -124,9 +147,10 @@ def test_the_header_carries_the_print_block_and_the_quotations_own_fields() -> N
 
 def test_the_line_prints_seven_columns_and_folds_the_tiers() -> None:
     flat = _flat(_doc())
-    # Price, Price after Dis., Qty. with its unit, Discount. Amt., Total Amt.
-    for figure in ("₹103.19", "₹88.23", "18 MTR", "₹269.32", "₹1,588.10"):
-        assert figure in flat, figure
+    # each row whole and in order: Price, Price after Dis., Qty. with its unit,
+    # Discount. Amt., Total Amt. Neither row's figures appear in the totals
+    assert ROW_1 in flat and ROW_2 in flat
+    assert f"{ROW_1} {ROW_2} Sub Total" in flat
     for gone in ("HSN", " 3917 ", "Disc %", "2nd disc", "185.74", "83.58", "1,671.68",
                  "Line total", "Taxable"):
         assert gone not in flat, f"{gone} is not on the client's sheet"
@@ -139,11 +163,10 @@ def test_the_totals_print_as_given() -> None:
     doc = _doc()
     flat = _flat(doc)
     q = doc["quotation"]
-    assert f"Sub Total ₹{_money(q['taxable'])}" in flat
-    assert f"CGST @ 2.5% ₹{_money(q['cgst'])}" in flat
-    assert f"SGST @ 2.5% ₹{_money(q['sgst'])}" in flat
-    assert f"Total ₹{_money(q['total'])}" in flat
-    assert f"Total Discount Amt. ₹{_money(q['discount'])}" in flat
+    assert (f"Sub Total ₹{_money(q['taxable'])} CGST @ 2.5% ₹{_money(q['cgst'])} "
+            f"SGST @ 2.5% ₹{_money(q['sgst'])} Total ₹{_money(q['total'])} "
+            f"Total Discount Amt. ₹{_money(q['discount'])} Amounts in Indian rupees") in flat
+    assert "Sub Total ₹1,768.10 CGST @ 2.5% ₹44.20" in flat and "Total ₹1,856.50" in flat
     assert "IGST" not in flat, "an intra-state document prints CGST and SGST"
     assert "Amounts in Indian rupees" in flat and "INDICATIVE PRICING" not in flat.upper()
     assert "each component is rounded on its own" in flat, "the per-line rounding sentence stays"
@@ -158,11 +181,13 @@ def test_a_tax_row_names_its_rate_only_when_every_line_shares_it() -> None:
 
 def test_an_inter_state_document_prints_one_igst_row_and_the_place_of_supply() -> None:
     doc = _doc(intra=False)
-    doc["quotation"].update(cgst="0.00", sgst="0.00", igst="79.40")
-    doc["lines"][0].update(cgst_rate="0.000", sgst_rate="0.000", igst_rate="5.000")
+    doc["quotation"].update(cgst="0.00", sgst="0.00", igst="88.40")
+    for line in doc["lines"]:
+        line.update(cgst_rate="0.000", sgst_rate="0.000", igst_rate="5.000")
     doc["print"]["supply_state"] = "Rajasthan"
     flat = _flat(doc)
-    assert "IGST @ 5% ₹79.40" in flat and "CGST" not in flat and "SGST" not in flat
+    assert "Sub Total ₹1,768.10 IGST @ 5% ₹88.40 Total ₹1,856.50 Total Discount" in flat
+    assert "CGST" not in flat and "SGST" not in flat
     assert "Place of Supply Rajasthan" in flat
     assert "Place of Supply" not in _flat(_doc()), "not printed when it is the lead's own state"
 
@@ -171,19 +196,21 @@ def test_an_export_prints_its_country_and_its_tax_treatment() -> None:
     lut = _doc(intra=False)
     lut["quotation"].update(tax_treatment="export_lut", export_country="Kenya",
                             lut_arn="AD240326000001X", cgst="0.00", sgst="0.00", igst="0.00",
-                            total="1588.10")
+                            total="1768.10")
     flat = _flat(lut)
     assert "Place of Supply Outside India (Kenya)" in flat
     assert "IGST" not in flat.replace("without payment of IGST", "") and "CGST" not in flat
     assert "export under LUT without payment of IGST (ARN AD240326000001X)" in flat
-    assert "Total ₹1,588.10" in flat
+    # the grand total row itself: "Total ₹..." alone is also inside "Sub Total ₹..."
+    assert "Sub Total ₹1,768.10 Total ₹1,768.10 Total Discount Amt. ₹289.32" in flat
 
     paid = _doc(intra=False)
     paid["quotation"].update(tax_treatment="export_igst", export_country="Kenya",
-                             cgst="0.00", sgst="0.00", igst="79.40")
-    paid["lines"][0].update(cgst_rate="0.000", sgst_rate="0.000", igst_rate="5.000")
+                             cgst="0.00", sgst="0.00", igst="88.40")
+    for line in paid["lines"]:
+        line.update(cgst_rate="0.000", sgst_rate="0.000", igst_rate="5.000")
     flat = _flat(paid)
-    assert "IGST @ 5% ₹79.40" in flat and "export under LUT" not in flat
+    assert "IGST @ 5% ₹88.40 Total ₹1,856.50" in flat and "export under LUT" not in flat
     assert "Outside India (Kenya)" in flat
 
 
@@ -252,6 +279,9 @@ def test_a_subsidised_quotation_prints_its_block_with_the_cost_as_calculated() -
     assert "Unit Cost" not in flat
     doc["subsidy"]["flat_charge"] = 0
     assert "plus inspection" not in _flat(doc)
+    # the category wraps, the amounts do not (F-4)
+    html = render_html(doc)
+    assert "<td>Small farmer (55%)</td>" in html and '<td class="n">₹66,495.44</td>' in html
 
 
 # ── the print block (FS-064 rules 27 and 28) ─────────────────────────────────
@@ -310,6 +340,8 @@ def test_the_validity_days_count_from_the_ist_send_date() -> None:
     doc = _doc()
     doc["quotation"]["sent_at"] = "2026-10-05T19:00:00+00:00"
     assert "valid for 40 days" in _flat(doc)
+    doc["quotation"]["valid_until"] = "2026-10-07"
+    assert "valid for 1 day from" in _flat(doc)
 
 
 def test_the_claim_decodes_money_as_decimal() -> None:
@@ -441,9 +473,10 @@ def test_the_pdf_is_a_portrait_pdf_and_carries_the_figures() -> None:
     assert data[:5] == b"%PDF-"
     assert _sizes(data) == [(595, 842)]
     text = "\n".join(_pages(data))
-    for figure in ("103.19", "88.23", "269.32", "1,588.10", "1,667.50", "QT/GJ/2026-27/00001"):
+    for figure in ("103.19", "88.23", "269.32", "1,588.10", "45.00", "180.00", "1,768.10",
+                   "1,856.50", "QT/GJ/2026-27/00001"):
         assert figure in text, figure
-    assert "page 1 of 1" in text
+    assert "QT/GJ/2026-27/00001, page 1 of 1" in " ".join(text.split())
     assert pypdf.PdfReader(io.BytesIO(data)).metadata.title == "Quotation QT/GJ/2026-27/00001 v1"
 
 
@@ -479,7 +512,13 @@ def test_every_glyph_of_the_widest_page_lies_on_the_page() -> None:
     doc["quotation"].update(taxable="19999999998.00", total="19999999998.00",
                             discount="19999999998.00", cgst="499999999.95", sgst="499999999.95")
     doc["quotation"]["party_name"] = "N" * 200
-    doc["print"].update(village="V" * 120, dealer_name="D" * 200)
+    # outside any table: the remark and the maker's name (F-5); and the longest
+    # category the masters hold, three times over (F-4)
+    doc["quotation"]["terms"] = "T" * 200
+    doc["print"].update(village="V" * 120, dealer_name="D" * 200, made_by="M" * 200)
+    doc["subsidy"] = {"scheme_code": "GJ", "category_name": "SC+ST(TRIBAL)+DarkZone90%" * 4,
+                      "total_cost": "19999999998.00", "flat_charge": 1003,
+                      "subsidy": "19999999998.00", "farmer_share": "19999999998.00"}
     reader = pypdf.PdfReader(io.BytesIO(render_pdf(render_html(doc))))
     for page in reader.pages:
         width = float(page.mediabox.width)
@@ -515,6 +554,20 @@ def test_sixty_lines_print_their_totals_once_and_number_their_pages() -> None:
     assert "MTR" in pages[last_with_totals], "the totals never sit alone on a page"
     for n in range(1, len(pages) + 1):
         assert f"page {n} of {len(pages)}" in pages[n - 1]
+
+
+@needs_weasyprint
+@pytest.mark.parametrize("count", range(40, 51))
+def test_the_totals_stay_whole_and_keep_a_line_with_them(count: int) -> None:
+    """Rule 29 at the counts where it bites: 60 lines pass with both break rules
+    deleted, while 45 and 46 split the totals and 47 leaves them alone on a page
+    (code review F-3). Every page's margin names the quotation."""
+    pages = [" ".join(p.split()) for p in _pages(render_pdf(render_html(_doc(lines=count))))]
+    [holder] = [p for p in pages if "Sub Total" in p]
+    assert "Total Discount Amt." in holder, "the totals split across pages"
+    assert "MTR" in holder or "NOS" in holder, "the totals sit alone on a page"
+    for n, page in enumerate(pages, 1):
+        assert f"QT/GJ/2026-27/00001, page {n} of {len(pages)}" in page
 
 
 @needs_weasyprint

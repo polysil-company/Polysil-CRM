@@ -224,9 +224,10 @@ PROFILE = TEMPLATES / "assets" / "company-profile.pdf"
 @functools.cache
 def company_profile() -> bytes:
     """The client's brochure, read on first use. The bytes are cached, never a
-    reader, which is stateful; a failed read is not cached, so a fixed file is
-    picked up. Not read at import: a missing file would take the worker, and the
-    sign-in codes it drains, down with it (edge case 8)."""
+    reader, which is stateful. A read that raises is not cached; a file that reads
+    but does not parse is, until the worker restarts, which is how a fixed file
+    arrives anyway. Not read at import: a missing file would take the worker, and
+    the sign-in codes it drains, down with it (edge case 8)."""
     return PROFILE.read_bytes()
 
 

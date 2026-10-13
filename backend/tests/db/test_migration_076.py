@@ -250,3 +250,52 @@ async def test_the_claims_body_holds_every_anchor_once(db: AsyncSession) -> None
         "SELECT has_function_privilege('app_role', 'quotation_render_claim(interval)', 'EXECUTE'), "
         "has_function_privilege('public', 'quotation_render_claim(interval)', 'EXECUTE')"))).one()
     assert tuple(kept) == (True, False), "CREATE OR REPLACE keeps the claim's grants"
+
+
+class _FakeOp:
+    """Alembic's `op`, as far as `_swap` uses it: read one body, execute one."""
+
+    def __init__(self, body: str) -> None:
+        self.body = body
+        self.executed: list[str] = []
+
+    def get_bind(self) -> _FakeOp:
+        return self
+
+    def execute(self, statement: object) -> _FakeOp:
+        if not str(statement).startswith("SELECT pg_get_functiondef"):
+            self.executed.append(str(statement))
+            self.body = str(statement)
+        return self
+
+    def scalar_one(self) -> str:
+        return self.body
+
+
+async def test_the_swap_reverses_exactly_and_refuses_a_body_that_drifted(
+        db: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The downgrade restores the claim byte for byte, and an anchor that is
+    missing or doubled stops the migration instead of writing a half-swapped
+    function (code review F-7)."""
+    m076 = _migration("076_quotation_print_block")
+    live = str((await db.execute(text(
+        "SELECT pg_get_functiondef('quotation_render_claim'::regproc)"))).scalar_one())
+    down = tuple((new, old) for old, new in reversed(m076.SWAPS))
+
+    fake = _FakeOp(live)
+    monkeypatch.setattr(m076, "op", fake)
+    m076._swap(down)
+    before = fake.body
+    assert before != live and "v_print" not in before and "quotation_print_block" not in before
+    m076._swap(m076.SWAPS)
+    assert fake.body == live, "up after down is the live body"
+
+    lines_anchor = m076.SWAPS[2][0]
+    assert before.count(lines_anchor) == 1
+    for drifted in (before.replace("v_token uuid;", "v_token uuid ;"),     # an anchor gone
+                    before.replace(lines_anchor, lines_anchor + "\n" + lines_anchor)):  # doubled
+        fake = _FakeOp(drifted)
+        monkeypatch.setattr(m076, "op", fake)
+        with pytest.raises(RuntimeError, match=r"anchor found [02] times"):
+            m076._swap(m076.SWAPS)
+        assert fake.executed == [], "nothing is written when an anchor is off"
