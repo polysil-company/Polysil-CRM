@@ -3,3 +3,5 @@
 *.xls binary
 *.docx binary
 *.excalidraw text eol=lf
+*.pdf binary
+*.png binary

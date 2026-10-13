@@ -1,5 +1,5 @@
-"""FS-056: the CG, RJ and UP workbooks, reproduced to the paisa, and the rules
-around them."""
+"""FS-056 and FS-063: the AP, CG, RJ and UP workbooks, reproduced to the paisa
+(AP drip's portal prints rupees), and the rules around them."""
 
 from __future__ import annotations
 
@@ -32,14 +32,20 @@ def test_each_state_workbook_reproduces_to_the_paisa(key: str) -> None:
     assert res.total.total_incl_gst == want["total_incl_gst"]
     assert crop.jantri.regular_for_cap == want["unit_cost"]
     assert row.exact.subsidy == want["subsidy"]
+    if expected.get("rupees"):
+        # FS-063: the portal prints whole rupees; 17,136.69 is its 17,137
+        rupee = row.money.farmer_share.quantize(D(1), ROUND_HALF_UP)
+        assert rupee == want["farmer_share"]
+        return
     assert row.exact.farmer_share == want["farmer_share"]
     assert (row.money.subsidy, row.money.farmer_share) == (r2(want["subsidy"]),
                                                            r2(want["farmer_share"]))
 
 
 def test_every_state_entry_is_present() -> None:
-    assert set(sm.ENTRIES) == {"CG/drip", "CG/sprinkler", "RJ/drip", "RJ/mini_sprinkler",
-                               "RJ/sprinkler", "UP/drip", "UP/mini_sprinkler", "UP/sprinkler"}
+    assert set(sm.ENTRIES) == {"AP/drip", "AP/sprinkler", "CG/drip", "CG/sprinkler", "RJ/drip",
+                               "RJ/mini_sprinkler", "RJ/sprinkler", "UP/drip",
+                               "UP/mini_sprinkler", "UP/sprinkler"}
 
 
 # ── cap modes (rules 2 to 4) ─────────────────────────────────────────────────
@@ -172,7 +178,8 @@ def test_every_state_parameter_fits_the_column_exactly() -> None:
 
 
 @sm.needs_state_samples
-@pytest.mark.parametrize("key", ["CG/sprinkler", "RJ/sprinkler", "UP/sprinkler"])
+@pytest.mark.parametrize("key", ["AP/sprinkler", "CG/sprinkler", "RJ/sprinkler",
+                                 "UP/sprinkler"])
 def test_a_state_sprinkler_takes_an_area_between_steps(key: str) -> None:
     """Code review F-3: FS-055 rule 20 holds for the state sheets too."""
     q = sm.example(key)

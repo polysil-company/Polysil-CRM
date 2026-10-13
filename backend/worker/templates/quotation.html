@@ -4,124 +4,180 @@
 <meta charset="utf-8">
 <title>Quotation {{ q.quote_no }} v{{ q.version }}</title>
 <style>
-  /* landscape: nineteen columns do not fit a portrait A4 at a legible size
-     (cross-vendor A-3); the CI test checks every glyph lies on the page */
-  @page { size: A4 landscape; margin: 12mm 10mm 14mm 10mm; }
+  /* the client's sheet (FS-064): portrait A4, seven columns. The page number
+     counts these pages only; the company profile is appended afterwards */
+  @page { size: A4 portrait; margin: 10mm 11mm 13mm 11mm;
+          @bottom-right { content: string(docno) ", page " counter(page) " of " counter(pages);
+                          font-family: "Noto Sans", "DejaVu Sans", sans-serif;
+                          font-size: 7.5pt; color: #555; } }
+  /* anywhere, on the body: the remark and the maker's name sit outside any
+     table, and an unbreakable token there left the page (code review F-5) */
   body { font-family: "Noto Sans", "Noto Sans Gujarati", "Noto Sans Devanagari", "DejaVu Sans", sans-serif;
-         font-size: 10.5pt; color: #111; }
-  h1 { font-size: 18pt; margin: 0 0 2mm; }
+         font-size: 9pt; color: #111; overflow-wrap: anywhere; }
   .muted { color: #555; }
-  .logo { height: 14mm; margin-bottom: 3mm; }
-  .banner { border: 2px solid #b3402c; color: #b3402c; padding: 2mm 4mm; font-weight: 700;
-            letter-spacing: .08em; text-transform: uppercase; margin: 4mm 0; }
-  .head { display: flex; justify-content: space-between; gap: 8mm; }
-  .box { border: 1px solid #999; padding: 3mm; flex: 1; }
-  .box h3 { margin: 0 0 1.5mm; font-size: 9pt; text-transform: uppercase; letter-spacing: .06em; color: #555; }
-  table { border-collapse: collapse; width: 100%; margin-top: 5mm; font-size: 7.5pt;
-          table-layout: auto; }
-  th, td { border: 1px solid #999; padding: 0.8mm 1mm; vertical-align: top; }
-  /* whole words: "Taxable" broke as "Taxabl / e" (demo walk D-5) */
-  th { overflow-wrap: normal; word-break: normal; hyphens: none; }
-  th.n { white-space: nowrap; }
-  .amounts { margin-top: 1.5mm; font-size: 8pt; color: #555; }
-  th { background: #eee; font-weight: 600; text-align: left; }
-  td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  th.n { text-align: right; }
-  tfoot td { font-weight: 600; }
-  .terms { margin-top: 6mm; white-space: pre-wrap; }
-  .foot { margin-top: 10mm; font-size: 8.5pt; color: #555; }
+  /* fixed widths, and long text breaks inside its cell: under auto layout one
+     unbreakable token pushes the amounts off the page (edge case 10) */
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  th, td { border: 1px solid #777; padding: 1mm 1.2mm; vertical-align: top;
+           overflow-wrap: anywhere; }
+  .letterhead td { border: none; padding: 0 0 2mm; vertical-align: middle; }
+  .company { font-size: 12pt; font-weight: 700; }
+  .logo { height: 13mm; float: right; }
+  h1 { font-size: 13pt; text-align: center; margin: 0; padding: 1.2mm; border: 1px solid #777; }
+  .party { margin-top: -1px; }
+  .banner + .party { margin-top: 0; }
+  .banner { border: 2px solid #b3402c; color: #b3402c; padding: 1.5mm 3mm; font-weight: 700;
+            letter-spacing: .06em; text-transform: uppercase; margin: 2mm 0; font-size: 8.5pt; }
+  .party th { text-align: left; font-weight: 600; background: #f3f3f3; }
+  .docno { string-set: docno content(text); }
+  .lines { margin-top: 2.5mm; font-size: 8pt; }
+  .lines td { padding: 0.7mm 1.2mm; }
+  .lines thead th { background: #eee; font-weight: 700; text-align: center; }
+  /* whole words in a heading: "Taxable" broke as "Taxabl / e" (demo walk D-5) */
+  .lines thead th { overflow-wrap: normal; word-break: normal; hyphens: none; }
+  .lines td.c { text-align: center; }
+  .lines td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;
+                font-size: 7.5pt; }
+  .lines tr { break-inside: avoid; }
+  /* once, after the last line, and never alone on a page (edge case 9): a tfoot
+     would repeat the grand total under every page's lines */
+  .totals { break-inside: avoid; }
+  .totals tr:first-child { break-before: avoid; }
+  .totals td { font-weight: 600; }
+  .totals td.label { text-align: right; }
+  .totals tr.grand td { font-weight: 700; background: #f3f3f3; }
+  .note { margin-top: 1.2mm; font-size: 7.5pt; color: #555; }
+  .block { margin-top: 2.5mm; white-space: pre-wrap; }
+  .subsidy { margin-top: 3mm; width: 60%; font-size: 8.5pt; }
+  .subsidy th { text-align: left; font-weight: 600; background: #f3f3f3; width: 55%; }
+  .subsidy caption { text-align: left; font-weight: 700; padding-bottom: 1mm; }
+  /* nowrap on the amounts only: a category name ran through its cell's border
+     ("SC+ST (TRIBAL)+Dark Zone Farmer 90 %", code review F-4) */
+  .subsidy td { text-align: right; }
+  .subsidy td.n { white-space: nowrap; }
+  .fixed { margin-top: 1.2mm; font-size: 8.5pt; }
+  .made { margin-top: 2.5mm; font-weight: 600; }
+  .site { margin-top: 2.5mm; text-align: center; font-weight: 700; font-size: 10.5pt; }
+  .foot { margin-top: 2mm; font-size: 7pt; color: #555; }
 </style>
 </head>
 <body>
-  <img class="logo" src="{{ logo }}" alt="Polysil">
-  <h1>Quotation {{ q.quote_no }} <span class="muted">version {{ q.version }}</span></h1>
-  <div class="muted">
-    Sent {{ q.sent_at | date }} &middot; Valid until {{ q.valid_until | date }} &middot;
-    Prices as on {{ q.price_effective_date | date }} &middot; {{ q.sales_type | capitalize }} sale
-  </div>
+  <table class="letterhead">
+    <tr>
+      <td style="width: 70%">
+        <div class="company">POLYSIL IRRIGATION SYSTEMS LTD</div>
+        <div>Survey No-340/1, At-Post-Raniya, Sakarda-Bhadrava Road, Ta-Savli, Dist-Vadodara 391780, Gujarat.</div>
+      </td>
+      <td><img class="logo" src="{{ logo }}" alt="Polysil"></td>
+    </tr>
+  </table>
+
+  <h1>Quotation</h1>
   {% if is_provisional %}
   <div class="banner">Indicative pricing: rates and tax on this document are provisional</div>
   {% endif %}
 
-  <div class="head">
-    <div class="box">
-      <h3>From</h3>
-      <div><strong>{{ q.seller_legal_name }}</strong></div>
-      {% if q.seller_address %}<div>{{ q.seller_address }}</div>{% endif %}
-      <div>GSTIN {{ q.seller_gstin_no }} &middot; State {{ q.seller_state_code }}</div>
-    </div>
-    <div class="box">
-      <h3>To</h3>
-      <div><strong>{{ q.party_name }}</strong></div>
-      {% if q.party_address %}<div>{{ q.party_address }}</div>{% endif %}
-      <div>{{ q.party_mobile | mobile }}</div>
-      {% if q.party_gstin %}<div>GSTIN {{ q.party_gstin }}</div>{% endif %}
-      {% if q.export_country %}<div>Place of supply: Outside India ({{ q.export_country }})</div>{% endif %}
-    </div>
-  </div>
+  <table class="party">
+    <!-- under a fixed layout the first row sets the widths, and the first row is
+         one label and one spanning cell: the columns are declared (F-6) -->
+    <colgroup>
+      <col style="width: 19%"><col style="width: 31%"><col style="width: 19%"><col style="width: 31%">
+    </colgroup>
+    <tr>
+      <th>Dealer Name and Contact detail</th>
+      <td colspan="3">{% if p.dealer_name %}{{ p.dealer_name }}{% if p.dealer_contact %}, {{ p.dealer_contact }}{% endif %}{% if p.dealer_mobile %}, {{ p.dealer_mobile | mobile }}{% endif %}{% endif %}</td>
+    </tr>
+    <tr>
+      <th>Farmer/Client Name</th>
+      <td><strong>{{ q.party_name }}</strong>{% if q.party_address %}<br>{{ q.party_address }}{% endif %}{% if q.party_gstin %}<br>GSTIN {{ q.party_gstin }}{% endif %}</td>
+      <th>MIS System</th><td>{{ p.mis_system or '' }}</td>
+    </tr>
+    <tr>
+      <th>Village</th><td>{{ p.village or '' }}</td>
+      <th>Contact Number</th><td>{{ q.party_mobile | mobile }}</td>
+    </tr>
+    <tr>
+      <th>Taluka</th><td>{{ p.taluka or '' }}</td>
+      <th>Quotation No.</th><td class="docno">{{ q.quote_no }}{% if q.version > 1 %} (version {{ q.version }}){% endif %}</td>
+    </tr>
+    <tr>
+      <th>District</th><td>{{ p.district or '' }}</td>
+      <th>Date</th><td>{{ q.sent_at | date }}</td>
+    </tr>
+    <tr>
+      <th>State</th><td>{{ p.state or '' }}</td>
+      <th>Valid Until</th><td>{{ q.valid_until | date }}</td>
+    </tr>
+    <tr>
+      <th>Effective Rate Date</th><td>{{ q.price_effective_date | date }}</td>
+      <th>GSTIN</th><td>{{ q.seller_gstin_no }}</td>
+    </tr>
+    {% if place_of_supply %}
+    <tr>
+      <th>Place of Supply</th><td colspan="3">{{ place_of_supply }}</td>
+    </tr>
+    {% endif %}
+  </table>
 
-  <table>
+  <table class="lines">
+    <colgroup>
+      <col style="width: 6%"><col style="width: 34%"><col style="width: 12%"><col style="width: 12%">
+      <col style="width: 10%"><col style="width: 12%"><col style="width: 14%">
+    </colgroup>
     <thead>
       <tr>
-        <th>#</th><th>Product</th><th>HSN</th><th>Unit</th>
-        <th class="n">Qty</th><th class="n">Rate</th><th class="n">Value</th>
-        {% if 1 in tiers %}<th class="n">Disc %</th><th class="n">Discount</th><th class="n">After disc</th>{% endif %}
-        {% if 2 in tiers %}<th class="n">2nd disc %</th><th class="n">2nd disc</th><th class="n">After 2nd</th>{% endif %}
-        {% if 3 in tiers %}<th class="n">3rd disc %</th><th class="n">3rd disc</th>{% endif %}
-        <th class="n">Taxable</th>
-        {% if intra_state %}<th class="n">CGST</th><th class="n">SGST</th>{% else %}<th class="n">IGST</th>{% endif %}
-        <th class="n">Line total</th>
+        <th>Sr. No.</th><th>Material Description</th><th>Price</th><th>Price after Dis.</th>
+        <th>Qty.</th><th>Discount. Amt.</th><th>Total Amt.</th>
       </tr>
     </thead>
     <tbody>
-      {% for l in lines %}
+      {% for r in rows %}
       <tr>
-        <td>{{ l.line_no }}</td><td>{{ l.description }}</td><td>{{ l.hsn_code }}</td><td>{{ l.uom }}</td>
-        <td class="n">{{ l.qty | qty }}</td><td class="n">{{ l.rate | rupees }}</td><td class="n">{{ l.gross | rupees }}</td>
-        {% if 1 in tiers %}<td class="n">{{ l.discount_pct | pct }}%</td><td class="n">{{ l.discount1_amt | money }}</td><td class="n">{{ l.after_discount1 | money }}</td>{% endif %}
-        {% if 2 in tiers %}<td class="n">{{ l.discount2_pct | pct }}%</td><td class="n">{{ l.discount2_amt | money }}</td><td class="n">{{ l.after_discount2 | money }}</td>{% endif %}
-        {% if 3 in tiers %}<td class="n">{{ l.discount3_pct | pct }}%</td><td class="n">{{ l.discount3_amt | money }}</td>{% endif %}
-        <td class="n">{{ l.taxable | rupees }}</td>
-        {% if intra_state %}
-        <td class="n">{{ l.cgst | money }} <span class="muted">({{ l.cgst_rate | pct }}%)</span></td>
-        <td class="n">{{ l.sgst | money }} <span class="muted">({{ l.sgst_rate | pct }}%)</span></td>
-        {% else %}
-        <td class="n">{{ l.igst | money }} <span class="muted">({{ l.igst_rate | pct }}%)</span></td>
-        {% endif %}
-        <td class="n">{{ l.total | rupees }}</td>
+        <td class="c">{{ r.line_no }}</td><td>{{ r.description }}</td>
+        <td class="n">{{ r.price | rupees }}</td><td class="n">{{ r.price_after | rupees }}</td>
+        <td class="c">{{ r.qty | qty }}{% if r.uom %} {{ r.uom }}{% endif %}</td>
+        <td class="n">{{ r.discount | rupees }}</td><td class="n">{{ r.total | rupees }}</td>
       </tr>
       {% endfor %}
     </tbody>
-    <tfoot>
-      <tr>
-        <td colspan="6">Totals</td>
-        <td class="n">{{ q.gross | money }}</td>
-        {% if discount_cols %}<td colspan="{{ discount_cols }}" class="n">Total discount {{ q.discount | money }}</td>{% endif %}
-        <td class="n">{{ q.taxable | money }}</td>
-        {% if intra_state %}
-        <td class="n">{{ q.cgst | money }}</td><td class="n">{{ q.sgst | money }}</td>
-        {% else %}
-        <td class="n">{{ q.igst | money }}</td>
-        {% endif %}
-        <td class="n">{{ q.total | rupees }}</td>
-      </tr>
-    </tfoot>
+    <tbody class="totals">
+      <tr><td class="label" colspan="5">Sub Total</td><td class="n" colspan="2">{{ q.taxable | rupees }}</td></tr>
+      {% if tax_rows == 'intra' %}
+      <tr><td class="label" colspan="5">CGST{% if cgst_rate is not none %} @ {{ cgst_rate | pct }}%{% endif %}</td><td class="n" colspan="2">{{ q.cgst | rupees }}</td></tr>
+      <tr><td class="label" colspan="5">SGST{% if sgst_rate is not none %} @ {{ sgst_rate | pct }}%{% endif %}</td><td class="n" colspan="2">{{ q.sgst | rupees }}</td></tr>
+      {% elif tax_rows == 'inter' %}
+      <tr><td class="label" colspan="5">IGST{% if igst_rate is not none %} @ {{ igst_rate | pct }}%{% endif %}</td><td class="n" colspan="2">{{ q.igst | rupees }}</td></tr>
+      {% endif %}
+      <tr class="grand"><td class="label" colspan="5">Total</td><td class="n" colspan="2">{{ q.total | rupees }}</td></tr>
+      <tr><td class="label" colspan="5">Total Discount Amt.</td><td class="n" colspan="2">{{ q.discount | rupees }}</td></tr>
+    </tbody>
   </table>
-  <div class="amounts">Amounts in Indian rupees (&#8377;).</div>
+  <div class="note">Amounts in Indian rupees (&#8377;). Price after Dis. is rounded to the paisa. Total Amt. is Price x Qty. less Discount. Amt.</div>
   {% if q.tax_treatment == 'export_lut' %}
-  <div class="terms">Supply meant for export under LUT without payment of IGST{% if q.lut_arn %} (ARN {{ q.lut_arn }}){% endif %}.</div>
+  <div class="block">Supply meant for export under LUT without payment of IGST{% if q.lut_arn %} (ARN {{ q.lut_arn }}){% endif %}.</div>
   {% endif %}
 
   {% if subsidy %}
-  <div class="terms"><strong>Subsidy</strong> ({{ subsidy.scheme_code }}, {{ subsidy.category_name }})<br>
-    Cost as calculated {{ subsidy.total_cost | rupees }}{% if subsidy_has_flat %} plus inspection {{ subsidy.flat_charge | rupees }}{% endif %}
-    &middot; Subsidy {{ subsidy.subsidy | rupees }}
-    &middot; <strong>Farmer's share {{ subsidy.farmer_share | rupees }}</strong></div>
+  <table class="subsidy">
+    <caption>Subsidy and Farmer Share ({{ subsidy.scheme_code }})</caption>
+    <tr><th>Farmer Category</th><td>{{ subsidy.category_name }}</td></tr>
+    <tr><th>Cost as calculated</th><td class="n">{{ subsidy.total_cost | rupees }}</td></tr>
+    {% if subsidy_has_flat %}<tr><th>plus inspection</th><td class="n">{{ subsidy.flat_charge | rupees }}</td></tr>{% endif %}
+    <tr><th>Subsidy</th><td class="n">{{ subsidy.subsidy | rupees }}</td></tr>
+    <tr><th>Farmer Share</th><td class="n"><strong>{{ subsidy.farmer_share | rupees }}</strong></td></tr>
+  </table>
   {% endif %}
 
-  {% if q.terms %}
-  <div class="terms"><strong>Terms</strong><br>{{ q.terms }}</div>
+  <div class="block"><strong>Remark</strong>{% if q.terms %}<br>{{ q.terms }}{% endif %}</div>
+
+  {% if valid_days is not none %}
+  <div class="fixed">This quotation is valid for {{ valid_days }} {{ 'day' if valid_days == 1 else 'days' }} from its date.</div>
   {% endif %}
+  <div class="fixed">POLYSIL IRRIGATION SYSTEMS LIMITED has the right to change rates, cancel this quotation or make any required changes.</div>
+  <div class="fixed">This is a system generated quotation, hence a signature is not required.</div>
+
+  <div class="made">Quotation made by: {{ p.made_by or '' }}</div>
+  <div class="site">For more detail visit our web site www.polysilirrigation.com</div>
 
   <div class="foot">
     Quotation {{ q.quote_no }}, version {{ q.version }}. Prepared on {{ rendered_on }}.

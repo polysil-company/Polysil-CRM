@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from decimal import Decimal
 
-from api.domain.subsidy.categories import category_rows
+from api.domain.subsidy.categories import category_rows, state_gst
 from api.domain.subsidy.defaults import SPRINKLER_COMPONENT_ORDER
 from api.domain.subsidy.jantri import Matrix2D, RowTable, between_1d, lookup_1d
 from api.domain.subsidy.money import ZERO, round2
@@ -150,6 +150,8 @@ def field_inspection(q: QuotationInput, masters: Masters, policy: SystemPolicy) 
     # the same figure per column, and reading it there means a workbook revision to
     # that row is honoured rather than silently ignored (code review F-11).
     transport_qty = area if between else qty.get("transport", area)   # FS-055 rule 20
+    if policy.transport_flat:
+        transport_qty = Decimal(1)       # FS-063 EC-3: AP's J22 is 'Fix', at any area
     lines.append(SprinklerLine("transport", transport.description, transport.uom, transport_qty,
                                transport.rate, r.line("transport", transport.rate * transport_qty)))
 
@@ -171,6 +173,7 @@ def field_inspection(q: QuotationInput, masters: Masters, policy: SystemPolicy) 
         sgst_e=cgst_b,
         cost_excl_gst=cost, total_cgst=total_cgst, total_sgst=total_cgst, total_gst=total_gst,
         total_incl_gst=r.block("total_incl_gst", cost + total_gst),     # R31
+        gst_paid_by_state=state_gst(cost, total_gst, policy.farmer_gst_fraction),   # FS-063
     )
 
     seven_year_ok = policy.seven_year_area_min <= area <= policy.seven_year_area_max
@@ -206,7 +209,10 @@ def field_inspection(q: QuotationInput, masters: Masters, policy: SystemPolicy) 
     categories = category_rows(masters.categories, cost=cost, total_gst=total_gst, sump=ZERO,
                                area=area, jantri=jantri, seven_year_applicable=seven_year_ok,
                                gsdma_max_area=None, cap_mode=policy.cap_mode,
-                               share_floor_zero=policy.share_floor_zero)
+                               share_floor_zero=policy.share_floor_zero,
+                               subsidy_cap=policy.subsidy_cap,
+                               farmer_gst_fraction=policy.farmer_gst_fraction,
+                               round_rupee=policy.subsidy_round_rupee)
     result = CropResult(crop.crop, crop.inter_crop, area, crop.lateral_spacing, jantri, blocks,
                         categories, ())
     figures = SprinklerFigures(size, tuple(lines), before_transport, with_gst, nozzle)

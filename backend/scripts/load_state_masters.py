@@ -1,4 +1,4 @@
-"""Load the CG, RJ and UP subsidy schemes from the state fixtures (FS-056).
+"""Load the AP, CG, RJ and UP subsidy schemes from the state fixtures (FS-056, FS-063).
 
 Reads `tests/fixtures/subsidy/states.json` (the scheme tables) and
 `states_samples.json` (the company's rates and quantities), which
@@ -6,14 +6,15 @@ Reads `tests/fixtures/subsidy/states.json` (the scheme tables) and
 table owner, as the GGRC loader does.
 
 Per state:
-- the scheme: the one linked to the state's territory (code CG, RJ, UP), else the
+- the scheme: the one linked to the state's territory (code AP, CG, RJ, UP), else the
   one with that code, else a new scheme with the state's stages copied from GGRC;
 - per system: the `subsidy_system` row (pipeline, table shape, cap mode, rounding),
   then categories, parameters, the unit cost table, quantities and component
-  rates, each effective from `--effective-from`.
+  rates, each effective from `--effective-from`. A system with no unit cost table
+  (AP drip, FS-063) loads without one.
 
 **Idempotent per system.** A system already loaded from that date is skipped
-whole. A later `--effective-from` is a revision: the rows in force end on that
+whole (read on its categories, which every system has). A later `--effective-from` is a revision: the rows in force end on that
 date (half-open) and the new ones start. An earlier date is refused.
 
     python scripts/load_state_masters.py                    # all three states
@@ -36,12 +37,13 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures" / "subsidy"
 DEFAULT_EFFECTIVE_FROM = dt.date(2026, 9, 15)       # the CG and RJ formats' arrival
-STATES = {"CG": "Chhattisgarh micro irrigation", "RJ": "Rajasthan micro irrigation",
+STATES = {"AP": "Andhra Pradesh micro irrigation (APMIP)", "CG": "Chhattisgarh micro irrigation", "RJ": "Rajasthan micro irrigation",
           "UP": "Uttar Pradesh micro irrigation"}
 FLAGS = {"min_area_prorate", "max_area_scaling", "jantri_guards", "share_floor_zero",
          "pipe_size_from_input", "unit_cost_round_rupee", "zero_above_max_area",
-         "exact_area_match_required"}
-RUPEES = {"flat_inspection", "head_unit_deduction", "inspection_floor", "education_amount"}
+         "exact_area_match_required", "subsidy_round_rupee", "transport_flat"}
+RUPEES = {"flat_inspection", "head_unit_deduction", "inspection_floor", "education_amount",
+          "subsidy_cap"}
 HECTARES = {"seven_year_area_min", "seven_year_area_max", "pipe_size_band_ha", "gsdma_max_area"}
 TABLES = ("subsidy_category", "subsidy_parameter", "unit_cost_matrix", "quantity_matrix",
           "subsidy_component_rate")
@@ -104,15 +106,27 @@ class Loader:
         st = pub["system_type"]
         p = {"s": sid, "t": st, "d": self.on}
         # a re-run on the same date writes nothing; a later date is a revision that
-        # ends what is in force (code review F-1); an earlier one would overlap
-        latest = self.one(
-            "SELECT max(effective_from) FROM unit_cost_matrix WHERE scheme_id = %(s)s "
-            "AND system_type = %(t)s::subsidy_system_type AND variant = 'regular'", p)
+        # ends what is in force (code review F-1); an earlier one would overlap. The
+        # date is read from the formula version this loader writes ("<state>-<date>"):
+        # every system has one, with or without a unit cost table (FS-063), and an
+        # admin's revision of a category or a rate does not move it.
+        written = self.one(
+            "SELECT formula_version FROM subsidy_system WHERE scheme_id = %(s)s "
+            "AND system_type = %(t)s::subsidy_system_type", p)
+        stamp = re.fullmatch(r"[a-z]+-(\d{4}-\d{2}-\d{2})", written or "")
+        latest = dt.date.fromisoformat(stamp.group(1)) if stamp else None
         if latest is not None and latest == self.on:
             self.skipped.append(f"{key}: already loaded from {self.on}")
             return
         if latest is not None and latest > self.on:
             raise SystemExit(f"{key}: a table from {latest} exists; load from a later date")
+        for table in TABLES:
+            # an admin's revision (FS-009a) does not move the stamp; it still blocks an
+            # earlier load, which would overlap it (code review F-3)
+            later = self.one(f"SELECT max(effective_from) FROM {table} WHERE scheme_id = %(s)s "
+                             f"AND system_type = %(t)s::subsidy_system_type", p)
+            if later is not None and later > self.on:
+                raise SystemExit(f"{key}: a {table} row from {later} exists; load from a later date")
         y = pub["system"]
         version = f"{key.split('/')[0].lower()}-{self.on.isoformat()}"
         self.x("""INSERT INTO subsidy_system (scheme_id, system_type, pipeline_variant, jantri_variant,
@@ -148,7 +162,8 @@ class Loader:
             self.x("INSERT INTO subsidy_parameter (scheme_id, system_type, key, value, unit, effective_from) "
                    "VALUES (%(s)s, %(t)s::subsidy_system_type, %(k)s, %(v)s, %(u)s::subsidy_param_unit, %(d)s)",
                    {**p, "k": k, "v": Decimal(v), "u": _unit(k)})
-        self._unit_cost(p, key, pub["unit_cost"], y["jantri_variant"])
+        if "unit_cost" in pub:
+            self._unit_cost(p, key, pub["unit_cost"], y["jantri_variant"])
         if smp.get("quantities"):
             q = smp["quantities"]
             qid = self.one("INSERT INTO quantity_matrix (scheme_id, system_type, effective_from, source) "
@@ -195,7 +210,10 @@ class Loader:
 
 def load(conn: Any, *, effective_from: dt.date, states: tuple[str, ...] = tuple(STATES)) -> Loader:
     pub = json.loads((FIXTURES / "states.json").read_text(encoding="utf-8"))
-    smp = json.loads((FIXTURES / "states_samples.json").read_text(encoding="utf-8"))
+    samples = FIXTURES / "states_samples.json"
+    # the samples (company pricing) are withheld from the shared repo; a system that
+    # needs none, AP drip, still loads without them (FS-063 code review F-1)
+    smp = json.loads(samples.read_text(encoding="utf-8")) if samples.exists() else {}
     loader = Loader(conn, effective_from=effective_from)
     for state in states:
         sid = loader.scheme(state)
@@ -226,6 +244,11 @@ def main(argv: list[str] | None = None) -> int:
         print("  wrote  ", line)
     for line in loader.skipped:
         print("  skipped", line)
+    for line in loader.written:
+        if "linked to state" in line and line.endswith("False)"):
+            print(f"  WARNING {line.split(' (')[0]} is not linked to a state territory: that "
+                  "state's leads find no scheme until the state exists and the scheme is linked "
+                  "(FS-063 EC-13)")
     if args.dry_run:
         print("dry run: nothing written")
     return 0

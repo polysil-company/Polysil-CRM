@@ -71,6 +71,8 @@ sum of the crops by a paisa of rounding.
 | `gravel_filter_m3` | number \| string \| null |  | RJ: gravel filter size in m³, 0 for none. |
 | `head_unit_existing` | boolean \| null |  | RJ: the farmer already has a head unit. |
 | `pvc_existing` | boolean \| null |  | RJ: the farmer already has the PVC main line. |
+| `guided_cost` | number \| string \| null |  | AP drip: the guided cost from the AP MIP portal's bill of quantities. Required there, refused for every other system. |
+| `fittings_amount` | number \| string \| null |  | AP drip: the portal's 'Fittings and accessories' amount, as printed; 0 for none. Required there, refused for every other system. |
 
 **Responses**
 
@@ -200,6 +202,7 @@ treated as no crop at all.
 | `total_sgst` | string | yes |  |
 | `total_gst` | string | yes |  |
 | `total_incl_gst` | string | yes |  |
+| `gst_paid_by_state` | string |  | AP: the half of the GST the state pays. The farmer's share leaves it out, so subsidy + farmer share + this = the total incl GST (FS-063). Default `0.00`. |
 
 **`CalculateRequest`**
 
@@ -220,6 +223,8 @@ treated as no crop at all.
 | `gravel_filter_m3` | number \| string \| null |  | RJ: gravel filter size in m³, 0 for none. |
 | `head_unit_existing` | boolean \| null |  | RJ: the farmer already has a head unit. |
 | `pvc_existing` | boolean \| null |  | RJ: the farmer already has the PVC main line. |
+| `guided_cost` | number \| string \| null |  | AP drip: the guided cost from the AP MIP portal's bill of quantities. Required there, refused for every other system. |
+| `fittings_amount` | number \| string \| null |  | AP drip: the portal's 'Fittings and accessories' amount, as printed; 0 for none. Required there, refused for every other system. |
 
 **`CalculateResponse`**
 
@@ -348,7 +353,7 @@ treated as no crop at all.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `regular` | string | yes | The unit cost per hectare, four decimals. |
+| `regular` | string | yes | The unit cost per hectare, four decimals. For AP drip, the portal's guided cost: a total, not per hectare (FS-063). |
 | `regular_with_sump` | string | yes | Plus the sump rate times the area (rule 9). |
 | `regular_for_cap` | string | yes | What the subsidy is actually capped on: the figure above, pro-rated for a Mini Sprinkler block below 0.2 Ha. Equal to `regular_with_sump` everywhere else. This is the unit cost the scheme's own sheet prints. |
 | `seven_year` | string \| null | yes | Null when the area is outside the window. |
@@ -371,8 +376,8 @@ treated as no crop at all.
 |---|---|---|---|
 | `as_of` | string | yes |  |
 | `formula_version` | string | yes |  |
-| `regular_matrix_id` | string | yes |  |
-| `seven_year_matrix_id` | string | yes |  |
+| `regular_matrix_id` | string \| null | yes | The unit cost table used; null for AP drip, which has none (FS-063). |
+| `seven_year_matrix_id` | string \| null | yes | The 7-year table used; the regular table's id for a state with none; null for AP drip (FS-063). |
 | `quantity_matrix_id` | string \| null | yes |  |
 
 **`SprinklerLineOut`**

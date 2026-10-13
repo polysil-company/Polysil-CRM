@@ -59,6 +59,9 @@ class QuotationInput:
     gravel_filter_m3: Decimal = ZERO
     head_unit_existing: bool = False
     pvc_existing: bool = False
+    # FS-063: AP drip takes the portal's figures
+    guided_cost: Decimal | None = None
+    fittings_amount: Decimal | None = None
 
 
 # ── masters ──────────────────────────────────────────────────────────────────
@@ -131,6 +134,11 @@ class SystemPolicy:
     head_unit_deduction: Decimal = ZERO
     gst_inclusive_rate: Decimal = Decimal("0.05")
     rates_include_gst: bool = False           # CG sprinkler: the pipeline is gst_inclusive
+    # FS-063
+    subsidy_cap: Decimal | None = None        # a ceiling in rupees on every category
+    farmer_gst_fraction: Decimal = Decimal(1)  # the part of the GST the farmer pays
+    subsidy_round_rupee: bool = False
+    transport_flat: bool = False              # one transport charge per quotation (AP)
 
 
 def rate_matches(row: ComponentRate, code: str, pipe_size_mm: int | None,
@@ -199,6 +207,7 @@ class Blocks:
     sump: Decimal = ZERO
     fittings: Decimal = ZERO          # FS-056: CG drip's % add-on
     flat_inspection: Decimal = ZERO   # FS-056: CG's charge outside the cap, on the share
+    gst_paid_by_state: Decimal = ZERO  # FS-063: AP's SGST, paid by the state, not the farmer
     cost_excl_gst: Decimal = ZERO
     total_cgst: Decimal = ZERO
     total_sgst: Decimal = ZERO

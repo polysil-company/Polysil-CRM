@@ -330,6 +330,10 @@ class QuotationSubsidy(BaseModel):
     farmer_share: str = Field(description="What the farmer pays.")
     as_of: str = Field(description="The masters' date.")
     formula_version: str
+    gst_paid_by_state: str = Field(
+        default="0.00",
+        description="AP: the state's half of the GST. subsidy + farmer_share + this = "
+                    "total_cost (FS-063).")
 
 
 class QuotationSubsidyIn(BaseModel):

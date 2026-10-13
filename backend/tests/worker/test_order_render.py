@@ -110,3 +110,22 @@ def test_the_pdf_is_a_pdf_and_carries_the_order_number() -> None:
     text = "\n".join(p.extract_text() or "" for p in pypdf.PdfReader(io.BytesIO(data)).pages)
     for figure in ("SO/GJ/2026-27/00007", "1,667.50"):
         assert figure in text, figure
+
+
+def test_an_order_pdf_carries_no_company_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FS-064 rule 22, from the order's side: the profile follows quotations only.
+    Through the order's own `render_document`, with the renderer replaced so it
+    runs where WeasyPrint does not import."""
+    import io
+
+    import pypdf
+
+    from tests.worker.test_quotation_render import _one_page
+
+    monkeypatch.setattr(job, "renderer_available", lambda: None)
+    monkeypatch.setattr(job, "render_pdf", lambda _html: _one_page("Order"))
+    settings = get_settings().model_copy(update={"pdf_renderer": "weasyprint",
+                                                 "quotation_profile_enabled": True})
+    data, content_type = job.render_document(_doc(), settings)
+    assert content_type == "application/pdf"
+    assert len(pypdf.PdfReader(io.BytesIO(data)).pages) == 1
