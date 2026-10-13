@@ -86,6 +86,50 @@ describe("[SO-001] Sales orders list", () => {
     expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
   });
 
+  it("narrows by an area from the territory tree, and by an office for staff", async () => {
+    signInAs("state_manager");
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <OrdersToolbar />
+        <OrdersTable />
+      </>,
+    );
+    const table = await screen.findByRole("table", { name: "Sales orders" });
+    const all = mockDb.orders.length;
+
+    await user.click(screen.getByRole("button", { name: "Area" }));
+    // The whole territory tree, without counts: every state first, then a state's districts.
+    const states = await screen.findByRole("list", { name: "States" });
+    expect(within(states).getByRole("checkbox", { name: "Uttar Pradesh" })).toBeInTheDocument();
+    await user.click(within(states).getByRole("button", { name: "Show districts in Gujarat" }));
+    const districts = await screen.findByRole("list", { name: "Areas in Gujarat" });
+    await user.click(within(districts).getByRole("checkbox", { name: "Amreli" }));
+    await waitFor(() => {
+      expect(within(table).getAllByRole("row").length).toBeLessThan(all + 1);
+    });
+    expect(screen.getByRole("button", { name: /^Area.*Amreli/ })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Clear area" }));
+    await waitFor(() => {
+      expect(within(table).getAllByRole("row")).toHaveLength(all + 1);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Office" }));
+    await user.click(await screen.findByRole("radio", { name: /^Amreli District/ }));
+    await waitFor(() => {
+      expect(within(table).getAllByRole("row").length).toBeLessThan(all + 1);
+    });
+    expect(screen.getByRole("button", { name: "Reset filters" })).toBeInTheDocument();
+  });
+
+  it("offers a dealer no office filter", async () => {
+    signInAs("dealer");
+    renderWithProviders(<OrdersToolbar />);
+
+    expect(await screen.findByRole("button", { name: "Area" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Office" })).not.toBeInTheDocument();
+  });
+
   it("explains where orders come from when there are none", async () => {
     signInAs("state_manager");
     writeMockScenario("empty");

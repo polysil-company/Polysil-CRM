@@ -1,5 +1,7 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 
+import { searchTerritories } from "@/features/lookups/api/lookups.api";
+
 import {
   getLead,
   getLeadStats,
@@ -10,7 +12,12 @@ import {
   listLeads,
   searchPartners,
 } from "./leads.api";
-import type { LeadAreasParams, LeadListParams } from "./leads.schemas";
+import {
+  LEAD_AREA_LEVELS,
+  type LeadAreaLevel,
+  type LeadAreasParams,
+  type LeadListParams,
+} from "./leads.schemas";
 
 /**
  * Query keys for leads. Invalidate by prefix:
@@ -27,7 +34,8 @@ export const leadKeys = {
   stats: () => [...leadKeys.all, "stats"] as const,
   assignees: () => [...leadKeys.all, "assignees"] as const,
   partners: (q: string) => [...leadKeys.all, "partners", q] as const,
-  areas: (params: LeadAreasParams) => [...leadKeys.all, "areas", params] as const,
+  areaRows: (source: AreaSource, params: LeadAreasParams) =>
+    [...leadKeys.all, "area-rows", source, params] as const,
   duplicates: () => [...leadKeys.all, "duplicates"] as const,
 };
 
@@ -44,13 +52,51 @@ export function duplicatesQueryOptions() {
   });
 }
 
-/** The area filter's options change as leads come in; a few minutes is fresh enough. */
-export function leadAreasQueryOptions(params: LeadAreasParams) {
+/** Where an area filter's rows come from: areas holding leads (with counts), or every territory. */
+export type AreaSource = "leads" | "territories";
+
+/** One row of an area filter: a state, district or taluka, and how many leads, when known. */
+export interface AreaRow {
+  readonly id: string;
+  readonly name: string;
+  readonly level: LeadAreaLevel;
+  readonly count: number | null;
+}
+
+function isAreaLevel(level: string): level is LeadAreaLevel {
+  return LEAD_AREA_LEVELS.some((item) => item === level);
+}
+
+/**
+ * LEAD-001, MSTR-002 · One level of an area filter. The lead list counts its leads in each area
+ * (`GET /leads/areas`); other lists, such as orders, drill through the territory tree
+ * (`GET /lookups/territories?parent_id=`), which has no counts. Both give the same rows.
+ */
+export function areaRowsQueryOptions(source: AreaSource, params: LeadAreasParams) {
   return queryOptions({
-    queryKey: leadKeys.areas(params),
-    queryFn: ({ signal }) => listLeadAreas(params, signal),
+    queryKey: leadKeys.areaRows(source, params),
+    queryFn: async ({ signal }): Promise<AreaRow[]> => {
+      if (source === "leads") {
+        const areas = await listLeadAreas(params, signal);
+        return areas.map((area) => ({
+          id: area.id,
+          name: area.name,
+          level: area.level,
+          count: area.leadCount,
+        }));
+      }
+      const territories = await searchTerritories(
+        { q: "", level: params.level, levels: null, limit: 100, parentId: params.parentId },
+        signal,
+      );
+      return territories.flatMap((territory) =>
+        isAreaLevel(territory.level)
+          ? [{ id: territory.id, name: territory.name, level: territory.level, count: null }]
+          : [],
+      );
+    },
     staleTime: 5 * 60_000,
-    meta: { dataId: "LEAD-001" },
+    meta: { dataId: source === "leads" ? "LEAD-001" : "MSTR-002" },
   });
 }
 

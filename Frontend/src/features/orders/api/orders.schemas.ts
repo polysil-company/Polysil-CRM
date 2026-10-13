@@ -129,6 +129,10 @@ export interface OrderListParams {
   readonly leadId: string | null;
   /** Orders this quotation is or was on (BE-019); a cancelled order released it. */
   readonly quotationId: string | null;
+  /** Territories, each with everything under it (`territory_id`, up to 20). */
+  readonly areas: readonly string[];
+  /** An office and the offices under it (`owner_org_unit_id`). */
+  readonly officeId: string | null;
 }
 
 // ── the document (SO-002) ─────────────────────────────────────────────────────────

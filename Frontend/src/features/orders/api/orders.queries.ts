@@ -42,6 +42,8 @@ const TO_SHIP: OrderListParams = {
   mine: false,
   leadId: null,
   quotationId: null,
+  areas: [],
+  officeId: null,
 };
 
 /** DISP-001 · The orders waiting to ship, a page at a time. */
