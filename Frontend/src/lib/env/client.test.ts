@@ -9,6 +9,7 @@ describe("[OBS-002] public environment", () => {
       apiBaseUrl: "/api/v1",
       apiMocking: "enabled",
       release: "local",
+      navOnly: null,
     });
   });
 
@@ -65,6 +66,17 @@ describe("[OBS-002] public environment", () => {
   it("rejects unknown environment names", () => {
     expect(() => parseClientEnv({ NEXT_PUBLIC_APP_ENV: "qa" })).toThrow(
       /Invalid public environment variables/,
+    );
+  });
+
+  it("[APP-007] reads the release's menu as nav item ids, and treats empty as everything", () => {
+    expect(
+      parseClientEnv({ NEXT_PUBLIC_NAV_ONLY: "dashboard, leads,quotations," }).navOnly,
+    ).toEqual(["dashboard", "leads", "quotations"]);
+    expect(parseClientEnv({ NEXT_PUBLIC_NAV_ONLY: "" }).navOnly).toBeNull();
+    expect(parseClientEnv({ NEXT_PUBLIC_NAV_ONLY: " , " }).navOnly).toBeNull();
+    expect(() => parseClientEnv({ NEXT_PUBLIC_NAV_ONLY: "Leads;Quotes" })).toThrow(
+      /nav item ids separated by commas/,
     );
   });
 });

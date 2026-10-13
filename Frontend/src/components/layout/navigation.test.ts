@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { ModulePermission } from "@/lib/auth/permissions";
@@ -143,5 +146,50 @@ describe("[APP-006] route guards", () => {
 
   it("leaves pages outside the nav map open", () => {
     expect(canOpenPath("/account", [], "partner_user")).toBe(true);
+  });
+});
+
+describe("[APP-007] the release's menu", () => {
+  const admin = mockPermissionsFor("admin");
+  const released = ["dashboard", "leads", "quotations", "products"];
+
+  it("shows only the released screens, whatever the permissions allow", () => {
+    const ids = visibleNavSections(admin, "staff", released).flatMap((section) =>
+      section.items.map((item) => item.id),
+    );
+    expect(ids).toEqual(["dashboard", "leads", "quotations", "products"]);
+  });
+
+  it("still applies the permissions inside the release", () => {
+    const ids = visibleNavSections([], "staff", released).flatMap((section) =>
+      section.items.map((item) => item.id),
+    );
+    expect(ids).toEqual(["dashboard"]);
+  });
+
+  it("refuses a screen outside the release by its address too", () => {
+    expect(canOpenPath("/qr-codes", admin, "staff", released)).toBe(false);
+    expect(canOpenPath("/subsidy-masters", admin, "staff", released)).toBe(false);
+    expect(canOpenPath("/products/price-lists/pl-1", admin, "staff", released)).toBe(true);
+    expect(canOpenPath("/account", admin, "staff", released)).toBe(true);
+  });
+
+  it("releases everything when no list is set", () => {
+    expect(canOpenPath("/qr-codes", admin, "staff", null)).toBe(true);
+  });
+
+  it("knows every id the deploy script releases", () => {
+    // The deploy script builds the client's frontend with NEXT_PUBLIC_NAV_ONLY=<RELEASED_NAV>;
+    // an id that matches no item would silently hide that screen.
+    const script = readFileSync(
+      resolve(__dirname, "../../../../backend/scripts/deploy_staging.py"),
+      "utf8",
+    );
+    const list = /RELEASED_NAV = \(([^)]*)\)/.exec(script)?.[1] ?? "";
+    const ids = [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+    const known = new Set(NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.id)));
+
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids.filter((id) => id === undefined || !known.has(id))).toEqual([]);
   });
 });
