@@ -154,7 +154,17 @@ describe("[QUOT-007] Ask for approval", () => {
     await user.type(within(dialog).getByLabelText(/Why is this discount needed/), "Repeat buyer");
     await user.click(within(dialog).getByRole("button", { name: "Ask for approval" }));
 
-    expect(await screen.findByRole("button", { name: "Waiting for approval" })).toBeDisabled();
+    // The page stays inert, hidden from role queries, until the dialog has closed; on a slow
+    // CI runner that outlasts findByRole's default second.
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
+    expect(
+      await screen.findByRole("button", { name: "Waiting for approval" }, { timeout: 5000 }),
+    ).toBeDisabled();
     expect(
       screen.getByText("Waiting for a State Manager to approve the 12% discount"),
     ).toBeInTheDocument();
