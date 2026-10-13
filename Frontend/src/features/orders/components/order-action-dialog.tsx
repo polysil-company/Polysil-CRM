@@ -44,12 +44,13 @@ import {
   stepRoleLabel,
 } from "@/features/orders/lib/order-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { readFieldErrors } from "@/lib/api/errors";
 import { formatInr } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
-import { RefusalAlert, useCloseAfterSuccess, useOrderRefusal } from "./order-dialog-shared";
+import { RefusalAlert, useOrderRefusal } from "./order-dialog-shared";
 import { RecordDispatchForm } from "./record-dispatch-form";
 
 const log = createLogger({

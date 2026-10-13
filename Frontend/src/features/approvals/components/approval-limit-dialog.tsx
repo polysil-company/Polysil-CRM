@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { useForm, useFormState, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -44,6 +44,7 @@ import {
   type LimitRefusal,
 } from "@/features/approvals/lib/approval-limits";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { createLogger } from "@/lib/logger";
 
@@ -72,9 +73,6 @@ function limitMeaning(target: LimitTarget): string {
         : "Discounts up to this are approved at this level.";
   }
 }
-
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
 
 /** The limit being changed: a document's ladder, one role, company-wide or a territory's. */
 export interface LimitTarget {
@@ -124,12 +122,7 @@ function LimitFormBody({
   const idempotency = useIdempotencyKey();
   const queryClient = useQueryClient();
   const [refusal, setRefusal] = useState<LimitRefusal | null>(null);
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
+  const closeSoon = useCloseAfterSuccess(onClose);
 
   const unit = limitUnit(target.docType);
   const territoryId = target.territory?.id ?? null;
@@ -173,7 +166,7 @@ function LimitFormBody({
       toast.success(`${who}'s ${what} changed`, {
         description: "It applies from the next order or discount request.",
       });
-      timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
+      closeSoon();
     },
     onError: (error) => {
       const view = limitRefusal(error);
