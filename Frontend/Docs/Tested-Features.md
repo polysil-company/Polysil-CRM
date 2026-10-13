@@ -42,7 +42,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
-| [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #PRNUM |
+| [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
