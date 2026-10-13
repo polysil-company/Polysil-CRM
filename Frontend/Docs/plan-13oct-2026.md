@@ -35,7 +35,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - `territory_id` (a comma list; a state selects its districts) and `owner_org_unit_id`, on `GET /orders`, `/orders/stats` and `/orders/export`.
   - Reuse the lead list's area picker.
   - SO-001.
-- [~] **3. Order stats and the Accounts queue** (BE-022, done on the backend). In progress on `feature/ACCT-001-accounts-queue` (14 Oct).
+- [x] **3. Order stats and the Accounts queue** (BE-022, done on the backend). PR #127, 14 Oct, stacked on #125: merge #125 first, then retarget #127 to `integration`. It also fixes the menu's permission: `payments`, not `accounts`.
   - `GET /orders/stats`.
   - The queue is `GET /orders?waiting_on=account_manager`, and its badge is stats `waiting_on.account_manager`.
   - ACCT-001: the nav item says "Soon" today, and it is not in `RELEASED_NAV`.
