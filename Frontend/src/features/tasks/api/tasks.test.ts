@@ -289,13 +289,14 @@ describe("[TASK-005] complete, cancel and reopen", () => {
   });
 
   it("refuses an officer cancelling a task someone else gave them", async () => {
+    // The seed settles tasks whose due time has passed, so which of the user's tasks are still
+    // open depends on the hour. Make one: an open task of the user's, given by their manager.
     const given = mockDb.tasks.find(
-      (task) =>
-        task.status === "open" &&
-        task.assigned_to?.id === MOCK_TASK_ME.id &&
-        task.assigned_by?.id !== MOCK_TASK_ME.id,
+      (task) => task.status === "open" && task.assigned_to?.id === MOCK_TASK_ME.id,
     );
-    if (given === undefined) throw new Error("No task given to the user by someone else");
+    const manager = MOCK_TEAM[0];
+    if (given === undefined || manager === undefined) throw new Error("No open task of the user's");
+    given.assigned_by = { id: manager.id, full_name: manager.full_name };
 
     await expect(
       cancelTask({ taskId: given.id, body: { reason: "Not needed." }, idempotencyKey: "x-2" }),
