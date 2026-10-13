@@ -33,11 +33,12 @@ import type { Complaint, RemedyKind } from "@/features/complaints/api/complaints
 import { complaintRefusal } from "@/features/complaints/lib/complaint-labels";
 import { ApprovalChain } from "@/features/orders/components/order-approval";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { formatInr } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
-import { COMPLAINT_TEXT_MAX, Refusal, useCloseLater } from "./complaint-dialog-parts";
+import { COMPLAINT_TEXT_MAX, Refusal } from "./complaint-dialog-parts";
 import { DealerPicker, type DealerChoice } from "./dealer-picker";
 
 const log = createLogger({
@@ -274,7 +275,7 @@ function ChooseRemedyForm({
 }): React.JSX.Element {
   const choose = useChooseRemedy();
   const idempotency = useIdempotencyKey();
-  const closeLater = useCloseLater(onClose);
+  const closeLater = useCloseAfterSuccess(onClose);
   const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
   const form = useForm<RemedyForm>({
     resolver: zodResolver(remedySchema),
@@ -489,7 +490,7 @@ function WithdrawForm({
 }): React.JSX.Element {
   const withdraw = useWithdrawRemedy();
   const idempotency = useIdempotencyKey();
-  const closeLater = useCloseLater(onClose);
+  const closeLater = useCloseAfterSuccess(onClose);
   const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
   const form = useForm<{ remark: string }>({
     resolver: zodResolver(withdrawSchema),

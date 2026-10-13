@@ -72,6 +72,7 @@ export function NewLeadDialog(): React.JSX.Element {
   const [formError, setFormError] = useState<unknown>(null);
   const lastAttempt = useRef<{ body: string; key: string } | null>(null);
   const closeTimer = useRef<number | undefined>(undefined);
+  const mounted = useRef(false);
   const createLead = useCreateLead();
   const form = useForm<CreateLeadFormValues, unknown, CreateLeadRequest>({
     resolver: zodResolver(createLeadFormSchema),
@@ -81,8 +82,11 @@ export function NewLeadDialog(): React.JSX.Element {
 
   // The dialog can be left before the success check has had its moment; the timer must not
   // outlive it, or it resets a form that is gone and writes to another page's URL.
+  // Nor may it start once the dialog has gone: a save can finish after the page was left.
   useEffect(() => {
+    mounted.current = true;
     return () => {
+      mounted.current = false;
       window.clearTimeout(closeTimer.current);
     };
   }, []);
@@ -117,6 +121,7 @@ export function NewLeadDialog(): React.JSX.Element {
     dataId: "LEAD-002",
     onSuccess: (lead) => {
       toast.success("Lead created", { description: describeCreatedLead(lead) });
+      if (!mounted.current) return;
       closeTimer.current = window.setTimeout(() => {
         void setOpen(false);
         resetForm();
