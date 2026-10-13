@@ -23,6 +23,7 @@ import { generateLeads } from "./data/leads";
 import { generateConversations } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
+import { seedPartners, type MockPartnerRecord } from "./data/partners";
 import {
   seedHsnHistory,
   seedPriceLists,
@@ -142,6 +143,10 @@ export interface MockDb {
   offices: OfficeWire[];
   /** POST /users replays: Idempotency-Key → the request and the person made. */
   userWrites: Map<string, { body: string; userId: string }>;
+  /** Channel partners, newest first (CHNL-001…005). */
+  partners: MockPartnerRecord[];
+  /** POST /partners replays: Idempotency-Key → the request and the partner made. */
+  partnerWrites: Map<string, { body: string; partnerId: string }>;
 }
 
 function createMockDb(): MockDb {
@@ -214,6 +219,8 @@ function createMockDb(): MockDb {
     users: seedUsers(),
     offices: seedOffices(),
     userWrites: new Map(),
+    partners: seedPartners(),
+    partnerWrites: new Map(),
   };
 }
 
