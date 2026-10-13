@@ -292,6 +292,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Lead history and notes — the Activity card on the lead page; assignments name the people (BE-006) | LEAD-005, LEAD-006 | `GET /leads/{id}/timeline`, `POST /leads/{id}/notes` |
 | Stage change and reopen — Update stage menu, lost reason, won and reopen dialogs | LEAD-007 | `POST /leads/{id}/transition`, `POST /leads/{id}/reopen` |
 | Assign owner and channel partner | LEAD-008 | `POST /leads/{id}/assign`, `GET /leads/assignees`, `GET /lookups/partners` |
+| Channel partners (Channel → Channel partners) — the list with search, type, status and parent filters and an Excel export; a partner's page; add a distributor, or a dealer or sub-dealer under one; correct; close and reopen; import from Excel | CHNL-001…005 | `GET/POST /partners`, `GET /partners/export`, `GET/PATCH /partners/{id}`, `POST /partners/{id}/close`, `/reopen`, `/imports` with `kind=partners` |
 | Quotations list — the Quotations page and a lead's quotations; drafts waiting on a manager read "Awaiting approval" | QUOT-001 | `GET /quotations` |
 | Quotation detail — the document as printed, with its notices | QUOT-002 | `GET /quotations/{id}` |
 | Open a quotation's PDF | QUOT-003 | `GET /quotations/{id}/pdf` |
