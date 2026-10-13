@@ -35,6 +35,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 👀 | `integration` |
 | [Approvals](#approvals) | 5 | 🧪 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 👀 | PR #34; the Dispatch queue in PR #56 |
+| [Documents on records](#documents-on-records) | 4 | 🧪 👀 | PR #PRNUM, stacked on PR #111 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
 | [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79 |
@@ -159,6 +160,28 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-30--feature--S
 - **DISP-002 · Void a dispatch** with a reason — it stays on record, struck through, and its quantities are open again — and **close the rest short** with a reason. Managers see neither. When someone else moved the order first, the dialog closes, a toast says what happened, and the page shows the latest. 🧪 👀
 - **DISP-001 · The Dispatch queue** (Dispatch, or anyone with `dispatch`; PR #56; screens: [to ship](screenshots/dispatch/to-ship-desktop-light.jpg), [to ship, phone dark](screenshots/dispatch/to-ship-phone-dark.jpg), [record from the queue](screenshots/dispatch/record-from-queue-desktop-light.jpg)): **To ship** lists every approved order still waiting to leave, partly sent ones with how much has gone ("46% sent"), with the count. **Record a dispatch** opens the order with the form already open (`?record=dispatch`); someone who may only look sees no button, and the link does nothing for them. States: skeleton, "Nothing waiting to ship", an error, a later page failing. 🧪 👀
 - **DISP-001 · The dispatch log** (PR #56; screens: [desktop](screenshots/dispatch/dispatched-desktop-light.jpg), [phone, dark](screenshots/dispatch/dispatched-phone-dark.jpg)): **Dispatched** lists what left, newest first — dispatch number, the order (linked) and party, items, challan, invoice, transporter and vehicle, who recorded it — voided ones marked with their reason. Between two days (in the URL), or any day; "Nothing sent on these days" otherwise. The **Accounts queue** waits on the backend (BE-022); Accounts' steps are in their Approvals inbox meanwhile. 🧪 👀
+
+## Documents on records
+
+Purchase orders, payment slips, invoices, transport receipts and photos, kept on the record they belong to (FS-050, `backend/docs/api/documents.md`). Walked through in the mock at desktop light and phone dark; axe found nothing. Not yet checked on staging.
+
+Screens:
+
+- Desktop, light: [a lead's documents](screenshots/documents/lead-documents-desktop-light.jpg), [an order, with a dispatch's](screenshots/documents/order-documents-desktop-light.jpg), [a quotation's](screenshots/documents/quotation-documents-desktop-light.jpg), [attach: what's missing](screenshots/documents/attach-errors-desktop-light.jpg), [attach: ready](screenshots/documents/attach-ready-desktop-light.jpg), [remove](screenshots/documents/remove-desktop-light.jpg).
+- Phone, dark: [a lead's documents](screenshots/documents/lead-documents-phone-dark.jpg), [attach](screenshots/documents/attach-phone-dark.jpg).
+
+- **DOC-001 · See a record's documents.**
+  - The lead, quotation and order pages have a Documents card, and each dispatch on the order page has a Documents section.
+  - Each row shows its name or type, the type, the file name and size, and who added it and when.
+  - **Open** uses a ten-minute link. A HEIC photo offers **Download**.
+  - On the lead, everything made from it shows too. Each row names its record (Quotation, Order, Dispatch, with the number), linked where the record has a page. 🧪 👀
+- **DOC-002 · Attach a file.**
+  - Choose what it is, a name for "Other" (a note otherwise), and one JPEG, PNG, WebP, HEIC or PDF up to 10 MB.
+  - Anything missing or wrong is named before sending. The backend's refusals each get a sentence. The same file again says it's already attached.
+  - Who: a lead's or order's editor (a dealer on its own); staff for quotations; Dispatch or the order's editor for a dispatch.
+  - A merged lead and a voided dispatch take none. 🧪 👀
+- **DOC-003 · Remove a document.** It asks first. Remove is offered to whoever added the document, and to staff who may add to its record. A dealer can't remove Polysil's files. 🧪 👀
+- **Not offered:** documents on payments (no payments screen yet), and a type list fitted to each record (BE-025).
 
 ## Tasks and the day planner
 

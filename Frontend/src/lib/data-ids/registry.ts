@@ -32,6 +32,7 @@ export const DATA_ID_DOMAINS = {
   SO: "Sales orders",
   APPR: "Approvals — amount-based auto-escalation",
   CMPL: "Complaints and QA review",
+  DOC: "Documents on records — purchase orders, payment slips, invoices, photos",
   TASK: "Tasks and daily work",
   CHNL: "Channel partners — distributor, dealer, sub-dealer",
   MKT: "Marketing and promotional offers",
@@ -714,6 +715,33 @@ export const DATA_IDS = {
       "POST /imports/{id}/commit",
       "DELETE /imports/{id}",
     ],
+  },
+  "DOC-001": {
+    domain: "DOC",
+    title:
+      "Documents on a lead, quotation, order or dispatch — the list, the types and opening one",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /documents",
+      "GET /leads/{id}/documents",
+      "GET /documents/types",
+      "GET /documents/{id}/link",
+    ],
+  },
+  "DOC-002": {
+    domain: "DOC",
+    title: "Attach a document to a record",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /documents"],
+  },
+  "DOC-003": {
+    domain: "DOC",
+    title: "Remove a document",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["DELETE /documents/{id}"],
   },
   "MSTR-008": {
     domain: "MSTR",
