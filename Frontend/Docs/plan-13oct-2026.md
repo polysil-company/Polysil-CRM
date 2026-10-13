@@ -31,7 +31,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - Endpoint: `POST /orders/{id}/amend`.
   - Contract: `backend/docs/handover/settings-amend-reopen-contract.md`, and "Amend after a voided dispatch" in `subsidised-orders-and-small-changes.md`.
   - Data ID: register a new `SO-` id (next free: SO-007).
-- [ ] **2. Order list filters by area and office.**
+- [x] **2. Order list filters by area and office.** PR #125, 14 Oct (`feature/SO-001-order-area-filters`). The lead list's Area pill now also serves orders (`source="territories"`).
   - `territory_id` (a comma list; a state selects its districts) and `owner_org_unit_id`, on `GET /orders`, `/orders/stats` and `/orders/export`.
   - Reuse the lead list's area picker.
   - SO-001.
