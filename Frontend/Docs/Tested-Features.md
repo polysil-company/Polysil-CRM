@@ -43,7 +43,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
-| [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #PRNUM, stacked on PR #111 |
+| [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #112, stacked on PR #111 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -452,4 +452,4 @@ The backend serves these, and the frontend has no screen for them — in the ord
 1. A consolidated order from several quotations on leads of one dealer.
 2. Complaint types, with the other lookups in the admin masters. Everything else in complaints is in PR #57 and PR #58.
 3. The subsidy masters and their revisions (categories, parameters, rates, crop spacings, matrices).
-4. Admin masters: offices and territories. Users and roles are in PR #90; products, price lists and tax rates in PR #95; channel partners in PR #PRNUM.
+4. Admin masters: offices and territories. Users and roles are in PR #90; products, price lists and tax rates in PR #95; channel partners in PR #112.
