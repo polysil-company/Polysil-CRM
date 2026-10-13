@@ -35,7 +35,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - `territory_id` (a comma list; a state selects its districts) and `owner_org_unit_id`, on `GET /orders`, `/orders/stats` and `/orders/export`.
   - Reuse the lead list's area picker.
   - SO-001.
-- [ ] **3. Order stats and the Accounts queue** (BE-022, done on the backend).
+- [~] **3. Order stats and the Accounts queue** (BE-022, done on the backend). In progress on `feature/ACCT-001-accounts-queue` (14 Oct).
   - `GET /orders/stats`.
   - The queue is `GET /orders?waiting_on=account_manager`, and its badge is stats `waiting_on.account_manager`.
   - ACCT-001: the nav item says "Soon" today, and it is not in `RELEASED_NAV`.
@@ -149,3 +149,4 @@ Move nothing here: tick items where they are. This section lists what was finish
   - #113: documents on leads, quotations, orders and dispatches (DOC-001…003).
   - #114: #112 and #113 brought into `integration`.
   - #118: the release menu (APP-007).
+- **14 Oct, #126 (not a plan item):** a dialog's close timer could start after the dialog had gone, failing CI at random (`window is not defined`). One `useCloseAfterSuccess` hook now serves eleven dialogs (APP-003); ported into #124.
