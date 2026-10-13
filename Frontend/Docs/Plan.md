@@ -356,6 +356,8 @@ Picked up from the backend's finished asks: crops and land on a lead (BE-003: th
 
 ### 9.3 Served by the backend, not yet built on the frontend
 
+Measured on 13 October 2026: 183 of the backend's 379 endpoints have no frontend yet. The build order for all of them is [plan-13oct-2026.md](plan-13oct-2026.md), and the full list is in [Frontend-Handover.md §12](Frontend-Handover.md). The table below keeps the earlier notes.
+
 | Area | Endpoints | Contract | Order |
 |---|---|---|---|
 | A **consolidated** order from several quotations on leads of one dealer (choosing several quotations at once) | `POST /orders` with several `quotation_ids` | `backend/docs/api/orders.md` | **1** |
