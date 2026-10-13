@@ -38,6 +38,23 @@ function emptyToUndefined(value: unknown): unknown {
 }
 
 /** Accepts an absolute URL (`https://api.example.com/v1`) or a same-origin path (`/api/v1`). */
+/**
+ * APP-007 · The release's menu: nav item ids, comma-separated (`dashboard,leads,quotations`).
+ * Set by the deploy script for a client's box, so only the released screens show and open,
+ * whatever a role's permissions allow. Unset or empty: every screen the permissions allow.
+ */
+const navOnlySchema = z
+  .string()
+  .transform((value) =>
+    value
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id !== ""),
+  )
+  .refine((ids) => ids.every((id) => /^[a-z][a-z0-9-]*$/.test(id)), {
+    message: "must be nav item ids separated by commas, like dashboard,leads,quotations",
+  });
+
 const apiBaseUrlSchema = z
   .string()
   .refine((value) => value.startsWith("/") || URL.canParse(value), {
@@ -51,6 +68,7 @@ export const clientEnvSchema = z
     NEXT_PUBLIC_API_BASE_URL: z.preprocess(emptyToUndefined, apiBaseUrlSchema.optional()),
     NEXT_PUBLIC_API_MOCKING: z.preprocess(emptyToUndefined, z.enum(API_MOCKING_MODES).optional()),
     NEXT_PUBLIC_RELEASE: z.preprocess(emptyToUndefined, z.string().default("local")),
+    NEXT_PUBLIC_NAV_ONLY: z.preprocess(emptyToUndefined, navOnlySchema.optional()),
   })
   .superRefine((env, ctx) => {
     const isDeployed =
@@ -85,6 +103,10 @@ export const clientEnvSchema = z
       apiBaseUrl: env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL,
       apiMocking,
       release: env.NEXT_PUBLIC_RELEASE,
+      navOnly:
+        env.NEXT_PUBLIC_NAV_ONLY === undefined || env.NEXT_PUBLIC_NAV_ONLY.length === 0
+          ? null
+          : env.NEXT_PUBLIC_NAV_ONLY,
     };
   });
 
@@ -104,4 +126,5 @@ export const clientEnv: ClientEnv = parseClientEnv({
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   NEXT_PUBLIC_API_MOCKING: process.env.NEXT_PUBLIC_API_MOCKING,
   NEXT_PUBLIC_RELEASE: process.env.NEXT_PUBLIC_RELEASE,
+  NEXT_PUBLIC_NAV_ONLY: process.env.NEXT_PUBLIC_NAV_ONLY,
 });

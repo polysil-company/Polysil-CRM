@@ -112,6 +112,12 @@ export const DATA_IDS = {
     owner: "frontend",
     status: "in-progress",
   },
+  "APP-007": {
+    domain: "APP",
+    title: "Release menu — a deployment shows and opens only the screens it releases",
+    owner: "frontend",
+    status: "in-progress",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",

@@ -7,13 +7,15 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-48 changes, newest first. Each title opens its entry.
+51 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
-| 2026-10-13 | [Documents on leads, quotations, orders and dispatches](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md) | `feature` | `DOC-001` `DOC-002` `DOC-003` |
+| 2026-10-13 | [The release's menu: only the screens a deployment releases](changelog/entries/2026-10-13--feature--APP-007--the-release-s-menu-only-the-screens-a-deployment-releases.md) | `feature` | `APP-007` |
 | 2026-10-13 | [Channel partners: list, add, correct, close and import](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md) | `feature` | `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` |
+| 2026-10-13 | [Documents on leads, quotations, orders and dispatches](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md) | `feature` | `DOC-001` `DOC-002` `DOC-003` |
 | 2026-10-13 | [Excel import with column matching, and price lists by sale type](changelog/entries/2026-10-13--feature--MSTR-007--excel-import-with-column-matching-and-price-lists-by-sale.md) | `feature` | `MSTR-007` `MSTR-008` |
+| 2026-10-13 | [CI green again: CHANGELOG.md regenerated, and two tests that depended on timing](changelog/entries/2026-10-13--fix--REPO-001--ci-green-again-changelog-md-regenerated-and-the-approval.md) | `fix` | `REPO-001` `QUOT-007` `TASK-005` |
 | 2026-10-12 | [A frontend handover: the build process, step by step, and everything left](changelog/entries/2026-10-12--docs--REPO-001--a-frontend-handover-the-build-process-step-by-step-and.md) | `docs` | `REPO-001` |
 | 2026-10-12 | [Go-live fixes from the 10 Oct staging walk](changelog/entries/2026-10-12--fix--APP-006--go-live-fixes-from-the-10-oct-walk.md) | `fix` | `APP-006` `APP-003` `LEAD-003` `LEAD-005` `LEAD-008` `LEAD-013` `LEAD-014` `APPR-001` `APPR-002` `QUOT-002` `SO-002` `CMPL-003` `AUTH-001` |
 | 2026-10-11 | [Products and prices: the catalogue, GST by HSN code, and price lists](changelog/entries/2026-10-11--feature--MSTR-004--products-and-prices-the-catalogue-gst-by-hsn-code-and-price.md) | `feature` | `MSTR-004` `MSTR-005` `MSTR-006` |
@@ -63,70 +65,52 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## 13 October 2026
 
-### Documents on leads, quotations, orders and dispatches
+### The release's menu: only the screens a deployment releases
 
-`feature` · `DOC-001` `DOC-002` `DOC-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md)
+`feature` · `APP-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--APP-007--the-release-s-menu-only-the-screens-a-deployment-releases.md)
 
 #### Before
 
-The client handles purchase orders, payment slips, invoices and transport receipts outside the app. The backend now keeps them on the record they belong to (FS-050, `backend/docs/api/documents.md`, handover `documents-and-replacement-chain.md`). The frontend had no screen for it, so a bill or PO PDF could not be attached anywhere.
+The client's box releases the go-live scope in two places:
+
+- the backend grants only those modules' permissions (`backend/scripts/seed_prod.py`);
+- the deploy script builds the frontend with `NEXT_PUBLIC_NAV_ONLY`, the go-live menu (`RELEASED_NAV` in `backend/scripts/deploy_staging.py`).
+
+Nothing in the frontend read `NEXT_PUBLIC_NAV_ONLY`, so the menu followed permissions alone. Screens whose module was released for another reason still showed. QR codes rides on `leads`; Subsidy masters and Masters ride on `masters`, which is released for offices and territories.
 
 #### Now
 
-- **A Documents card** on the lead, quotation and order pages, and a Documents section on each dispatch on the order page.
-  - The list is newest first. Each row shows the document's name (or its type), the type, the file name and size, and who added it and when.
-  - **Open** uses the backend's ten-minute link, which is renewed before it runs out and is never fetched with the bearer token. A HEIC photo, which browsers can't show, is offered as **Download** instead.
-- **On the lead**, the card shows everything on the lead and on what came from it: its quotations, their orders, those orders' dispatches, and leads merged into it. Each row names its record, such as "Quotation QT/GJ/…" or "Order SO/GJ/…", linked where the record has a page.
-- **Attach a file** (DOC-002).
-  - **The form.** Pick what it is from the backend's types, then give a name for "Other" (a note otherwise, up to 80 characters), then choose one file.
-  - **Checks before sending.** A missing type or file, a missing name for "Other", a file over 10 MB, and a file that isn't JPEG, PNG, WebP, HEIC or PDF are each named first.
-  - **Refusals.** Each backend refusal has its sentence: 413; `attachment_type`; `too_many_documents` at 50; `record_closed` on a merged lead or a voided dispatch; `storage_unavailable`; 403; 404.
-  - **The same file again.** It answers with the one already there, and the toast says so.
-- **Remove** (DOC-003) asks first. It's offered to whoever added the document, and to staff who may add to the record it sits on (on a lead, the lead's own documents).
-- **Who adds**, from the handover:
-  - Leads: whoever edits them, a dealer on their own leads.
-  - Quotations: staff who edit quotations.
-  - Orders: whoever edits them.
-  - Dispatches: Dispatch, or the order's editor.
-  - A merged lead and a voided dispatch take none.
-- Checked on a phone in dark mode and a desktop in light mode. axe found nothing.
+- **The variable.** `NEXT_PUBLIC_NAV_ONLY` (build time) is read and checked as a list of nav item ids, for example `dashboard,leads,quotations`. A badly formed value fails the build.
+- **Outside the list,** a screen is gone from the sidebar and the command menu. Typing its address shows "You don't have access to this page", for every role, administrators included. Pages under a released item stay open, such as `/products/price-lists/…` under Products.
+- **Inside the list,** permissions decide as before.
+- **Unset or empty,** nothing changes: every screen the permissions allow shows. That covers local development, feature previews and the team's own staging box.
 
 #### Discussion
 
-- **One component, two shapes.** It's a card on a page. On the order page each dispatch gets a section, named after its number ("Documents on D/SO/…") so the lists and buttons on that page stay distinct.
-- **Links are fetched one per document and renewed every nine minutes**, as the complaint and subsidy files do. A list holds 50 documents at most.
-- **The type picker shows every type the backend lists.** That includes the five a dealer application uses (GST certificate, PAN card…). BE-025 asks for a `record_type` filter rather than the frontend hard-coding which types to hide.
-- **Payments aren't built here.** The backend takes documents on payments (Accounts). There is no payments screen yet, so none is offered.
-- **Stacked on #111** for its upload plumbing: the multipart reader in the mock, multipart in jsdom tests, and `formatFileSize`.
+- **One rule, in one place.** The list is checked in `canSeeNavItem`, which the sidebar, the command menu, the header and the route guard (APP-006) all use. Something left out of the menu can't be reached by address either.
+- **Hiding is a courtesy.** The backend's permission rows are still what enforces the scope.
+- **A test reads the deploy script.** It checks that every id in `RELEASED_NAV` exists in the menu, so a renamed nav item can't silently hide a released screen.
+- **Widening the release** takes both changes: a new `RELEASED_NAV` and a frontend rebuild, plus the backend's `seed_prod.py --modules …` for the permissions.
 
 #### Files changed
 
-- `src/features/documents/` — new: the contract, calls, queries, mutations and tests; refusal messages; the `RecordDocuments` card with its attach and remove dialogs, and its tests.
-- `src/features/leads/components/lead-detail.tsx` — the lead's documents card.
-- `src/features/quotations/components/quotation-detail.tsx` — the quotation's documents card.
-- `src/features/orders/components/order-detail.tsx`, `order-dispatches.tsx` — the order's card, and a section per dispatch.
-- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — the DOC domain; DOC-001 to DOC-003.
-- `src/mocks/data/documents.ts`, `src/mocks/handlers/documents.ts` — new: the types, a seeded story, and the endpoints with the backend's rules. Also `db.ts`, `handlers/index.ts` and `data/reference.ts`.
-- `../docs/Backend-Tasks.md` — BE-025.
-- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/documents/` — records and screens.
+- `src/lib/env/client.ts` and its test: `NEXT_PUBLIC_NAV_ONLY` becomes `navOnly`.
+- `src/components/layout/navigation.ts`: `isReleased`. `canSeeNavItem`, `visibleNavSections` and `canOpenPath` take the release list, defaulting to the build's.
+- `src/components/layout/navigation.test.ts`: the release's tests.
+- `.env.example`, `Docs/Environments.md`: the variable.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: APP-007.
+- `Docs/Tested-Features.md`: the story.
 
 #### Tests
 
-- `src/features/documents/api/documents.test.ts`:
-  - `[DOC-001]`: types; one record's list; a lead's whole story with labels; the link; 404.
-  - `[DOC-002]`: attach, and the same file again; Other unnamed; a wrong type; over 10 MB; quotations staff only; a merged lead; a voided dispatch.
-  - `[DOC-003]`: remove; a partner refused someone else's.
-- `src/features/documents/components/record-documents.test.tsx`:
-  - The order's list, with Open and Download.
-  - The lead's story, with record links.
-  - Nothing to add on a closed record.
-  - Attach, with its missing fields, the name for Other, and success.
-  - A bad file refused before sending.
-  - Remove.
-- Walked through in the mock:
-  - On the desktop in light mode: the lead, the order (with a dispatch's section) and the quotation; attach and remove on the order.
-  - On a phone in dark mode: the lead's card and the attach dialog.
-  - As a dealer on its lead: Attach is offered, but not Remove on Polysil's files.
+- **`src/components/layout/navigation.test.ts`, `[APP-007] the release's menu`:**
+  - only released screens show for an administrator;
+  - permissions still apply inside the release;
+  - `/qr-codes` and `/subsidy-masters` are refused by address, while a page under a released item and a page outside the menu open;
+  - no list releases everything;
+  - every id the deploy script releases exists.
+- **`src/lib/env/client.test.ts`:** the list is parsed, empty means everything, and a malformed list is refused.
+
 ### Channel partners: list, add, correct, close and import
 
 `feature` · `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md)
@@ -201,6 +185,71 @@ The client handles purchase orders, payment slips, invoices and transport receip
 - `src/components/layout/navigation.test.ts` — `[APP-006]`: `/partners` is open to staff who read partners, and closed to partners and to QA.
 - Walked through in the mock at desktop light and phone dark: list, detail, a dealer added under a distributor, close, the import, edit. Also checked: a field officer's list, and a dealer refused at `/partners`.
 
+### Documents on leads, quotations, orders and dispatches
+
+`feature` · `DOC-001` `DOC-002` `DOC-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md)
+
+#### Before
+
+The client handles purchase orders, payment slips, invoices and transport receipts outside the app. The backend now keeps them on the record they belong to (FS-050, `backend/docs/api/documents.md`, handover `documents-and-replacement-chain.md`). The frontend had no screen for it, so a bill or PO PDF could not be attached anywhere.
+
+#### Now
+
+- **A Documents card** on the lead, quotation and order pages, and a Documents section on each dispatch on the order page.
+  - The list is newest first. Each row shows the document's name (or its type), the type, the file name and size, and who added it and when.
+  - **Open** uses the backend's ten-minute link, which is renewed before it runs out and is never fetched with the bearer token. A HEIC photo, which browsers can't show, is offered as **Download** instead.
+- **On the lead**, the card shows everything on the lead and on what came from it: its quotations, their orders, those orders' dispatches, and leads merged into it. Each row names its record, such as "Quotation QT/GJ/…" or "Order SO/GJ/…", linked where the record has a page.
+- **Attach a file** (DOC-002).
+  - **The form.** Pick what it is from the backend's types, then give a name for "Other" (a note otherwise, up to 80 characters), then choose one file.
+  - **Checks before sending.** A missing type or file, a missing name for "Other", a file over 10 MB, and a file that isn't JPEG, PNG, WebP, HEIC or PDF are each named first.
+  - **Refusals.** Each backend refusal has its sentence: 413; `attachment_type`; `too_many_documents` at 50; `record_closed` on a merged lead or a voided dispatch; `storage_unavailable`; 403; 404.
+  - **The same file again.** It answers with the one already there, and the toast says so.
+- **Remove** (DOC-003) asks first. It's offered to whoever added the document, and to staff who may add to the record it sits on (on a lead, the lead's own documents).
+- **Who adds**, from the handover:
+  - Leads: whoever edits them, a dealer on their own leads.
+  - Quotations: staff who edit quotations.
+  - Orders: whoever edits them.
+  - Dispatches: Dispatch, or the order's editor.
+  - A merged lead and a voided dispatch take none.
+- Checked on a phone in dark mode and a desktop in light mode. axe found nothing.
+
+#### Discussion
+
+- **One component, two shapes.** It's a card on a page. On the order page each dispatch gets a section, named after its number ("Documents on D/SO/…") so the lists and buttons on that page stay distinct.
+- **Links are fetched one per document and renewed every nine minutes**, as the complaint and subsidy files do. A list holds 50 documents at most.
+- **The type picker shows every type the backend lists.** That includes the five a dealer application uses (GST certificate, PAN card…). BE-025 asks for a `record_type` filter rather than the frontend hard-coding which types to hide.
+- **Payments aren't built here.** The backend takes documents on payments (Accounts). There is no payments screen yet, so none is offered.
+- **Stacked on #111** for its upload plumbing: the multipart reader in the mock, multipart in jsdom tests, and `formatFileSize`.
+
+#### Files changed
+
+- `src/features/documents/` — new: the contract, calls, queries, mutations and tests; refusal messages; the `RecordDocuments` card with its attach and remove dialogs, and its tests.
+- `src/features/leads/components/lead-detail.tsx` — the lead's documents card.
+- `src/features/quotations/components/quotation-detail.tsx` — the quotation's documents card.
+- `src/features/orders/components/order-detail.tsx`, `order-dispatches.tsx` — the order's card, and a section per dispatch.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — the DOC domain; DOC-001 to DOC-003.
+- `src/mocks/data/documents.ts`, `src/mocks/handlers/documents.ts` — new: the types, a seeded story, and the endpoints with the backend's rules. Also `db.ts`, `handlers/index.ts` and `data/reference.ts`.
+- `../docs/Backend-Tasks.md` — BE-025.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/documents/` — records and screens.
+
+#### Tests
+
+- `src/features/documents/api/documents.test.ts`:
+  - `[DOC-001]`: types; one record's list; a lead's whole story with labels; the link; 404.
+  - `[DOC-002]`: attach, and the same file again; Other unnamed; a wrong type; over 10 MB; quotations staff only; a merged lead; a voided dispatch.
+  - `[DOC-003]`: remove; a partner refused someone else's.
+- `src/features/documents/components/record-documents.test.tsx`:
+  - The order's list, with Open and Download.
+  - The lead's story, with record links.
+  - Nothing to add on a closed record.
+  - Attach, with its missing fields, the name for Other, and success.
+  - A bad file refused before sending.
+  - Remove.
+- Walked through in the mock:
+  - On the desktop in light mode: the lead, the order (with a dispatch's section) and the quotation; attach and remove on the order.
+  - On a phone in dark mode: the lead's card and the attach dialog.
+  - As a dealer on its lead: Attach is offered, but not Remove on Polysil's files.
+
 ### Excel import with column matching, and price lists by sale type
 
 `feature` · `MSTR-007` `MSTR-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--MSTR-007--excel-import-with-column-matching-and-price-lists-by-sale.md)
@@ -266,6 +315,42 @@ The backend's Excel import (FS-062, `backend/docs/api/imports.md`) and price lis
 - `src/features/quotations/lib/builder-lines.test.ts` — the sale type in previews; `draftLinesFromImport`.
 - `src/lib/format/format.test.ts` — `formatFileSize`.
 - Walked through in the mock: new list with a sale type, filter, a rate import at desktop light and phone dark, items into a quotation. axe found nothing on the dialog's four steps.
+
+### CI green again: CHANGELOG.md regenerated, and two tests that depended on timing
+
+`fix` · `REPO-001` `QUOT-007` `TASK-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--fix--REPO-001--ci-green-again-changelog-md-regenerated-and-the-approval.md)
+
+#### Before
+
+GitHub Actions runs again, and two checks failed on `integration` after #111 and #114:
+
+- **"CHANGELOG.md is up to date".** The stacked PRs #112 and #113 merged into the MSTR-007 branch, and that branch then merged into `integration` (#114). The generated `CHANGELOG.md` was never rebuilt after the last merge, so `npm run changelog:build -- --check` found it stale.
+- **`[QUOT-007] Ask for approval`** timed out on CI looking for "Waiting for approval". The CI output shows why: the page was still inert behind the closing dialog, and an inert page is hidden from role queries. A slow runner outlasted `findByRole`'s default second. It passes locally.
+- **`[TASK-005]` refuses an officer cancelling a task someone else gave them** failed locally on 13 October. It searched the seed for an open task of the user's given by someone else. The seed settles tasks whose due time has passed, so by late morning that task was done and the search found nothing. The result depended on the hour.
+
+#### Now
+
+- `CHANGELOG.md` is rebuilt from the entries, so the check passes.
+- The approval test first waits for the dialog to close, then finds the button, each with a 5-second ceiling. It still fails at once if the button never appears or isn't disabled.
+- The task test makes its own precondition: it takes an open task of the user's and gives it a manager as the one who assigned it, then expects the 403. `afterEach` resets the mock database.
+
+#### Discussion
+
+- Nothing on screen changes; the client's app is the same.
+- `npm run verify` runs `changelog:check` but not `changelog:build -- --check`, so a stale `CHANGELOG.md` only shows up on CI. Run `npm run changelog:build` after every merge into a branch, as `Docs/Frontend-Handover.md` §4.13 says.
+
+#### Files changed
+
+- `CHANGELOG.md`: regenerated.
+- `src/features/quotations/components/quotation-actions.test.tsx`: the `[QUOT-007]` test waits for the dialog to close.
+- `src/features/tasks/api/tasks.test.ts`: the `[TASK-005]` test sets up its own task.
+
+#### Tests
+
+- `npx vitest run --project unit src/features/quotations/components/quotation-actions.test.tsx`: 7 passed, three runs in a row.
+- `npx vitest run --project unit src/features/tasks/api/tasks.test.ts`: 27 passed, at the hour it had failed.
+- `npm run changelog:build -- --check` passes.
+- `npm run verify` passes.
 
 ## 12 October 2026
 

@@ -27,6 +27,7 @@ import type { Route } from "next";
 import type { IconGlyph } from "@/components/ui/icon";
 import { can, canApprove, type ModuleCode, type ModulePermission } from "@/lib/auth/permissions";
 import type { DataId } from "@/lib/data-ids";
+import { clientEnv } from "@/lib/env/client";
 
 export interface NavItem {
   readonly id: string;
@@ -310,11 +311,23 @@ export const NAV_SECTIONS: readonly NavSection[] = [
  * `userType` is the session's `userType` ("staff", "partner_user" …). Unknown (null), it
  * hides staff-only items rather than risk showing them to a partner.
  */
+/**
+ * APP-007 · Whether a deployment releases this item: `NEXT_PUBLIC_NAV_ONLY` lists the nav item
+ * ids a client's box shows (the deploy script's RELEASED_NAV). Null releases everything.
+ */
+export function isReleased(item: NavItem, navOnly: readonly string[] | null): boolean {
+  return navOnly === null || navOnly.includes(item.id);
+}
+
 export function canSeeNavItem(
   item: NavItem,
   permissions: readonly ModulePermission[],
   userType: string | null = null,
+  navOnly: readonly string[] | null = clientEnv.navOnly,
 ): boolean {
+  if (!isReleased(item, navOnly)) {
+    return false;
+  }
   if (item.audience === "staff" && userType !== "staff") {
     return false;
   }
@@ -328,10 +341,11 @@ export function canSeeNavItem(
 export function visibleNavSections(
   permissions: readonly ModulePermission[],
   userType: string | null = null,
+  navOnly: readonly string[] | null = clientEnv.navOnly,
 ): NavSection[] {
   return NAV_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => canSeeNavItem(item, permissions, userType)),
+    items: section.items.filter((item) => canSeeNavItem(item, permissions, userType, navOnly)),
   })).filter((section) => section.items.length > 0);
 }
 
@@ -345,11 +359,13 @@ const STAFF_ONLY_PATHS: readonly string[] = ["/leads/duplicates"];
  * APP-006 · Whether the user may open a page, by the same rule that shows its nav item, so a
  * page left out of someone's menu cannot be opened by typing its address either (walk F-8).
  * Pages outside the nav map are open to everyone signed in. A courtesy: the backend enforces.
+ * A screen the deployment doesn't release (APP-007) can't be opened either.
  */
 export function canOpenPath(
   pathname: string,
   permissions: readonly ModulePermission[],
   userType: string | null = null,
+  navOnly: readonly string[] | null = clientEnv.navOnly,
 ): boolean {
   const staffOnly = STAFF_ONLY_PATHS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
@@ -358,7 +374,7 @@ export function canOpenPath(
     return false;
   }
   const item = findActiveNavItem(pathname);
-  return item === undefined || canSeeNavItem(item, permissions, userType);
+  return item === undefined || canSeeNavItem(item, permissions, userType, navOnly);
 }
 
 export function isNavItemActive(item: NavItem, pathname: string): boolean {

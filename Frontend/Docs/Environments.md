@@ -31,6 +31,7 @@ in the hosting platform — never in the repository.
 | `API_PROXY_TARGET` | Dev-server start and **build time** (server only) | The backend origin `/api/v1` is rewritten to, e.g. `http://127.0.0.1:8000`. Default in development; required in staging and production |
 | `NEXT_PUBLIC_API_MOCKING` | Build time | `enabled` · `partial` · `disabled`. `partial` mocks only what the backend lacks. Anything but `disabled` is forbidden in staging and production |
 | `NEXT_PUBLIC_RELEASE` | Build time | Release identifier (git SHA) — shown in logs and error references |
+| `NEXT_PUBLIC_NAV_ONLY` | Build time | The release's menu (APP-007): nav item ids, comma-separated. Only these screens show and open, on top of the permissions. Empty releases every screen. The client's box gets `RELEASED_NAV` from `backend/scripts/deploy_staging.py` |
 | `LOG_LEVEL` | **Runtime** | `debug` · `info` · `warn` · `error` · `silent`. See [Logging.md](Logging.md) |
 
 **`NEXT_PUBLIC_*` values are baked into the JavaScript at build time.** Each environment therefore
