@@ -235,6 +235,9 @@ class Settings(BaseSettings):
     # weasyprint renders a PDF; html stores the rendered HTML as the document and
     # is allowed on the dev box only, where WeasyPrint's native libraries are not.
     pdf_renderer: Literal["weasyprint", "html"] = "weasyprint"
+    # FS-064 rule 25: the client's company profile follows every quotation PDF.
+    # Off, the PDF is the quotation's pages alone (GAP-490, GAP-494).
+    quotation_profile_enabled: bool = True
     # The render lease (FS-005 5.2): longer than any render, shorter than a
     # user's patience.
     pdf_lease_minutes: int = 5

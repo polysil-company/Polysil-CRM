@@ -12,6 +12,8 @@ import datetime as dt
 import hashlib
 import re
 import secrets
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
 # ── the lifecycle (FS-005 3) ─────────────────────────────────────────────────
@@ -144,3 +146,57 @@ def discount_approval_required(gross: Decimal, discount: Decimal,
     if owner_limit_pct is None:
         return False
     return discount * 100 > owner_limit_pct * gross
+
+
+# ── the printed sheet (FS-064) ───────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class PrintLine:
+    """One row of the client's sheet: seven columns for the cascade's nineteen."""
+    line_no: int
+    description: str
+    uom: str
+    qty: Decimal
+    price: Decimal
+    price_after: Decimal
+    discount: Decimal
+    total: Decimal
+
+
+def _dec(v: object) -> Decimal:
+    """Through str, so a float that slipped in never brings its binary tail."""
+    return v if isinstance(v, Decimal) else Decimal(str(v))
+
+
+def print_lines(lines: Sequence[Mapping[str, object]]) -> list[PrintLine]:
+    """The stored lines as the sheet shows them (FS-064 rule 9). Nothing is
+    recomputed but the price after discount: the taxable value over the quantity,
+    half up to the paisa, and the rate itself on a line with no discount, where a
+    division could land a paisa under the price (GAP-487)."""
+    out: list[PrintLine] = []
+    for ln in lines:
+        qty, rate = _dec(ln["qty"]), _dec(ln["rate"])
+        discount, taxable = _dec(ln["discount"]), _dec(ln["taxable"])
+        if discount == 0 or qty == 0:
+            after = rate
+        else:
+            after = (taxable / qty).quantize(_PCT, rounding=ROUND_HALF_UP)
+        out.append(PrintLine(
+            line_no=int(str(ln["line_no"])), description=str(ln["description"]),
+            uom=str(ln.get("uom") or ""), qty=qty, price=rate, price_after=after,
+            discount=discount, total=taxable))
+    return out
+
+
+def shared_rate(lines: Sequence[Mapping[str, object]], key: str) -> Decimal | None:
+    """The rate every line carries under `key`, or None when they differ or there
+    are no lines: a tax row names its percentage only when one holds for the whole
+    document (FS-064 rule 12)."""
+    rates = {_dec(ln[key]) for ln in lines}
+    return rates.pop() if len(rates) == 1 else None
+
+
+def validity_days(sent_on: dt.date, until: dt.date) -> int:
+    """Days the quotation stays open, both dates on the IST calendar (FS-064 rule
+    15). Never negative."""
+    return max((until - sent_on).days, 0)

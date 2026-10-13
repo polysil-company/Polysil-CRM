@@ -986,8 +986,9 @@ def f_quotation() -> None:
                sub="The save re-resolves every line. The send is a database transaction and "
                    "nothing else. The worker renders. A sent document never changes.",
                status="BUILT (FS-005 rev 4): migration 012, /quotations, /public/q, the worker "
-                      "render lease and the nightly expiry. The PDF renders in CI and the "
-                      "container; not on the Windows box.",
+                      "render lease and the nightly expiry. FS-064: the client's print format "
+                      "and the company profile. The PDF renders in CI and the container; not "
+                      "on the Windows box.",
                status_colour=GREEN)
 
     steps = [
@@ -1014,9 +1015,9 @@ def f_quotation() -> None:
         ("q8", "COMMIT. status sent, pdf_state pending.\n"
                "No network call happened.", GREEN),
         ("q9", "WORKER, every 5 s, as the system principal:\n"
-               "claim one pending (definer, SKIP LOCKED)\n"
-               "render HTML -> PDF, put to R2, mark ready,\n"
-               "THEN queue the WhatsApp link", VIOLET),
+               "claim one pending (definer, SKIP LOCKED) + print block\n"
+               "the client's sheet -> PDF, + company profile (7 pages),\n"
+               "put to R2, mark ready, THEN queue the WhatsApp link", VIOLET),
         ("q10", "GET /public/q/{token}: number, total, validity.\n"
                 "NO name, NO mobile, NO lines.\n"
                 "GET /public/q/{token}/pdf: the view is recorded HERE,\n"
@@ -1110,6 +1111,33 @@ def f_quotation() -> None:
               "selector on a revision (GAP-116), export / marketing / sample /\n"
               "subsidised types, streaming the PDF through the API.",
               w=560, colour=GREY)
+
+    e += note("nPrint", -420, 330,
+              "THE PRINTED SHEET (FS-064, migration 076)\n\n"
+              "The claim carries a print block: dealer, village,\n"
+              "taluka, district, state, system, maker. Read LIVE\n"
+              "at claim time, not at send (GAP-495).\n\n"
+              "No print block -> the attempt FAILS. A new worker\n"
+              "claims from the old function while the migration\n"
+              "runs on every deploy; an empty header published\n"
+              "then could never be recalled.\n\n"
+              "A block that raises returns {error} from a\n"
+              "sub-block: one attempt lost, the queue moves on.\n\n"
+              "An unreadable company profile fails the render.\n"
+              "QUOTATION_PROFILE_ENABLED=false is the way out,\n"
+              "and it must be in the compose environment list.\n\n"
+              "NO approver's name on the page (FS-012 rules 2, 9).",
+              w=380, colour=RED)
+
+    e += note("nPrintCfg", -420, 60,
+              "The layout is the client's own sheet:\n"
+              "data/quotation-formats/commercial/.\n"
+              "Portrait, seven columns, three discount tiers in\n"
+              "one column. Twelve defaults where the sheet is\n"
+              "silent: GAP-484 to 497, questions 30.1 to 30.12.\n"
+              "Old PDFs are never re-rendered (GAP-491).\n"
+              "Orders keep their own layout.",
+              w=380, colour=YELLOW)
 
     e += note("nDisc", -420, 700,
               "DISCOUNT APPROVAL (FS-013)\n\n"

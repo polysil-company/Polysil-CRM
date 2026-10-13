@@ -16,6 +16,11 @@ guarded on `app_is_system()`; nothing here reads `quotation` directly.
 
 The renderer is probed at startup and logged, never refused: a missing PDF
 library fails jobs with a recorded `pdf_error`, not the CRM (edge case 20).
+
+The page is the client's own sheet and its company profile follows it in the
+same file (FS-064). What the sheet prints beside the figures arrives in the
+claim's `print` block; a claim without one fails the attempt rather than publish
+an empty header.
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ import asyncio
 import base64
 import datetime as dt
 import functools
+import io
 import json
 import pathlib
 import time
@@ -33,6 +39,7 @@ from typing import Any
 
 import structlog
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pypdf import PdfReader, PdfWriter
 from sqlalchemy import text
 
 from api.config import Settings, get_settings
@@ -77,7 +84,8 @@ def _plain(v: Any) -> str:
 
 def discount_tiers(lines: list[dict[str, Any]]) -> list[int]:
     """The discount tiers any line uses: a tier nobody uses is three columns of
-    zeros on the page (demo walk D-5)."""
+    zeros on the page (demo walk D-5). The order PDF's; the quotation folds the
+    tiers into one column since FS-064."""
     keys = {1: "discount_pct", 2: "discount2_pct", 3: "discount3_pct"}
     return [t for t, k in keys.items() if any(Decimal(str(ln.get(k) or 0)) != 0 for ln in lines)]
 
@@ -118,19 +126,69 @@ _env.globals["logo"] = "data:image/png;base64," + base64.b64encode(
     (TEMPLATES / "assets" / "polysil-logo.png").read_bytes()).decode("ascii")
 
 
+def _ist_date(v: Any) -> dt.date | None:
+    """`sent_at` on the IST calendar, as `_date` prints it."""
+    if not v:
+        return None
+    s = str(v)
+    if len(s) <= 10:
+        return dt.date.fromisoformat(s)
+    stamp = dt.datetime.fromisoformat(s)
+    return (stamp.astimezone(IST) if stamp.tzinfo is not None else stamp).date()
+
+
+def print_block(doc: dict[str, Any]) -> dict[str, Any]:
+    """The claim's `print` object, or the reason this attempt fails (FS-064 rules
+    27 and 28). A new worker claims from the old function for as long as
+    `alembic upgrade head` runs on every deploy; a blank header published then
+    could not be recalled, and the backoff outlasts the migration."""
+    if "print" not in doc:
+        raise RuntimeError("the claim has no print block: migration 076 is not applied")
+    block = doc["print"]
+    if not isinstance(block, dict):
+        raise RuntimeError("the claim's print block is empty")
+    if "error" in block:
+        raise RuntimeError(f"the print block could not be built: {block['error']}")
+    return block
+
+
+def place_of_supply(q: dict[str, Any], block: dict[str, Any]) -> str | None:
+    """Printed only where the address above it would mislead: an export, or a
+    supply state that is not the lead's, where a home-state address beside an
+    IGST row reads as the wrong tax (FS-064 rule 5b)."""
+    if q.get("export_country"):
+        return f"Outside India ({q['export_country']})"
+    supply = block.get("supply_state")
+    return str(supply) if supply and supply != block.get("state") else None
+
+
+def tax_rows(q: dict[str, Any]) -> str:
+    """Which tax rows the totals carry (FS-064 rule 11)."""
+    if q.get("tax_treatment") == "export_lut":
+        return "none"
+    return "intra" if q.get("intra_state") else "inter"
+
+
 def render_html(doc: dict[str, Any]) -> str:
-    """The document as HTML. Money and rates arrive as strings the filters format;
-    the template does no arithmetic (FS-005 5.3)."""
+    """The document as HTML, in the client's layout (FS-064). Money and rates
+    arrive as strings the filters format; the template does no arithmetic
+    (FS-005 5.3), and what the sheet derives is derived in `domain/`."""
     q = doc["quotation"]
     lines = doc["lines"]
-    tiers = discount_tiers(lines)
+    block = print_block(doc)
+    sent_on, until = _ist_date(q.get("sent_at")), _ist_date(q.get("valid_until"))
     return _env.get_template("quotation.html").render(
-        q=q, lines=lines, tiers=tiers, discount_cols=discount_columns(tiers),
+        q=q, p=block, rows=domain.print_lines(lines),
+        tax_rows=tax_rows(q), place_of_supply=place_of_supply(q, block),
+        cgst_rate=domain.shared_rate(lines, "cgst_rate"),
+        sgst_rate=domain.shared_rate(lines, "sgst_rate"),
+        igst_rate=domain.shared_rate(lines, "igst_rate"),
+        valid_days=domain.validity_days(sent_on, until) if sent_on and until else None,
         subsidy=doc.get("subsidy"),   # FS-057 rule 7; absent on a document claimed before 072
         subsidy_has_flat=bool(doc.get("subsidy"))
         and Decimal(str(doc["subsidy"].get("flat_charge") or 0)) > 0,
         is_provisional=bool(q.get("is_provisional")),
-        intra_state=bool(q.get("intra_state")), rendered_on=today_ist().strftime("%d %b %Y"))
+        rendered_on=today_ist().strftime("%d %b %Y"))
 
 
 @functools.cache
@@ -158,16 +216,70 @@ def render_pdf(html: str) -> bytes:
     return bytes(weasyprint.HTML(string=html).write_pdf())
 
 
+# ── the company profile (FS-064 rules 21 to 26) ──────────────────────────────
+
+PROFILE = TEMPLATES / "assets" / "company-profile.pdf"
+
+
+@functools.cache
+def company_profile() -> bytes:
+    """The client's brochure, read on first use. The bytes are cached, never a
+    reader, which is stateful; a failed read is not cached, so a fixed file is
+    picked up. Not read at import: a missing file would take the worker, and the
+    sign-in codes it drains, down with it (edge case 8)."""
+    return PROFILE.read_bytes()
+
+
+def append_profile(pdf: bytes, profile: bytes) -> bytes:
+    """The quotation's pages, then the profile's. The writer starts as a clone of
+    the quotation so its title and text layer survive; a fresh writer keeps only
+    the pages (edge case 14). An unreadable or encrypted profile raises."""
+    extra = PdfReader(io.BytesIO(profile))
+    if extra.is_encrypted:
+        raise ValueError("the company profile is encrypted")
+    if not extra.pages:
+        raise ValueError("the company profile has no pages")
+    writer = PdfWriter(clone_from=PdfReader(io.BytesIO(pdf)))
+    writer.append(extra)
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
+def profile_problem() -> str | None:
+    """None when the profile can be appended, else why not. The startup probe."""
+    try:
+        blank = PdfWriter()
+        blank.add_blank_page(width=595, height=842)
+        probe = io.BytesIO()
+        blank.write(probe)
+        append_profile(probe.getvalue(), company_profile())
+    except Exception as exc:
+        return f"{type(exc).__name__}: {(str(exc).splitlines() or [''])[0][:200]}"
+    return None
+
+
 def render_document(doc: dict[str, Any], settings: Settings) -> tuple[bytes, str]:
     """The bytes and their content type. `pdf_renderer = html` is the dev box's
-    fallback and settings refuse it anywhere else."""
+    fallback and settings refuse it anywhere else; it carries no profile.
+
+    The profile is appended here and not in `render_pdf`, which the order job
+    shares (FS-064 rule 22). A profile that cannot be read fails the render: no
+    quotation goes out without it while the switch is on (rule 26, GAP-494)."""
     html = render_html(doc)
     if settings.pdf_renderer == "html":
         return html.encode("utf-8"), "text/html; charset=utf-8"
     problem = renderer_available()
     if problem:
         raise RuntimeError(f"the PDF renderer is unavailable: {problem}")
-    return render_pdf(html), "application/pdf"
+    pdf = render_pdf(html)
+    if settings.quotation_profile_enabled:
+        try:
+            pdf = append_profile(pdf, company_profile())
+        except Exception as exc:
+            raise RuntimeError(f"the company profile could not be appended: "
+                               f"{type(exc).__name__}: {exc}") from exc
+    return pdf, "application/pdf"
 
 
 # ── the render job ───────────────────────────────────────────────────────────

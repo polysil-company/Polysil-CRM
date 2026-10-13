@@ -22,6 +22,8 @@ dependencies = [
     # the API and the worker, so both are core dependencies.
     "jinja2>=3.1",
     "weasyprint>=62",
+    # FS-064: the company profile is appended to every quotation PDF
+    "pypdf>=6,<7",
     "boto3>=1.35",
     # FS-009: the PIMS sheet is built by the API (review B-1)
     "openpyxl>=3.1",
@@ -37,8 +39,6 @@ dev = [
     "mypy>=1.11",
     "psycopg[binary]>=3.2",
     "types-redis",
-    # FS-005: the PDF text-layer test reads the rendered document back
-    "pypdf>=5.0",
 ]
 
 [build-system]

@@ -29,7 +29,12 @@ from worker.jobs.complaints import complaint_escalation
 from worker.jobs.leads import lead_dormancy
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
-from worker.jobs.quotations import quotation_expire, quotation_render_due, renderer_available
+from worker.jobs.quotations import (
+    profile_problem,
+    quotation_expire,
+    quotation_render_due,
+    renderer_available,
+)
 from worker.jobs.schemes import scheme_nightly
 from worker.schedules import CRON_JOBS
 
@@ -73,6 +78,12 @@ async def on_startup(ctx: dict[str, Any]) -> None:
         log.error("quotation.renderer_unavailable", problem=problem)
     else:
         log.info("quotation.renderer_ok", renderer=settings.pdf_renderer)
+    # FS-064 rule 26: an unreadable profile fails every quotation render, so say
+    # so once here; the worker still starts
+    if settings.quotation_profile_enabled:
+        profile = await asyncio.to_thread(profile_problem)
+        if profile:
+            log.error("quotation.profile_unreadable", problem=profile)
     # a hung bucket must not hold the first outbox drain (ISS-113)
     storage_problem = await asyncio.to_thread(get_storage(settings).probe)
     if storage_problem:
