@@ -27,7 +27,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 
 ## Tier 1: gaps inside the go-live screens
 
-- [~] **1. Amend an approved order.** In progress on `feature/SO-007-amend-order` (13 Oct).
+- [x] **1. Amend an approved order.** PR #124, 13 Oct (`feature/SO-007-amend-order`). Also fixed there: the duplicated §9 paragraph in `Plan.md`.
   - Endpoint: `POST /orders/{id}/amend`.
   - Contract: `backend/docs/handover/settings-amend-reopen-contract.md`, and "Amend after a voided dispatch" in `subsidised-orders-and-small-changes.md`.
   - Data ID: register a new `SO-` id (next free: SO-007).
