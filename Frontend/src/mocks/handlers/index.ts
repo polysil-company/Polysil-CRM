@@ -4,6 +4,7 @@ import { approvalHandlers } from "./approvals";
 import { authHandlers } from "./auth";
 import { complaintHandlers } from "./complaints";
 import { dashboardHandlers } from "./dashboard";
+import { importHandlers } from "./imports";
 import { leadCaptureHandlers } from "./lead-capture";
 import { leadHandlers } from "./leads";
 import { lookupHandlers } from "./lookups";
@@ -41,6 +42,7 @@ export const handlers: readonly HttpHandler[] = [
   ...lookupHandlers,
   ...quotationHandlers,
   ...productHandlers,
+  ...importHandlers,
   ...orderHandlers,
   ...dashboardHandlers,
   ...notificationHandlers,

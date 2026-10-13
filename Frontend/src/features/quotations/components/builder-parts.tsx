@@ -1,17 +1,22 @@
 "use client";
 
-import { Add01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, FileImportIcon } from "@hugeicons/core-free-icons";
+import { useState } from "react";
 import type * as React from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
+import { ImportDialog } from "@/features/imports/components/import-dialog";
 import type { QuotePreview } from "@/features/quotations/api/quotations.schemas";
 import type { PricedLines } from "@/features/quotations/hooks/use-priced-lines";
+import { draftLinesFromImport } from "@/features/quotations/lib/builder-lines";
 import { parseWarnings } from "@/features/quotations/lib/quotation-labels";
 import { toUserFacingError } from "@/lib/api/error-messages";
-import { formatInr } from "@/lib/format";
+import { createRequestId } from "@/lib/api/request-id";
+import { formatCount, formatInr } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { QuotationLineRow } from "./quotation-line-row";
@@ -21,8 +26,16 @@ import { QuotationLineRow } from "./quotation-line-row";
  * totals, the pricing notes and a labelled text field.
  */
 
-/** The items being built, each priced as it changes, with "Add item". */
-export function PricedItemsCard({ priced }: { priced: PricedLines }): React.JSX.Element {
+/** The items being built, each priced as it changes, with "Add item" and "Import from Excel". */
+export function PricedItemsCard({
+  priced,
+  importInto,
+}: {
+  priced: PricedLines;
+  /** MSTR-007 · What the imported lines are added to; no import without it. */
+  importInto?: "quotation" | "order";
+}): React.JSX.Element {
+  const [importing, setImporting] = useState(false);
   return (
     <Card>
       <CardHeader>
@@ -51,10 +64,42 @@ export function PricedItemsCard({ priced }: { priced: PricedLines }): React.JSX.
             />
           ))}
         </ol>
-        <Button type="button" variant="outline" className="self-start" onClick={priced.addLine}>
-          <Icon icon={Add01Icon} />
-          Add item
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={priced.addLine}>
+            <Icon icon={Add01Icon} />
+            Add item
+          </Button>
+          {importInto === undefined ? null : (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setImporting(true);
+              }}
+            >
+              <Icon icon={FileImportIcon} />
+              Import from Excel
+            </Button>
+          )}
+        </div>
+        {importInto === undefined ? null : (
+          <ImportDialog
+            kind="lines"
+            open={importing}
+            onOpenChange={setImporting}
+            title="Import items from Excel"
+            description={`A sheet with a product (item code or description) and a quantity on each row, and up to three discounts. The good rows are added to the ${importInto}, then priced as usual.`}
+            noun={{ one: "item", many: "items" }}
+            linesAction={`Add to ${importInto}`}
+            onLines={(lines) => {
+              priced.addLines(draftLinesFromImport(lines, createRequestId));
+              toast.success(
+                `${formatCount(lines.length)} ${lines.length === 1 ? "item" : "items"} added`,
+                { description: "Check them, then save." },
+              );
+            }}
+          />
+        )}
       </CardContent>
     </Card>
   );

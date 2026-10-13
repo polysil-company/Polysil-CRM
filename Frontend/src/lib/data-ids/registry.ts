@@ -701,6 +701,27 @@ export const DATA_IDS = {
       "POST /price-lists/{id}/publish",
     ],
   },
+  "MSTR-007": {
+    domain: "MSTR",
+    title:
+      "Excel import with column matching — price list rates, partners, order and quotation lines",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /imports",
+      "GET /imports/{id}",
+      "POST /imports/{id}/check",
+      "POST /imports/{id}/commit",
+      "DELETE /imports/{id}",
+    ],
+  },
+  "MSTR-008": {
+    domain: "MSTR",
+    title: "Price lists by sale type — commercial, industrial or subsidised",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /price-lists", "POST /price-lists", "POST /pricing/quote-lines"],
+  },
   "MSTR-002": {
     domain: "MSTR",
     title: "Lead lookups — sources, irrigation systems, lost reasons and the territory picker",

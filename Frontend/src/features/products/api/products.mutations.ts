@@ -153,6 +153,8 @@ export function useCopyPriceList(): UseMutationResult<
           channel_tier: source.tier,
           effective_to: null,
           source_note: sourceNote,
+          // A copy keeps the whole scope, the sale type with it (MSTR-008).
+          sales_type: source.salesType,
         },
         idempotencyKey: createKey,
       });

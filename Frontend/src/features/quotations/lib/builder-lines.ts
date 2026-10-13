@@ -1,3 +1,4 @@
+import type { ImportLine } from "@/features/imports/api/imports.schemas";
 import type {
   ProductPick,
   QuotationLine,
@@ -75,6 +76,11 @@ export interface PricingContext {
   readonly partnerId: string | null;
   /** A draft keeps the price date it was made on. */
   readonly asOf: string | null;
+  /**
+   * MSTR-008 · The quotation's sale type or the order's type, so the preview prices from the
+   * same lists the save will: a list for that sale type comes before the general ones.
+   */
+  readonly salesType: string | null;
 }
 
 /** The pricing request for every row that can be priced; unfinished rows wait. */
@@ -98,6 +104,7 @@ export function previewRequestFor(
       })),
       ...(context.asOf === null ? {} : { as_of: context.asOf }),
       ...(context.partnerId === null ? {} : { partner_id: context.partnerId }),
+      ...(context.salesType === null ? {} : { sales_type: context.salesType }),
     },
     keys: priceable.map((line) => line.key),
   };
@@ -157,6 +164,36 @@ export function draftLinesFrom(lines: readonly QuotationLine[], newKey: () => st
       trimZeros(line.discounts[0].pct),
       trimZeros(line.discounts[1].pct),
       trimZeros(line.discounts[2].pct),
+    ],
+  }));
+}
+
+/**
+ * MSTR-007 · The builder's rows for the good rows of an Excel import. The import names each
+ * product by id and description only; the unit shows from the price preview, and the backend
+ * checks the unit's decimals on save.
+ */
+export function draftLinesFromImport(
+  lines: readonly ImportLine[],
+  newKey: () => string,
+): DraftLine[] {
+  return lines.map((line) => ({
+    key: newKey(),
+    product: {
+      id: line.productId,
+      code: null,
+      description: line.product,
+      uom: "",
+      uomDecimals: 3,
+      hsnCode: null,
+      gstSlab: null,
+      packMultiple: null,
+    },
+    qty: trimZeros(line.qty),
+    discounts: [
+      trimZeros(line.discounts[0]),
+      trimZeros(line.discounts[1]),
+      trimZeros(line.discounts[2]),
     ],
   }));
 }

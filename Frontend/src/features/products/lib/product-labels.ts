@@ -1,6 +1,7 @@
 import type {
   ChannelTier,
   PriceList,
+  PriceListSalesType,
   ProvisionalField,
   QuotationCategory,
 } from "@/features/products/api/products.schemas";
@@ -27,6 +28,18 @@ export const TIER_LABELS: Readonly<Record<ChannelTier, string>> = {
   sub_dealer: "Sub-dealers",
   farmer: "Farmers (retail)",
 };
+
+/** MSTR-008 · The backend's choice of words: "Subsidy" sends `subsidised`. */
+export const PRICE_LIST_SALES_TYPE_LABELS: Readonly<Record<PriceListSalesType, string>> = {
+  commercial: "Commercial",
+  industrial: "Industrial",
+  subsidised: "Subsidy",
+};
+
+/** "All sale types", "Subsidy": what a list prices. */
+export function salesTypeOf(list: Pick<PriceList, "salesType">): string {
+  return list.salesType === null ? "All sale types" : PRICE_LIST_SALES_TYPE_LABELS[list.salesType];
+}
 
 /** "Every state · every tier", "Gujarat · Dealers". */
 export function scopeOf(list: Pick<PriceList, "state" | "tier">): string {

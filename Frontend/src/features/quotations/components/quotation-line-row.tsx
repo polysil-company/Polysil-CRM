@@ -105,8 +105,9 @@ export function QuotationLineRow({
                 onChange({ ...line, qty: event.target.value });
               }}
             />
-            {line.product === null ? null : (
-              <InputGroupAddon align="end">{line.product.uom}</InputGroupAddon>
+            {/* An imported line names no unit: the price preview does (MSTR-007). */}
+            {(line.product?.uom || priced?.uom || "") === "" ? null : (
+              <InputGroupAddon align="end">{line.product?.uom || priced?.uom}</InputGroupAddon>
             )}
           </InputGroup>
         </div>
@@ -209,7 +210,10 @@ function PricedStrip({
         </div>
       ))}
       {priced.provisionalFields.length > 0 ? (
-        <div className="text-warning">Indicative rate</div>
+        <div className="text-warning">
+          <dt className="sr-only">Rate status</dt>
+          <dd>Indicative rate</dd>
+        </div>
       ) : null}
     </dl>
   );

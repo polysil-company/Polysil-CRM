@@ -42,6 +42,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
+| [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #PRNUM |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -390,6 +391,28 @@ What changed for leads, quotations and orders after the 10 Oct staging walk (bac
 - **Copy and forms (F-19, FS-052).** The dealer code comes "on WhatsApp"; the farmer's enquiry form shows no QR label and no "Loading…" before a state; the dashboard reads "Leads, quotations, orders and service at a glance."; a direct order's dialogs don't mention quotations; "10 defective of 100 NOS"; a complaint submit asks first and names who gets the WhatsApp, "once messages are switched on"; a list field (the lost Reason) isn't red when its list opens; land is asked and shown in hectares, with acres beside them. Light on a dark computer gives a light page (F-20). 🧪 👀
 
 Open with the user: whether dealers should have QR codes (read-only) in their menu; whether a field officer should lose Assign, QR codes, Dispatch queue or Complaint targets from the menu (each follows RBAC.md §6.1 today); and F-12, no files on a complaint after the QC verdict.
+
+## Excel import and price lists by sale type
+
+The backend's Excel import (FS-062, `backend/docs/api/imports.md`) and price lists by sale type (FS-061). Walked through in the mock at desktop light and phone dark. axe found nothing on the import's four steps. Not yet checked on staging.
+
+Screens:
+
+- Price lists: [a new list's sale type](screenshots/imports/new-list-sale-type-desktop-light.jpg), [filtered by sale type](screenshots/imports/price-lists-filtered-desktop-light.jpg).
+- Rate import, desktop: [upload](screenshots/imports/import-upload-desktop-light.jpg), [match columns](screenshots/imports/import-match-desktop-light.jpg), [review](screenshots/imports/import-review-desktop-light.jpg), [done](screenshots/imports/import-done-desktop-light.jpg).
+- Rate import, phone: [match](screenshots/imports/import-match-phone-dark.jpg), [review](screenshots/imports/import-review-phone-dark.jpg).
+- Items into a quotation: [review](screenshots/imports/lines-review-desktop-light.jpg), [added](screenshots/imports/lines-added-desktop-light.jpg).
+
+- **MSTR-008 · A price list for one sale type.** Admin-Sales and the MD (`pricing.edit`) give a new list a sale type (Commercial, Industrial, Subsidy) or leave it for all. The list row and the draft's header say which. **Sale type** filters the lists, with "All sale types (general)". A copy keeps it. A quotation's sale type, or an order's type, goes with every price preview, so a Subsidy quotation prices from the Subsidy list. 🧪 👀
+- **MSTR-007 · Rates from Excel into a draft list.** **Import from Excel** on a draft (`pricing.edit`; off while typed rates are unsaved, absent on a published list).
+  - Upload `.xlsx` or `.csv` up to 10 MB. Match each column to a field or skip it, starting from the suggested match; required fields are named until matched. Pick the sheet and the row holding the column names.
+  - Replace or Merge the list's rates. **Check the rows**: "3 ready · 2 with errors", each bad row with its column and reason, and the first good rows as they will be saved.
+  - **Import good rows only**, or all or nothing. Done says "3 rates written, 2 skipped."
+  - A file too big or unreadable, a mapping refused on a field, rows changed since the check, a published list, and no permission each say what to do. Closing before importing discards the upload. 🧪 👀
+- **MSTR-007 · Items from Excel into a quotation or order.** **Import from Excel** on the Items card. Upload, match and check as above, then **Add to quotation** (or order) adds the good rows as lines with quantity and discounts, priced live. Nothing is saved until the quotation or order is. 🧪 👀
+- **MSTR-007 · Keyboard and screen readers.** The step trail names the current step. The error and preview tables scroll in regions that take focus. Every async button shows working, then done or failed. 🧪 👀
+
+In the mock, any `.xlsx` gets a sample workbook (the mock reads CSV only). The backend reads both.
 
 ## Not built yet
 

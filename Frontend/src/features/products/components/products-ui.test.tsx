@@ -261,3 +261,157 @@ describe("[MSTR-006] Price lists", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("[MSTR-008] Price lists by sale type", () => {
+  beforeEach(() => {
+    signInAs("admin");
+  });
+  afterEach(() => {
+    resetMockDb();
+    writeMockRole("state_manager");
+    push.mockReset();
+  });
+
+  it("starts a list for one sale type, and finds it by that type", async () => {
+    let sent: unknown = null;
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "POST" && new URL(request.url).pathname.endsWith("/price-lists")) {
+        void request
+          .clone()
+          .json()
+          .then((body: unknown) => {
+            sent = body;
+          });
+      }
+    });
+    const user = show(<ProductMaster />, "?tab=price-lists");
+    await user.click(await screen.findByRole("button", { name: "New price list" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Name"), "Subsidy rates Gujarat");
+    expect(within(dialog).getByRole("combobox", { name: "Sale type" })).toHaveTextContent(
+      "All sale types",
+    );
+    await user.click(within(dialog).getByRole("combobox", { name: "Sale type" }));
+    await user.click(await screen.findByRole("option", { name: "Subsidy" }));
+    await user.click(within(dialog).getByRole("button", { name: "Start the draft" }));
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/products\/price-lists\//));
+    });
+    expect(sent).toMatchObject({ name: "Subsidy rates Gujarat", sales_type: "subsidised" });
+    expect(
+      mockDb.priceLists.find((list) => list.name === "Subsidy rates Gujarat")?.sales_type,
+    ).toBe("subsidised");
+    server.events.removeAllListeners("request:start");
+  });
+
+  it("says each list's sale type, and filters by it", async () => {
+    const draft = mockDb.priceLists.find((list) => list.status === "draft");
+    if (draft !== undefined) draft.sales_type = "industrial";
+    const user = show(<ProductMaster />, "?tab=price-lists");
+    const lists = await screen.findByRole("list", { name: "Price lists" });
+    expect(within(lists).getAllByText("All sale types").length).toBeGreaterThan(0);
+    expect(within(lists).getByText("Industrial")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Sale type/ }));
+    await user.click(await screen.findByRole("radio", { name: /^Industrial/ }));
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole("list", { name: "Price lists" })).getAllByRole("listitem"),
+      ).toHaveLength(1);
+    });
+  });
+});
+
+describe("[MSTR-007] Import rates from Excel", () => {
+  beforeEach(() => {
+    signInAs("admin");
+  });
+  afterEach(() => {
+    resetMockDb();
+    writeMockRole("state_manager");
+    push.mockReset();
+  });
+
+  const RATES = ["Item Code,Net Rate", "PL-1001,15.20", "PL-9999,120", "PL-1002,3.95"].join("\n");
+
+  it("uploads a sheet, matches its columns, names the bad rows and imports the good ones", async () => {
+    const listId = listNamed("Gujarat dealers, November");
+    const user = show(<PriceListSheet listId={listId} />);
+    await user.click(await screen.findByRole("button", { name: "Import from Excel" }));
+    const dialog = await screen.findByRole("dialog", { name: "Import rates from Excel" });
+
+    expect(within(dialog).getByRole("button", { name: "Upload" })).toBeDisabled();
+    await user.upload(
+      within(dialog).getByTestId("import-file-input"),
+      new File([RATES], "rates.csv", { type: "text/csv" }),
+    );
+    expect(within(dialog).getByText("rates.csv")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Upload" }));
+
+    // Step 2: the backend's suggestion is filled in, column by column.
+    const columns = await within(dialog).findByRole("list", { name: "Columns in your file" });
+    expect(within(columns).getByRole("combobox", { name: "Item Code" })).toHaveTextContent(
+      "Item code",
+    );
+    expect(within(columns).getByRole("combobox", { name: "Net Rate" })).toHaveTextContent(
+      "Rate (required)",
+    );
+    expect(within(columns).getByText("PL-1001 · PL-9999")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("radio", { name: /Merge/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Check the rows" }));
+
+    // Step 3: counts, the bad row with its reason, and the good rows.
+    expect(await within(dialog).findByText("2 ready")).toBeInTheDocument();
+    expect(within(dialog).getByText("1 with errors")).toBeInTheDocument();
+    const errors = within(dialog).getByRole("table", { name: /Rows with errors/ });
+    expect(within(errors).getByText("no product with this item code")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Import 2 rates" })).toBeDisabled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Import good rows only" }));
+
+    expect(await within(dialog).findByText("2 rates written, 1 skipped.")).toBeInTheDocument();
+    expect(await screen.findByText("2 rates imported")).toBeInTheDocument();
+    const rates = mockDb.priceLists.find((list) => list.id === listId)?.rates;
+    expect(rates?.get(mockDb.products.find((item) => item.item_code === "PL-1001")?.id ?? "")).toBe(
+      "15.20",
+    );
+  });
+
+  it("puts a mapping problem on its field, and discards the upload when closed", async () => {
+    const user = show(<PriceListSheet listId={listNamed("Gujarat dealers, November")} />);
+    await user.click(await screen.findByRole("button", { name: "Import from Excel" }));
+    const dialog = await screen.findByRole("dialog", { name: "Import rates from Excel" });
+    await user.upload(
+      within(dialog).getByTestId("import-file-input"),
+      new File([RATES], "rates.csv", { type: "text/csv" }),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Upload" }));
+    const columns = await within(dialog).findByRole("list", { name: "Columns in your file" });
+    await user.click(within(columns).getByRole("combobox", { name: "Net Rate" }));
+    await user.click(await screen.findByRole("option", { name: "Skip this column" }));
+
+    expect(within(dialog).getByText("Still to match: Rate.")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Check the rows" }));
+    // The backend refuses the mapping (`mapping.rate: required`): it stays on matching.
+    expect(
+      await within(dialog).findByText("Match the columns named below, then check again."),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Still to match: Rate.")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/ready$/)).not.toBeInTheDocument();
+
+    const [batch] = [...mockDb.imports.values()];
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(batch?.status).toBe("discarded");
+    });
+  });
+
+  it("offers no import on a published list", async () => {
+    show(<PriceListSheet listId={listNamed("GJ 2026-27")} />);
+    await screen.findByRole("list", { name: "Rates" });
+
+    expect(screen.queryByRole("button", { name: "Import from Excel" })).not.toBeInTheDocument();
+  });
+});

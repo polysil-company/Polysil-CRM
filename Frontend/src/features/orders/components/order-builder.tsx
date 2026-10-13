@@ -211,9 +211,11 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       : (source.order.partner?.id ?? null);
   const asOf = source.mode === "edit" ? source.order.priceEffectiveDate : null;
   const placeId = place?.id ?? "";
+  // MSTR-008 · The order's type picks its sale type's price list first, as the save will.
+  const orderType = useWatch({ control: form.control, name: "orderType" });
   const context = useMemo<PricingContext>(
-    () => ({ placeOfSupplyTerritoryId: placeId, partnerId, asOf }),
-    [placeId, partnerId, asOf],
+    () => ({ placeOfSupplyTerritoryId: placeId, partnerId, asOf, salesType: orderType }),
+    [placeId, partnerId, asOf, orderType],
   );
   const priced = usePricedLines(context, () =>
     source.mode === "edit" && source.order.lines.length > 0
@@ -420,7 +422,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
-          <PricedItemsCard priced={priced} />
+          <PricedItemsCard priced={priced} importInto="order" />
 
           <Card>
             <CardHeader>

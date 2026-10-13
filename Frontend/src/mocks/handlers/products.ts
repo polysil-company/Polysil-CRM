@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   CHANNEL_TIERS,
+  PRICE_LIST_SALES_TYPES,
   GST_SLABS,
   QUOTATION_CATEGORIES,
   type TaxRateWire,
@@ -482,11 +483,20 @@ export const productHandlers = [
     if (!allowed("pricing", "view")) return forbidden("pricing.view");
     const url = new URL(request.url);
     const status = url.searchParams.get("status");
+    // MSTR-008 · One sale type, or `general` for the lists with none.
+    const salesType = url.searchParams.get("sales_type");
     const rows =
       scenario === "empty"
         ? []
         : mockDb.priceLists
             .filter((list) => (status === null ? true : list.status === status))
+            .filter((list) =>
+              salesType === null
+                ? true
+                : salesType === "general"
+                  ? (list.sales_type ?? null) === null
+                  : list.sales_type === salesType,
+            )
             .sort((a, b) => b.effective_from.localeCompare(a.effective_from))
             .map(listWire);
     return HttpResponse.json(pageOf(rows, url, 50, 100));
@@ -506,6 +516,7 @@ export const productHandlers = [
         channel_tier: z.enum(CHANNEL_TIERS).nullish(),
         effective_to: z.iso.date().nullish(),
         source_note: z.string().nullish(),
+        sales_type: z.enum(PRICE_LIST_SALES_TYPES).nullish(),
       })
       .safeParse(await request.json());
     if (!parsed.success) {
@@ -530,6 +541,7 @@ export const productHandlers = [
       name: body.name,
       state_territory: state,
       channel_tier: body.channel_tier ?? null,
+      sales_type: body.sales_type ?? null,
       status: "draft",
       published_at: null,
       effective_from: body.effective_from,
@@ -649,6 +661,7 @@ export const productHandlers = [
         other.status === "published" &&
         (other.state_territory?.id ?? null) === (list.state_territory?.id ?? null) &&
         other.channel_tier === list.channel_tier &&
+        (other.sales_type ?? null) === (list.sales_type ?? null) &&
         overlaps(
           { from: other.effective_from, to: other.effective_to },
           { from: list.effective_from, to: list.effective_to },
