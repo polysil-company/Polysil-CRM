@@ -5,9 +5,9 @@ import { AlertCircleIcon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type * as React from "react";
-import { Controller, useForm, useFormState } from "react-hook-form";
+import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
 import { ErrorReference } from "@/components/patterns/error-state";
@@ -79,7 +79,7 @@ const HEADER_FIELD_NAMES: readonly (keyof QuotationHeaderForm)[] = [
   "terms",
 ];
 
-function contextFor(source: BuilderSource): PricingContext {
+function contextFor(source: BuilderSource): Omit<PricingContext, "salesType"> {
   return source.mode === "create"
     ? {
         placeOfSupplyTerritoryId: source.lead.territory.id,
@@ -135,7 +135,19 @@ function partyFrom(values: QuotationHeaderForm): PartyRequest {
 export function QuotationBuilder({ source }: { source: BuilderSource }): React.JSX.Element {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [context] = useState(() => contextFor(source));
+  const [baseContext] = useState(() => contextFor(source));
+  const [initialHeader] = useState(() => headerDefaults(source));
+  const form = useForm<QuotationHeaderForm>({
+    resolver: zodResolver(quotationHeaderFormSchema),
+    defaultValues: initialHeader,
+    mode: "onTouched",
+  });
+  // MSTR-008 · The preview prices from the sale type's own list, as the save will.
+  const salesType = useWatch({ control: form.control, name: "salesType" });
+  const context = useMemo<PricingContext>(
+    () => ({ ...baseContext, salesType }),
+    [baseContext, salesType],
+  );
   const priced = usePricedLines(context, () =>
     source.mode === "edit" && source.quotation.lines.length > 0
       ? draftLinesFrom(source.quotation.lines, createRequestId)
@@ -146,12 +158,6 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
     description: string;
     reference?: string | undefined;
   } | null>(null);
-  const [initialHeader] = useState(() => headerDefaults(source));
-  const form = useForm<QuotationHeaderForm>({
-    resolver: zodResolver(quotationHeaderFormSchema),
-    defaultValues: initialHeader,
-    mode: "onTouched",
-  });
   const { errors } = useFormState({ control: form.control });
   const idempotency = useIdempotencyKey();
   const create = useCreateQuotation();
@@ -340,7 +346,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
-          <PricedItemsCard priced={priced} />
+          <PricedItemsCard priced={priced} importInto="quotation" />
 
           <Card>
             <CardHeader>

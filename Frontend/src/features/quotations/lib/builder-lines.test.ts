@@ -7,6 +7,7 @@ import {
   lineIssue,
   linesToSave,
   pricedByKey,
+  draftLinesFromImport,
   previewRequestFor,
   routeSaveErrors,
   type DraftLine,
@@ -27,7 +28,7 @@ function line(key: string, patch: Partial<DraftLine> = {}): DraftLine {
   return { key, product: PIPE, qty: "18", discounts: ["", "", ""], ...patch };
 }
 
-const CONTEXT = { placeOfSupplyTerritoryId: "t-1", partnerId: null, asOf: null };
+const CONTEXT = { placeOfSupplyTerritoryId: "t-1", partnerId: null, asOf: null, salesType: null };
 
 describe("[QUOT-004] lineIssue", () => {
   it("says what a row still needs, and nothing for a finished or an empty row", () => {
@@ -181,5 +182,53 @@ describe("[QUOT-004] routeSaveErrors", () => {
       header: { partyMobile: "Not an Indian mobile number" },
       lines: { a: "Rate: now 108.35", b: "Quantity: nOS takes whole numbers" },
     });
+  });
+});
+
+describe("[MSTR-008] the sale type on the price preview", () => {
+  it("sends the document's sale type, so the preview prices from that type's list first", () => {
+    expect(
+      previewRequestFor([line("a")], { ...CONTEXT, salesType: "subsidised" }).request,
+    ).toMatchObject({ sales_type: "subsidised" });
+    expect(previewRequestFor([line("a")], CONTEXT).request).not.toHaveProperty("sales_type");
+  });
+});
+
+describe("[MSTR-007] draftLinesFromImport", () => {
+  it("turns an import's good rows into builder rows, the unit left to the preview", () => {
+    let next = 0;
+    const rows = draftLinesFromImport(
+      [
+        {
+          row: 2,
+          productId: "p-1",
+          product: "INLINE DRIPPER 4 LPH",
+          qty: "120.000",
+          discounts: ["5.00", "0", "0"],
+        },
+      ],
+      () => {
+        next += 1;
+        return `k-${String(next)}`;
+      },
+    );
+
+    expect(rows).toEqual([
+      {
+        key: "k-1",
+        product: {
+          id: "p-1",
+          code: null,
+          description: "INLINE DRIPPER 4 LPH",
+          uom: "",
+          uomDecimals: 3,
+          hsnCode: null,
+          gstSlab: null,
+          packMultiple: null,
+        },
+        qty: "120",
+        discounts: ["5", "0", "0"],
+      },
+    ]);
   });
 });

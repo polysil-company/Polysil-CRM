@@ -526,6 +526,8 @@ export interface QuoteLinesRequest {
   }[];
   readonly as_of?: string;
   readonly partner_id?: string;
+  /** MSTR-008 · The document's sale type; commercial, industrial and subsidised have lists. */
+  readonly sales_type?: string;
 }
 
 const previewLineWireSchema = quotationLineWireSchema.omit({ line_no: true });

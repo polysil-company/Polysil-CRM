@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatFileSize,
   EMPTY_VALUE,
   formatCount,
   formatDate,
@@ -160,5 +161,16 @@ describe("[DS-001] Indian mobile numbers", () => {
     expect(formatIndianPhone("+919812345678")).toBe("+91 98123 45678");
     expect(formatIndianPhone("12345")).toBe("12345");
     expect(formatIndianPhone(null)).toBe(EMPTY_VALUE);
+  });
+});
+
+describe("[DS-001] file sizes", () => {
+  it("reads a size as a file picker shows it", () => {
+    expect(formatFileSize(1)).toBe("1 byte");
+    expect(formatFileSize(512)).toBe("512 bytes");
+    expect(formatFileSize(84_000)).toBe("82 KB");
+    expect(formatFileSize(2_400_000)).toBe("2.3 MB");
+    expect(formatFileSize(10 * 1024 * 1024)).toBe("10 MB");
+    expect(formatFileSize(-1)).toBe("—");
   });
 });

@@ -16,5 +16,12 @@ export {
   type DateInput,
 } from "./date";
 export { describeCountdown, formatCountdown } from "./duration";
-export { EMPTY_VALUE, formatCount, formatDelta, formatNumber, formatPercent } from "./number";
+export {
+  EMPTY_VALUE,
+  formatCount,
+  formatDelta,
+  formatFileSize,
+  formatNumber,
+  formatPercent,
+} from "./number";
 export { formatIndianPhone, normalizeIndianMobile } from "./phone";

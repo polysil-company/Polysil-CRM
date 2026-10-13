@@ -196,6 +196,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-004 | Product catalogue — browse, add and correct products (`GET`/`POST /products`, `GET`/`PATCH /products/{id}`) | shared | in-progress |
 | MSTR-005 | Tax classification — a product's HSN code and each code's GST slab, from a date (`/products/{id}/hsn`, `/tax-rates`) | shared | in-progress |
 | MSTR-006 | Price lists — draft, fill the rate sheet, publish, close (`/price-lists*`) | shared | in-progress |
+| MSTR-007 | Excel import with column matching — price list rates, partners, order and quotation lines (`/imports*`) | shared | in-progress |
+| MSTR-008 | Price lists by sale type — commercial, industrial or subsidised (`sales_type` on `/price-lists`, `/pricing/quote-lines`) | shared | in-progress |
 | SUBS-001 | Subsidy forms and case status | shared | planned |
 | SUBS-002 | Subsidy calculator — the scheme's cost blocks and every farmer category's share (`POST /subsidy/calculate`) | shared | in-progress |
 | SUBS-003 | Subsidy scheme lookups — what each system accepts, the crops and the categories (`GET /subsidy/config`, `GET /subsidy/crops`, `GET /subsidy/categories`) | shared | in-progress |
