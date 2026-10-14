@@ -40,7 +40,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - The queue is `GET /orders?waiting_on=account_manager`, and its badge is stats `waiting_on.account_manager`.
   - ACCT-001: the nav item says "Soon" today, and it is not in `RELEASED_NAV`.
   - Contract: `accounts-queue-order-names.md`. Payments themselves are Tier 4 (item 26).
-- [~] **4. Dashboard: two new charts.** Started 14 Oct on `feature/RPT-001-dashboard-charts`.
+- [x] **4. Dashboard: two new charts.** PR #128, 14 Oct (`feature/RPT-001-dashboard-charts`). Also adds the `targets` permission module and a target line on `ProportionBar`.
   - `area_by_system: [{system, name, leads, hectares}]`.
   - `targets_by_month: [{month, target, achieved}]`: 6 months, null without a targets permission.
   - Both on `GET /dashboard/overview`. RPT-001.
