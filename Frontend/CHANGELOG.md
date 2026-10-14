@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-51 changes, newest first. Each title opens its entry.
+52 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-14 | [An empty conversation names its colleague after a reload](changelog/entries/2026-10-14--feature--MSG-004--an-empty-conversation-names-its-colleague-after-a-reload.md) | `feature` | `MSG-004` `MSG-002` |
 | 2026-10-13 | [The release's menu: only the screens a deployment releases](changelog/entries/2026-10-13--feature--APP-007--the-release-s-menu-only-the-screens-a-deployment-releases.md) | `feature` | `APP-007` |
 | 2026-10-13 | [Channel partners: list, add, correct, close and import](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md) | `feature` | `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` |
 | 2026-10-13 | [Documents on leads, quotations, orders and dispatches](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md) | `feature` | `DOC-001` `DOC-002` `DOC-003` |
@@ -62,6 +63,57 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 14 October 2026
+
+### An empty conversation names its colleague after a reload
+
+`feature` · `MSG-004` `MSG-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-14--feature--MSG-004--an-empty-conversation-names-its-colleague-after-a-reload.md)
+
+#### Before
+
+The backend lists a conversation only once someone writes in it, and had no way to read one on its own. So the thread named the colleague of a just-started conversation from the answer to "start", kept in the page's memory.
+
+After a reload, or from a link a colleague shared, an empty conversation's header read "Conversation". The empty state said "No messages yet" rather than whom to write to, and the box had no name. The backend has since added `GET /conversations/{id}` (BE-021).
+
+#### Now
+
+- **The thread reads a conversation it can't find in the list** from `GET /conversations/{id}`. That covers a conversation just started, opened after a reload, or opened from a link.
+  - The header names the colleague and their role.
+  - The empty state reads "Say hello to Imran Sheikh".
+  - The box is labelled "Message Imran Sheikh".
+- **A listed conversation is not read again;** the list, which is polled, stays the source.
+- **Starting a conversation** seeds that read with the backend's answer, so the header doesn't wait for it.
+- **If the read fails,** the header says "Conversation", as before, and the thread still loads and sends. A conversation that isn't the user's is a 404, and the page shows not-found, as it already did from the messages call.
+- The mock answers `GET /conversations/{id}`, including the 404.
+- Checked on a desktop in light mode and a phone in dark mode: a new conversation with Imran Sheikh, one read of the conversation each time. axe found nothing.
+
+#### Discussion
+
+- **Under the list's key.** The read's query key sits under the conversation list's, so a refresh of the list (after a send, a start, or a colleague found to have left) refreshes it too.
+- **Groups are not handled here.** The backend's `Conversation` now carries `kind` and `group`, with `participant` null for a group (FS-048). The frontend still expects one colleague, so a group in the list or behind a link would be a contract error. Groups are plan item 7, which widens the schema.
+- **A reload can't be shown in the mock walk:** the mock's data resets on a reload, so a new conversation is gone. A unit test covers it: the conversation is started outside the page and the thread names it from the backend.
+
+#### Files changed
+
+- `src/features/messages/api/messages.api.ts`: `getConversation`.
+- `src/features/messages/api/messages.queries.ts`: `conversationQueryOptions` and `messageKeys.conversation`. They replace the in-memory `startedConversationQueryOptions`.
+- `src/features/messages/api/messages.mutations.ts`: starting a conversation seeds the read.
+- `src/features/messages/components/conversation-thread.tsx`: reads an unlisted conversation.
+- `src/mocks/handlers/messages.ts`: `GET /conversations/:conversationId`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: MSG-004 reads one conversation.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/messages-notifications/`: records and screens.
+
+#### Tests
+
+- `src/features/messages/api/messages.api.test.ts`, `[MSG-004]`:
+  - one conversation read before anyone writes in it, and a listed one;
+  - a 404 for one that isn't the user's.
+- `src/features/messages/components/conversation-thread.test.tsx`, `[MSG-002] ConversationThread`:
+  - the colleague named after a reload, from the backend, with the box labelled;
+  - "Conversation" when the read fails, with the thread still there;
+  - the existing test for a just-started conversation now seeds the read.
+- Walked through in the mock: desktop light and phone dark.
 
 ## 13 October 2026
 

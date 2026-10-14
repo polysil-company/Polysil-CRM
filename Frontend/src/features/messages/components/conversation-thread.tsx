@@ -17,8 +17,8 @@ import { useMarkConversationRead } from "@/features/messages/api/messages.mutati
 import {
   conversationListQueryOptions,
   conversationMessagesQueryOptions,
+  conversationQueryOptions,
   messageKeys,
-  startedConversationQueryOptions,
 } from "@/features/messages/api/messages.queries";
 import {
   sendMessageRequestSchema,
@@ -53,12 +53,15 @@ export function ConversationThread({
   const queryClient = useQueryClient();
   const thread = useQuery(conversationMessagesQueryOptions(conversationId));
   const conversations = useQuery(conversationListQueryOptions());
-  const started = useQuery(startedConversationQueryOptions(conversationId));
+  const listed = conversations.data?.items.find((item) => item.id === conversationId);
+  // A conversation nobody has written in yet is not listed: it is read on its own (BE-021).
+  const unlisted = useQuery({
+    ...conversationQueryOptions(conversationId),
+    enabled: conversations.status !== "pending" && listed === undefined,
+  });
   const { mutate: markConversationRead } = useMarkConversationRead();
 
-  // A conversation nobody has written in yet is not listed: the "start" answer names it.
-  const conversation =
-    conversations.data?.items.find((item) => item.id === conversationId) ?? started.data ?? null;
+  const conversation = listed ?? unlisted.data ?? null;
   const unreadCount = conversation?.unreadCount ?? 0;
   const newestShown = thread.data?.items.at(-1)?.id ?? null;
   const participantLeft = conversation?.participant.isActive === false;
@@ -87,7 +90,10 @@ export function ConversationThread({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      <ThreadHeader conversation={conversation} loading={conversations.status === "pending"} />
+      <ThreadHeader
+        conversation={conversation}
+        loading={conversations.status === "pending" || unlisted.isLoading}
+      />
       <div className="flex min-h-0 flex-1 flex-col">
         <QueryView
           query={thread}

@@ -8,6 +8,7 @@ import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 
 import {
+  getConversation,
   listConversations,
   listMessages,
   markConversationRead,
@@ -154,6 +155,24 @@ describe("[MSG-004] staff directory and new conversations", () => {
 
     await sendMessage(conversation.id, { body: "Hello Imran", resource: null });
     expect((await listConversations()).items[0]?.id).toBe(conversation.id);
+  });
+
+  it("reads one conversation on its own, before anyone writes in it (BE-021)", async () => {
+    const started = await startConversation("usr-007");
+
+    const conversation = await getConversation(started.id);
+
+    expect(conversation).toMatchObject({
+      id: started.id,
+      participant: { name: "Imran Sheikh" },
+      lastMessage: null,
+      unreadCount: 0,
+    });
+    expect((await getConversation("conv-001")).participant.id).toBe("usr-002");
+  });
+
+  it("fails with 404 for a conversation that is not the user's", async () => {
+    expect(await statusOfFailure(getConversation("conv-missing"))).toBe(404);
   });
 
   it("offers only colleagues still at Polysil, and refuses one who has left", async () => {
