@@ -45,7 +45,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - `targets_by_month: [{month, target, achieved}]`: 6 months, null without a targets permission.
   - Both on `GET /dashboard/overview`. RPT-001.
   - Contract: "Five small changes" in `dealer-recruitment-and-small-changes.md`. Read the `dataviz` guidance before drawing them.
-- [ ] **5. One conversation by id** (BE-021, done on the backend).
+- [~] **5. One conversation by id** (BE-021, done on the backend). Started 14 Oct on `feature/MSG-004-read-one-conversation`.
   - `GET /conversations/{id}`, so the thread header names the colleague after a reload or from a shared link.
   - MSG-002, MSG-004.
 - [ ] **6. The dealership enquiry type and GSTIN details.**
