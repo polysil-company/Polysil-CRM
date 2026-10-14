@@ -315,11 +315,12 @@ export const DATA_IDS = {
   },
   "RPT-001": {
     domain: "RPT",
-    title: "Dashboard overview — KPIs, pipeline, follow-ups",
+    title: "Dashboard overview — KPIs, pipeline, follow-ups, area by system, targets",
     owner: "shared",
     status: "in-progress",
     endpoints: ["GET /dashboard/overview"],
-    notes: "The backend's shape since BE-008: snake_case, every figure a decimal string.",
+    notes:
+      "The backend's shape since BE-008: snake_case, every figure a decimal string. Area by system and targets by month since FS-052.",
   },
   "QUOT-001": {
     domain: "QUOT",

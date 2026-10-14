@@ -1,12 +1,13 @@
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { isApiError } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
+import { writeMockRole } from "@/lib/dev/mock-settings";
 import { server } from "@/mocks/node";
 
 import { getDashboardOverview } from "./dashboard.api";
-import { figure, trendPoints, type DashboardOverviewWire } from "./dashboard.schemas";
+import { amount, figure, trendPoints, type DashboardOverviewWire } from "./dashboard.schemas";
 
 /** The backend's answer from backend/docs/api/dashboard.md, snake_case with decimal strings. */
 const BACKEND_ANSWER: DashboardOverviewWire = {
@@ -23,6 +24,11 @@ const BACKEND_ANSWER: DashboardOverviewWire = {
     { stage: "dormant", count: 1, value: "0.00" },
   ],
   sources: [{ source: "field_visit", name: "Field visit", count: 30 }],
+  area_by_system: [{ system: "drip", name: "Drip", leads: 14, hectares: "38.50" }],
+  targets_by_month: [
+    { month: "2026-09", target: "1200000.00", achieved: "984000.00" },
+    { month: "2026-10", target: "0.00", achieved: null },
+  ],
   follow_ups: [
     {
       task_id: "task-1",
@@ -37,6 +43,10 @@ const BACKEND_ANSWER: DashboardOverviewWire = {
 };
 
 describe("[RPT-001] getDashboardOverview", () => {
+  afterEach(() => {
+    writeMockRole("state_manager");
+  });
+
   it("reads the backend's shape, keeping money as strings", async () => {
     server.use(
       http.get(buildApiUrl("/dashboard/overview"), () =>
@@ -53,6 +63,13 @@ describe("[RPT-001] getDashboardOverview", () => {
     });
     expect(overview.kpis.overdueFollowUps.value).toBeNull();
     expect(overview.pipeline.map((stage) => stage.stage)).toEqual(["new", "dormant"]);
+    expect(overview.areaBySystem).toEqual([
+      { system: "drip", name: "Drip", leads: 14, hectares: "38.50" },
+    ]);
+    expect(overview.targetsByMonth).toEqual([
+      { month: "2026-09", target: "1200000.00", achieved: "984000.00" },
+      { month: "2026-10", target: "0.00", achieved: null },
+    ]);
     expect(overview.followUps[0]).toEqual({
       taskId: "task-1",
       leadId: "lead-1",
@@ -62,6 +79,35 @@ describe("[RPT-001] getDashboardOverview", () => {
       ownerName: null,
       overdue: true,
     });
+  });
+
+  it("reads a backend from before FS-052 as no areas and no targets", async () => {
+    const { area_by_system: _area, targets_by_month: _targets, ...older } = BACKEND_ANSWER;
+    server.use(
+      http.get(buildApiUrl("/dashboard/overview"), () => HttpResponse.json({ data: older })),
+    );
+
+    const overview = await getDashboardOverview();
+
+    expect(overview.areaBySystem).toEqual([]);
+    expect(overview.targetsByMonth).toBeNull();
+  });
+
+  it("refuses a month that is not YYYY-MM as a contract violation", async () => {
+    server.use(
+      http.get(buildApiUrl("/dashboard/overview"), () =>
+        HttpResponse.json({
+          data: {
+            ...BACKEND_ANSWER,
+            targets_by_month: [{ month: "Oct 2026", target: "0.00", achieved: null }],
+          },
+        }),
+      ),
+    );
+
+    await expect(getDashboardOverview()).rejects.toSatisfy(
+      (error) => isApiError(error) && error.kind === "contract",
+    );
   });
 
   it("refuses the old camelCase shape as a contract violation", async () => {
@@ -80,6 +126,14 @@ describe("[RPT-001] getDashboardOverview", () => {
     const overview = await getDashboardOverview();
     expect(overview.pipeline.length).toBeGreaterThan(0);
     expect(typeof overview.kpis.pipelineValue.value).toBe("string");
+    expect(overview.areaBySystem.length).toBeGreaterThan(0);
+    expect(overview.targetsByMonth).toHaveLength(6);
+  });
+
+  it("sends the mock's targets only to a role with a targets permission, as the backend does", async () => {
+    writeMockRole("account_manager");
+    const overview = await getDashboardOverview();
+    expect(overview.targetsByMonth).toBeNull();
   });
 });
 
@@ -89,5 +143,7 @@ describe("[RPT-001] dashboard figures", () => {
     expect(figure(null)).toBeNull();
     expect(figure("n/a")).toBeNull();
     expect(trendPoints(["8", "11", "x"])).toEqual([8, 11]);
+    expect(amount("38.50")).toBe(38.5);
+    expect(amount(null)).toBe(0);
   });
 });

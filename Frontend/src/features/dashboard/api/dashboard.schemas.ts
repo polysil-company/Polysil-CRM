@@ -12,6 +12,7 @@ import { LEAD_STAGES } from "@/features/leads/api/leads.schemas";
 const isoDateTime = z.iso.datetime({ offset: true });
 const isoDate = z.iso.date();
 const decimal = z.string().regex(/^-?\d+(\.\d+)?$/);
+const yearMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
 const kpiWireSchema = z.object({
   /** Null only for overdue follow-ups when the role has no task permission. */
@@ -55,6 +56,37 @@ const dashboardOverviewWireSchema = z.object({
       count: z.number().int().nonnegative(),
     }),
   ),
+  /**
+   * Open and won leads now, by irrigation system, in name order; systems with none are left
+   * out. Added with FS-052, so an older backend may not send it yet.
+   */
+  area_by_system: z
+    .array(
+      z.object({
+        /** The irrigation system's code; `name` comes with it, since administrators edit the list. */
+        system: z.string().min(1),
+        name: z.string().min(1),
+        leads: z.number().int().nonnegative(),
+        /** Summed land of those leads; leads without land add nothing. */
+        hectares: decimal,
+      }),
+    )
+    .optional(),
+  /**
+   * This month and the five before it, oldest first: the order value target against what was
+   * sold. Null (or missing, from an older backend) without a targets permission.
+   */
+  targets_by_month: z
+    .array(
+      z.object({
+        month: yearMonth,
+        /** Summed over the user's team; "0.00" when nobody has one. */
+        target: decimal,
+        /** Null without a sales orders permission. */
+        achieved: decimal.nullable(),
+      }),
+    )
+    .nullish(),
   /** The 10 earliest-due open tasks on the user's leads; empty without a task permission. */
   follow_ups: z.array(
     z.object({
@@ -86,6 +118,8 @@ export const dashboardOverviewSchema = z
     },
     pipeline: data.pipeline,
     sources: data.sources,
+    areaBySystem: data.area_by_system ?? [],
+    targetsByMonth: data.targets_by_month ?? null,
     followUps: data.follow_ups.map((item) => ({
       taskId: item.task_id,
       leadId: item.lead_id,
@@ -106,6 +140,11 @@ export function figure(value: string | null): number | null {
   }
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+/** Hectares or rupees from a decimal string, for drawing only: 0 when unreadable. */
+export function amount(value: string | null): number {
+  return figure(value) ?? 0;
 }
 
 /** A trend's points as numbers, for drawing only. */
