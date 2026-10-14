@@ -41,7 +41,7 @@ The dashboard read neither. The mock sent neither, and the frontend knew no `tar
 - **One hue.** The bars are the primary colour; the target line is the text colour with a ring. No status colour marks a month over or under target: the percentage says it.
 - **One scale per card.** The targets bars share the largest of every target and sale, so months compare with each other, and a month over target runs past its line.
 - **Sorted by land** rather than the backend's name order, so the comparison reads at a glance.
-- **Not yet checked on staging.**
+- **Not yet checked on staging.** PR #128.
 
 ## Files changed
 
