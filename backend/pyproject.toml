@@ -92,6 +92,9 @@ strict = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# FS-065 rule 26: the live suite needs a deployed box and is run by
+# `deploy_staging.py verify`, never collected by `pytest .`
+norecursedirs = ["live", ".*", "*.egg", "build", "dist", "node_modules", "venv"]
 markers = [
     "db: needs a live Postgres through PgBouncer",
     "rls: asserts a row-level security property, including the negative cases",
