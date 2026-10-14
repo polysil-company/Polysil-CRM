@@ -37,6 +37,8 @@ import tarfile
 import time
 from pathlib import Path
 
+import live_verify
+
 ROOT = Path(__file__).resolve().parent.parent
 INFRA = ROOT / "infra"
 ENV_FILE = INFRA / ".env.staging"
@@ -193,16 +195,20 @@ def load_config() -> dict[str, str]:
 
 
 def ssh_argv(env: dict[str, str]) -> list[str]:
+    # the two timeouts: a box that does not answer fails the step instead of
+    # hanging it (FS-065 rule 16)
     return ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=15",
             "-i", env["SSH_KEY_PATH"], env["SSH_USER"] + "@" + env["SSH_HOST"]]
 
 
 def run_remote(env: dict[str, str], command: str, *, stdin: bytes | None = None,
-               check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
+               check: bool = True, capture: bool = False,
+               timeout: float | None = None) -> subprocess.CompletedProcess:
     """One command on the box, through a non-interactive shell."""
     argv = [*ssh_argv(env), "bash", "-lc", shlex.quote(command)]
     return subprocess.run(
-        argv, input=stdin, check=check,
+        argv, input=stdin, check=check, timeout=timeout,
         stdout=subprocess.PIPE if capture else None,
         stderr=subprocess.PIPE if capture else None,
     )
@@ -448,6 +454,9 @@ def deploy_prod(env: dict[str, str]) -> None:
     frontend_sync(env)
     ok = health(env)
     print(f"\n  app:     https://{env['APP_DOMAIN']}   (once its A record points here)\n")
+    # FS-065 rule 28: only once the API answers, and a failed check fails the
+    # deploy's exit code. Nothing is rolled back: the release is already live.
+    ok = ok and verify(env, read_only=True)
     sys.exit(0 if ok else 1)
 
 
@@ -479,6 +488,13 @@ def health(env: dict[str, str], *, attempts: int = 30) -> bool:
         time.sleep(2)
     print("  health   no answer")
     return False
+
+
+def verify(env: dict[str, str], *, read_only: bool) -> bool:
+    """FS-065: the box checks, the read-only HTTP checks, and on staging the
+    journey. With --source the live suite comes from the tree that was deployed."""
+    return live_verify.verify(TARGET, env, CODE_ROOT, read_only=read_only,
+                              run_remote=run_remote, compose=compose, ssh_argv=ssh_argv)
 
 
 def status(env: dict[str, str]) -> None:
@@ -593,7 +609,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("step", nargs="?", default="deploy",
                         choices=["provision", "deploy", "sync", "build", "up", "migrate",
                                  "seed", "seed-prod", "load-states", "templates", "requeue-pdfs",
-                                 "status", "logs", "down", "frontend-prod",
+                                 "status", "verify", "logs", "down", "frontend-prod",
                                  "frontend-provision", "frontend", "frontend-caddy"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
     parser.add_argument("--seed", action="store_true", help="deploy: run the seeds too")
@@ -601,6 +617,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="seed: skip the showcase dataset, demo users and masters only")
     parser.add_argument("--no-masters", action="store_true",
                         help="seed: the demo users only, not the workbooks")
+    parser.add_argument("--read-only", action="store_true",
+                        help="verify: skip the staging journey, which creates records")
     parser.add_argument("--target", choices=["staging", "prod"], default="staging",
                         help="prod: the Hostinger box, infra/.env.prod and docker-compose.prod.yml")
     parser.add_argument("--source", type=Path, default=None,
@@ -626,6 +644,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.step == "frontend-prod":
         frontend_sync(env)
         return 0
+    if args.step == "verify":
+        return 0 if verify(env, read_only=args.read_only) else 1
     if args.step == "provision":
         provision(env)
     elif args.step == "deploy":

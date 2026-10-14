@@ -2507,6 +2507,27 @@ def f_excel_import() -> None:
          ("n4", "Not yet: updating partners, a template file,\nfuzzy product match (GAP-471 to 473, 476).", YELLOW)])
 
 
+def f_live_checks() -> None:
+    _columns(
+        "70-live-checks", "Live checks on a deployed box",
+        "deploy_staging.py verify: pass or fail after a deploy. Read-only on production.",
+        "BUILT. FS-065: not yet run on a deployed box.",
+        [("v1", "deploy, health answers, then verify\n(a production deploy runs it itself)", BLUE),
+         ("v2", "box checks: compose run --rm --no-deps worker\npython -m worker.live_check, one JSON line each", GREEN),
+         ("v3", "base URL: https://APP_DOMAIN on production,\nan SSH tunnel to the API port on staging", GREY),
+         ("v4", "guard: /health through that same URL names\nthe target; containment on; app_role", GREEN),
+         ("v5", "read-only: one sign-in, every parameterless GET\nwith a token and without, one sign-out", BLUE),
+         ("v6", "report: PASS, FAIL or SKIP per check;\nexit 1 on any FAIL. Nothing rolled back", GREY)],
+        [("j1", "staging only: the journey. Lead, two stages,\nquotation, send (channel none), PDF", YELLOW),
+         ("j2", "accept, order (never submitted), document,\neach record's timeline", YELLOW),
+         ("j3", "negatives: another office reads no lead;\na role without view gets 403", GREEN),
+         ("j4", "live/inventory.json: 118 paths, each checked\nor skipped with a reason; 47 forbidden on prod", GREY)],
+        [("n1", "TWO GETS WRITE\n\n/tracking/team/latest and /visits insert view-log\nrows. Never called on production. The normal suite\ncalls every checked GET in a READ ONLY transaction.", RED),
+         ("n2", "STAGING SENDS REAL WHATSAPP\n\nEvery record carries LIVE_TEST_MOBILE: one message\nper run, the lead acknowledgement.", RED),
+         ("n3", "THE GUARD READS THE SAME URL THE WRITES USE\n\nA wrong address fails the guard instead of passing it.", GREEN),
+         ("n4", "Not yet: a production account (GAP-498), a storage\nwrite (499), the dealer steps (500), a browser (501).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2520,5 +2541,5 @@ if __name__ == "__main__":
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
     f_export_sample_orders(); f_ratings(); f_warranty()
     f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
-    f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy()
+    f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy(); f_live_checks()
     print(f"\nwrote to {OUT}")

@@ -10,7 +10,6 @@ WeasyPrint imports (CI, the container) and skip with a reason where it does not
 from __future__ import annotations
 
 import asyncio
-import copy
 import io
 import re
 import threading
@@ -35,65 +34,16 @@ from worker.jobs.quotations import (
     render_pdf,
     renderer_available,
 )
+from worker.sample_quotation import PAGE_ONE_FIGURES
+from worker.sample_quotation import document as _doc
 
 GUJARATI_NAME = "રમેશભાઈ પટેલ"
 HINDI_TERMS = "भुगतान 7 दिनों में"
 APPROVER = "Asha Mehta"
 
-LINE: dict[str, Any] = {
-    "line_no": 1, "description": "UPVC PIPE 90 MM 4 KG/CM2 CLASS - 2 IS: 4985",
-    "hsn_code": "3917", "uom": "MTR", "qty": "18.000", "rate": "103.19",
-    "gross": "1857.42", "discount_pct": "10.000", "discount1_amt": "185.74",
-    "after_discount1": "1671.68", "discount2_pct": "5.000", "discount2_amt": "83.58",
-    "after_discount2": "1588.10", "discount3_pct": "0.000", "discount3_amt": "0.00",
-    "discount": "269.32", "taxable": "1588.10", "gst_slab": "5.000",
-    "cgst_rate": "2.500", "sgst_rate": "2.500", "igst_rate": "0.000",
-    "cgst": "39.70", "sgst": "39.70", "igst": "0.00", "total": "1667.50",
-}
-# a second line with figures of its own, so no line figure equals a document
-# total: with one line the totals rows satisfied every line assertion, and a
-# blank or swapped line cell passed (code review F-1)
-LINE_2: dict[str, Any] = {
-    "line_no": 2, "description": "END PLUG WITH QUICK ACTION COUPLER 90MM",
-    "hsn_code": "3917", "uom": "NOS", "qty": "4.000", "rate": "50.00",
-    "gross": "200.00", "discount_pct": "10.000", "discount1_amt": "20.00",
-    "after_discount1": "180.00", "discount2_pct": "0.000", "discount2_amt": "0.00",
-    "after_discount2": "180.00", "discount3_pct": "0.000", "discount3_amt": "0.00",
-    "discount": "20.00", "taxable": "180.00", "gst_slab": "5.000",
-    "cgst_rate": "2.500", "sgst_rate": "2.500", "igst_rate": "0.000",
-    "cgst": "4.50", "sgst": "4.50", "igst": "0.00", "total": "189.00",
-}
+# the sample's two lines as one row each on the page (worker/sample_quotation.py)
 ROW_1 = "1 UPVC PIPE 90 MM 4 KG/CM2 CLASS - 2 IS: 4985 ₹103.19 ₹88.23 18 MTR ₹269.32 ₹1,588.10"
 ROW_2 = "2 END PLUG WITH QUICK ACTION COUPLER 90MM ₹50.00 ₹45.00 4 NOS ₹20.00 ₹180.00"
-PRINT: dict[str, Any] = {
-    "dealer_name": "Shree Agro", "dealer_contact": "Bhavesh Shah", "dealer_mobile": "9876500000",
-    "village": "Vadod", "taluka": "Gondal", "district": "Rajkot", "state": "Gujarat",
-    "supply_state": "Gujarat", "mis_system": "Sprinkler", "made_by": "Ravi Kumar",
-}
-
-
-def _doc(*, provisional: bool = False, intra: bool = True, party: str = "Rameshbhai Patel",
-         terms: str | None = "Prices ex-works.", lines: int = 2) -> dict:
-    return {
-        "quotation": {
-            "id": "00000000-0000-0000-0000-000000000001", "quote_no": "QT/GJ/2026-27/00001",
-            "version": 1, "sales_type": "commercial", "sent_at": "2026-10-01T09:00:00+05:30",
-            "valid_until": "2026-11-15", "price_effective_date": "2026-10-03",
-            "is_provisional": provisional, "intra_state": intra, "tax_treatment": "domestic",
-            "seller_legal_name": "Polysil Irrigation Systems Pvt Ltd",
-            "seller_address": "Rajkot, Gujarat", "seller_gstin_no": "24AAACP1234A1Z5",
-            "seller_state_code": "GJ",
-            "party_name": party, "party_address": "Near the dairy, Anand road",
-            "party_mobile": "+919876543210",
-            "party_gstin": None, "terms": terms, "export_country": None, "lut_arn": None,
-            "gross": "2057.42", "discount": "289.32", "taxable": "1768.10",
-            "cgst": "44.20", "sgst": "44.20", "igst": "0.00", "total": "1856.50",
-            "share_token": "t" * 43,
-        },
-        "lines": [dict(LINE), dict(LINE_2)][:lines]
-        + [{**LINE, "line_no": n + 1} for n in range(2, lines)],
-        "print": copy.deepcopy(PRINT),
-    }
 
 
 def _text(html: str) -> str:
@@ -473,8 +423,7 @@ def test_the_pdf_is_a_portrait_pdf_and_carries_the_figures() -> None:
     assert data[:5] == b"%PDF-"
     assert _sizes(data) == [(595, 842)]
     text = "\n".join(_pages(data))
-    for figure in ("103.19", "88.23", "269.32", "1,588.10", "45.00", "180.00", "1,768.10",
-                   "1,856.50", "QT/GJ/2026-27/00001"):
+    for figure in PAGE_ONE_FIGURES:
         assert figure in text, figure
     assert "QT/GJ/2026-27/00001, page 1 of 1" in " ".join(text.split())
     assert pypdf.PdfReader(io.BytesIO(data)).metadata.title == "Quotation QT/GJ/2026-27/00001 v1"
