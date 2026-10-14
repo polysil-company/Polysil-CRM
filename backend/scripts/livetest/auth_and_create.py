@@ -11,8 +11,10 @@ from pathlib import Path
 
 import httpx
 import psycopg
+from _guard import require_local
 
 BASE = "http://127.0.0.1:8100/api/v1"
+require_local(BASE)  # FS-065 rule 25: a local stack only, never a tunnel to a box
 PW = "polysil-demo-2026"
 ROOT = Path("D:/Polysil-CRM")
 
