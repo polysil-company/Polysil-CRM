@@ -197,6 +197,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | CHNL-005 | Import channel partners from Excel (`/imports` with `kind=partners`) | shared | in-progress |
 | CHNL-006 | GSTIN details — fill a partner's names from the GST record (`GET /gstin/{gstin}`) | shared | in-progress |
 | CHNL-007 | Dealer applications — start one, fill it for the applicant, and decide (`/dealer-applications`, `…/submit`, `…/withdraw`, `…/link`, `…/decision`) | shared | in-progress |
+| CHNL-008 | The dealer applicant's own page — verify the mobile, fill in, upload, submit (`/public/dealer-apply/{token}`, `…/verify`, `…/documents`, `…/submit`) | shared | in-progress |
 | MKT-001 | Marketing offers — set by Admin, visible to channel partners only | shared | planned |
 | SCHM-001 | Schemes — set by Admin, visible to everyone | shared | planned |
 | MSTR-001 | Masters — products, stock, price lists, territories | shared | planned |

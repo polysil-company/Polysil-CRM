@@ -11,4 +11,7 @@ export interface MockDealerApplication extends Omit<
   token: string;
   created_by: { id: string; full_name: string } | null;
   submitted_at: string | null;
+  /** CHNL-008 · The applicant's session once verified, and when a code was last sent. */
+  session?: { value: string; expiresAt: number } | null;
+  lastCodeAt?: number | null;
 }
