@@ -67,14 +67,14 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 ## Tier 2: smaller missing pieces of built modules
 
 - [x] **9. Reopen a closed complaint:** `POST /complaints/{id}/reopen` (`settings-amend-reopen-contract.md`). PR #136, 15 Oct (`feature/CMPL-010-reopen-complaint`, CMPL-010).
-- [~] **10. Subsidy applications:** started on `feature/SUBS-015-reopen-application`.
+- [x] **10. Subsidy applications:** PR #137, 15 Oct (`feature/SUBS-015-reopen-application`, SUBS-015, SUBS-007). The checklist is a read-only Documents tab in Subsidy masters.
   - Reopen a closed file: `POST /subsidy-applications/{id}/reopen` (`subsidy-completion.md` §4).
   - The document types: `GET /subsidy-document-types`.
 - [x] **11. One approval request on its own:** `GET /approvals/{request_id}`. Checked 15 Oct: **not needed, nothing to build.**
   - Every approval notification (`approval_requested`) points at the order, the quotation or the complaint, never at the approval itself: `v_type` is `sales_order`, `quotation` or `complaint` in `notify_step` (migrations 023 and 026).
   - Those pages already carry the approval chain (`approval.steps[]`), and the inbox gets the decided request back from its own `POST`.
   - Build it only if a notification ever sends `resource.type = "approval"`; `resourceHref` would then need a screen for it.
-- [ ] **12. One set of minutes on its own page:** `GET /minutes/{id}` (`tasks-and-planner-contract.md`).
+- [~] **12. One set of minutes on its own page:** started on `feature/TASK-009-minutes-page`. `GET /minutes/{id}` (`tasks-and-planner-contract.md`).
 - [ ] **13. Check the screens against three handovers,** which the endpoint count can't see:
   - `list-exports.md`: every list it names has an export.
   - `lead-small-gaps-contract.md`: dormant leads, and assigning moves the lead's office.
