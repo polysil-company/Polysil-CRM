@@ -66,8 +66,8 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 
 ## Tier 2: smaller missing pieces of built modules
 
-- [~] **9. Reopen a closed complaint:** `POST /complaints/{id}/reopen` (`settings-amend-reopen-contract.md`). Started on `feature/CMPL-010-reopen-complaint` (CMPL-010).
-- [ ] **10. Subsidy applications:**
+- [x] **9. Reopen a closed complaint:** `POST /complaints/{id}/reopen` (`settings-amend-reopen-contract.md`). PR #136, 15 Oct (`feature/CMPL-010-reopen-complaint`, CMPL-010).
+- [~] **10. Subsidy applications:** started on `feature/SUBS-015-reopen-application`.
   - Reopen a closed file: `POST /subsidy-applications/{id}/reopen` (`subsidy-completion.md` §4).
   - The document types: `GET /subsidy-document-types`.
 - [ ] **11. One approval request on its own:** `GET /approvals/{request_id}`. Check whether a deep link from a notification needs it.
