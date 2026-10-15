@@ -40,7 +40,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
 | [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79 |
 | [Users and roles](#users-and-roles) | 6 | 🧪 👀 | PR #90 |
-| [Dashboard, notifications, messages](#dashboard-notifications-messages) | 4 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43; group chats in PR #NNN |
+| [Dashboard, notifications, messages](#dashboard-notifications-messages) | 4 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43; group chats in PR #133 |
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
@@ -384,7 +384,7 @@ The dashboard reads the backend's real shape since the demo-walk fixes ([changel
   - A conversation nobody has written in yet names its colleague: just started, after a reload, or from a link, read on its own from `GET /conversations/{id}` (BE-021, PR #131). If that read fails, the header says "Conversation" and the thread still works. Screens: [desktop](screenshots/messages-notifications/new-conversation-desktop-light.jpg), [phone, dark](screenshots/messages-notifications/new-conversation-phone-dark.jpg).
   - A colleague who has left: the conversation stays readable and closed. If the backend refuses a send because they have left, the draft stays to copy.
   - Screens: [thread](screenshots/messages-notifications/messages-thread-desktop-light.jpg), [colleague who has left, phone dark](screenshots/messages-notifications/messages-colleague-left-phone-dark.jpg). 🧪 👀
-- **MSG-006 · Group chats (FS-048), PR #NNN.** Staff talk in named groups as well as one to one.
+- **MSG-006 · Group chats (FS-048), PR #133.** Staff talk in named groups as well as one to one.
   - **New group** (the people icon beside New message): a name and colleagues ticked from the directory, up to 49; the form names what's missing. The user manages the group, and it opens at once.
   - The list mixes groups and pairs. A group row shows its name and size ("4 members · …"), from the moment it is made.
   - A group thread names each sender above their messages, from the member list. The box reads "Message Saurashtra sales".
