@@ -115,7 +115,10 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 
 In the handover's order of value to the client (§10, P2). Each has a contract in `backend/docs/api/` and a handover in `backend/docs/handover/`.
 
-- [~] **19. Dealer recruitment** (17 endpoints). Started 15 Oct on `feature/CHNL-007-dealer-recruitment`, from `integration`: 19a the staff screens, then 19b the applicant's page: staff screens, and the public applicant page `/dealer-apply/<token>`. `dealer-recruitment-and-small-changes.md`.
+- [~] **19. Dealer recruitment** (17 endpoints).
+  - [x] **19a. The staff screens.** PR #145, 15 Oct (`feature/CHNL-007-dealer-recruitment`, CHNL-007), stacked on #132: the list, start with its link, edit, documents, submit, new link, withdraw, decide.
+  - [~] **19b. The applicant's page** `/dealer-apply/<token>`. Started on `feature/CHNL-008-dealer-apply-page`, stacked on #145.
+  - Contract: `dealer-recruitment-and-small-changes.md`, `docs/api/dealer-applications.md`.
 - [ ] **20. Territories admin** (4). `backend/docs/api/territories.md`.
 - [ ] **21. Company settings** (2). `settings-amend-reopen-contract.md`.
 - [ ] **22. Reports, and the 360° lead view** (9). RPT-002. `reports-contract.md`, `when-a-sale-counts.md`.
