@@ -300,6 +300,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Quotation builder — a new draft from a lead, editing a draft's header and items | QUOT-004 | `POST /quotations`, `PATCH /quotations/{id}`, `PUT /quotations/{id}/lines` |
 | Subsidised quotation — Subsidised in the builder for a subsidised lead; the subsidy step (the calculator for the lead's scheme and system, then the farmer's category) and the Subsidy card on the quotation with the full calculation (PR #141; not go-live) | QUOT-014 | `PUT /quotations/{id}/subsidy`, `GET /quotations/{id}/subsidy/calculation` |
 | Subsidised order — Place order on an accepted subsidised quotation makes a subsidised order with its subsidy; the order's Subsidy card (material, scheme, farmer, leads) and editing a draft's amounts (PR #142; not go-live) | SO-008 | `POST /orders` (`order_type: subsidised`), `PUT /orders/{id}/subsidy` |
+| Subsidised order typed in — Subsidised on New order for staff, with the leads (1 to 50, the first the order's lead), the material, the subsidy and the farmer payable; adding and removing a draft's leads (PR #NNN; not go-live) | SO-008 | `POST /orders` (`order_type: subsidised`, `subsidy`), `PUT /orders/{id}/subsidy` |
 | Live pricing while items are entered | QUOT-005 | `POST /pricing/quote-lines` |
 | Product picker | MSTR-003 | `GET /products` |
 | Send a quotation | QUOT-006 | `POST /quotations/{id}/send` |
