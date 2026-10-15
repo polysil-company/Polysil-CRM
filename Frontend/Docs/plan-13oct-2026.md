@@ -48,7 +48,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 - [x] **5. One conversation by id** (BE-021, done on the backend). PR #131, 14 Oct (`feature/MSG-004-read-one-conversation`). Groups (`participant: null`) are left to item 7.
   - `GET /conversations/{id}`, so the thread header names the colleague after a reload or from a shared link.
   - MSG-002, MSG-004.
-- [ ] **6. The dealership enquiry type and GSTIN details.**
+- [~] **6. The dealership enquiry type and GSTIN details.** Started 15 Oct on `feature/LEAD-015-dealership-enquiry`.
   - Leads take `inquiry_type: "dealership"`, shown as "Dealership"; such a lead can go from qualified straight to won.
   - `GET /gstin/{gstin}`: prefill the legal and trade names on the channel-partner form when found, and keep them editable.
   - Contract: `subsidised-orders-and-small-changes.md`, "The dealership enquiry type" and "GSTIN details".
