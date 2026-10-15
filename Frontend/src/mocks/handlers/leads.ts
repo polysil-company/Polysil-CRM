@@ -39,6 +39,7 @@ import {
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
+import { dealerApplicationWire, startMockDealerApplicationFor } from "./dealer-applications";
 import { MOCK_CREATOR, leadEventsOf, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
@@ -332,15 +333,23 @@ function hasAcceptedQuotation(lead: LeadWire): boolean {
  * why none was started when a partner already has the mobile number.
  */
 function startMockDealerApplication(lead: LeadWire): NonNullable<LeadWire["dealer_application"]> {
-  if (mockDb.partners.some((partner) => partner.mobile === lead.mobile.replace(/^\+/, ""))) {
-    return { id: null, apply_url: null, not_started: "mobile_in_use" };
+  const mobile = lead.mobile.replace(/^\+/, "");
+  if (!/^91\d{10}$/.test(mobile)) {
+    return { id: null, apply_url: null, not_started: "mobile_invalid" };
   }
-  const token = `apply-${lead.id.slice(-8)}`;
-  return {
-    id: `dapp-${lead.id.slice(-8)}`,
-    apply_url: `https://crm.polysil.example/dealer-apply/${token}`,
-    not_started: null,
-  };
+  // CHNL-007 · a real application, so its link and its page work in the mock
+  const started = startMockDealerApplicationFor({
+    firm: lead.farmer_name,
+    contact: lead.farmer_name,
+    mobile,
+    territory: { id: lead.territory.id, name: lead.territory.name },
+    leadId: lead.id,
+  });
+  if ("refused" in started) {
+    return { id: null, apply_url: null, not_started: started.refused };
+  }
+  const wire = dealerApplicationWire(started.application, true);
+  return { id: wire.id, apply_url: wire.apply_url ?? null, not_started: null };
 }
 
 /** Idempotency-Key handling shared by the stage endpoints: 400, replay or 409. */
