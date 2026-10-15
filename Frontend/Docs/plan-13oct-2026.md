@@ -119,8 +119,8 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
   - [x] **19a. The staff screens.** PR #145, 15 Oct (`feature/CHNL-007-dealer-recruitment`, CHNL-007), stacked on #132: the list, start with its link, edit, documents, submit, new link, withdraw, decide.
   - [x] **19b. The applicant's page** `/dealer-apply/<token>`. PR #146, 15 Oct (`feature/CHNL-008-dealer-apply-page`, CHNL-008), stacked on #145: verify by WhatsApp code, fill in, Check GSTIN, documents, submit.
   - Contract: `dealer-recruitment-and-small-changes.md`, `docs/api/dealer-applications.md`.
-- [~] **20. Territories admin** (4). `backend/docs/api/territories.md`. Started on `feature/MSTR-012-masters-territories`, a Territories tab in Masters, stacked on #135.
-- [ ] **21. Company settings** (2). `settings-amend-reopen-contract.md`.
+- [x] **20. Territories admin** (4). PR #147, 15 Oct (`feature/MSTR-012-masters-territories`, MSTR-012), a Territories tab in Masters, stacked on #135. `backend/docs/api/territories.md`.
+- [~] **21. Company settings** (2). `settings-amend-reopen-contract.md`. Started on `feature/SET-001-company-settings`, from `integration`.
 - [ ] **22. Reports, and the 360° lead view** (9). RPT-002. `reports-contract.md`, `when-a-sale-counts.md`.
 - [ ] **23. Targets and achievement** (3). `targets-contract.md`.
 - [ ] **24. Schemes and promotions** (6, plus `GET /orders/{id}/schemes`). SCHM-001. `schemes-contract.md`.
