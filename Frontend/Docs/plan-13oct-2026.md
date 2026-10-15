@@ -57,7 +57,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - `POST /conversations/groups`, `PATCH /conversations/{id}`, and the members endpoints (list, add, remove).
   - Contract: `group-chat.md`.
   - Data ID: register a new `MSG-` id (next free: MSG-006).
-- [~] **8. Masters admin.** Started 15 Oct on `feature/MSTR-001-masters-lists` (the lists and scoring); offices follow in a second PR.
+- [~] **8. Masters admin.** The lists and lead scoring: PR #134, 15 Oct (`feature/MSTR-001-masters-lists`, MSTR-009, MSTR-010; asks BE-026). Offices: started on `feature/MSTR-011-masters-offices`, stacked on #134.
   - Create and edit the lookups: complaint types, crops, lead sources, lost reasons, meeting types and MIS systems. That is 12 endpoints under `/lookups/*`.
   - Lead scoring: `GET`/`PATCH /lookups/scoring`.
   - Offices: `POST /org-units`, `GET`/`PATCH /org-units/{id}`, close and reopen.
