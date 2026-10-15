@@ -105,7 +105,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - [x] **17b. Typed in directly**, with the multi-lead picker (1 to 50) and the amounts on the new-order screen. PR #143, 15 Oct (`feature/SO-008-direct-subsidised-order`), stacked on #142. Edit the subsidy also adds and removes leads.
   - `PUT /orders/{id}/subsidy`, and the "Subsidised" type on the new-order screen and the order page.
   - Contract: `subsidised-orders-and-small-changes.md`.
-- [~] **18. Subsidy completion** (`subsidy-completion.md`). Started on `feature/SUBS-016-subsidy-completion`, stacked on #143. Reopening a closed file (its part 4) is already in #137:
+- [x] **18. Subsidy completion** (`subsidy-completion.md`). PR #144, 15 Oct (`feature/SUBS-006-subsidy-completion`; SUBS-006, SUBS-002, NOTIF-001, SO-008), stacked on #143. Reopening a closed file (its part 4) is already in #137. The payable shows on the Subsidy card only; payments elsewhere are item 26:
   - the farmer's share paying a subsidised order;
   - the dispatch date on an application;
   - the new bell notifications;
@@ -115,7 +115,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 
 In the handover's order of value to the client (§10, P2). Each has a contract in `backend/docs/api/` and a handover in `backend/docs/handover/`.
 
-- [ ] **19. Dealer recruitment** (17 endpoints): staff screens, and the public applicant page `/dealer-apply/<token>`. `dealer-recruitment-and-small-changes.md`.
+- [~] **19. Dealer recruitment** (17 endpoints). Started 15 Oct on `feature/CHNL-007-dealer-recruitment`, from `integration`: 19a the staff screens, then 19b the applicant's page: staff screens, and the public applicant page `/dealer-apply/<token>`. `dealer-recruitment-and-small-changes.md`.
 - [ ] **20. Territories admin** (4). `backend/docs/api/territories.md`.
 - [ ] **21. Company settings** (2). `settings-amend-reopen-contract.md`.
 - [ ] **22. Reports, and the 360° lead view** (9). RPT-002. `reports-contract.md`, `when-a-sale-counts.md`.
