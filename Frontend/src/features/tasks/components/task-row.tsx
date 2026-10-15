@@ -146,7 +146,14 @@ export function TaskRow({
           </p>
         )}
         {task.minutesId === null ? null : (
-          <p className="text-xs text-muted-foreground">From meeting minutes</p>
+          <p className="text-xs text-muted-foreground">
+            <Link
+              href={`/tasks/minutes/${task.minutesId}`}
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              From meeting minutes
+            </Link>
+          </p>
         )}
         {task.notes === null || !open ? null : (
           <p className="line-clamp-2 text-sm text-pretty text-muted-foreground">{task.notes}</p>

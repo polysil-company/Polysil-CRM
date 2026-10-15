@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-51 changes, newest first. Each title opens its entry.
+52 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-15 | [One set of meeting minutes on its own page](changelog/entries/2026-10-15--feature--TASK-007--one-set-of-minutes-on-its-own-page.md) | `feature` | `TASK-007` |
 | 2026-10-13 | [The release's menu: only the screens a deployment releases](changelog/entries/2026-10-13--feature--APP-007--the-release-s-menu-only-the-screens-a-deployment-releases.md) | `feature` | `APP-007` |
 | 2026-10-13 | [Channel partners: list, add, correct, close and import](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md) | `feature` | `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` |
 | 2026-10-13 | [Documents on leads, quotations, orders and dispatches](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md) | `feature` | `DOC-001` `DOC-002` `DOC-003` |
@@ -62,6 +63,54 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 15 October 2026
+
+### One set of meeting minutes on its own page
+
+`feature` · `TASK-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--TASK-007--one-set-of-minutes-on-its-own-page.md)
+
+#### Before
+
+A task created from meeting minutes said "From meeting minutes" as plain text. The minutes themselves showed only on the lead's page, in a list. From My day, Team or All tasks there was no way to read the meeting a task came from without finding the lead first. The backend's `GET /minutes/{id}` (`tasks-and-planner-contract.md`) was registered under TASK-007 but unused.
+
+#### Now
+
+- **"From meeting minutes"** on an action item's task is a link, wherever the task shows: My day, Team, All tasks and a lead's tasks.
+- **It opens `/tasks/minutes/{id}`**, which shows:
+  - the meeting's date;
+  - the lead it was about, as a link, or the partner;
+  - who was there and the notes;
+  - each action item as its task stands now ("1 of 2 done", overdue in red);
+  - who recorded the minutes.
+- **The page sits under Tasks,** so the Tasks menu rule decides who opens it (APP-006), and Tasks stays highlighted. Minutes out of scope (`404`) show "Page not found"; other failures show the error with a retry.
+- **Shared view:** the lead's minutes card and the page show the same view (`MinutesContent`). The minutes now carry their lead and partner.
+- **The mock** serves `GET /minutes/{id}`.
+- Checked on a desktop in light mode and a phone in dark mode: the link on a task, the page, and minutes not found. axe found nothing.
+
+#### Discussion
+
+- **Under `/tasks`, not `/minutes`:** a page outside the menu map is open to anyone signed in, and minutes are staff only.
+- **No new Data ID:** `GET /minutes/{id}` was already listed under TASK-007.
+
+#### Files changed
+
+- `src/features/tasks/api/tasks.schemas.ts`, `tasks.api.ts`, `tasks.queries.ts`: the minutes' lead and partner, `getMinutes`, `minutesQueryOptions`.
+- `src/features/tasks/components/minutes-detail.tsx`: new, the page.
+- `src/app/(app)/tasks/minutes/[minutesId]/page.tsx`: new, the route.
+- `src/features/tasks/components/lead-minutes.tsx`: `MinutesContent`, shared with the page.
+- `src/features/tasks/components/task-row.tsx`: the link.
+- `src/mocks/handlers/tasks.ts`: `GET /minutes/{id}`.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/tasks/minutes-*`: records and screens.
+
+#### Tests
+
+- `src/features/tasks/components/minutes-detail.test.tsx`:
+  - `getMinutes` reads the minutes with each action item as it stands, and a 404 for unknown ones;
+  - the page shows the meeting, the linked lead, "1 of 2 done", the action items and the notes;
+  - minutes out of scope are not found;
+  - a lead's action-item task links to the page.
+- Walked through in the mock: desktop light and phone dark.
 
 ## 13 October 2026
 
