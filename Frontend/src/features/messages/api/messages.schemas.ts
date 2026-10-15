@@ -3,9 +3,9 @@ import { z } from "zod";
 import type { ResourceRef } from "@/lib/navigation/resource-href";
 
 /**
- * MSG-001 … MSG-005 · Direct messages between staff, as the backend serves them since BE-010
- * (backend/docs/api/messages.md). Staff only: the backend answers partner users with 403.
- * There is no push: the list and the open conversation poll.
+ * MSG-001 … MSG-006 · Messages between staff, one to one or in named groups, as the backend
+ * serves them since BE-010 and FS-048 (backend/docs/api/messages.md). Staff only: the backend
+ * answers partner users with 403. There is no push: the list and the open conversation poll.
  */
 
 const isoDateTime = z.iso.datetime({ offset: true });
@@ -42,15 +42,44 @@ export const messageWireSchema = z.object({
 
 export type MessageWire = z.input<typeof messageWireSchema>;
 
-export const conversationWireSchema = z.object({
-  id: z.string().min(1),
-  /** The other person. Conversations are one-to-one. */
-  participant: personWireSchema,
-  last_message: messageWireSchema.nullish(),
-  /** Messages the signed-in user has not read yet. */
-  unread_count: count,
-  updated_at: isoDateTime,
+/** Group size limits: up to 49 colleagues besides the user at the start, 50 in all. */
+export const GROUP_NAME_MAX_LENGTH = 80;
+export const GROUP_MAX_MEMBERS = 50;
+
+const groupInfoWireSchema = z.object({
+  name: z.string().min(1),
+  /** Members in the group now. */
+  member_count: count,
+  /** Who renames and removes. Null only when nobody active is left to manage it. */
+  manager_id: z.string().min(1).nullable(),
+  i_manage: z.boolean(),
 });
+
+export const conversationWireSchema = z
+  .object({
+    id: z.string().min(1),
+    /** direct: one to one. group: a named group (MSG-006). Older answers leave it out. */
+    kind: z.enum(["direct", "group"]).default("direct"),
+    /** The other person, for a direct conversation; null for a group. */
+    participant: personWireSchema.nullable(),
+    group: groupInfoWireSchema.nullish(),
+    last_message: messageWireSchema.nullish(),
+    /** Messages the signed-in user has not read yet. */
+    unread_count: count,
+    updated_at: isoDateTime,
+  })
+  .superRefine((wire, context) => {
+    if (wire.kind === "direct" && wire.participant === null) {
+      context.addIssue({
+        code: "custom",
+        path: ["participant"],
+        message: "a direct conversation names its participant",
+      });
+    }
+    if (wire.kind === "group" && (wire.group === undefined || wire.group === null)) {
+      context.addIssue({ code: "custom", path: ["group"], message: "a group carries its group" });
+    }
+  });
 
 export type ConversationWire = z.input<typeof conversationWireSchema>;
 
@@ -72,12 +101,49 @@ export interface Message {
   readonly createdAt: string;
 }
 
-export interface Conversation {
+export interface GroupInfo {
+  readonly name: string;
+  readonly memberCount: number;
+  /** Null only when nobody active is left to manage it. */
+  readonly managerId: string | null;
+  /** The signed-in user manages it: renames, and removes members. */
+  readonly iManage: boolean;
+}
+
+interface ConversationBase {
   readonly id: string;
-  readonly participant: Person;
   readonly lastMessage: Message | null;
   readonly unreadCount: number;
   readonly updatedAt: string;
+}
+
+export interface DirectConversation extends ConversationBase {
+  readonly kind: "direct";
+  readonly participant: Person;
+  readonly group: null;
+}
+
+export interface GroupConversation extends ConversationBase {
+  readonly kind: "group";
+  readonly participant: null;
+  readonly group: GroupInfo;
+}
+
+/** One to one, or a named group (MSG-006). */
+export type Conversation = DirectConversation | GroupConversation;
+
+/** What a conversation is called: the colleague's name, or the group's. */
+export function conversationName(conversation: Conversation): string {
+  return conversation.kind === "group" ? conversation.group.name : conversation.participant.name;
+}
+
+/** MSG-006 · Someone who is, or was, in a group. */
+export interface Member {
+  readonly person: Person;
+  readonly addedAt: string;
+  /** Set once they have left the group, or been removed. */
+  readonly leftAt: string | null;
+  readonly isManager: boolean;
 }
 
 export interface ConversationList {
@@ -119,13 +185,30 @@ function toMessage(wire: z.output<typeof messageWireSchema>): Message {
 }
 
 function toConversation(wire: z.output<typeof conversationWireSchema>): Conversation {
-  return {
+  const base = {
     id: wire.id,
-    participant: toPerson(wire.participant),
     lastMessage: wire.last_message ? toMessage(wire.last_message) : null,
     unreadCount: wire.unread_count,
     updatedAt: wire.updated_at,
   };
+  // The schema has checked that a group carries its group and a pair its participant.
+  if (wire.kind === "group" && wire.group) {
+    return {
+      ...base,
+      kind: "group",
+      participant: null,
+      group: {
+        name: wire.group.name,
+        memberCount: wire.group.member_count,
+        managerId: wire.group.manager_id,
+        iManage: wire.group.i_manage,
+      },
+    };
+  }
+  if (wire.participant === null) {
+    throw new Error("A direct conversation without its participant passed the schema");
+  }
+  return { ...base, kind: "direct", participant: toPerson(wire.participant), group: null };
 }
 
 /** MSG-001 · GET /conversations */
@@ -199,3 +282,48 @@ export interface MarkConversationReadRequest {
 export const startConversationRequestSchema = z.object({ participant_id: z.string().min(1) });
 
 export type StartConversationRequest = z.infer<typeof startConversationRequestSchema>;
+
+/** MSG-006 · One member of a group, as the backend lists them. */
+export const memberWireSchema = z.object({
+  person: personWireSchema,
+  added_at: isoDateTime,
+  left_at: isoDateTime.nullable(),
+  is_manager: z.boolean(),
+});
+
+/** MSG-006 · GET and POST /conversations/{id}/members: everyone who has been in it, current first. */
+export const memberListResponseSchema = z
+  .object({ data: z.array(memberWireSchema) })
+  .transform(({ data }): readonly Member[] =>
+    data.map((wire) => ({
+      person: toPerson(wire.person),
+      addedAt: wire.added_at,
+      leftAt: wire.left_at,
+      isManager: wire.is_manager,
+    })),
+  );
+
+export type MemberListResponse = z.input<typeof memberListResponseSchema>;
+
+/** MSG-006 · POST /conversations/groups: a name, and 1 to 49 colleagues besides the user. */
+export const createGroupRequestSchema = z.object({
+  name: z.string().trim().min(1).max(GROUP_NAME_MAX_LENGTH),
+  member_ids: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(GROUP_MAX_MEMBERS - 1),
+});
+
+export type CreateGroupRequest = z.infer<typeof createGroupRequestSchema>;
+
+/** MSG-006 · PATCH /conversations/{id}: the manager renames the group. */
+export const renameGroupRequestSchema = z.object({
+  name: z.string().trim().min(1).max(GROUP_NAME_MAX_LENGTH),
+});
+
+export type RenameGroupRequest = z.infer<typeof renameGroupRequestSchema>;
+
+/** MSG-006 · POST /conversations/{id}/members. Someone already in is ignored. */
+export const addMembersRequestSchema = z.object({ user_ids: z.array(z.string().min(1)).min(1) });
+
+export type AddMembersRequest = z.infer<typeof addMembersRequestSchema>;

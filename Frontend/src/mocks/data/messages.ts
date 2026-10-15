@@ -206,6 +206,7 @@ export function generateConversations(
     messages.push(...thread);
     conversations.push({
       id: seed.id,
+      kind: "direct",
       participant,
       last_message: last ?? null,
       unread_count: seed.unread,
@@ -214,4 +215,111 @@ export function generateConversations(
   }
 
   return { conversations, messages };
+}
+
+/** The signed-in staff user, as a group's member list names them. */
+export const MOCK_CURRENT_STAFF_PERSON: PersonWire = {
+  id: MOCK_CURRENT_STAFF_ID,
+  full_name: "Aarav Desai",
+  role_name: "State Manager",
+  org_unit_name: "Gujarat",
+  is_active: true,
+};
+
+/** Someone in a group, or who was (MSG-006). */
+export interface MockGroupMember {
+  readonly userId: string;
+  addedAt: string;
+  leftAt: string | null;
+  isManager: boolean;
+}
+
+interface GroupSeed {
+  readonly id: string;
+  readonly name: string;
+  readonly managerId: string;
+  readonly memberIds: readonly string[];
+  readonly unread: number;
+  readonly messages: readonly { from: string; body: string; minutesAgo: number }[];
+}
+
+const GROUP_SEEDS: readonly GroupSeed[] = [
+  {
+    id: "grp-001",
+    name: "Saurashtra sales",
+    managerId: MOCK_CURRENT_STAFF_ID,
+    memberIds: [MOCK_CURRENT_STAFF_ID, "usr-002", "usr-003", "usr-005"],
+    unread: 1,
+    messages: [
+      {
+        from: MOCK_CURRENT_STAFF_ID,
+        body: "Morning all — let's close the Rajkot quotes this week.",
+        minutesAgo: 300,
+      },
+      {
+        from: "usr-002",
+        body: "Two of mine are waiting on the farmer's land papers.",
+        minutesAgo: 280,
+      },
+      { from: "usr-003", body: "I can visit Gondal on Thursday.", minutesAgo: 275 },
+      { from: "usr-005", body: "Dispatch says the drip kits arrive Friday.", minutesAgo: 40 },
+    ],
+  },
+  {
+    id: "grp-002",
+    name: "Dispatch coordination",
+    managerId: "usr-005",
+    memberIds: ["usr-005", MOCK_CURRENT_STAFF_ID, "usr-006"],
+    unread: 0,
+    messages: [],
+  },
+];
+
+/** Seeded groups: one the user manages, with messages, and one someone else manages, empty. */
+export function generateGroups(now: number = Date.now()): {
+  conversations: ConversationWire[];
+  messages: MessageWire[];
+  members: Map<string, MockGroupMember[]>;
+} {
+  const conversations: ConversationWire[] = [];
+  const messages: MessageWire[] = [];
+  const members = new Map<string, MockGroupMember[]>();
+
+  for (const seed of GROUP_SEEDS) {
+    const thread = seed.messages.map((entry, index): MessageWire => ({
+      id: `${seed.id}-msg-${String(index + 1)}`,
+      conversation_id: seed.id,
+      sender_id: entry.from,
+      body: entry.body,
+      resource: null,
+      created_at: minutesAgo(now, entry.minutesAgo),
+    }));
+    messages.push(...thread);
+    members.set(
+      seed.id,
+      seed.memberIds.map((userId, index) => ({
+        userId,
+        addedAt: minutesAgo(now, 60 * 24 * 10 - index),
+        leftAt: null,
+        isManager: userId === seed.managerId,
+      })),
+    );
+    const last = thread.at(-1);
+    conversations.push({
+      id: seed.id,
+      kind: "group",
+      participant: null,
+      group: {
+        name: seed.name,
+        member_count: seed.memberIds.length,
+        manager_id: seed.managerId,
+        i_manage: seed.managerId === MOCK_CURRENT_STAFF_ID,
+      },
+      last_message: last ?? null,
+      unread_count: seed.unread,
+      updated_at: last?.created_at ?? minutesAgo(now, 60 * 24 * 2),
+    });
+  }
+
+  return { conversations, messages, members };
 }

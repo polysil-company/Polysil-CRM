@@ -19,6 +19,8 @@ export interface MessageBubbleProps {
   mine: boolean;
   /** Read out before the message: "You" or the colleague's name. */
   senderName: string;
+  /** Shows the sender's name above the bubble: the first of a run, in a group (MSG-006). */
+  showSender?: boolean;
   /** Sits close to the previous bubble from the same sender. */
   grouped: boolean;
   /** Shows the time — on the last bubble of a group. */
@@ -32,6 +34,7 @@ export function MessageBubble({
   createdAt,
   mine,
   senderName,
+  showSender = false,
   grouped,
   showTime,
 }: MessageBubbleProps): React.JSX.Element {
@@ -45,6 +48,11 @@ export function MessageBubble({
         grouped ? "mt-0.5" : "mt-3",
       )}
     >
+      {showSender ? (
+        <span aria-hidden="true" className="mb-1 px-1 text-xs font-medium text-muted-foreground">
+          {senderName}
+        </span>
+      ) : null}
       <div
         className={cn(
           "flex max-w-xs flex-col gap-2 rounded-2xl px-3.5 py-2 text-sm sm:max-w-md",
