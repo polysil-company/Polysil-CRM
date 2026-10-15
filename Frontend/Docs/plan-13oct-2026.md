@@ -100,7 +100,9 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 - [x] **16. Subsidised quotation.** PR #141, 15 Oct (`feature/QUOT-013-subsidised-quotation`, QUOT-014), stacked on #140: merge #140 first, then retarget #141 to `integration`.
   - `PUT /quotations/{id}/subsidy` and `GET /quotations/{id}/subsidy/calculation`.
   - Contract: `subsidised-quotations.md`.
-- [~] **17. Subsidised order.** Started on `feature/SO-008-subsidised-order`, stacked on #141.
+- [~] **17. Subsidised order.**
+  - [x] **17a. From a subsidised quotation.** PR #142, 15 Oct (`feature/SO-008-subsidised-order`, SO-008), stacked on #141. Also: the order's Subsidy card, editing a draft's amounts, and Edit items keeping a fixed type.
+  - [~] **17b. Typed in directly**, with the multi-lead picker (1 to 50) and the amounts on the new-order screen. Started on `feature/SO-008-direct-subsidised-order`, stacked on #142.
   - `PUT /orders/{id}/subsidy`, and the "Subsidised" type on the new-order screen and the order page.
   - Contract: `subsidised-orders-and-small-changes.md`.
 - [ ] **18. Subsidy completion** (`subsidy-completion.md`):
