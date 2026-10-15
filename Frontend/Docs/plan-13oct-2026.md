@@ -53,11 +53,11 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - `GET /gstin/{gstin}`: prefill the legal and trade names on the channel-partner form when found, and keep them editable.
   - Contract: `subsidised-orders-and-small-changes.md`, "The dealership enquiry type" and "GSTIN details".
   - LEAD-, CHNL-.
-- [~] **7. Group chats.** Started 15 Oct on `feature/MSG-006-group-chats`, stacked on #131.
+- [x] **7. Group chats.** PR #133, 15 Oct (`feature/MSG-006-group-chats`), stacked on #131: merge #131 first, then retarget #133 to `integration`.
   - `POST /conversations/groups`, `PATCH /conversations/{id}`, and the members endpoints (list, add, remove).
   - Contract: `group-chat.md`.
   - Data ID: register a new `MSG-` id (next free: MSG-006).
-- [ ] **8. Masters admin.**
+- [~] **8. Masters admin.** Started 15 Oct on `feature/MSTR-001-masters-lists` (the lists and scoring); offices follow in a second PR.
   - Create and edit the lookups: complaint types, crops, lead sources, lost reasons, meeting types and MIS systems. That is 12 endpoints under `/lookups/*`.
   - Lead scoring: `GET`/`PATCH /lookups/scoring`.
   - Offices: `POST /org-units`, `GET`/`PATCH /org-units/{id}`, close and reopen.
@@ -137,6 +137,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 
 - [ ] A "Deleted leads" view with `deleted=true`, for `leads.delete` holders.
 - [ ] The mock's quotation pricing reads `mockDb.products` and the in-force price list, rather than the six `MOCK_PRODUCTS`.
+- [ ] Dark mode: a hovered row with an avatar fails colour contrast (the avatar's 5% white background on `bg-accent`; initials below 4.5:1). Seen in New message and New group (#133). A token change in `tokens.css`, so it reaches every screen.
 
 ## Done
 
