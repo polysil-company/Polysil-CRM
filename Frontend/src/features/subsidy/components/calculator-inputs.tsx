@@ -5,10 +5,12 @@ import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -19,8 +21,12 @@ import {
 } from "@/components/ui/select";
 import { TextField } from "@/features/quotations/components/builder-parts";
 import {
+  GRAVEL_FILTER_SIZES,
+  HYDROCYCLONE_SIZES,
   NOZZLES,
+  PIPE_SIZES,
   type Nozzle,
+  type SchemeInput,
   type SubsidyCrop,
   type SystemConfig,
 } from "@/features/subsidy/api/subsidy.schemas";
@@ -32,6 +38,7 @@ import {
   type DraftCrop,
   type DraftLine,
   type DraftProblems,
+  type SchemeInputsDraft,
 } from "@/features/subsidy/lib/calculator-draft";
 import { cn } from "@/lib/utils";
 
@@ -592,9 +599,11 @@ export function QuotationCostsCard({
                   </label>
                 ))}
               </RadioGroup>
-              <p className="text-xs text-muted-foreground">
-                The pipe size follows the area: the result names it.
-              </p>
+              {system.inputs.includes("pipe_size_mm") ? null : (
+                <p className="text-xs text-muted-foreground">
+                  The pipe size follows the area: the result names it.
+                </p>
+              )}
               {problems.nozzle === undefined ? null : (
                 <p id="nozzle-error" className="text-xs text-danger">
                   {problems.nozzle}
@@ -605,5 +614,284 @@ export function QuotationCostsCard({
         </FieldGroup>
       </CardContent>
     </Card>
+  );
+}
+
+// ── the scheme's own inputs ──────────────────────────────────────────────────────
+
+const PIPE_SIZE_ITEMS = PIPE_SIZES.map((size) => ({
+  value: String(size),
+  label: `${String(size)} mm`,
+}));
+const sizeItems = (sizes: readonly number[]): { value: string; label: string }[] =>
+  sizes.map((size) => ({ value: String(size), label: size === 0 ? "None" : `${String(size)} m³` }));
+const HYDROCYCLONE_ITEMS = sizeItems(HYDROCYCLONE_SIZES);
+const GRAVEL_FILTER_ITEMS = sizeItems(GRAVEL_FILTER_SIZES);
+
+export interface SchemeInputsCardProps {
+  draft: CalculatorDraft;
+  system: SystemConfig;
+  problems: DraftProblems;
+  onChange: (next: CalculatorDraft) => void;
+}
+
+/**
+ * SUBS-002 · What this scheme asks for beyond the design, from its config's `inputs`: a
+ * sprinkler set size, a spacing from the scheme's list, RJ's filters and existing equipment,
+ * AP drip's guided cost and fittings amount from the state portal. Nothing here is decided by
+ * state; a scheme that asks for none shows no card.
+ */
+export function SchemeInputsCard({
+  draft,
+  system,
+  problems,
+  onChange,
+}: SchemeInputsCardProps): React.JSX.Element | null {
+  if (system.inputs.length === 0 && system.unknownInputs.length === 0) return null;
+  const asks = (input: SchemeInput): boolean => system.inputs.includes(input);
+  const set = (next: Partial<SchemeInputsDraft>): void => {
+    onChange({ ...draft, scheme: { ...draft.scheme, ...next } });
+  };
+  const fromPortal = asks("guided_cost") || asks("fittings_amount");
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-0.5">
+          <CardTitle>The scheme&apos;s inputs</CardTitle>
+          <CardDescription>
+            {fromPortal
+              ? "Copy these, and the lines above, from the portal's bill of quantities."
+              : "What this scheme asks for beyond the design."}
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <FieldGroup className="grid gap-4 sm:grid-cols-2">
+          {asks("pipe_size_mm") ? (
+            <ChoiceField
+              id="scheme-pipe-size"
+              label="Sprinkler set size"
+              items={PIPE_SIZE_ITEMS}
+              value={draft.scheme.pipeSizeMm}
+              placeholder="Choose the size"
+              error={problems.pipe_size_mm}
+              onChange={(pipeSizeMm) => {
+                set({ pipeSizeMm });
+              }}
+            />
+          ) : null}
+          {asks("spacing_label") ? (
+            <ChoiceField
+              id="scheme-spacing-label"
+              label="Spacing"
+              items={system.spacingLabels.map((label) => ({ value: label, label }))}
+              value={draft.scheme.spacingLabel}
+              placeholder="Choose the spacing"
+              description="As the scheme's table names it."
+              error={problems.spacing_label}
+              onChange={(spacingLabel) => {
+                set({ spacingLabel });
+              }}
+            />
+          ) : null}
+          {asks("hydrocyclone_m3") ? (
+            <ChoiceField
+              id="scheme-hydrocyclone"
+              label="Hydrocyclone filter"
+              items={HYDROCYCLONE_ITEMS}
+              value={draft.scheme.hydrocycloneM3}
+              error={problems.hydrocyclone_m3}
+              onChange={(hydrocycloneM3) => {
+                set({ hydrocycloneM3 });
+              }}
+            />
+          ) : null}
+          {asks("gravel_filter_m3") ? (
+            <ChoiceField
+              id="scheme-gravel-filter"
+              label="Gravel filter"
+              items={GRAVEL_FILTER_ITEMS}
+              value={draft.scheme.gravelFilterM3}
+              error={problems.gravel_filter_m3}
+              onChange={(gravelFilterM3) => {
+                set({ gravelFilterM3 });
+              }}
+            />
+          ) : null}
+          {asks("head_unit_existing") ? (
+            <ToggleField
+              id="scheme-head-unit-existing"
+              label="Farmer already has a head unit"
+              checked={draft.scheme.headUnitExisting}
+              error={problems.head_unit_existing}
+              onChange={(headUnitExisting) => {
+                set({ headUnitExisting });
+              }}
+            />
+          ) : null}
+          {asks("pvc_existing") ? (
+            <ToggleField
+              id="scheme-pvc-existing"
+              label="Farmer already has the PVC main line"
+              checked={draft.scheme.pvcExisting}
+              error={problems.pvc_existing}
+              onChange={(pvcExisting) => {
+                set({ pvcExisting });
+              }}
+            />
+          ) : null}
+          {asks("guided_cost") ? (
+            <MoneyField
+              id="scheme-guided-cost"
+              label="Guided cost (from the AP MIP portal)"
+              description="The portal's total, not per hectare."
+              value={draft.scheme.guidedCost}
+              error={problems.guided_cost}
+              onChange={(guidedCost) => {
+                set({ guidedCost });
+              }}
+            />
+          ) : null}
+          {asks("fittings_amount") ? (
+            <MoneyField
+              id="scheme-fittings-amount"
+              label="Fittings and accessories (from the portal)"
+              description="0 if the portal shows none."
+              value={draft.scheme.fittingsAmount}
+              error={problems.fittings_amount}
+              onChange={(fittingsAmount) => {
+                set({ fittingsAmount });
+              }}
+            />
+          ) : null}
+        </FieldGroup>
+        {system.unknownInputs.length === 0 ? null : (
+          <p role="note" className="mt-4 text-xs text-muted-foreground">
+            This scheme also asks for {system.unknownInputs.join(", ")}, which this screen
+            can&apos;t take yet. Its figures may be refused until it can.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ChoiceField({
+  id,
+  label,
+  items,
+  value,
+  placeholder,
+  description,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  items: readonly { value: string; label: string }[];
+  value: string;
+  placeholder?: string;
+  description?: string;
+  error: string | undefined;
+  onChange: (next: string) => void;
+}): React.JSX.Element {
+  return (
+    <TextField id={id} label={label} error={error} {...(description ? { description } : {})}>
+      {(aria) => (
+        <Select
+          items={items}
+          value={value === "" ? null : value}
+          onValueChange={(next) => {
+            if (typeof next === "string") onChange(next);
+          }}
+        >
+          <SelectTrigger {...aria} className="w-full">
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </TextField>
+  );
+}
+
+function ToggleField({
+  id,
+  label,
+  checked,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  error: string | undefined;
+  onChange: (next: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-1 sm:col-span-2">
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id={id}
+          checked={checked}
+          aria-invalid={error === undefined ? undefined : true}
+          aria-describedby={error === undefined ? undefined : `${id}-error`}
+          onCheckedChange={(next) => {
+            onChange(next);
+          }}
+        />
+        <Label htmlFor={id} className="text-sm font-normal">
+          {label}
+        </Label>
+      </div>
+      {error === undefined ? null : (
+        <p id={`${id}-error`} className="text-xs text-danger">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function MoneyField({
+  id,
+  label,
+  description,
+  value,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  description: string;
+  value: string;
+  error: string | undefined;
+  onChange: (next: string) => void;
+}): React.JSX.Element {
+  return (
+    <TextField id={id} label={label} error={error} description={description}>
+      {(aria) => (
+        <InputGroup>
+          <InputGroupAddon>₹</InputGroupAddon>
+          <InputGroupInput
+            {...aria}
+            inputMode="decimal"
+            autoComplete="off"
+            className="tabular-nums"
+            value={value}
+            onChange={(event) => {
+              onChange(event.target.value);
+            }}
+          />
+        </InputGroup>
+      )}
+    </TextField>
   );
 }
