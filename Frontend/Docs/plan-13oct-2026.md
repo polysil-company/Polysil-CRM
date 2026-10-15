@@ -75,11 +75,11 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - Those pages already carry the approval chain (`approval.steps[]`), and the inbox gets the decided request back from its own `POST`.
   - Build it only if a notification ever sends `resource.type = "approval"`; `resourceHref` would then need a screen for it.
 - [x] **12. One set of minutes on its own page:** PR #138, 15 Oct (`feature/TASK-007-minutes-page`, TASK-007, which already listed the endpoint). "From meeting minutes" on a task links to `/tasks/minutes/{id}`. `GET /minutes/{id}` (`tasks-and-planner-contract.md`).
-- [~] **13. Check the screens against three handovers,** which the endpoint count can't see. Checked 15 Oct:
+- [x] **13. Check the screens against three handovers,** which the endpoint count can't see. Checked 15 Oct:
   - Exports: all eight lists have Download Excel (`export_too_large` handled; no button on the complaints "Waiting on me" queue). Nothing to do.
   - QR codes: Active/Off chip and Edit exist. Assign: the response replaces the lead, so the new office shows. Nothing to do.
   - Quotation print: the PDF opens as a link, so mixed orientation is fine; the one-discount-column mirror is optional and left.
-  - **Gap: dormant leads** (banner, Reopen to `dormant_from_stage`, Mark lost). Started on `feature/LEAD-007-dormant-leads`.
+  - **Gap: dormant leads** (banner, Reopen to `dormant_from_stage`, Mark lost): PR #139, 15 Oct (`feature/LEAD-007-dormant-leads`).
   The handovers:
   - `list-exports.md`: every list it names has an export.
   - `lead-small-gaps-contract.md`: dormant leads, and assigning moves the lead's office.
