@@ -1,8 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Cancel01Icon, Delete02Icon, Edit02Icon, SentIcon } from "@hugeicons/core-free-icons";
-import { useQuery } from "@tanstack/react-query";
+import {
+  Cancel01Icon,
+  Delete02Icon,
+  Edit02Icon,
+  RotateLeft01Icon,
+  SentIcon,
+} from "@hugeicons/core-free-icons";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -40,17 +46,26 @@ import {
   useCheckComplaint,
   useDeleteComplaint,
   useQcComplaint,
+  useReopenComplaint,
   useSubmitComplaint,
 } from "@/features/complaints/api/complaints.mutations";
-import { complaintAssigneesQueryOptions } from "@/features/complaints/api/complaints.queries";
+import {
+  complaintAssigneesQueryOptions,
+  complaintKeys,
+} from "@/features/complaints/api/complaints.queries";
 import {
   COMPLAINT_SEVERITIES,
   type Complaint,
   type ComplaintSeverity,
 } from "@/features/complaints/api/complaints.schemas";
-import { complaintRefusal, SEVERITY_LABELS } from "@/features/complaints/lib/complaint-labels";
+import {
+  complaintRefusal,
+  SEVERITY_LABELS,
+  timesText,
+} from "@/features/complaints/lib/complaint-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
+import { isApiError } from "@/lib/api/errors";
 import { formatIndianPhone, todayInIndia } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
@@ -63,16 +78,17 @@ const log = createLogger({
 
 const TEXT_MAX = COMPLAINT_TEXT_MAX;
 
-type DialogKind = "submit" | "check" | "qc" | "cancel" | "delete";
+type DialogKind = "submit" | "check" | "qc" | "cancel" | "delete" | "reopen";
 
 function title(complaint: Complaint): string {
   return complaint.number ?? "this draft";
 }
 
 /**
- * CMPL-003…005 · What the user may do on this complaint — only the buttons in its `can`:
- * edit and submit a draft, the manager's check, the QC verdict, cancel, delete a draft never
- * submitted. A step someone else took first closes the dialog and shows the latest.
+ * CMPL-003…005, CMPL-010 · What the user may do on this complaint — only the buttons in its
+ * `can`: edit and submit a draft, the manager's check, the QC verdict, cancel, delete a draft
+ * never submitted, and reopen a closed or rejected one. A step someone else took first closes
+ * the dialog and shows the latest.
  */
 export function ComplaintActions({
   complaint,
@@ -82,7 +98,17 @@ export function ComplaintActions({
   const [dialog, setDialog] = useState<DialogKind | null>(null);
   const { can } = complaint;
 
-  if (!can.edit && !can.submit && !can.check && !can.qc && !can.cancel && !can.delete) return null;
+  if (
+    !can.edit &&
+    !can.submit &&
+    !can.check &&
+    !can.qc &&
+    !can.cancel &&
+    !can.delete &&
+    !can.reopen
+  ) {
+    return null;
+  }
   const close = (): void => {
     setDialog(null);
   };
@@ -126,6 +152,17 @@ export function ComplaintActions({
           Give the QC verdict
         </Button>
       ) : null}
+      {can.reopen ? (
+        <Button
+          variant="outline"
+          onClick={() => {
+            setDialog("reopen");
+          }}
+        >
+          <Icon icon={RotateLeft01Icon} />
+          Reopen
+        </Button>
+      ) : null}
       {can.cancel ? (
         <Button
           variant="ghost"
@@ -156,13 +193,18 @@ export function ComplaintActions({
         }}
       >
         <DialogContent
-          size={dialog === "delete" || dialog === "cancel" || dialog === "submit" ? "sm" : "md"}
+          size={
+            dialog === "delete" || dialog === "cancel" || dialog === "submit" || dialog === "reopen"
+              ? "sm"
+              : "md"
+          }
         >
           {dialog === "submit" ? <SubmitForm complaint={complaint} onClose={close} /> : null}
           {dialog === "check" ? <CheckForm complaint={complaint} onClose={close} /> : null}
           {dialog === "qc" ? <QcForm complaint={complaint} onClose={close} /> : null}
           {dialog === "cancel" ? <CancelForm complaint={complaint} onClose={close} /> : null}
           {dialog === "delete" ? <DeleteForm complaint={complaint} onClose={close} /> : null}
+          {dialog === "reopen" ? <ReopenForm complaint={complaint} onClose={close} /> : null}
         </DialogContent>
       </Dialog>
     </div>
@@ -842,6 +884,146 @@ function CancelForm({
           errorLabel="Not cancelled"
         >
           Cancel complaint
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+// ── reopen (CMPL-010) ─────────────────────────────────────────────────────────────
+
+const reopenSchema: z.ZodType<{ reason: string }, { reason: string }> = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(1, "Say why it is reopened.")
+    .max(TEXT_MAX, "Keep it under 2000 characters."),
+});
+
+/**
+ * A closed or QC-rejected complaint starts a new round: the manager's check, QC and a remedy
+ * again. The backend decides who may and until when (`complaint_reopen_days`, `_max`,
+ * `_roles`); `can.reopen` already says so, and a refusal names the reason.
+ */
+function ReopenForm({
+  complaint,
+  onClose,
+}: {
+  complaint: Complaint;
+  onClose: () => void;
+}): React.JSX.Element {
+  const queryClient = useQueryClient();
+  const reopen = useReopenComplaint();
+  const idempotency = useIdempotencyKey();
+  const closeLater = useCloseLater(onClose);
+  const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
+  const form = useForm<{ reason: string }>({
+    resolver: zodResolver(reopenSchema),
+    defaultValues: { reason: "" },
+    mode: "onTouched",
+  });
+  const { errors } = useFormState({ control: form.control });
+  const rejected = complaint.status === "qc_rejected";
+
+  const submit = useAsyncAction({
+    action: ({ reason }: { reason: string }) => {
+      const body = { reason: reason.trim() };
+      return reopen.mutateAsync({
+        complaintId: complaint.id,
+        body,
+        idempotencyKey: idempotency.keyFor({ reopen: complaint.id, ...body }),
+      });
+    },
+    logger: log,
+    fn: "handleReopenComplaint",
+    dataId: "CMPL-010",
+    onSuccess: () => {
+      idempotency.reset();
+      toast.success("Complaint reopened", {
+        description: "It waits for the manager's check again.",
+      });
+      closeLater();
+    },
+    onError: (error) => {
+      const view = complaintRefusal(error);
+      if (view.stale) {
+        void queryClient.invalidateQueries({ queryKey: complaintKeys.detail(complaint.id) });
+        toast.error(view.title, { description: view.message });
+        onClose();
+        return;
+      }
+      const reason = view.fields?.reason;
+      if (reason !== undefined) {
+        form.setError("reason", { message: "Say why it is reopened." });
+        return;
+      }
+      if (isApiError(error) && error.status === 403) {
+        setRefusal({
+          title: "Not yours to reopen",
+          message: rejected
+            ? "Only the roles set in the company settings reopen a rejected complaint."
+            : "Only the person who raised it, or the roles set in the company settings, reopen it.",
+        });
+        return;
+      }
+      setRefusal({ title: view.title, message: view.message });
+    },
+  });
+
+  return (
+    <form
+      noValidate
+      className="flex min-h-0 flex-1 flex-col"
+      onSubmit={(event) => {
+        setRefusal(null);
+        void form.handleSubmit((values) => submit.run(values))(event);
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Reopen {title(complaint)}?</DialogTitle>
+        <DialogDescription>
+          {rejected
+            ? "QC found no defect. Reopened, it goes to the manager's check and QC again."
+            : "It goes through the manager's check, QC and a remedy again."}
+          {complaint.reopenCount > 0
+            ? ` It was reopened ${timesText(complaint.reopenCount)} before.`
+            : ""}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody>
+        <Field data-invalid={errors.reason ? true : undefined}>
+          <FieldLabel htmlFor="complaint-reopen-reason">Why reopen it</FieldLabel>
+          <Textarea
+            id="complaint-reopen-reason"
+            rows={3}
+            placeholder="The same emitters failed again"
+            aria-invalid={errors.reason ? true : undefined}
+            aria-describedby={
+              errors.reason ? "complaint-reopen-reason-error" : "complaint-reopen-reason-hint"
+            }
+            {...form.register("reason")}
+          />
+          {errors.reason ? null : (
+            <FieldDescription id="complaint-reopen-reason-hint">
+              Staff see it; a dealer doesn&apos;t.
+            </FieldDescription>
+          )}
+          <FieldError id="complaint-reopen-reason-error">{errors.reason?.message}</FieldError>
+        </Field>
+        <Refusal refusal={refusal} />
+      </DialogBody>
+      <DialogFooter>
+        <DialogClose render={<Button type="button" variant="outline" disabled={submit.isBusy} />}>
+          Keep it {rejected ? "rejected" : "closed"}
+        </DialogClose>
+        <Button
+          type="submit"
+          state={submit.state}
+          loadingLabel="Reopening…"
+          successLabel="Reopened"
+          errorLabel="Not reopened"
+        >
+          Reopen
         </Button>
       </DialogFooter>
     </form>

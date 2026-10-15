@@ -67,7 +67,9 @@ export function slaFor(
 
 /**
  * Seeded complaints, one or more in every status: drafts, a returned one, some waiting on a
- * manager's check (one late), some with QC, approved and rejected verdicts, and a cancelled one.
+ * manager's check (one late), some with QC, approved and rejected verdicts, a cancelled one, and
+ * one closed with no remedy due, raised by the signed-in staff user so they may reopen it
+ * (CMPL-010).
  * Numbered `Poly/Comp./2026-27/GJ/NN` once submitted.
  */
 export function generateComplaints(
@@ -92,6 +94,7 @@ export function generateComplaints(
     ["qc_rejected", "low", 12],
     ["cancelled", "medium", 6],
     ["draft", "medium", 5],
+    ["closed", "medium", 10],
   ];
   let serial = 0;
 
@@ -101,15 +104,19 @@ export function generateComplaints(
     const lead = leads[index * 3];
     const order = index % 3 === 0 ? orders.find((item) => item.dispatches.length > 0) : undefined;
     const [contact, mobile] = PEOPLE[index % PEOPLE.length] ?? PEOPLE[0];
-    const raiser = MOCK_STAFF[(index % 3) + 2] ?? MOCK_STAFF[0];
+    const closed = status === "closed";
+    // every mock staff role signs in as usr-001: the raiser of the closed one may reopen it
+    const raiser = closed
+      ? { id: "usr-001", full_name: "Aarav Desai" }
+      : (MOCK_STAFF[(index % 3) + 2] ?? MOCK_STAFF[0]);
     const territory = talukas[index % talukas.length];
     const partner = MOCK_PARTNERS[index % MOCK_PARTNERS.length];
     const type = types[index % types.length];
     const returned = index === 10; // a draft the manager sent back
-    const checked = status === "under_qc" || status.startsWith("qc_");
+    const checked = status === "under_qc" || status.startsWith("qc_") || closed;
     const respondedAt = submitted === null || status === "submitted" ? null : submitted + 3 * HOUR;
     const resolvedAt =
-      status === "qc_approved" || status === "qc_rejected"
+      status === "qc_approved" || status === "qc_rejected" || closed
         ? submitted === null
           ? null
           : submitted + 2 * DAY
@@ -197,11 +204,11 @@ export function generateComplaints(
             }
           : null,
       quality:
-        status === "qc_approved" || status === "qc_rejected"
+        status === "qc_approved" || status === "qc_rejected" || closed
           ? {
-              verdict: status === "qc_approved" ? "approved" : "rejected",
+              verdict: status === "qc_rejected" ? "rejected" : "approved",
               remark:
-                status === "qc_approved"
+                status !== "qc_rejected"
                   ? "Manufacturing defect in the wall thickness."
                   : "Damage from rodents in the field, not a defect.",
               sample_received_on: todayInIndia(new Date(created + 2 * DAY)),
@@ -225,8 +232,23 @@ export function generateComplaints(
       owner: checked ? (raiser ?? null) : null,
       owner_org_unit: { id: "ou-vadodara", name: "Vadodara District" },
       raised_by: raiser ?? null,
-      remedy: null,
-      closed_at: null,
+      remedy: closed
+        ? {
+            id: mockUuid(MOCK_ID_SPACE.complaint, 0x9000 + index),
+            kind: "none",
+            status: "completed",
+            remark: "Within tolerance; the farmer was shown how to flush the lines.",
+            refund: null,
+            replacement: null,
+            chosen_by: qc ?? null,
+            chosen_at: new Date(created + 4 * DAY).toISOString(),
+            completed_at: new Date(created + 4 * DAY).toISOString(),
+          }
+        : null,
+      closed_at: closed ? new Date(created + 4 * DAY + HOUR).toISOString() : null,
+      reopen_count: 0,
+      reopened_at: null,
+      reopen_reason: null,
       created_at: new Date(created).toISOString(),
       updated_at: new Date(submitted ?? created).toISOString(),
       submitted_at: submitted === null ? null : new Date(submitted).toISOString(),

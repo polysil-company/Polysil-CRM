@@ -25,6 +25,7 @@ import {
   complaintHistoryEntry,
   SEVERITY_BADGE,
   SEVERITY_LABELS,
+  timesText,
 } from "@/features/complaints/lib/complaint-labels";
 import { formatQuantity } from "@/features/quotations/lib/quotation-labels";
 import { toUserFacingError } from "@/lib/api/error-messages";
@@ -157,6 +158,17 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
           title={`Returned to fix${complaint.check.by === null ? "" : ` by ${complaint.check.by.name}`}`}
         >
           {complaint.check.remark} Edit the draft, then submit it again.
+        </Notice>
+      ) : null}
+      {complaint.reopenCount > 0 ? (
+        <Notice tone="neutral" title={`Reopened ${timesText(complaint.reopenCount)}`}>
+          {complaint.reopenReason ?? "It went through the check, QC and a remedy again."}
+          {complaint.reopenedAt === null ? null : (
+            <span className="text-muted-foreground">
+              {" "}
+              · last <RelativeDate value={complaint.reopenedAt} />
+            </span>
+          )}
         </Notice>
       ) : null}
       {complaint.status === "cancelled" && complaint.cancellation !== null ? (
