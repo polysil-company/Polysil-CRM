@@ -136,6 +136,9 @@ describe("[SO-008] A subsidised order, through the API", () => {
       leads: [{ id: quotation.lead?.id }],
     });
     expect(Number(order.subsidy?.subsidyAmount)).toBeGreaterThan(0);
+    // paid by the farmer's share, never above the total (`subsidy-completion.md` §1)
+    const share = Math.min(Number(order.totals.total), Number(quotation.subsidy?.farmerShare));
+    expect(order.payable).toBe(share.toFixed(2));
   });
 
   it("refuses a quotation of the wrong type, one without its subsidy, and a dealer", async () => {
@@ -267,6 +270,7 @@ describe("[SO-008] The subsidy on the order", () => {
 
     expect(await screen.findByText("The scheme pays")).toBeInTheDocument();
     expect(screen.getByText("The farmer pays")).toBeInTheDocument();
+    expect(screen.getByText(/the farmer's share\.$/)).toBeInTheDocument();
     const leads = screen.getByRole("list", { name: "Leads on this order" });
     expect(within(leads).getByText("(the order's lead)")).toBeInTheDocument();
 

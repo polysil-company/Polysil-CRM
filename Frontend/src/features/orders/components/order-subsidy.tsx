@@ -121,6 +121,15 @@ export function OrderSubsidyCard({ order }: { order: Order }): React.JSX.Element
             strong
           />
         </dl>
+        {order.payable === null ? null : (
+          <p className="text-sm text-muted-foreground">
+            Payable{" "}
+            <span className="font-medium text-foreground tabular-nums">
+              {formatInr(order.payable, { paise: true })}
+            </span>
+            : the farmer&apos;s share.
+          </p>
+        )}
         <div className="flex flex-col gap-1 text-sm">
           <p className="text-xs text-muted-foreground">
             {subsidy.leads.length === 1 ? "Lead" : `${String(subsidy.leads.length)} leads`}

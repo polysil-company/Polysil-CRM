@@ -20,6 +20,7 @@ import {
   BLOCK_ROWS,
   EXTRA_BLOCK_ROWS,
   ratioAsPercent,
+  warningSentence,
   warningTitle,
   type BlockRow,
 } from "@/features/subsidy/lib/subsidy-labels";
@@ -94,7 +95,7 @@ function CalculationWarnings({ result }: { result: SubsidyCalculation }): React.
                 <span className="text-muted-foreground">{warning.where}: </span>
               )}
               {title === null ? null : <span className="font-medium">{title}. </span>}
-              {warning.sentence}
+              {warningSentence(warning.code, warning.sentence)}
             </li>
           );
         })}

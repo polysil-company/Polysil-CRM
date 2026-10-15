@@ -457,6 +457,8 @@ function applySubsidy(order: OrderWire): void {
       inquiry_no: mockDb.leads.find((lead) => lead.id === id)?.inquiry_no ?? null,
     })),
   };
+  // FS-055 rule 4: the order is paid by the farmer's share, never below 0 or above the total
+  order.payable = rupees(Math.max(0, Math.min(paise(order.totals.total), payable)));
   order.warnings = [
     ...order.warnings.filter(
       (warning) =>

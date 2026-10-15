@@ -248,6 +248,27 @@ describe("[SUBS-006] Stages and cancel", () => {
     ]);
   });
 
+  it("takes the dispatch date as stage 7's supply date when none is sent", async () => {
+    const files = await listApplications({ ...ALL, cursor: null });
+    const dispatched = files.items.find((item) => item.dispatchedOn !== null);
+    if (dispatched === undefined || dispatched.dispatchedOn === null) {
+      throw new Error("No seeded file with a dispatch date");
+    }
+
+    await recordStage(dispatched.id, {
+      body: {
+        stage_code: "farmer_share",
+        occurred_on: todayInIndia(),
+        values: { farmer_share_amt: "1000.00" },
+        remark: null,
+      },
+      idempotencyKey: "st-supply",
+    });
+
+    const entries = await listStageEntries(dispatched.id);
+    expect(entries.at(-1)?.values).toMatchObject({ supply: dispatched.dispatchedOn });
+  });
+
   it("closes itself once every stage-16 amount has its stage-17 date", async () => {
     const id = await fresh();
     const today = todayInIndia();

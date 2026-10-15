@@ -101,7 +101,7 @@ describe("[SUBS-002] Subsidy calculation", () => {
     });
   });
 
-  it("derives Sprinkler's lines and refuses an area the table doesn't hold", async () => {
+  it("derives Sprinkler's lines, takes an area between steps, refuses one outside", async () => {
     const sprinkler: CalculateRequest = {
       system_type: "sprinkler",
       crops: [
@@ -120,10 +120,19 @@ describe("[SUBS-002] Subsidy calculation", () => {
     expect(result.sprinkler).toMatchObject({ pipeSizeMm: 75, nozzle: "brass" });
     expect(result.crops[0]?.warnings[0]).toMatch(/^spacing_outside_table: /);
 
+    // SUBS-002 · between two steps: the next step's quantities, with a warning (§5)
+    const between = await calculateSubsidy({
+      ...sprinkler,
+      crops: sprinkler.crops.map((crop) => ({ ...crop, area: "1.300" })),
+    });
+    expect(between.crops[0]?.warnings).toContainEqual(
+      expect.stringMatching(/^area_between_steps: /),
+    );
+
     await expect(
       calculateSubsidy({
         ...sprinkler,
-        crops: sprinkler.crops.map((crop) => ({ ...crop, area: "1.300" })),
+        crops: sprinkler.crops.map((crop) => ({ ...crop, area: "5.500" })),
       }),
     ).rejects.toMatchObject({
       status: 422,

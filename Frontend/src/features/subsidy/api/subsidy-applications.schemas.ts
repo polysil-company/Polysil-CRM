@@ -76,6 +76,11 @@ const applicationWireSchema = z.object({
     days_since_inward: z.number().int().nullable(),
   }),
   full_fp_received_on: z.string().nullable(),
+  /**
+   * SUBS-006 · The IST date of the first dispatch of a subsidised order naming this lead
+   * (`subsidy-completion.md` §2); stage 7 takes it as the supply date when none is sent.
+   */
+  dispatched_on: z.string().nullish(),
   created_at: z.string(),
   cancellation: z.object({ reason: z.string() }).nullable(),
 });
@@ -111,6 +116,7 @@ const applicationSchema = applicationWireSchema.transform((wire) => ({
   daysInStage: wire.ageing.days_in_stage,
   daysSinceInward: wire.ageing.days_since_inward,
   closedOn: wire.full_fp_received_on,
+  dispatchedOn: wire.dispatched_on ?? null,
   createdAt: wire.created_at,
   cancellation: wire.cancellation,
 }));
