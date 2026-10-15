@@ -70,7 +70,10 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 - [~] **10. Subsidy applications:** started on `feature/SUBS-015-reopen-application`.
   - Reopen a closed file: `POST /subsidy-applications/{id}/reopen` (`subsidy-completion.md` §4).
   - The document types: `GET /subsidy-document-types`.
-- [ ] **11. One approval request on its own:** `GET /approvals/{request_id}`. Check whether a deep link from a notification needs it.
+- [x] **11. One approval request on its own:** `GET /approvals/{request_id}`. Checked 15 Oct: **not needed, nothing to build.**
+  - Every approval notification (`approval_requested`) points at the order, the quotation or the complaint, never at the approval itself: `v_type` is `sales_order`, `quotation` or `complaint` in `notify_step` (migrations 023 and 026).
+  - Those pages already carry the approval chain (`approval.steps[]`), and the inbox gets the decided request back from its own `POST`.
+  - Build it only if a notification ever sends `resource.type = "approval"`; `resourceHref` would then need a screen for it.
 - [ ] **12. One set of minutes on its own page:** `GET /minutes/{id}` (`tasks-and-planner-contract.md`).
 - [ ] **13. Check the screens against three handovers,** which the endpoint count can't see:
   - `list-exports.md`: every list it names has an export.
