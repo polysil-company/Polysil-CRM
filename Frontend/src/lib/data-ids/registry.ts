@@ -690,9 +690,10 @@ export const DATA_IDS = {
   },
   "MSTR-001": {
     domain: "MSTR",
-    title: "Masters — products, stock, price lists, territories",
+    title: "Masters — the Admin → Masters area: lists, lead scoring and offices",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
+    notes: "The page at /masters. Products and prices are MSTR-004…008; territories stay seeded.",
   },
   "MSTR-003": {
     domain: "MSTR",
@@ -784,6 +785,22 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     endpoints: ["GET /price-lists", "POST /price-lists", "POST /pricing/quote-lines"],
+  },
+  "MSTR-009": {
+    domain: "MSTR",
+    title: "Masters lists — add a row, switch it on or off",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /lookups/{list}", "PATCH /lookups/{list}/{id}"],
+    notes:
+      "Lead sources, irrigation systems, lost reasons, crops, meeting types and complaint types (CMPL-008). Rows are never renamed or deleted (ADR-033).",
+  },
+  "MSTR-010": {
+    domain: "MSTR",
+    title: "Lead scoring — the weights, caps and thresholds behind a lead's score",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lookups/scoring", "PATCH /lookups/scoring"],
   },
   "MSTR-002": {
     domain: "MSTR",

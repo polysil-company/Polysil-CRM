@@ -196,7 +196,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | CHNL-005 | Import channel partners from Excel (`/imports` with `kind=partners`) | shared | in-progress |
 | MKT-001 | Marketing offers — set by Admin, visible to channel partners only | shared | planned |
 | SCHM-001 | Schemes — set by Admin, visible to everyone | shared | planned |
-| MSTR-001 | Masters — products, stock, price lists, territories | shared | planned |
+| MSTR-001 | Masters — the Admin → Masters area: lists, lead scoring and offices (`/masters`) | shared | in-progress |
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
 | MSTR-004 | Product catalogue — browse, add and correct products (`GET`/`POST /products`, `GET`/`PATCH /products/{id}`) | shared | in-progress |
@@ -204,6 +204,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-006 | Price lists — draft, fill the rate sheet, publish, close (`/price-lists*`) | shared | in-progress |
 | MSTR-007 | Excel import with column matching — price list rates, partners, order and quotation lines (`/imports*`) | shared | in-progress |
 | MSTR-008 | Price lists by sale type — commercial, industrial or subsidised (`sales_type` on `/price-lists`, `/pricing/quote-lines`) | shared | in-progress |
+| MSTR-009 | Masters lists — add a row, switch it on or off (`POST /lookups/{list}`, `PATCH /lookups/{list}/{id}`) | shared | in-progress |
+| MSTR-010 | Lead scoring — the weights, caps and thresholds behind a lead's score (`GET`/`PATCH /lookups/scoring`) | shared | in-progress |
 | DOC-001 | Documents on a lead, quotation, order or dispatch — the list, the types and opening one (`GET /documents`, `/leads/{id}/documents`, `/documents/types`, `/documents/{id}/link`) | shared | in-progress |
 | DOC-002 | Attach a document to a record (`POST /documents`) | shared | in-progress |
 | DOC-003 | Remove a document (`DELETE /documents/{id}`) | shared | in-progress |
