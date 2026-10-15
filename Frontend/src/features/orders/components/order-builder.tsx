@@ -25,6 +25,7 @@ import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
 import { useCreateOrder, useSaveOrderDraft } from "@/features/orders/api/orders.mutations";
 import {
+  ORDER_TYPES,
   ORDERABLE_TYPES,
   PAYMENT_TERMS,
   type Order,
@@ -71,7 +72,13 @@ export type OrderBuilderSource =
   | { readonly mode: "create"; readonly lead: Lead | null }
   | { readonly mode: "edit"; readonly order: Order };
 
-const OrderTypeSchema = z.enum(ORDERABLE_TYPES);
+const OrderTypeSchema = z.enum(ORDER_TYPES);
+
+type OrderableType = (typeof ORDERABLE_TYPES)[number];
+
+function orderableType(value: string): value is OrderableType {
+  return ORDERABLE_TYPES.some((type) => type === value);
+}
 
 const orderHeaderSchema = z.object({
   orderType: OrderTypeSchema,
@@ -129,7 +136,8 @@ function headerDefaults(source: OrderBuilderSource): OrderHeaderForm {
   }
   const { order } = source;
   return {
-    orderType: order.orderType === "industrial" ? "industrial" : "commercial",
+    // SO-008 · A subsidised draft (and any type the builder doesn't offer) keeps its type
+    orderType: order.orderType,
     partyName: order.party.name,
     partyMobile: order.party.mobile ?? "",
     partyAddress: order.party.address ?? "",
@@ -202,6 +210,9 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   const { errors } = useFormState({ control: form.control });
   const place = useWatch({ control: form.control, name: "place" });
   const fromQuotations = source.mode === "edit" && source.order.quotations.length > 0;
+  // FS-042 rule 18: a draft from quotations, or one the builder can't make, keeps its type
+  const typeFixed =
+    source.mode === "edit" && (fromQuotations || !orderableType(source.order.orderType));
   // The place is fixed by the lead, or by the draft once saved.
   const placeFixed = source.mode === "edit" || source.lead !== null;
 
@@ -244,7 +255,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       };
       if (source.mode === "create") {
         const body = {
-          order_type: values.orderType,
+          order_type: orderableType(values.orderType) ? values.orderType : "commercial",
           ...(source.lead === null ? {} : { lead_id: source.lead.id }),
           ...(partnerId === null ? {} : { partner_id: partnerId }),
           party: partyFrom(values),
@@ -255,8 +266,14 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         return create.mutateAsync({ body, idempotencyKey: idempotency.keyFor(body) });
       }
       const headerChanged = JSON.stringify(values) !== JSON.stringify(initialHeader);
+      // Only a changed type is sent: an order from quotations, or a subsidised one, keeps its
+      // own (422 order_type_fixed)
+      const newType =
+        values.orderType !== initialHeader.orderType && orderableType(values.orderType)
+          ? { order_type: values.orderType }
+          : {};
       const headerBody = {
-        order_type: values.orderType,
+        ...newType,
         ...(fromQuotations ? {} : { party: partyFrom(values) }),
         ...common,
         expected_status: "draft" as const,
@@ -437,34 +454,46 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
             </CardHeader>
             <CardContent>
               <FieldGroup className="grid gap-4 sm:grid-cols-2">
-                <Controller
-                  control={form.control}
-                  name="orderType"
-                  render={({ field }) => (
-                    <Field className="sm:col-span-2">
-                      <FieldLabel id="order-type-label">Order type</FieldLabel>
-                      <RadioGroup<(typeof ORDERABLE_TYPES)[number]>
-                        aria-labelledby="order-type-label"
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        className="flex-row flex-wrap gap-5"
-                      >
-                        {ORDERABLE_TYPES.map((type) => (
-                          <label
-                            key={type}
-                            className="flex items-center gap-2 text-sm text-foreground"
-                          >
-                            <RadioGroupItem value={type} />
-                            {ORDER_TYPE_LABELS[type]}
-                          </label>
-                        ))}
-                      </RadioGroup>
-                      <FieldDescription>
-                        Export, sample, subsidised and the others wait on the client&apos;s rules.
-                      </FieldDescription>
-                    </Field>
-                  )}
-                />
+                {typeFixed ? (
+                  <Field className="sm:col-span-2">
+                    <FieldLabel>Order type</FieldLabel>
+                    <p className="text-sm text-foreground">{ORDER_TYPE_LABELS[orderType]}</p>
+                    <FieldDescription>
+                      {fromQuotations
+                        ? "An order made from quotations keeps its type."
+                        : "This order keeps its type."}
+                    </FieldDescription>
+                  </Field>
+                ) : (
+                  <Controller
+                    control={form.control}
+                    name="orderType"
+                    render={({ field }) => (
+                      <Field className="sm:col-span-2">
+                        <FieldLabel id="order-type-label">Order type</FieldLabel>
+                        <RadioGroup<OrderableType>
+                          aria-labelledby="order-type-label"
+                          value={orderableType(field.value) ? field.value : "commercial"}
+                          onValueChange={field.onChange}
+                          className="flex-row flex-wrap gap-5"
+                        >
+                          {ORDERABLE_TYPES.map((type) => (
+                            <label
+                              key={type}
+                              className="flex items-center gap-2 text-sm text-foreground"
+                            >
+                              <RadioGroupItem value={type} />
+                              {ORDER_TYPE_LABELS[type]}
+                            </label>
+                          ))}
+                        </RadioGroup>
+                        <FieldDescription>
+                          Export, sample, subsidised and the others wait on the client&apos;s rules.
+                        </FieldDescription>
+                      </Field>
+                    )}
+                  />
+                )}
                 <TextField
                   id="order-party-name"
                   label="Party"

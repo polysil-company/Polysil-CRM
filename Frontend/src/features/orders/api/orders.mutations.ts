@@ -14,6 +14,7 @@ import {
   deleteOrder,
   patchOrder,
   replaceOrderLines,
+  setOrderSubsidy,
   submitOrder,
   voidDispatch,
   type WriteInput,
@@ -28,6 +29,7 @@ import type {
   Order,
   PatchOrderRequest,
   RemarkRequest,
+  OrderSubsidyRequest,
   ReplaceOrderLinesRequest,
 } from "./orders.schemas";
 
@@ -69,6 +71,21 @@ export function useCreateOrder(): UseMutationResult<
     mutationKey: [...orderKeys.all, "create"],
     mutationFn: createOrder,
     meta: { dataId: "SO-003" },
+    onSuccess: apply,
+  });
+}
+
+/** SO-008 · A subsidised draft's leads and amounts. */
+export function useSetOrderSubsidy(): UseMutationResult<
+  Order,
+  Error,
+  OrderActionInput<OrderSubsidyRequest>
+> {
+  const apply = useApplyOrder();
+  return useMutation({
+    mutationKey: [...orderKeys.all, "subsidy"],
+    mutationFn: ({ id, input }) => setOrderSubsidy(id, input),
+    meta: { dataId: "SO-008" },
     onSuccess: apply,
   });
 }

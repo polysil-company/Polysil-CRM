@@ -311,6 +311,18 @@ export interface DispatchListParams {
   readonly to: string | null;
 }
 
+/** SO-008 · GET /orders/{id} `subsidy` (FS-054). */
+const subsidyBlockWireSchema = z.object({
+  /** The material amount, or the order total when `material_is_total`. */
+  material_amount: decimal,
+  subsidy_amount: decimal,
+  /** The farmer's share, material less subsidy when derived: what the order collects. */
+  farmer_payable: decimal,
+  material_is_total: z.boolean(),
+  farmer_payable_is_derived: z.boolean(),
+  leads: z.array(z.object({ id: z.string().min(1), inquiry_no: z.string().nullable() })),
+});
+
 export const orderWireSchema = z.object({
   doc_type: z.literal("sales_order").optional(),
   id: z.string().min(1),
@@ -357,6 +369,8 @@ export const orderWireSchema = z.object({
   dispatches: z.array(dispatchSchema),
   /** "code: sentence", as on a quotation. */
   warnings: z.array(z.string()),
+  /** SO-008 · A subsidised order's subsidy (FS-054, FS-057); null on every other type. */
+  subsidy: subsidyBlockWireSchema.nullish(),
   remarks: z.string().nullable(),
   pdf_state: z.enum(ORDER_PDF_STATES),
   pdf_error: z.string().nullish(),
@@ -415,6 +429,18 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
   lastRejection: wire.last_rejection,
   dispatches: wire.dispatches,
   warnings: wire.warnings,
+  subsidy:
+    wire.subsidy == null
+      ? null
+      : {
+          materialAmount: wire.subsidy.material_amount,
+          subsidyAmount: wire.subsidy.subsidy_amount,
+          farmerPayable: wire.subsidy.farmer_payable,
+          materialIsTotal: wire.subsidy.material_is_total,
+          farmerPayableIsDerived: wire.subsidy.farmer_payable_is_derived,
+          /** In order; the first is the order's lead. A null number is a lead you can't see. */
+          leads: wire.subsidy.leads.map((lead) => ({ id: lead.id, code: lead.inquiry_no ?? null })),
+        },
   remarks: wire.remarks,
   pdfState: wire.pdf_state,
   pdfError: wire.pdf_error ?? null,
@@ -443,9 +469,12 @@ export const noContentSchema = z.undefined();
 
 // ── writes (SO-003, SO-004, DISP-002) ─────────────────────────────────────────────
 
-/** POST /orders from accepted quotations: the order takes the rest from them. */
+/**
+ * POST /orders from accepted quotations: the order takes the rest from them. A subsidised
+ * order is made from one subsidised quotation and takes its subsidy from it (FS-057 rule 8).
+ */
 export interface CreateOrderFromQuotations {
-  readonly order_type: (typeof ORDERABLE_TYPES)[number];
+  readonly order_type: (typeof ORDERABLE_TYPES)[number] | "subsidised";
   readonly quotation_ids: readonly string[];
   readonly delivery_address: string | null;
   readonly payment_terms: PaymentTerms;
@@ -491,6 +520,17 @@ export interface PatchOrderRequest {
   readonly payment_terms?: PaymentTerms;
   readonly remarks?: string | null;
   readonly expected_status: "draft";
+}
+
+/** SO-008 · PUT /orders/{id}/subsidy — a subsidised draft's leads and amounts. */
+export interface OrderSubsidyRequest {
+  /** 1 to 50; the first stays the order's lead (422 first_lead_fixed). */
+  readonly lead_ids: readonly string[];
+  /** Left out: the order total, read at the time. */
+  readonly material_amount?: string;
+  readonly subsidy_amount: string;
+  /** Left out: material less subsidy. */
+  readonly farmer_payable?: string;
 }
 
 export interface ExpectedStatusRequest {

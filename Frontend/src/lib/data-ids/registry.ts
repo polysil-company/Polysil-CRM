@@ -499,6 +499,15 @@ export const DATA_IDS = {
     endpoints: ["GET /orders/export"],
     notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
   },
+  "SO-008": {
+    domain: "SO",
+    title: "A subsidised order — from a subsidised quotation, its subsidy block and editing it",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders", "PUT /orders/{orderId}/subsidy"],
+    notes:
+      "FS-054, FS-057; subsidised-orders-and-small-changes.md. Staff only. Not part of go-live (13 Oct).",
+  },
   "APPR-001": {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",

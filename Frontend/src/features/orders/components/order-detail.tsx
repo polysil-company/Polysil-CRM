@@ -46,6 +46,7 @@ import { OrderApproval } from "./order-approval";
 import { OrderDispatches } from "./order-dispatches";
 import { OrderHistory } from "./order-history";
 import { OrderStatusBadge } from "./order-status-badge";
+import { isSubsidyWarning, OrderSubsidyCard } from "./order-subsidy";
 
 /** SO-002 · The order as the backend prints it. A 404 renders the route's not-found page. */
 export function OrderDetail({ orderId }: { orderId: string }): React.JSX.Element {
@@ -142,6 +143,8 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
           <TotalsBlock order={order} />
         </CardContent>
       </Card>
+
+      <OrderSubsidyCard order={order} />
 
       {shipping ? <OrderDispatches order={order} /> : null}
 
@@ -410,7 +413,7 @@ function OrderNotices({ order }: { order: Order }): React.JSX.Element | null {
     );
   }
   for (const [index, warning] of parseWarnings(order.warnings)
-    .filter((item) => item.code !== "provisional_pricing")
+    .filter((item) => item.code !== "provisional_pricing" && !isSubsidyWarning(item.code))
     .entries()) {
     notices.push(
       <Notice key={`warning-${String(index)}`} tone="warning">

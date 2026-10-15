@@ -58,6 +58,11 @@ export interface MockDb {
   orders: OrderWire[];
   /** Order writes: Idempotency-Key → the request and the order it made or changed. */
   orderWrites: Map<string, { body: string; orderId: string }>;
+  /** SO-008 · A subsidised order's subsidy as written: null material is the order total. */
+  orderSubsidies: Map<
+    string,
+    { material: string | null; subsidy: string; payable: string | null; leadIds: string[] }
+  >;
   /** Each order's history, newest first: derived once from the seed, then written to. */
   orderEvents: Map<string, TimelineEventWire[]>;
   /** When a just-approved order's PDF is ready (epoch ms); read by the next GET. */
@@ -178,6 +183,7 @@ function createMockDb(): MockDb {
     pdfReadyAt: new Map(),
     orders,
     orderWrites: new Map(),
+    orderSubsidies: new Map(),
     orderEvents: new Map(),
     orderPdfReadyAt: new Map(),
     thresholds,

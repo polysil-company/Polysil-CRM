@@ -209,6 +209,70 @@ export function orderRefusal(error: unknown): OrderRefusal {
       };
     case "order_type_unsupported":
       return { title: "This order type isn't available yet", message: error.message, stale: false };
+    // SO-008 · A subsidised order (subsidised-orders-and-small-changes.md, FS-057)
+    case "subsidy_above_material":
+      return {
+        title: "The subsidy is more than the material",
+        message: "Lower the subsidy, or raise the material amount.",
+        stale: false,
+      };
+    case "payable_above_material":
+      return {
+        title: "The farmer's share is more than the material",
+        message: "Lower the farmer payable, or leave it empty for material less subsidy.",
+        stale: false,
+      };
+    case "first_lead_fixed":
+      return {
+        title: "The first lead can't change",
+        message: "It is the order's lead and routes it. Keep it first; add or remove the others.",
+        stale: false,
+      };
+    case "lead_not_visible":
+      return { title: "A lead isn't visible to you", message: error.message, stale: false };
+    case "order_type_not_subsidised":
+      return {
+        title: "This order isn't subsidised",
+        message: "Only a subsidised order takes a subsidy.",
+        stale: true,
+      };
+    case "subsidy_missing":
+      return {
+        title: "The subsidy is missing",
+        message: "A subsidised order needs its leads and subsidy amount.",
+        stale: false,
+      };
+    case "quotation_subsidy_missing":
+      return {
+        title: "The quotation has no subsidy",
+        message: "Calculate the quotation's subsidy before making its order.",
+        stale: false,
+      };
+    case "subsidised_quotation_count":
+      return {
+        title: "One quotation per subsidised order",
+        message: "A subsidised order is made from exactly one quotation.",
+        stale: false,
+      };
+    case "type_mismatch":
+      return {
+        title: "The order type doesn't match the quotation",
+        message: "A subsidised quotation makes a subsidised order, and only it does.",
+        stale: false,
+      };
+    case "subsidy_scheme_changed":
+    case "subsidy_system_changed":
+      return {
+        title: "The lead changed since the subsidy was calculated",
+        message: "Revise the quotation and calculate its subsidy again.",
+        stale: false,
+      };
+    case "type_staff_only":
+      return {
+        title: "Staff only",
+        message: "Export, sample and subsidised orders are made by Polysil staff.",
+        stale: false,
+      };
     default: {
       const view = toUserFacingError(error);
       return { title: view.title, message: view.description, stale: false };

@@ -359,6 +359,18 @@ const createSchema = z.object({
   payment_terms: z.enum(PAYMENT_TERMS).default("full_payment"),
   remarks: z.string().trim().max(2000).nullish(),
   lines: z.array(lineInSchema).max(200).default([]),
+  /** SO-008 · Typed in on a direct subsidised order; refused alongside quotations. */
+  subsidy: z.unknown().optional(),
+});
+
+const rupeesText = z.string().regex(/^\d+(\.\d{1,2})?$/);
+
+/** SO-008 · PUT /orders/{id}/subsidy (FS-054 SubsidyBlockIn). */
+const subsidySchema = z.strictObject({
+  lead_ids: z.array(z.string().min(1)).min(1).max(50),
+  material_amount: rupeesText.nullish(),
+  subsidy_amount: rupeesText,
+  farmer_payable: rupeesText.nullish(),
 });
 
 const linesSchema = z.object({
@@ -413,6 +425,55 @@ function onLiveOrder(quotationId: string): boolean {
       order.status !== "cancelled" &&
       order.quotations.some((quotation) => quotation.id === quotationId),
   );
+}
+
+function paise(value: string): number {
+  return Math.round(Number(value) * 100);
+}
+
+function rupees(value: number): string {
+  return (value / 100).toFixed(2);
+}
+
+/**
+ * SO-008 · The order's subsidy block from what was written (FS-054 rule 3a): a missing material
+ * is the order total now, a missing payable is material less subsidy; with its warnings.
+ */
+function applySubsidy(order: OrderWire): void {
+  const raw = mockDb.orderSubsidies.get(order.id);
+  if (raw === undefined) return;
+  const material = paise(raw.material ?? order.totals.total);
+  const subsidy = paise(raw.subsidy);
+  const derived = material - subsidy;
+  const payable = raw.payable === null ? derived : paise(raw.payable);
+  order.subsidy = {
+    material_amount: rupees(material),
+    subsidy_amount: rupees(subsidy),
+    farmer_payable: rupees(payable),
+    material_is_total: raw.material === null,
+    farmer_payable_is_derived: raw.payable === null,
+    leads: raw.leadIds.map((id) => ({
+      id,
+      inquiry_no: mockDb.leads.find((lead) => lead.id === id)?.inquiry_no ?? null,
+    })),
+  };
+  order.warnings = [
+    ...order.warnings.filter(
+      (warning) =>
+        !warning.startsWith("subsidy_above_material") &&
+        !warning.startsWith("farmer_payable_not_material_less_subsidy"),
+    ),
+    ...(subsidy > material
+      ? ["subsidy_above_material: the subsidy is more than the material"]
+      : []),
+    ...(raw.payable !== null && payable !== derived
+      ? ["farmer_payable_not_material_less_subsidy: the farmer payable differs"]
+      : []),
+  ];
+}
+
+function isStaff(): boolean {
+  return mockMeFor(readMockRole()).data.user_type === "staff";
 }
 
 // ── handlers ────────────────────────────────────────────────────────────────────
@@ -688,7 +749,9 @@ export const orderHandlers = [
       return validation({ order_type: "check the order's fields" });
     }
     const body = parsed.data;
-    if (!orderableType(body.order_type)) {
+    const subsidised = body.order_type === "subsidised";
+    // TODO(SO-008): a subsidised order typed in, its leads in subsidy.lead_ids (plan item 17b)
+    if (!orderableType(body.order_type) && !(subsidised && body.quotation_ids.length > 0)) {
       return errorResponse(
         422,
         "order_type_unsupported",
@@ -697,6 +760,31 @@ export const orderHandlers = [
           order_type: body.order_type,
         },
       );
+    }
+    if (subsidised && !isStaff()) {
+      return errorResponse(
+        403,
+        "type_staff_only",
+        "Subsidised orders are raised by Polysil staff.",
+      );
+    }
+    if (!subsidised && body.subsidy !== undefined) {
+      return errorResponse(422, "subsidy_not_allowed", "Only a subsidised order takes a subsidy.", {
+        subsidy: "not allowed",
+      });
+    }
+    if (subsidised && new Set(body.quotation_ids).size !== 1) {
+      return errorResponse(
+        422,
+        "subsidised_quotation_count",
+        "A subsidised order is made from one quotation.",
+        { quotation_ids: "exactly one" },
+      );
+    }
+    if (subsidised && body.subsidy !== undefined) {
+      return errorResponse(422, "subsidy_from_quotation", "The subsidy comes from the quotation.", {
+        subsidy: "not allowed",
+      });
     }
     if (body.quotation_ids.length === 0) {
       return createDirect(body, replay);
@@ -727,6 +815,23 @@ export const orderHandlers = [
     if (first === undefined) {
       return validation({ quotation_ids: "at least one accepted quotation" });
     }
+    if (found.some((item) => (item.sales_type === "subsidised") !== subsidised)) {
+      return errorResponse(
+        422,
+        "type_mismatch",
+        "A subsidised order is made from a subsidised quotation, and only it.",
+        { order_type: body.order_type },
+      );
+    }
+    const fromQuote = subsidised ? first.subsidy : null;
+    if (subsidised && fromQuote == null) {
+      return errorResponse(
+        422,
+        "quotation_subsidy_missing",
+        "The quotation has no subsidy calculation.",
+        { quotation_ids: first.id },
+      );
+    }
     const disagrees = found.find(
       (item) =>
         item.partner?.id !== first.partner?.id ||
@@ -753,6 +858,16 @@ export const orderHandlers = [
     });
     const me = mockMeFor(readMockRole()).data;
     order.owner = { id: me.id, full_name: me.full_name };
+    if (fromQuote != null && first.lead !== null) {
+      // FS-057 rule 8: material is the calculation's cost; AP's state GST joins the subsidy
+      mockDb.orderSubsidies.set(order.id, {
+        material: fromQuote.total_cost,
+        subsidy: rupees(paise(fromQuote.subsidy) + paise(fromQuote.gst_paid_by_state ?? "0")),
+        payable: fromQuote.farmer_share,
+        leadIds: [first.lead.id],
+      });
+      applySubsidy(order);
+    }
     mockDb.orders.unshift(order);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.created", {});
@@ -781,6 +896,13 @@ export const orderHandlers = [
       if (!orderableType(body.order_type)) {
         return errorResponse(422, "order_type_unsupported", "Only commercial and industrial.", {
           order_type: body.order_type,
+        });
+      }
+      // FS-042 rule 18: an order from quotations, or a subsidised one, keeps its type
+      const fixed = order.quotations.length > 0 || order.order_type === "subsidised";
+      if (body.order_type !== order.order_type && fixed) {
+        return errorResponse(422, "order_type_fixed", "This order's type is fixed.", {
+          order_type: order.order_type,
         });
       }
       order.order_type = body.order_type;
@@ -842,8 +964,101 @@ export const orderHandlers = [
       return validation(priced.fields);
     }
     Object.assign(order, withOrderLines(orderLinesFrom(priced.lines)));
+    applySubsidy(order);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.lines_replaced", { lines: priced.lines.length });
+    return HttpResponse.json({ data: order });
+  }),
+
+  /** SO-008 · Replace a subsidised draft's subsidy (FS-054 rule 5); the first lead stays. */
+  http.put(buildApiUrl("/orders/:orderId/subsidy"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    if (!allowed(readMockRole(), "sales_orders", "edit")) {
+      return errorResponse(403, "forbidden", "You cannot change orders.");
+    }
+    const parsed = subsidySchema.safeParse(raw);
+    if (!parsed.success) {
+      const field = String(parsed.error.issues[0]?.path[0] ?? "subsidy_amount");
+      return validation({ [`subsidy.${field}`]: "Enter rupees, with at most two decimals." });
+    }
+    const order = findOrder(String(params.orderId));
+    if (order === undefined) {
+      return errorResponse(404, "not_found", "No such order.");
+    }
+    if (order.status !== "draft") {
+      return errorResponse(409, "order_not_draft", "Only a draft can be changed.", {
+        status: order.status,
+      });
+    }
+    if (order.order_type !== "subsidised") {
+      return errorResponse(
+        422,
+        "order_type_not_subsidised",
+        "Only a subsidised order takes a subsidy.",
+        { order_type: order.order_type },
+      );
+    }
+    if (!isStaff()) {
+      return errorResponse(
+        403,
+        "type_staff_only",
+        "Subsidised orders are raised by Polysil staff.",
+      );
+    }
+    const body = parsed.data;
+    const ids = [...new Set(body.lead_ids)];
+    if (order.lead === null || ids[0] !== order.lead.id) {
+      return errorResponse(
+        422,
+        "first_lead_fixed",
+        "The first lead routes the order and cannot change.",
+        { "subsidy.lead_ids": order.lead?.id ?? "none" },
+      );
+    }
+    for (const id of ids) {
+      const lead = mockDb.leads.find((item) => item.id === id);
+      if (lead === undefined) {
+        return errorResponse(422, "lead_not_visible", "You cannot see that lead.", {
+          "subsidy.lead_ids": id,
+        });
+      }
+      if (!ORDERABLE_STAGES.includes(lead.stage)) {
+        return errorResponse(422, "lead_not_open", `A named lead is ${lead.stage}.`, {
+          "subsidy.lead_ids": id,
+        });
+      }
+    }
+    const material = paise(body.material_amount ?? order.totals.total);
+    if (paise(body.subsidy_amount) > material) {
+      return errorResponse(
+        422,
+        "subsidy_above_material",
+        "The subsidy is more than the material amount.",
+        { "subsidy.subsidy_amount": body.subsidy_amount },
+      );
+    }
+    if (body.farmer_payable != null && paise(body.farmer_payable) > material) {
+      return errorResponse(
+        422,
+        "payable_above_material",
+        "The farmer payable is more than the material amount.",
+        { "subsidy.farmer_payable": body.farmer_payable },
+      );
+    }
+    mockDb.orderSubsidies.set(order.id, {
+      material: body.material_amount ?? null,
+      subsidy: body.subsidy_amount,
+      payable: body.farmer_payable ?? null,
+      leadIds: ids,
+    });
+    applySubsidy(order);
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.updated", {});
     return HttpResponse.json({ data: order });
   }),
 
