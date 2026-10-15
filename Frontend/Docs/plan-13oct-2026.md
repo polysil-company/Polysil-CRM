@@ -120,7 +120,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
   - [x] **19b. The applicant's page** `/dealer-apply/<token>`. PR #146, 15 Oct (`feature/CHNL-008-dealer-apply-page`, CHNL-008), stacked on #145: verify by WhatsApp code, fill in, Check GSTIN, documents, submit.
   - Contract: `dealer-recruitment-and-small-changes.md`, `docs/api/dealer-applications.md`.
 - [x] **20. Territories admin** (4). PR #147, 15 Oct (`feature/MSTR-012-masters-territories`, MSTR-012), a Territories tab in Masters, stacked on #135. `backend/docs/api/territories.md`.
-- [~] **21. Company settings** (2). `settings-amend-reopen-contract.md`. Started on `feature/SET-001-company-settings`, from `integration`.
+- [~] **21. Company settings** (2). `settings-amend-reopen-contract.md`. Started on `feature/ADMN-007-company-settings`, from `integration`.
 - [ ] **22. Reports, and the 360° lead view** (9). RPT-002. `reports-contract.md`, `when-a-sale-counts.md`.
 - [ ] **23. Targets and achievement** (3). `targets-contract.md`.
 - [ ] **24. Schemes and promotions** (6, plus `GET /orders/{id}/schemes`). SCHM-001. `schemes-contract.md`.
