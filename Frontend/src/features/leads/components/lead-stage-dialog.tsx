@@ -380,8 +380,9 @@ function ReopenForm({ lead, onClose }: FormProps): React.JSX.Element {
       <DialogHeader>
         <DialogTitle>Reopen lead</DialogTitle>
         <DialogDescription>
-          {lead.customerName} goes back to the stage it was lost from. Its lost reason moves to the
-          history.
+          {lead.stage === "dormant"
+            ? `${lead.customerName} goes back to ${LEAD_STAGE_LABELS[lead.dormantFromStage ?? "new"]}, where it was before it went dormant.`
+            : `${lead.customerName} goes back to the stage it was lost from. Its lost reason moves to the history.`}
         </DialogDescription>
       </DialogHeader>
       <DialogBody>

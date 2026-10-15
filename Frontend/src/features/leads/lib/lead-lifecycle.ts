@@ -56,10 +56,12 @@ export function stageMenuFor(stage: LeadStage): StageMenu {
       return { actions: [{ kind: "won" }, { kind: "lost" }], hint: null };
     case "lost":
       return { actions: [{ kind: "reopen" }], hint: null };
-    // won and merged are closed; dormant is set and cleared by the backend's worker.
+    // The backend's worker sets dormant; it is reopened to where it stood, or closed as lost.
+    case "dormant":
+      return { actions: [{ kind: "reopen" }, { kind: "lost" }], hint: null };
+    // won and merged are closed.
     case "won":
     case "merged":
-    case "dormant":
       return { actions: [], hint: null };
   }
 }
@@ -88,7 +90,7 @@ export function stageActionDescription(action: StageAction): string {
     case "lost":
       return "Asks for the reason. The lead can be reopened later.";
     case "reopen":
-      return "Back to the stage it was lost from.";
+      return "Back to the stage it was at before.";
   }
 }
 
