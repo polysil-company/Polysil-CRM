@@ -45,7 +45,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
 | [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #112, stacked on PR #111 |
-| [Masters](#masters) | 2 | 🧪 👀 | lists and lead scoring in PR #134 |
+| [Masters](#masters) | 3 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #NNN |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -482,6 +482,11 @@ Admin → **Masters** (`/masters`), for staff who see masters (`backend/docs/api
   - Screens: [a list, desktop](screenshots/masters/masters-lists-desktop-light.jpg), [adding a source](screenshots/masters/masters-add-desktop-light.jpg), [phone, dark](screenshots/masters/masters-lists-phone-dark.jpg). 🧪 👀
 - **MSTR-010 · Lead scoring:** the four weights (and what they add up to), the value cap, the fast and slow contact hours, the engagement cap, and the hot and warm bands, each saying what it does. **Save the settings** sends only what changed; a cap or an hour band of 0 is refused on its field. Read-only without `masters.edit`.
   - Screens: [desktop](screenshots/masters/masters-scoring-desktop-light.jpg), [phone, dark](screenshots/masters/masters-scoring-phone-dark.jpg). 🧪 👀
+- **MSTR-011 · Offices,** the last tab, PR #NNN. Open offices by default, or Closed or All, searched by name. Each says where it sits ("Under Gujarat State" or "Top level"), the territory it covers (or "HQ unit"), its level by the role that runs it ("District Manager"), and how many people work from it.
+  - **New office:** a name, the level (from the roles: "2 · District Manager"; it can't change later), the office it sits under or "A top-level office", and the territory it covers or "An HQ unit". What's missing is named first; a name already used beside it, a closed parent, or a move under one of its own offices comes back on its field.
+  - **Edit** renames, moves or re-covers an open office, sending only what changed ("Nothing changed yet" until then).
+  - **Close** is refused while people work from it: "2 people still work from Rajkot District. Move them to another office, or deactivate them in Users & roles, then close it." **Reopen** a closed one from All.
+  - Screens: [desktop](screenshots/masters/offices-desktop-light.jpg), [edit, phone dark](screenshots/masters/office-edit-phone-dark.jpg), [new office](screenshots/masters/office-new-desktop-light.jpg). 🧪 👀
 
 ## Not built yet
 
@@ -490,4 +495,4 @@ The backend serves these, and the frontend has no screen for them — in the ord
 1. A consolidated order from several quotations on leads of one dealer.
 2. ~~Complaint types, with the other lookups in the admin masters.~~ In Masters, PR #134.
 3. The subsidy masters and their revisions (categories, parameters, rates, crop spacings, matrices).
-4. Admin masters: offices and territories. Users and roles are in PR #90; products, price lists and tax rates in PR #95; channel partners in PR #112.
+4. Admin masters: territories (offices are in Masters, PR #NNN). Users and roles are in PR #90; products, price lists and tax rates in PR #95; channel partners in PR #112.
