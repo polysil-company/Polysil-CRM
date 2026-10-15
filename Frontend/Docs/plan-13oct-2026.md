@@ -57,7 +57,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - `POST /conversations/groups`, `PATCH /conversations/{id}`, and the members endpoints (list, add, remove).
   - Contract: `group-chat.md`.
   - Data ID: register a new `MSG-` id (next free: MSG-006).
-- [~] **8. Masters admin.** The lists and lead scoring: PR #134, 15 Oct (`feature/MSTR-001-masters-lists`, MSTR-009, MSTR-010; asks BE-026). Offices: started on `feature/MSTR-011-masters-offices`, stacked on #134.
+- [x] **8. Masters admin.** The lists and lead scoring: PR #134, 15 Oct (`feature/MSTR-001-masters-lists`, MSTR-009, MSTR-010; asks BE-026). Offices: PR #135, 15 Oct (`feature/MSTR-011-masters-offices`, MSTR-011), stacked on #134: merge #134 first, then retarget #135 to `integration`.
   - Create and edit the lookups: complaint types, crops, lead sources, lost reasons, meeting types and MIS systems. That is 12 endpoints under `/lookups/*`.
   - Lead scoring: `GET`/`PATCH /lookups/scoring`.
   - Offices: `POST /org-units`, `GET`/`PATCH /org-units/{id}`, close and reopen.
@@ -66,7 +66,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 
 ## Tier 2: smaller missing pieces of built modules
 
-- [ ] **9. Reopen a closed complaint:** `POST /complaints/{id}/reopen` (`settings-amend-reopen-contract.md`).
+- [~] **9. Reopen a closed complaint:** `POST /complaints/{id}/reopen` (`settings-amend-reopen-contract.md`). Started on `feature/CMPL-010-reopen-complaint` (CMPL-010).
 - [ ] **10. Subsidy applications:**
   - Reopen a closed file: `POST /subsidy-applications/{id}/reopen` (`subsidy-completion.md` §4).
   - The document types: `GET /subsidy-document-types`.
