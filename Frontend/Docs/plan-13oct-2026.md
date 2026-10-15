@@ -97,10 +97,10 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
 
 ## Tier 3: subsidised quotations and orders (not go-live, per the user on 13 Oct)
 
-- [ ] **16. Subsidised quotation.**
+- [x] **16. Subsidised quotation.** PR #141, 15 Oct (`feature/QUOT-013-subsidised-quotation`, QUOT-014), stacked on #140: merge #140 first, then retarget #141 to `integration`.
   - `PUT /quotations/{id}/subsidy` and `GET /quotations/{id}/subsidy/calculation`.
   - Contract: `subsidised-quotations.md`.
-- [ ] **17. Subsidised order.**
+- [~] **17. Subsidised order.** Started on `feature/SO-008-subsidised-order`, stacked on #141.
   - `PUT /orders/{id}/subsidy`, and the "Subsidised" type on the new-order screen and the order page.
   - Contract: `subsidised-orders-and-small-changes.md`.
 - [ ] **18. Subsidy completion** (`subsidy-completion.md`):
