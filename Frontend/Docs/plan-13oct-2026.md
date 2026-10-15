@@ -84,11 +84,11 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - `list-exports.md`: every list it names has an export.
   - `lead-small-gaps-contract.md`: dormant leads, and assigning moves the lead's office.
   - `quotation-print-format.md`: optionally, the quotation page shows one discount column, as the PDF now does.
-- [~] **14. Andhra Pradesh in the calculator** (FS-063, `andhra-pradesh-subsidy.md`). Started on `feature/SUBS-002-scheme-inputs`.
+- [x] **14. Andhra Pradesh in the calculator** (FS-063, `andhra-pradesh-subsidy.md`). PR #140, 15 Oct (`feature/SUBS-002-scheme-inputs`): every scheme's `inputs` (CG, RJ, UP, AP), AP's null matrix ids and state GST, and the scheme picker's default fixed.
   - Checked 15 Oct: the calculator reads none of the config's `inputs`, so CG, RJ and UP's fields (`state-subsidy-formulas.md`) are missing too, and an AP drip result (`regular_matrix_id: null`) would fail the response schema. This item builds every scheme's inputs from the config.
   - Drip asks for "Guided cost (from the AP MIP portal)" and "Fittings and accessories", read from `GET /subsidy/config?scheme=AP`.
   - Not checked yet whether the calculator builds these inputs from the config by itself.
-- [ ] **15. Staging checks (🔌) for #111, #112 and #113:**
+- [-] **15. Staging checks (🔌) for #111, #112 and #113:** waiting on staging credentials from the user (asked 15 Oct).
   - a real `.xlsx` import into a draft price list and into a quotation;
   - add a distributor, a dealer under it, and close a partner that has a user;
   - attach a PDF and a HEIC photo, then open both.
