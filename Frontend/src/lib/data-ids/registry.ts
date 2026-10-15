@@ -863,6 +863,7 @@ export const DATA_IDS = {
       "GET /subsidy-applications/{id}/documents",
       "POST /subsidy-applications/{id}/documents",
       "GET /subsidy-applications/{id}/documents/{docId}",
+      "GET /subsidy-document-types",
     ],
   },
   "SUBS-008": {
@@ -922,6 +923,15 @@ export const DATA_IDS = {
       "PATCH /subsidy-schemes/{code}",
       "PATCH /subsidy-schemes/{code}/stages/{stageCode}",
     ],
+  },
+  "SUBS-015": {
+    domain: "SUBS",
+    title: "Reopen a closed subsidy application, with a reason",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /subsidy-applications/{id}/reopen"],
+    notes:
+      "subsidy.approve only. Refused while the dealer's commission on it is approved or paid. It closes again on a stage-16 amount or a stage-17 date.",
   },
 
   "REPO-001": {

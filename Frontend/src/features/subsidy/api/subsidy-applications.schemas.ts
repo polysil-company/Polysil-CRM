@@ -234,6 +234,13 @@ export interface CancelApplicationRequest {
   readonly reason: string;
 }
 
+/** SUBS-015 · POST /subsidy-applications/{id}/reopen — 1 to 500 characters. */
+export interface ReopenApplicationRequest {
+  readonly reason: string;
+}
+
+export const REOPEN_REASON_MAX = 500;
+
 // ── documents ────────────────────────────────────────────────────────────────────
 
 const documentTypeSchema = z.object({
@@ -253,6 +260,16 @@ const documentWireSchema = z.object({
 });
 
 export type ApplicationDocumentWire = z.input<typeof documentWireSchema>;
+
+/** SUBS-007 · GET /subsidy-document-types — the checklist every application is given. */
+export const documentTypeListSchema = z
+  .object({ data: z.array(documentTypeSchema) })
+  .transform(({ data }) =>
+    data.map((type) => ({ id: type.id, code: type.code, name: type.name, active: type.is_active })),
+  );
+
+export type DocumentType = z.output<typeof documentTypeListSchema>[number];
+export type DocumentTypeWire = z.input<typeof documentTypeSchema>;
 
 export const checklistSchema = z
   .object({

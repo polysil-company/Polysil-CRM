@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-51 changes, newest first. Each title opens its entry.
+52 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-15 | [Reopen a closed subsidy file, and the document checklist](changelog/entries/2026-10-15--feature--SUBS-015--reopen-a-closed-subsidy-file.md) | `feature` | `SUBS-015` `SUBS-007` |
 | 2026-10-13 | [The release's menu: only the screens a deployment releases](changelog/entries/2026-10-13--feature--APP-007--the-release-s-menu-only-the-screens-a-deployment-releases.md) | `feature` | `APP-007` |
 | 2026-10-13 | [Channel partners: list, add, correct, close and import](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md) | `feature` | `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` |
 | 2026-10-13 | [Documents on leads, quotations, orders and dispatches](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md) | `feature` | `DOC-001` `DOC-002` `DOC-003` |
@@ -62,6 +63,70 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 15 October 2026
+
+### Reopen a closed subsidy file, and the document checklist
+
+`feature` · `SUBS-015` `SUBS-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--SUBS-015--reopen-a-closed-subsidy-file.md)
+
+#### Before
+
+A subsidy application closes by itself once every stage-16 amount has its stage-17 date. After that it takes no more entries. When a date or an amount had been entered wrong, nobody could correct it from the screen.
+
+The backend added `POST /subsidy-applications/{id}/reopen` (`subsidy-completion.md` §4) and `GET /subsidy-document-types`, the checklist every application is given. The frontend used neither.
+
+#### Now
+
+- **Reopen** shows on a closed ("Fully paid") file, only for those with `subsidy.approve`: Admin Sales and the MD.
+  - The closed file's note tells them they can reopen it to correct an entry, and that it closes again when the payment entries are complete.
+  - The dialog asks why (1 to 500 characters) and says that the file's owner and the lead's owner are told.
+  - Afterwards the file is open, with its stages and figures as they were, and **Record stage** and **Cancel** are back.
+- **It closes again** only when an entry writes a stage-16 amount or a stage-17 date, as the backend checks.
+- **Refusals:**
+  - no reason: on the field;
+  - `409 commission_settled`: "The dealer's commission is settled". The file stays closed;
+  - `409 application_not_closed`: the dialog closes, a toast says why, and the file refreshes;
+  - `403`: "Not yours to reopen".
+- **Subsidy masters → Documents** lists the checklist from `GET /subsidy-document-types`.
+  - Each item is numbered, with its code; an item no longer asked for is marked.
+  - It is read only and the same for every scheme.
+- **The mock:**
+  - It seeds one closed file through every stage.
+  - Reopen needs `subsidy.approve`.
+  - A file closes again only on an entry that writes a payment field, so reopening and then opening the file no longer closes it.
+  - It serves the checklist, and records `subsidy.reopened` on the lead's history.
+- Checked on a desktop in light mode and a phone in dark mode: the closed file, the dialog, the reopened file and the checklist. axe found nothing.
+
+#### Discussion
+
+- **Why a Documents tab:** each application's checklist already names its items, so `GET /subsidy-document-types` adds nothing there. The tab lets an administrator read the list without opening an application. If the client wants the list editable, that needs a backend endpoint.
+- **The commission rule can't be shown in the mock,** which has no dealer commissions; a test stands in for it.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/subsidy/api/subsidy-applications.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: `reopenApplication`, `listDocumentTypes` and their query and mutation.
+- `src/features/subsidy/components/application-actions.tsx`: the Reopen button and dialog.
+- `src/features/subsidy/components/application-detail.tsx`: `subsidy.approve`, and the closed note's hint.
+- `src/features/subsidy/components/document-checklist-panel.tsx`: new, the checklist.
+- `src/features/subsidy/components/subsidy-masters.tsx`: the Documents tab.
+- `src/mocks/handlers/subsidy-applications.ts`: the reopen and checklist routes, a closed seeded file, and closing only on a payment entry.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SUBS-015, and `GET /subsidy-document-types` under SUBS-007.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/subsidy/`: records and screens.
+
+#### Tests
+
+- `src/features/subsidy/components/subsidy-reopen.test.tsx`:
+  - a closed file reopened stays open until a payment entry closes it again;
+  - a missing reason, an open file and someone without `subsidy.approve` refused;
+  - the checklist read;
+  - on the page: the hint, the empty reason, the reopen and the buttons back;
+  - no Reopen for a District Manager;
+  - a settled commission explained in the dialog;
+  - a file no longer closed closes the dialog;
+  - the masters checklist, with an item no longer asked for.
+- Walked through in the mock: desktop light and phone dark.
 
 ## 13 October 2026
 
