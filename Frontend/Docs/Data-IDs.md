@@ -207,6 +207,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-009 | Masters lists — add a row, switch it on or off (`POST /lookups/{list}`, `PATCH /lookups/{list}/{id}`) | shared | in-progress |
 | MSTR-010 | Lead scoring — the weights, caps and thresholds behind a lead's score (`GET`/`PATCH /lookups/scoring`) | shared | in-progress |
 | MSTR-011 | Offices — the office tree: add, rename, move, close and reopen (`/org-units*`) | shared | in-progress |
+| MSTR-012 | Territories — the state, district, taluka and village tree: add, rename, set codes (`GET /territories`, `POST /territories`, `PATCH /territories/{id}`) | shared | in-progress |
 | DOC-001 | Documents on a lead, quotation, order or dispatch — the list, the types and opening one (`GET /documents`, `/leads/{id}/documents`, `/documents/types`, `/documents/{id}/link`) | shared | in-progress |
 | DOC-002 | Attach a document to a record (`POST /documents`) | shared | in-progress |
 | DOC-003 | Remove a document (`DELETE /documents/{id}`) | shared | in-progress |

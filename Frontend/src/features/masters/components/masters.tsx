@@ -10,9 +10,10 @@ import { useCan } from "@/features/session/hooks/use-session";
 import { LIST_COPY, LookupListPanel } from "./lookup-list-panel";
 import { OfficesPanel } from "./offices-panel";
 import { ScoringPanel } from "./scoring-panel";
+import { TerritoriesPanel } from "./territories-panel";
 
-/** The tabs: each admin list, the lead score's settings, then the offices. */
-export const MASTER_TABS = [...LOOKUP_LISTS, "scoring", "offices"] as const;
+/** The tabs: each admin list, the lead score's settings, the offices, then the territories. */
+export const MASTER_TABS = [...LOOKUP_LISTS, "scoring", "offices", "territories"] as const;
 export type MasterTab = (typeof MASTER_TABS)[number];
 
 const DEFAULT_TAB: MasterTab = "lead-sources";
@@ -20,12 +21,13 @@ const DEFAULT_TAB: MasterTab = "lead-sources";
 function tabLabel(tab: MasterTab): string {
   if (tab === "scoring") return "Lead scoring";
   if (tab === "offices") return "Offices";
+  if (tab === "territories") return "Territories";
   return LIST_COPY[tab].title;
 }
 
 /**
  * MSTR-001 · Admin → Masters: the lists behind the pickers (MSTR-009), the lead score's
- * settings (MSTR-010) and the offices (MSTR-011), one tab each, the open tab kept in the URL. Everyone who sees Masters
+ * settings (MSTR-010), the offices (MSTR-011) and the territories (MSTR-012), one tab each, the open tab kept in the URL. Everyone who sees Masters
  * reads them; those who may edit masters add rows, switch them on or off, and retune the score.
  */
 export function Masters(): React.JSX.Element {
@@ -38,8 +40,9 @@ export function Masters(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <p className="max-w-prose text-sm text-muted-foreground">
-        The lists every form picks from, how a lead is scored, and the office tree. A list row is
-        never deleted: one no longer wanted is switched off, so records that use it keep it.
+        The lists every form picks from, how a lead is scored, the office tree and the territories.
+        A list row is never deleted: one no longer wanted is switched off, so records that use it
+        keep it.
         {canEdit ? "" : " Only administrators of masters change them."}
       </p>
       <Tabs
@@ -65,6 +68,9 @@ export function Masters(): React.JSX.Element {
         </TabsContent>
         <TabsContent value="offices">
           <OfficesPanel canEdit={canEdit} />
+        </TabsContent>
+        <TabsContent value="territories">
+          <TerritoriesPanel canEdit={canEdit} />
         </TabsContent>
       </Tabs>
     </div>

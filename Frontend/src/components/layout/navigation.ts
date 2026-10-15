@@ -290,7 +290,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "masters",
         label: "Masters",
-        description: "The lists every form picks from, how a lead is scored, and the offices.",
+        description:
+          "The lists every form picks from, how a lead is scored, the offices and the territories.",
         icon: Database01Icon,
         module: "masters",
         audience: "staff",

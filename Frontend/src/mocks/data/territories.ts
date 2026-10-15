@@ -120,3 +120,13 @@ export function mockTerritoryLineage(id: string): MockTerritory[] {
   }
   return lineage;
 }
+
+/** MSTR-012 · A territory as the Masters screen edits it: with when it was added. */
+export interface MockAdminTerritory {
+  id: string;
+  name: string;
+  level: "state" | "district" | "taluka" | "village";
+  code: string | null;
+  parent: { id: string; name: string; level: string } | null;
+  created_at: string;
+}

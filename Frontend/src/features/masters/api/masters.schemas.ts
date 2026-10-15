@@ -153,3 +153,71 @@ export interface OfficePatchRequest {
   readonly parent_id?: string | null;
   readonly territory_id?: string | null;
 }
+
+// ── MSTR-012 · territories ──────────────────────────────────────────────────────
+
+/** State, then district, taluka and village: each sits under the level above. */
+export const TERRITORY_LEVELS = ["state", "district", "taluka", "village"] as const;
+export type TerritoryLevel = (typeof TERRITORY_LEVELS)[number];
+
+/** One territory, as `/territories` answers it (backend/docs/api/territories.md). */
+const territoryWireSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  level: z.enum(TERRITORY_LEVELS),
+  /** A state's code numbers its leads (POL/<code>/<FY>/<n>); optional elsewhere. */
+  code: z.string().nullable(),
+  parent: z.object({ id: z.string().min(1), name: z.string(), level: z.string() }).nullable(),
+  /** A lead is numbered under this state: its code can no longer change. */
+  code_locked: z.boolean(),
+  created_at: z.string().min(1),
+});
+
+export interface Territory {
+  readonly id: string;
+  readonly name: string;
+  readonly level: TerritoryLevel;
+  readonly code: string | null;
+  readonly parent: { readonly id: string; readonly name: string; readonly level: string } | null;
+  readonly codeLocked: boolean;
+}
+
+function toTerritory(wire: z.output<typeof territoryWireSchema>): Territory {
+  return {
+    id: wire.id,
+    name: wire.name,
+    level: wire.level,
+    code: wire.code,
+    parent: wire.parent,
+    codeLocked: wire.code_locked,
+  };
+}
+
+export const territoryListSchema = cursorPageSchema(territoryWireSchema.transform(toTerritory));
+
+export const territoryResponseSchema = z
+  .object({ data: territoryWireSchema })
+  .transform(({ data }) => toTerritory(data));
+
+export interface TerritoryListParams {
+  /** Null: every level. */
+  readonly level: TerritoryLevel | null;
+  /** The children of this territory; null: anywhere. */
+  readonly parentId: string | null;
+  readonly q: string;
+  readonly cursor: string | null;
+}
+
+/** POST /territories: a state at the root, or one level down under its parent. */
+export interface TerritoryCreateRequest {
+  readonly name: string;
+  readonly level: TerritoryLevel;
+  readonly parent_id: string | null;
+  readonly code: string | null;
+}
+
+/** PATCH /territories/{id}: rename, or set the code (refused on a locked state). */
+export interface TerritoryPatchRequest {
+  readonly name?: string;
+  readonly code?: string | null;
+}

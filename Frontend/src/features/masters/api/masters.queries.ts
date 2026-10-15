@@ -1,7 +1,7 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import { getScoring, listOffices } from "./masters.api";
-import type { OfficeListParams } from "./masters.schemas";
+import { getScoring, listOffices, listTerritories } from "./masters.api";
+import type { OfficeListParams, TerritoryListParams } from "./masters.schemas";
 
 export const masterKeys = {
   all: ["masters"] as const,
@@ -9,6 +9,9 @@ export const masterKeys = {
   offices: () => [...masterKeys.all, "offices"] as const,
   officeList: (params: Omit<OfficeListParams, "cursor">) =>
     [...masterKeys.offices(), "list", params] as const,
+  territories: () => [...masterKeys.all, "territories"] as const,
+  territoryList: (params: Omit<TerritoryListParams, "cursor">) =>
+    [...masterKeys.territories(), "list", params] as const,
 };
 
 /** MSTR-010 · The lead score's settings. */
@@ -30,5 +33,16 @@ export function officeListQueryOptions(params: Omit<OfficeListParams, "cursor">)
     initialPageParam: FIRST_PAGE,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     meta: { dataId: "MSTR-011" },
+  });
+}
+
+/** MSTR-012 · Territories, a page at a time. */
+export function territoryListQueryOptions(params: Omit<TerritoryListParams, "cursor">) {
+  return infiniteQueryOptions({
+    queryKey: masterKeys.territoryList(params),
+    queryFn: ({ pageParam, signal }) => listTerritories({ ...params, cursor: pageParam }, signal),
+    initialPageParam: FIRST_PAGE,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    meta: { dataId: "MSTR-012" },
   });
 }
