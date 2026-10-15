@@ -28,7 +28,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Sign-in and session](#sign-in-and-session) | 4 | 🧪 🌐 🔌 | `integration` |
 | [App shell](#app-shell) | 3 | 🧪 🌐 | `integration` |
 | [Leads — list, create, open](#leads--list-create-open) | 4 | 🧪 🌐 🔌 | `integration`; sorting and territory levels in PR #42 |
-| [Leads — history, notes, stage, assign](#leads--history-notes-stage-assign) | 5 | 🧪 👀 | `integration`; dealership enquiries in PR #NNN |
+| [Leads — history, notes, stage, assign](#leads--history-notes-stage-assign) | 5 | 🧪 👀 | `integration`; dealership enquiries in PR #132 |
 | [Quotations — reading](#quotations--reading) | 4 | 🧪 👀 | `integration` |
 | [Quotations — the builder](#quotations--the-builder) | 5 | 🧪 👀 | `integration` |
 | [Quotations — send, approve, answer, revise, delete](#quotations--send-approve-answer-revise-delete) | 7 | 🧪 👀 | `integration` |
@@ -44,7 +44,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
-| [Channel partners](#channel-partners) | 6 | 🧪 👀 | PR #112, stacked on PR #111; GSTIN details in PR #NNN |
+| [Channel partners](#channel-partners) | 6 | 🧪 👀 | PR #112, stacked on PR #111; GSTIN details in PR #132 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -90,7 +90,7 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-27--feature--L
 - **LEAD-005 · Read a lead's history** as sentences ("Ravi Joshi moved the lead from Qualified to Lost", with the reason and note), newest first, 20 at a time with "Show older activity". Covers notes, stage changes, reopenings, assignments, edits, merges, duplicate flags, quotation events with the quotation's number as a link ("QT/GJ/2026-27/00009 · v2"), approval steps ("approved the District Manager step"), and order and dispatch events with the dispatch number. An order's own number and link wait on BE-020. An unknown kind still reads well. States: skeleton, "No activity yet", error with retry, an older page failing without losing what is shown. 🧪 👀
 - **LEAD-006 · Add a note** (anyone with `leads.edit`, not on a merged lead). Ctrl/⌘ + Enter saves, Enter adds a line; the note appears at the top at once; a counter near the 2,000-character limit; a failed save keeps the text, and a retry never adds it twice. 🧪 👀
 - **LEAD-007 · Move the stage.** Update stage says what the current stage means, and what each move does (PR #45, [screen](screenshots/stage-help/stage-menu-phone-dark.jpg)). It offers only the moves allowed from the current stage: Contacted and Qualified in one click; Lost needs a reason (note optional); Won confirms; a lost lead can be reopened. Steps that happen on a quotation are listed but disabled with where they happen. If someone else moved the lead first, it says so and shows the latest; Won without an accepted quotation is explained. No menu on a won, merged or dormant lead, or without `leads.edit`. 🧪 👀
-- **LEAD-015 · Dealership enquiries (FS-053), PR #NNN.** A lead can be of type **Dealership**: in the type picker, the list's filter and on the lead. A qualified dealership lead offers **Mark as won**, with no quotation, "They're to become a dealer. Closes the lead and starts their dealer application."
+- **LEAD-015 · Dealership enquiries (FS-053), PR #132.** A lead can be of type **Dealership**: in the type picker, the list's filter and on the lead. A qualified dealership lead offers **Mark as won**, with no quotation, "They're to become a dealer. Closes the lead and starts their dealer application."
   - Winning it shows **Dealer application started** with the link to send, once: **Copy link** and **Share on WhatsApp** (to the lead's number, with a message and the link). The link isn't shown again.
   - If no application was started, it says why: the mobile already belongs to a partner, an application is already open for it, or the number can't take one.
   - Screens: [menu, phone dark](screenshots/dealership/dealership-menu-phone-dark.jpg), [application started, desktop](screenshots/dealership/dealership-application-desktop-light.jpg), [phone dark](screenshots/dealership/dealership-application-phone-dark.jpg). 🧪 👀
@@ -470,7 +470,7 @@ Screens:
   - The review gives each bad row's reason, such as "no district 'Nowhere' in Gujarat", "CP-002 is already in use" or a wrong-type parent.
   - The preview shows the territory the backend worked out.
   - **Import good rows only** adds the rest, parents first. 🧪 👀
-- **CHNL-006 · GSTIN details (FS-053).** Staff only. Once a GSTIN is complete, the form checks it with the GST record (`GET /gstin/{gstin}`), PR #NNN.
+- **CHNL-006 · GSTIN details (FS-053).** Staff only. Once a GSTIN is complete, the form checks it with the GST record (`GET /gstin/{gstin}`), PR #132.
   - Found: the legal name, trade name and status, and **Use these details**, which fills the business name (the trade name, else the legal name), PAN and address and ticks GST-registered. Every field stays editable.
   - Not found, or the backend has no GST data provider yet ("GST details can't be fetched yet"): the names are typed by hand, as before.
   - A GSTIN that doesn't check out says why; an error says to type the names. Nothing is asked until the GSTIN is complete.
