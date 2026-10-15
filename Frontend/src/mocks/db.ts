@@ -50,6 +50,8 @@ export interface MockDb {
   priceVersion: number;
   /** Each quotation's history, newest first: derived once from the seed, then written to. */
   quotationEvents: Map<string, TimelineEventWire[]>;
+  /** QUOT-014 · The subsidy calculation stored with each subsidised quotation. */
+  quotationSubsidyCalculations: Map<string, CalculateResponseWire["data"]>;
   /** When a just-sent quotation's PDF is ready (epoch ms); read by the next GET. */
   pdfReadyAt: Map<string, number>;
   /** Sales orders, newest first, full documents (SO-001 … SO-004, DISP-002). */
@@ -172,6 +174,7 @@ function createMockDb(): MockDb {
     quotationWrites: new Map(),
     priceVersion: 0,
     quotationEvents: new Map(),
+    quotationSubsidyCalculations: new Map(),
     pdfReadyAt: new Map(),
     orders,
     orderWrites: new Map(),

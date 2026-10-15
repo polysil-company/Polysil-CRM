@@ -431,6 +431,18 @@ export const DATA_IDS = {
     endpoints: ["GET /quotations/export"],
     notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
   },
+  "QUOT-014": {
+    domain: "QUOT",
+    title: "A subsidised quotation's subsidy, for one farmer category",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "PUT /quotations/{quotationId}/subsidy",
+      "GET /quotations/{quotationId}/subsidy/calculation",
+    ],
+    notes:
+      "FS-057, subsidised-quotations.md. A draft only; sending needs it (422 subsidy_missing). Not part of go-live (13 Oct).",
+  },
   "SO-001": {
     domain: "SO",
     title: "Sales orders list",

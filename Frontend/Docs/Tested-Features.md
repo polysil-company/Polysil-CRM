@@ -31,7 +31,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Leads — history, notes, stage, assign](#leads--history-notes-stage-assign) | 4 | 🧪 👀 | `integration` |
 | [Quotations — reading](#quotations--reading) | 4 | 🧪 👀 | `integration` |
 | [Quotations — the builder](#quotations--the-builder) | 5 | 🧪 👀 | `integration` |
-| [Quotations — send, approve, answer, revise, delete](#quotations--send-approve-answer-revise-delete) | 7 | 🧪 👀 | `integration` |
+| [Quotations — send, approve, answer, revise, delete](#quotations--send-approve-answer-revise-delete) | 8 | 🧪 👀 | `integration`; subsidised quotations in PR #NNN |
 | [Quotations — the customer's link](#quotations--the-customers-link) | 2 | 🧪 👀 | `integration` |
 | [Approvals](#approvals) | 5 | 🧪 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 9 | 🧪 👀 | PR #34; the Dispatch queue in PR #56 |
@@ -127,6 +127,7 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-28--feature--Q
 - **QUOT-010 · Read a quotation's history**: drafted, edited, sent (how), opened (how often), the answer with its remark, revised, and each step of the discount approval; older events a page at a time. The lead's history names the same events. 🧪 👀
 - **QUOT-011 · Delete a draft** (only roles holding `quotations.delete` — Admin in the mock) and return to the lead. A sent quotation is never deleted; a State Manager sees no Delete. 🧪 👀
 - **QUOT-006 … 011 · When someone else got there first** (sent it, answered it, revised it), the dialog closes, a toast says what happened, and the page shows the latest. 🧪
+- **QUOT-014 · A subsidised quotation** (PR #NNN; FS-057, `subsidised-quotations.md`; not part of go-live; screens: [a draft without its subsidy](screenshots/quotations/quote-subsidy-missing-desktop-light.jpg), [the subsidy step](screenshots/quotations/quote-subsidy-step-desktop-light.jpg), [saved, with the full calculation](screenshots/quotations/quote-subsidy-saved-desktop-light.jpg), [phone, dark](screenshots/quotations/quote-subsidy-step-phone-dark.jpg)). The builder offers **Subsidised** for a subsidised lead, and starts there. The quotation's **Subsidy** card says a draft has none yet ("A subsidised quotation is sent with its subsidy") and links to **Calculate the subsidy**: the calculator for the lead's scheme and irrigation system (the scheme's own inputs included), then the farmer's category, only one that applies on every crop block, with the subsidy and the farmer's share beside each. Saved, the card shows the category, what the scheme pays, what the farmer pays, the total cost (and CG's inspection outside the cap, AP's GST paid by the state), with **Recalculate** on a draft and **Show the full calculation**; when the lines and the calculation's total differ, it says so in words. Sending a subsidised draft without it: "Calculate the subsidy first"; a lead whose scheme or system changed: calculate again. Walked through in the mock as Admin from a subsidised lead to a saved subsidy, at desktop light and phone dark; axe found nothing. Making an order from it is item 17. 🧪 👀
 
 ## Quotations — the customer's link
 

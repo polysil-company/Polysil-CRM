@@ -388,7 +388,7 @@ const cancelSchema = z.object({ reason: z.string().trim().min(1).max(500) });
  * scheme of the lead's state; in legacy mode (no active scheme names a state) the one active
  * scheme. A Response is the backend's 422.
  */
-function schemeForLead(territoryId: string): MockScheme | Response {
+export function schemeForLead(territoryId: string): MockScheme | Response {
   const state = mockTerritoryLineage(territoryId).find((territory) => territory.level === "state");
   if (state === undefined) {
     return errorResponse(
