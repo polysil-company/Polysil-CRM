@@ -28,7 +28,8 @@ export const LEAD_STAGES = [
 ] as const;
 export type LeadStage = (typeof LEAD_STAGES)[number];
 
-export const LEAD_INQUIRY_TYPES = ["commercial", "subsidised", "industrial"] as const;
+/** dealership (FS-053): someone asking to become a dealer; won from qualified, without a quotation. */
+export const LEAD_INQUIRY_TYPES = ["commercial", "subsidised", "industrial", "dealership"] as const;
 export type LeadInquiryType = (typeof LEAD_INQUIRY_TYPES)[number];
 
 export const LEAD_PRIORITIES = ["hot", "warm", "cold"] as const;
@@ -87,6 +88,18 @@ export const leadWireSchema = z.object({
   last_activity_at: isoDateTime,
   created_at: isoDateTime,
   created_by: userRefSchema.nullable(),
+  /**
+   * LEAD-015 · Only on the answer that wins a dealership lead (FS-053): the dealer application
+   * it started and the link to send the applicant, shown once; or why none was started.
+   */
+  dealer_application: z
+    .object({
+      id: z.string().min(1).nullable(),
+      apply_url: z.string().min(1).nullable(),
+      /** mobile_in_use, application_open or mobile_invalid. */
+      not_started: z.string().min(1).nullable(),
+    })
+    .nullish(),
   /** Pending duplicate links whose other lead the caller can also see. */
   duplicates: z
     .array(
@@ -147,6 +160,13 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   lastActivityAt: wire.last_activity_at,
   createdAt: wire.created_at,
   createdBy: wire.created_by ? { id: wire.created_by.id, name: wire.created_by.full_name } : null,
+  dealerApplication: wire.dealer_application
+    ? {
+        id: wire.dealer_application.id,
+        applyUrl: wire.dealer_application.apply_url,
+        notStarted: wire.dealer_application.not_started,
+      }
+    : null,
   duplicates: (wire.duplicates ?? []).map((duplicate) => ({
     linkId: duplicate.link_id,
     leadId: duplicate.lead_id,

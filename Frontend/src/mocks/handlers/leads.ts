@@ -327,6 +327,22 @@ function hasAcceptedQuotation(lead: LeadWire): boolean {
   return lead.stage === "negotiation";
 }
 
+/**
+ * LEAD-015 · What winning a dealership lead starts (FS-053): an application and its link, or
+ * why none was started when a partner already has the mobile number.
+ */
+function startMockDealerApplication(lead: LeadWire): NonNullable<LeadWire["dealer_application"]> {
+  if (mockDb.partners.some((partner) => partner.mobile === lead.mobile.replace(/^\+/, ""))) {
+    return { id: null, apply_url: null, not_started: "mobile_in_use" };
+  }
+  const token = `apply-${lead.id.slice(-8)}`;
+  return {
+    id: `dapp-${lead.id.slice(-8)}`,
+    apply_url: `https://crm.polysil.example/dealer-apply/${token}`,
+    not_started: null,
+  };
+}
+
 /** Idempotency-Key handling shared by the stage endpoints: 400, replay or 409. */
 function replayStageChange(
   request: Request,
@@ -717,7 +733,12 @@ export const leadHandlers = [
         stage: current,
       });
     }
-    if (!(MOCK_TRANSITIONS[current] ?? []).includes(body.to_stage)) {
+    // FS-053: a dealership lead is also won straight from qualified, with no quotation.
+    const dealershipWin = lead.inquiry_type === "dealership" && body.to_stage === "won";
+    const allowed =
+      (MOCK_TRANSITIONS[current] ?? []).includes(body.to_stage) ||
+      (dealershipWin && current === "qualified");
+    if (!allowed) {
       return errorResponse(
         422,
         "invalid_transition",
@@ -737,7 +758,7 @@ export const leadHandlers = [
         },
       );
     }
-    if (body.to_stage === "won" && !hasAcceptedQuotation(lead)) {
+    if (body.to_stage === "won" && !dealershipWin && !hasAcceptedQuotation(lead)) {
       return errorResponse(
         422,
         "quotation_required",
@@ -773,6 +794,13 @@ export const leadHandlers = [
       lead.first_contacted_at = lead.last_activity_at;
     }
     mockDb.stageChanges.set(idempotency.key, { body: idempotency.serialized, leadId: lead.id });
+    if (dealershipWin) {
+      // Only this answer carries the application, and its link, as on the backend.
+      const body: LeadResponseWire = {
+        data: { ...lead, dealer_application: startMockDealerApplication(lead) },
+      };
+      return HttpResponse.json(body);
+    }
     return HttpResponse.json({ data: lead } satisfies LeadResponseWire);
   }),
 

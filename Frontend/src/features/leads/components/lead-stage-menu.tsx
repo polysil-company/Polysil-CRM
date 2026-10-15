@@ -51,7 +51,7 @@ export function LeadStageMenu({ lead }: LeadStageMenuProps): React.JSX.Element |
   const [dialog, setDialog] = useState<StageDialogKind | null>(null);
   const transition = useTransitionLead();
   const idempotency = useIdempotencyKey();
-  const menu = stageMenuFor(lead.stage);
+  const menu = stageMenuFor(lead.stage, lead.type);
 
   const move = useAsyncAction({
     action: (to: "contacted" | "qualified") => {
@@ -84,7 +84,9 @@ export function LeadStageMenu({ lead }: LeadStageMenuProps): React.JSX.Element |
     },
   });
 
-  if (menu.actions.length === 0) {
+  // A won lead has no moves left, but the dialog that won it stays open: a dealership's shows
+  // its application link (LEAD-015).
+  if (menu.actions.length === 0 && dialog === null) {
     return null;
   }
 
@@ -98,48 +100,51 @@ export function LeadStageMenu({ lead }: LeadStageMenuProps): React.JSX.Element |
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              state={move.state}
-              loadingLabel="Updating…"
-              successLabel="Updated"
-              errorLabel="Not changed"
-            />
-          }
-        >
-          Update stage
-          <Icon icon={ArrowDown01Icon} />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72">
-          <DropdownMenuGroup>
-            <DropdownMenuLabel className="flex flex-col gap-0.5">
-              <span>Now {LEAD_STAGE_LABELS[lead.stage]}</span>
-              <span className="text-xs font-normal tracking-normal text-muted-foreground normal-case">
-                {LEAD_STAGE_DESCRIPTIONS[lead.stage]}
-              </span>
-            </DropdownMenuLabel>
-            {menu.actions.map((action) => (
-              <StageMenuItem
-                key={action.kind === "move" ? action.to : action.kind}
-                action={action}
-                disabled={move.isBusy}
-                onChoose={choose}
+      {menu.actions.length === 0 ? null : (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                state={move.state}
+                loadingLabel="Updating…"
+                successLabel="Updated"
+                errorLabel="Not changed"
               />
-            ))}
-          </DropdownMenuGroup>
-          {menu.hint === null ? null : (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled className="flex-col items-start gap-0.5">
-                <span>{menu.hint.label}</span>
-                <span className="text-xs text-muted-foreground">{menu.hint.reason}</span>
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+            }
+          >
+            Update stage
+            <Icon icon={ArrowDown01Icon} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-72">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="flex flex-col gap-0.5">
+                <span>Now {LEAD_STAGE_LABELS[lead.stage]}</span>
+                <span className="text-xs font-normal tracking-normal text-muted-foreground normal-case">
+                  {LEAD_STAGE_DESCRIPTIONS[lead.stage]}
+                </span>
+              </DropdownMenuLabel>
+              {menu.actions.map((action) => (
+                <StageMenuItem
+                  key={action.kind === "move" ? action.to : action.kind}
+                  action={action}
+                  type={lead.type}
+                  disabled={move.isBusy}
+                  onChoose={choose}
+                />
+              ))}
+            </DropdownMenuGroup>
+            {menu.hint === null ? null : (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled className="flex-col items-start gap-0.5">
+                  <span>{menu.hint.label}</span>
+                  <span className="text-xs text-muted-foreground">{menu.hint.reason}</span>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       <LeadStageDialog
         lead={lead}
         kind={dialog}
@@ -154,10 +159,12 @@ export function LeadStageMenu({ lead }: LeadStageMenuProps): React.JSX.Element |
 /** One move, named by its label and described by the line under it (what the stage means). */
 function StageMenuItem({
   action,
+  type,
   disabled,
   onChoose,
 }: {
   action: StageAction;
+  type: Lead["type"];
   disabled: boolean;
   onChoose: (action: StageAction) => void;
 }): React.JSX.Element {
@@ -176,7 +183,7 @@ function StageMenuItem({
     >
       <span>{label}</span>
       <span id={`${id}-description`} className="text-xs text-muted-foreground">
-        {stageActionDescription(action)}
+        {stageActionDescription(action, type)}
       </span>
     </DropdownMenuItem>
   );

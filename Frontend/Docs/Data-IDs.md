@@ -149,6 +149,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-012 | Duplicate review — dismiss a pair, or merge one lead into the other (`GET /leads/duplicates`, `POST /leads/duplicates/{linkId}/dismiss`, `POST /leads/{leadId}/merge`) | shared | in-progress |
 | LEAD-013 | Lead QR codes — make, print, rename or switch off (`GET /lead-qr-codes`, `POST /lead-qr-codes`, `PATCH /lead-qr-codes/{qrId}`) | shared | in-progress |
 | LEAD-014 | The public enquiry page — /enquiry, with or without a QR code (`GET /public/lead-form`, `GET /public/territories`, `POST /public/leads/verify`, `POST /public/leads`) | shared | in-progress |
+| LEAD-015 | Dealership enquiries — won from qualified, starting a dealer application (`POST /leads/{id}/transition`) | shared | in-progress |
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
 | RPT-002 | Reports | shared | planned |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
@@ -194,6 +195,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | CHNL-003 | Correct a channel partner's details and credit terms (`PATCH /partners/{id}`) | shared | in-progress |
 | CHNL-004 | Close or reopen a channel partner (`POST /partners/{id}/close`, `/reopen`) | shared | in-progress |
 | CHNL-005 | Import channel partners from Excel (`/imports` with `kind=partners`) | shared | in-progress |
+| CHNL-006 | GSTIN details — fill a partner's names from the GST record (`GET /gstin/{gstin}`) | shared | in-progress |
 | MKT-001 | Marketing offers — set by Admin, visible to channel partners only | shared | planned |
 | SCHM-001 | Schemes — set by Admin, visible to everyone | shared | planned |
 | MSTR-001 | Masters — products, stock, price lists, territories | shared | planned |
