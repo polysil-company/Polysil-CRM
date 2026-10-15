@@ -84,7 +84,8 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - `list-exports.md`: every list it names has an export.
   - `lead-small-gaps-contract.md`: dormant leads, and assigning moves the lead's office.
   - `quotation-print-format.md`: optionally, the quotation page shows one discount column, as the PDF now does.
-- [ ] **14. Andhra Pradesh in the calculator** (FS-063, `andhra-pradesh-subsidy.md`).
+- [~] **14. Andhra Pradesh in the calculator** (FS-063, `andhra-pradesh-subsidy.md`). Started on `feature/SUBS-002-scheme-inputs`.
+  - Checked 15 Oct: the calculator reads none of the config's `inputs`, so CG, RJ and UP's fields (`state-subsidy-formulas.md`) are missing too, and an AP drip result (`regular_matrix_id: null`) would fail the response schema. This item builds every scheme's inputs from the config.
   - Drip asks for "Guided cost (from the AP MIP portal)" and "Fittings and accessories", read from `GET /subsidy/config?scheme=AP`.
   - Not checked yet whether the calculator builds these inputs from the config by itself.
 - [ ] **15. Staging checks (🔌) for #111, #112 and #113:**
