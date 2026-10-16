@@ -30,6 +30,7 @@ export const MODULE_CODES = [
   "accounts",
   "dispatch",
   "reports",
+  "targets",
   "masters",
   "users",
   "products",

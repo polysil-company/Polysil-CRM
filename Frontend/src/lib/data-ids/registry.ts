@@ -35,6 +35,7 @@ export const DATA_ID_DOMAINS = {
   DOC: "Documents on records — purchase orders, payment slips, invoices, photos",
   TASK: "Tasks and daily work",
   CHNL: "Channel partners — distributor, dealer, sub-dealer",
+  TGT: "Sales targets and achievement",
   MKT: "Marketing and promotional offers",
   SCHM: "Schemes",
   MSTR: "Masters — products, stock, price lists, territories",
@@ -797,6 +798,24 @@ export const DATA_IDS = {
       "GET /lookups/territories",
     ],
     notes: "Admin-edited lists: the frontend never hard-codes their codes or names.",
+  },
+  "TGT-001": {
+    domain: "TGT",
+    title: "Targets — the month's achievement, yours and your team's",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /targets/achievement"],
+    notes:
+      "Achieved is null for a measure the user may not see; pct is null without a target. Sales follow the company's sale setting.",
+  },
+  "TGT-002": {
+    domain: "TGT",
+    title: "Set a person's monthly targets, with their history",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /targets", "PUT /targets"],
+    notes:
+      "Only for people below you in office and rank (admin and MD: anyone). 0 clears a target. A past month is closed except to global scope.",
   },
   "RPT-002": {
     domain: "RPT",

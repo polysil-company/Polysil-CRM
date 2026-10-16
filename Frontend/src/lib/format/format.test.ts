@@ -19,7 +19,9 @@ import {
   toRupeeNumber,
   todayInIndia,
   shiftCalendarDay,
+  shiftMonth,
   formatCalendarDay,
+  formatMonth,
   calendarDayOf,
   timeOfDayOf,
 } from "@/lib/format";
@@ -125,6 +127,9 @@ describe("[DS-001] date formatting (India Standard Time)", () => {
   it("moves a calendar day across months and years, and names it", () => {
     expect(shiftCalendarDay("2026-10-31", 1)).toBe("2026-11-01");
     expect(shiftCalendarDay("2027-01-01", -1)).toBe("2026-12-31");
+    expect(shiftMonth("2026-12", 1)).toBe("2027-01");
+    expect(shiftMonth("2026-01", -1)).toBe("2025-12");
+    expect(formatMonth("2026-10")).toBe("October 2026");
     expect(formatCalendarDay("2026-10-03")).toBe("Saturday, 3 October");
   });
 

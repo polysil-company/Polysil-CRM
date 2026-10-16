@@ -45,6 +45,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
 | [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #112, stacked on PR #111 |
+| [Targets](#targets) | 2 | 🧪 👀 | PR #NNN |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -468,6 +469,19 @@ Screens:
   - **Import good rows only** adds the rest, parents first. 🧪 👀
 
 Open with the client: whether distributors and dealers should add their own dealers and sub-dealers from the portal, as the backend allows.
+
+## Targets
+
+Sales → **Targets** (`/targets`), on the backend's contract (handover `targets-contract.md`, read against `api/services/targets.py`), PR #NNN. Walked through in the mock as a State Manager and a Field Officer, on a desktop in light mode and a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
+
+- **TGT-001 · The month's achievement:** the month in the URL, moved a month at a time, with This month to come back. "As of" and "Sales counted at" say what the figures used.
+  - **Your month:** order value, orders, leads won and visits, each achieved so far "of" its target with its share and a bar, or "No target set". A measure the role may not see is a dash, read out as "Not available to you".
+  - **Your team:** a card per person below you, with or without a target, and All together. A field officer sees only their own month; an administrator, who carries no targets, sees everyone.
+  - Screens: [team, desktop](screenshots/targets/targets-team-desktop-light.jpg), [team, phone dark](screenshots/targets/targets-team-phone-dark.jpg), [a field officer](screenshots/targets/targets-own-desktop-light.jpg). 🧪 👀
+- **TGT-002 · Set targets** (managers and administrators): the four measures as they stand, and the changes to them this month, newest first, with who made each.
+  - Only what changed is sent; an emptied measure is sent as 0, which clears it, and says so first. A count that isn't whole, or rupees with more than two decimal places, is named on its field.
+  - A past month warns first that only an administrator changes it, and the backend's refusal (`month_closed`) is shown; so are `not_your_team`, `user_inactive` and `no_targets`.
+  - Screens: [the dialog](screenshots/targets/targets-set-desktop-light.jpg), [saved](screenshots/targets/targets-saved-desktop-light.jpg), [a past month, phone dark](screenshots/targets/targets-past-month-phone-dark.jpg). 🧪 👀
 
 ## Not built yet
 

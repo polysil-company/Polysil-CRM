@@ -36,6 +36,7 @@ import {
 import { generateQuotations } from "./data/quotations";
 import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
 import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
+import { seedTargets, type MockTargetEntry } from "./data/targets";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
 import { seedOffices, seedUsers, type MockUserRecord } from "./data/users";
 
@@ -152,6 +153,8 @@ export interface MockDb {
   partners: MockPartnerRecord[];
   /** POST /partners replays: Idempotency-Key → the request and the partner made. */
   partnerWrites: Map<string, { body: string; partnerId: string }>;
+  /** Every change to a monthly target, oldest first (TGT-002). */
+  targets: MockTargetEntry[];
 }
 
 function createMockDb(): MockDb {
@@ -228,6 +231,7 @@ function createMockDb(): MockDb {
     userWrites: new Map(),
     partners: seedPartners(),
     partnerWrites: new Map(),
+    targets: seedTargets(),
   };
 }
 
