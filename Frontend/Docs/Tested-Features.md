@@ -39,7 +39,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 6 | 🧪 👀 | PR #57 |
 | [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79 |
-| [Users and roles](#users-and-roles) | 6 | 🧪 👀 | PR #90 |
+| [Users and roles](#users-and-roles) | 7 | 🧪 👀 | PR #90; company settings in PR #NNN |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 3 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43 |
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
@@ -361,6 +361,13 @@ On the backend's contract (`backend/docs/api/users.md`, handover `administration
   - Hand over leads and tasks to someone who can work leads, in batches of 500 until none remain, then optionally deactivate.
   - Delete is disabled while open leads remain, and refused for your own row.
   - 🧪 👀
+- **ADMN-007 · Company settings** (Admin → Company settings, `/settings`, PR #NNN; `backend/docs/handover/settings-amend-reopen-contract.md`, read against `api/routers/settings.py`):
+  - Every setting the backend lists, drawn from its kind: a choice as radio buttons, a whole number with its range, role codes as checkboxes of the staff roles, four rising bands. Each says what it does (the backend's words) and when it last changed.
+  - The 18 the backend seeds today, in sections. **Orders:** re-approving an amended order, when an order counts as a sale (with "Changing this recalculates reports and targets for every month."), a dealer's credit limit, who approves a replacement order, tax on an export, pricing a sample order and the largest one. **Complaints:** the reopen days, roles, clock and count, and what happens when one misses its target. **Dealers:** tasks for dealers, and the dealer rating's window and bands. **Customers:** the farmers' portal and its hourly cap on sign-in codes. A key the page doesn't know goes under **Other**, titled from its name.
+  - **Who approves a replacement order** is a chain: the roles keep the order they're ticked in, and the card says it ("In this order: State Manager, then Regional Manager, then MD / CEO."). Untick one and tick it again to move it to the end.
+  - **Save changes** sends only what changed, all together; the count of changes and **Undo changes** show until then. An empty or broken number, a number out of range, and bands that aren't four rising whole numbers are named on their setting first; the backend's refusal comes back on the setting it names.
+  - Without `masters.edit` the values are shown as text. Only Admin sees the page in the mock; other staff get the access-denied page.
+  - Walked through in the mock as Admin at desktop light and phone dark, changing two settings at once; axe found nothing. Screens: [desktop](screenshots/settings/settings-desktop-light.jpg), [saved](screenshots/settings/settings-saved-desktop-light.jpg), [phone, dark](screenshots/settings/settings-phone-dark.jpg), [saved, phone](screenshots/settings/settings-saved-phone-dark.jpg). 🧪 👀
 
 ---
 

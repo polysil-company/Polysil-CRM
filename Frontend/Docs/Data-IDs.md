@@ -230,6 +230,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | ADMN-004 | Correct a person — details, role, office, territories; deactivate or reactivate (`PATCH /users/{id}`) | shared | in-progress |
 | ADMN-005 | Account actions — a new temporary password, sign out everywhere, unlock (`POST /users/{id}/password`, `/sessions/revoke`, `/unlock`) | shared | in-progress |
 | ADMN-006 | A leaver — hand over their open leads and tasks, then deactivate or delete (`POST /users/{id}/handover`, `DELETE /users/{id}`) | shared | in-progress |
+| ADMN-007 | Company settings — how amended orders are re-approved, and complaint reopening (`GET /settings`, `PATCH /settings`) | shared | in-progress |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |
 | NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | in-progress |
 | NOTIF-002 | Mark notifications as read — one or all | shared | in-progress |
