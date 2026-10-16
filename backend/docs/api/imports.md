@@ -58,6 +58,37 @@ and the first non-empty row are the defaults.
 
 ---
 
+## `GET /api/v1/imports/template`
+
+**Download Template**
+
+A blank file to fill for this import, for the "Download template" link on the
+upload screen. Sheet 1 has our column names in row 1 and no rows. Sheet 2, "How
+to fill", says what goes in each column, with an example. A filled sheet 1
+uploads with every column matched by name.
+
+The same permission as upload. Fetch it with the bearer token as a blob, and
+save it as `partner-import-template.xlsx`, `price-list-template.xlsx` or
+`order-lines-template.xlsx`: `Content-Disposition` is not readable from another
+origin.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `kind` | query | `partners` \| `price_list_items` \| `lines` | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The blank `.xlsx`. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No permission to upload this kind of import. |
+| `422` | `ErrorResponse` | `validation_error`: `kind` missing or unknown. |
+
+---
+
 ## `DELETE /api/v1/imports/{batch_id}`
 
 **Discard Import**
