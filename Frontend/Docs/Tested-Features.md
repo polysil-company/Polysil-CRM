@@ -45,7 +45,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
 | [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #112, stacked on PR #111 |
-| [Targets](#targets) | 2 | 🧪 👀 | PR #NNN |
+| [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -472,7 +472,7 @@ Open with the client: whether distributors and dealers should add their own deal
 
 ## Targets
 
-Sales → **Targets** (`/targets`), on the backend's contract (handover `targets-contract.md`, read against `api/services/targets.py`), PR #NNN. Walked through in the mock as a State Manager and a Field Officer, on a desktop in light mode and a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
+Sales → **Targets** (`/targets`), on the backend's contract (handover `targets-contract.md`, read against `api/services/targets.py`), PR #150. Walked through in the mock as a State Manager and a Field Officer, on a desktop in light mode and a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
 
 - **TGT-001 · The month's achievement:** the month in the URL, moved a month at a time, with This month to come back. "As of" and "Sales counted at" say what the figures used.
   - **Your month:** order value, orders, leads won and visits, each achieved so far "of" its target with its share and a bar, or "No target set". A measure the role may not see is a dash, read out as "Not available to you".
