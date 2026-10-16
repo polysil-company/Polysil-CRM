@@ -45,7 +45,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
 | [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #112, stacked on PR #111 |
-| [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #NNN |
+| [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -472,7 +472,7 @@ Open with the client: whether distributors and dealers should add their own deal
 
 ## Reports and the lead's 360° view
 
-Admin → **Reports** (`/reports`), on the backend's contract (handover `reports-contract.md` and `when-a-sale-counts.md`, read against `api/services/reports.py`), PR #NNN. Walked through in the mock as Admin and as a State Manager, on a desktop in light mode and a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
+Admin → **Reports** (`/reports`), on the backend's contract (handover `reports-contract.md` and `when-a-sale-counts.md`, read against `api/services/reports.py`), PR #149. Walked through in the mock as Admin and as a State Manager, on a desktop in light mode and a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
 
 - **RPT-002 · Reports home:** a card for each of the eight reports the user may open, with its figure over the last 30 days ("16.2% converted", "16 overdue", "₹2.48 L"…). A report that answers 403 is left out; with none left, "No reports for your role". Screens: [desktop](screenshots/reports/reports-home-desktop-light.jpg), [phone, dark](screenshots/reports/reports-home-phone-dark.jpg). 🧪 👀
 - **RPT-002 · A report** (`/reports/{name}`):
