@@ -1,0 +1,13 @@
+.next/
+node_modules/
+coverage/
+storybook-static/
+playwright-report/
+test-results/
+public/mockServiceWorker.js
+package-lock.json
+next-env.d.ts
+# Client and planning documents are hand-formatted; do not reflow them.
+Docs/
+# Generated from changelog/entries — edit the fragments, not this file.
+CHANGELOG.md

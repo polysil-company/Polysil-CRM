@@ -1,0 +1,1076 @@
+/**
+ * Data ID registry — the shared vocabulary between frontend and backend.
+ *
+ * A Data ID names ONE functionality: an API operation, a screen action, or a
+ * cross-cutting capability. The identical ID is used by the backend for the
+ * matching endpoint, so any log line, error or bug report can be traced to a
+ * single functionality on both sides in seconds.
+ *
+ * Where a Data ID appears:
+ *  - `x-data-id` header on every API request (the backend logs it too)
+ *  - every log line written through `@/lib/logger`
+ *  - error references shown to users: "LEAD-001 · 3f2a9c1e-…"
+ *  - test names:        describe("[LEAD-001] …")
+ *  - changelog entries: `dataIds: [LEAD-001]`
+ *  - branches/commits:  `feature/LEAD-001-leads-table`, `feat(LEAD-001): …`
+ *
+ * Rules (full version in Docs/Data-IDs.md):
+ *  1. Register the ID here BEFORE writing the feature or integration.
+ *  2. IDs are never reused or renumbered. Retired IDs stay, marked "deprecated".
+ *  3. Format is DOMAIN-NNN, where DOMAIN is a key of `DATA_ID_DOMAINS`.
+ */
+
+export const DATA_ID_PATTERN = /^([A-Z]{2,6})-(\d{3})$/;
+
+export const DATA_ID_DOMAINS = {
+  APP: "Application shell, navigation, theming, route transitions",
+  OBS: "Observability — logging, API tracing, error reporting",
+  DS: "Design system — tokens and component library",
+  AUTH: "Authentication, session and permissions",
+  LEAD: "Lead generation and management",
+  QUOT: "Quotations",
+  SO: "Sales orders",
+  APPR: "Approvals — amount-based auto-escalation",
+  CMPL: "Complaints and QA review",
+  DOC: "Documents on records — purchase orders, payment slips, invoices, photos",
+  TASK: "Tasks and daily work",
+  CHNL: "Channel partners — distributor, dealer, sub-dealer",
+  MKT: "Marketing and promotional offers",
+  SCHM: "Schemes",
+  MSTR: "Masters — products, stock, price lists, territories",
+  RPT: "Reports and dashboards",
+  SUBS: "Subsidy forms and case status",
+  ACCT: "Accounts — payments, ledgers, financial approval queue",
+  DISP: "Dispatch — stock, dispatch and delivery queue",
+  ADMN: "Administration — users, roles, thresholds, handover",
+  NOTIF: "Notifications — in-app bell, WhatsApp and email templates and history",
+  MSG: "Messages — direct conversations between staff",
+  BOT: "AI assistant",
+  SITE: "Public website",
+  REPO: "Repository tooling — changelog, lint rules, git hooks, CI",
+} as const;
+
+export type DataIdDomain = keyof typeof DATA_ID_DOMAINS;
+
+/** Who implements the functionality. `shared` = frontend UI + backend endpoint. */
+export type DataIdOwner = "frontend" | "backend" | "shared";
+
+/**
+ * Lifecycle of a functionality.
+ * - planned:     registered, not started
+ * - in-progress: being built
+ * - mocked:      frontend complete against MSW mocks, waiting for the real endpoint
+ * - integrated:  running against the real backend in staging
+ * - deprecated:  retired; the ID must not be reused
+ */
+export type DataIdStatus = "planned" | "in-progress" | "mocked" | "integrated" | "deprecated";
+
+export interface DataIdDefinition {
+  readonly domain: DataIdDomain;
+  readonly title: string;
+  readonly owner: DataIdOwner;
+  readonly status: DataIdStatus;
+  /** Backend operations in `METHOD /path` form, when the functionality calls the API. */
+  readonly endpoints?: readonly string[];
+  readonly notes?: string;
+}
+
+export const DATA_IDS = {
+  "APP-001": {
+    domain: "APP",
+    title: "App shell — sidebar, header, role-filtered navigation, command menu",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "APP-002": {
+    domain: "APP",
+    title: "Theme — light, dark and system preference",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "APP-003": {
+    domain: "APP",
+    title: "Route transitions, page skeletons and route-level error boundaries",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "APP-004": {
+    domain: "APP",
+    title: "Mock scenarios for previewing loading, empty, error and contract states",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "APP-005": {
+    domain: "APP",
+    title: "Collapsible desktop sidebar and page titles in the top bar",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "APP-006": {
+    domain: "APP",
+    title: "Route guards — a page the user may not open shows access denied, not the page",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "APP-007": {
+    domain: "APP",
+    title: "Release menu — a deployment shows and opens only the screens it releases",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "OBS-001": {
+    domain: "OBS",
+    title: "Logger utility with runtime log level",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "OBS-002": {
+    domain: "OBS",
+    title: "API client — request IDs, error normalisation, response contract validation",
+    owner: "shared",
+    status: "in-progress",
+    notes: "Backend must accept x-request-id / x-data-id headers and log them.",
+  },
+  "DS-001": {
+    domain: "DS",
+    title: "Design tokens (src/styles/tokens.css) and component library",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "AUTH-001": {
+    domain: "AUTH",
+    title: "Mobile sign-in with a one-time code — channel partners",
+    owner: "shared",
+    status: "mocked",
+    endpoints: ["POST /auth/otp/request", "POST /auth/otp/verify"],
+    notes: "Contract: backend/docs/api/auth.md. Also owns the /api/v1 same-origin rewrite.",
+  },
+  "AUTH-002": {
+    domain: "AUTH",
+    title: "Current session — user, role, organisation unit, partner and permissions",
+    owner: "shared",
+    status: "mocked",
+    endpoints: ["GET /auth/me"],
+  },
+  "AUTH-003": {
+    domain: "AUTH",
+    title: "Email and password sign-in — Polysil staff",
+    owner: "shared",
+    status: "mocked",
+    endpoints: ["POST /auth/login"],
+  },
+  "AUTH-004": {
+    domain: "AUTH",
+    title: "Keep signed in — rotate the access token with the refresh cookie",
+    owner: "shared",
+    status: "mocked",
+    endpoints: ["POST /auth/refresh"],
+  },
+  "AUTH-005": {
+    domain: "AUTH",
+    title: "Sign out",
+    owner: "shared",
+    status: "mocked",
+    endpoints: ["POST /auth/logout"],
+  },
+  "AUTH-006": {
+    domain: "AUTH",
+    title: "Signed-in routing — sign-in redirects, return path and session end",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "AUTH-007": {
+    domain: "AUTH",
+    title: "Change your own password — forced while a temporary password is in force",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /auth/password"],
+  },
+  "LEAD-001": {
+    domain: "LEAD",
+    title: "List leads with filters, sorting and pagination",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads", "GET /leads/areas"],
+    notes:
+      "Connected to the dev API: cursor paging with include_total; sorting by customer or value since BE-001 (a sort change starts from the first page); the Area filter (state, district, taluka; at most 20) since backend #50.",
+  },
+  "LEAD-002": {
+    domain: "LEAD",
+    title: "Create lead",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads"],
+    notes: "Connected to the dev API. Duplicates are flagged on the new lead, never refused.",
+  },
+  "LEAD-003": {
+    domain: "LEAD",
+    title: "Lead detail",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads/{leadId}"],
+    notes: "Connected to the dev API.",
+  },
+  "LEAD-004": {
+    domain: "LEAD",
+    title: "Lead stats — navigation badge and sales tab",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads/stats"],
+    notes:
+      "Connected to the dev API. An exact count, by stage and priority, with the unassigned total; the badge and the tab show the total.",
+  },
+  "LEAD-005": {
+    domain: "LEAD",
+    title: "Lead timeline — the lead's history, newest first",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads/{leadId}/timeline"],
+    notes: "Cursor-paged; includes the events of leads merged into this one.",
+  },
+  "LEAD-006": {
+    domain: "LEAD",
+    title: "Add a note to a lead",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{leadId}/notes"],
+    notes: "The note becomes a timeline entry and bumps the lead's last activity.",
+  },
+  "LEAD-007": {
+    domain: "LEAD",
+    title: "Move a lead's stage — contact, qualify, mark lost, reopen",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{leadId}/transition", "POST /leads/{leadId}/reopen"],
+    notes:
+      "Quoted and negotiation are reached through a quotation; won needs an accepted quotation. Lost needs a lost reason.",
+  },
+  "LEAD-008": {
+    domain: "LEAD",
+    title: "Assign a lead — owner and channel partner",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{leadId}/assign", "GET /leads/assignees", "GET /lookups/partners"],
+    notes:
+      "Only what changed is sent. Owners come from GET /leads/assignees, which is empty for roles that may not set one; a closed lead cannot be reassigned.",
+  },
+  "LEAD-009": {
+    domain: "LEAD",
+    title: "Export the lead list to Excel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads/export"],
+    notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
+  },
+  "LEAD-010": {
+    domain: "LEAD",
+    title: "Edit a lead's own fields",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["PATCH /leads/{leadId}"],
+    notes: "Only what changes. A closed lead (won, lost, merged) is 422 stage_terminal.",
+  },
+  "LEAD-011": {
+    domain: "LEAD",
+    title: "Delete a lead",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["DELETE /leads/{leadId}"],
+    notes: "Soft delete, leads.delete only; its pending duplicate pairs close.",
+  },
+  "LEAD-012": {
+    domain: "LEAD",
+    title: "Duplicate review — dismiss a pair, or merge one lead into the other",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /leads/duplicates",
+      "POST /leads/duplicates/{linkId}/dismiss",
+      "POST /leads/{leadId}/merge",
+    ],
+    notes: "Neither lead may be won, lost or merged (merge_terminal); never into itself.",
+  },
+  "LEAD-013": {
+    domain: "LEAD",
+    title: "Lead QR codes — make, print, rename or switch off",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lead-qr-codes", "POST /lead-qr-codes", "PATCH /lead-qr-codes/{qrId}"],
+    notes:
+      "The code and its URL never change, so printed codes keep working. The QR is drawn here.",
+  },
+  "LEAD-014": {
+    domain: "LEAD",
+    title: "The public enquiry page — /enquiry, with or without a QR code",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /public/lead-form",
+      "GET /public/territories",
+      "POST /public/leads/verify",
+      "POST /public/leads",
+    ],
+    notes:
+      "No sign-in. The mobile is checked with a six-digit WhatsApp code before the lead is made.",
+  },
+  "RPT-001": {
+    domain: "RPT",
+    title: "Dashboard overview — KPIs, pipeline, follow-ups",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /dashboard/overview"],
+    notes: "The backend's shape since BE-008: snake_case, every figure a decimal string.",
+  },
+  "QUOT-001": {
+    domain: "QUOT",
+    title: "Quotations list — the Quotations page and a lead's quotations",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /quotations"],
+    notes: "Cursor paging with include_total; current versions only unless asked.",
+  },
+  "QUOT-002": {
+    domain: "QUOT",
+    title: "Quotation detail — the document as the backend prints it",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /quotations/{quotationId}"],
+    notes: "Every figure comes from the backend; the screen never computes a total.",
+  },
+  "QUOT-003": {
+    domain: "QUOT",
+    title: "Open a quotation's PDF",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /quotations/{quotationId}/pdf"],
+    notes: "A signed URL valid for ten minutes, opened in a new tab; never fetched with the token.",
+  },
+  "QUOT-004": {
+    domain: "QUOT",
+    title: "Quotation builder — create and edit a draft",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /quotations",
+      "PATCH /quotations/{quotationId}",
+      "PUT /quotations/{quotationId}/lines",
+    ],
+    notes:
+      "Saves what the preview priced; 409 rate_changed names the lines whose rate or slab moved, and the builder re-prices.",
+  },
+  "QUOT-005": {
+    domain: "QUOT",
+    title: "Live pricing — the quotation preview",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /pricing/quote-lines"],
+    notes: "Stores nothing; called on every change, debounced. Every printed figure comes back.",
+  },
+  "QUOT-006": {
+    domain: "QUOT",
+    title: "Send a quotation — number it, share the link, render the PDF",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /quotations/{quotationId}/send"],
+    notes:
+      "Sends only when discount.send_gate allows; WhatsApp waits for the PDF. The lead moves to quoted.",
+  },
+  "QUOT-007": {
+    domain: "QUOT",
+    title: "Ask a manager to approve a quotation's discount",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /quotations/{quotationId}/request-approval"],
+    notes: "Any save or delete of the draft cancels a pending request.",
+  },
+  "QUOT-008": {
+    domain: "QUOT",
+    title: "Record the customer's answer — accepted, rejected or negotiation",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /quotations/{quotationId}/transition"],
+    notes: "Accepted moves the lead to won, negotiation to negotiation; rejected moves nothing.",
+  },
+  "QUOT-009": {
+    domain: "QUOT",
+    title: "Revise a quotation, and its versions",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /quotations/{quotationId}/revise", "GET /quotations/{quotationId}/versions"],
+    notes: "A new draft of the same number at today's prices; one open revision per number.",
+  },
+  "QUOT-010": {
+    domain: "QUOT",
+    title: "A quotation's history",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /quotations/{quotationId}/timeline"],
+  },
+  "QUOT-011": {
+    domain: "QUOT",
+    title: "Delete a draft quotation",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["DELETE /quotations/{quotationId}"],
+    notes: "Drafts only, with quotations.delete. A sent quotation is never deleted.",
+  },
+  "QUOT-012": {
+    domain: "QUOT",
+    title: "The customer's quotation page — /q/{token}",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /public/q/{token}", "GET /public/q/{token}/pdf"],
+    notes:
+      "No sign-in. Shows the number, seller, validity and total only; the PDF opens from the button, never on load, so a link preview is not a view.",
+  },
+  "QUOT-013": {
+    domain: "QUOT",
+    title: "Export the quotation list to Excel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /quotations/export"],
+    notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
+  },
+  "SO-001": {
+    domain: "SO",
+    title: "Sales orders list",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /orders"],
+    notes:
+      "Cursor paging with include_total; each row carries dispatched_pct and approval_waiting_on.",
+  },
+  "SO-002": {
+    domain: "SO",
+    title: "A sales order — the document, its approval chain, PDF and history",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /orders/{orderId}",
+      "GET /orders/{orderId}/pdf",
+      "GET /orders/{orderId}/timeline",
+    ],
+    notes: "Every figure comes from the backend. Blocks the caller may not see come back null.",
+  },
+  "SO-003": {
+    domain: "SO",
+    title: "New order from accepted quotations, and a draft's header",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders", "PATCH /orders/{orderId}", "DELETE /orders/{orderId}"],
+    notes:
+      "Quotations must agree on partner, place of supply, seller, price date, office and territory.",
+  },
+  "SO-004": {
+    domain: "SO",
+    title: "Submit an order for approval, and cancel it",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders/{orderId}/submit", "POST /orders/{orderId}/cancel"],
+    notes:
+      "Submit numbers the order and builds the chain by value: managers, then Accounts, then Dispatch.",
+  },
+  "SO-005": {
+    domain: "SO",
+    title: "A direct order typed in line by line, and a draft's lines",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders", "PUT /orders/{orderId}/lines", "POST /pricing/quote-lines"],
+    notes:
+      "Party, place of supply and lines as on a quotation, priced by the backend; a lead is optional.",
+  },
+  "SO-006": {
+    domain: "SO",
+    title: "Export the order list to Excel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /orders/export"],
+    notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
+  },
+  "APPR-001": {
+    domain: "APPR",
+    title: "Approval inbox — amount-based escalation",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /approvals/pending", "POST /approvals/steps/{stepId}/decision"],
+    notes:
+      "Quotation discounts and sales orders side by side, with the asker's reason (request_remark, backend #49). An order's chain is its managers by value, then Accounts, then Dispatch.",
+  },
+  "APPR-002": {
+    domain: "APPR",
+    title: "Approval limits — order value and discount per role",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /approvals/thresholds", "PUT /approvals/thresholds"],
+    notes:
+      "Anyone signed in reads them; masters.edit changes them. Each level stays above the one below.",
+  },
+  "CMPL-001": {
+    domain: "CMPL",
+    title: "Complaints list — filters, waiting on me, counts",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /complaints", "GET /complaints/stats"],
+  },
+  "CMPL-002": {
+    domain: "CMPL",
+    title: "Complaint detail and history",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /complaints/{id}", "GET /complaints/{id}/timeline"],
+  },
+  "CMPL-003": {
+    domain: "CMPL",
+    title: "Raise a complaint — draft, edit, products, submit, cancel, delete",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /complaints",
+      "PATCH /complaints/{id}",
+      "PUT /complaints/{id}/lines",
+      "POST /complaints/{id}/submit",
+      "POST /complaints/{id}/cancel",
+      "DELETE /complaints/{id}",
+    ],
+  },
+  "CMPL-004": {
+    domain: "CMPL",
+    title: "Manager's check — approve or return, severity and owner",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /complaints/{id}/check", "GET /complaints/{id}/assignees"],
+  },
+  "CMPL-005": {
+    domain: "CMPL",
+    title: "QC verdict",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /complaints/{id}/qc"],
+  },
+  "CMPL-006": {
+    domain: "CMPL",
+    title: "Complaint attachments — photos and documents",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /complaints/{id}/attachments",
+      "GET /complaints/{id}/attachments/{attachmentId}",
+      "DELETE /complaints/{id}/attachments/{attachmentId}",
+    ],
+  },
+  "CMPL-007": {
+    domain: "CMPL",
+    title: "Complaint remedy — refund, replacement or none; withdraw",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /complaints/{id}/remedy", "POST /complaints/{id}/remedy/withdraw"],
+  },
+  "CMPL-008": {
+    domain: "CMPL",
+    title: "Complaint targets (SLA policies) and complaint types",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /complaint-sla-policies",
+      "POST /complaint-sla-policies",
+      "GET /lookups/complaint-types",
+      "POST /lookups/complaint-types",
+    ],
+  },
+  "CMPL-009": {
+    domain: "CMPL",
+    title: "Export complaints to Excel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /complaints/export"],
+  },
+  "TASK-001": {
+    domain: "TASK",
+    title: "My day — one person's tasks due that day and overdue",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /planner"],
+    notes: "The Tasks page. A manager can open the day of someone below them (?user=).",
+  },
+  "TASK-002": {
+    domain: "TASK",
+    title: "Team day — due, done and overdue per person below a manager",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /planner/team"],
+  },
+  "TASK-003": {
+    domain: "TASK",
+    title: "List tasks — a lead's tasks, and every task with filters",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /tasks", "GET /tasks/{id}"],
+  },
+  "TASK-004": {
+    domain: "TASK",
+    title: "Create a task — call, visit, meeting, follow-up",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /tasks", "GET /tasks/assignees", "GET /lookups/meeting-types"],
+  },
+  "TASK-005": {
+    domain: "TASK",
+    title: "Complete, cancel or reopen a task",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /tasks/{id}/complete", "POST /tasks/{id}/cancel", "POST /tasks/{id}/reopen"],
+  },
+  "TASK-006": {
+    domain: "TASK",
+    title: "Edit or reassign an open task",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["PATCH /tasks/{id}"],
+  },
+  "TASK-007": {
+    domain: "TASK",
+    title: "Meeting minutes with action items",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /minutes", "GET /minutes", "GET /minutes/{id}"],
+  },
+  "TASK-008": {
+    domain: "TASK",
+    title: "Export the task list to Excel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /tasks/export"],
+  },
+  "CHNL-001": {
+    domain: "CHNL",
+    title: "Channel partners list and detail, with the Excel export",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /partners", "GET /partners/{id}", "GET /partners/export"],
+  },
+  "CHNL-002": {
+    domain: "CHNL",
+    title: "Add a channel partner — a distributor, or a dealer or sub-dealer under one",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /partners"],
+  },
+  "CHNL-003": {
+    domain: "CHNL",
+    title: "Correct a channel partner's details and credit terms",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["PATCH /partners/{id}"],
+  },
+  "CHNL-004": {
+    domain: "CHNL",
+    title: "Close or reopen a channel partner",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /partners/{id}/close", "POST /partners/{id}/reopen"],
+  },
+  "CHNL-005": {
+    domain: "CHNL",
+    title: "Import channel partners from Excel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /imports", "POST /imports/{id}/check", "POST /imports/{id}/commit"],
+  },
+  "MKT-001": {
+    domain: "MKT",
+    title: "Marketing offers — set by Admin, visible to channel partners only",
+    owner: "shared",
+    status: "planned",
+  },
+  "SCHM-001": {
+    domain: "SCHM",
+    title: "Schemes — set by Admin, visible to everyone",
+    owner: "shared",
+    status: "planned",
+  },
+  "MSTR-001": {
+    domain: "MSTR",
+    title: "Masters — products, stock, price lists, territories",
+    owner: "shared",
+    status: "planned",
+  },
+  "MSTR-003": {
+    domain: "MSTR",
+    title: "Product picker — search the catalogue",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /products"],
+    notes:
+      "Active products by description; the rate is not here — it comes from the pricing preview.",
+  },
+  "MSTR-004": {
+    domain: "MSTR",
+    title: "Product catalogue — browse, add and correct products",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /products", "POST /products", "GET /products/{id}", "PATCH /products/{id}"],
+  },
+  "MSTR-005": {
+    domain: "MSTR",
+    title: "Tax classification — a product's HSN code and each code's GST slab, from a date",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /products/{id}/hsn",
+      "PUT /products/{id}/hsn",
+      "GET /tax-rates",
+      "PUT /tax-rates/{hsn_code}",
+    ],
+  },
+  "MSTR-006": {
+    domain: "MSTR",
+    title: "Price lists — draft, fill the rate sheet, publish, close",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /price-lists",
+      "POST /price-lists",
+      "GET /price-lists/{id}",
+      "PATCH /price-lists/{id}",
+      "GET /price-lists/{id}/items",
+      "PUT /price-lists/{id}/items",
+      "POST /price-lists/{id}/publish",
+    ],
+  },
+  "MSTR-007": {
+    domain: "MSTR",
+    title:
+      "Excel import with column matching — price list rates, partners, order and quotation lines",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /imports",
+      "GET /imports/{id}",
+      "POST /imports/{id}/check",
+      "POST /imports/{id}/commit",
+      "DELETE /imports/{id}",
+    ],
+  },
+  "DOC-001": {
+    domain: "DOC",
+    title:
+      "Documents on a lead, quotation, order or dispatch — the list, the types and opening one",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /documents",
+      "GET /leads/{id}/documents",
+      "GET /documents/types",
+      "GET /documents/{id}/link",
+    ],
+  },
+  "DOC-002": {
+    domain: "DOC",
+    title: "Attach a document to a record",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /documents"],
+  },
+  "DOC-003": {
+    domain: "DOC",
+    title: "Remove a document",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["DELETE /documents/{id}"],
+  },
+  "MSTR-008": {
+    domain: "MSTR",
+    title: "Price lists by sale type — commercial, industrial or subsidised",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /price-lists", "POST /price-lists", "POST /pricing/quote-lines"],
+  },
+  "MSTR-002": {
+    domain: "MSTR",
+    title: "Lead lookups — sources, irrigation systems, lost reasons and the territory picker",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /lookups/lead-sources",
+      "GET /lookups/mis-systems",
+      "GET /lookups/lost-reasons",
+      "GET /lookups/territories",
+    ],
+    notes: "Admin-edited lists: the frontend never hard-codes their codes or names.",
+  },
+  "RPT-002": {
+    domain: "RPT",
+    title: "Reports",
+    owner: "shared",
+    status: "planned",
+  },
+  "SUBS-001": {
+    domain: "SUBS",
+    title: "Subsidy forms and case status",
+    owner: "shared",
+    status: "planned",
+    notes: "Calculation is owned by the backend; the frontend captures and displays.",
+  },
+  "SUBS-002": {
+    domain: "SUBS",
+    title: "Subsidy calculator — the scheme's cost blocks and every farmer category's share",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /subsidy/calculate"],
+    notes: "A preview: nothing is stored. The backend calculates; the screen prints its figures.",
+  },
+  "SUBS-003": {
+    domain: "SUBS",
+    title: "Subsidy scheme lookups — what each system accepts, the crops and the categories",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy/config", "GET /subsidy/crops", "GET /subsidy/categories"],
+  },
+  "SUBS-004": {
+    domain: "SUBS",
+    title: "Start a subsidy application from a lead — the calculation and the farmer's category",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /subsidy-applications", "GET /subsidy-schemes/for-lead/{leadId}"],
+  },
+  "SUBS-005": {
+    domain: "SUBS",
+    title: "Subsidy applications worklist, with its Excel export",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-applications", "GET /subsidy-applications/export"],
+  },
+  "SUBS-006": {
+    domain: "SUBS",
+    title: "A subsidy application — its figures, stored calculation, stages and cancel",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /subsidy-applications/{id}",
+      "GET /subsidy-applications/{id}/calculation",
+      "GET /subsidy-applications/{id}/stages",
+      "POST /subsidy-applications/{id}/stages",
+      "POST /subsidy-applications/{id}/cancel",
+      "GET /subsidy-stages",
+    ],
+  },
+  "SUBS-007": {
+    domain: "SUBS",
+    title: "A subsidy application's document checklist and uploads",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /subsidy-applications/{id}/documents",
+      "POST /subsidy-applications/{id}/documents",
+      "GET /subsidy-applications/{id}/documents/{docId}",
+    ],
+  },
+  "SUBS-008": {
+    domain: "SUBS",
+    title: "Download a subsidy application's PIMS sheet",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-applications/{id}/pims.xlsx"],
+  },
+  "SUBS-009": {
+    domain: "SUBS",
+    title: "Subsidy ageing — the client's six ageing figures per application, with its export",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-reports/ageing", "GET /subsidy-reports/ageing/export"],
+  },
+  "SUBS-010": {
+    domain: "SUBS",
+    title: "Subsidy stage report — applications and money in each stage, with its export",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-reports/stages", "GET /subsidy-reports/stages/export"],
+  },
+  "SUBS-011": {
+    domain: "SUBS",
+    title: "Subsidy supply report — supplied and not supplied by district, with its export",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-reports/supply", "GET /subsidy-reports/supply/export"],
+  },
+  "SUBS-012": {
+    domain: "SUBS",
+    title:
+      "Subsidy masters — categories, parameters, component rates and crop spacings, revised from a date",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-masters/{kind}", "POST /subsidy-masters/{kind}/revisions"],
+  },
+  "SUBS-013": {
+    domain: "SUBS",
+    title:
+      "Subsidy matrices — the unit-cost and quantity matrices in force, and a new one from a date",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /subsidy-masters/{kind}/matrices", "POST /subsidy-masters/{kind}/matrices"],
+  },
+  "SUBS-014": {
+    domain: "SUBS",
+    title:
+      "Subsidy schemes — a state's scheme set up, its readiness, stage names and switching off",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /subsidy-schemes",
+      "POST /subsidy-schemes",
+      "GET /subsidy-schemes/{code}",
+      "PATCH /subsidy-schemes/{code}",
+      "PATCH /subsidy-schemes/{code}/stages/{stageCode}",
+    ],
+  },
+
+  "REPO-001": {
+    domain: "REPO",
+    title: "Changelog system — one entry per change, generated CHANGELOG.md",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "REPO-002": {
+    domain: "REPO",
+    title: "Quality gates — lint rules, git hooks, CI pipeline",
+    owner: "frontend",
+    status: "in-progress",
+  },
+  "ACCT-001": {
+    domain: "ACCT",
+    title: "Accounts work queue",
+    owner: "shared",
+    status: "planned",
+    notes:
+      "Waits on BE-022: GET /orders cannot filter on approval_waiting_on, and there is no payments API. Accounts' steps are in the Approvals inbox meanwhile.",
+  },
+  "DISP-002": {
+    domain: "DISP",
+    title: "Record a dispatch on an order, void it, close the rest short",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /orders/{orderId}/dispatches",
+      "POST /dispatches/{dispatchId}/void",
+      "POST /orders/{orderId}/close-short",
+    ],
+    notes:
+      "Line by line, at most the open quantity, in the unit's precision; the system records invoices, never issues them.",
+  },
+  "DISP-001": {
+    domain: "DISP",
+    title: "Dispatch work queue — orders to ship, and the dispatch log",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /orders?status=approved,partially_dispatched", "GET /dispatches"],
+    notes:
+      "Record a dispatch opens the order with ?record=dispatch, which opens the DISP-002 form at once.",
+  },
+  "ADMN-001": {
+    domain: "ADMN",
+    title: "People — the list of staff and partner users, with filters and an Excel export",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /users", "GET /users/export"],
+  },
+  "ADMN-002": {
+    domain: "ADMN",
+    title: "A person — identity, role, office or partner, territories, sign-in state",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /users/{id}"],
+  },
+  "ADMN-003": {
+    domain: "ADMN",
+    title: "Add a person — a staff member with a temporary password, or a partner user",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /users", "GET /lookups/roles", "GET /org-units"],
+  },
+  "ADMN-004": {
+    domain: "ADMN",
+    title: "Correct a person — details, role, office, territories; deactivate or reactivate",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["PATCH /users/{id}"],
+  },
+  "ADMN-005": {
+    domain: "ADMN",
+    title: "Account actions — a new temporary password, sign out everywhere, unlock",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /users/{id}/password",
+      "POST /users/{id}/sessions/revoke",
+      "POST /users/{id}/unlock",
+    ],
+  },
+  "ADMN-006": {
+    domain: "ADMN",
+    title: "A leaver — hand over their open leads and tasks, then deactivate or delete",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /users/{id}/handover", "DELETE /users/{id}"],
+  },
+  "SITE-001": {
+    domain: "SITE",
+    title: "Public website — information, Product Master, phone-number entry",
+    owner: "shared",
+    status: "planned",
+  },
+  "NOTIF-001": {
+    domain: "NOTIF",
+    title: "In-app notifications — bell, latest notifications and unread count",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /notifications"],
+    notes:
+      "Served since BE-009 (backend/docs/api/notifications.md). The badge polls ?limit=1 every 30 s; the list is read when the bell opens. No push.",
+  },
+  "NOTIF-002": {
+    domain: "NOTIF",
+    title: "Mark notifications as read — one or all",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /notifications/read"],
+  },
+  "MSG-001": {
+    domain: "MSG",
+    title: "Conversation list with unread counts",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /conversations"],
+    notes:
+      "Served since BE-010 (backend/docs/api/messages.md). Staff only: partner users get 403. A conversation is listed once someone writes in it.",
+  },
+  "MSG-002": {
+    domain: "MSG",
+    title: "Messages in a conversation",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /conversations/{conversationId}/messages"],
+  },
+  "MSG-003": {
+    domain: "MSG",
+    title: "Send a message, optionally linking a CRM record",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /conversations/{conversationId}/messages"],
+  },
+  "MSG-004": {
+    domain: "MSG",
+    title: "Start a conversation — staff directory search",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /staff-directory", "POST /conversations"],
+  },
+  "MSG-005": {
+    domain: "MSG",
+    title: "Mark a conversation as read",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /conversations/{conversationId}/read"],
+  },
+} as const satisfies Record<string, DataIdDefinition>;
+
+export type DataId = keyof typeof DATA_IDS;
