@@ -26,6 +26,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.authz.predicate import Caller
 from api.domain.imports import fields as import_fields
+from api.domain.imports import template as import_template
 from api.domain.imports.cells import key, redact
 from api.domain.imports.reader import ImportUnreadableError, SheetRow, read_upload
 from api.domain.imports.rows import (
@@ -111,6 +112,12 @@ def _staff_only(caller: Caller, kind: str) -> None:
     form's rules, so partner and price imports are staff only."""
     if kind in STAFF_ONLY and (caller.user_type != "staff" or caller.partner_id is not None):
         raise ForbiddenError()
+
+
+async def template(db: AsyncSession, caller: Caller, kind: str) -> bytes:
+    """FS-068: the blank file for a kind, to whoever may upload that kind."""
+    await _permit(db, caller, kind)
+    return await run_in_threadpool(import_template.template, kind)
 
 
 async def _remembered(db: AsyncSession, kind: str) -> dict[str, str]:

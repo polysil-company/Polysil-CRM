@@ -5,11 +5,12 @@ from __future__ import annotations
 import hashlib
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, Form, Path, Response, UploadFile
+from fastapi import APIRouter, File, Form, Path, Query, Response, UploadFile
 from fastapi.responses import JSONResponse
 
 from api.deps import CallerDep, Claims, DbSession, IdemKey
 from api.domain import complaints as files
+from api.domain.imports.template import FILE_NAMES
 from api.idempotency import payload_digest, run_idempotent
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.imports import (
@@ -74,6 +75,32 @@ async def upload(db: DbSession, caller: CallerDep, claims: Claims, idem: IdemKey
     outcome = await run_idempotent(db, key=idem, user_id=claims.sub, route="POST /api/v1/imports",
                                    payload_hash=payload_digest(digest), work=run)
     return JSONResponse(outcome.body, status_code=outcome.status_code)
+
+
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+# Declared above /{batch_id}: its UUID pattern validates, it does not route, so
+# "template" would reach get_import and fail there (FS-068 EC-2).
+@router.get("/template", responses={
+    200: {"content": {XLSX: {}}, "description": "The blank `.xlsx`."},
+    401: _ERRORS[401],
+    403: {"model": ErrorResponse, "description": "No permission to upload this kind of import."},
+    422: {"model": ErrorResponse, "description": "`validation_error`: `kind` missing or unknown."}})
+async def download_template(kind: Annotated[ImportKind, Query()], db: DbSession,
+                            caller: CallerDep) -> Response:
+    """A blank file to fill for this import, for the "Download template" link on the
+    upload screen. Sheet 1 has our column names in row 1 and no rows. Sheet 2, "How
+    to fill", says what goes in each column, with an example. A filled sheet 1
+    uploads with every column matched by name.
+
+    The same permission as upload. Fetch it with the bearer token as a blob, and
+    save it as `partner-import-template.xlsx`, `price-list-template.xlsx` or
+    `order-lines-template.xlsx`: `Content-Disposition` is not readable from another
+    origin."""
+    data = await service.template(db, caller, kind)
+    return Response(content=data, media_type=XLSX,
+                    headers={"Content-Disposition": f'attachment; filename="{FILE_NAMES[kind]}"'})
 
 
 @router.get("/{batch_id}", response_model=Envelope[ImportBatch], responses=_ERRORS)
