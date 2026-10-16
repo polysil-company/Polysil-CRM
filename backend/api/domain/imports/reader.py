@@ -39,9 +39,11 @@ Score = Callable[[Sequence[str]], int]
 class ImportUnreadableError(ValueError):
     """The file is not one this reads. `code` is the API's error code."""
 
-    def __init__(self, message: str, code: str = "import_unreadable") -> None:
+    def __init__(self, message: str, code: str = "import_unreadable",
+                 field: str = "file") -> None:
         super().__init__(message)
         self.code = code
+        self.field = field  # the upload input the API reports it on
 
 
 @dataclass(frozen=True)
@@ -112,7 +114,8 @@ def _read_xlsx(data: bytes, *, sheet: str | None, header_row: int | None,
         elif sheet in wb.sheetnames:
             title = sheet
         else:
-            raise ImportUnreadableError(f"No sheet named {sheet!r}.", code="validation_error")
+            raise ImportUnreadableError(f"No sheet named {sheet!r}.", code="validation_error",
+                                        field="sheet")
         ws = wb[title]
         raw: list[tuple[int, list[str]]] = []
         filled = 0
@@ -184,6 +187,7 @@ def _read_csv(data: bytes, *, header_row: int | None, score: Score | None) -> Sh
 def _assemble(raw: list[tuple[int, list[str]]], *, sheets: list[str], sheet: str | None,
               header_row: int | None, score: Score | None = None) -> Sheet:
     labelled = False
+    chosen = header_row is not None
     if header_row is None:
         filled = [n for n, cells in raw if any(cells)]
         if not filled:
@@ -193,7 +197,7 @@ def _assemble(raw: list[tuple[int, list[str]]], *, sheets: list[str], sheet: str
     by_row = dict(raw)
     if header_row not in by_row or not any(by_row[header_row]):
         raise ImportUnreadableError(f"Row {header_row} is empty, so it cannot be the header row.",
-                               code="validation_error")
+                                    code="validation_error", field="header_row")
     header_cells = by_row[header_row]
     width = max([len(header_cells)] + [len(c) for n, c in raw if n > header_row])
     width = min(width, MAX_COLUMNS)
@@ -205,6 +209,13 @@ def _assemble(raw: list[tuple[int, list[str]]], *, sheets: list[str], sheet: str
             continue
         padded = (list(cells) + [""] * width)[:width]
         rows.append(SheetRow(row=n, cells=tuple(padded)))
+    if not rows:
+        # FS-068 rule 7: the blank template uploads cleanly and checks as 0 of 0
+        if chosen:
+            raise ImportUnreadableError(f"Row {header_row} has no rows under it.",
+                                        code="validation_error", field="header_row")
+        raise ImportUnreadableError("This sheet has column names but no rows under them. Fill "
+                                    "it in and upload again.")
     if len(rows) > MAX_DATA_ROWS:
         raise ImportUnreadableError(f"This sheet has more than {MAX_DATA_ROWS:,} rows. Split it "
                                     f"into smaller files.", code="import_too_many_rows")

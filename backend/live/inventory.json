@@ -21,6 +21,7 @@
   "/api/v1/documents/types": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/gifts": {"query": {}, "public": false, "skip": {}, "forbidden": ["production"]},
   "/api/v1/holidays": {"query": {}, "public": false, "skip": {}, "forbidden": []},
+  "/api/v1/imports/template": {"query": {"kind": "lines"}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/lead-qr-codes": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/leads": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/leads/areas": {"query": {"level": "state"}, "public": false, "skip": {}, "forbidden": []},

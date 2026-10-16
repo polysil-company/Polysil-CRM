@@ -26,6 +26,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.authz.predicate import Caller
 from api.domain.imports import fields as import_fields
+from api.domain.imports import template as import_template
 from api.domain.imports.cells import key, redact
 from api.domain.imports.reader import ImportUnreadableError, SheetRow, read_upload
 from api.domain.imports.rows import (
@@ -113,6 +114,12 @@ def _staff_only(caller: Caller, kind: str) -> None:
         raise ForbiddenError()
 
 
+async def template(db: AsyncSession, caller: Caller, kind: str) -> bytes:
+    """FS-068: the blank file for a kind, to whoever may upload that kind."""
+    await _permit(db, caller, kind)
+    return await run_in_threadpool(import_template.template, kind)
+
+
 async def _remembered(db: AsyncSession, kind: str) -> dict[str, str]:
     """The caller's last committed mapping of this kind, as field to header text. A
     discarded one is the mapping that did not work (FS-067 rule 4a). A line import is
@@ -148,8 +155,7 @@ async def upload(db: AsyncSession, caller: Caller, *, kind: str, target_id: str 
                                          header_row=header_row,
                                          score=import_fields.header_score(kind))
     except ImportUnreadableError as exc:
-        field = {"validation_error": "sheet" if sheet else "header_row"}.get(exc.code, "file")
-        raise ValidationFailed(str(exc), code=exc.code, fields={field: str(exc)}) from exc
+        raise ValidationFailed(str(exc), code=exc.code, fields={exc.field: str(exc)}) from exc
 
     new_id = (await db.execute(text(
         "INSERT INTO import_batch (kind, target_id, file_name, file_sha256, sheet, sheets, "
