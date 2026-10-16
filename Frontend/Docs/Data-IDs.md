@@ -150,7 +150,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-013 | Lead QR codes — make, print, rename or switch off (`GET /lead-qr-codes`, `POST /lead-qr-codes`, `PATCH /lead-qr-codes/{qrId}`) | shared | in-progress |
 | LEAD-014 | The public enquiry page — /enquiry, with or without a QR code (`GET /public/lead-form`, `GET /public/territories`, `POST /public/leads/verify`, `POST /public/leads`) | shared | in-progress |
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
-| RPT-002 | Reports | shared | planned |
+| RPT-002 | Reports — conversion, people, lost leads, follow-ups, dealers, campaigns, areas, complaints (`GET /reports/*`) | shared | in-progress |
+| RPT-003 | A lead's 360° view (`GET /leads/{id}/360`) | shared | in-progress |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |

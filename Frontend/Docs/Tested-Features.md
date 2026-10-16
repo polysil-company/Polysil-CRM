@@ -45,6 +45,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
 | [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #112, stacked on PR #111 |
+| [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #NNN |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -468,6 +469,19 @@ Screens:
   - **Import good rows only** adds the rest, parents first. 🧪 👀
 
 Open with the client: whether distributors and dealers should add their own dealers and sub-dealers from the portal, as the backend allows.
+
+## Reports and the lead's 360° view
+
+Admin → **Reports** (`/reports`), on the backend's contract (handover `reports-contract.md` and `when-a-sale-counts.md`, read against `api/services/reports.py`), PR #NNN. Walked through in the mock as Admin and as a State Manager, on a desktop in light mode and a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
+
+- **RPT-002 · Reports home:** a card for each of the eight reports the user may open, with its figure over the last 30 days ("16.2% converted", "16 overdue", "₹2.48 L"…). A report that answers 403 is left out; with none left, "No reports for your role". Screens: [desktop](screenshots/reports/reports-home-desktop-light.jpg), [phone, dark](screenshots/reports/reports-home-phone-dark.jpg). 🧪 👀
+- **RPT-002 · A report** (`/reports/{name}`):
+  - Its filters are in the URL: From and to (the last 30 days when empty), Area, Person, and By (source, person or territory; reason or person; type, status or severity; district or taluka), each only where the report takes it. Follow-ups is as of now, with no window.
+  - A table with a Total line where the backend sends totals, the window the figures used, and "Sales counted at: approval" on the reports that count sales. A figure the role may not see is a dash, read out as "Not available to you", with a line saying so.
+  - A window over a year, or one that ends before it starts, is named before asking. Past 1,000 rows, a notice says only the first are shown. A report the role may not run says so.
+  - **Download Excel** sends the same filters with `format=xlsx`.
+  - Screens: [conversion](screenshots/reports/report-conversion-desktop-light.jpg), [by person](screenshots/reports/report-conversion-person-desktop-light.jpg), [salespeople, as a State Manager](screenshots/reports/report-people-hidden-desktop-light.jpg), [dealers](screenshots/reports/report-dealers-desktop-light.jpg), [lost leads, phone dark](screenshots/reports/report-lost-phone-dark.jpg), [follow-ups](screenshots/reports/report-follow-ups-desktop-light.jpg), [territories](screenshots/reports/report-territory-desktop-light.jpg), [complaints by status](screenshots/reports/report-complaints-desktop-light.jpg), [campaigns](screenshots/reports/report-campaigns-desktop-light.jpg), [a window too long](screenshots/reports/report-window-too-long-desktop-light.jpg). 🧪 👀
+- **RPT-003 · At a glance** on a lead, for those who see reports: quotations, orders and their value, received, complaints, visits, open tasks and the subsidy stage, each a dash when withheld; then the other leads on the same mobile ("same mobile", never "same customer"), each linked with its stage. Screens: [desktop](screenshots/reports/lead-360-desktop-light.jpg), [phone, dark](screenshots/reports/lead-360-phone-dark.jpg). 🧪 👀
 
 ## Not built yet
 

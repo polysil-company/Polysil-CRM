@@ -800,9 +800,30 @@ export const DATA_IDS = {
   },
   "RPT-002": {
     domain: "RPT",
-    title: "Reports",
+    title:
+      "Reports — conversion, people, lost leads, follow-ups, dealers, campaigns, areas, complaints",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
+    endpoints: [
+      "GET /reports/lead-conversion",
+      "GET /reports/salesperson-performance",
+      "GET /reports/lost-leads",
+      "GET /reports/follow-ups",
+      "GET /reports/dealer-performance",
+      "GET /reports/campaign-performance",
+      "GET /reports/territory-performance",
+      "GET /reports/complaints",
+    ],
+    notes:
+      "A figure the user may not see is null, shown as not available. A report that answers 403 is hidden. format=xlsx downloads the same rows.",
+  },
+  "RPT-003": {
+    domain: "RPT",
+    title: "A lead's 360° view — tiles and leads on the same mobile",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads/{id}/360"],
+    notes: "Needs leads.view and reports.view. The timeline below it is LEAD-005's.",
   },
   "SUBS-001": {
     domain: "SUBS",

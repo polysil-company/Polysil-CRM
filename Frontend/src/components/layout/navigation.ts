@@ -242,9 +242,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "reports",
         label: "Reports",
+        description:
+          "Conversion, people, lost leads, follow-ups, dealers, campaigns, areas and complaints.",
         icon: Analytics01Icon,
         module: "reports",
         dataId: "RPT-002",
+        href: "/reports",
       },
       {
         id: "approval-limits",
