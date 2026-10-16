@@ -110,7 +110,8 @@ def test_only_the_needed_columns_filled(kind: str) -> None:
     assert got == {f.key: i for i, f in enumerate(FIELDS[kind]) if f.key in keep}
 
 
-def test_partner_examples_pass_the_format_checks_and_fail_on_the_parent() -> None:
+def test_partner_examples_are_well_formed_and_the_parent_resolves_to_nothing() -> None:
+    # format only: "fake" is the EXAMPLE- prefix, checked below against the masters
     gj, ahd = Place("gj", "Gujarat"), Place("ahd", "Ahmedabad")
     lk = PartnerLookups(states={"gujarat": gj}, districts={("gj", "ahmedabad"): ahd})
     mapping = {f.key: i for i, f in enumerate(FIELDS["partners"])}
@@ -123,11 +124,19 @@ def test_partner_examples_pass_the_format_checks_and_fail_on_the_parent() -> Non
 
 @pytest.mark.parametrize(("kind", "parse"), [("price_list_items", parse_price_items),
                                              ("lines", parse_lines)])
-def test_product_examples_are_well_formed_and_match_no_product(kind: str, parse: object) -> None:
+def test_product_examples_are_well_formed(kind: str, parse: object) -> None:
     mapping = {f.key: i for i, f in enumerate(FIELDS[kind])}
     rows = [SheetRow(row=2, cells=tuple(_examples(kind)))]
     result = parse(rows, mapping, ProductLookups.build([]))[0]  # type: ignore[operator]
     assert set(result.errors) == {"item_code"}, result.errors
+
+
+def test_example_codes_are_marked_as_examples() -> None:
+    # code review F-5: a copied example must never name a real product or partner
+    for kind in KINDS:
+        for f in FIELDS[kind]:
+            if f.key in ("item_code", "code", "parent_code", "description"):
+                assert f.example.upper().startswith("EXAMPLE"), (kind, f.key)
 
 
 # ── rule 6 ───────────────────────────────────────────────────────────────────
@@ -147,9 +156,20 @@ def test_a_remembered_alias_still_counts() -> None:
         "parent_code": 0}
 
 
-def test_a_contact_under_name_is_not_remembered() -> None:
-    # the price of rule 6: "Name" is the partner name field's own label
-    assert suggest("partners", ["Firm", "Name"], {"contact_name": "Name"}) == {"name": 1}
+def test_the_clients_own_layout_keeps_its_remembered_match() -> None:
+    # code review F-1: no Description column, so names under "Item Code" stay names
+    assert suggest("price_list_items", ["Item Code", "Rate"], {"description": "Item Code"}) == {
+        "description": 0, "rate": 1}
+    assert suggest("partners", ["Type", "Partner Code", "Firm", "State", "Code"],
+                   {"code": "Partner Code", "parent_code": "Code"})["parent_code"] == 4
+    assert suggest("partners", ["Firm", "Name"], {"contact_name": "Name"}) == {
+        "contact_name": 1, "name": 0}
+
+
+def test_a_contact_under_name_beside_a_contact_column_is_not_remembered() -> None:
+    # the price of rule 6: with "Contact name" present, "Name" is the name field's own
+    assert suggest("partners", ["Firm", "Name", "Contact name"], {"contact_name": "Name"}) == {
+        "name": 1, "contact_name": 2}
 
 
 # ── rule 7 ───────────────────────────────────────────────────────────────────

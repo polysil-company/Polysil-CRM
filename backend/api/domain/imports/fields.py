@@ -142,8 +142,10 @@ def suggest(kind: str, headers: list[str], remembered: dict[str, str] | None = N
     rule 4).
 
     A remembered column whose header is another field's own key or label is
-    skipped: a past "description on Item Code" must not take the template's Item
-    code column (FS-068 rule 6). Aliases do not count, so "Item" stays."""
+    skipped when the file also has the remembered field's own column: a past
+    "description on Item Code" must not take the template's Item code column when
+    Description sits beside it (FS-068 rule 6). Without that column, as in the
+    client's own file, the remembered match stands. Aliases do not count."""
     out: dict[str, int] = {}
     taken: set[int] = set(empty)
     by_key: dict[str, int] = {}
@@ -152,7 +154,8 @@ def suggest(kind: str, headers: list[str], remembered: dict[str, str] | None = N
     known = {f.key for f in FIELDS[kind]} - NEVER_REMEMBERED
     own = {f.key: {key(f.key), key(f.label)} for f in FIELDS[kind]}
     for field_key, header in (remembered or {}).items():
-        if any(key(header) in names for k, names in own.items() if k != field_key):
+        own_here = field_key in own and any(n in by_key for n in own[field_key])
+        if own_here and any(key(header) in names for k, names in own.items() if k != field_key):
             continue
         col = by_key.get(key(header))
         if col is not None and col not in taken and field_key in known:

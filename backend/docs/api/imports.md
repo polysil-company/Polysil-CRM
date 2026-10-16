@@ -34,8 +34,10 @@ Step 1: upload an `.xlsx` or `.csv` (up to 10 MB and 5,000 rows).
 The answer has the column headers, five sample rows, this kind's fields and a
 suggested match for each. Nothing is saved to partners, prices or documents
 until commit. `target_id` is the draft price list, for `price_list_items` only.
-Choose `sheet` and `header_row` when the guess is wrong: the first visible sheet
-and the first non-empty row are the defaults.
+Choose `sheet` and `header_row` when the guess is wrong. The defaults are the
+first visible sheet, and the row among the first ten that names the most of this
+kind's fields. A header with no rows under it is refused: the blank template
+comes back as `import_unreadable` on `file`.
 
 **Parameters**
 
@@ -54,7 +56,7 @@ and the first non-empty row are the defaults.
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
 | `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
-| `422` | `ErrorResponse` | `import_unreadable`, `import_too_many_rows`, `import_has_errors`, or `validation_error` with `fields.mapping.<key>`. |
+| `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
 ---
 
@@ -113,7 +115,7 @@ Discard an uncommitted import. Its rows are removed at once.
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
 | `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
-| `422` | `ErrorResponse` | `import_unreadable`, `import_too_many_rows`, `import_has_errors`, or `validation_error` with `fields.mapping.<key>`. |
+| `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
 ---
 
@@ -141,7 +143,7 @@ and `check`. Batches are purged seven days after upload.
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
 | `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
-| `422` | `ErrorResponse` | `import_unreadable`, `import_too_many_rows`, `import_has_errors`, or `validation_error` with `fields.mapping.<key>`. |
+| `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
 ---
 
@@ -184,7 +186,7 @@ suggests it.
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
 | `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
-| `422` | `ErrorResponse` | `import_unreadable`, `import_too_many_rows`, `import_has_errors`, or `validation_error` with `fields.mapping.<key>`. |
+| `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
 ---
 
@@ -224,7 +226,7 @@ login. A `lines` import has no commit: the form saves the lines.
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
 | `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
-| `422` | `ErrorResponse` | `import_unreadable`, `import_too_many_rows`, `import_has_errors`, or `validation_error` with `fields.mapping.<key>`. |
+| `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
 ---
 

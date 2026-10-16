@@ -155,8 +155,7 @@ async def upload(db: AsyncSession, caller: Caller, *, kind: str, target_id: str 
                                          header_row=header_row,
                                          score=import_fields.header_score(kind))
     except ImportUnreadableError as exc:
-        field = {"validation_error": "sheet" if sheet else "header_row"}.get(exc.code, "file")
-        raise ValidationFailed(str(exc), code=exc.code, fields={field: str(exc)}) from exc
+        raise ValidationFailed(str(exc), code=exc.code, fields={exc.field: str(exc)}) from exc
 
     new_id = (await db.execute(text(
         "INSERT INTO import_batch (kind, target_id, file_name, file_sha256, sheet, sheets, "

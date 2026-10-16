@@ -39,9 +39,11 @@ Score = Callable[[Sequence[str]], int]
 class ImportUnreadableError(ValueError):
     """The file is not one this reads. `code` is the API's error code."""
 
-    def __init__(self, message: str, code: str = "import_unreadable") -> None:
+    def __init__(self, message: str, code: str = "import_unreadable",
+                 field: str = "file") -> None:
         super().__init__(message)
         self.code = code
+        self.field = field  # the upload input the API reports it on
 
 
 @dataclass(frozen=True)
@@ -112,7 +114,8 @@ def _read_xlsx(data: bytes, *, sheet: str | None, header_row: int | None,
         elif sheet in wb.sheetnames:
             title = sheet
         else:
-            raise ImportUnreadableError(f"No sheet named {sheet!r}.", code="validation_error")
+            raise ImportUnreadableError(f"No sheet named {sheet!r}.", code="validation_error",
+                                        field="sheet")
         ws = wb[title]
         raw: list[tuple[int, list[str]]] = []
         filled = 0
@@ -194,7 +197,7 @@ def _assemble(raw: list[tuple[int, list[str]]], *, sheets: list[str], sheet: str
     by_row = dict(raw)
     if header_row not in by_row or not any(by_row[header_row]):
         raise ImportUnreadableError(f"Row {header_row} is empty, so it cannot be the header row.",
-                               code="validation_error")
+                                    code="validation_error", field="header_row")
     header_cells = by_row[header_row]
     width = max([len(header_cells)] + [len(c) for n, c in raw if n > header_row])
     width = min(width, MAX_COLUMNS)
@@ -210,7 +213,7 @@ def _assemble(raw: list[tuple[int, list[str]]], *, sheets: list[str], sheet: str
         # FS-068 rule 7: the blank template uploads cleanly and checks as 0 of 0
         if chosen:
             raise ImportUnreadableError(f"Row {header_row} has no rows under it.",
-                                        code="validation_error")
+                                        code="validation_error", field="header_row")
         raise ImportUnreadableError("This sheet has column names but no rows under them. Fill "
                                     "it in and upload again.")
     if len(rows) > MAX_DATA_ROWS:

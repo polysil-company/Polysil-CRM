@@ -40,9 +40,11 @@ _ERRORS: dict[int | str, dict[str, object]] = {
                                                  "checked, or a lines import at commit); "
                                                  "`price_list_published`."},
     413: {"model": ErrorResponse, "description": "`attachment_too_large`: over 10 MB."},
-    422: {"model": ErrorResponse, "description": "`import_unreadable`, `import_too_many_rows`, "
-                                                 "`import_has_errors`, or `validation_error` with "
-                                                 "`fields.mapping.<key>`."},
+    422: {"model": ErrorResponse, "description": "`import_unreadable` on `fields.file` (also a "
+                                                 "header with no rows under it), "
+                                                 "`import_too_many_rows`, `import_has_errors`, or "
+                                                 "`validation_error` on `fields.sheet`, "
+                                                 "`fields.header_row` or `fields.mapping.<key>`."},
 }
 
 
@@ -58,8 +60,10 @@ async def upload(db: DbSession, caller: CallerDep, claims: Claims, idem: IdemKey
     The answer has the column headers, five sample rows, this kind's fields and a
     suggested match for each. Nothing is saved to partners, prices or documents
     until commit. `target_id` is the draft price list, for `price_list_items` only.
-    Choose `sheet` and `header_row` when the guess is wrong: the first visible sheet
-    and the first non-empty row are the defaults."""
+    Choose `sheet` and `header_row` when the guess is wrong. The defaults are the
+    first visible sheet, and the row among the first ten that names the most of this
+    kind's fields. A header with no rows under it is refused: the blank template
+    comes back as `import_unreadable` on `file`."""
     data = await file.read(files.MAX_UPLOAD_BYTES + 1)
     if len(data) > files.MAX_UPLOAD_BYTES:
         raise BodyTooLarge()
@@ -82,7 +86,7 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 # Declared above /{batch_id}: its UUID pattern validates, it does not route, so
 # "template" would reach get_import and fail there (FS-068 EC-2).
-@router.get("/template", responses={
+@router.get("/template", response_class=Response, responses={
     200: {"content": {XLSX: {}}, "description": "The blank `.xlsx`."},
     401: _ERRORS[401],
     403: {"model": ErrorResponse, "description": "No permission to upload this kind of import."},

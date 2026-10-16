@@ -90,6 +90,18 @@ async def test_the_blank_template_is_refused_at_upload(
     assert "no rows under them" in body["error"]["fields"]["file"]
 
 
+async def test_a_chosen_header_row_with_no_rows_is_reported_on_header_row(
+        client: httpx.AsyncClient, imported: base.Fx) -> None:
+    """Code review F-2: with both sheet and header_row sent, the error names the
+    header row, not the sheet."""
+    h = await endpoints._as(client, imported.shop, "admin_sales")
+    blank = (await _template(client, h, "lines")).content
+    r = await base._upload(client, h, "lines", blank, name="t.xlsx", sheet="Order lines",
+                           header_row="1")
+    assert r.status_code == 422, r.text
+    assert r.json()["error"]["fields"] == {"header_row": "Row 1 has no rows under it."}
+
+
 async def test_a_filled_template_is_matched_by_name_after_a_wrong_mapping(
         client: httpx.AsyncClient, imported: base.Fx) -> None:
     """Rule 6 and EC-1: the 16 Oct file, names under "Item Code", saved as the
