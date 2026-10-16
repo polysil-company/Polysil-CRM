@@ -123,7 +123,8 @@ def name_key(text: str) -> str:
     return _RUNS.sub(" ", _ESCAPES.sub("", text)).strip().casefold()
 
 
-_QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
+# a Python repr: '...' or "...", with backslash escapes inside
+_QUOTED = re.compile(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"")
 _DIGITS = re.compile(r"\d{6,}")
 
 

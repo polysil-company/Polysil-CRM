@@ -239,15 +239,17 @@ def _best_header(raw: list[tuple[int, list[str]]], filled: list[int],
 
 def _labels(raw: list[tuple[int, list[str]]], header_row: int, width: int) -> list[str]:
     """FS-067 rule 2: short text above the header names its column, as the state codes
-    over the client's price columns do. A row's first filled cell is its title and a
-    cell with a colon is a note ("Date: 16-10-2026"), so neither is a label."""
+    over the client's price columns do. A row's first filled cell is its title, and a
+    cell with a colon or a digit is a note or a date ("Date: 16-10-2026", "w.e.f.
+    01-04-2026"): neither is a label, or the names would change with every list."""
     out = [""] * width
     for n, cells in raw:
         if n >= header_row or not any(cells):
             continue
         first = next(i for i, c in enumerate(cells) if c)
         for i, c in enumerate(cells[:width]):
-            if c and i != first and len(c) <= MAX_LABEL_CHARS and ":" not in c:
+            if (c and i != first and len(c) <= MAX_LABEL_CHARS and ":" not in c
+                    and not any(ch.isdigit() for ch in c)):
                 out[i] = f"{out[i]} {c}".strip()
     return out
 

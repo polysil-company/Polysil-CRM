@@ -115,12 +115,14 @@ def _staff_only(caller: Caller, kind: str) -> None:
 
 async def _remembered(db: AsyncSession, kind: str) -> dict[str, str]:
     """The caller's last committed mapping of this kind, as field to header text. A
-    discarded one is the mapping that did not work (FS-067 rule 4a)."""
+    discarded one is the mapping that did not work (FS-067 rule 4a). A line import is
+    never committed, since the form saves its lines, so its last check counts."""
     last = (await db.execute(text(
         "SELECT headers, mapping FROM import_batch WHERE kind = :k AND mapping IS NOT NULL "
-        "AND status = 'committed' AND created_by = app_current_user_id() "
+        "AND status = ANY(CAST(:done AS text[])) AND created_by = app_current_user_id() "
         "ORDER BY created_at DESC LIMIT 1"),
-        {"k": kind})).one_or_none()
+        {"k": kind, "done": ["checked", "committed"] if kind == "lines" else ["committed"]}
+    )).one_or_none()
     if last is None:
         return {}
     headers = list(last.headers)
@@ -183,7 +185,7 @@ class Evaluation:
 
 
 def _empty_columns(rows: Sequence[SheetRow], width: int) -> set[int]:
-    """Columns with no value on any row. None when there are no rows at all."""
+    """Columns with no value on any row. Empty when there are no rows at all."""
     if not rows:
         return set()
     return {c for c in range(width) if not any(c < len(r.cells) and r.cells[c] for r in rows)}
@@ -284,6 +286,8 @@ async def _evaluate(db: AsyncSession, kind: str, rows: list[SheetRow],
     if by_name:
         # FS-067 rule 6 b: good rows, said once for the column
         warnings.setdefault("item_code", (
+            "1 item code is not in the catalogue. That row was matched by its description."
+            if by_name == 1 else
             f"{by_name} item codes are not in the catalogue. Those rows were matched by "
             f"their description."))
     return Evaluation(results, warnings)

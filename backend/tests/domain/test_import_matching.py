@@ -144,11 +144,22 @@ def test_a_long_label_is_not_a_label() -> None:
 
 def test_labels_from_two_rows_join_and_a_rows_only_cell_is_a_title() -> None:
     data = _xlsx([["Title", None, "GJ"],
-                  ["", "wef", "2026-10"],
+                  ["", "wef", "Dealer"],
                   ["Item Code", "Description", None],
                   ["C1", "PIPE", 10]])
     sheet = read_upload(data, "p.xlsx", score=PRICE)
-    assert sheet.headers[1:] == ["Description", "GJ 2026-10"], "wef opens its row: a title"
+    assert sheet.headers[1:] == ["Description", "GJ Dealer"], "wef opens its row: a title"
+
+
+@pytest.mark.parametrize("note", ["w.e.f. 01-04-2026", "2026-04-01", "Rev 3"])
+def test_a_date_or_a_number_above_a_column_is_not_a_label(note: str) -> None:
+    # code review F3: the name would change with every list, and hide the rate
+    data = _xlsx([["Polysil Irrigation price list", None, note],
+                  ["Item Code", "Description", "Rate"],
+                  ["C1", "PIPE", 10]])
+    sheet = read_upload(data, "p.xlsx", score=PRICE)
+    assert sheet.headers[2] == "Rate"
+    assert suggest("price_list_items", sheet.headers)["rate"] == 2
 
 
 def test_a_lone_cell_above_is_a_title_not_a_label() -> None:
@@ -200,6 +211,16 @@ def test_redaction_takes_out_quoted_cells_and_long_numbers() -> None:
     assert redact("no product 'Ramesh Patel'") == "no product '…'"
     assert redact("also on row 12") == "also on row 12"
     assert "98765" not in redact("bad value 9876543210 here")
+
+
+@pytest.mark.parametrize("cell", ["He said \"x\" O'Brien", "abc'def\"ghi", "O'Neil"])
+def test_redaction_survives_both_quote_marks(cell: str) -> None:
+    # code review F4: repr escapes one quote mark when the cell holds both
+    for message in (f"no product with item code {cell!r}",
+                    f"{cell!r} is not this product's item code (C1)"):
+        kept = redact(message)
+        assert "Brien" not in kept and "def" not in kept and "ghi" not in kept \
+            and "Neil" not in kept, kept
 
 
 # ── finding the product (rules 6 to 8) ───────────────────────────────────────

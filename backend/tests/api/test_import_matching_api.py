@@ -84,7 +84,8 @@ async def test_a_titled_sheet_finds_its_header_and_matches_names_loosely(
 
     result = (await base._check(client, h, batch["id"], batch["suggested_mapping"])).json()["data"]
     assert (result["ok"], result["errors"]) == (1, 0), result
-    assert result["column_warnings"]["item_code"].startswith("1 item codes are not in the catalogue")
+    assert result["column_warnings"]["item_code"] == (
+        "1 item code is not in the catalogue. That row was matched by its description.")
     assert (await base._commit(client, h, batch["id"])).status_code == 200
     assert await base._rates(client, h, list_id, products.plain) == {products.plain: "12.50"}
 
@@ -186,3 +187,31 @@ async def test_a_discarded_mapping_is_not_remembered(
     third = (await base._upload(client, h, "price_list_items", sheet, name="r.csv",
                                 target_id=list_id)).json()["data"]
     assert third["suggested_mapping"] == {"description": 0}, "a committed one is; never the rate"
+
+
+async def test_an_empty_rate_is_not_guessed_and_is_warned_about(
+        client: httpx.AsyncClient, imported: base.Fx) -> None:
+    """Rule 4 and FS-062 EC-16 through the service: the empty columns reach
+    `suggest` on upload and GET, and a mapped empty column gets its warning."""
+    h = await endpoints._as(client, imported.shop, "admin_sales")
+    list_id = await base._draft_list(client, h)
+    batch = (await base._upload(client, h, "price_list_items", base._csv([
+        ["Description", "Rate", "MRP"], [imported.product_description, "", "50"],
+    ]), name="r.csv", target_id=list_id)).json()["data"]
+    assert batch["suggested_mapping"] == {"description": 0}
+    got = (await client.get(f"{V1}/imports/{batch['id']}", headers=h)).json()["data"]
+    assert got["suggested_mapping"] == {"description": 0}
+    result = (await base._check(client, h, batch["id"], {"description": 0, "rate": 1})).json()["data"]
+    assert result["column_warnings"]["rate"].startswith("This column is empty on every row")
+
+
+async def test_a_line_import_remembers_its_last_check(
+        client: httpx.AsyncClient, imported: base.Fx) -> None:
+    """Code review F1: a line batch is never committed, so its check is what worked."""
+    h = await endpoints._as(client, imported.shop, "admin_sales")
+    sheet = base._csv([["Naam", "Ginti"], [imported.product_description, "5"]])
+    first = (await base._upload(client, h, "lines", sheet, name="l.csv")).json()["data"]
+    assert first["suggested_mapping"] == {}
+    assert (await base._check(client, h, first["id"], {"description": 0, "qty": 1})).status_code == 200
+    second = (await base._upload(client, h, "lines", sheet, name="l.csv")).json()["data"]
+    assert second["suggested_mapping"] == {"description": 0, "qty": 1}
