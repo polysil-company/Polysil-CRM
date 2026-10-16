@@ -26,7 +26,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.authz.predicate import Caller
 from api.domain.imports import fields as import_fields
-from api.domain.imports.cells import key
+from api.domain.imports.cells import key, redact
 from api.domain.imports.reader import ImportUnreadableError, SheetRow, read_upload
 from api.domain.imports.rows import (
     TYPE_ORDER,
@@ -114,10 +114,12 @@ def _staff_only(caller: Caller, kind: str) -> None:
 
 
 async def _remembered(db: AsyncSession, kind: str) -> dict[str, str]:
-    """The caller's last checked mapping of this kind, as field to header text."""
+    """The caller's last committed mapping of this kind, as field to header text. A
+    discarded one is the mapping that did not work (FS-067 rule 4a)."""
     last = (await db.execute(text(
         "SELECT headers, mapping FROM import_batch WHERE kind = :k AND mapping IS NOT NULL "
-        "AND created_by = app_current_user_id() ORDER BY created_at DESC LIMIT 1"),
+        "AND status = 'committed' AND created_by = app_current_user_id() "
+        "ORDER BY created_at DESC LIMIT 1"),
         {"k": kind})).one_or_none()
     if last is None:
         return {}
@@ -141,7 +143,8 @@ async def upload(db: AsyncSession, caller: Caller, *, kind: str, target_id: str 
         # openpyxl is CPU-bound: a 5,000-row sheet takes a second or more, which must
         # not stall every other request on this worker (code review F-3)
         parsed = await run_in_threadpool(read_upload, data, file_name, sheet=sheet,
-                                         header_row=header_row)
+                                         header_row=header_row,
+                                         score=import_fields.header_score(kind))
     except ImportUnreadableError as exc:
         field = {"validation_error": "sheet" if sheet else "header_row"}.get(exc.code, "file")
         raise ValidationFailed(str(exc), code=exc.code, fields={field: str(exc)}) from exc
@@ -158,13 +161,16 @@ async def upload(db: AsyncSession, caller: Caller, *, kind: str, target_id: str 
             "rows": json.dumps([{"row": r.row, "cells": list(r.cells)} for r in parsed.rows]),
             "n": len(parsed.rows)})).scalar_one()
     row = await _load(db, str(new_id))
-    return _out(row, import_fields.suggest(kind, parsed.headers, await _remembered(db, kind)))
+    return _out(row, import_fields.suggest(kind, parsed.headers, await _remembered(db, kind),
+                                           empty=_empty_columns(parsed.rows, len(parsed.headers))))
 
 
 async def get(db: AsyncSession, batch_id: str) -> sch.ImportBatch:
     row = await _load(db, batch_id)
-    suggested = (import_fields.suggest(row.kind, list(row.headers), await _remembered(db, row.kind))
-                 if row.status != "discarded" else {})
+    suggested = (import_fields.suggest(
+        row.kind, list(row.headers), await _remembered(db, row.kind),
+        empty=_empty_columns(_sheet_rows(row), len(row.headers)))
+        if row.status != "discarded" else {})
     return _out(row, suggested)
 
 
@@ -176,11 +182,19 @@ class Evaluation:
     column_warnings: dict[str, str]
 
 
+def _empty_columns(rows: Sequence[SheetRow], width: int) -> set[int]:
+    """Columns with no value on any row. None when there are no rows at all."""
+    if not rows:
+        return set()
+    return {c for c in range(width) if not any(c < len(r.cells) and r.cells[c] for r in rows)}
+
+
 def _column_warnings(rows: Sequence[SheetRow], mapping: dict[str, int]) -> dict[str, str]:
     """EC-16: a mapped column with nothing in it is one message, not a row each."""
     out = {}
+    empty = _empty_columns(rows, max(mapping.values(), default=-1) + 1)
     for field_key, col in mapping.items():
-        if rows and not any(col < len(r.cells) and r.cells[col] for r in rows):
+        if col in empty:
             out[field_key] = ("This column is empty on every row, or holds formulas with no "
                               "saved result. Open the file in Excel, save it, and upload again.")
     return out
@@ -242,30 +256,19 @@ async def _evaluate_partners(db: AsyncSession, rows: list[SheetRow],
     return results
 
 
-async def _product_lookups(db: AsyncSession, rows: list[SheetRow],
-                           mapping: dict[str, int]) -> ProductLookups:
-    def column(name: str) -> list[str]:
-        i = mapping.get(name)
-        return sorted({r.cells[i] for r in rows if i is not None and i < len(r.cells)
-                       and r.cells[i]})
-
+async def _product_lookups(db: AsyncSession) -> ProductLookups:
+    """Every product not deleted, once per check or commit. Names are compared after
+    `name_key`, which SQL cannot index, so the catalogue is keyed here: 1,092 rows
+    on production (FS-067 rule 5)."""
     found = (await db.execute(text(
         "SELECT p.id::text, p.description::text, p.item_code::text, p.is_active, u.code::text, "
         "       u.decimals, p.pack_multiple "
-        "FROM product p JOIN uom u ON u.id = p.uom_id "
-        "WHERE p.deleted_at IS NULL AND (p.item_code = ANY(CAST(:codes AS citext[])) "
-        "   OR p.description = ANY(CAST(:descs AS citext[])))"),
-        {"codes": column("item_code"), "descs": column("description")})).all()
-    by_code: dict[str, ProductRef] = {}
-    by_desc: dict[str, ProductRef] = {}
-    for r in found:
-        ref = ProductRef(id=r[0], description=r[1], is_active=r[3], uom_code=r[4],
-                         uom_decimals=int(r[5]),
-                         pack_multiple=Decimal(r[6]) if r[6] is not None else None)
-        by_desc[r[1].casefold()] = ref
-        if r[2]:
-            by_code[r[2].casefold()] = ref
-    return ProductLookups(by_code=by_code, by_description=by_desc)
+        "FROM product p JOIN uom u ON u.id = p.uom_id WHERE p.deleted_at IS NULL"))).all()
+    return ProductLookups.build(
+        ProductRef(id=r[0], description=r[1], item_code=r[2], is_active=r[3], uom_code=r[4],
+                   uom_decimals=int(r[5]),
+                   pack_multiple=Decimal(r[6]) if r[6] is not None else None)
+        for r in found)
 
 
 async def _evaluate(db: AsyncSession, kind: str, rows: list[SheetRow],
@@ -273,10 +276,17 @@ async def _evaluate(db: AsyncSession, kind: str, rows: list[SheetRow],
     if kind == "partners":
         results = await _evaluate_partners(db, rows, mapping)
     elif kind == "price_list_items":
-        results = parse_price_items(rows, mapping, await _product_lookups(db, rows, mapping))
+        results = parse_price_items(rows, mapping, await _product_lookups(db))
     else:
-        results = parse_lines(rows, mapping, await _product_lookups(db, rows, mapping))
-    return Evaluation(results, _column_warnings(rows, mapping))
+        results = parse_lines(rows, mapping, await _product_lookups(db))
+    warnings = _column_warnings(rows, mapping)
+    by_name = sum(1 for r in results if r.ok and r.notes.get("item_code"))
+    if by_name:
+        # FS-067 rule 6 b: good rows, said once for the column
+        warnings.setdefault("item_code", (
+            f"{by_name} item codes are not in the catalogue. Those rows were matched by "
+            f"their description."))
+    return Evaluation(results, warnings)
 
 
 def _preview_values(kind: str, values: dict[str, Any]) -> dict[str, object]:
@@ -331,12 +341,32 @@ async def check(db: AsyncSession, caller: Caller, batch_id: str,
     return result
 
 
+def _kept_check(kind: str, stored: Any) -> str | None:
+    """FS-067 rule 9: what a discarded batch keeps of its check, in the full
+    `ImportCheck` shape so GET still reads it. Partner errors can quote a mobile, so
+    a partner batch keeps counts only. Product errors keep their reasons with the
+    quoted cell taken out: a misfiled staff sheet must not leave names behind."""
+    if not stored:
+        return None
+    check = sch.ImportCheck.model_validate(stored)
+    check.preview = []
+    check.lines = None
+    if kind == "partners":
+        check.error_rows = []
+        check.column_warnings = {}
+    else:
+        check.error_rows = [sch.ImportRowError(row=e.row, errors={
+            k: redact(v) for k, v in e.errors.items()}) for e in check.error_rows]
+    return check.model_dump_json()
+
+
 async def discard(db: AsyncSession, batch_id: str) -> None:
     row = await _load(db, batch_id, for_update=True)
     _open(row)
     await db.execute(text(
-        "UPDATE import_batch SET status = 'discarded', rows = NULL, check_result = NULL "
-        "WHERE id = CAST(:id AS uuid)"), {"id": batch_id})
+        "UPDATE import_batch SET status = 'discarded', rows = NULL, "
+        "  check_result = CAST(:c AS jsonb) WHERE id = CAST(:id AS uuid)"),
+        {"id": batch_id, "c": _kept_check(row.kind, row.check_result)})
 
 
 # ── commit ───────────────────────────────────────────────────────────────────
@@ -383,10 +413,13 @@ async def commit(db: AsyncSession, caller: Caller, batch_id: str,
         created = await _commit_rates(db, row.target_id, good,
                                       merge=options.get("mode") == "merge")
         target = row.target_id
+    stored = _summary(row.kind, ev)
+    if row.kind == "partners":
+        stored.preview = []   # FS-067 rule 9b: mobiles, GSTINs and PANs
     await db.execute(text(
         "UPDATE import_batch SET status = 'committed', committed_at = now(), "
         "  check_result = CAST(:c AS jsonb) WHERE id = CAST(:id AS uuid)"),
-        {"id": batch_id, "c": _summary(row.kind, ev).model_dump_json()})
+        {"id": batch_id, "c": stored.model_dump_json()})
     return sch.ImportCommitResult(status="committed", created=created, skipped=bad,
                                   price_list_id=target)
 

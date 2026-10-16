@@ -6,6 +6,7 @@ decides (rule 2).
 
 from __future__ import annotations
 
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 
 from api.domain.imports.cells import key
@@ -29,7 +30,8 @@ _PRODUCT = (
     FieldSpec("description", "Description", False,
               "The product's description, exactly as in the catalogue. Give this or the item "
               "code.", ("description", "product", "productname", "item", "itemname",
-                        "itemdescription", "particulars", "name")),
+                        "itemdescription", "particulars", "name", "productdescription",
+                        "desc")),
 )
 
 FIELDS: dict[str, tuple[FieldSpec, ...]] = {
@@ -99,16 +101,39 @@ ONE_OF: dict[str, tuple[tuple[str, ...], ...]] = {
 }
 
 
-def suggest(kind: str, headers: list[str],
-            remembered: dict[str, str] | None = None) -> dict[str, int]:
+def _names(spec: FieldSpec) -> tuple[str, ...]:
+    return (key(spec.key), key(spec.label), *spec.aliases)
+
+
+def header_score(kind: str) -> Callable[[Sequence[str]], int]:
+    """FS-067 rule 1: how many of the kind's fields a row names, each counted once."""
+    names = [set(_names(spec)) for spec in FIELDS[kind]]
+
+    def score(cells: Sequence[str]) -> int:
+        keys = {key(c) for c in cells if c}
+        return sum(1 for n in names if n & keys)
+    return score
+
+
+# FS-067 rule 4a: a remembered rate column is the wrong state's prices on the next list
+NEVER_REMEMBERED = frozenset({"rate"})
+
+
+def suggest(kind: str, headers: list[str], remembered: dict[str, str] | None = None, *,
+            empty: Collection[int] = ()) -> dict[str, int]:
     """Field to column, from the caller's last mapping of the same kind (by header
-    text), then from the built-in names. A column is used once; a field once."""
+    text), then from the built-in names. A column is used once; a field once.
+
+    A column in `empty` has no value on any row and is never suggested. A field
+    whose best-named column is empty stays unsuggested rather than falling through
+    to a weaker name: an empty "Rate" must not hand the rate to "MRP" (FS-067
+    rule 4)."""
     out: dict[str, int] = {}
-    taken: set[int] = set()
+    taken: set[int] = set(empty)
     by_key: dict[str, int] = {}
     for i, h in enumerate(headers):
         by_key.setdefault(key(h), i)
-    known = {f.key for f in FIELDS[kind]}
+    known = {f.key for f in FIELDS[kind]} - NEVER_REMEMBERED
     for field_key, header in (remembered or {}).items():
         col = by_key.get(key(header))
         if col is not None and col not in taken and field_key in known:
@@ -117,9 +142,13 @@ def suggest(kind: str, headers: list[str],
     for spec in FIELDS[kind]:
         if spec.key in out:
             continue
-        for alias in (key(spec.key), key(spec.label), *spec.aliases):
+        for alias in _names(spec):
             col = by_key.get(alias)
-            if col is not None and col not in taken:
+            if col is None:
+                continue
+            if col in empty:
+                break
+            if col not in taken:
                 out[spec.key] = col
                 taken.add(col)
                 break

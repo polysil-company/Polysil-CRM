@@ -108,3 +108,26 @@ def to_bool(text: str) -> bool:
 def key(text: str) -> str:
     """Comparison form for names: case, spaces, dots and hyphens ignored."""
     return re.sub(r"[\s.\-_/]+", "", text.casefold())
+
+
+# Excel keeps a carriage return, a newline or a tab inside a cell as these literal
+# escapes; openpyxl hands them back as text. The catalogue loader strips them too.
+_ESCAPES = re.compile(r"_x000[DA9]_", re.IGNORECASE)
+_RUNS = re.compile(r"\s+")
+
+
+def name_key(text: str) -> str:
+    """Comparison form for product names and codes (FS-067 rule 5): Excel escapes
+    gone, every run of whitespace one space, trimmed, case ignored. Unlike `key`,
+    dots and hyphens stay: `PE-100` and `PE100` are different products."""
+    return _RUNS.sub(" ", _ESCAPES.sub("", text)).strip().casefold()
+
+
+_QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
+_DIGITS = re.compile(r"\d{6,}")
+
+
+def redact(message: str) -> str:
+    """An error message with the cell it quotes taken out (FS-067 rule 9): kept after
+    a discard, it must not hold a mobile or a name from a misfiled sheet."""
+    return _DIGITS.sub("…", _QUOTED.sub("'…'", message))

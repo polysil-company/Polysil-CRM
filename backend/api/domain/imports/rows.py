@@ -12,13 +12,13 @@ Values leave here as JSON-ready text, in the stored form: a mobile as
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
 from api.domain import identity
-from api.domain.imports.cells import CellError, key, to_bool, to_decimal
+from api.domain.imports.cells import CellError, key, name_key, to_bool, to_decimal
 from api.domain.imports.reader import SheetRow
 
 TYPE_ORDER = ("distributor", "dealer", "sub_dealer")
@@ -37,6 +37,10 @@ class RowResult:
     row: int
     values: dict[str, Any] = field(default_factory=dict)
     errors: dict[str, str] = field(default_factory=dict)
+    # field to a note that is not an error: the service counts them into one column
+    # warning (FS-067 rule 6 b)
+    notes: dict[str, str] = field(default_factory=dict)
+    matched_on: str | None = None   # the column that found the product (rule 7)
 
     @property
     def ok(self) -> bool:
@@ -252,39 +256,124 @@ class ProductRef:
     uom_code: str
     uom_decimals: int
     pack_multiple: Decimal | None
+    item_code: str | None = None
 
 
 @dataclass
 class ProductLookups:
-    by_code: dict[str, ProductRef]            # casefolded item code
-    by_description: dict[str, ProductRef]     # casefolded description
+    """Products by `name_key` of code and description (FS-067 rule 5), and by the
+    plain casefolded text, which wins first (rule 8). A key two products share is
+    ambiguous."""
+    by_code: dict[str, ProductRef]
+    by_description: dict[str, ProductRef]
+    exact_code: dict[str, ProductRef] = field(default_factory=dict)
+    exact_description: dict[str, ProductRef] = field(default_factory=dict)
+    ambiguous_codes: frozenset[str] = frozenset()
+    ambiguous_descriptions: frozenset[str] = frozenset()
+
+    @classmethod
+    def build(cls, products: Iterable[ProductRef]) -> ProductLookups:
+        maps: dict[str, dict[str, ProductRef]] = {
+            "code": {}, "description": {}, "exact_code": {}, "exact_description": {}}
+        twins: dict[str, set[str]] = {"code": set(), "description": set()}
+        for ref in products:
+            for kind, text in (("code", ref.item_code), ("description", ref.description)):
+                if not text:
+                    continue
+                maps["exact_" + kind].setdefault(text.strip().casefold(), ref)
+                k = name_key(text)
+                if k in maps[kind] and maps[kind][k].id != ref.id:
+                    twins[kind].add(k)
+                maps[kind].setdefault(k, ref)
+        return cls(by_code=maps["code"], by_description=maps["description"],
+                   exact_code=maps["exact_code"], exact_description=maps["exact_description"],
+                   ambiguous_codes=frozenset(twins["code"]),
+                   ambiguous_descriptions=frozenset(twins["description"]))
+
+    def code(self, text: str) -> ProductRef | _Ambiguous | None:
+        return _find(text, self.exact_code, self.by_code, self.ambiguous_codes)
+
+    def description(self, text: str) -> ProductRef | _Ambiguous | None:
+        return _find(text, self.exact_description, self.by_description,
+                     self.ambiguous_descriptions)
+
+
+class _Ambiguous:
+    """Two products share this name once spaces and case are ignored (rule 8)."""
+
+
+AMBIGUOUS = _Ambiguous()
+
+
+def _find(text: str, exact: dict[str, ProductRef], keyed: dict[str, ProductRef],
+          ambiguous: frozenset[str]) -> ProductRef | _Ambiguous | None:
+    hit = exact.get(text.strip().casefold())
+    if hit is not None:
+        return hit
+    k = name_key(text)
+    return AMBIGUOUS if k in ambiguous else keyed.get(k)
+
+
+NAME_IN_CODE = "this is a product name, not an item code. Match this column to Description."
 
 
 def _product(r: SheetRow, mapping: Mapping[str, int], lk: ProductLookups,
              res: RowResult) -> ProductRef | None:
+    """FS-067 rule 6, in order: the code finds the product; an unknown code with a
+    known description of a product that has no code; a description whose product
+    has another code; a code that is a product's name; nothing."""
     code = _get(r, mapping, "item_code")
     desc = _get(r, mapping, "description")
     if not code and not desc:
         res.errors["item_code" if "item_code" in mapping else "description"] = "required"
         return None
-    # GAP-473: exact item code or exact description only, no closest match
-    by_code = lk.by_code.get(code.casefold()) if code else None
-    by_desc = lk.by_description.get(desc.casefold()) if desc else None
-    if code and by_code is None:
-        res.errors["item_code"] = f"no product with item code {code}"
+    # GAP-473: no closest match. Every message quotes its cell, so a kept check can
+    # take the value out (rule 9a)
+    by_code = lk.code(code) if code else None
+    by_desc = lk.description(desc) if desc else None
+    if isinstance(by_code, _Ambiguous):
+        res.errors["item_code"] = f"more than one product has the item code {code!r}"
         return None
-    if by_code and by_desc and by_code.id != by_desc.id:
-        # EC-17. A description that matches nothing is ignored when the code matches:
-        # sheets carry their own wording.
-        res.errors["description"] = "names a different product from the item code"
+    if by_code is not None:
+        if isinstance(by_desc, ProductRef) and by_desc.id != by_code.id:
+            # EC-17. A description that matches nothing is ignored when the code
+            # matches: sheets carry their own wording.
+            res.errors["description"] = "names a different product from the item code"
+            return None
+        return _found(res, by_code, "item_code")
+    if isinstance(by_desc, _Ambiguous):
+        res.errors["description"] = f"more than one product has the name {desc!r}"
         return None
-    found = by_code or by_desc
-    if found is None:
+    if code:
+        if by_desc is not None:
+            if by_desc.item_code:
+                res.errors["item_code"] = (f"{code!r} is not this product's item code "
+                                           f"({by_desc.item_code})")
+                return None
+            res.notes["item_code"] = "matched by description"
+            return _found(res, by_desc, "description")
+        if lk.description(code) is not None:
+            res.errors["item_code"] = NAME_IN_CODE
+        else:
+            res.errors["item_code"] = f"no product with item code {code!r}"
+        return None
+    if by_desc is None:
         res.errors["description"] = f"no product {desc!r}"
         return None
-    res.values["product_id"] = found.id
-    res.values["product"] = found.description
-    return found
+    return _found(res, by_desc, "description")
+
+
+def _found(res: RowResult, product: ProductRef, column: str) -> ProductRef:
+    res.values["product_id"] = product.id
+    res.values["product"] = product.description
+    res.matched_on = column
+    return product
+
+
+def _matched_column(mapping: Mapping[str, int]) -> Callable[[RowResult], str]:
+    """Rule 7: an error about the product sits on the column that found it."""
+    default = "item_code" if "item_code" in mapping else "description"
+    return lambda res: res.matched_on or default
 
 
 def parse_price_items(rows: Sequence[SheetRow], mapping: Mapping[str, int],
@@ -303,8 +392,7 @@ def parse_price_items(rows: Sequence[SheetRow], mapping: Mapping[str, int],
             except CellError as exc:
                 res.errors["rate"] = str(exc)
         out.append(res)
-    _duplicates(out, "item_code" if "item_code" in mapping else "description",
-                lambda v: v.get("product_id"))
+    _duplicates(out, _matched_column(mapping), lambda v: v.get("product_id"))
     return out
 
 
@@ -315,8 +403,7 @@ def parse_lines(rows: Sequence[SheetRow], mapping: Mapping[str, int],
         res = RowResult(r.row)
         product = _product(r, mapping, lk, res)
         if product is not None and not product.is_active:
-            res.errors["item_code" if "item_code" in mapping else "description"] = (
-                "this product is no longer sold")
+            res.errors[_matched_column(mapping)(res)] = "this product is no longer sold"
         qty = _get(r, mapping, "qty")
         if not qty:
             res.errors["qty"] = "required"
@@ -347,22 +434,23 @@ def parse_lines(rows: Sequence[SheetRow], mapping: Mapping[str, int],
     return out
 
 
-def _duplicates(results: list[RowResult], field_name: str,
+def _duplicates(results: list[RowResult], field_name: str | Callable[[RowResult], str],
                 ident: Any) -> None:
+    where = field_name if callable(field_name) else (lambda _res: field_name)
     first: dict[Any, int] = {}
+    repeated: set[Any] = set()
     for res in results:
         k = ident(res.values)
         if k is None:
             continue
         if k in first:
-            res.errors.setdefault(field_name, f"also on row {first[k]}")
+            res.errors.setdefault(where(res), f"also on row {first[k]}")
+            repeated.add(k)
         else:
             first[k] = res.row
     # the first row of a repeated value is also wrong: which one was meant?
-    repeated = {ident(res.values) for res in results
-                if res.errors.get(field_name, "").startswith("also on row")}
     for res in results:
         k = ident(res.values)
         if k in repeated and first.get(k) == res.row:
             later = next(o.row for o in results if o.row != res.row and ident(o.values) == k)
-            res.errors.setdefault(field_name, f"also on row {later}")
+            res.errors.setdefault(where(res), f"also on row {later}")
