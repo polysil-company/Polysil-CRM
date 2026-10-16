@@ -122,8 +122,8 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [x] **20. Territories admin** (4). PR #147, 15 Oct (`feature/MSTR-012-masters-territories`, MSTR-012), a Territories tab in Masters, stacked on #135. `backend/docs/api/territories.md`.
 - [x] **21. Company settings** (2). `settings-amend-reopen-contract.md`. PR #148 (`feature/ADMN-007-company-settings`, from `integration`): all 18 settings the backend seeds, in sections.
 - [x] **22. Reports, and the 360° lead view** (9). RPT-002. `reports-contract.md`, `when-a-sale-counts.md`. PR #149 (`feature/RPT-002-reports`, from `integration`): eight reports (campaign performance too) and At a glance on a lead (RPT-003).
-- [~] **23. Targets and achievement** (3). `targets-contract.md`. Started on `feature/TGT-001-targets`, from `integration`.
-- [ ] **24. Schemes and promotions** (6, plus `GET /orders/{id}/schemes`). SCHM-001. `schemes-contract.md`.
+- [x] **23. Targets and achievement** (3). `targets-contract.md`. PR #150 (`feature/TGT-001-targets`, from `integration`): your month, your team, and Set targets with its history.
+- [~] **24. Schemes and promotions** (6, plus `GET /orders/{id}/schemes`). SCHM-001. `schemes-contract.md`. In two parts: 24a, the schemes themselves (admin and dealer), on `feature/SCHM-001-schemes` from `integration`; 24b, benefits on the order, stacked on #144 for `payable`.
 - [ ] **25. Reward points** (19), **and dealer commission and TOD** (12). `rewards-contract.md`, `dealer-commission-contract.md`.
 - [ ] **26. Payments, partner credit and the dealer ledger** (8). `payments-contract.md`. It goes with item 3.
 - [ ] **27. Marketing material ordering** (11), **and campaigns** (5). MKT-001. `marketing-material-contract.md`, `campaigns.md`.
