@@ -242,14 +242,14 @@ login. A `lines` import has no commit: the form saves the lines.
 | `file_name` | string | yes |  |
 | `sheet` | string \| null | yes | Null for a CSV. |
 | `sheets` | string[] | yes | Every sheet in the workbook. Empty for a CSV. |
-| `header_row` | integer | yes |  |
+| `header_row` | integer | yes | The row the column names came from. Without one in the upload, the row among the first ten non-blank rows that holds the most known column names; otherwise the first non-blank row. |
 | `row_count` | integer | yes |  |
-| `headers` | string[] | yes | Column headers. A blank one reads `Column C`; a repeated one gets ` (2)`. |
+| `headers` | string[] | yes | Column headers. A blank one reads `Column C`; a repeated one gets ` (2)`. When the header row was found below a title, short text above a column joins its name: `Price (GJ)`, or `UP` over a blank header. |
 | `sample` | string[][] | yes | The first five rows, cell by cell. |
 | `fields` | ImportField[] | yes |  |
-| `suggested_mapping` | object | yes | Field key to column index (0-based into `headers`). From your last import of this kind, then from common header names. Absent means no guess. |
+| `suggested_mapping` | object | yes | Field key to column index (0-based into `headers`). From your last saved import of this kind (never the rate), then from common header names. A column empty on every row is never suggested. Absent means no guess. |
 | `mapping` | object \| null | yes | The mapping last checked. |
-| `check` | ImportCheck \| null | yes | The last check. |
+| `check` | ImportCheck \| null | yes | The last check. A discarded batch keeps its counts and, for prices and lines, its row errors with the cell values taken out. |
 | `created_at` | date-time | yes |  |
 
 **`ImportCheck`**

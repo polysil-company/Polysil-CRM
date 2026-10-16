@@ -2490,21 +2490,24 @@ def f_excel_import() -> None:
     _columns(
         "69-excel-import", "Excel import with column matching",
         "Partners, a draft list's rates, or order lines. Nothing is saved before the check.",
-        "BUILT. FS-062: migration 074, /imports.",
+        "BUILT. FS-062: migration 074, /imports. FS-067: matching fixes.",
         [("i1", "POST /imports (multipart): kind, file, target_id?\n.xlsx or .csv, 10 MB, 5,000 rows", BLUE),
-         ("i2", "read: caps checked BEFORE openpyxl; rows stored\nas text in import_batch (owner only)", GREEN),
-         ("i3", "answer: headers, sample, fields,\nsuggested_mapping (your last, then common names)", GREY),
+         ("i2", "read: caps checked BEFORE openpyxl; header = the row\nwith the most known names (2+); rows stored as text", GREEN),
+         ("i3", "answer: headers (labels from above: Price (GJ), UP),\nsuggested_mapping: last SAVED, never the rate, no empty column", GREY),
          ("i4", "POST /imports/{id}/check {mapping}\nevery row, every error, sheet row numbers", BLUE),
          ("i5", "POST /imports/{id}/commit: re-check in the\ntransaction; all or nothing, or skip_invalid", GREEN),
          ("i6", "partners: one INSERT per type tier, parents first;\nrates: delete + insert into the DRAFT list", BLUE)],
         [("d1", "lines: the check returns them; the order or\nquotation form saves them. No commit.", GREY),
          ("d2", "area: a placeholder insert per territory in a\nsavepoint asks the real policy (42501 = outside)", YELLOW),
          ("d3", "codes: partner_codes_taken() sees hidden partners", YELLOW),
-         ("d4", "purge after 7 days: import_batch_purge(),\nsystem principal only", GREY)],
+         ("d4", "purge after 7 days: import_batch_purge(),\nsystem principal only", GREY),
+         ("d5", "products: names cleaned as the loader did (_x000D_,\nspaces); unknown code + known name: by name if uncoded", GREEN),
+         ("d6", "discard: rows gone; the check kept with cell values\ntaken out (partners: counts only)", GREY)],
         [("n1", "NO LOGIN IS CREATED\n\nEvery dealer can be a record. Portal access is a\nseparate POST /users per dealer.", RED),
          ("n2", "FLOATS ARE NOT MONEY\n\nrepr -> Decimal, 9 places, no exponent. A % cell is read\nas shown. More than 2 decimals on a rate is refused.", RED),
          ("n3", "A CHILD OF A BAD ROW IS A BAD ROW\n\nSkipping a distributor strands its dealers; the check\nsays so before commit (EC-12).", RED),
-         ("n4", "Not yet: updating partners, a template file,\nfuzzy product match (GAP-471 to 473, 476).", YELLOW)])
+         ("n4", "Not yet: updating partners, a template file, fuzzy\nmatch, codes from a sheet (GAP-471 to 476, 503 to 505).", YELLOW),
+         ("n5", "LOOK AT THE FILE FIRST\n\n16 Oct: names under Item Code, no rates. Every row\nnow says: match this column to Description.", RED)])
 
 
 def f_live_checks() -> None:
