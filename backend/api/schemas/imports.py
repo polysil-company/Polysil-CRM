@@ -64,17 +64,27 @@ class ImportBatch(BaseModel):
     file_name: str
     sheet: str | None = Field(description="Null for a CSV.")
     sheets: list[str] = Field(description="Every sheet in the workbook. Empty for a CSV.")
-    header_row: int
+    header_row: int = Field(description="The row the column names came from. Without one in "
+                                        "the upload, the row among the first ten non-blank "
+                                        "rows that holds the most known column names; "
+                                        "otherwise the first non-blank row.")
     row_count: int
     headers: list[str] = Field(description="Column headers. A blank one reads `Column C`; a "
-                                           "repeated one gets ` (2)`.")
+                                           "repeated one gets ` (2)`. When the header row was "
+                                           "found below a title, short text above a column "
+                                           "joins its name: `Price (GJ)`, or `UP` over a blank "
+                                           "header.")
     sample: list[list[str]] = Field(description="The first five rows, cell by cell.")
     fields: list[ImportField]
     suggested_mapping: dict[str, int] = Field(
         description="Field key to column index (0-based into `headers`). From your last "
-                    "import of this kind, then from common header names. Absent means no guess.")
+                    "saved import of this kind (never the rate), then from common header "
+                    "names. A column empty on every row is never suggested. Absent means no "
+                    "guess.")
     mapping: dict[str, int] | None = Field(description="The mapping last checked.")
-    check: ImportCheck | None = Field(description="The last check.")
+    check: ImportCheck | None = Field(description="The last check. A discarded batch keeps "
+                                                  "its counts and, for prices and lines, its "
+                                                  "row errors with the cell values taken out.")
     created_at: dt.datetime
 
 

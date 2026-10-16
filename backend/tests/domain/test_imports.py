@@ -332,7 +332,7 @@ def test_price_rows_match_by_code_or_description() -> None:
     assert out[0].values == {"product_id": "p1", "product": "PIPE 16MM", "rate": "10.50"}
     assert out[1].ok and out[1].values["product_id"] == "p2"
     assert out[2].errors["description"] == "names a different product from the item code"
-    assert out[3].errors == {"item_code": "no product with item code C9"}
+    assert out[3].errors == {"item_code": "no product with item code 'C9'"}
     assert out[4].errors == {"rate": "at most 2 decimal places"}, "unknown wording is ignored"
     assert out[5].errors == {"item_code": "required"}
 
