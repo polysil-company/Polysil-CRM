@@ -51,6 +51,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Marketing material](#marketing-material) | 3 | 🧪 👀 | PR #160 |
 | [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
 | [Stock](#stock) | 4 | 🧪 👀 | PR #162; on orders in PR #163 |
+| [Warranty](#warranty) | 3 | 🧪 👀 | PR #164 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
@@ -602,6 +603,14 @@ Operations → **Stock** (`/stock`; handover `stock-contract.md`). Walked throug
 - **MSTR-015 · Record stock** (screen: [the form](screenshots/stock/record-stock-desktop-light.jpg)). Dispatch and Admin: warehouse, received or a correction, reference, note, a quantity per product; received above 0, a correction not 0; below zero, a switched-off warehouse or product, and decimals on a whole-unit product are refused in words. 🧪 👀
 - **MSTR-016 · Warehouses** (screen: [the list](screenshots/stock/warehouses-desktop-light.jpg)). Admin adds, renames, makes default, switches off or on; a taken code on its field; the default can't be switched off until another is the default. 🧪 👀
 - **DISP-003 · Stock on orders** (screens: [Order to and availability](screenshots/stock/order-to-desktop-light.jpg), [line stock on an order](screenshots/stock/order-line-stock-desktop-light.jpg), [Left from](screenshots/stock/dispatch-left-from-desktop-light.jpg)). Staff pick Order to (the default shown as chosen) and see each line's availability, "Short by …" in amber, never blocking; dealers see neither and can't send one. The order page names its warehouse and each open line's stock. A dispatch picks Left from (the order's by default), takes the stock out, and voiding puts it back. 🧪 👀
+
+## Warranty
+
+The order's **Warranty** card, the chip on complaint lines, and Masters → **Warranty periods** (handover `warranty.md`). Walked through in the mock as Admin on a desktop in light mode and on a phone in dark mode, and as Accounts; axe found nothing. Not yet checked on the dev API.
+
+- **SO-009 · An order's warranty** (screens: [desktop](screenshots/warranty/order-warranty-desktop-light.jpg), [on a phone](screenshots/warranty/order-warranty-mobile-dark.jpg)). On a shipped order, for those who see orders and dispatches: each line's status ("In warranty until …", "Expired …", "No warranty", "No period on record", "Not sent yet"), each dispatch's period from its DC date (or the day it left) with its months, and the complaints raised on the product, in or out of warranty. Hidden on a draft, from Accounts (no dispatch view) and on a 403. 🧪 👀
+- **CMPL-011 · Warranty on a complaint line** (screen: [complaint](screenshots/warranty/complaint-warranty-desktop-light.jpg)). Each line shows In warranty or Out of warranty, until or ended when, and whether the period ran from the dispatch or from the supply date. Out of warranty blocks nothing. 🧪 👀
+- **MSTR-017 · Warranty periods** (screens: [the list](screenshots/warranty/masters-warranty-desktop-light.jpg), [set a period](screenshots/warranty/set-period-desktop-light.jpg), [after setting](screenshots/warranty/masters-warranty-after-desktop-light.jpg), [on a phone](screenshots/warranty/masters-warranty-mobile-dark.jpg)). Everyone who sees Masters reads the default and each category's periods, in force, upcoming or ended. Admin sets one for the default or a listed category: 0 to 120 whole months, from tomorrow or later; the one in force ends the day before. Today or earlier, and a second period on the same day (409 `term_exists`), are refused on the start-day field. Only categories that already have a period are offered until the category list lands (BE-024). 🧪 👀
 
 ## Masters
 
