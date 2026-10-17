@@ -32,6 +32,7 @@ import {
   LEAD_INQUIRY_TYPE_LABELS,
   LEAD_PRIORITY_BADGE,
   LEAD_PRIORITY_LABELS,
+  LEAD_STAGE_LABELS,
   landText,
   partnerTypeLabel,
 } from "@/features/leads/lib/lead-labels";
@@ -134,6 +135,21 @@ function LeadNotices({
   const pending = showDuplicates
     ? lead.duplicates.filter((duplicate) => duplicate.state === "pending")
     : [];
+
+  if (lead.stage === "dormant") {
+    return (
+      <LeadNotice>
+        <p className="font-medium">Dormant: no activity for a long time</p>
+        <p className="text-muted-foreground">
+          {lead.dormantFromStage === null
+            ? "The system set it aside."
+            : `It was ${LEAD_STAGE_LABELS[lead.dormantFromStage]}.`}{" "}
+          Reopen it from Update stage to pick it up again, or mark it lost. It can still be edited,
+          assigned and given tasks; a quotation waits until it is reopened.
+        </p>
+      </LeadNotice>
+    );
+  }
 
   if (lead.mergedInto) {
     return (

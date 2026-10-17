@@ -206,6 +206,8 @@ export function generateLeads(
         stage === "lost" ? { id: reason.id, code: reason.code, name: reason.name } : null,
       lost_note: stage === "lost" && random.chance(0.5) ? random.pick(LOST_NOTES) : null,
       reopen_count: random.chance(0.05) ? 1 : 0,
+      // swept by the backend's worker from where it stood (FS-035)
+      dormant_from_stage: stage === "dormant" ? "qualified" : null,
       merged_into:
         stage === "merged" && previous
           ? { id: previous.id, inquiry_no: previous.inquiry_no }

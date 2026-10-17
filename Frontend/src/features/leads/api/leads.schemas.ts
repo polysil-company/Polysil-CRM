@@ -82,6 +82,8 @@ export const leadWireSchema = z.object({
   lost_reason: refSchema.extend({ code: z.string().min(1) }).nullable(),
   lost_note: z.string().nullable(),
   reopen_count: z.number().int().nonnegative(),
+  /** Set while the lead is dormant: the stage Reopen returns it to (FS-035). */
+  dormant_from_stage: z.enum(LEAD_STAGES).nullish(),
   /** Set on a merged lead; points at the lead that absorbed it. */
   merged_into: z.object({ id: z.string().min(1), inquiry_no: z.string().min(1) }).nullable(),
   first_contacted_at: isoDateTime.nullable(),
@@ -153,6 +155,7 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   lostReason: wire.lost_reason,
   lostNote: wire.lost_note,
   reopenCount: wire.reopen_count,
+  dormantFromStage: wire.dormant_from_stage ?? null,
   mergedInto: wire.merged_into
     ? { id: wire.merged_into.id, code: wire.merged_into.inquiry_no }
     : null,
