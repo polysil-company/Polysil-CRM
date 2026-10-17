@@ -569,8 +569,29 @@ export const importHandlers = [
       typeof sheetValue === "string" && sheetValue !== "" ? sheetValue : null,
       typeof headerValue === "string" && headerValue !== "" ? Number(headerValue) : null,
     );
-    if (sheet === undefined || sheet.rows.length < headerRow) {
-      return errorResponse(422, "import_unreadable", "That sheet has no rows under its header.");
+    // MSTR-013 · the backend names the field it refuses the upload on.
+    if (sheet === undefined) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        sheet: "No sheet of that name in this workbook.",
+      });
+    }
+    if (sheet.rows.length < headerRow) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        header_row: `This sheet has ${String(sheet.rows.length)} rows; choose one of them.`,
+      });
+    }
+    const after = sheet.rows
+      .slice(headerRow)
+      .filter((row) => row.some((cell) => cell.trim() !== ""));
+    if (after.length === 0) {
+      return errorResponse(
+        422,
+        "import_unreadable",
+        "That sheet has no rows under its column names. Fill in the template, then upload it.",
+        {
+          file: "That sheet has no rows under its column names. Fill in the template, then upload it.",
+        },
+      );
     }
     const headers = nameHeaders(sheet.rows[headerRow - 1] ?? []);
     const rows = sheet.rows
@@ -617,6 +638,28 @@ export const importHandlers = [
     };
     mockDb.imports.set(id, batch);
     return HttpResponse.json({ data: batch.wire }, { status: 201 });
+  }),
+
+  // MSTR-013 · a blank template for this kind of import: the same permission as the upload.
+  http.get(buildApiUrl("/imports/template"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const kind = IMPORT_KINDS.find(
+      (value) => value === new URL(request.url).searchParams.get("kind"),
+    );
+    if (kind === undefined) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        kind: "partners, price_list_items or lines",
+      });
+    }
+    if (!permitted(kind)) return errorResponse(403, "forbidden", "No permission for this import.");
+    // Not a real workbook: the mock only needs a file to save.
+    const columns = MOCK_IMPORT_FIELDS[kind].map((field) => field.label).join(",");
+    return new HttpResponse(`${columns}\n`, {
+      headers: {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+    });
   }),
 
   http.get(buildApiUrl("/imports/:batchId"), async ({ params }) => {

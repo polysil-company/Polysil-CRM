@@ -419,3 +419,60 @@ describe("[MSTR-007] Import rates from Excel", () => {
     expect(screen.queryByRole("button", { name: "Import from Excel" })).not.toBeInTheDocument();
   });
 });
+
+describe("[MSTR-013] Import polish", () => {
+  beforeEach(() => {
+    signInAs("admin");
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetMockDb();
+    writeMockRole("state_manager");
+    push.mockReset();
+  });
+
+  it("starts a list from Excel beside New price list, and lands on it with the import open", async () => {
+    const user = show(<ProductMaster />, "?tab=price-lists");
+    await user.click(await screen.findByRole("button", { name: "Import from Excel" }));
+    const dialog = await screen.findByRole("dialog", { name: "Import a price list from Excel" });
+    await user.type(within(dialog).getByLabelText("Name"), "Gujarat farmers, December");
+    await user.click(within(dialog).getByRole("button", { name: "Next: choose the file" }));
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/products\/price-lists\/[^?]+\?import=rates$/),
+      );
+    });
+  });
+
+  it("opens the import on arrival, gives the template, puts a file problem under the picker, and keeps the draft", async () => {
+    const listId = listNamed("Gujarat dealers, November");
+    mockDb.priceLists.find((list) => list.id === listId)?.rates.clear();
+    const createObjectURL = vi.fn<(blob: Blob) => string>(() => "blob:template");
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn<(url: string) => void>() });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    const user = show(<PriceListSheet listId={listId} />, "?import=rates");
+
+    const dialog = await screen.findByRole("dialog", { name: "Import rates from Excel" });
+    await user.click(within(dialog).getByRole("button", { name: "Download the template" }));
+    await waitFor(() => {
+      expect(click).toHaveBeenCalled();
+    });
+    expect(createObjectURL).toHaveBeenCalled();
+
+    await user.upload(
+      within(dialog).getByTestId("import-file-input"),
+      new File(["Item Code,Net Rate"], "rates.csv", { type: "text/csv" }),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Upload" }));
+    expect(await within(dialog).findByText(/no rows under its column names/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(await screen.findByText("The draft is kept, with no rates yet")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+});
