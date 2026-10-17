@@ -180,3 +180,79 @@ describe("[SO-005] OrderBuilder", () => {
     expect(await screen.findByText(/was submitted$/)).toBeInTheDocument();
   });
 });
+
+describe("[SO-008] A subsidised order typed in", () => {
+  afterEach(() => {
+    push.mockReset();
+    resetMockDb();
+    writeMockRole("admin");
+  });
+
+  it(
+    "names the leads, the first being the order's, and the subsidy, then saves",
+    PRICING_TEST,
+    async () => {
+      signInAs("admin");
+      const leadId = leadAt("qualified");
+      const other = mockDb.leads.find((lead) => lead.stage === "won" && lead.id !== leadId);
+      if (other === undefined) throw new Error("No second orderable lead");
+      const user = show(<NewDirectOrder leadId={leadId} />);
+
+      await screen.findByRole("form", { name: "New order" });
+      await user.click(screen.getByRole("radio", { name: "Subsidised" }));
+      const leads = await screen.findByRole("list", { name: "Leads on this order" });
+      expect(within(leads).getByText("(the order's lead)")).toBeInTheDocument();
+
+      await user.type(screen.getByRole("combobox", { name: "Leads" }), other.inquiry_no);
+      await user.click(await screen.findByRole("option", { name: new RegExp(other.inquiry_no) }));
+      expect(within(leads).getAllByRole("listitem")).toHaveLength(2);
+
+      await addPipe(user, "10");
+      await waitFor(() => {
+        expect(within(screen.getByLabelText("Totals")).queryByText("—")).not.toBeInTheDocument();
+      }, PRICED);
+      await user.type(screen.getByRole("textbox", { name: "Subsidy" }), "100");
+      await user.click(screen.getByRole("button", { name: "Save draft order" }));
+
+      await waitFor(() => {
+        expect(push).toHaveBeenCalledTimes(1);
+      });
+      const [saved] = mockDb.orders;
+      expect(saved).toMatchObject({
+        order_type: "subsidised",
+        lead: { id: leadId },
+        subsidy: {
+          subsidy_amount: "100.00",
+          material_is_total: true,
+          farmer_payable_is_derived: true,
+          leads: [{ id: leadId }, { id: other.id }],
+        },
+      });
+    },
+  );
+
+  it("asks for the subsidy before saving", PRICING_TEST, async () => {
+    signInAs("admin");
+    const user = show(<NewDirectOrder leadId={leadAt("qualified")} />);
+
+    await screen.findByRole("form", { name: "New order" });
+    await user.click(screen.getByRole("radio", { name: "Subsidised" }));
+    await addPipe(user, "10");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save draft order" })).toBeEnabled();
+    }, PRICED);
+    await user.click(screen.getByRole("button", { name: "Save draft order" }));
+
+    expect(await screen.findByText("Enter the subsidy.")).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("isn't offered to a dealer", async () => {
+    signInAs("dealer");
+    show(<NewDirectOrder leadId={null} />);
+
+    await screen.findByRole("form", { name: "New order" });
+    expect(screen.getByRole("radio", { name: "Commercial" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Subsidised" })).not.toBeInTheDocument();
+  });
+});

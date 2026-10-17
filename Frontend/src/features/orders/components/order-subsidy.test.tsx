@@ -315,3 +315,97 @@ describe("[SO-008] The subsidy on the order", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("[SO-008] A subsidised order typed in, through the API", () => {
+  afterEach(reset);
+
+  function typedIn(subsidy: {
+    lead_ids: string[];
+    subsidy_amount: string;
+    material_amount?: string;
+  }): Promise<Order> {
+    const product = MOCK_PRODUCTS[0];
+    const lead = mockDb.leads.find((item) => item.id === subsidy.lead_ids[0]);
+    if (product === undefined || lead === undefined) throw new Error("No product or lead");
+    return createOrder({
+      body: {
+        order_type: "subsidised",
+        party: { name: "Ramesh Patel", mobile: null, address: null, gstin: null },
+        place_of_supply_territory_id: lead.territory.id,
+        delivery_address: null,
+        payment_terms: "full_payment",
+        remarks: null,
+        lines: [
+          {
+            product_id: product.id,
+            qty: "10",
+            discount_pct: "0",
+            discount2_pct: "0",
+            discount3_pct: "0",
+          },
+        ],
+        subsidy,
+      },
+      idempotencyKey: nextKey(),
+    });
+  }
+
+  it("takes its lead from the first named, and refuses a subsidy above the material", async () => {
+    signInAs("admin");
+    const [first, second] = mockDb.leads.filter((lead) => lead.stage === "qualified");
+    if (first === undefined || second === undefined) throw new Error("No two qualified leads");
+
+    const order = await typedIn({ lead_ids: [first.id, second.id], subsidy_amount: "10.00" });
+    expect(order.lead?.id).toBe(first.id);
+    expect(order.subsidy?.leads.map((lead) => lead.id)).toEqual([first.id, second.id]);
+    expect(order.subsidy?.materialIsTotal).toBe(true);
+
+    await expect(
+      typedIn({ lead_ids: [first.id], material_amount: "5.00", subsidy_amount: "10.00" }),
+    ).rejects.toMatchObject({ status: 422, code: "subsidy_above_material" });
+    const closed = mockDb.leads.find((lead) => lead.stage === "new");
+    if (closed === undefined) throw new Error("No new lead");
+    await expect(
+      typedIn({ lead_ids: [first.id, closed.id], subsidy_amount: "10.00" }),
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "lead_not_open",
+      details: { fields: { "subsidy.lead_ids": closed.id } },
+    });
+  });
+});
+
+describe("[SO-008] The leads on a draft", () => {
+  afterEach(reset);
+
+  it("keeps the first lead, and adds and removes the others", async () => {
+    signInAs("admin");
+    const { order } = await subsidisedOrder();
+    const other = mockDb.leads.find(
+      (lead) => lead.stage === "quoted" && lead.id !== order.lead?.id,
+    );
+    if (other === undefined) throw new Error("No second orderable lead");
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <OrderDetail orderId={order.id} />
+        <Toaster />
+      </>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Edit the subsidy" }));
+    const form = await screen.findByRole("form", { name: "Edit the subsidy" });
+    const leads = within(form).getByRole("list", { name: "Leads on this order" });
+    expect(within(leads).queryByRole("button", { name: /^Remove/ })).not.toBeInTheDocument();
+
+    await user.type(within(form).getByRole("combobox", { name: "Leads" }), other.inquiry_no);
+    await user.click(await screen.findByRole("option", { name: new RegExp(other.inquiry_no) }));
+    await user.click(within(form).getByRole("button", { name: "Save the subsidy" }));
+
+    expect(await screen.findByText("Subsidy saved", { selector: "[data-title]" })).toBeVisible();
+    const shown = await screen.findByRole("list", { name: "Leads on this order" });
+    await waitFor(() => {
+      expect(within(shown).getAllByRole("listitem")).toHaveLength(2);
+    });
+  });
+});

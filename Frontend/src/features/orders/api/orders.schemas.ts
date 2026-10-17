@@ -528,8 +528,11 @@ export interface OrderPartyRequest {
  * direct sale by staff; it names the lead's dealer when there is one.
  */
 export interface CreateDirectOrder {
-  readonly order_type: (typeof ORDERABLE_TYPES)[number];
+  /** SO-008 · Subsidised (staff only) takes `subsidy` and no `lead_id` (FS-054). */
+  readonly order_type: (typeof ORDERABLE_TYPES)[number] | "subsidised";
   readonly lead_id?: string;
+  /** SO-008 · The leads (the first is the order's lead) and amounts of a subsidised order. */
+  readonly subsidy?: OrderSubsidyRequest;
   readonly partner_id?: string;
   readonly party: OrderPartyRequest;
   readonly place_of_supply_territory_id: string;

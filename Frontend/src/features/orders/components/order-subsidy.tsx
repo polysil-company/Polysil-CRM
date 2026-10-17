@@ -19,9 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { useSetOrderSubsidy } from "@/features/orders/api/orders.mutations";
 import type { Order } from "@/features/orders/api/orders.schemas";
 import { parseWarnings } from "@/features/quotations/lib/quotation-labels";
@@ -29,11 +27,18 @@ import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
-import { readFieldErrors } from "@/lib/api/errors";
 import { formatInr } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
 import { RefusalAlert, useOrderRefusal } from "./order-dialog-shared";
+import {
+  SubsidyFields,
+  subsidyDraftProblems,
+  subsidyFieldErrors,
+  subsidyRequest,
+  type SubsidyDraft,
+  type SubsidyProblems,
+} from "./order-subsidy-fields";
 
 const log = createLogger({
   file: "features/orders/components/order-subsidy.tsx",
@@ -191,16 +196,9 @@ function LeadLink({ lead }: { lead: { id: string; code: string | null } }): Reac
   );
 }
 
-type AmountField = "material_amount" | "subsidy_amount" | "farmer_payable";
-
-/** "12.50" with at most two decimals, never negative; null when it is one. */
-function moneyProblem(value: string): string | null {
-  return /^\d+(\.\d{1,2})?$/.test(value.trim()) ? null : "Enter rupees, like 49000 or 49000.50.";
-}
-
 /**
- * The amounts on a draft: material (empty for the order total), the subsidy, and the farmer
- * payable (empty for material less subsidy, shown as a hint). The leads stay as they are.
+ * A draft's subsidy: the leads (the first stays first) and the amounts, as on the new-order
+ * screen. Empty material is the order total; empty farmer payable is material less subsidy.
  */
 function OrderSubsidyForm({
   order,
@@ -214,39 +212,20 @@ function OrderSubsidyForm({
   const idempotency = useIdempotencyKey();
   const refusal = useOrderRefusal(order.id, onClose);
   const closeSoon = useCloseAfterSuccess(onClose);
-  const [material, setMaterial] = useState(
-    subsidy === null || subsidy.materialIsTotal ? "" : subsidy.materialAmount,
-  );
-  const [amount, setAmount] = useState(subsidy?.subsidyAmount ?? "");
-  const [payable, setPayable] = useState(
-    subsidy === null || subsidy.farmerPayableIsDerived ? "" : subsidy.farmerPayable,
-  );
+  const [draft, setDraft] = useState<SubsidyDraft>(() => ({
+    leads: (subsidy?.leads ?? []).map((lead) => ({ id: lead.id, code: lead.code, name: null })),
+    material: subsidy === null || subsidy.materialIsTotal ? "" : subsidy.materialAmount,
+    amount: subsidy?.subsidyAmount ?? "",
+    payable: subsidy === null || subsidy.farmerPayableIsDerived ? "" : subsidy.farmerPayable,
+  }));
   const [shown, setShown] = useState(false);
-  const [serverProblems, setServerProblems] = useState<Partial<Record<AmountField, string>>>({});
-
-  const local: Partial<Record<AmountField, string>> = {};
-  const materialProblem = material.trim() === "" ? null : moneyProblem(material);
-  if (materialProblem !== null) local.material_amount = materialProblem;
-  const amountProblem = amount.trim() === "" ? "Enter the subsidy." : moneyProblem(amount);
-  if (amountProblem !== null) local.subsidy_amount = amountProblem;
-  const payableProblem = payable.trim() === "" ? null : moneyProblem(payable);
-  if (payableProblem !== null) local.farmer_payable = payableProblem;
-  const shownProblem = (field: AmountField): string | undefined =>
-    (shown ? local[field] : undefined) ?? serverProblems[field];
-  const base = material.trim() === "" ? order.totals.total : material.trim();
-  const derived =
-    moneyProblem(base) === null && moneyProblem(amount) === null
-      ? Number(base) - Number(amount)
-      : null;
+  const [serverProblems, setServerProblems] = useState<SubsidyProblems>({});
+  const local = subsidyDraftProblems(draft);
+  const problems: SubsidyProblems = { ...(shown ? local : {}), ...serverProblems };
 
   const submit = useAsyncAction({
     action: () => {
-      const body = {
-        lead_ids: (subsidy?.leads ?? []).map((lead) => lead.id),
-        subsidy_amount: amount.trim(),
-        ...(material.trim() === "" ? {} : { material_amount: material.trim() }),
-        ...(payable.trim() === "" ? {} : { farmer_payable: payable.trim() }),
-      };
+      const body = subsidyRequest(draft);
       return save.mutateAsync({
         id: order.id,
         input: { body, idempotencyKey: idempotency.keyFor(body) },
@@ -261,13 +240,7 @@ function OrderSubsidyForm({
       closeSoon();
     },
     onError: (error) => {
-      const fields = readFieldErrors(error) ?? {};
-      const mapped: Partial<Record<AmountField, string>> = {};
-      for (const field of ["material_amount", "subsidy_amount", "farmer_payable"] as const) {
-        const message = fields[field] ?? fields[`subsidy.${field}`];
-        if (message !== undefined) mapped[field] = message;
-      }
-      setServerProblems(mapped);
+      setServerProblems(subsidyFieldErrors(error));
       refusal.handle(error);
     },
   });
@@ -289,40 +262,22 @@ function OrderSubsidyForm({
       <DialogHeader>
         <DialogTitle>The subsidy</DialogTitle>
         <DialogDescription>
-          The leads stay as they are. Leave the material empty for the order total, and the farmer
-          payable empty for material less subsidy.
+          Leave the material empty for the order total, and the farmer payable empty for material
+          less subsidy.
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-4">
-        <MoneyInput
-          id="order-subsidy-material"
-          label="Material amount"
-          optional
-          placeholder={`Order total, ${formatInr(order.totals.total, { paise: true })}`}
-          value={material}
-          error={shownProblem("material_amount")}
-          onChange={setMaterial}
-        />
-        <MoneyInput
-          id="order-subsidy-amount"
-          label="Subsidy"
-          value={amount}
-          error={shownProblem("subsidy_amount")}
-          onChange={setAmount}
-        />
-        <MoneyInput
-          id="order-subsidy-payable"
-          label="Farmer payable"
-          optional
-          placeholder="Material less subsidy"
-          description={
-            derived === null
-              ? "Empty: the material less the subsidy."
-              : `Empty: material less subsidy, ${formatInr(derived.toFixed(2), { paise: true })}.`
-          }
-          value={payable}
-          error={shownProblem("farmer_payable")}
-          onChange={setPayable}
+        <SubsidyFields
+          idPrefix="order-subsidy"
+          draft={draft}
+          onDraftChange={(next) => {
+            setDraft(next);
+            setServerProblems({});
+          }}
+          problems={problems}
+          total={order.totals.total}
+          firstLeadFixed
+          stacked
         />
         <RefusalAlert refusal={refusal.refusal} />
       </DialogBody>
@@ -341,55 +296,5 @@ function OrderSubsidyForm({
         </Button>
       </DialogFooter>
     </form>
-  );
-}
-
-function MoneyInput({
-  id,
-  label,
-  optional = false,
-  placeholder,
-  description,
-  value,
-  error,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  optional?: boolean;
-  placeholder?: string;
-  description?: string;
-  value: string;
-  error: string | undefined;
-  onChange: (next: string) => void;
-}): React.JSX.Element {
-  const describedBy = error !== undefined ? `${id}-error` : description ? `${id}-hint` : undefined;
-  return (
-    <Field data-invalid={error === undefined ? undefined : true}>
-      <FieldLabel htmlFor={id}>
-        {label}
-        {optional ? <span className="font-normal text-muted-foreground">(optional)</span> : null}
-      </FieldLabel>
-      <InputGroup>
-        <InputGroupAddon>₹</InputGroupAddon>
-        <InputGroupInput
-          id={id}
-          inputMode="decimal"
-          autoComplete="off"
-          className="tabular-nums"
-          placeholder={placeholder}
-          value={value}
-          aria-invalid={error === undefined ? undefined : true}
-          aria-describedby={describedBy}
-          onChange={(event) => {
-            onChange(event.target.value);
-          }}
-        />
-      </InputGroup>
-      {description !== undefined && error === undefined ? (
-        <FieldDescription id={`${id}-hint`}>{description}</FieldDescription>
-      ) : null}
-      <FieldError id={`${id}-error`}>{error}</FieldError>
-    </Field>
   );
 }
