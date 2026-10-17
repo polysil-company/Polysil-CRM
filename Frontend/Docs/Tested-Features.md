@@ -45,7 +45,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
 | [Channel partners](#channel-partners) | 8 | 🧪 👀 | PR #112, stacked on PR #111; GSTIN details in PR #132; dealer applications in PR #145; the applicant's page in PR #146 |
-| [Schemes](#schemes) | 4 | 🧪 👀 | PR #NNN |
+| [Schemes](#schemes) | 4 | 🧪 👀 | PR #155 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
@@ -539,7 +539,7 @@ Open with the client: whether distributors and dealers should add their own deal
 
 ## Schemes
 
-Channel → **Schemes** (`/schemes`), on the backend's contract (handover `schemes-contract.md`, read against `api/schemas/schemes.py`), PR #NNN. Walked through in the mock as Admin on a desktop in light mode, and as a dealer on a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API. Benefits on an order come next, in item 24b.
+Channel → **Schemes** (`/schemes`), on the backend's contract (handover `schemes-contract.md`, read against `api/schemas/schemes.py`), PR #155. Walked through in the mock as Admin on a desktop in light mode, and as a dealer on a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API. Benefits on an order come next, in item 24b.
 
 - **SCHM-001 · The list and a scheme:** newest first, with what it gives and who qualifies in words ("5% off, up to ₹50,000 · Orders of ₹2,00,000 or more"), its dates and whether it's running, scheduled, ended or switched off. Staff filter by status, type and a search; a dealer sees only the running schemes aimed at it, and never who else they're for. A scheme's page shows its terms and, to staff, who it's for (any one name on a line, every line). Screens: [list](screenshots/schemes/schemes-list-desktop-light.jpg), [a used scheme](screenshots/schemes/scheme-detail-used-desktop-light.jpg), [a dealer's list, phone dark](screenshots/schemes/schemes-dealer-phone-dark.jpg). 🧪 👀
 - **SCHM-002 · New scheme and Edit** (Admin):
