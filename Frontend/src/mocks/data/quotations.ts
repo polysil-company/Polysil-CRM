@@ -157,7 +157,7 @@ export function totalsOf(lines: readonly QuotationLineWire[]): QuotationWire["to
     taxable: sumField(lines, "taxable"),
     cgst: sumField(lines, "cgst"),
     sgst: sumField(lines, "sgst"),
-    igst: "0.00",
+    igst: sumField(lines, "igst"),
     total: sumField(lines, "total"),
   };
 }

@@ -12,13 +12,18 @@ import {
   type OrderPageWire,
   type OrderStatus,
   type OrderWire,
+  type SamplePricing,
 } from "@/features/orders/api/orders.schemas";
-import type { PdfLinkWire } from "@/features/quotations/api/quotations.schemas";
+import type {
+  PdfLinkWire,
+  QuotationLineWire,
+  TaxTreatment,
+} from "@/features/quotations/api/quotations.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
 import { PARTNER_ROLES, type Role } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
-import { calendarDayOf } from "@/lib/format";
+import { calendarDayOf, formatNumber } from "@/lib/format";
 import { orderQueueStep, type MockApprovalStep } from "@/mocks/data/approvals";
 import {
   applyOrderBenefits,
@@ -47,6 +52,15 @@ import { findMockTerritory, mockTerritoryLineage } from "@/mocks/data/territorie
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
+import {
+  asFreeSample,
+  exportTreatment,
+  listValue,
+  lutArnOn,
+  sampleMaxValue,
+  samplePricing,
+  withTaxTreatment,
+} from "./export-sample";
 import { MOCK_CREATOR, newMockEvent } from "./lead-events";
 import { paymentsBlockFor } from "./payments";
 import { lineInSchema, priceLines, rateChanges } from "./quotations";
@@ -440,6 +454,8 @@ const createSchema = z.object({
   subsidy: subsidySchema.optional(),
   /** DISP-003 · "Order to"; staff only. */
   warehouse_id: z.string().min(1).nullish(),
+  /** SO-010 · Required on an export, refused on any other type. */
+  export_country: z.string().trim().max(100).nullish(),
 });
 
 const linesSchema = z.object({
@@ -458,6 +474,8 @@ const patchSchema = z.object({
   remarks: z.string().trim().max(2000).nullish(),
   /** DISP-003 · "Order to"; staff only. */
   warehouse_id: z.string().min(1).nullish(),
+  /** SO-010 · Omit to keep; required on an export. */
+  export_country: z.string().trim().max(100).nullish(),
   expected_status: expectedStatus,
 });
 
@@ -600,6 +618,49 @@ function subsidyAmountsRefusal(
  * SO-005 · POST /orders typed in line by line: the party, the place of supply (or the lead's),
  * and lines priced as the preview priced them; a lead must be qualified or later.
  */
+/** SO-010 · A line priced domestically, then taxed as an export or given as a free sample. */
+function repriced(
+  line: QuotationLineWire,
+  treatment: TaxTreatment,
+  pricing: SamplePricing | null,
+): QuotationLineWire {
+  const taxed = withTaxTreatment(line, treatment);
+  return pricing === "free" ? asFreeSample(taxed) : taxed;
+}
+
+function sampleOverLimit(): Response {
+  return errorResponse(
+    422,
+    "sample_over_limit",
+    `A sample may be worth up to ₹${formatNumber(sampleMaxValue())} at list price.`,
+  );
+}
+
+/** SO-010 · An export needs the buyer's country and no GSTIN; no other type takes a country. */
+function orderExportRefusal(
+  orderType: string,
+  country: string | null | undefined,
+  gstin: string | null | undefined,
+): Response | null {
+  const named = country !== null && country !== undefined && country.trim() !== "";
+  if (orderType === "export" && !named) {
+    return errorResponse(422, "export_country_required", "An export needs the buyer's country.", {
+      export_country: "Enter the buyer's country.",
+    });
+  }
+  if (orderType !== "export" && named) {
+    return errorResponse(422, "export_country_not_export", "Only an export takes a country.", {
+      export_country: "Only an export takes a country.",
+    });
+  }
+  if (orderType === "export" && gstin !== null && gstin !== undefined && gstin !== "") {
+    return errorResponse(422, "export_party_gstin", "An export buyer has no GSTIN.", {
+      "party.gstin": "An export buyer has no GSTIN.",
+    });
+  }
+  return null;
+}
+
 function createDirect(
   body: z.infer<typeof createSchema>,
   replay: { key: string; serialized: string },
@@ -633,10 +694,16 @@ function createDirect(
   if (Object.keys(changed).length > 0) {
     return errorResponse(409, "rate_changed", "Prices or tax changed since the preview.", changed);
   }
-  const priced = priceLines(body.lines);
-  if (!priced.ok) {
-    return validation(priced.fields);
+  const domestic = priceLines(body.lines);
+  if (!domestic.ok) {
+    return validation(domestic.fields);
   }
+  // SO-010 · a sample is worth at most the setting at list price; an export is taxed by its own
+  const sample = body.order_type === "sample";
+  if (sample && listValue(domestic.lines) > sampleMaxValue()) return sampleOverLimit();
+  const treatment = body.order_type === "export" ? exportTreatment() : "domestic";
+  const pricing = sample ? samplePricing() : null;
+  const priced = { lines: domestic.lines.map((line) => repriced(line, treatment, pricing)) };
   const me = mockMeFor(readMockRole()).data;
   const partner = lead?.assigned_partner;
   const order = mockDirectOrder({
@@ -663,6 +730,11 @@ function createDirect(
     remarks: body.remarks ?? null,
     createdAt: new Date().toISOString(),
   });
+  order.tax_treatment = treatment;
+  order.export_country = treatment === "domestic" ? null : (body.export_country ?? null);
+  order.sample_pricing = pricing;
+  order.lut_arn = null;
+  if (treatment !== "domestic") order.intra_state = false;
   if (body.subsidy !== undefined) {
     const refusal = subsidyAmountsRefusal(body.subsidy, order.totals.total);
     if (refusal !== null) return refusal;
@@ -898,7 +970,9 @@ export const orderHandlers = [
     }
     const body = parsed.data;
     const subsidised = body.order_type === "subsidised";
-    if (!orderableType(body.order_type) && !subsidised) {
+    // SO-010 · exports and samples, staff only
+    const special = body.order_type === "export" || body.order_type === "sample";
+    if (!orderableType(body.order_type) && !subsidised && !special) {
       return errorResponse(
         422,
         "order_type_unsupported",
@@ -908,12 +982,25 @@ export const orderHandlers = [
         },
       );
     }
-    if (subsidised && !isStaff()) {
+    if ((subsidised || special) && !isStaff()) {
       return errorResponse(
         403,
         "type_staff_only",
-        "Subsidised orders are raised by Polysil staff.",
+        "Subsidised, export and sample orders are raised by Polysil staff.",
       );
+    }
+    if (body.order_type === "sample" && body.quotation_ids.length > 0) {
+      return errorResponse(422, "sample_from_quotation", "A sample's items are typed in.", {
+        quotation_ids: "not allowed",
+      });
+    }
+    if (body.quotation_ids.length === 0) {
+      const exportRefusal = orderExportRefusal(
+        body.order_type,
+        body.export_country,
+        body.party?.gstin,
+      );
+      if (exportRefusal !== null) return exportRefusal;
     }
     if (!subsidised && body.subsidy !== undefined) {
       return errorResponse(422, "subsidy_not_allowed", "Only a subsidised order takes a subsidy.", {
@@ -984,6 +1071,14 @@ export const orderHandlers = [
     if (first === undefined) {
       return validation({ quotation_ids: "at least one accepted quotation" });
     }
+    if (found.some((item) => (item.sales_type === "export") !== (body.order_type === "export"))) {
+      return errorResponse(
+        422,
+        "type_mismatch",
+        "An export order is made from export quotations, and only them.",
+        { order_type: body.order_type },
+      );
+    }
     if (found.some((item) => (item.sales_type === "subsidised") !== subsidised)) {
       return errorResponse(
         422,
@@ -1027,6 +1122,12 @@ export const orderHandlers = [
     });
     const me = mockMeFor(readMockRole()).data;
     order.owner = { id: me.id, full_name: me.full_name };
+    // SO-010 · an order from export quotations is taxed as they are
+    order.tax_treatment = first.tax_treatment ?? "domestic";
+    order.export_country = first.export_country ?? null;
+    order.sample_pricing = null;
+    order.lut_arn = null;
+    if (order.tax_treatment !== "domestic") order.intra_state = false;
     if (fromQuote != null && first.lead !== null) {
       // FS-057 rule 8: material is the calculation's cost; AP's state GST joins the subsidy
       mockDb.orderSubsidies.set(order.id, {
@@ -1064,6 +1165,15 @@ export const orderHandlers = [
       return errorResponse(409, "order_not_draft", "Only a draft can be changed.");
     }
     const body = parsed.data;
+    if (body.export_country !== undefined) {
+      const exportRefusal = orderExportRefusal(
+        order.order_type,
+        body.export_country,
+        body.party === undefined || body.party === null ? order.party.gstin : body.party.gstin,
+      );
+      if (exportRefusal !== null) return exportRefusal;
+      order.export_country = body.export_country ?? null;
+    }
     if (body.order_type != null) {
       if (!orderableType(body.order_type)) {
         return errorResponse(422, "order_type_unsupported", "Only commercial and industrial.", {
@@ -1136,10 +1246,18 @@ export const orderHandlers = [
         changed,
       );
     }
-    const priced = priceLines(parsed.data.lines);
-    if (!priced.ok) {
-      return validation(priced.fields);
+    const domestic = priceLines(parsed.data.lines);
+    if (!domestic.ok) {
+      return validation(domestic.fields);
     }
+    if (order.order_type === "sample" && listValue(domestic.lines) > sampleMaxValue()) {
+      return sampleOverLimit();
+    }
+    const priced = {
+      lines: domestic.lines.map((line) =>
+        repriced(line, order.tax_treatment ?? "domestic", order.sample_pricing ?? null),
+      ),
+    };
     Object.assign(order, withOrderLines(orderLinesFrom(priced.lines)));
     applySubsidy(order);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
@@ -1256,8 +1374,24 @@ export const orderHandlers = [
     if (order.lines.length === 0) {
       return errorResponse(422, "no_lines", "Add a line first.");
     }
-    if (Number(order.totals.total) <= 0) {
+    // SO-010 · a free sample's total is 0.00 by design; its approval runs on the list value
+    const freeSample = order.sample_pricing === "free";
+    if (Number(order.totals.total) <= 0 && !freeSample) {
       return errorResponse(422, "zero_total", "The order's total is zero.");
+    }
+    if (order.order_type === "sample" && Number(order.totals.gross) > sampleMaxValue()) {
+      return sampleOverLimit();
+    }
+    if (order.tax_treatment === "export_lut") {
+      const arn = lutArnOn(new Date().toISOString().slice(0, 10));
+      if (arn === null) {
+        return errorResponse(
+          422,
+          "lut_missing",
+          "No LUT covers this date. Ask an admin to record this year's LUT.",
+        );
+      }
+      order.lut_arn = arn;
     }
     order.order_no ??= orderNumber(nextSerial());
     // SCHM-005 · submit stores what the preview showed, numbered with the order.
@@ -1278,7 +1412,11 @@ export const orderHandlers = [
       request_id: mockUuid(MOCK_ID_SPACE.approval, 80_000 + mockDb.approvalSteps.length),
       status: "pending",
       steps: chainSteps(
-        chainFor(order.totals.total, mockDb.thresholds, order.territory.id),
+        chainFor(
+          freeSample ? order.totals.gross : order.totals.total,
+          mockDb.thresholds,
+          order.territory.id,
+        ),
         200_000 + mockDb.approvalSteps.length * 10,
       ),
     };
