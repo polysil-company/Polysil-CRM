@@ -95,6 +95,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-027** · Name a scheme's targets, and list product categories with their ids · SCHM-001, SCHM-002 · normal
 
+**Marketing material** — added as it is built (MKT-002…004).
+
+- [ ] **BE-028** · Say which roles may order, approve and send marketing material: default grants for `marketing_material` · MKT-002, MKT-003, MKT-004 · normal
+
 ---
 
 ## Details
@@ -541,5 +545,23 @@ in the same shape. Never renumber or reuse a number.
   product category at all.
 - **Done when:** targets come with their names, and the categories come with their ids. The
   frontend then drops the per-target calls and offers categories in the form.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-028 · Say which roles may order, approve and send marketing material: default grants for `marketing_material`
+
+- **Status:** ⬜ Open
+- **Asked:** 17 Oct 2026 · MKT-002, MKT-003, MKT-004
+- **What:**
+  - Migration 038 checks `marketing_material` (view, create, approve, edit, delete) but seeds no
+    role grants, so on a fresh database nobody but a role edited by hand can open the screens.
+  - Seed the defaults the handover describes, or say who gets what: dealers and field staff order
+    (view, create); the District Manager over the office approves (approve); the marketing team
+    keeps the catalogue and records dispatch (edit); Admin everything.
+  - Add the `marketing` role's grants, since it is a functional role in `/roles`.
+- **Why:** the frontend gates the menu item and every button on these permissions. The mock grants
+  them as above for now; without seeded grants the page is hidden for everyone on staging.
+- **Done when:** `GET /auth/me` returns `marketing_material` for those roles on a fresh database.
+  The frontend then checks the mock against the seeded grants.
 - **Done in:** —
 - **Backend notes:** —
