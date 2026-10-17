@@ -40,6 +40,8 @@ import { mockDb } from "@/mocks/db";
 import { MOCK_CREATOR, newMockEvent, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
+import { calculate, checkCalculation } from "./subsidy";
+import { schemeForLead } from "./subsidy-applications";
 
 /**
  * QUOT-001 … QUOT-003 · The backend's quotation reads (backend/docs/api/quotations.md): the
@@ -768,6 +770,11 @@ export const quotationHandlers = [
     if (quotation.lines.length === 0) {
       return errorResponse(422, "no_lines", "Add at least one item before sending.");
     }
+    if (quotation.sales_type === "subsidised" && quotation.subsidy == null) {
+      return errorResponse(422, "subsidy_missing", "Calculate the subsidy before sending.", {
+        subsidy: "required",
+      });
+    }
     const closed = leadNotOpen(quotation);
     if (closed !== null) return closed;
     const gate = sendGateFor(quotation);
@@ -928,6 +935,102 @@ export const quotationHandlers = [
       return HttpResponse.json({ data: quotation });
     },
   ),
+
+  /**
+   * QUOT-014 · A subsidised draft's subsidy for one category, calculated on the lead's scheme
+   * and stored with it (FS-057). The calculation's total is compared with the lines.
+   */
+  http.put(buildApiUrl("/quotations/:quotationId/subsidy"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    const parsed = z
+      .object({ category_code: z.string().min(1), calculation: z.record(z.string(), z.unknown()) })
+      .safeParse(raw);
+    if (!parsed.success) return validation({ category_code: "required", calculation: "required" });
+    const draft = editableDraft(String(params.quotationId), undefined);
+    if (!draft.ok) return draft.response;
+    const quotation = draft.quotation;
+    if (quotation.sales_type !== "subsidised") {
+      return errorResponse(422, "not_subsidised", "Only a subsidised quotation takes a subsidy.", {
+        sales_type: quotation.sales_type,
+      });
+    }
+    const lead = mockDb.leads.find((item) => item.id === quotation.lead?.id);
+    if (lead === undefined) return errorResponse(404, "not_found", "No such lead.");
+    const scheme = schemeForLead(lead.territory.id);
+    if (scheme instanceof Response) return scheme;
+    if ("scheme" in parsed.data.calculation && parsed.data.calculation.scheme !== scheme.code) {
+      return validation({ "calculation.scheme": `This lead's scheme is ${scheme.code}.` });
+    }
+    const checked = checkCalculation({ ...parsed.data.calculation, scheme: scheme.code });
+    if ("fields" in checked) {
+      return validation(
+        Object.fromEntries(
+          Object.entries(checked.fields).map(([path, message]) => [`calculation.${path}`, message]),
+        ),
+      );
+    }
+    const calc = calculate(checked.body);
+    const everywhere = (code: string): boolean =>
+      calc.crops.every(
+        (crop) => crop.categories.find((row) => row.code === code)?.applicable === true,
+      );
+    const category = calc.crops[0]?.categories.find(
+      (row) => row.code === parsed.data.category_code,
+    );
+    if (category === undefined || !everywhere(category.code)) {
+      return validation({ category_code: "does not apply on every crop" });
+    }
+    const subsidy = calc.crops.reduce(
+      (sum, crop) =>
+        sum + Number(crop.categories.find((row) => row.code === category.code)?.subsidy ?? "0"),
+      0,
+    );
+    const total = Number(calc.total.blocks.total_incl_gst);
+    const flat = Number(calc.total.blocks.flat_inspection ?? "0");
+    const stateGst = Number(calc.total.blocks.gst_paid_by_state ?? "0");
+    quotation.subsidy = {
+      scheme: scheme.code,
+      system_type: checked.body.system_type,
+      category: { code: category.code, name: category.name, pct: category.pct },
+      total_cost: (total + flat).toFixed(2),
+      flat_charge: flat.toFixed(2),
+      subsidy: subsidy.toFixed(2),
+      farmer_share: Math.max(0, total + flat - subsidy - stateGst).toFixed(2),
+      gst_paid_by_state: stateGst.toFixed(2),
+      as_of: calc.masters.as_of,
+      formula_version: calc.masters.formula_version,
+    };
+    // the lines are what is sold; the calculation is what the scheme pays on (rule 4)
+    const lines = Number(quotation.totals.total);
+    quotation.warnings = [
+      ...quotation.warnings.filter((warning) => !warning.startsWith("calculation_total_differs")),
+      ...(lines <= 0 || Math.abs(total + flat - lines) > lines * 0.01
+        ? [
+            `calculation_total_differs: the calculation's total ${(total + flat).toFixed(2)} differs from the quotation's ${lines.toFixed(2)}`,
+          ]
+        : []),
+    ];
+    quotation.updated_at = new Date().toISOString();
+    mockDb.quotationSubsidyCalculations.set(quotation.id, calc);
+    recordQuotationEvent(quotation, "quotation.subsidy_set", { category: category.name });
+    mockDb.quotationWrites.set(replay.key, { body: replay.serialized, quotationId: quotation.id });
+    return HttpResponse.json({ data: quotation });
+  }),
+
+  /** QUOT-014 · The full calculation stored with a subsidised quotation. */
+  http.get(buildApiUrl("/quotations/:quotationId/subsidy/calculation"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const calc = mockDb.quotationSubsidyCalculations.get(String(params.quotationId));
+    if (calc === undefined) {
+      return errorResponse(404, "not_found", "This quotation has no subsidy calculation.");
+    }
+    return HttpResponse.json({ data: calc });
+  }),
 
   http.post(buildApiUrl("/quotations/:quotationId/transition"), async ({ params, request }) => {
     const { failure } = await applyScenario();

@@ -188,6 +188,24 @@ export function lifecycleRefusal(error: unknown): LifecycleRefusal {
         message: "It is above every manager's limit. Lower the discount, or ask an administrator.",
         stale: false,
       };
+    case "subsidy_missing":
+      return {
+        title: "Calculate the subsidy first",
+        message: "A subsidised quotation is sent with its subsidy. Calculate it on the quotation.",
+        stale: false,
+      };
+    case "subsidy_scheme_changed":
+      return {
+        title: "The lead's subsidy scheme changed",
+        message: "The lead moved to another state's scheme. Calculate the subsidy again.",
+        stale: false,
+      };
+    case "subsidy_system_changed":
+      return {
+        title: "The lead's irrigation system changed",
+        message: "Calculate the subsidy again for the lead's system.",
+        stale: false,
+      };
     case "no_lines":
       return {
         title: "The quotation has no items",
