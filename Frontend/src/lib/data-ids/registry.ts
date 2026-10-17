@@ -828,6 +828,21 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /lookups/scoring", "PATCH /lookups/scoring"],
   },
+  "MSTR-011": {
+    domain: "MSTR",
+    title: "Offices — the office tree: add, rename, move, close and reopen",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /org-units",
+      "POST /org-units",
+      "GET /org-units/{id}",
+      "PATCH /org-units/{id}",
+      "POST /org-units/{id}/close",
+      "POST /org-units/{id}/reopen",
+    ],
+    notes: "An office with active people anchored on it can't be closed (`422 fields.id`).",
+  },
   "MSTR-002": {
     domain: "MSTR",
     title: "Lead lookups — sources, irrigation systems, lost reasons and the territory picker",

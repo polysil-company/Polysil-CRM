@@ -4,12 +4,23 @@ import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/r
 
 import { lookupKeys, lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import type { LookupItem, LookupList } from "@/features/lookups/api/lookups.schemas";
+import { userKeys } from "@/features/users/api/users.queries";
 
-import { addLookupItem, patchScoring, updateLookupItem } from "./masters.api";
-import { scoringQueryOptions } from "./masters.queries";
+import {
+  addLookupItem,
+  createOffice,
+  patchOffice,
+  patchScoring,
+  setOfficeOpen,
+  updateLookupItem,
+} from "./masters.api";
+import { masterKeys, scoringQueryOptions } from "./masters.queries";
 import type {
   LookupCreateRequest,
   LookupUpdateRequest,
+  Office,
+  OfficeCreateRequest,
+  OfficePatchRequest,
   ScoringItem,
   ScoringPatchRequest,
 } from "./masters.schemas";
@@ -63,5 +74,57 @@ export function usePatchScoring(): UseMutationResult<ScoringItem[], Error, Scori
     onSuccess: (items) => {
       queryClient.setQueryData(scoringQueryOptions().queryKey, items);
     },
+  });
+}
+
+/** Every office list, and the office pickers on the people forms, see the change. */
+function useRefreshOffices(): () => void {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: masterKeys.offices() });
+    void queryClient.invalidateQueries({ queryKey: userKeys.all });
+  };
+}
+
+/** MSTR-011. */
+export function useCreateOffice(): UseMutationResult<Office, Error, OfficeCreateRequest> {
+  const refresh = useRefreshOffices();
+  return useMutation({
+    mutationKey: ["masters", "office", "create"],
+    mutationFn: createOffice,
+    meta: { dataId: "MSTR-011" },
+    onSuccess: refresh,
+  });
+}
+
+export interface PatchOfficeVariables {
+  readonly officeId: string;
+  readonly body: OfficePatchRequest;
+}
+
+/** MSTR-011. */
+export function usePatchOffice(): UseMutationResult<Office, Error, PatchOfficeVariables> {
+  const refresh = useRefreshOffices();
+  return useMutation({
+    mutationKey: ["masters", "office", "patch"],
+    mutationFn: ({ officeId, body }: PatchOfficeVariables) => patchOffice(officeId, body),
+    meta: { dataId: "MSTR-011" },
+    onSuccess: refresh,
+  });
+}
+
+export interface SetOfficeOpenVariables {
+  readonly officeId: string;
+  readonly open: boolean;
+}
+
+/** MSTR-011. Close (refused while people are anchored on it) or reopen. */
+export function useSetOfficeOpen(): UseMutationResult<Office, Error, SetOfficeOpenVariables> {
+  const refresh = useRefreshOffices();
+  return useMutation({
+    mutationKey: ["masters", "office", "open"],
+    mutationFn: ({ officeId, open }: SetOfficeOpenVariables) => setOfficeOpen(officeId, open),
+    meta: { dataId: "MSTR-011" },
+    onSuccess: refresh,
   });
 }

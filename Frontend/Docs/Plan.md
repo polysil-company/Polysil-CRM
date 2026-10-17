@@ -329,6 +329,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Subsidy applications — start from a subsidised lead (the calculator plus the farmer's category), the worklist with status, stage and search and its Excel export, the application with its stored figures and calculation, stages recorded from the scheme's stage list, cancel, the document checklist with uploads, the PIMS sheet, and the lead's application card | SUBS-004…008 | `/subsidy-applications*`, `/subsidy-stages` |
 | Subsidy reports — the client's six ageing figures per application (filters, paging), applications and money by stage, supplied and not supplied by district; each downloads as Excel | SUBS-009…011 | `GET /subsidy-reports/{ageing,stages,supply}` and their `/export` |
 | Masters (Admin → Masters) — the lists behind the pickers (lead sources, irrigation systems, lost reasons, crops, meeting types, complaint types): add a row, switch one off or on; and the lead score's weights, caps and bands (PR #134; sort order and quality wait on BE-026) | MSTR-001, MSTR-009, MSTR-010 | `POST /lookups/{list}`, `PATCH /lookups/{list}/{id}`, `GET`/`PATCH /lookups/scoring` |
+| Offices (Masters → Offices) — the office tree, open, closed or all, with each office's place, territory, level and people; add, rename, move, re-cover, close (refused while people work from it) and reopen (PR #135) | MSTR-011 | `GET`/`POST /org-units`, `GET`/`PATCH /org-units/{id}`, `POST /org-units/{id}/close`, `/reopen` |
 | Subsidy masters and schemes — per scheme: categories, parameters, component rates and crop spacings revised or added from a date; unit-cost and quantity matrices copied and pasted as grids; a scheme's readiness with each gap linked to its table, stage rename, switch off, a new state's scheme and linking a scheme to its state; the calculator's scheme picker | SUBS-012…014 | `/subsidy-masters/{kind}`, `/revisions`, `/matrices`, `/subsidy-schemes*` |
 | Approval limits — order value and discount per role, company-wide and per territory; administrators change one level at a time | APPR-002 | `GET /approvals/thresholds`, `PUT /approvals/thresholds` |
 | Notification bell — the unread count polled with `limit=1`, the latest read when it opens, links to leads, quotations and sales orders; mark one or all read | NOTIF-001, NOTIF-002 | `GET /notifications`, `POST /notifications/read` |
@@ -365,7 +366,7 @@ Measured on 13 October 2026: 183 of the backend's 379 endpoints have no frontend
 |---|---|---|---|
 | A **consolidated** order from several quotations on leads of one dealer (choosing several quotations at once) | `POST /orders` with several `quotation_ids` | `backend/docs/api/orders.md` | **1** |
 | The subsidy masters: categories, parameters, component rates, crop spacings, and the unit-cost and quantity matrices, with their revisions | `/subsidy-masters/*` | `subsidy-reports-and-masters.md` | **2** |
-| Org units and territories (admin); partners are in PR #112 | `/org-units`, `/territories` | `backend/docs/api/*.md` | 6 |
+| Territories (admin); offices are in Masters (PR #135), partners in PR #112 | `/territories` | `backend/docs/api/*.md` | 6 |
 | Portal partners adding the next type down under themselves (CHNL-002) | `POST /partners` from the portal | `partners.md` | waits on the client |
 
 

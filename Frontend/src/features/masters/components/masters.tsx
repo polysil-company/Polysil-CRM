@@ -8,21 +8,24 @@ import { LOOKUP_LISTS } from "@/features/lookups/api/lookups.schemas";
 import { useCan } from "@/features/session/hooks/use-session";
 
 import { LIST_COPY, LookupListPanel } from "./lookup-list-panel";
+import { OfficesPanel } from "./offices-panel";
 import { ScoringPanel } from "./scoring-panel";
 
-/** The tabs: each admin list, then the lead score's settings. */
-export const MASTER_TABS = [...LOOKUP_LISTS, "scoring"] as const;
+/** The tabs: each admin list, the lead score's settings, then the offices. */
+export const MASTER_TABS = [...LOOKUP_LISTS, "scoring", "offices"] as const;
 export type MasterTab = (typeof MASTER_TABS)[number];
 
 const DEFAULT_TAB: MasterTab = "lead-sources";
 
 function tabLabel(tab: MasterTab): string {
-  return tab === "scoring" ? "Lead scoring" : LIST_COPY[tab].title;
+  if (tab === "scoring") return "Lead scoring";
+  if (tab === "offices") return "Offices";
+  return LIST_COPY[tab].title;
 }
 
 /**
- * MSTR-001 · Admin → Masters: the lists behind the pickers (MSTR-009) and the lead score's
- * settings (MSTR-010), one tab each, the open tab kept in the URL. Everyone who sees Masters
+ * MSTR-001 · Admin → Masters: the lists behind the pickers (MSTR-009), the lead score's
+ * settings (MSTR-010) and the offices (MSTR-011), one tab each, the open tab kept in the URL. Everyone who sees Masters
  * reads them; those who may edit masters add rows, switch them on or off, and retune the score.
  */
 export function Masters(): React.JSX.Element {
@@ -35,8 +38,8 @@ export function Masters(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <p className="max-w-prose text-sm text-muted-foreground">
-        The lists every form picks from, and how a lead is scored. A row is never deleted: one no
-        longer wanted is switched off, so records that use it keep it.
+        The lists every form picks from, how a lead is scored, and the office tree. A list row is
+        never deleted: one no longer wanted is switched off, so records that use it keep it.
         {canEdit ? "" : " Only administrators of masters change them."}
       </p>
       <Tabs
@@ -59,6 +62,9 @@ export function Masters(): React.JSX.Element {
         ))}
         <TabsContent value="scoring">
           <ScoringPanel canEdit={canEdit} />
+        </TabsContent>
+        <TabsContent value="offices">
+          <OfficesPanel canEdit={canEdit} />
         </TabsContent>
       </Tabs>
     </div>
