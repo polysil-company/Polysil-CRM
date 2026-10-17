@@ -207,7 +207,10 @@ The registry file is the source of truth; this snapshot helps reading.
 | CHNL-007 | Dealer applications — start one, fill it for the applicant, and decide (`/dealer-applications`, `…/submit`, `…/withdraw`, `…/link`, `…/decision`) | shared | in-progress |
 | CHNL-008 | The dealer applicant's own page — verify the mobile, fill in, upload, submit (`/public/dealer-apply/{token}`, `…/verify`, `…/documents`, `…/submit`) | shared | in-progress |
 | MKT-001 | Marketing offers — set by Admin, visible to channel partners only | shared | planned |
-| SCHM-001 | Schemes — set by Admin, visible to everyone | shared | planned |
+| SCHM-001 | Schemes — the list and a scheme (`GET /schemes`, `GET /schemes/{id}`) | shared | in-progress |
+| SCHM-002 | Create and change a scheme (`POST /schemes`, `PATCH /schemes/{id}`) | shared | in-progress |
+| SCHM-003 | A period scheme's standing (`GET /schemes/{id}/standing`) | shared | in-progress |
+| SCHM-004 | Scheme credits (`GET /scheme-entitlements`) | shared | in-progress |
 | MSTR-001 | Masters — the Admin → Masters area: lists, lead scoring and offices (`/masters`) | shared | in-progress |
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
