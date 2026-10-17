@@ -148,7 +148,13 @@ function OrderView({
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-4">
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div
+          role="region"
+          aria-label="Order items"
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by keyboard (WCAG 2.1.1)
+          tabIndex={0}
+          className="overflow-x-auto rounded-lg border border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
           <table className="w-full min-w-lg text-sm">
             <caption className="sr-only">Items, with what the company and the dealer pay</caption>
             <thead className="bg-muted text-left text-xs text-muted-foreground">
