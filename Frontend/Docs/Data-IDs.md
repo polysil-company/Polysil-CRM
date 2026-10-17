@@ -179,6 +179,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SO-006 | Export the order list to Excel (`GET /orders/export`) | shared | in-progress |
 | SO-007 | Amend an approved order (`POST /orders/{orderId}/amend`) | shared | in-progress |
 | SO-008 | A subsidised order: from a subsidised quotation, its subsidy block, and editing it on a draft (`POST /orders`, `PUT /orders/{id}/subsidy`) | shared | in-progress |
+| SO-009 | Warranty on an order: each line's dispatches with start, end and status, and the claims raised (`GET /orders/{id}/warranty`) | shared | in-progress |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
 | CMPL-001 | Complaints list — filters, waiting on me, counts (`GET /complaints`, `GET /complaints/stats`) | shared | in-progress |
@@ -191,6 +192,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | CMPL-008 | Complaint targets (SLA policies) and complaint types (`GET /complaint-sla-policies`, `POST /complaint-sla-policies`, `GET /lookups/complaint-types`, `POST /lookups/complaint-types`) | shared | in-progress |
 | CMPL-009 | Export complaints to Excel (`GET /complaints/export`) | shared | in-progress |
 | CMPL-010 | Reopen a closed or QC-rejected complaint, with a reason (`POST /complaints/{id}/reopen`) | shared | in-progress |
+| CMPL-011 | Warranty on a complaint line: in warranty, out, none or unknown, from the dispatch or the supply date (`warranty` on `GET /complaints/{id}`) | shared | in-progress |
 | TASK-001 | My day — one person's tasks due that day and overdue (`GET /planner`) | shared | in-progress |
 | TASK-002 | Team day — due, done and overdue per person below a manager (`GET /planner/team`) | shared | in-progress |
 | TASK-003 | List tasks — a lead's tasks, and every task with filters (`GET /tasks`, `GET /tasks/{id}`) | shared | in-progress |
@@ -238,6 +240,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-014 | Stock: on hand, committed and available by warehouse and product, and the stock ledger (`GET /stock`, `GET /stock/movements`) | shared | in-progress |
 | MSTR-015 | Record stock: a receipt or a correction, by warehouse (`POST /stock/movements`) | shared | in-progress |
 | MSTR-016 | Warehouses: add, change, switch off, and the default (`/warehouses`) | shared | in-progress |
+| MSTR-017 | Warranty periods: the default and each category's months, from a date (`GET`/`POST /warranty-terms`) | shared | in-progress |
 | DOC-001 | Documents on a lead, quotation, order or dispatch — the list, the types and opening one (`GET /documents`, `/leads/{id}/documents`, `/documents/types`, `/documents/{id}/link`) | shared | in-progress |
 | DOC-002 | Attach a document to a record (`POST /documents`) | shared | in-progress |
 | DOC-003 | Remove a document (`DELETE /documents/{id}`) | shared | in-progress |

@@ -34,6 +34,7 @@ import { targetHandlers } from "./targets";
 import { taskHandlers } from "./tasks";
 import { territoryHandlers } from "./territories";
 import { userHandlers } from "./users";
+import { warrantyHandlers } from "./warranty";
 
 /**
  * What the backend does not serve yet, so it stays mocked even against a real API
@@ -78,6 +79,7 @@ export const handlers: readonly HttpHandler[] = [
   ...marketingHandlers,
   ...campaignHandlers,
   ...stockHandlers,
+  ...warrantyHandlers,
   ...schemeHandlers,
   ...subsidyHandlers,
   ...subsidyApplicationHandlers,

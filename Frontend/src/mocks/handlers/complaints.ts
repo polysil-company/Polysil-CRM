@@ -44,6 +44,7 @@ import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse } from "./shared";
+import { complaintLineWarranty } from "./warranty";
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -125,6 +126,11 @@ function toWire(complaint: MockComplaint, who: Caller = caller()): ComplaintWire
   const portal = PARTNER_ROLES.some((role) => role === who.role);
   return {
     ...complaint,
+    // CMPL-011 · each line's warranty, worked out on every read as the backend does
+    lines: complaint.lines.map((line) => ({
+      ...line,
+      warranty: complaintLineWarranty(complaint, line.product.id),
+    })),
     ...(portal ? { reopen_reason: null } : {}),
     can: canFor(complaint, who),
   };
