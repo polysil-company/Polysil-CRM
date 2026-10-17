@@ -81,8 +81,9 @@ export function taskRefusal(error: unknown): TaskRefusal {
         };
       case "link_not_visible_to_assignee":
         return {
-          title: "They can't open this lead",
-          message: "Choose someone who works this lead's area, or give it to yourself.",
+          title: "They can't open what this task is about",
+          message:
+            "Choose someone who works this lead's area, or give it to yourself. A dealer sees only its own leads and orders.",
           stale: false,
           fields: { assigned_to: "can't open the lead this task is about" },
         };

@@ -111,13 +111,17 @@ export function exportTasks(params: TaskListParams): Promise<DownloadedFile> {
   });
 }
 
-/** TASK-004 · GET /tasks/assignees — the user first, then the active staff below them. */
+/**
+ * TASK-004, TASK-009 · GET /tasks/assignees — the user first, then the active staff below them,
+ * then the users of dealers they can see while `tasks_for_dealers` is on.
+ */
 export function listTaskAssignees(signal?: AbortSignal): Promise<TaskAssignee[]> {
   return apiRequest({
     dataId: "TASK-004",
     logger: log,
     fn: "listTaskAssignees",
     path: "/tasks/assignees",
+    query: { include_partners: "true" },
     schema: taskAssigneesSchema,
     signal,
   });

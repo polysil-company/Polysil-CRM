@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCan, useSession } from "@/features/session/hooks/use-session";
-import { taskAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
+import { staffAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
 import { useHasTeam, useTaskParams, type TaskView } from "@/features/tasks/hooks/use-task-params";
 import { formatCalendarDay, shiftCalendarDay, todayInIndia } from "@/lib/format";
 
@@ -201,7 +201,7 @@ function PersonHeader({
   personId: string;
   onBack: () => void;
 }): React.JSX.Element {
-  const people = useQuery(taskAssigneesQueryOptions());
+  const people = useQuery(staffAssigneesQueryOptions());
   const person = people.data?.find((candidate) => candidate.id === personId);
 
   return (

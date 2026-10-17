@@ -104,6 +104,8 @@ function channelPartner(): MockModulePermission[] {
     grant("marketing_material", ["view", "create"], "partner_subtree"),
     // RBAC.md §6.3: "V + redeem", view and create (GAP-043).
     grant("rewards", ["view", "create"], "partner_subtree"),
+    // RBAC.md §6.3: their own tasks, completed, while `tasks_for_dealers` is on (FS-037).
+    grant("tasks", ["view", "edit"], "own"),
     SCHEMES_VIEW,
     ...CATALOGUE_VIEW,
   ];
