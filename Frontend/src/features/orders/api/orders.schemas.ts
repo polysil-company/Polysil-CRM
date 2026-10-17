@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import { orderPaymentsSchema } from "@/features/payments/api/payments.schemas";
-import type { QuotationLineRequest } from "@/features/quotations/api/quotations.schemas";
+import {
+  TAX_TREATMENTS,
+  type QuotationLineRequest,
+} from "@/features/quotations/api/quotations.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 import { EMPTY_VALUE } from "@/lib/format";
 
@@ -36,6 +39,10 @@ export const ORDER_TYPES = [
   "replacement",
 ] as const;
 export type OrderType = (typeof ORDER_TYPES)[number];
+
+/** SO-010 · A sample's pricing, from the `sample_pricing` setting when it was made. */
+export const SAMPLE_PRICINGS = ["free", "charged"] as const;
+export type SamplePricing = (typeof SAMPLE_PRICINGS)[number];
 
 /** The types the backend accepts today; the others answer `order_type_unsupported`. */
 export const ORDERABLE_TYPES = ["commercial", "industrial"] as const satisfies readonly OrderType[];
@@ -439,6 +446,14 @@ export const orderWireSchema = z.object({
   order_no: z.string().min(1).nullable(),
   status: z.enum(ORDER_STATUSES),
   order_type: z.enum(ORDER_TYPES),
+  /** SO-010 · Fixed at create. */
+  tax_treatment: z.enum(TAX_TREATMENTS).default("domestic"),
+  /** SO-010 · The buyer's country; null unless an export. */
+  export_country: z.string().nullish(),
+  /** SO-010 · The LUT an export_lut order is zero-rated under; taken at submit, null on a draft. */
+  lut_arn: z.string().nullish(),
+  /** SO-010 · On a sample only: free (every line 100 % off) or charged. */
+  sample_pricing: z.enum(SAMPLE_PRICINGS).nullish(),
   party: z.object({
     name: z.string(),
     mobile: z.string().nullish(),
@@ -518,6 +533,10 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
   orderNo: wire.order_no,
   status: wire.status,
   orderType: wire.order_type,
+  taxTreatment: wire.tax_treatment,
+  exportCountry: wire.export_country ?? null,
+  lutArn: wire.lut_arn ?? null,
+  samplePricing: wire.sample_pricing ?? null,
   party: {
     name: wire.party.name.trim() || "Unnamed party",
     mobile: wire.party.mobile ?? null,
@@ -608,12 +627,16 @@ export const noContentSchema = z.undefined();
  * order is made from one subsidised quotation and takes its subsidy from it (FS-057 rule 8).
  */
 export interface CreateOrderFromQuotations {
-  readonly order_type: (typeof ORDERABLE_TYPES)[number] | "subsidised";
+  /** SO-010 · Export quotations make an export order (422 type_mismatch otherwise). */
+  readonly order_type: (typeof ORDERABLE_TYPES)[number] | "subsidised" | "export";
   readonly quotation_ids: readonly string[];
   readonly delivery_address: string | null;
   readonly payment_terms: PaymentTerms;
   readonly remarks: string | null;
 }
+
+/** SO-008, SO-010 · The types staff may make beyond the everyday ones (FS-042, FS-054). */
+export type StaffOrderType = (typeof ORDERABLE_TYPES)[number] | "subsidised" | "export" | "sample";
 
 /** The buyer printed on an order: the farmer, or the dealer on a consolidated order. */
 export interface OrderPartyRequest {
@@ -629,8 +652,13 @@ export interface OrderPartyRequest {
  * direct sale by staff; it names the lead's dealer when there is one.
  */
 export interface CreateDirectOrder {
-  /** SO-008 · Subsidised (staff only) takes `subsidy` and no `lead_id` (FS-054). */
-  readonly order_type: (typeof ORDERABLE_TYPES)[number] | "subsidised";
+  /**
+   * SO-008 · Subsidised (staff only) takes `subsidy` and no `lead_id` (FS-054). SO-010 · Export
+   * and sample are staff only too (403 `type_staff_only`).
+   */
+  readonly order_type: StaffOrderType;
+  /** SO-010 · Required on an export, refused on any other type. */
+  readonly export_country?: string;
   readonly lead_id?: string;
   /** SO-008 · The leads (the first is the order's lead) and amounts of a subsidised order. */
   readonly subsidy?: OrderSubsidyRequest;
@@ -654,6 +682,8 @@ export interface ReplaceOrderLinesRequest {
 /** PATCH /orders/{id} — a draft's header, as far as the screens edit it. */
 export interface PatchOrderRequest {
   readonly order_type?: (typeof ORDERABLE_TYPES)[number];
+  /** SO-010 · Omit to keep. Required on an export. */
+  readonly export_country?: string | null;
   readonly party?: OrderPartyRequest;
   readonly delivery_address?: string | null;
   readonly payment_terms?: PaymentTerms;

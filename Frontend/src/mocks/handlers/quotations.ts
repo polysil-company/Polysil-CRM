@@ -8,6 +8,7 @@ import type {
 } from "@/features/leads/api/leads.schemas";
 import {
   PRICED_SALES_TYPES,
+  TAX_TREATMENTS,
   QUOTATION_ANSWERS,
   QUOTATION_STATUSES,
   SALES_TYPES,
@@ -37,6 +38,7 @@ import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
+import { exportTreatment, lutArnOn, withTaxTreatment } from "./export-sample";
 import { MOCK_CREATOR, newMockEvent, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
@@ -487,6 +489,34 @@ function sharedQuotation(token: string): QuotationWire | undefined {
   return mockDb.quotations.find((item) => item.share_url?.endsWith(`/q/${token}`) === true);
 }
 
+/**
+ * SO-010 · An export's header: it needs the buyer's country, takes no GSTIN, and no other type
+ * takes a country.
+ */
+function exportHeaderRefusal(
+  salesType: string,
+  country: string | null | undefined,
+  gstin: string | null | undefined,
+): Response | null {
+  const named = country !== null && country !== undefined && country.trim() !== "";
+  if (salesType === "export" && !named) {
+    return errorResponse(422, "export_country_required", "An export needs the buyer's country.", {
+      export_country: "Enter the buyer's country.",
+    });
+  }
+  if (salesType !== "export" && named) {
+    return errorResponse(422, "export_country_not_export", "Only an export takes a country.", {
+      export_country: "Only an export takes a country.",
+    });
+  }
+  if (salesType === "export" && gstin !== null && gstin !== undefined && gstin !== "") {
+    return errorResponse(422, "export_party_gstin", "An export buyer has no GSTIN.", {
+      "party.gstin": "An export buyer has no GSTIN.",
+    });
+  }
+  return null;
+}
+
 export const quotationHandlers = [
   http.get(buildApiUrl("/quotations"), async ({ request }) => {
     const { scenario, failure } = await applyScenario();
@@ -553,20 +583,26 @@ export const quotationHandlers = [
       .object({
         place_of_supply_territory_id: z.string().min(1),
         lines: z.array(lineInSchema).min(1),
+        tax_treatment: z.enum(TAX_TREATMENTS).default("domestic"),
       })
       .safeParse(await request.json());
     if (!parsed.success) {
       return validation({ lines: "at least one line with a product and a quantity" });
     }
-    const priced = priceLines(parsed.data.lines);
-    if (!priced.ok) {
-      return validation(priced.fields);
+    const domestic = priceLines(parsed.data.lines);
+    if (!domestic.ok) {
+      return validation(domestic.fields);
     }
+    // SO-010 · the preview shows the tax an export will store
+    const treatment = parsed.data.tax_treatment;
+    const priced = {
+      lines: domestic.lines.map((line) => withTaxTreatment(line, treatment)),
+    };
     const provisional = priced.lines.filter((line) => line.provisional_fields.length > 0).length;
     const body: QuotePreviewWire = {
       data: {
         as_of: new Date().toISOString().slice(0, 10),
-        intra_state: true,
+        intra_state: treatment === "domestic",
         price_list_ids: [priced.lines[0]?.price_list_id ?? ""],
         lines: priced.lines.map(({ line_no: _lineNo, ...line }) => line),
         totals: totalsOf(priced.lines),
@@ -593,6 +629,7 @@ export const quotationHandlers = [
       .object({
         lead_id: z.string().min(1),
         sales_type: z.enum(SALES_TYPES).optional(),
+        export_country: z.string().trim().max(100).nullish(),
         party: partySchema.optional(),
         terms: z.string().max(2000).nullish(),
         lines: z.array(lineInSchema).max(200).default([]),
@@ -620,6 +657,9 @@ export const quotationHandlers = [
         { sales_type: "not priced yet" },
       );
     }
+    // SO-010 · an export names the buyer's country, and its buyer has no GSTIN
+    const exportRefusal = exportHeaderRefusal(salesType, body.export_country, body.party?.gstin);
+    if (exportRefusal !== null) return exportRefusal;
     const changed = rateChanges(body.lines);
     if (Object.keys(changed).length > 0) {
       return errorResponse(
@@ -629,10 +669,12 @@ export const quotationHandlers = [
         changed,
       );
     }
-    const priced = priceLines(body.lines);
-    if (!priced.ok) {
-      return validation(priced.fields);
+    const domestic = priceLines(body.lines);
+    if (!domestic.ok) {
+      return validation(domestic.fields);
     }
+    const treatment = salesType === "export" ? exportTreatment() : "domestic";
+    const priced = { lines: domestic.lines.map((line) => withTaxTreatment(line, treatment)) };
 
     const quotation = mockDraft({
       id: mockUuid(MOCK_ID_SPACE.quotation, 50_000 + mockDb.quotations.length),
@@ -650,6 +692,13 @@ export const quotationHandlers = [
       lines: priced.lines,
       createdAt: new Date().toISOString(),
     });
+    if (treatment !== "domestic") {
+      quotation.tax_treatment = treatment;
+      quotation.export_country = body.export_country ?? null;
+      quotation.intra_state = false;
+      quotation.lut_arn =
+        treatment === "export_lut" ? lutArnOn(quotation.price_effective_date) : null;
+    }
     mockDb.quotations.unshift(quotation);
     // A new quotation has no seeded history to derive; this event starts it.
     mockDb.quotationEvents.set(quotation.id, []);
@@ -669,6 +718,7 @@ export const quotationHandlers = [
     const parsed = z
       .object({
         sales_type: z.enum(SALES_TYPES).optional(),
+        export_country: z.string().trim().max(100).nullish(),
         party: partySchema.optional(),
         terms: z.string().max(2000).nullish(),
         expected_status: z.string().optional(),
@@ -682,6 +732,22 @@ export const quotationHandlers = [
 
     const { quotation } = draft;
     const body = parsed.data;
+    // SO-010 · the tax treatment is fixed at create: an export stays one, a domestic one can't become one
+    const nextType = body.sales_type ?? quotation.sales_type;
+    if ((nextType === "export") !== (quotation.sales_type === "export")) {
+      return errorResponse(
+        422,
+        "type_mismatch",
+        "An export quotation stays an export, and a domestic one domestic.",
+      );
+    }
+    const exportRefusal = exportHeaderRefusal(
+      nextType,
+      body.export_country === undefined ? quotation.export_country : body.export_country,
+      body.party === undefined ? quotation.party.gstin : body.party.gstin,
+    );
+    if (exportRefusal !== null) return exportRefusal;
+    if (body.export_country !== undefined) quotation.export_country = body.export_country ?? null;
     if (body.sales_type !== undefined) {
       if (!PRICED_SALES_TYPES.some((type) => type === body.sales_type)) {
         return errorResponse(422, "sales_type_unsupported", "Not priced yet.", {
@@ -738,7 +804,11 @@ export const quotationHandlers = [
     if (!priced.ok) {
       return validation(priced.fields);
     }
-    const updated = withLines(draft.quotation, priced.lines);
+    const treatment = draft.quotation.tax_treatment ?? "domestic";
+    const updated = withLines(
+      draft.quotation,
+      priced.lines.map((line) => withTaxTreatment(line, treatment)),
+    );
     mockDb.quotations = mockDb.quotations.map((item) => (item.id === updated.id ? updated : item));
     voidApproval(updated, "edited");
     recordQuotationEvent(updated, "quotation.lines_replaced", { line_count: updated.lines.length });

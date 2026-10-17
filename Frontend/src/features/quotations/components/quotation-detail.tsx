@@ -22,6 +22,7 @@ import type { Quotation, QuotationLine } from "@/features/quotations/api/quotati
 import {
   PDF_STATE_LABELS,
   SALES_TYPE_LABELS,
+  TAX_TREATMENT_LABELS,
   formatQuantity,
   formatRate,
   parseWarnings,
@@ -159,6 +160,9 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
                     : formatIndianPhone(quotation.party.mobile)}
                 </DetailItem>
                 <DetailItem label="Address">{quotation.party.address ?? EMPTY_VALUE}</DetailItem>
+                {quotation.exportCountry === null ? null : (
+                  <DetailItem label="Country">{quotation.exportCountry}</DetailItem>
+                )}
                 {quotation.party.gstin === null ? null : (
                   <DetailItem label="GSTIN">
                     <span className="font-mono">{quotation.party.gstin}</span>
@@ -207,11 +211,29 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
                 <DetailItem label="Place of supply">
                   {quotation.placeOfSupply.territory.name} · {quotation.placeOfSupply.state}
                   <span className="block text-xs text-muted-foreground">
-                    {quotation.intraState
-                      ? "Within the state: CGST and SGST"
-                      : "Across states: IGST"}
+                    {quotation.taxTreatment !== "domestic"
+                      ? "An export: never within the state"
+                      : quotation.intraState
+                        ? "Within the state: CGST and SGST"
+                        : "Across states: IGST"}
                   </span>
                 </DetailItem>
+                {quotation.taxTreatment === "domestic" ? null : (
+                  <DetailItem label="Tax">
+                    {TAX_TREATMENT_LABELS[quotation.taxTreatment]}
+                    <span className="block text-xs text-muted-foreground">
+                      {quotation.taxTreatment === "export_igst" ? (
+                        "IGST at each line's rate."
+                      ) : quotation.lutArn === null ? (
+                        "No LUT covers its price date yet."
+                      ) : (
+                        <>
+                          Under LUT <span className="font-mono">{quotation.lutArn}</span>
+                        </>
+                      )}
+                    </span>
+                  </DetailItem>
+                )}
                 <DetailItem label="Seller">
                   {quotation.seller.legalName}
                   <span className="block font-mono text-xs text-muted-foreground">

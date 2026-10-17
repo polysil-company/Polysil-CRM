@@ -36,6 +36,16 @@ export const SALES_TYPES = [
 ] as const;
 export type SalesType = (typeof SALES_TYPES)[number];
 
+/**
+ * SO-010 · How a document is taxed, fixed when it is created (FS-042): domestic GST, an export
+ * zero-rated under a LUT (every line at 0 % IGST), or an export charged IGST at each slab.
+ */
+export const TAX_TREATMENTS = ["domestic", "export_lut", "export_igst"] as const;
+export type TaxTreatment = (typeof TAX_TREATMENTS)[number];
+
+/** The buyer's country on an export: free text, as the backend stores it. */
+export const EXPORT_COUNTRY_MAX_LENGTH = 100;
+
 export const PDF_STATES = ["pending", "ready", "failed"] as const;
 export type PdfState = (typeof PDF_STATES)[number];
 
@@ -328,6 +338,12 @@ export const quotationWireSchema = z.object({
   version: z.number().int().positive(),
   status: z.enum(QUOTATION_STATUSES),
   sales_type: z.enum(SALES_TYPES),
+  /** SO-010 · Fixed at create; a revision keeps it. */
+  tax_treatment: z.enum(TAX_TREATMENTS).default("domestic"),
+  /** SO-010 · The buyer's country; null unless an export. */
+  export_country: z.string().nullish(),
+  /** SO-010 · The LUT an export_lut quotation is zero-rated under, as of its price date. */
+  lut_arn: z.string().nullish(),
   source: z.enum(["internal", "external"]),
   lead: leadRef.nullable(),
   party: z.object({
@@ -396,6 +412,9 @@ export const quotationSchema = quotationWireSchema.transform((wire) => ({
   version: wire.version,
   status: wire.status,
   salesType: wire.sales_type,
+  taxTreatment: wire.tax_treatment,
+  exportCountry: wire.export_country ?? null,
+  lutArn: wire.lut_arn ?? null,
   source: wire.source,
   lead:
     wire.lead === null
@@ -564,6 +583,8 @@ export interface QuoteLinesRequest {
   readonly partner_id?: string;
   /** MSTR-008 · The document's sale type; commercial, industrial and subsidised have lists. */
   readonly sales_type?: string;
+  /** SO-010 · An export's treatment, so the preview shows the tax it will store. */
+  readonly tax_treatment?: TaxTreatment;
 }
 
 const previewLineWireSchema = quotationLineWireSchema.omit({ line_no: true });
@@ -614,6 +635,8 @@ export interface PartyRequest {
 export interface CreateQuotationRequest {
   readonly lead_id: string;
   readonly sales_type: SalesType;
+  /** SO-010 · Required on an export, refused on any other type. */
+  readonly export_country?: string;
   readonly party: PartyRequest;
   readonly terms: string | null;
   readonly lines: readonly QuotationLineRequest[];
@@ -622,6 +645,8 @@ export interface CreateQuotationRequest {
 /** PATCH /quotations/{id} — a draft's header; the response re-prices the lines. */
 export interface PatchQuotationRequest {
   readonly sales_type?: SalesType;
+  /** SO-010 · Omit to keep. Required on an export. */
+  readonly export_country?: string | null;
   readonly party?: PartyRequest;
   readonly terms?: string | null;
   readonly expected_status: "draft";
@@ -637,6 +662,7 @@ export interface ReplaceLinesRequest {
 export const PRICED_SALES_TYPES = [
   "commercial",
   "industrial",
+  "export",
   "subsidised",
 ] as const satisfies readonly SalesType[];
 
@@ -649,6 +675,11 @@ export interface QuotationSubsidyRequest {
 /** The builder's header form. */
 export const quotationHeaderFormSchema = z.object({
   salesType: z.enum(PRICED_SALES_TYPES),
+  /** SO-010 · Checked against the sale type when saving: an export needs it. */
+  exportCountry: z
+    .string()
+    .trim()
+    .max(EXPORT_COUNTRY_MAX_LENGTH, { message: "Keep the country under 100 characters" }),
   partyName: z.string().trim().min(1, { message: "Enter who the quotation is for" }).max(200),
   partyMobile: z
     .string()

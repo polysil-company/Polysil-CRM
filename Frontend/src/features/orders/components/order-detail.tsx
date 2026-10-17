@@ -29,7 +29,11 @@ import {
   stepRoleLabel,
 } from "@/features/orders/lib/order-labels";
 import { OrderPaymentsCard } from "@/features/payments/components/order-payments";
-import { formatRate, parseWarnings } from "@/features/quotations/lib/quotation-labels";
+import {
+  TAX_TREATMENT_LABELS,
+  formatRate,
+  parseWarnings,
+} from "@/features/quotations/lib/quotation-labels";
 import { OrderPoints } from "@/features/rewards/components/order-points";
 import { useCan } from "@/features/session/hooks/use-session";
 import { OrderWarrantyCard } from "@/features/warranty/components/order-warranty";
@@ -140,8 +144,18 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
             <p className="text-sm text-muted-foreground">No items yet. This draft is empty.</p>
           ) : (
             <>
-              <LineCards lines={order.lines} intraState={order.intraState} shipping={shipping} />
-              <LineTable lines={order.lines} intraState={order.intraState} shipping={shipping} />
+              <LineCards
+                lines={order.lines}
+                intraState={order.intraState}
+                shipping={shipping}
+                freeSample={order.samplePricing === "free"}
+              />
+              <LineTable
+                lines={order.lines}
+                intraState={order.intraState}
+                shipping={shipping}
+                freeSample={order.samplePricing === "free"}
+              />
             </>
           )}
           <TotalsBlock order={order} />
@@ -183,6 +197,9 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
                     : formatIndianPhone(order.party.mobile)}
                 </DetailItem>
                 <DetailItem label="Address">{order.party.address ?? EMPTY_VALUE}</DetailItem>
+                {order.exportCountry === null ? null : (
+                  <DetailItem label="Country">{order.exportCountry}</DetailItem>
+                )}
                 {order.party.gstin === null ? null : (
                   <DetailItem label="GSTIN">
                     <span className="font-mono">{order.party.gstin}</span>
@@ -265,9 +282,39 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
                 <DetailItem label="Place of supply">
                   {order.placeOfSupply.name}
                   <span className="block text-xs text-muted-foreground">
-                    {order.intraState ? "Within the state: CGST and SGST" : "Across states: IGST"}
+                    {order.taxTreatment !== "domestic"
+                      ? "An export: never within the state"
+                      : order.intraState
+                        ? "Within the state: CGST and SGST"
+                        : "Across states: IGST"}
                   </span>
                 </DetailItem>
+                {order.taxTreatment === "domestic" ? null : (
+                  <DetailItem label="Tax">
+                    {TAX_TREATMENT_LABELS[order.taxTreatment]}
+                    <span className="block text-xs text-muted-foreground">
+                      {order.taxTreatment === "export_igst" ? (
+                        "IGST at each line's rate."
+                      ) : order.lutArn === null ? (
+                        "The LUT is taken when the order is submitted."
+                      ) : (
+                        <>
+                          Under LUT <span className="font-mono">{order.lutArn}</span>
+                        </>
+                      )}
+                    </span>
+                  </DetailItem>
+                )}
+                {order.samplePricing === null ? null : (
+                  <DetailItem label="Sample">
+                    {order.samplePricing === "free" ? "Free sample" : "Charged sample"}
+                    <span className="block text-xs text-muted-foreground">
+                      {order.samplePricing === "free"
+                        ? "Every line is 100 % off; the approval runs on the list value."
+                        : "Priced like a commercial order."}
+                    </span>
+                  </DetailItem>
+                )}
                 <DetailItem label="Seller">
                   {order.seller === null ? (
                     "Set when submitted"
@@ -317,6 +364,15 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
         </div>
       </div>
     </div>
+  );
+}
+
+/** SO-010 · Marks a line given free on a sample order. */
+function FreeSampleBadge(): React.JSX.Element {
+  return (
+    <Badge variant="info" size="sm" className="mt-1">
+      Free sample
+    </Badge>
   );
 }
 
@@ -488,10 +544,13 @@ function LineTable({
   lines,
   intraState,
   shipping,
+  freeSample,
 }: {
   lines: readonly OrderLine[];
   intraState: boolean;
   shipping: boolean;
+  /** SO-010 · A free sample: every line is 100 % off. */
+  freeSample: boolean;
 }): React.JSX.Element {
   const headCell = "px-3 py-2 text-left text-xs font-medium text-muted-foreground";
   const numHead = cn(headCell, "text-right");
@@ -548,6 +607,7 @@ function LineTable({
               <td className={cn(cell, "text-muted-foreground tabular-nums")}>{line.lineNo}</td>
               <th scope="row" className={cn(cell, "min-w-56 text-left font-normal")}>
                 <span className="block font-medium text-foreground">{line.description}</span>
+                {freeSample ? <FreeSampleBadge /> : null}
                 <span className="block text-xs text-muted-foreground">
                   HSN {line.hsnCode} · {line.uom}
                   {line.provisionalFields.length > 0 ? " · indicative" : ""}
@@ -615,10 +675,13 @@ function LineCards({
   lines,
   intraState,
   shipping,
+  freeSample,
 }: {
   lines: readonly OrderLine[];
   intraState: boolean;
   shipping: boolean;
+  /** SO-010 · A free sample: every line is 100 % off. */
+  freeSample: boolean;
 }): React.JSX.Element {
   return (
     <ol aria-label="Order items" className="flex flex-col gap-3 md:hidden">
@@ -628,6 +691,7 @@ function LineCards({
             <span className="text-sm font-medium text-foreground">
               {line.lineNo}. {line.description}
             </span>
+            {freeSample ? <FreeSampleBadge /> : null}
             <span className="text-xs text-muted-foreground">
               HSN {line.hsnCode}
               {line.provisionalFields.length > 0 ? " · indicative" : ""}
