@@ -87,6 +87,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-025** · Offer only the document types a record takes: `record_type` on `GET /documents/types` · DOC-002 · low
 
+**Masters** — added as Admin → Masters is built (MSTR-009, MSTR-010).
+
+- [ ] **BE-026** · Show a list row's sort order, quality and kind: return them on `LookupItem` · MSTR-009 · low
+
 ---
 
 ## Details
@@ -503,3 +507,17 @@ in the same shape. Never renumber or reuse a number.
   picker from this list as the handover says, and won't hard-code which types to hide.
 - **Done when:** the filter answers the record's types only. The frontend will send the record's
   type and drop nothing itself.
+
+### BE-026 · Show a list row's sort order, quality and kind: return them on `LookupItem`
+
+- **Status:** ⬜ Open
+- **Asked:** 15 Oct 2026 · MSTR-009
+- **What:** `GET /lookups/{list}` (and the `POST`/`PATCH` answers) carry each row's `sort_order`
+  for sources and reasons, `quality` for sources, and `kind` for reasons, as `LookupCreate` takes
+  them. Null where a list has none.
+- **Why:** Masters sets them when a row is added, and `PATCH` can change `sort_order` and
+  `quality`, but the list answers only `id`, `code`, `name` and `is_active`. So the screen can't
+  show a source's quality or a row's place, and changing one would be blind. For now Masters asks
+  for them only when adding a row.
+- **Done when:** the three fields come back on every list row. The frontend will show them and
+  offer to change sort order and quality in place.

@@ -1,0 +1,67 @@
+"use client";
+
+import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
+
+import { lookupKeys, lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
+import type { LookupItem, LookupList } from "@/features/lookups/api/lookups.schemas";
+
+import { addLookupItem, patchScoring, updateLookupItem } from "./masters.api";
+import { scoringQueryOptions } from "./masters.queries";
+import type {
+  LookupCreateRequest,
+  LookupUpdateRequest,
+  ScoringItem,
+  ScoringPatchRequest,
+} from "./masters.schemas";
+
+/** MSTR-009. Every picker that reads the list refreshes. */
+export function useAddLookupItem(
+  list: LookupList,
+): UseMutationResult<LookupItem, Error, LookupCreateRequest> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["masters", "lookup", "add", list],
+    mutationFn: (body: LookupCreateRequest) => addLookupItem(list, body),
+    meta: { dataId: "MSTR-009" },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: lookupKeys.list(list) });
+    },
+  });
+}
+
+export interface UpdateLookupItemVariables {
+  readonly itemId: string;
+  readonly body: LookupUpdateRequest;
+}
+
+/** MSTR-009. The row changes in place; pickers refresh. */
+export function useUpdateLookupItem(
+  list: LookupList,
+): UseMutationResult<LookupItem, Error, UpdateLookupItemVariables> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["masters", "lookup", "update", list],
+    mutationFn: ({ itemId, body }: UpdateLookupItemVariables) =>
+      updateLookupItem(list, itemId, body),
+    meta: { dataId: "MSTR-009" },
+    onSuccess: (item) => {
+      queryClient.setQueryData(lookupListQueryOptions(list).queryKey, (rows) =>
+        rows?.map((row) => (row.id === item.id ? item : row)),
+      );
+      void queryClient.invalidateQueries({ queryKey: lookupKeys.list(list) });
+    },
+  });
+}
+
+/** MSTR-010. The answer is every setting, as now stored. */
+export function usePatchScoring(): UseMutationResult<ScoringItem[], Error, ScoringPatchRequest> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["masters", "scoring"],
+    mutationFn: patchScoring,
+    meta: { dataId: "MSTR-010" },
+    onSuccess: (items) => {
+      queryClient.setQueryData(scoringQueryOptions().queryKey, items);
+    },
+  });
+}
