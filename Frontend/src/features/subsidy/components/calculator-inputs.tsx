@@ -39,6 +39,7 @@ import {
   type DraftLine,
   type DraftProblems,
   type SchemeInputsDraft,
+  sprinklerAreaHint,
 } from "@/features/subsidy/lib/calculator-draft";
 import { cn } from "@/lib/utils";
 
@@ -312,62 +313,34 @@ export function CropBlockCard({
             )}
           </TextField>
 
-          {isSprinkler ? (
-            <TextField
-              id={`${id}-area`}
-              label="Area"
-              error={problems[`${at}.area`]}
-              description="The scheme's table holds only these areas."
-            >
-              {(aria) => (
-                <Select
-                  items={(system.sprinklerAreas ?? []).map((area) => ({
-                    value: area,
-                    label: `${area} Ha`,
-                  }))}
-                  value={crop.area === "" ? null : crop.area}
-                  onValueChange={(value) => {
-                    if (typeof value === "string") setter("area")(value);
+          {/* SUBS-002 · Sprinkler takes an area between its table's steps too (§5) */}
+          <TextField
+            id={`${id}-area`}
+            label="Area"
+            error={problems[`${at}.area`]}
+            description={
+              isSprinkler
+                ? sprinklerAreaHint(system.sprinklerAreas)
+                : "In hectares, up to three decimals."
+            }
+          >
+            {(aria) => (
+              <InputGroup>
+                <InputGroupInput
+                  {...aria}
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="1.000"
+                  className="tabular-nums"
+                  value={crop.area}
+                  onChange={(event) => {
+                    setter("area")(event.target.value);
                   }}
-                >
-                  <SelectTrigger {...aria} className="w-full">
-                    <SelectValue placeholder="Choose the area" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(system.sprinklerAreas ?? []).map((area) => (
-                      <SelectItem key={area} value={area}>
-                        {area} Ha
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </TextField>
-          ) : (
-            <TextField
-              id={`${id}-area`}
-              label="Area"
-              error={problems[`${at}.area`]}
-              description="In hectares, up to three decimals."
-            >
-              {(aria) => (
-                <InputGroup>
-                  <InputGroupInput
-                    {...aria}
-                    inputMode="decimal"
-                    autoComplete="off"
-                    placeholder="1.000"
-                    className="tabular-nums"
-                    value={crop.area}
-                    onChange={(event) => {
-                      setter("area")(event.target.value);
-                    }}
-                  />
-                  <InputGroupAddon align="end">Ha</InputGroupAddon>
-                </InputGroup>
-              )}
-            </TextField>
-          )}
+                />
+                <InputGroupAddon align="end">Ha</InputGroupAddon>
+              </InputGroup>
+            )}
+          </TextField>
 
           <TextField
             id={`${id}-lateral`}

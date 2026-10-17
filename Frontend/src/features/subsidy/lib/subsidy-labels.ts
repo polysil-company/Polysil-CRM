@@ -93,8 +93,18 @@ const WARNING_TITLES: Readonly<Record<string, string>> = {
   pipe_size_ignored: "This scheme sets the pipe size by area",
   guided_cost_above_cost: "The guided cost is more than the cost",
   fittings_above_material: "The fittings amount is more than the lines",
-  area_between_steps: "The area is between the table's steps",
+  area_between_steps: "The area is between table steps",
 };
+
+/** Warnings said in plain words in place of the backend's sentence. */
+const WARNING_SENTENCES: Readonly<Record<string, string>> = {
+  // SUBS-002 · `subsidy-completion.md` §5
+  area_between_steps: "Quantities use the next step; the unit cost is in between.",
+};
+
+export function warningSentence(code: string, sentence: string): string {
+  return WARNING_SENTENCES[code] ?? sentence;
+}
 
 /**
  * "seven_year_area_below_table" is the seven-year table's clamp, a different figure from the

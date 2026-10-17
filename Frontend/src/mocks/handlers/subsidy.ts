@@ -288,9 +288,9 @@ function refusals(body: CalculateBody): Record<string, string> {
     if (Number(crop.area) <= 0) fields[`${at}.area`] = "must be more than 0";
     if (Number(crop.lateral_spacing) <= 0) fields[`${at}.lateral_spacing`] = "must be more than 0";
     if (body.system_type === "sprinkler") {
-      if (!MOCK_SPRINKLER_AREAS.some((area) => Number(area) === Number(crop.area))) {
-        fields[`${at}.area`] =
-          "Sprinkler areas are the scheme's steps: 0.4 to 5.0 Ha in steps of 0.2, or 2.01 Ha";
+      // SUBS-002 · between two steps is allowed (`subsidy-completion.md` §5); outside isn't
+      if (Number(crop.area) < 0.4 || Number(crop.area) > 5) {
+        fields[`${at}.area`] = "Sprinkler areas run from 0.4 to 5 Ha";
       }
       if (crop.lines.length > 0) fields[`${at}.lines`] = "Sprinkler derives its own lines";
     }
@@ -468,6 +468,11 @@ export function calculate(body: CalculateBody): CalculateResponseWire["data"] {
     }
     if (area > 5) {
       warnings.push("area_above_table: The area is above 5 Ha; the unit cost is scaled.");
+    }
+    if (system === "sprinkler" && !MOCK_SPRINKLER_AREAS.some((step) => Number(step) === area)) {
+      warnings.push(
+        `area_between_steps: ${crop.area} Ha is between table steps; quantities use the next step up and the unit cost is pro rata between the two`,
+      );
     }
     const sevenYearApplies =
       area >= SEVEN_YEAR_MIN && area <= SEVEN_YEAR_MAX && forSubsidy >= SEVEN_YEAR_SPACING_FLOOR;
