@@ -36,7 +36,7 @@ export function RewardSettingsPanel({ canEdit }: { canEdit: boolean }): React.JS
   return (
     <Card className="max-w-xl">
       <CardHeader>
-        <CardTitle level={3}>Point value and limit</CardTitle>
+        <CardTitle>Point value and limit</CardTitle>
         <CardDescription>
           A change applies from today, once a day. Orders already submitted keep their day&apos;s
           value.

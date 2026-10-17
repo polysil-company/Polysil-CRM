@@ -130,7 +130,9 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [x] **24. Schemes and promotions** (6, plus `GET /orders/{id}/schemes`). `schemes-contract.md`. In two parts:
   - [x] **24a. The schemes** (SCHM-001…004): the list, a scheme, create and edit, standing, credits; BE-027 asked. PR #155, 17 Oct (`feature/SCHM-001-schemes`, from `integration`).
   - [x] **24b. Benefits on the order** (SCHM-005): the scheme preview on a draft order, `benefits` and "To pay" after submit. PR #156, 17 Oct (`feature/SCHM-005-order-benefits`), stacked on #155: merge #155 first, then retarget #156 to `integration`.
-- [ ] **25. Reward points** (19), **and dealer commission and TOD** (12). `rewards-contract.md`, `dealer-commission-contract.md`.
+- [~] **25. Reward points** (19), **and dealer commission and TOD** (12). `rewards-contract.md`, `dealer-commission-contract.md`. In two parts, commission first because it needs nothing still open:
+  - [x] **25a. Dealer commission and TOD** (SUBS-016…018): stage 18 on the application, Operations → Dealer commissions for Accounts, and Commission rates in Subsidy masters. PR #157, 17 Oct (`feature/SUBS-016-dealer-commission`, from `integration`).
+  - [~] **25b. Reward points** (RWD-001…004): points and history, gifts and requests, the gift desk, earning rules, point value, gifts and adjustments for Admin, and points on a dealer's draft order. On `feature/RWD-001-reward-points`, from `integration`.
 - [ ] **26. Payments, partner credit and the dealer ledger** (8). `payments-contract.md`. It goes with item 3.
 - [ ] **27. Marketing material ordering** (11), **and campaigns** (5). MKT-001. `marketing-material-contract.md`, `campaigns.md`.
 - [ ] **28. Stock** (7): warehouses, availability on the order form, and the stock list. `stock-contract.md`.

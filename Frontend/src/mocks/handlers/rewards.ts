@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
+import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import {
   REDEMPTION_STATUSES,
   RULE_BASES,
@@ -507,5 +508,146 @@ export const rewardHandlers = [
       `Gift withdrawn: ${redemption.gift?.name ?? "a gift"}`,
     );
     return HttpResponse.json({ data: redemption });
+  }),
+];
+
+// ── points on an order (RWD-004) ────────────────────────────────────────────────
+
+function heldOn(orderId: string, status: RedemptionWire["status"]): RedemptionWire | undefined {
+  return mockDb.rewardRedemptions.find(
+    (row) => row.kind === "order" && row.status === status && row.sales_order?.id === orderId,
+  );
+}
+
+function paise(value: string | number): number {
+  return Math.round(Number(value) * 100);
+}
+
+/** The most points may pay on an order: its total (GST included) at the limit, in paise. */
+function limitOf(order: OrderWire): number {
+  return Math.floor((paise(order.totals.total) * Number(currentSettings().max_redeem_pct)) / 100);
+}
+
+/**
+ * Submit: the held points come off `payable` as a benefit, in whole points only, up to the
+ * limit and what is left to pay; the rest go back to the balance.
+ */
+export function applyOrderPoints(order: OrderWire, benefitId: string): void {
+  const held = heldOn(order.id, "pending");
+  if (held === undefined) return;
+  const pointValue = paise(currentSettings().point_value);
+  const left = paise(order.payable ?? order.totals.total);
+  const usable = Math.min(held.points * pointValue, limitOf(order), left);
+  const used = pointValue <= 0 ? 0 : Math.floor(usable / pointValue);
+  const amount = used * pointValue;
+  const holder = holderOfRedemption(held);
+  if (used < held.points) {
+    addLedger(
+      holder,
+      held.points - used,
+      "released",
+      `Points not needed on ${order.order_no ?? "the order"}`,
+    );
+  }
+  held.status = used > 0 ? "applied" : "released";
+  held.points = used;
+  held.amount = (amount / 100).toFixed(2);
+  held.decided_at = new Date().toISOString();
+  if (used === 0) return;
+  order.benefits = [
+    ...(order.benefits ?? []),
+    {
+      id: benefitId,
+      kind: "reward_redemption",
+      scheme: null,
+      amount: (amount / 100).toFixed(2),
+      status: "applied",
+      applied_at: new Date().toISOString(),
+    },
+  ];
+  order.payable = ((left - amount) / 100).toFixed(2);
+}
+
+/** Back to draft or cancelled: points held or spent on the order go back to the balance. */
+export function releaseOrderPoints(order: OrderWire): void {
+  for (const status of ["pending", "applied"] as const) {
+    const row = heldOn(order.id, status);
+    if (row === undefined || row.points === 0) continue;
+    addLedger(
+      holderOfRedemption(row),
+      row.points,
+      "released",
+      `Points back from ${order.order_no ?? "a draft order"}`,
+    );
+    row.status = "released";
+    row.decided_at = new Date().toISOString();
+  }
+}
+
+function draftFor(orderId: unknown): OrderWire | Response {
+  const order = mockDb.orders.find((item) => item.id === orderId);
+  if (order === undefined) return errorResponse(404, "not_found", "Not found in your scope.");
+  if (order.status !== "draft") {
+    return errorResponse(409, "order_not_draft", "Points go on a draft only.");
+  }
+  return order;
+}
+
+export const orderPointsHandlers = [
+  http.post(buildApiUrl("/orders/:orderId/reward-redemption"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    // The dealer's own user; staff can't redeem yet (GAP-336).
+    if (!allowed("create") || !isPartnerRole(readMockRole())) return forbidden();
+    const order = draftFor(params.orderId);
+    if (order instanceof Response) return order;
+    const parsed = z
+      .object({ points: z.number().int().positive("At least 1 point.") })
+      .safeParse(await request.json());
+    if (!parsed.success) return invalid(fieldsOf(parsed.error));
+    if (heldOn(order.id, "pending") !== undefined) {
+      return errorResponse(409, "points_on_order", "Points are already on this order.");
+    }
+    const holder = myHolder();
+    const points = parsed.data.points;
+    if (balanceOf(holder) < points) {
+      return errorResponse(422, "insufficient_points", "Not that many points to spend.", {
+        points: "More than your balance.",
+      });
+    }
+    if (points * paise(currentSettings().point_value) > limitOf(order)) {
+      return errorResponse(422, "over_redeem_limit", "More than points may pay on this order.", {
+        points: `Up to ${currentSettings().max_redeem_pct}% of the order.`,
+      });
+    }
+    addLedger(holder, -points, "redeemed", `Held for ${order.order_no ?? "a draft order"}`);
+    const redemption: RedemptionWire = {
+      id: mockRewardId(4, 500 + mockDb.rewardRedemptions.length),
+      kind: "order",
+      holder: { type: holder.type, id: holder.id, name: holder.name },
+      points,
+      amount: null,
+      status: "pending",
+      gift: null,
+      sales_order: { id: order.id, order_no: order.order_no },
+      remark: null,
+      decided_at: null,
+      created_at: new Date().toISOString(),
+    };
+    mockDb.rewardRedemptions.unshift(redemption);
+    return HttpResponse.json({ data: redemption }, { status: 201 });
+  }),
+
+  http.delete(buildApiUrl("/orders/:orderId/reward-redemption"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!allowed("create") || !isPartnerRole(readMockRole())) return forbidden();
+    const order = draftFor(params.orderId);
+    if (order instanceof Response) return order;
+    if (heldOn(order.id, "pending") === undefined) {
+      return errorResponse(404, "not_found", "No points on this order.");
+    }
+    releaseOrderPoints(order);
+    return new HttpResponse(null, { status: 204 });
   }),
 ];

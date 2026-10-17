@@ -120,7 +120,7 @@ function BalanceCard({ holder }: { holder: HolderQuery }): React.JSX.Element {
   return (
     <Card>
       <CardHeader>
-        <CardTitle level={3}>Balance</CardTitle>
+        <CardTitle>Balance</CardTitle>
         <CardDescription>
           {query.data === undefined
             ? "Points to spend."
@@ -205,7 +205,7 @@ function History({
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle level={3}>History</CardTitle>
+        <CardTitle>History</CardTitle>
         <CardDescription>Every change to the balance, newest first.</CardDescription>
       </CardHeader>
       <CardContent>

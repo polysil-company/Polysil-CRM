@@ -7,6 +7,7 @@ import {
   giftResponseSchema,
   ledgerPageSchema,
   ledgerRowResponseSchema,
+  noContentSchema,
   redemptionPageSchema,
   redemptionResponseSchema,
   ruleListSchema,
@@ -155,6 +156,39 @@ export function decideRedemption(
     body,
     idempotencyKey,
     schema: redemptionResponseSchema,
+  });
+}
+
+/**
+ * RWD-004 · Put points on the dealer's own draft order; they are held at once. 422
+ * insufficient_points, over_redeem_limit; 409 points_on_order.
+ */
+export function redeemOnOrder(
+  orderId: string,
+  { body, idempotencyKey }: WriteInput<{ readonly points: number }>,
+): Promise<Redemption> {
+  return apiRequest({
+    dataId: "RWD-004",
+    logger: log,
+    fn: "redeemOnOrder",
+    method: "POST",
+    path: `/orders/${encodeURIComponent(orderId)}/reward-redemption`,
+    body,
+    idempotencyKey,
+    schema: redemptionResponseSchema,
+  });
+}
+
+/** RWD-004 · Take the points off the draft; they go back to the balance. */
+export async function removeFromOrder(orderId: string, idempotencyKey: string): Promise<void> {
+  await apiRequest({
+    dataId: "RWD-004",
+    logger: log,
+    fn: "removeFromOrder",
+    method: "DELETE",
+    path: `/orders/${encodeURIComponent(orderId)}/reward-redemption`,
+    idempotencyKey,
+    schema: noContentSchema,
   });
 }
 

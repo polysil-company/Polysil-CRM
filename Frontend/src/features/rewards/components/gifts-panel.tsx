@@ -77,7 +77,7 @@ export function GiftsPanel(): React.JSX.Element {
       <Card>
         <CardHeader className="flex-row flex-wrap items-start justify-between gap-2">
           <div className="flex flex-col gap-0.5">
-            <CardTitle level={3}>Gifts</CardTitle>
+            <CardTitle>Gifts</CardTitle>
             <CardDescription>
               {canRedeem
                 ? points === null
@@ -244,7 +244,7 @@ function MyRequests(): React.JSX.Element {
   return (
     <Card>
       <CardHeader>
-        <CardTitle level={3}>Your requests</CardTitle>
+        <CardTitle>Your requests</CardTitle>
         <CardDescription>Newest first. A waiting request can be withdrawn.</CardDescription>
       </CardHeader>
       <CardContent>

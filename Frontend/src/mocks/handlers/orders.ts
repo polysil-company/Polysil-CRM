@@ -49,6 +49,7 @@ import { mockDb } from "@/mocks/db";
 
 import { MOCK_CREATOR, newMockEvent } from "./lead-events";
 import { lineInSchema, priceLines, rateChanges } from "./quotations";
+import { applyOrderPoints, releaseOrderPoints } from "./rewards";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
 
@@ -370,6 +371,7 @@ export function decideOrderStep(
   if (decision === "reject") {
     order.status = "draft";
     reverseOrderBenefits(order, mockDb.entitlements);
+    releaseOrderPoints(order);
     order.approval = { ...order.approval, status: "rejected" };
     order.last_rejection = { remark: remark ?? "", role: decided?.role ?? "", at: decidedAt };
     recordOrderEvent(order, "order.returned", { remark });
@@ -1240,6 +1242,11 @@ export const orderHandlers = [
       mockDb.entitlements,
       (index) => mockUuid(MOCK_ID_SPACE.orderBenefit, mockDb.orders.indexOf(order) * 100 + index),
     );
+    // RWD-004 · held reward points come off what is left to pay.
+    applyOrderPoints(
+      order,
+      mockUuid(MOCK_ID_SPACE.orderBenefit, mockDb.orders.indexOf(order) * 100 + 99),
+    );
     order.status = "submitted";
     order.submitted_at = new Date().toISOString();
     order.approval = {
@@ -1296,6 +1303,7 @@ export const orderHandlers = [
     order.cancelled_at = new Date().toISOString();
     order.cancel_remark = parsed.data.remark;
     reverseOrderBenefits(order, mockDb.entitlements);
+    releaseOrderPoints(order);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.cancelled", { remark: parsed.data.remark });
     return HttpResponse.json({ data: order });
@@ -1347,6 +1355,7 @@ export const orderHandlers = [
     order.amend_reason = parsed.data.remark;
     order.status = "draft";
     reverseOrderBenefits(order, mockDb.entitlements);
+    releaseOrderPoints(order);
     order.approved_at = null;
     order.pdf_state = "none";
     order.pdf_error = null;

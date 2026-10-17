@@ -10,6 +10,8 @@ import {
   patchGift,
   patchRule,
   putRewardSettings,
+  redeemOnOrder,
+  removeFromOrder,
   requestGift,
   type RedemptionDecision,
   type WriteInput,
@@ -144,5 +146,26 @@ export function useSaveGift(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [...rewardKeys.all, "gifts"] });
     },
+  });
+}
+
+/** RWD-004 · Put points on a draft order, or take them off. */
+export function useOrderPoints(): UseMutationResult<
+  Redemption | null,
+  Error,
+  { orderId: string; points: number | null; idempotencyKey: string }
+> {
+  const refresh = useRefreshPoints();
+  return useMutation({
+    mutationKey: [...rewardKeys.all, "order-points"],
+    mutationFn: async ({ orderId, points, idempotencyKey }) => {
+      if (points === null) {
+        await removeFromOrder(orderId, idempotencyKey);
+        return null;
+      }
+      return redeemOnOrder(orderId, { body: { points }, idempotencyKey });
+    },
+    meta: { dataId: "RWD-004" },
+    onSuccess: refresh,
   });
 }

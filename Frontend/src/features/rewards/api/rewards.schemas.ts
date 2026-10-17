@@ -337,6 +337,9 @@ export interface SettingsRequest {
   readonly max_redeem_pct: string;
 }
 
+/** DELETE answers 204 with no body. */
+export const noContentSchema = z.undefined();
+
 export interface AdjustmentRequest {
   readonly partner_id: string | null;
   readonly user_id: string | null;

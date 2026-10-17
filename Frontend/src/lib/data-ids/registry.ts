@@ -859,6 +859,15 @@ export const DATA_IDS = {
     notes:
       "rewards.edit. A rule that has awarded points changes only its end date and active flag (409 rule_in_use); settings change once a day (409 settings_changed_today).",
   },
+  "RWD-004": {
+    domain: "RWD",
+    title: "Reward points on a dealer's draft order — held now, taken off To pay at submit",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders/{id}/reward-redemption", "DELETE /orders/{id}/reward-redemption"],
+    notes:
+      "The dealer's own user, on its draft. At most max_redeem_pct of the order total; whole points only; points not needed go back. 422 insufficient_points, over_redeem_limit; 409 points_on_order.",
+  },
   "MSTR-001": {
     domain: "MSTR",
     title: "Masters — the Admin → Masters area: lists, lead scoring and offices",

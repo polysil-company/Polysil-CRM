@@ -5,6 +5,8 @@ import type * as NextNavigation from "next/navigation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
+import { submitOrder } from "@/features/orders/api/orders.api";
+import { OrderDetail } from "@/features/orders/components/order-detail";
 import {
   adjustPoints,
   createRule,
@@ -13,6 +15,8 @@ import {
   getLedger,
   patchRule,
   putRewardSettings,
+  redeemOnOrder,
+  removeFromOrder,
   requestGift,
 } from "@/features/rewards/api/rewards.api";
 import { isApiError } from "@/lib/api/errors";
@@ -308,5 +312,83 @@ describe("[RWD-003] Reward admin — the screen", () => {
 
     expect(await screen.findByText("Points adjusted")).toBeInTheDocument();
     expect(await screen.findByText("370 points")).toBeInTheDocument();
+  });
+});
+
+describe("[RWD-004] Points on an order", () => {
+  afterEach(reset);
+
+  function dealerDraft(): string {
+    const order = mockDb.orders.find(
+      (item) => item.status === "draft" && item.partner?.partner_type === "dealer",
+    );
+    if (order === undefined) throw new Error("No dealer draft");
+    return order.id;
+  }
+
+  it("holds points on a draft, refuses a second lot or one over the limit, and takes them off", async () => {
+    writeMockRole("dealer");
+    const orderId = dealerDraft();
+    const held = await redeemOnOrder(orderId, { body: { points: 100 }, idempotencyKey: key() });
+    expect(held).toMatchObject({ kind: "order", status: "pending", points: 100 });
+    expect((await getBalance({ kind: "me" })).points).toBe(760);
+    expect(
+      await codeOf(redeemOnOrder(orderId, { body: { points: 10 }, idempotencyKey: key() })),
+    ).toBe("points_on_order");
+
+    await removeFromOrder(orderId, key());
+    expect((await getBalance({ kind: "me" })).points).toBe(860);
+
+    // At 1% of the order, 500 points is over the limit.
+    mockDb.rewardSettings.push({
+      point_value: "1.00",
+      max_redeem_pct: "1.00",
+      effective_from: "2026-10-01",
+    });
+    expect(
+      await codeOf(redeemOnOrder(orderId, { body: { points: 500 }, idempotencyKey: key() })),
+    ).toBe("over_redeem_limit");
+    expect(
+      await codeOf(redeemOnOrder(orderId, { body: { points: 5000 }, idempotencyKey: key() })),
+    ).toBe("insufficient_points");
+
+    writeMockRole("admin");
+    expect(
+      await codeOf(redeemOnOrder(orderId, { body: { points: 10 }, idempotencyKey: key() })),
+    ).toBe("forbidden");
+  });
+
+  it("takes the held points off what is paid at submit, as a benefit", async () => {
+    writeMockRole("dealer");
+    const orderId = dealerDraft();
+    await redeemOnOrder(orderId, { body: { points: 250 }, idempotencyKey: key() });
+    const submitted = await submitOrder(orderId, {
+      body: { expected_status: "draft" },
+      idempotencyKey: key(),
+    });
+
+    const benefit = submitted.benefits.find((item) => item.kind === "reward_redemption");
+    expect(benefit).toMatchObject({ amount: "250.00", scheme: null, status: "applied" });
+    expect(Number(submitted.payable)).toBeCloseTo(Number(submitted.totals.total) - 250, 2);
+  });
+
+  it("lets a dealer use points on its draft and take them off", async () => {
+    signInAs("dealer");
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <OrderDetail orderId={dealerDraft()} />
+        <Toaster />
+      </>,
+    );
+    const card = await screen.findByRole("region", { name: "Reward points" });
+    const form = await within(card).findByRole("form", { name: "Use points on this order" });
+    await user.type(within(form).getByLabelText("Points to use"), "100");
+    await user.click(within(form).getByRole("button", { name: "Use points" }));
+
+    expect(await screen.findByText("Points on the order")).toBeInTheDocument();
+    expect(await within(card).findByText("100 points")).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Take them off" }));
+    expect(await screen.findByText("Points taken off")).toBeInTheDocument();
   });
 });
