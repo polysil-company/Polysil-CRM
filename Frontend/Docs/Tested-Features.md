@@ -47,6 +47,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Channel partners](#channel-partners) | 8 | 🧪 👀 | PR #112, stacked on PR #111; GSTIN details in PR #132; dealer applications in PR #145; the applicant's page in PR #146 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
+| [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -566,6 +567,19 @@ Admin → **Reports** (`/reports`), on the backend's contract (handover `reports
   - **Download Excel** sends the same filters with `format=xlsx`.
   - Screens: [conversion](screenshots/reports/report-conversion-desktop-light.jpg), [by person](screenshots/reports/report-conversion-person-desktop-light.jpg), [salespeople, as a State Manager](screenshots/reports/report-people-hidden-desktop-light.jpg), [dealers](screenshots/reports/report-dealers-desktop-light.jpg), [lost leads, phone dark](screenshots/reports/report-lost-phone-dark.jpg), [follow-ups](screenshots/reports/report-follow-ups-desktop-light.jpg), [territories](screenshots/reports/report-territory-desktop-light.jpg), [complaints by status](screenshots/reports/report-complaints-desktop-light.jpg), [campaigns](screenshots/reports/report-campaigns-desktop-light.jpg), [a window too long](screenshots/reports/report-window-too-long-desktop-light.jpg). 🧪 👀
 - **RPT-003 · At a glance** on a lead, for those who see reports: quotations, orders and their value, received, complaints, visits, open tasks and the subsidy stage, each a dash when withheld; then the other leads on the same mobile ("same mobile", never "same customer"), each linked with its stage. Screens: [desktop](screenshots/reports/lead-360-desktop-light.jpg), [phone, dark](screenshots/reports/lead-360-phone-dark.jpg). 🧪 👀
+
+## Targets
+
+Sales → **Targets** (`/targets`), on the backend's contract (handover `targets-contract.md`, read against `api/services/targets.py`), PR #150. Walked through in the mock as a State Manager and a Field Officer, on a desktop in light mode and a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
+
+- **TGT-001 · The month's achievement:** the month in the URL, moved a month at a time, with This month to come back. "As of" and "Sales counted at" say what the figures used.
+  - **Your month:** order value, orders, leads won and visits, each achieved so far "of" its target with its share and a bar, or "No target set". A measure the role may not see is a dash, read out as "Not available to you".
+  - **Your team:** a card per person below you, with or without a target, and All together. A field officer sees only their own month; an administrator, who carries no targets, sees everyone.
+  - Screens: [team, desktop](screenshots/targets/targets-team-desktop-light.jpg), [team, phone dark](screenshots/targets/targets-team-phone-dark.jpg), [a field officer](screenshots/targets/targets-own-desktop-light.jpg). 🧪 👀
+- **TGT-002 · Set targets** (managers and administrators): the four measures as they stand, and the changes to them this month, newest first, with who made each.
+  - Only what changed is sent; an emptied measure is sent as 0, which clears it, and says so first. A count that isn't whole, or rupees with more than two decimal places, is named on its field.
+  - A past month warns first that only an administrator changes it, and the backend's refusal (`month_closed`) is shown; so are `not_your_team`, `user_inactive` and `no_targets`.
+  - Screens: [the dialog](screenshots/targets/targets-set-desktop-light.jpg), [saved](screenshots/targets/targets-saved-desktop-light.jpg), [a past month, phone dark](screenshots/targets/targets-past-month-phone-dark.jpg). 🧪 👀
 
 ## Not built yet
 

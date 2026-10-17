@@ -23,6 +23,7 @@ import { subsidyApplicationHandlers } from "./subsidy-applications";
 import { subsidyMasterHandlers } from "./subsidy-masters";
 import { subsidyReportHandlers } from "./subsidy-reports";
 import { subsidySchemeHandlers } from "./subsidy-schemes";
+import { targetHandlers } from "./targets";
 import { taskHandlers } from "./tasks";
 import { territoryHandlers } from "./territories";
 import { userHandlers } from "./users";
@@ -56,6 +57,7 @@ export const handlers: readonly HttpHandler[] = [
   ...notificationHandlers,
   ...messageHandlers,
   ...taskHandlers,
+  ...targetHandlers,
   ...complaintHandlers,
   ...userHandlers,
   ...partnerHandlers,

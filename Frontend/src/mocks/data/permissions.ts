@@ -69,6 +69,7 @@ function manager(scope: Scope): MockModulePermission[] {
         entry.module !== "partners" &&
         entry.module !== "targets",
     ),
+    // Managers see their team's targets and set them for the people below them.
     grant("targets", ["view", "create"], scope),
     // District and State Managers add and correct partners in their area (RBAC.md §6.1).
     grant("partners", ["view", "create", "edit"], scope),
