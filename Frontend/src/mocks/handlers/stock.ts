@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
-import type { OrderWire } from "@/features/orders/api/orders.schemas";
+import type { DispatchWire, OrderWire } from "@/features/orders/api/orders.schemas";
 import {
   MAX_AVAILABILITY_PRODUCTS,
   RECORDABLE_KINDS,
@@ -11,6 +11,7 @@ import {
 } from "@/features/stock/api/stock.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
+import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { mockStockId } from "@/mocks/data/stock";
@@ -358,3 +359,82 @@ export const stockHandlers = [
     return HttpResponse.json({ data: { movements: created } }, { status: 201 });
   }),
 ];
+
+type WarehouseRef = NonNullable<OrderWire["warehouse"]>;
+
+function refOf(warehouse: WarehouseWire): WarehouseRef {
+  return { id: warehouse.id, code: warehouse.code, name: warehouse.name };
+}
+
+/**
+ * DISP-003 · The warehouse an order names: null (the default) when none is sent. A dealer may
+ * not choose one, and a switched-off or unknown warehouse is refused, each on `warehouse_id`.
+ */
+export function warehouseChoice(
+  warehouseId: string | null | undefined,
+): WarehouseRef | null | Response {
+  if (warehouseId == null) return null;
+  if (isPartnerRole(readMockRole())) {
+    return invalid({ warehouse_id: "A dealer's order is served from the default warehouse." });
+  }
+  const warehouse = mockDb.warehouses.find((item) => item.id === warehouseId);
+  if (warehouse === undefined || !warehouse.is_active) {
+    return invalid({ warehouse_id: "Not an open warehouse." });
+  }
+  return refOf(warehouse);
+}
+
+/** DISP-003 · Where a dispatch left from: the one chosen, else the order's, else the default. */
+export function dispatchWarehouseFor(
+  order: OrderWire,
+  warehouseId: string | null | undefined,
+): WarehouseRef | null | Response {
+  const chosen = warehouseChoice(warehouseId);
+  if (chosen instanceof Response || chosen !== null) return chosen;
+  if (order.warehouse != null) return order.warehouse;
+  const fallback = defaultWarehouse();
+  return fallback === undefined ? null : refOf(fallback);
+}
+
+/** DISP-003 · Each open line's stock in the order's warehouse; null for those who may not see it. */
+export function orderStockFor(order: OrderWire): void {
+  const seesStock = can(mockPermissionsFor(readMockRole()), "stock", "view");
+  const warehouseId = orderWarehouseId(order);
+  order.lines = order.lines.map((line) => {
+    if (!seesStock || warehouseId === null || milli(line.qty_open) <= 0) {
+      return { ...line, stock: null };
+    }
+    const available = availableIn(warehouseId, line.product_id);
+    // Committed already counts this order, so it is short only when the warehouse is over-committed.
+    return { ...line, stock: { available: fromMilli(available), short: available < 0 } };
+  });
+}
+
+/** DISP-003 · A dispatch takes stock out of the warehouse it left from; voiding it puts it back. */
+export function recordDispatchStock(order: OrderWire, dispatch: DispatchWire, sign: 1 | -1): void {
+  const warehouse = dispatch.warehouse ?? null;
+  if (warehouse === null) return;
+  const now = new Date().toISOString();
+  for (const sent of dispatch.lines) {
+    const line = order.lines.find((item) => item.id === sent.order_line_id);
+    if (line === undefined) continue;
+    const product = mockDb.products.find((item) => item.id === line.product_id);
+    mockDb.stockMovements.unshift({
+      id: mockStockId(2, 5000 + mockDb.stockMovements.length),
+      warehouse,
+      product: {
+        id: line.product_id,
+        code: product?.item_code ?? null,
+        name: product?.description ?? line.description,
+      },
+      qty: fromMilli(-sign * milli(sent.qty)),
+      kind: sign === 1 ? "dispatch" : "dispatch_void",
+      reference: null,
+      note: null,
+      dispatch_no: dispatch.dispatch_no,
+      order: order.order_no,
+      created_by: { id: "usr-001", full_name: "Aarav Desai" },
+      created_at: now,
+    });
+  }
+}

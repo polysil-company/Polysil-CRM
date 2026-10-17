@@ -54,7 +54,8 @@ import {
   type DraftLine,
   type PricingContext,
 } from "@/features/quotations/lib/builder-lines";
-import { useIsStaff } from "@/features/session/hooks/use-session";
+import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
+import { LineAvailability, OrderToField } from "@/features/stock/components/order-stock";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toUserFacingError } from "@/lib/api/error-messages";
@@ -236,6 +237,11 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   // The place is fixed by the lead, or by the draft once saved.
   const placeFixed = source.mode === "edit" || source.lead !== null;
   const staff = useIsStaff();
+  const canSeeStock = useCan("stock", "view");
+  // DISP-003 · Staff pick "Order to" and see stock; a dealer's order comes from the default.
+  const showsStock = staff && canSeeStock;
+  const initialWarehouse = source.mode === "edit" ? (source.order.warehouse?.id ?? null) : null;
+  const [warehouseId, setWarehouseId] = useState<string | null>(initialWarehouse);
   const typeChoices: readonly BuildableType[] =
     source.mode === "create" && staff ? [...ORDERABLE_TYPES, "subsidised"] : ORDERABLE_TYPES;
   // SO-008 · A subsidised order typed in names its leads and subsidy; the lead it starts from
@@ -310,10 +316,13 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
           place_of_supply_territory_id: values.place?.id ?? "",
           ...common,
           lines,
+          ...(showsStock && warehouseId !== null ? { warehouse_id: warehouseId } : {}),
         };
         return create.mutateAsync({ body, idempotencyKey: idempotency.keyFor(body) });
       }
-      const headerChanged = JSON.stringify(values) !== JSON.stringify(initialHeader);
+      const warehouseChanged = showsStock && warehouseId !== initialWarehouse;
+      const headerChanged =
+        warehouseChanged || JSON.stringify(values) !== JSON.stringify(initialHeader);
       // Only a changed type is sent: an order from quotations, or a subsidised one, keeps its
       // own (422 order_type_fixed)
       const newType =
@@ -324,6 +333,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         ...newType,
         ...(fromQuotations ? {} : { party: partyFrom(values) }),
         ...common,
+        ...(warehouseChanged ? { warehouse_id: warehouseId } : {}),
         expected_status: "draft" as const,
       };
       const linesBody = { lines, expected_status: "draft" as const };
@@ -677,6 +687,13 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
                 >
                   {(aria) => <Textarea rows={2} {...aria} {...form.register("deliveryAddress")} />}
                 </TextField>
+                {showsStock ? (
+                  <OrderToField
+                    value={warehouseId}
+                    onValueChange={setWarehouseId}
+                    className="sm:col-span-2"
+                  />
+                ) : null}
                 <Controller
                   control={form.control}
                   name="paymentTerms"
@@ -757,6 +774,24 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <PricedSummary priced={priced} />
+            {showsStock ? (
+              <LineAvailability
+                warehouseId={warehouseId}
+                lines={priced.lines.flatMap((line) =>
+                  line.product === null || line.qty.trim() === ""
+                    ? []
+                    : [
+                        {
+                          key: line.key,
+                          productId: line.product.id,
+                          name: line.product.description,
+                          qty: line.qty.trim(),
+                          uom: line.product.uom,
+                        },
+                      ],
+                )}
+              />
+            ) : null}
             <div className="flex flex-col gap-2 border-t border-border pt-4">
               <Button
                 type="submit"
