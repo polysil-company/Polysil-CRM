@@ -7,7 +7,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-85 changes, newest first. Each title opens its entry.
+86 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
@@ -15,6 +15,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-10-17 | [Marketing material: order from the catalogue with both shares, approve and send, and keep the catalogue](changelog/entries/2026-10-17--feature--MKT-002--marketing-material.md) | `feature` | `MKT-002` `MKT-003` `MKT-004` |
 | 2026-10-17 | [Campaigns: the list and a campaign's summary for Marketing, and a campaign on leads and QR codes](changelog/entries/2026-10-17--feature--MKT-005--campaigns.md) | `feature` | `MKT-005` `MKT-006` |
 | 2026-10-17 | [Import polish: the template, upload errors on their fields, and Import from Excel beside New price list](changelog/entries/2026-10-17--feature--MSTR-013--import-polish.md) | `feature` | `MSTR-013` `MSTR-007` |
+| 2026-10-17 | [Stock: what each warehouse holds, the ledger, recording stock, and the warehouses](changelog/entries/2026-10-17--feature--MSTR-014--stock.md) | `feature` | `MSTR-014` `MSTR-015` `MSTR-016` |
 | 2026-10-17 | [Reward points: balances, gifts and the gift desk, earning rules and point value, and points on a dealer's order](changelog/entries/2026-10-17--feature--RWD-001--reward-points.md) | `feature` | `RWD-001` `RWD-002` `RWD-003` `RWD-004` |
 | 2026-10-17 | [Scheme benefits on an order: the preview on a draft, the benefits and To pay after submit](changelog/entries/2026-10-17--feature--SCHM-005--order-scheme-benefits.md) | `feature` | `SCHM-005` |
 | 2026-10-17 | [Dealer commission and TOD: stage 18 on the application, Accounts' approvals and payments, and the rates](changelog/entries/2026-10-17--feature--SUBS-016--dealer-commission.md) | `feature` | `SUBS-016` `SUBS-017` `SUBS-018` |
@@ -348,6 +349,73 @@ Nothing else had a screen. A QR code carried only a free-text "Campaign".
 
 - `src/features/imports/api/imports.test.ts`, `[MSTR-013]`: the template under its own name, and refused without permission; an unknown sheet, a far header row and a header-only file each refused on their own field.
 - `src/features/products/components/products-ui.test.tsx`, `[MSTR-013]`: **Import from Excel** beside **New price list** lands on the draft with `?import=rates`; the import opens on arrival, the template downloads, a header-only file is named under the picker, and closing says the draft is kept.
+
+### Stock: what each warehouse holds, the ledger, recording stock, and the warehouses
+
+`feature` · `MSTR-014` `MSTR-015` `MSTR-016` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--MSTR-014--stock.md)
+
+#### Before
+
+The backend keeps stock by warehouse (handover `stock-contract.md`):
+
+- receipts and corrections;
+- dispatches taking stock out;
+- what open orders have committed;
+- the default warehouse.
+
+None of it had a screen.
+
+#### Now
+
+- **Operations → Stock** (`/stock`), for every staff role (`stock.view`); dealers get none. The tab is in the URL.
+- **Stock (MSTR-014):** each product in each warehouse, with on hand, committed and available.
+  - Committed is what submitted, approved and partly dispatched orders still owe.
+  - A negative available reads "Short by …" in red.
+  - Filters: warehouse, product, and **Short only**.
+  - On a phone the table scrolls sideways and takes keyboard focus.
+- **Ledger (MSTR-014):** every movement, newest first: received, correction, dispatched or dispatch undone. Each shows its product, warehouse, reference, dispatch and order, who recorded it, and a signed quantity, with minus in red.
+- **Record stock (MSTR-015, `stock.create`: Dispatch and Admin):**
+  - the warehouse (the default first), **Stock received** or **A correction**, a reference ("Opening" for an opening balance), a note, and a quantity per product;
+  - received must be more than 0, and a correction is not 0 (a minus takes stock off);
+  - the backend's refusals are in words: below zero (`negative_stock`), a switched-off warehouse or product, and a quantity with decimals on a whole-unit product, which is marked on its line.
+- **Warehouses (MSTR-016, `stock.edit`: Admin):** add a warehouse, change its code or name, **Make default**, and switch it off or on.
+  - A taken code is refused on its field.
+  - The default can't be switched off until another is the default (`default_warehouse`).
+  - The first warehouse added is the default.
+- Every list has its loading skeleton, empty state and error with retry.
+- Walked through in the mock, with axe finding nothing:
+  - Dispatch on a desktop in light mode;
+  - Admin on Warehouses;
+  - a field officer on a phone in dark mode.
+
+#### Discussion
+
+- **A new permission module, `stock`,** as the backend checks it:
+  - every staff role views;
+  - Dispatch and Admin create;
+  - Admin edits.
+- **The order side is item 28b,** in its own pull request: "Order to", availability per line, the order's warehouse and the dispatch's. The order contract gains `warehouse` now, so the mock can count what each warehouse has committed.
+- Built to the backend's contract and checked against the mock only; not yet checked on staging.
+
+#### Files changed
+
+- `src/features/stock/` — the contract, API, queries, mutations, labels, the page, the stock list, the ledger, the record form, warehouses, the warehouse select, and tests.
+- `src/app/(app)/stock/page.tsx` — the route.
+- `src/components/layout/navigation.ts` — Stock in Operations.
+- `src/lib/auth/permissions.ts` — the `stock` module.
+- `src/features/orders/api/orders.schemas.ts` — `warehouse` on an order (DISP-003).
+- `src/mocks/` — three warehouses, opening balances and two movements, all seven stock endpoints, and the grants.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — MSTR-014…016 and DISP-003.
+
+#### Tests
+
+- `src/features/stock/components/stock.test.tsx` — 9 tests:
+  - contract: `[MSTR-014] Stock`, `[MSTR-015] Recording stock`, `[MSTR-016] Warehouses`;
+  - labels: `[MSTR-014] Stock labels`;
+  - screens: `[MSTR-014] StockPage`.
+- By hand:
+  1. As Dispatch, open Operations → Stock, tick Short only, and record stock received.
+  2. As Admin, open Warehouses and make Rajkot the default.
 
 ### Reward points: balances, gifts and the gift desk, earning rules and point value, and points on a dealer's order
 
