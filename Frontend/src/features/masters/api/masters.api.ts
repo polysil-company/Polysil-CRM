@@ -16,6 +16,12 @@ import {
   type OfficePatchRequest,
   type ScoringItem,
   type ScoringPatchRequest,
+  territoryListSchema,
+  territoryResponseSchema,
+  type Territory,
+  type TerritoryCreateRequest,
+  type TerritoryListParams,
+  type TerritoryPatchRequest,
 } from "./masters.schemas";
 
 const log = createLogger({ file: "features/masters/api/masters.api.ts", dataId: "MSTR-009" });
@@ -138,5 +144,59 @@ export function setOfficeOpen(officeId: string, open: boolean): Promise<Office> 
     method: "POST",
     path: `${officePath(officeId)}/${open ? "reopen" : "close"}`,
     schema: officeResponseSchema,
+  });
+}
+
+/** Territories per page. */
+export const TERRITORY_PAGE_SIZE = 50;
+
+/** MSTR-012 · GET /territories: the tree for administration, newest first, filtered. */
+export function listTerritories(
+  params: TerritoryListParams,
+  signal?: AbortSignal,
+): Promise<CursorPage<Territory>> {
+  return apiRequest({
+    dataId: "MSTR-012",
+    logger: log,
+    fn: "listTerritories",
+    path: "/territories",
+    query: {
+      level: params.level ?? undefined,
+      parent_id: params.parentId ?? undefined,
+      q: params.q.trim() === "" ? undefined : params.q.trim(),
+      limit: TERRITORY_PAGE_SIZE,
+      cursor: params.cursor ?? undefined,
+    },
+    schema: territoryListSchema,
+    signal,
+  });
+}
+
+/** MSTR-012 · POST /territories: names unique among siblings, codes unique per level. */
+export function createTerritory(body: TerritoryCreateRequest): Promise<Territory> {
+  return apiRequest({
+    dataId: "MSTR-012",
+    logger: log,
+    fn: "createTerritory",
+    method: "POST",
+    path: "/territories",
+    body,
+    schema: territoryResponseSchema,
+  });
+}
+
+/** MSTR-012 · PATCH /territories/{id}: rename or set the code. */
+export function patchTerritory(
+  territoryId: string,
+  body: TerritoryPatchRequest,
+): Promise<Territory> {
+  return apiRequest({
+    dataId: "MSTR-012",
+    logger: log,
+    fn: "patchTerritory",
+    method: "PATCH",
+    path: `/territories/${encodeURIComponent(territoryId)}`,
+    body,
+    schema: territoryResponseSchema,
   });
 }

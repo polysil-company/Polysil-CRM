@@ -40,6 +40,7 @@ import { generateQuotations } from "./data/quotations";
 import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
 import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
+import type { MockAdminTerritory } from "./data/territories";
 import { seedOffices, seedUsers, type MockUserRecord } from "./data/users";
 
 export interface MockDb {
@@ -130,6 +131,8 @@ export interface MockDb {
   subsidyApplications: ApplicationWire[] | null;
   /** CHNL-007 · Dealer applications, seeded on first use (`handlers/dealer-applications.ts`). */
   dealerApplications: MockDealerApplication[] | null;
+  /** MSTR-012 · The territory tree as Masters edits it, copied from the seed on first use. */
+  territories: MockAdminTerritory[] | null;
   /** Each application's stage history, oldest first (SUBS-006). */
   subsidyEntries: Map<string, StageEntryWire[]>;
   /** Each application's calculation as stored at create (SUBS-006). */
@@ -236,6 +239,7 @@ function createMockDb(): MockDb {
     enquiriesToday: new Map(),
     subsidyApplications: null,
     dealerApplications: null,
+    territories: null,
     subsidyEntries: new Map(),
     subsidyCalculations: new Map(),
     subsidyDocuments: new Map(),
