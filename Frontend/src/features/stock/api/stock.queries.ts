@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 
-import { listMovements, listStock, listWarehouses } from "./stock.api";
+import { getAvailability, listMovements, listStock, listWarehouses } from "./stock.api";
 import type { MovementListParams, StockListParams } from "./stock.schemas";
 
 /**
@@ -50,5 +50,15 @@ export function movementsQueryOptions(params: MovementListParams) {
     getNextPageParam: (page) => page.nextCursor,
     placeholderData: keepPreviousData,
     meta: { dataId: "MSTR-014" },
+  });
+}
+
+/** DISP-003 · Availability for an order's products in its warehouse. */
+export function availabilityQueryOptions(warehouseId: string, productIds: readonly string[]) {
+  return queryOptions({
+    queryKey: stockKeys.availability(warehouseId, productIds),
+    queryFn: ({ signal }) => getAvailability(warehouseId, productIds, signal),
+    placeholderData: keepPreviousData,
+    meta: { dataId: "DISP-003" },
   });
 }

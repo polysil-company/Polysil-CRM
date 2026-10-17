@@ -254,6 +254,14 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
                     Recorded, not checked: there is no credit check.
                   </span>
                 </DetailItem>
+                {order.warehouse === null ? null : (
+                  <DetailItem label="Order to">
+                    {order.warehouse.name}
+                    <span className="block text-xs text-muted-foreground">
+                      The warehouse it ships from.
+                    </span>
+                  </DetailItem>
+                )}
                 <DetailItem label="Place of supply">
                   {order.placeOfSupply.name}
                   <span className="block text-xs text-muted-foreground">
@@ -544,6 +552,7 @@ function LineTable({
                   HSN {line.hsnCode} · {line.uom}
                   {line.provisionalFields.length > 0 ? " · indicative" : ""}
                 </span>
+                <LineStock line={line} />
               </th>
               <td className={numCell}>{qty(line, line.qty)}</td>
               {shipping ? (
@@ -581,6 +590,26 @@ function LineTable({
   );
 }
 
+/**
+ * DISP-003 · An open line's stock in the order's warehouse: what is available, in amber when
+ * the warehouse is over-committed. Nothing once the line has shipped, or without stock access.
+ */
+function LineStock({ line }: { line: OrderLine }): React.JSX.Element | null {
+  if (line.stock === null) return null;
+  return (
+    <span
+      className={cn(
+        "block text-xs tabular-nums",
+        line.stock.short ? "font-medium text-warning" : "text-muted-foreground",
+      )}
+    >
+      {line.stock.short
+        ? `Warehouse short: ${qty(line, line.stock.available)} ${line.uom} available`
+        : `${qty(line, line.stock.available)} ${line.uom} available`}
+    </span>
+  );
+}
+
 /** Phones: one card per line, the same figures in reading order. */
 function LineCards({
   lines,
@@ -603,6 +632,7 @@ function LineCards({
               HSN {line.hsnCode}
               {line.provisionalFields.length > 0 ? " · indicative" : ""}
             </span>
+            <LineStock line={line} />
           </div>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
             <dt className="text-muted-foreground">Qty × rate</dt>

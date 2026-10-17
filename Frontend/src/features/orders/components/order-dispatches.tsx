@@ -134,6 +134,9 @@ function DispatchItem({
           )}
         </DispatchField>
         <DispatchField label="Transporter">{dispatch.transporter ?? EMPTY_VALUE}</DispatchField>
+        {dispatch.warehouse === null ? null : (
+          <DispatchField label="Left from">{dispatch.warehouse.name}</DispatchField>
+        )}
         <DispatchField label="Vehicle">
           <span className="font-mono">{dispatch.vehicleNo ?? EMPTY_VALUE}</span>
         </DispatchField>
