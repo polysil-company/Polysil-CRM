@@ -137,6 +137,7 @@ const OTHER_KIND_LABELS: Readonly<Record<string, string>> = {
   "order.returned": "Sales order returned for changes",
   "order.cancelled": "Sales order cancelled",
   "order.closed_short": "Sales order closed short",
+  "order.amended": "Sales order amended, back to draft",
   "order.confirmed": "Customer told of the sales order",
   "order.deleted": "Draft sales order deleted",
   "dispatch.recorded": "Dispatch recorded",

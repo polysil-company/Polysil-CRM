@@ -10,6 +10,7 @@ import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 
 import {
+  amendOrder,
   cancelOrder,
   closeOrderShort,
   createDispatch,
@@ -349,6 +350,72 @@ describe("[SO-004] submitOrder and the approval chain", () => {
         }),
       ),
     ).resolves.toEqual({ status: 409, code: "order_dispatched" });
+  });
+});
+
+describe("[SO-007] amendOrder", () => {
+  afterEach(reset);
+
+  function approvedUnshipped(): string {
+    const order = mockDb.orders.find(
+      (item) =>
+        item.status === "approved" &&
+        item.dispatches.length === 0 &&
+        item.order_type !== "replacement",
+    );
+    if (order === undefined) throw new Error("No approved, unshipped order in the mock");
+    return order.id;
+  }
+
+  it("takes an approved order back to draft under its number, keeping what it was approved at", async () => {
+    as("admin");
+    const id = approvedUnshipped();
+    const before = await getOrder(id);
+    const amended = await amendOrder(id, {
+      body: { remark: "Farmer wants 20 more laterals", expected_status: "approved" },
+      idempotencyKey: key(),
+    });
+    expect(amended).toMatchObject({
+      status: "draft",
+      orderNo: before.orderNo,
+      approvedAt: null,
+      pdfState: "none",
+      amendCount: 1,
+      amendedFromTotal: before.totals.total,
+      amendReason: "Farmer wants 20 more laterals",
+    });
+    const history = await getOrderTimeline({ orderId: id, cursor: null });
+    expect(history.items.map((event) => event.kind)).toContain("order.amended");
+  });
+
+  it("refuses once something has shipped, a stale status, and a partner user", async () => {
+    as("admin");
+    await expect(
+      refusal(
+        amendOrder(seeded("partially_dispatched"), {
+          body: { remark: "More", expected_status: "partially_dispatched" },
+          idempotencyKey: key(),
+        }),
+      ),
+    ).resolves.toEqual({ status: 409, code: "order_dispatched" });
+    const id = approvedUnshipped();
+    await expect(
+      refusal(
+        amendOrder(id, {
+          body: { remark: "More", expected_status: "draft" },
+          idempotencyKey: key(),
+        }),
+      ),
+    ).resolves.toEqual({ status: 409, code: "status_changed" });
+    as("dealer");
+    await expect(
+      refusal(
+        amendOrder(id, {
+          body: { remark: "More", expected_status: "approved" },
+          idempotencyKey: key(),
+        }),
+      ),
+    ).resolves.toEqual({ status: 403, code: "forbidden" });
   });
 });
 

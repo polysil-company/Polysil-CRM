@@ -240,6 +240,26 @@ export function cancelOrder(
   });
 }
 
+/**
+ * SO-007 · POST /orders/{id}/amend — an approved order back to draft under its number, with a
+ * reason. Refused once anything ships or is paid (409), and for a replacement order (422).
+ */
+export function amendOrder(
+  orderId: string,
+  { body, idempotencyKey }: WriteInput<RemarkRequest>,
+): Promise<Order> {
+  return apiRequest({
+    dataId: "SO-007",
+    logger: log,
+    fn: "amendOrder",
+    method: "POST",
+    path: `/orders/${encodeURIComponent(orderId)}/amend`,
+    body,
+    idempotencyKey,
+    schema: orderResponseSchema,
+  });
+}
+
 /** DISP-002 · POST /orders/{id}/dispatches — 201 with the dispatch. */
 export function createDispatch(
   orderId: string,

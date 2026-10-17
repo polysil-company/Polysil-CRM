@@ -367,6 +367,12 @@ export const orderWireSchema = z.object({
   cancel_remark: z.string().nullable(),
   closed_at: isoDateTime.nullable(),
   close_remark: z.string().nullable(),
+  /** FS-036: how many times the order was taken back to draft after approval. */
+  amend_count: z.number().int().nonnegative().default(0),
+  /** The approved total the last amend started from; null when never amended. */
+  amended_from_total: z.string().nullish(),
+  /** Why it was last amended; staff only, so a partner reads null. */
+  amend_reason: z.string().nullish(),
   created_at: isoDateTime,
 });
 
@@ -425,6 +431,9 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
   cancelRemark: wire.cancel_remark,
   closedAt: wire.closed_at,
   closeRemark: wire.close_remark,
+  amendCount: wire.amend_count,
+  amendedFromTotal: wire.amended_from_total ?? null,
+  amendReason: wire.amend_reason ?? null,
   createdAt: wire.created_at,
 }));
 
@@ -497,7 +506,7 @@ export interface ExpectedStatusRequest {
   readonly expected_status: OrderStatus;
 }
 
-/** POST /orders/{id}/cancel, /close-short and /dispatches/{id}/void: a reason is required. */
+/** POST /orders/{id}/cancel, /close-short, /amend and /dispatches/{id}/void: a reason is required. */
 export interface RemarkRequest {
   readonly remark: string;
   readonly expected_status: OrderStatus;

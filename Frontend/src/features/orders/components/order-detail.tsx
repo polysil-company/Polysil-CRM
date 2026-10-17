@@ -345,6 +345,28 @@ function OrderNotices({ order }: { order: Order }): React.JSX.Element | null {
       </Notice>,
     );
   }
+  // SO-007: amended back to draft, until it is approved again.
+  if (order.amendCount > 0 && (order.status === "draft" || order.status === "submitted")) {
+    notices.push(
+      <Notice key="amended" tone="info">
+        <p className="font-medium">
+          Amended after approval
+          {order.amendCount > 1 ? ` (${String(order.amendCount)} times)` : null}
+          {order.amendedFromTotal === null
+            ? null
+            : ` · it was approved at ${formatInr(order.amendedFromTotal, { paise: true })}`}
+        </p>
+        {order.amendReason === null ? null : (
+          <p className="whitespace-pre-line text-muted-foreground">{order.amendReason}</p>
+        )}
+        <p className="text-muted-foreground">
+          {order.status === "draft"
+            ? "Make the changes, then submit it for approval again. The PDF returns once it is approved."
+            : "It waits for approval again. The PDF returns once it is approved."}
+        </p>
+      </Notice>,
+    );
+  }
   if (order.status === "cancelled") {
     notices.push(
       <Notice key="cancelled" tone="danger">

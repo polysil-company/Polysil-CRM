@@ -299,3 +299,97 @@ describe("[DISP-002] Record a dispatch from the queue's link", () => {
     expect(screen.queryByRole("dialog", { name: "Record a dispatch" })).not.toBeInTheDocument();
   });
 });
+
+describe("[SO-007] Amend an approved order", () => {
+  afterEach(reset);
+
+  function approvedUnshipped(): { id: string; total: string } {
+    const order = mockDb.orders.find(
+      (item) =>
+        item.status === "approved" &&
+        item.dispatches.length === 0 &&
+        item.order_type !== "replacement",
+    );
+    if (order === undefined) throw new Error("No approved, unshipped order in the mock");
+    return { id: order.id, total: order.totals.total };
+  }
+
+  it("asks why, takes the order back to draft, and says what it was approved at", async () => {
+    signInAs("admin");
+    const { id } = approvedUnshipped();
+    const user = showOrder(id);
+
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Amend order…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Amend this approved order?" });
+    expect(
+      within(dialog).getByText(/goes back to draft under the same number/),
+    ).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Amend order" }));
+    expect(
+      within(dialog).getByRole("textbox", { name: "What needs to change, and why?" }),
+    ).toHaveAttribute("aria-invalid", "true");
+    await user.type(
+      within(dialog).getByRole("textbox", { name: "What needs to change, and why?" }),
+      "Farmer wants 20 more laterals",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Amend order" }));
+
+    expect(await screen.findByText(/is a draft again$/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/^Amended after approval · it was approved at ₹/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Farmer wants 20 more laterals")).toBeInTheDocument();
+    // The chain that approved it before is kept, and named as such.
+    expect(
+      await screen.findByRole("heading", { name: "Approval before the amend" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Submit for approval" })).toBeInTheDocument();
+    expect(mockDb.orders.find((item) => item.id === id)).toMatchObject({
+      status: "draft",
+      amend_count: 1,
+    });
+  });
+
+  it("says why when a voided dispatch still holds the lines", async () => {
+    signInAs("admin");
+    const { id } = approvedUnshipped();
+    server.use(
+      http.post(buildApiUrl("/orders/:orderId/amend"), () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: "voided_dispatch_holds_lines",
+              message: "A voided dispatch still names this order's lines.",
+            },
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    const user = showOrder(id);
+
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Amend order…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Amend this approved order?" });
+    await user.type(within(dialog).getByRole("textbox"), "More laterals");
+    await user.click(within(dialog).getByRole("button", { name: "Amend order" }));
+
+    expect(await within(dialog).findByText("This order had a dispatch voided")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Its items can't change now. Cancel it and create a new one."),
+    ).toBeInTheDocument();
+  });
+
+  it("isn't offered to a dealer", async () => {
+    signInAs("dealer");
+    const { id } = approvedUnshipped();
+    showOrder(id);
+
+    // An approved order offers its PDF to anyone who can see it: the page has loaded.
+    await screen.findByRole("button", { name: "Open PDF" });
+    // A dealer has nothing in the "more" menu of an approved order, so it isn't drawn at all.
+    expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+  });
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ import { useCancelTask, useCompleteTask } from "@/features/tasks/api/tasks.mutat
 import { TASK_TEXT_MAX, type Task } from "@/features/tasks/api/tasks.schemas";
 import { taskRefusal, taskSubjectLabel } from "@/features/tasks/lib/task-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { formatDateTime } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
@@ -34,9 +35,6 @@ const log = createLogger({
   file: "features/tasks/components/task-action-dialog.tsx",
   dataId: "TASK-005",
 });
-
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
 
 export type TaskActionKind = "complete" | "cancel";
 
@@ -111,12 +109,7 @@ function ActionForm({
     mode: "onTouched",
   });
   const { errors } = useFormState({ control: form.control });
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
+  const closeSoon = useCloseAfterSuccess(onClose);
 
   const completing = kind === "complete";
   const meeting = task.type === "meeting";
@@ -145,7 +138,7 @@ function ActionForm({
     onSuccess: () => {
       idempotency.reset();
       toast.success(completing ? "Marked done" : "Task cancelled", { description: task.title });
-      timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
+      closeSoon();
     },
     onError: (error) => {
       const view = taskRefusal(error);

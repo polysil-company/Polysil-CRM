@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ import { stageChangeError } from "@/features/leads/lib/lead-lifecycle";
 import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import { LookupSelect } from "@/features/lookups/components/lookup-select";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { readFieldErrors } from "@/lib/api/errors";
 import { createLogger } from "@/lib/logger";
@@ -40,9 +41,6 @@ const log = createLogger({
   file: "features/leads/components/lead-stage-dialog.tsx",
   dataId: "LEAD-007",
 });
-
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
 
 /** The stage changes that ask before acting: they close or reopen the lead. */
 export type StageDialogKind = "won" | "lost" | "reopen";
@@ -81,19 +79,6 @@ export function LeadStageDialog({ lead, kind, onClose }: LeadStageDialogProps): 
 interface FormProps {
   lead: Lead;
   onClose: () => void;
-}
-
-/** Closes the dialog a moment after success, and never after the dialog is gone. */
-function useCloseAfterSuccess(onClose: () => void): () => void {
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
-  return () => {
-    timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
-  };
 }
 
 /** A refusal: stale ones close the dialog with a toast, the rest show inside it. */
