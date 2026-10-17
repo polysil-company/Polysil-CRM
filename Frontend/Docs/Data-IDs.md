@@ -211,6 +211,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SCHM-002 | Create and change a scheme (`POST /schemes`, `PATCH /schemes/{id}`) | shared | in-progress |
 | SCHM-003 | A period scheme's standing (`GET /schemes/{id}/standing`) | shared | in-progress |
 | SCHM-004 | Scheme credits (`GET /scheme-entitlements`) | shared | in-progress |
+| SCHM-005 | Scheme benefits on an order: the preview on a draft, the benefits and To pay after submit (`GET /orders/{id}/schemes`, `benefits` and `payable` on `GET /orders/{id}`) | shared | in-progress |
 | MSTR-001 | Masters — the Admin → Masters area: lists, lead scoring and offices (`/masters`) | shared | in-progress |
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |

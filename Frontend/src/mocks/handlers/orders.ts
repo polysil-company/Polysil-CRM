@@ -21,6 +21,11 @@ import { readMockRole } from "@/lib/dev/mock-settings";
 import { calendarDayOf } from "@/lib/format";
 import { orderQueueStep, type MockApprovalStep } from "@/mocks/data/approvals";
 import {
+  applyOrderBenefits,
+  previewOrderSchemes,
+  reverseOrderBenefits,
+} from "@/mocks/data/order-schemes";
+import {
   applyDispatch,
   chainFor,
   chainSteps,
@@ -364,6 +369,7 @@ export function decideOrderStep(
 
   if (decision === "reject") {
     order.status = "draft";
+    reverseOrderBenefits(order, mockDb.entitlements);
     order.approval = { ...order.approval, status: "rejected" };
     order.last_rejection = { remark: remark ?? "", role: decided?.role ?? "", at: decidedAt };
     recordOrderEvent(order, "order.returned", { remark });
@@ -783,6 +789,21 @@ export const orderHandlers = [
     return order === undefined
       ? errorResponse(404, "not_found", "No such order.")
       : HttpResponse.json({ data: settle(order) });
+  }),
+
+  // SCHM-005 · the scheme panel on a draft: nothing is stored by reading it.
+  http.get(buildApiUrl("/orders/:orderId/schemes"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const order = findOrder(String(params.orderId));
+    if (order === undefined) return errorResponse(404, "not_found", "No such order.");
+    if (order.status !== "draft") {
+      return errorResponse(409, "order_not_draft", "Read the benefits on the order instead.");
+    }
+    return HttpResponse.json({
+      data: previewOrderSchemes(order, mockDb.schemes, mockDb.entitlements),
+    });
   }),
 
   http.get(buildApiUrl("/orders/:orderId/pdf"), async ({ params }) => {
@@ -1212,6 +1233,13 @@ export const orderHandlers = [
       return errorResponse(422, "zero_total", "The order's total is zero.");
     }
     order.order_no ??= orderNumber(nextSerial());
+    // SCHM-005 · submit stores what the preview showed, numbered with the order.
+    applyOrderBenefits(
+      order,
+      previewOrderSchemes(order, mockDb.schemes, mockDb.entitlements),
+      mockDb.entitlements,
+      (index) => mockUuid(MOCK_ID_SPACE.orderBenefit, mockDb.orders.indexOf(order) * 100 + index),
+    );
     order.status = "submitted";
     order.submitted_at = new Date().toISOString();
     order.approval = {
@@ -1267,6 +1295,7 @@ export const orderHandlers = [
     order.status = "cancelled";
     order.cancelled_at = new Date().toISOString();
     order.cancel_remark = parsed.data.remark;
+    reverseOrderBenefits(order, mockDb.entitlements);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.cancelled", { remark: parsed.data.remark });
     return HttpResponse.json({ data: order });
@@ -1317,6 +1346,7 @@ export const orderHandlers = [
     order.amended_from_total = order.totals.total;
     order.amend_reason = parsed.data.remark;
     order.status = "draft";
+    reverseOrderBenefits(order, mockDb.entitlements);
     order.approved_at = null;
     order.pdf_state = "none";
     order.pdf_error = null;

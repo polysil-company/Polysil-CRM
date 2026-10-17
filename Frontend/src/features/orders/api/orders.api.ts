@@ -14,6 +14,7 @@ import {
   noContentSchema,
   orderPageSchema,
   orderResponseSchema,
+  orderSchemePreviewSchema,
   orderStatsSchema,
   type CreateDispatchRequest,
   type CreateDirectOrder,
@@ -23,6 +24,7 @@ import {
   type Order,
   type OrderListParams,
   type OrderPage,
+  type OrderSchemePreview,
   type OrderStats,
   type PatchOrderRequest,
   type RemarkRequest,
@@ -89,6 +91,24 @@ export function getOrder(orderId: string, signal?: AbortSignal): Promise<Order> 
     fn: "getOrder",
     path: `/orders/${encodeURIComponent(orderId)}`,
     schema: orderResponseSchema,
+    signal,
+  });
+}
+
+/**
+ * SCHM-005 · GET /orders/{id}/schemes — the scheme panel on a draft: what submit would take off
+ * and what delivery would earn. `409 order_not_draft` once submitted: read `benefits` instead.
+ */
+export function getOrderSchemes(
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<OrderSchemePreview> {
+  return apiRequest({
+    dataId: "SCHM-005",
+    logger: log,
+    fn: "getOrderSchemes",
+    path: `/orders/${encodeURIComponent(orderId)}/schemes`,
+    schema: orderSchemePreviewSchema,
     signal,
   });
 }
