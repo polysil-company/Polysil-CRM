@@ -773,9 +773,34 @@ export const DATA_IDS = {
   },
   "SCHM-001": {
     domain: "SCHM",
-    title: "Schemes — set by Admin, visible to everyone",
+    title: "Schemes — the list and a scheme, for staff and the dealers they're aimed at",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
+    endpoints: ["GET /schemes", "GET /schemes/{id}"],
+    notes: "A partner user sees only the active schemes aimed at it, and never partner targets.",
+  },
+  "SCHM-002": {
+    domain: "SCHM",
+    title: "Create and change a scheme",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /schemes", "PATCH /schemes/{id}"],
+    notes:
+      "Once a scheme has given a benefit, only its end date (earlier) and the active switch change: 409 scheme_in_use.",
+  },
+  "SCHM-003": {
+    domain: "SCHM",
+    title: "A period scheme's standing — progress against the target this month or quarter",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /schemes/{id}/standing"],
+  },
+  "SCHM-004": {
+    domain: "SCHM",
+    title: "Scheme credits — earned now, used on a later order",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /scheme-entitlements"],
   },
   "MSTR-001": {
     domain: "MSTR",

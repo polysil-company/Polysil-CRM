@@ -218,9 +218,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "schemes",
         label: "Schemes",
+        description: "Discounts, points and credits for dealers, and the credits earned.",
         icon: DiscountTag01Icon,
         module: "schemes",
         dataId: "SCHM-001",
+        href: "/schemes",
       },
     ],
   },

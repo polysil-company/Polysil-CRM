@@ -91,6 +91,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-026** · Show a list row's sort order, quality and kind: return them on `LookupItem` · MSTR-009 · low
 
+**Schemes** — added as the schemes are built (SCHM-001…004).
+
+- [ ] **BE-027** · Name a scheme's targets, and list product categories with their ids · SCHM-001, SCHM-002 · normal
+
 ---
 
 ## Details
@@ -521,3 +525,21 @@ in the same shape. Never renumber or reuse a number.
   for them only when adding a row.
 - **Done when:** the three fields come back on every list row. The frontend will show them and
   offer to change sort order and quality in place.
+### BE-027 · Name a scheme's targets, and list product categories with their ids
+
+- **Status:** ⬜ Open
+- **Asked:** 16 Oct 2026 · SCHM-001, SCHM-002
+- **What:**
+  - Each entry of a scheme's `targets` gains `name`: the territory's, partner's, product's or
+    category's name (for `partner_type`, the type itself is enough).
+  - `GET /lookups/product-categories` (BE-024) answers each category's `id` beside its code,
+    since a `product_category` target takes the id.
+- **Why:** a scheme answers its targets as `{ type, id }` only. The frontend reads each name from
+  its own record (`GET /territories/{id}`, `/partners/{id}`, `/products/{id}`): one call per target,
+  and each needs access to that record. Someone who may view schemes but not masters sees "Territory
+  1a2b…" instead of "Rajkot". No endpoint lists category ids, so the scheme form can't offer a
+  product category at all.
+- **Done when:** targets come with their names, and the categories come with their ids. The
+  frontend then drops the per-target calls and offers categories in the form.
+- **Done in:** —
+- **Backend notes:** —
