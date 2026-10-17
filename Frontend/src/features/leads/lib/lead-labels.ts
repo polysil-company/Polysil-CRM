@@ -55,6 +55,7 @@ export const LEAD_INQUIRY_TYPE_LABELS: Readonly<Record<LeadInquiryType, string>>
   commercial: "Commercial",
   subsidised: "Subsidised",
   industrial: "Industrial",
+  dealership: "Dealership",
 };
 
 export const LEAD_PRIORITY_LABELS: Readonly<Record<LeadPriority, string>> = {

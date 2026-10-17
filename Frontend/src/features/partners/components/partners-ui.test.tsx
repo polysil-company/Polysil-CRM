@@ -262,3 +262,99 @@ describe("[CHNL-004] PartnerDetail", () => {
     expect(within(page).queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
   });
 });
+
+describe("[CHNL-006] GSTIN details on the partner form", () => {
+  beforeEach(reset);
+  afterEach(reset);
+
+  it("shows the GST record for a GSTIN it finds, and fills the names, PAN and address on request", async () => {
+    signInAs("admin");
+    const user = show(<NewPartner parentId={null} />);
+    const form = await screen.findByRole("form", { name: "New partner" });
+    await user.type(
+      within(form).getByRole("textbox", { name: "GSTIN (optional)" }),
+      "24aaacp1234f1z5",
+    );
+
+    expect(
+      await within(form).findByText("Patel Agro Irrigation Private Limited"),
+    ).toBeInTheDocument();
+    expect(within(form).getByText("Active")).toBeInTheDocument();
+    expect(within(form).getByRole("textbox", { name: "Business name" })).toHaveValue("");
+
+    await user.click(within(form).getByRole("button", { name: "Use these details" }));
+
+    expect(within(form).getByRole("textbox", { name: "Business name" })).toHaveValue("Patel Agro");
+    expect(within(form).getByRole("textbox", { name: "PAN (optional)" })).toHaveValue("AAACP1234F");
+    expect(within(form).getByRole("textbox", { name: "Address (optional)" })).toHaveValue(
+      "Plot 14, GIDC Estate, Anand, Gujarat 388001",
+    );
+    // Still the officer's to change.
+    await user.clear(within(form).getByRole("textbox", { name: "Business name" }));
+    await user.type(
+      within(form).getByRole("textbox", { name: "Business name" }),
+      "Patel Agro Anand",
+    );
+    expect(within(form).getByRole("textbox", { name: "Business name" })).toHaveValue(
+      "Patel Agro Anand",
+    );
+  });
+
+  it("asks for the names by hand while GST details can't be fetched, or no record is found", async () => {
+    signInAs("admin");
+    const user = show(<NewPartner parentId={null} />);
+    const form = await screen.findByRole("form", { name: "New partner" });
+    const gstin = within(form).getByRole("textbox", { name: "GSTIN (optional)" });
+    await user.type(gstin, "24ABCDE1234F1Z5");
+    expect(
+      await within(form).findByText("GST details can't be fetched yet. Type the names yourself."),
+    ).toBeInTheDocument();
+
+    server.use(
+      http.get(buildApiUrl("/gstin/:gstin"), ({ params }) =>
+        HttpResponse.json({
+          data: {
+            gstin: String(params.gstin),
+            valid: true,
+            reason: null,
+            state_code: "24",
+            pan: "ABCDE5678F",
+            lookup: "not_found",
+          },
+        }),
+      ),
+    );
+    await user.clear(gstin);
+    await user.type(gstin, "24ABCDE5678F1Z5");
+    expect(
+      await within(form).findByText("No GST record found for this GSTIN. Type the names yourself."),
+    ).toBeInTheDocument();
+    expect(
+      within(form).queryByRole("button", { name: "Use these details" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("doesn't look a GSTIN up until it is complete", async () => {
+    signInAs("admin");
+    let lookups = 0;
+    server.use(
+      http.get(buildApiUrl("/gstin/:gstin"), () => {
+        lookups += 1;
+        return HttpResponse.json({ error: { code: "internal", message: "Down" } }, { status: 500 });
+      }),
+    );
+    const user = show(<NewPartner parentId={null} />);
+    const form = await screen.findByRole("form", { name: "New partner" });
+    await user.type(
+      within(form).getByRole("textbox", { name: "GSTIN (optional)" }),
+      "24AAACP1234F1Z",
+    );
+    expect(lookups).toBe(0);
+
+    await user.type(within(form).getByRole("textbox", { name: "GSTIN (optional)" }), "5");
+    expect(
+      await within(form).findByText("Couldn't check the GST record. Type the names yourself."),
+    ).toBeInTheDocument();
+    expect(lookups).toBe(1);
+  });
+});

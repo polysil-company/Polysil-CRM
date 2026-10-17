@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { LEAD_STAGES, type LeadStage } from "@/features/leads/api/leads.schemas";
+import {
+  LEAD_STAGES,
+  type LeadInquiryType,
+  type LeadStage,
+} from "@/features/leads/api/leads.schemas";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
 
@@ -13,7 +17,8 @@ import { LEAD_STAGE_DESCRIPTIONS, LEAD_STAGE_LABELS } from "./lead-labels";
  * the menu only offers moves that can succeed. The backend still decides: a refusal is
  * explained by `stageChangeError`. quoted and negotiation are reached through a
  * quotation, never from here; won needs an accepted quotation, which only the backend
- * can check.
+ * can check. A dealership lead (LEAD-015, FS-053) is also won straight from qualified: it
+ * needs no quotation, and winning it starts a dealer application.
  */
 export type StageAction =
   | { readonly kind: "move"; readonly to: "contacted" | "qualified" }
@@ -42,7 +47,10 @@ const NEGOTIATION_HINT: StageHint = {
   reason: "Recorded on the quotation",
 };
 
-export function stageMenuFor(stage: LeadStage): StageMenu {
+export function stageMenuFor(stage: LeadStage, type?: LeadInquiryType): StageMenu {
+  if (stage === "qualified" && type === "dealership") {
+    return { actions: [{ kind: "won" }, { kind: "lost" }], hint: QUOTATION_HINT };
+  }
   switch (stage) {
     case "new":
       return { actions: [{ kind: "move", to: "contacted" }, { kind: "lost" }], hint: null };
@@ -79,12 +87,14 @@ export function stageActionLabel(action: StageAction): string {
 }
 
 /** What each action does, in one line under it, for someone new to the pipeline. */
-export function stageActionDescription(action: StageAction): string {
+export function stageActionDescription(action: StageAction, type?: LeadInquiryType): string {
   switch (action.kind) {
     case "move":
       return LEAD_STAGE_DESCRIPTIONS[action.to];
     case "won":
-      return "The farmer accepted a quotation. Closes the lead.";
+      return type === "dealership"
+        ? "They're to become a dealer. Closes the lead and starts their dealer application."
+        : "The farmer accepted a quotation. Closes the lead.";
     case "lost":
       return "Asks for the reason. The lead can be reopened later.";
     case "reopen":
