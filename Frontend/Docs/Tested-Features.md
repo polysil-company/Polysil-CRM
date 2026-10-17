@@ -49,7 +49,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
-| [Dealer commission](#dealer-commission) | 3 | 🧪 👀 | item 25a |
+| [Dealer commission](#dealer-commission) | 3 | 🧪 👀 | PR #157 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
