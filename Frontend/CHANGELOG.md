@@ -289,7 +289,7 @@ Walked on a desktop in light mode and a 390 px phone in dark mode: axe found not
 
 - **The preview prices a sample domestically.** The contract makes a free sample 100 % off when it is saved. It doesn't say the preview does the same, so the builder says so in words instead of guessing.
 - **The settings are staff only.** If they can't be read, the builder falls back to the backend's documented defaults (LUT, free).
-- **Stacked on PR #165.** It needs the seller GSTINs and their LUTs; merge #165 first.
+- **Built on PR #165** (merged): the LUT comes from the seller GSTINs and their LUTs.
 
 #### Files changed
 
@@ -300,7 +300,7 @@ Walked on a desktop in light mode and a 390 px phone in dark mode: axe found not
   - Export now priced;
   - `exportCountry` on the header form.
 - `src/features/quotations/lib/builder-lines.ts`: `taxTreatment` in the pricing context; `export_country` errors routed to the field.
-- `src/features/quotations/lib/quotation-labels.ts`: `TAX_TREATMENT_LABELS`, `taxTreatmentText`.
+- `src/features/quotations/lib/quotation-labels.ts`: `TAX_TREATMENT_LABELS`.
 - `src/features/settings/hooks/use-export-sample-settings.ts`: new, the export and sample settings with their defaults.
 - Forms:
   - `src/features/orders/components/order-builder.tsx`: Export and Sample, the Country field, the refusals, `sampleHint`.
