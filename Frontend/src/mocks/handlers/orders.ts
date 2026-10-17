@@ -48,6 +48,7 @@ import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
 import { MOCK_CREATOR, newMockEvent } from "./lead-events";
+import { paymentsBlockFor } from "./payments";
 import { lineInSchema, priceLines, rateChanges } from "./quotations";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
@@ -84,6 +85,8 @@ function settle(order: OrderWire): OrderWire {
     order.pdf_state = "ready";
     mockDb.orderPdfReadyAt.delete(order.id);
   }
+  // ACCT-004 · worked out on every read, as the backend does.
+  order.payments = paymentsBlockFor(order);
   return order;
 }
 
@@ -185,6 +188,7 @@ function filteredOrders(params: URLSearchParams, statuses?: readonly string[]): 
   );
   const officeId = params.get("owner_org_unit_id");
   const waitingOn = params.get("waiting_on");
+  const partnerId = params.get("partner_id");
   return mockDb.orders.filter(
     (order) =>
       (wanted.length === 0 || wanted.includes(order.status)) &&
@@ -199,6 +203,7 @@ function filteredOrders(params: URLSearchParams, statuses?: readonly string[]): 
       (waitingOn === null ||
         waitingOn === "" ||
         toOrderSummary(order).approval_waiting_on === waitingOn) &&
+      (partnerId === null || partnerId === "" || order.partner?.id === partnerId) &&
       matchesSearch(order, q),
   );
 }

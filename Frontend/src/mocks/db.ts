@@ -7,6 +7,7 @@ import type { LookupList, LookupListWire } from "@/features/lookups/api/lookups.
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
+import type { PaymentWire } from "@/features/payments/api/payments.schemas";
 import type { HsnRowWire, TaxRateWire } from "@/features/products/api/products.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 import type { EntitlementWire, SchemeWire } from "@/features/schemes/api/schemes.schemas";
@@ -32,6 +33,7 @@ import { generateConversations, generateGroups, type MockGroupMember } from "./d
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
 import { seedPartners, type MockPartnerRecord } from "./data/partners";
+import { seedPayments, seedSchedules, type MockInstalment } from "./data/payments";
 import {
   seedHsnHistory,
   seedPriceLists,
@@ -190,6 +192,10 @@ export interface MockDb {
   entitlements: EntitlementWire[];
   /** Every change to a monthly target, oldest first (TGT-002). */
   targets: MockTargetEntry[];
+  /** Receipts, newest first, voided ones kept (ACCT-002, ACCT-003). */
+  payments: PaymentWire[];
+  /** Each order's planned instalments, in due order (ACCT-004). */
+  paymentSchedules: Map<string, MockInstalment[]>;
   /** Dealer commissions, newest first; seeded on first use from the applications (SUBS-016, SUBS-017). */
   commissions: CommissionWire[] | null;
   /** Commission rates of every scheme (SUBS-018). */
@@ -284,6 +290,8 @@ function createMockDb(): MockDb {
       orders[0] === undefined ? null : { id: orders[0].id, order_no: orders[0].order_no },
     ),
     targets: seedTargets(),
+    payments: seedPayments(orders),
+    paymentSchedules: seedSchedules(orders),
     commissions: null,
     commissionRates: seedCommissionRates(),
   };

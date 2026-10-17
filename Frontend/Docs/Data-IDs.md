@@ -243,6 +243,10 @@ The registry file is the source of truth; this snapshot helps reading.
 | SUBS-013 | Subsidy matrices — the unit-cost and quantity matrices in force, and a new one from a date (`GET /subsidy-masters/{kind}/matrices`, `POST /subsidy-masters/{kind}/matrices`) | shared | in-progress |
 | SUBS-014 | Subsidy schemes — a state's scheme set up, its readiness, stage names and switching off (`GET /subsidy-schemes`, `POST /subsidy-schemes`, `GET /subsidy-schemes/{code}`, `PATCH /subsidy-schemes/{code}`, `PATCH /subsidy-schemes/{code}/stages/{stageCode}`) | shared | in-progress |
 | ACCT-001 | Accounts work queue (`GET /orders?waiting_on=account_manager`, `GET /orders/stats`, `GET /orders/export`) | shared | in-progress |
+| ACCT-002 | Record a payment, spread over a dealer's orders (`POST /payments`) | shared | in-progress |
+| ACCT-003 | Receipts for Accounts: allocate the rest, void (`GET /payments`, `/payments/{id}/allocations`, `/void`) | shared | in-progress |
+| ACCT-004 | An order's payments and instalments (`payments` on `GET /orders/{id}`, `PUT /orders/{id}/payment-schedule`) | shared | in-progress |
+| ACCT-005 | A dealer's ledger and credit (`GET /partners/{id}/ledger`, `/credit`) | shared | in-progress |
 | SUBS-015 | Reopen a closed subsidy application, with a reason (`POST /subsidy-applications/{id}/reopen`) | shared | in-progress |
 | SUBS-016 | Dealer commission and TOD on an application, stage 18 (`GET`/`POST /subsidy-applications/{id}/commission`, `/commission/preview`) | shared | in-progress |
 | SUBS-017 | Dealer commissions for Accounts: approve, return, cancel, pay, Excel (`/dealer-commissions*`) | shared | in-progress |
