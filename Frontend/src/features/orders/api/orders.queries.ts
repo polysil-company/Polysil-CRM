@@ -2,6 +2,7 @@ import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/
 
 import {
   getOrder,
+  getOrderSchemes,
   getOrderStats,
   getOrderTimeline,
   listDispatches,
@@ -137,6 +138,18 @@ export function orderDetailQueryOptions(orderId: string) {
     // The PDF is ready when the user comes back from another tab or app (walk F-14).
     refetchIntervalInBackground: true,
     meta: { dataId: "SO-002" },
+  });
+}
+
+/**
+ * SCHM-005 · A draft's scheme preview. Under the order's own key, so whatever refreshes the order
+ * refreshes it; `revision` (the total and line count) refetches it as soon as the lines change.
+ */
+export function orderSchemesQueryOptions(orderId: string, revision: string) {
+  return queryOptions({
+    queryKey: [...orderKeys.detail(orderId), "schemes", revision] as const,
+    queryFn: ({ signal }) => getOrderSchemes(orderId, signal),
+    meta: { dataId: "SCHM-005" },
   });
 }
 

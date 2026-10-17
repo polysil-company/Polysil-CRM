@@ -803,6 +803,16 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /scheme-entitlements"],
   },
+  "SCHM-005": {
+    domain: "SCHM",
+    title:
+      "Scheme benefits on an order — the preview on a draft, the benefits and To pay after submit",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /orders/{id}/schemes", "GET /orders/{id}"],
+    notes:
+      "A benefit lowers payable, never the invoice. The preview is draft only (409 order_not_draft); a reversed benefit shows struck through.",
+  },
   "RWD-001": {
     domain: "RWD",
     title: "Reward points — a balance and its history, the gift catalogue, and asking for a gift",

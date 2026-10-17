@@ -45,6 +45,7 @@ import { OrderActions } from "./order-actions";
 import { OrderApproval } from "./order-approval";
 import { OrderDispatches } from "./order-dispatches";
 import { OrderHistory } from "./order-history";
+import { OrderSchemesCard } from "./order-schemes";
 import { OrderStatusBadge } from "./order-status-badge";
 import { isSubsidyWarning, OrderSubsidyCard } from "./order-subsidy";
 
@@ -143,6 +144,8 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
           <TotalsBlock order={order} />
         </CardContent>
       </Card>
+
+      <OrderSchemesCard order={order} />
 
       <OrderSubsidyCard order={order} />
 
