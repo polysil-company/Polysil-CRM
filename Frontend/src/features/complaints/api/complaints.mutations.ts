@@ -17,6 +17,7 @@ import {
   deleteComplaint,
   patchComplaint,
   qcComplaint,
+  reopenComplaint,
   replaceComplaintLines,
   submitComplaint,
   type WriteInput,
@@ -33,6 +34,7 @@ import type {
   CreateComplaintRequest,
   PatchComplaintRequest,
   QcRequest,
+  ReopenComplaintRequest,
   ReplaceLinesRequest,
 } from "./complaints.schemas";
 
@@ -121,6 +123,21 @@ export function useCancelComplaint(): UseMutationResult<
     mutationKey: [...complaintKeys.all, "cancel"],
     mutationFn: ({ complaintId, ...input }) => cancelComplaint(complaintId, input),
     meta: { dataId: "CMPL-003" },
+    onSuccess: settle,
+  });
+}
+
+/** CMPL-010 · Reopen a closed or rejected complaint, with a reason. */
+export function useReopenComplaint(): UseMutationResult<
+  Complaint,
+  Error,
+  Keyed<ReopenComplaintRequest>
+> {
+  const settle = useSettle();
+  return useMutation({
+    mutationKey: [...complaintKeys.all, "reopen"],
+    mutationFn: ({ complaintId, ...input }) => reopenComplaint(complaintId, input),
+    meta: { dataId: "CMPL-010" },
     onSuccess: settle,
   });
 }

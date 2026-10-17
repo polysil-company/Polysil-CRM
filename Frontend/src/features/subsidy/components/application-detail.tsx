@@ -93,6 +93,7 @@ function ApplicationView({ application }: { application: Application }): React.J
   // Both hooks always run; the backend lets either change an application.
   const canCreate = useCan("subsidy", "create");
   const canEdit = useCan("subsidy", "edit");
+  const canApprove = useCan("subsidy", "approve");
   const canWrite = canCreate || canEdit;
   const open = application.status === "open";
 
@@ -127,7 +128,7 @@ function ApplicationView({ application }: { application: Application }): React.J
             · {systemLabel(application.systemType)} · {application.scheme}
           </p>
         </div>
-        <ApplicationActions application={application} canWrite={canWrite} />
+        <ApplicationActions application={application} canWrite={canWrite} canApprove={canApprove} />
       </div>
 
       {application.status === "cancelled" ? (
@@ -143,7 +144,12 @@ function ApplicationView({ application }: { application: Application }): React.J
             Every payment received
             {application.closedOn === null ? "" : ` on ${formatBusinessDay(application.closedOn)}`}
           </p>
-          <p>The application closed by itself and takes no more entries.</p>
+          <p>
+            The application closed by itself and takes no more entries.
+            {canApprove
+              ? " Reopen it to correct an entry; it closes again when the payment entries are complete."
+              : ""}
+          </p>
         </Notice>
       ) : null}
 
@@ -172,6 +178,11 @@ function ApplicationView({ application }: { application: Application }): React.J
                 <Fact label="Documents">
                   {application.documents.uploaded} of {application.documents.listed} on the
                   checklist
+                </Fact>
+                <Fact label="Dispatched on">
+                  {application.dispatchedOn === null
+                    ? "Not yet"
+                    : formatBusinessDay(application.dispatchedOn)}
                 </Fact>
               </dl>
             </CardContent>

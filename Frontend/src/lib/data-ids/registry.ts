@@ -35,6 +35,7 @@ export const DATA_ID_DOMAINS = {
   DOC: "Documents on records — purchase orders, payment slips, invoices, photos",
   TASK: "Tasks and daily work",
   CHNL: "Channel partners — distributor, dealer, sub-dealer",
+  TGT: "Sales targets and achievement",
   MKT: "Marketing and promotional offers",
   SCHM: "Schemes",
   MSTR: "Masters — products, stock, price lists, territories",
@@ -313,13 +314,22 @@ export const DATA_IDS = {
     notes:
       "No sign-in. The mobile is checked with a six-digit WhatsApp code before the lead is made.",
   },
+  "LEAD-015": {
+    domain: "LEAD",
+    title: "Dealership enquiries — won from qualified, starting a dealer application",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{id}/transition"],
+    notes: "FS-053: `inquiry_type: dealership`; the winning answer carries `dealer_application`.",
+  },
   "RPT-001": {
     domain: "RPT",
-    title: "Dashboard overview — KPIs, pipeline, follow-ups",
+    title: "Dashboard overview — KPIs, pipeline, follow-ups, area by system, targets",
     owner: "shared",
     status: "in-progress",
     endpoints: ["GET /dashboard/overview"],
-    notes: "The backend's shape since BE-008: snake_case, every figure a decimal string.",
+    notes:
+      "The backend's shape since BE-008: snake_case, every figure a decimal string. Area by system and targets by month since FS-052.",
   },
   "QUOT-001": {
     domain: "QUOT",
@@ -431,6 +441,18 @@ export const DATA_IDS = {
     endpoints: ["GET /quotations/export"],
     notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
   },
+  "QUOT-014": {
+    domain: "QUOT",
+    title: "A subsidised quotation's subsidy, for one farmer category",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "PUT /quotations/{quotationId}/subsidy",
+      "GET /quotations/{quotationId}/subsidy/calculation",
+    ],
+    notes:
+      "FS-057, subsidised-quotations.md. A draft only; sending needs it (422 subsidy_missing). Not part of go-live (13 Oct).",
+  },
   "SO-001": {
     domain: "SO",
     title: "Sales orders list",
@@ -486,6 +508,24 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /orders/export"],
     notes: "The list's filters, every page, up to 5,000 rows (422 export_too_large beyond).",
+  },
+  "SO-007": {
+    domain: "SO",
+    title: "Amend an approved order",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders/{orderId}/amend"],
+    notes:
+      "Staff only, before anything ships or is paid: back to draft under its number, with a remark (FS-036).",
+  },
+  "SO-008": {
+    domain: "SO",
+    title: "A subsidised order — from a subsidised quotation, its subsidy block and editing it",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders", "PUT /orders/{orderId}/subsidy"],
+    notes:
+      "FS-054, FS-057; subsidised-orders-and-small-changes.md. Staff only. Not part of go-live (13 Oct).",
   },
   "APPR-001": {
     domain: "APPR",
@@ -584,6 +624,15 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /complaints/export"],
   },
+  "CMPL-010": {
+    domain: "CMPL",
+    title: "Reopen a closed or QC-rejected complaint, with a reason",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /complaints/{id}/reopen"],
+    notes:
+      "The raiser reopens a closed one; the complaint_reopen_roles setting's roles reopen either, within complaint_reopen_days and under complaint_reopen_max.",
+  },
   "TASK-001": {
     domain: "TASK",
     title: "My day — one person's tasks due that day and overdue",
@@ -676,6 +725,46 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["POST /imports", "POST /imports/{id}/check", "POST /imports/{id}/commit"],
   },
+  "CHNL-006": {
+    domain: "CHNL",
+    title: "GSTIN details — fill a partner's names from the GST record",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /gstin/{gstin}"],
+    notes: "`lookup` is unavailable until the backend has a GST data provider key (GAP-292).",
+  },
+  "CHNL-007": {
+    domain: "CHNL",
+    title: "Dealer applications — start one, fill it for the applicant, and decide",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /dealer-applications",
+      "POST /dealer-applications",
+      "GET /dealer-applications/{id}",
+      "PATCH /dealer-applications/{id}",
+      "POST /dealer-applications/{id}/submit",
+      "POST /dealer-applications/{id}/withdraw",
+      "POST /dealer-applications/{id}/link",
+      "POST /dealer-applications/{id}/decision",
+    ],
+  },
+  "CHNL-008": {
+    domain: "CHNL",
+    title: "The dealer applicant's own page — verify the mobile, fill in, upload, submit",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /public/dealer-apply/{token}",
+      "POST /public/dealer-apply/{token}/verify",
+      "POST /public/dealer-apply/{token}/verify/check",
+      "PATCH /public/dealer-apply/{token}",
+      "GET /public/dealer-apply/{token}/gstin/{gstin}",
+      "POST /public/dealer-apply/{token}/documents",
+      "DELETE /public/dealer-apply/{token}/documents/{id}",
+      "POST /public/dealer-apply/{token}/submit",
+    ],
+  },
   "MKT-001": {
     domain: "MKT",
     title: "Marketing offers — set by Admin, visible to channel partners only",
@@ -715,9 +804,10 @@ export const DATA_IDS = {
   },
   "MSTR-001": {
     domain: "MSTR",
-    title: "Masters — products, stock, price lists, territories",
+    title: "Masters — the Admin → Masters area: lists, lead scoring and offices",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
+    notes: "The page at /masters. Products and prices are MSTR-004…008; territories stay seeded.",
   },
   "MSTR-003": {
     domain: "MSTR",
@@ -810,6 +900,45 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /price-lists", "POST /price-lists", "POST /pricing/quote-lines"],
   },
+  "MSTR-009": {
+    domain: "MSTR",
+    title: "Masters lists — add a row, switch it on or off",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /lookups/{list}", "PATCH /lookups/{list}/{id}"],
+    notes:
+      "Lead sources, irrigation systems, lost reasons, crops, meeting types and complaint types (CMPL-008). Rows are never renamed or deleted (ADR-033).",
+  },
+  "MSTR-010": {
+    domain: "MSTR",
+    title: "Lead scoring — the weights, caps and thresholds behind a lead's score",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lookups/scoring", "PATCH /lookups/scoring"],
+  },
+  "MSTR-011": {
+    domain: "MSTR",
+    title: "Offices — the office tree: add, rename, move, close and reopen",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /org-units",
+      "POST /org-units",
+      "GET /org-units/{id}",
+      "PATCH /org-units/{id}",
+      "POST /org-units/{id}/close",
+      "POST /org-units/{id}/reopen",
+    ],
+    notes: "An office with active people anchored on it can't be closed (`422 fields.id`).",
+  },
+  "MSTR-012": {
+    domain: "MSTR",
+    title: "Territories — the state, district, taluka and village tree: add, rename, set codes",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /territories", "POST /territories", "PATCH /territories/{id}"],
+    notes: "A state's code numbers its leads and locks once a lead is numbered under it.",
+  },
   "MSTR-002": {
     domain: "MSTR",
     title: "Lead lookups — sources, irrigation systems, lost reasons and the territory picker",
@@ -823,11 +952,50 @@ export const DATA_IDS = {
     ],
     notes: "Admin-edited lists: the frontend never hard-codes their codes or names.",
   },
+  "TGT-001": {
+    domain: "TGT",
+    title: "Targets — the month's achievement, yours and your team's",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /targets/achievement"],
+    notes:
+      "Achieved is null for a measure the user may not see; pct is null without a target. Sales follow the company's sale setting.",
+  },
+  "TGT-002": {
+    domain: "TGT",
+    title: "Set a person's monthly targets, with their history",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /targets", "PUT /targets"],
+    notes:
+      "Only for people below you in office and rank (admin and MD: anyone). 0 clears a target. A past month is closed except to global scope.",
+  },
   "RPT-002": {
     domain: "RPT",
-    title: "Reports",
+    title:
+      "Reports — conversion, people, lost leads, follow-ups, dealers, campaigns, areas, complaints",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
+    endpoints: [
+      "GET /reports/lead-conversion",
+      "GET /reports/salesperson-performance",
+      "GET /reports/lost-leads",
+      "GET /reports/follow-ups",
+      "GET /reports/dealer-performance",
+      "GET /reports/campaign-performance",
+      "GET /reports/territory-performance",
+      "GET /reports/complaints",
+    ],
+    notes:
+      "A figure the user may not see is null, shown as not available. A report that answers 403 is hidden. format=xlsx downloads the same rows.",
+  },
+  "RPT-003": {
+    domain: "RPT",
+    title: "A lead's 360° view — tiles and leads on the same mobile",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads/{id}/360"],
+    notes: "Needs leads.view and reports.view. The timeline below it is LEAD-005's.",
   },
   "SUBS-001": {
     domain: "SUBS",
@@ -888,6 +1056,7 @@ export const DATA_IDS = {
       "GET /subsidy-applications/{id}/documents",
       "POST /subsidy-applications/{id}/documents",
       "GET /subsidy-applications/{id}/documents/{docId}",
+      "GET /subsidy-document-types",
     ],
   },
   "SUBS-008": {
@@ -948,6 +1117,15 @@ export const DATA_IDS = {
       "PATCH /subsidy-schemes/{code}/stages/{stageCode}",
     ],
   },
+  "SUBS-015": {
+    domain: "SUBS",
+    title: "Reopen a closed subsidy application, with a reason",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /subsidy-applications/{id}/reopen"],
+    notes:
+      "subsidy.approve only. Refused while the dealer's commission on it is approved or paid. It closes again on a stage-16 amount or a stage-17 date.",
+  },
 
   "REPO-001": {
     domain: "REPO",
@@ -965,9 +1143,14 @@ export const DATA_IDS = {
     domain: "ACCT",
     title: "Accounts work queue",
     owner: "shared",
-    status: "planned",
+    status: "in-progress",
+    endpoints: [
+      "GET /orders?waiting_on=account_manager",
+      "GET /orders/stats",
+      "GET /orders/export",
+    ],
     notes:
-      "Waits on BE-022: GET /orders cannot filter on approval_waiting_on, and there is no payments API. Accounts' steps are in the Approvals inbox meanwhile.",
+      "BE-022: submitted orders whose next step is Accounts', decided in Approvals; the badge is stats waiting_on.account_manager. Recording payments comes with the payments screens.",
   },
   "DISP-002": {
     domain: "DISP",
@@ -1037,6 +1220,13 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["POST /users/{id}/handover", "DELETE /users/{id}"],
   },
+  "ADMN-007": {
+    domain: "ADMN",
+    title: "Company settings — how amended orders are re-approved, and complaint reopening",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /settings", "PATCH /settings"],
+  },
   "SITE-001": {
     domain: "SITE",
     title: "Public website — information, Product Master, phone-number entry",
@@ -1084,10 +1274,14 @@ export const DATA_IDS = {
   },
   "MSG-004": {
     domain: "MSG",
-    title: "Start a conversation — staff directory search",
+    title: "Start or read one conversation — staff directory search",
     owner: "shared",
     status: "in-progress",
-    endpoints: ["GET /staff-directory", "POST /conversations"],
+    endpoints: [
+      "GET /staff-directory",
+      "POST /conversations",
+      "GET /conversations/{conversationId}",
+    ],
   },
   "MSG-005": {
     domain: "MSG",
@@ -1095,6 +1289,20 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     endpoints: ["POST /conversations/{conversationId}/read"],
+  },
+  "MSG-006": {
+    domain: "MSG",
+    title: "Group chats — start a group, rename it, add, remove and leave",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /conversations/groups",
+      "PATCH /conversations/{conversationId}",
+      "GET /conversations/{conversationId}/members",
+      "POST /conversations/{conversationId}/members",
+      "DELETE /conversations/{conversationId}/members/{userId}",
+    ],
+    notes: "FS-048. A conversation's `kind` and `group`; `participant` is null for a group.",
   },
 } as const satisfies Record<string, DataIdDefinition>;
 

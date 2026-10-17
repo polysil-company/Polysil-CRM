@@ -17,8 +17,10 @@ import {
   QrCodeIcon,
   RupeeIcon,
   Settings02Icon,
+  Settings05Icon,
   SlidersHorizontalIcon,
   Store01Icon,
+  Target02Icon,
   Task01Icon,
   UserMultiple02Icon,
 } from "@hugeicons/core-free-icons";
@@ -45,7 +47,7 @@ export interface NavItem {
   /** "approvers": shown to whoever may approve an order or a quotation discount, whatever `module` says. */
   readonly visibleTo?: "approvers";
   /** A live count shown next to the label. */
-  readonly countSource?: "leads" | "messages" | "approvals";
+  readonly countSource?: "leads" | "messages" | "approvals" | "accounts";
 }
 
 export interface NavSection {
@@ -153,6 +155,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         dataId: "SUBS-005",
         href: "/subsidy",
       },
+      {
+        id: "targets",
+        label: "Targets",
+        description: "Your month against its targets, and your team's.",
+        icon: Target02Icon,
+        module: "targets",
+        audience: "staff",
+        dataId: "TGT-001",
+        href: "/targets",
+      },
     ],
   },
   {
@@ -221,9 +233,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "accounts",
         label: "Accounts queue",
+        description: "Submitted orders waiting on Accounts' payment check.",
         icon: RupeeIcon,
-        module: "accounts",
+        // The backend has no `accounts` module: Accounts holds `payments` (RBAC.md §6.2).
+        module: "payments",
+        audience: "staff",
         dataId: "ACCT-001",
+        href: "/accounts",
+        countSource: "accounts",
       },
       {
         id: "dispatch",
@@ -244,9 +261,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "reports",
         label: "Reports",
+        description:
+          "Conversion, people, lost leads, follow-ups, dealers, campaigns, areas and complaints.",
         icon: Analytics01Icon,
         module: "reports",
         dataId: "RPT-002",
+        href: "/reports",
       },
       {
         id: "approval-limits",
@@ -292,9 +312,24 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "masters",
         label: "Masters",
+        description:
+          "The lists every form picks from, how a lead is scored, the offices and the territories.",
         icon: Database01Icon,
         module: "masters",
+        audience: "staff",
         dataId: "MSTR-001",
+        href: "/masters",
+      },
+      {
+        id: "company-settings",
+        label: "Company settings",
+        description: "Rules for orders, complaints, dealers and the farmers' portal.",
+        icon: Settings05Icon,
+        module: "masters",
+        // GET /settings is staff only (settings-amend-reopen-contract.md).
+        audience: "staff",
+        dataId: "ADMN-007",
+        href: "/settings",
       },
       {
         id: "users",

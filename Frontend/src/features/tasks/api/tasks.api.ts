@@ -241,6 +241,18 @@ export function listLeadMinutes(leadId: string, signal?: AbortSignal): Promise<M
   });
 }
 
+/** TASK-007 · GET /minutes/{id} — one set of minutes, each action item as its task stands now. */
+export function getMinutes(minutesId: string, signal?: AbortSignal): Promise<Minutes> {
+  return apiRequest({
+    dataId: "TASK-007",
+    logger: log,
+    fn: "getMinutes",
+    path: `/minutes/${encodeURIComponent(minutesId)}`,
+    schema: minutesResponseSchema,
+    signal,
+  });
+}
+
 /**
  * TASK-007 · POST /minutes — the minutes and a task per action item, in one save. One bad
  * action item refuses the whole save, with `fields.action_items[i]…`.

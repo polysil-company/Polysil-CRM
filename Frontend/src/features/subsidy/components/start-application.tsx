@@ -31,10 +31,14 @@ import {
   subsidyConfigQueryOptions,
   subsidyCropsQueryOptions,
 } from "@/features/subsidy/api/subsidy.queries";
-import type { SubsidyCalculation, SystemConfig } from "@/features/subsidy/api/subsidy.schemas";
+import type { SystemConfig } from "@/features/subsidy/api/subsidy.schemas";
 import type { SubsidyCalculationState } from "@/features/subsidy/hooks/use-subsidy-calculation";
 import { cannotStartReason, subsidySystemOf } from "@/features/subsidy/lib/application-labels";
-import { emptyDraft, type CalculatorDraft } from "@/features/subsidy/lib/calculator-draft";
+import {
+  applicableEverywhere,
+  emptyDraft,
+  type CalculatorDraft,
+} from "@/features/subsidy/lib/calculator-draft";
 import { SYSTEM_LABELS } from "@/features/subsidy/lib/subsidy-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
@@ -254,21 +258,6 @@ function StartForLead({
         after={(calculation) => <CategoryPick lead={lead} calculation={calculation} />}
       />
     </div>
-  );
-}
-
-/** Categories that apply on every crop block — the only ones an application may take. */
-function applicableEverywhere(
-  result: SubsidyCalculation,
-): SubsidyCalculation["crops"][number]["categories"] {
-  const [first, ...rest] = result.crops;
-  if (first === undefined) return [];
-  return first.categories.filter(
-    (category) =>
-      category.applicable &&
-      rest.every(
-        (crop) => crop.categories.find((row) => row.code === category.code)?.applicable === true,
-      ),
   );
 }
 

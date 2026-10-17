@@ -1,7 +1,12 @@
 "use client";
 
-import { Cancel01Icon, Download04Icon, Flag03Icon } from "@hugeicons/core-free-icons";
-import { useQuery } from "@tanstack/react-query";
+import {
+  Cancel01Icon,
+  Download04Icon,
+  Flag03Icon,
+  RotateLeft01Icon,
+} from "@hugeicons/core-free-icons";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
@@ -33,12 +38,19 @@ import { downloadPims } from "@/features/subsidy/api/subsidy-applications.api";
 import {
   useCancelApplication,
   useRecordStage,
+  useReopenApplication,
 } from "@/features/subsidy/api/subsidy-applications.mutations";
 import {
+  applicationKeys,
   stageDefsQueryOptions,
   stageEntriesQueryOptions,
 } from "@/features/subsidy/api/subsidy-applications.queries";
-import type { Application, StageField } from "@/features/subsidy/api/subsidy-applications.schemas";
+import {
+  REOPEN_REASON_MAX,
+  type Application,
+  type StageField,
+} from "@/features/subsidy/api/subsidy-applications.schemas";
+import { formatBusinessDay } from "@/features/subsidy/lib/application-labels";
 import {
   changedValues,
   fieldProblem,
@@ -93,18 +105,21 @@ function RefusalNote({ refusal }: { refusal: Refusal }): React.JSX.Element | nul
 }
 
 /**
- * SUBS-006, SUBS-008 · What can be done to an application: record a stage and cancel (for
- * whoever may change applications, while it is open), and download the PIMS sheet (anyone who
- * can see it).
+ * SUBS-006, SUBS-008, SUBS-015 · What can be done to an application: record a stage and cancel
+ * (for whoever may change applications, while it is open), reopen a closed one (for those who
+ * approve subsidy files), and download the PIMS sheet (anyone who can see it).
  */
 export function ApplicationActions({
   application,
   canWrite,
+  canApprove,
 }: {
   application: Application;
   canWrite: boolean;
+  /** `subsidy.approve`: Admin Sales and the MD. */
+  canApprove: boolean;
 }): React.JSX.Element {
-  const [dialog, setDialog] = useState<"stage" | "cancel" | null>(null);
+  const [dialog, setDialog] = useState<"stage" | "cancel" | "reopen" | null>(null);
   const open = application.status === "open";
   // The PIMS sheet is GGRC's portal format; other schemes have none yet (backend GAP-363).
   const hasPims = application.scheme === PIMS_SCHEME;
@@ -145,6 +160,17 @@ export function ApplicationActions({
           PIMS sheet
         </Button>
       ) : null}
+      {canApprove && application.status === "full_fp_received" ? (
+        <Button
+          variant="outline"
+          onClick={() => {
+            setDialog("reopen");
+          }}
+        >
+          <Icon icon={RotateLeft01Icon} />
+          Reopen
+        </Button>
+      ) : null}
       {canWrite && open ? (
         <>
           <Button
@@ -179,6 +205,9 @@ export function ApplicationActions({
           ) : null}
           {dialog === "cancel" ? (
             <CancelApplicationForm application={application} onClose={close} />
+          ) : null}
+          {dialog === "reopen" ? (
+            <ReopenApplicationForm application={application} onClose={close} />
           ) : null}
         </DialogContent>
       </Dialog>
@@ -366,6 +395,11 @@ function RecordStageForm({
                 <StageFieldInput
                   key={`${stage.code}-${field.key}`}
                   field={field}
+                  hint={
+                    field.key === "supply" && application.dispatchedOn !== null
+                      ? supplyHint(application.dispatchedOn, formValues[field.key] ?? "")
+                      : undefined
+                  }
                   value={formValues[field.key] ?? ""}
                   today={today}
                   error={visible[`values.${field.key}`]}
@@ -433,14 +467,28 @@ function RecordStageForm({
   );
 }
 
+/**
+ * SUBS-006 · Stage 7's supply date beside the dispatch (`subsidy-completion.md` §2). Left
+ * empty and untouched, the key isn't sent and the backend takes the dispatch date.
+ */
+function supplyHint(dispatchedOn: string, value: string): string {
+  const day = formatBusinessDay(dispatchedOn);
+  return value === ""
+    ? `Dispatched on ${day}. Left empty, the supply date is taken from it.`
+    : `Dispatched on ${day}.`;
+}
+
 function StageFieldInput({
   field,
+  hint,
   value,
   today,
   error,
   onChange,
 }: {
   field: StageField;
+  /** Shown under the field while it reads right. */
+  hint?: string | undefined;
   value: string;
   today: string;
   error: string | undefined;
@@ -450,7 +498,8 @@ function StageFieldInput({
   const aria = {
     id,
     "aria-invalid": error === undefined ? undefined : true,
-    "aria-describedby": error === undefined ? undefined : `${id}-error`,
+    "aria-describedby":
+      error !== undefined ? `${id}-error` : hint === undefined ? undefined : `${id}-hint`,
   } as const;
   return (
     <Field
@@ -498,6 +547,9 @@ function StageFieldInput({
           }}
         />
       )}
+      {hint !== undefined && error === undefined ? (
+        <FieldDescription id={`${id}-hint`}>{hint}</FieldDescription>
+      ) : null}
       <FieldError id={`${id}-error`}>{error}</FieldError>
     </Field>
   );
@@ -598,6 +650,160 @@ function CancelApplicationForm({
           errorLabel="Not cancelled"
         >
           Cancel application
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+// ── reopen (SUBS-015) ─────────────────────────────────────────────────────────────
+
+/** Why a reopen was refused, in words; `stale` when the file is no longer closed. */
+function reopenRefusalOf(error: unknown): { refusal: Refusal; stale: boolean } {
+  if (isApiError(error)) {
+    if (error.code === "application_not_closed" || error.code === "status_changed") {
+      return {
+        refusal: {
+          title: "This application isn't closed any more",
+          message: "Someone reopened or cancelled it meanwhile. The page now shows its latest.",
+        },
+        stale: true,
+      };
+    }
+    if (error.code === "commission_settled") {
+      return {
+        refusal: {
+          title: "The dealer's commission is settled",
+          message:
+            "The commission on this file is approved or paid, so its figures can't change. It stays closed.",
+        },
+        stale: false,
+      };
+    }
+    if (error.status === 403) {
+      return {
+        refusal: {
+          title: "Not yours to reopen",
+          message: "Only those who approve subsidy files reopen one.",
+        },
+        stale: false,
+      };
+    }
+  }
+  return refusalOf(error);
+}
+
+/**
+ * A closed file opens again to correct it. Its stages and values stay; it closes again only
+ * when an entry writes a stage-16 amount or a stage-17 date (`subsidy-completion.md` §4).
+ */
+function ReopenApplicationForm({
+  application,
+  onClose,
+}: {
+  application: Application;
+  onClose: () => void;
+}): React.JSX.Element {
+  const queryClient = useQueryClient();
+  const [reason, setReason] = useState("");
+  const [shown, setShown] = useState(false);
+  const [refusal, setRefusal] = useState<Refusal>(null);
+  const reopen = useReopenApplication();
+  const idempotency = useIdempotencyKey();
+  const [serverProblem, setServerProblem] = useState<string | null>(null);
+  const problem = reason.trim() === "" ? "Say why it is reopened." : null;
+  const submit = useAsyncAction({
+    action: () => {
+      const body = { reason: reason.trim() };
+      return reopen.mutateAsync({
+        applicationId: application.id,
+        body,
+        idempotencyKey: idempotency.keyFor({ reopen: application.id, ...body }),
+      });
+    },
+    logger: log,
+    fn: "handleReopenApplication",
+    dataId: "SUBS-015",
+    onSuccess: () => {
+      idempotency.reset();
+      toast.success("Application reopened", {
+        description: "It closes again when the payment entries are complete.",
+      });
+      onClose();
+    },
+    onError: (error) => {
+      if (readFieldErrors(error)?.reason !== undefined) {
+        setServerProblem("Say why it is reopened.");
+        return;
+      }
+      const { refusal: next, stale } = reopenRefusalOf(error);
+      if (stale) {
+        void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(application.id) });
+        toast.error(next?.title ?? "Not reopened", { description: next?.message });
+        onClose();
+        return;
+      }
+      setRefusal(next);
+    },
+  });
+  const error = shown ? (problem ?? serverProblem) : null;
+
+  return (
+    <form
+      noValidate
+      aria-label="Reopen application"
+      className="flex min-h-0 flex-1 flex-col"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setShown(true);
+        setRefusal(null);
+        setServerProblem(null);
+        if (problem !== null) return;
+        void submit.run();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Reopen {application.number}?</DialogTitle>
+        <DialogDescription>
+          It opens again to correct an entry; its stages and figures stay. It closes again when the
+          payment entries are complete.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody className="flex flex-col gap-3">
+        <Field data-invalid={error === null ? undefined : true}>
+          <FieldLabel htmlFor="reopen-reason">Why reopen it</FieldLabel>
+          <Textarea
+            id="reopen-reason"
+            maxLength={REOPEN_REASON_MAX}
+            value={reason}
+            placeholder="FP date entered wrong"
+            aria-invalid={error === null ? undefined : true}
+            aria-describedby={error === null ? "reopen-reason-hint" : "reopen-reason-error"}
+            onChange={(event) => {
+              setReason(event.target.value);
+            }}
+          />
+          {error === null ? (
+            <FieldDescription id="reopen-reason-hint">
+              The file&apos;s owner and the lead&apos;s owner are told, with this reason.
+            </FieldDescription>
+          ) : null}
+          <FieldError id="reopen-reason-error">{error}</FieldError>
+        </Field>
+        <RefusalNote refusal={refusal} />
+      </DialogBody>
+      <DialogFooter>
+        <DialogClose render={<Button type="button" variant="outline" disabled={submit.isBusy} />}>
+          Keep it closed
+        </DialogClose>
+        <Button
+          type="submit"
+          state={submit.state}
+          loadingLabel="Reopening…"
+          successLabel="Reopened"
+          errorLabel="Not reopened"
+        >
+          Reopen
         </Button>
       </DialogFooter>
     </form>

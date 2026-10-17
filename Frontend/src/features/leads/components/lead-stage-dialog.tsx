@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
 import { toast } from "sonner";
@@ -32,17 +32,20 @@ import { stageChangeError } from "@/features/leads/lib/lead-lifecycle";
 import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import { LookupSelect } from "@/features/lookups/components/lookup-select";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { readFieldErrors } from "@/lib/api/errors";
 import { createLogger } from "@/lib/logger";
+
+import {
+  DealerApplicationStarted,
+  type DealerApplicationStart,
+} from "./dealer-application-started";
 
 const log = createLogger({
   file: "features/leads/components/lead-stage-dialog.tsx",
   dataId: "LEAD-007",
 });
-
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
 
 /** The stage changes that ask before acting: they close or reopen the lead. */
 export type StageDialogKind = "won" | "lost" | "reopen";
@@ -81,19 +84,6 @@ export function LeadStageDialog({ lead, kind, onClose }: LeadStageDialogProps): 
 interface FormProps {
   lead: Lead;
   onClose: () => void;
-}
-
-/** Closes the dialog a moment after success, and never after the dialog is gone. */
-function useCloseAfterSuccess(onClose: () => void): () => void {
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
-  return () => {
-    timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
-  };
 }
 
 /** A refusal: stale ones close the dialog with a toast, the rest show inside it. */
@@ -269,6 +259,9 @@ function MarkWonForm({ lead, onClose }: FormProps): React.JSX.Element {
   const idempotency = useIdempotencyKey();
   const refusal = useRefusal(onClose);
   const closeSoon = useCloseAfterSuccess(onClose);
+  // LEAD-015 · Winning a dealership lead answers with its dealer application, shown once.
+  const [started, setStarted] = useState<DealerApplicationStart | null>(null);
+  const dealership = lead.type === "dealership";
 
   const submit = useAsyncAction({
     action: () => {
@@ -287,12 +280,20 @@ function MarkWonForm({ lead, onClose }: FormProps): React.JSX.Element {
     logger: log,
     fn: "handleMarkWon",
     dataId: "LEAD-007",
-    onSuccess: () => {
+    onSuccess: (won) => {
       toast.success("Lead won", { description: lead.customerName });
-      closeSoon();
+      if (won.dealerApplication === null) {
+        closeSoon();
+      } else {
+        setStarted(won.dealerApplication);
+      }
     },
     onError: refusal.handle,
   });
+
+  if (started !== null) {
+    return <DealerApplicationStarted lead={lead} started={started} />;
+  }
 
   return (
     <form
@@ -313,7 +314,9 @@ function MarkWonForm({ lead, onClose }: FormProps): React.JSX.Element {
       </DialogHeader>
       <DialogBody>
         <p className="text-sm text-muted-foreground">
-          The lead needs an accepted quotation. If it has none yet, accept the quotation first.
+          {dealership
+            ? "A dealership lead needs no quotation. Winning it starts their dealer application, with a link to send them."
+            : "The lead needs an accepted quotation. If it has none yet, accept the quotation first."}
         </p>
         <RefusalAlert message={refusal.message} />
       </DialogBody>
@@ -380,8 +383,9 @@ function ReopenForm({ lead, onClose }: FormProps): React.JSX.Element {
       <DialogHeader>
         <DialogTitle>Reopen lead</DialogTitle>
         <DialogDescription>
-          {lead.customerName} goes back to the stage it was lost from. Its lost reason moves to the
-          history.
+          {lead.stage === "dormant"
+            ? `${lead.customerName} goes back to ${LEAD_STAGE_LABELS[lead.dormantFromStage ?? "new"]}, where it was before it went dormant.`
+            : `${lead.customerName} goes back to the stage it was lost from. Its lost reason moves to the history.`}
         </DialogDescription>
       </DialogHeader>
       <DialogBody>

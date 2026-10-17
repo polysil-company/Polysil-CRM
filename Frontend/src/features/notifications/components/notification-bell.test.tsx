@@ -61,6 +61,28 @@ describe("[NOTIF-001] NotificationBell", () => {
     ).toHaveAttribute("href", `/sales-orders/${order?.resource?.id ?? ""}`);
   });
 
+  it("[SUBS-006] opens the subsidy file a subsidy bell is about", async () => {
+    mockDb.notifications.unshift({
+      id: "ntf-100",
+      kind: "subsidy_query",
+      title: "Subsidy file SA/GJ/2026-27/00003 has a query from the department",
+      body: null,
+      actor: { id: "usr-002", full_name: "Priya Nair" },
+      resource: { type: "subsidy_application", id: "app-3", label: "SA/GJ/2026-27/00003" },
+      created_at: new Date().toISOString(),
+      read_at: null,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationBell />);
+
+    await user.click(await screen.findByRole("button", { name: "Notifications, 4 unread" }));
+    const list = await screen.findByRole("list", { name: "Latest notifications" });
+    expect(within(list).getByRole("link", { name: /has a query/ })).toHaveAttribute(
+      "href",
+      "/subsidy/app-3",
+    );
+  });
+
   it("marks everything as read (NOTIF-002)", async () => {
     const user = userEvent.setup();
     renderWithProviders(<NotificationBell />);

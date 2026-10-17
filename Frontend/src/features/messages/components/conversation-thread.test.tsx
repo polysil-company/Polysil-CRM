@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { startConversation } from "@/features/messages/api/messages.api";
-import { startedConversationQueryOptions } from "@/features/messages/api/messages.queries";
+import { conversationQueryOptions } from "@/features/messages/api/messages.queries";
 import { sessionKeys } from "@/features/session/api/session.queries";
 import { meResponseSchema } from "@/features/session/api/session.schemas";
 import { buildApiUrl } from "@/lib/api/url";
@@ -16,7 +16,8 @@ import { createTestQueryClient, renderWithProviders } from "@/test/render";
 
 import { ConversationThread } from "./conversation-thread";
 
-vi.mock("next/navigation", () => ({ notFound: vi.fn() }));
+const replace = vi.fn();
+vi.mock("next/navigation", () => ({ notFound: vi.fn(), useRouter: () => ({ replace }) }));
 
 function signedInClient(): QueryClient {
   const queryClient = createTestQueryClient();
@@ -105,14 +106,38 @@ describe("[MSG-002] ConversationThread", () => {
   it("names a colleague in a conversation just started, before anyone writes (MSG-004)", async () => {
     const queryClient = signedInClient();
     const conversation = await startConversation("usr-007");
-    queryClient.setQueryData(
-      startedConversationQueryOptions(conversation.id).queryKey,
-      conversation,
-    );
+    queryClient.setQueryData(conversationQueryOptions(conversation.id).queryKey, conversation);
     renderWithProviders(<ConversationThread conversationId={conversation.id} />, { queryClient });
 
     expect(await screen.findByRole("heading", { name: "Imran Sheikh" })).toBeInTheDocument();
     expect(await screen.findByText("Say hello to Imran Sheikh")).toBeInTheDocument();
+  });
+
+  it("names the colleague of an empty conversation after a reload, from the backend (BE-021)", async () => {
+    // Started earlier, in another tab or before the reload: nothing is cached here.
+    const conversation = await startConversation("usr-007");
+    renderWithProviders(<ConversationThread conversationId={conversation.id} />, {
+      queryClient: signedInClient(),
+    });
+
+    expect(await screen.findByRole("heading", { name: "Imran Sheikh" })).toBeInTheDocument();
+    expect(await screen.findByText("Say hello to Imran Sheikh")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Message Imran Sheikh" })).toBeInTheDocument();
+  });
+
+  it('falls back to "Conversation" when the conversation can\'t be read on its own', async () => {
+    const conversation = await startConversation("usr-007");
+    server.use(
+      http.get(buildApiUrl("/conversations/:conversationId"), () =>
+        HttpResponse.json({ error: { code: "internal", message: "Down" } }, { status: 500 }),
+      ),
+    );
+    renderWithProviders(<ConversationThread conversationId={conversation.id} />, {
+      queryClient: signedInClient(),
+    });
+
+    expect(await screen.findByRole("heading", { name: "Conversation" })).toBeInTheDocument();
+    expect(await screen.findByText("No messages yet")).toBeInTheDocument();
   });
 
   it("closes the conversation when the backend says the colleague has left, keeping the draft", async () => {
@@ -121,7 +146,7 @@ describe("[MSG-002] ConversationThread", () => {
       http.post(buildApiUrl("/conversations/:conversationId/messages"), () => {
         left = true;
         const conversation = mockDb.conversations.find((item) => item.id === "conv-003");
-        if (conversation !== undefined) {
+        if (conversation?.participant) {
           conversation.participant = { ...conversation.participant, is_active: false };
         }
         return HttpResponse.json(

@@ -2,12 +2,14 @@ import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
 import type { SlaPolicyWire } from "@/features/complaints/api/complaints.schemas";
 import type { QrCodeWire } from "@/features/lead-capture/api/lead-capture.schemas";
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
+import type { LookupList, LookupListWire } from "@/features/lookups/api/lookups.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { HsnRowWire, TaxRateWire } from "@/features/products/api/products.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 import type { EntitlementWire, SchemeWire } from "@/features/schemes/api/schemes.schemas";
+import type { SettingWire } from "@/features/settings/api/settings.schemas";
 import type {
   ApplicationDocumentWire,
   ApplicationWire,
@@ -18,11 +20,13 @@ import type { OfficeWire } from "@/features/users/api/users.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
+import type { MockDealerApplication } from "./data/dealer-applications";
 import { seedDocuments, type MockDocument } from "./data/documents";
 import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
 import { generateLeads } from "./data/leads";
-import { generateConversations } from "./data/messages";
+import { seedLookups, seedScoring } from "./data/lookups";
+import { generateConversations, generateGroups, type MockGroupMember } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
 import { seedPartners, type MockPartnerRecord } from "./data/partners";
@@ -38,7 +42,9 @@ import { generateQuotations } from "./data/quotations";
 import { seedEntitlements, seedSchemes } from "./data/schemes";
 import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
 import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
+import { seedTargets, type MockTargetEntry } from "./data/targets";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
+import type { MockAdminTerritory } from "./data/territories";
 import { seedOffices, seedUsers, type MockUserRecord } from "./data/users";
 
 export interface MockDb {
@@ -52,12 +58,19 @@ export interface MockDb {
   priceVersion: number;
   /** Each quotation's history, newest first: derived once from the seed, then written to. */
   quotationEvents: Map<string, TimelineEventWire[]>;
+  /** QUOT-014 · The subsidy calculation stored with each subsidised quotation. */
+  quotationSubsidyCalculations: Map<string, CalculateResponseWire["data"]>;
   /** When a just-sent quotation's PDF is ready (epoch ms); read by the next GET. */
   pdfReadyAt: Map<string, number>;
   /** Sales orders, newest first, full documents (SO-001 … SO-004, DISP-002). */
   orders: OrderWire[];
   /** Order writes: Idempotency-Key → the request and the order it made or changed. */
   orderWrites: Map<string, { body: string; orderId: string }>;
+  /** SO-008 · A subsidised order's subsidy as written: null material is the order total. */
+  orderSubsidies: Map<
+    string,
+    { material: string | null; subsidy: string; payable: string | null; leadIds: string[] }
+  >;
   /** Each order's history, newest first: derived once from the seed, then written to. */
   orderEvents: Map<string, TimelineEventWire[]>;
   /** When a just-approved order's PDF is ready (epoch ms); read by the next GET. */
@@ -75,6 +88,15 @@ export interface MockDb {
   notifications: NotificationWire[];
   conversations: ConversationWire[];
   messages: MessageWire[];
+  /** Who is, or was, in each group, by conversation id (MSG-006). */
+  groupMembers: Map<string, MockGroupMember[]>;
+  /**
+   * The admin lists as Masters edits them (MSTR-009). GET /lookups/{list} reads these; other
+   * mock handlers still read the seeded rows, so a row added here shows in Masters and pickers.
+   */
+  lookups: Record<LookupList, LookupListWire["data"]>;
+  /** The lead score's settings (MSTR-010), as `GET /lookups/scoring` lists them. */
+  scoring: { key: string; value: string }[];
   /** POST /leads replays: Idempotency-Key → the request body and the lead it created. */
   leadCreations: Map<string, { body: string; leadId: string }>;
   /** Events written through the mock (notes, stage changes), by lead, newest first. */
@@ -111,6 +133,12 @@ export interface MockDb {
   enquiriesToday: Map<string, string>;
   /** Subsidy applications, newest first; seeded from the leads on first use (SUBS-005). */
   subsidyApplications: ApplicationWire[] | null;
+  /** CHNL-007 · Dealer applications, seeded on first use (`handlers/dealer-applications.ts`). */
+  dealerApplications: MockDealerApplication[] | null;
+  /** MSTR-012 · The territory tree as Masters edits it, copied from the seed on first use. */
+  territories: MockAdminTerritory[] | null;
+  /** ADMN-007 · Company settings, seeded on first use (`handlers/settings.ts`). */
+  settings: SettingWire[] | null;
   /** Each application's stage history, oldest first (SUBS-006). */
   subsidyEntries: Map<string, StageEntryWire[]>;
   /** Each application's calculation as stored at create (SUBS-006). */
@@ -158,12 +186,15 @@ export interface MockDb {
   schemes: SchemeWire[];
   /** Scheme credits, newest first (SCHM-004). */
   entitlements: EntitlementWire[];
+  /** Every change to a monthly target, oldest first (TGT-002). */
+  targets: MockTargetEntry[];
 }
 
 function createMockDb(): MockDb {
   const products = seedProducts();
   const leads = generateLeads();
-  const { conversations, messages } = generateConversations(leads);
+  const direct = generateConversations(leads);
+  const groups = generateGroups();
   const quotations = generateQuotations(leads);
   const district = leads.find((lead) => lead.territory.level === "district")?.territory;
   const thresholds = seedThresholds(
@@ -178,9 +209,11 @@ function createMockDb(): MockDb {
     quotationWrites: new Map(),
     priceVersion: 0,
     quotationEvents: new Map(),
+    quotationSubsidyCalculations: new Map(),
     pdfReadyAt: new Map(),
     orders,
     orderWrites: new Map(),
+    orderSubsidies: new Map(),
     orderEvents: new Map(),
     orderPdfReadyAt: new Map(),
     thresholds,
@@ -194,8 +227,11 @@ function createMockDb(): MockDb {
       ),
       order: orders.find((order) => order.status === "approved"),
     }),
-    conversations,
-    messages,
+    conversations: [...direct.conversations, ...groups.conversations],
+    messages: [...direct.messages, ...groups.messages],
+    groupMembers: groups.members,
+    lookups: seedLookups(),
+    scoring: seedScoring(),
     leadCreations: new Map(),
     leadEvents: new Map(),
     noteCreations: new Map(),
@@ -214,6 +250,9 @@ function createMockDb(): MockDb {
     enquiryCodes: new Map(),
     enquiriesToday: new Map(),
     subsidyApplications: null,
+    dealerApplications: null,
+    territories: null,
+    settings: null,
     subsidyEntries: new Map(),
     subsidyCalculations: new Map(),
     subsidyDocuments: new Map(),
@@ -238,6 +277,7 @@ function createMockDb(): MockDb {
     entitlements: seedEntitlements(
       orders[0] === undefined ? null : { id: orders[0].id, order_no: orders[0].order_no },
     ),
+    targets: seedTargets(),
   };
 }
 

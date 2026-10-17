@@ -1,28 +1,12 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
 import { orderKeys } from "@/features/orders/api/orders.queries";
 import { orderRefusal, type OrderRefusal } from "@/features/orders/lib/order-lifecycle";
-
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
-
-/** Closes the dialog a moment after success, and never after the dialog is gone. */
-export function useCloseAfterSuccess(onClose: () => void): () => void {
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
-  return () => {
-    timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
-  };
-}
 
 /** A refusal: stale ones close the dialog with a toast and re-read the order. */
 export function useOrderRefusal(

@@ -2490,21 +2490,25 @@ def f_excel_import() -> None:
     _columns(
         "69-excel-import", "Excel import with column matching",
         "Partners, a draft list's rates, or order lines. Nothing is saved before the check.",
-        "BUILT. FS-062: migration 074, /imports.",
+        "BUILT. FS-062: migration 074, /imports. FS-067: matching fixes. FS-068: template.",
         [("i1", "POST /imports (multipart): kind, file, target_id?\n.xlsx or .csv, 10 MB, 5,000 rows", BLUE),
-         ("i2", "read: caps checked BEFORE openpyxl; rows stored\nas text in import_batch (owner only)", GREEN),
-         ("i3", "answer: headers, sample, fields,\nsuggested_mapping (your last, then common names)", GREY),
+         ("i2", "read: caps checked BEFORE openpyxl; header = the row\nwith the most known names (2+); rows stored as text", GREEN),
+         ("i3", "answer: headers (labels from above: Price (GJ), UP),\nsuggested_mapping: last SAVED, never the rate, no empty\ncolumn, never another field's own name", GREY),
          ("i4", "POST /imports/{id}/check {mapping}\nevery row, every error, sheet row numbers", BLUE),
          ("i5", "POST /imports/{id}/commit: re-check in the\ntransaction; all or nothing, or skip_invalid", GREEN),
          ("i6", "partners: one INSERT per type tier, parents first;\nrates: delete + insert into the DRAFT list", BLUE)],
         [("d1", "lines: the check returns them; the order or\nquotation form saves them. No commit.", GREY),
          ("d2", "area: a placeholder insert per territory in a\nsavepoint asks the real policy (42501 = outside)", YELLOW),
          ("d3", "codes: partner_codes_taken() sees hidden partners", YELLOW),
-         ("d4", "purge after 7 days: import_batch_purge(),\nsystem principal only", GREY)],
+         ("d4", "purge after 7 days: import_batch_purge(),\nsystem principal only", GREY),
+         ("d5", "products: names cleaned as the loader did (_x000D_,\nspaces); unknown code + known name: by name if uncoded", GREEN),
+         ("d6", "discard: rows gone; the check kept with cell values\ntaken out (partners: counts only)", GREY),
+         ("d7", "GET /imports/template?kind=: our names in row 1, no\nrows, codes as text; uploaded blank it is refused", GREEN)],
         [("n1", "NO LOGIN IS CREATED\n\nEvery dealer can be a record. Portal access is a\nseparate POST /users per dealer.", RED),
          ("n2", "FLOATS ARE NOT MONEY\n\nrepr -> Decimal, 9 places, no exponent. A % cell is read\nas shown. More than 2 decimals on a rate is refused.", RED),
          ("n3", "A CHILD OF A BAD ROW IS A BAD ROW\n\nSkipping a distributor strands its dealers; the check\nsays so before commit (EC-12).", RED),
-         ("n4", "Not yet: updating partners, a template file,\nfuzzy product match (GAP-471 to 473, 476).", YELLOW)])
+         ("n4", "Not yet: updating partners, fuzzy match, codes from\na sheet, a template under the wrong kind (GAP-471, 473,\n476, 503 to 507).", YELLOW),
+         ("n5", "LOOK AT THE FILE FIRST\n\n16 Oct: names under Item Code, no rates. Every row\nnow says: match this column to Description.", RED)])
 
 
 def f_live_checks() -> None:
@@ -2521,7 +2525,7 @@ def f_live_checks() -> None:
         [("j1", "staging only: the journey. Lead, two stages,\nquotation, send (channel none), PDF", YELLOW),
          ("j2", "accept, order (never submitted), document,\neach record's timeline", YELLOW),
          ("j3", "negatives: another office reads no lead;\na role without view gets 403", GREEN),
-         ("j4", "live/inventory.json: 118 paths, each checked\nor skipped with a reason; 47 forbidden on prod", GREY)],
+         ("j4", "live/inventory.json: 119 paths, each checked\nor skipped with a reason; 47 forbidden on prod", GREY)],
         [("n1", "TWO GETS WRITE\n\n/tracking/team/latest and /visits insert view-log\nrows. Never called on production. The normal suite\ncalls every checked GET in a READ ONLY transaction.", RED),
          ("n2", "STAGING SENDS REAL WHATSAPP\n\nEvery record carries LIVE_TEST_MOBILE: one message\nper run, the lead acknowledgement.", RED),
          ("n3", "THE GUARD READS THE SAME URL THE WRITES USE\n\nA wrong address fails the guard instead of passing it.", GREEN),

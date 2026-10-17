@@ -206,6 +206,8 @@ export function generateLeads(
         stage === "lost" ? { id: reason.id, code: reason.code, name: reason.name } : null,
       lost_note: stage === "lost" && random.chance(0.5) ? random.pick(LOST_NOTES) : null,
       reopen_count: random.chance(0.05) ? 1 : 0,
+      // swept by the backend's worker from where it stood (FS-035)
+      dormant_from_stage: stage === "dormant" ? "qualified" : null,
       merged_into:
         stage === "merged" && previous
           ? { id: previous.id, inquiry_no: previous.inquiry_no }
@@ -244,6 +246,20 @@ export function generateLeads(
     }
 
     leads.push(lead);
+  }
+
+  // A few prospective dealers (FS-053), chosen without drawing on `random`, so every other
+  // lead stays as it was: two qualified, ready to be won, and one new.
+  for (const [stage, take] of [
+    ["qualified", 2],
+    ["new", 1],
+  ] as const) {
+    leads
+      .filter((lead) => lead.stage === stage && lead.inquiry_type === "commercial")
+      .slice(0, take)
+      .forEach((lead) => {
+        lead.inquiry_type = "dealership";
+      });
   }
 
   // Newest first, as the backend lists them; every lead must satisfy the contract.

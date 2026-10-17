@@ -16,7 +16,7 @@ import {
 import type { PdfLinkWire } from "@/features/quotations/api/quotations.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
-import type { Role } from "@/lib/auth/roles";
+import { PARTNER_ROLES, type Role } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { calendarDayOf } from "@/lib/format";
 import { orderQueueStep, type MockApprovalStep } from "@/mocks/data/approvals";
@@ -38,7 +38,7 @@ import {
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { mockMeFor } from "@/mocks/data/sessions";
-import { findMockTerritory } from "@/mocks/data/territories";
+import { findMockTerritory, mockTerritoryLineage } from "@/mocks/data/territories";
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
@@ -156,6 +156,57 @@ function replayWrite(
         ? new HttpResponse(null, { status: 204 })
         : HttpResponse.json({ data: order }, { status }),
   };
+}
+
+/**
+ * SO-001, SO-006 · The orders a list or its export asks for: statuses, type, owner, lead,
+ * quotation, search, areas (an order sits in an area when its territory or any above it is
+ * one), an office (the order's office, or any office above it, is the one asked for) and
+ * `waiting_on`, the role whose approval step is next (BE-022).
+ */
+function filteredOrders(params: URLSearchParams, statuses?: readonly string[]): OrderWire[] {
+  const wanted =
+    statuses ?? (params.get("status") ?? "").split(",").filter((value) => value !== "");
+  const orderType = params.get("order_type");
+  const owner = params.get("owner");
+  const leadId = params.get("lead_id");
+  const quotationId = params.get("quotation_id");
+  const q = params.get("q") ?? "";
+  const areas = new Set(
+    (params.get("territory_id") ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id !== ""),
+  );
+  const officeId = params.get("owner_org_unit_id");
+  const waitingOn = params.get("waiting_on");
+  return mockDb.orders.filter(
+    (order) =>
+      (wanted.length === 0 || wanted.includes(order.status)) &&
+      (orderType === null || order.order_type === orderType) &&
+      (owner === null || order.owner?.id === (owner === "me" ? MOCK_CREATOR?.id : owner)) &&
+      (leadId === null || order.lead?.id === leadId) &&
+      (quotationId === null ||
+        order.quotations.some((quotation) => quotation.id === quotationId)) &&
+      (areas.size === 0 ||
+        mockTerritoryLineage(order.territory.id).some((territory) => areas.has(territory.id))) &&
+      (officeId === null || officeId === "" || inOfficeTree(order.owner_org_unit.id, officeId)) &&
+      (waitingOn === null ||
+        waitingOn === "" ||
+        toOrderSummary(order).approval_waiting_on === waitingOn) &&
+      matchesSearch(order, q),
+  );
+}
+
+/** True when the office is the one asked for, or sits anywhere under it. */
+function inOfficeTree(officeId: string, ancestorId: string): boolean {
+  let current: string | null = officeId;
+  for (let hops = 0; current !== null && hops < 10; hops += 1) {
+    if (current === ancestorId) return true;
+    const id: string = current;
+    current = mockDb.offices.find((office) => office.id === id)?.parent?.id ?? null;
+  }
+  return false;
 }
 
 /** 404, or 409 status_changed when the screen showed another status. */
@@ -348,6 +399,16 @@ const orderPartySchema = z.object({
     .nullish(),
 });
 
+const rupeesText = z.string().regex(/^\d+(\.\d{1,2})?$/);
+
+/** SO-008 · PUT /orders/{id}/subsidy (FS-054 SubsidyBlockIn). */
+const subsidySchema = z.strictObject({
+  lead_ids: z.array(z.string().min(1)).min(1).max(50),
+  material_amount: rupeesText.nullish(),
+  subsidy_amount: rupeesText,
+  farmer_payable: rupeesText.nullish(),
+});
+
 const createSchema = z.object({
   order_type: z.enum(ORDER_TYPES).default("commercial"),
   quotation_ids: z.array(z.string().min(1)).default([]),
@@ -359,6 +420,8 @@ const createSchema = z.object({
   payment_terms: z.enum(PAYMENT_TERMS).default("full_payment"),
   remarks: z.string().trim().max(2000).nullish(),
   lines: z.array(lineInSchema).max(200).default([]),
+  /** SO-008 · Typed in on a direct subsidised order; refused alongside quotations. */
+  subsidy: subsidySchema.optional(),
 });
 
 const linesSchema = z.object({
@@ -415,6 +478,100 @@ function onLiveOrder(quotationId: string): boolean {
   );
 }
 
+function paise(value: string): number {
+  return Math.round(Number(value) * 100);
+}
+
+function rupees(value: number): string {
+  return (value / 100).toFixed(2);
+}
+
+/**
+ * SO-008 · The order's subsidy block from what was written (FS-054 rule 3a): a missing material
+ * is the order total now, a missing payable is material less subsidy; with its warnings.
+ */
+function applySubsidy(order: OrderWire): void {
+  const raw = mockDb.orderSubsidies.get(order.id);
+  if (raw === undefined) return;
+  const material = paise(raw.material ?? order.totals.total);
+  const subsidy = paise(raw.subsidy);
+  const derived = material - subsidy;
+  const payable = raw.payable === null ? derived : paise(raw.payable);
+  order.subsidy = {
+    material_amount: rupees(material),
+    subsidy_amount: rupees(subsidy),
+    farmer_payable: rupees(payable),
+    material_is_total: raw.material === null,
+    farmer_payable_is_derived: raw.payable === null,
+    leads: raw.leadIds.map((id) => ({
+      id,
+      inquiry_no: mockDb.leads.find((lead) => lead.id === id)?.inquiry_no ?? null,
+    })),
+  };
+  // FS-055 rule 4: the order is paid by the farmer's share, never below 0 or above the total
+  order.payable = rupees(Math.max(0, Math.min(paise(order.totals.total), payable)));
+  order.warnings = [
+    ...order.warnings.filter(
+      (warning) =>
+        !warning.startsWith("subsidy_above_material") &&
+        !warning.startsWith("farmer_payable_not_material_less_subsidy"),
+    ),
+    ...(subsidy > material
+      ? ["subsidy_above_material: the subsidy is more than the material"]
+      : []),
+    ...(raw.payable !== null && payable !== derived
+      ? ["farmer_payable_not_material_less_subsidy: the farmer payable differs"]
+      : []),
+  ];
+}
+
+function isStaff(): boolean {
+  return mockMeFor(readMockRole()).data.user_type === "staff";
+}
+
+/** FS-054 rule 3: each named lead seen by the caller and qualified or later. */
+function subsidyLeadsRefusal(ids: readonly string[]): Response | null {
+  for (const id of ids) {
+    const lead = mockDb.leads.find((item) => item.id === id);
+    if (lead === undefined) {
+      return errorResponse(422, "lead_not_visible", "You cannot see that lead.", {
+        "subsidy.lead_ids": id,
+      });
+    }
+    if (!ORDERABLE_STAGES.includes(lead.stage)) {
+      return errorResponse(422, "lead_not_open", `A named lead is ${lead.stage}.`, {
+        "subsidy.lead_ids": id,
+      });
+    }
+  }
+  return null;
+}
+
+/** FS-054 rule 4: the subsidy and the payable at most the material, or the total now. */
+function subsidyAmountsRefusal(
+  body: z.infer<typeof subsidySchema>,
+  total: string,
+): Response | null {
+  const material = paise(body.material_amount ?? total);
+  if (paise(body.subsidy_amount) > material) {
+    return errorResponse(
+      422,
+      "subsidy_above_material",
+      "The subsidy is more than the material amount.",
+      { "subsidy.subsidy_amount": body.subsidy_amount },
+    );
+  }
+  if (body.farmer_payable != null && paise(body.farmer_payable) > material) {
+    return errorResponse(
+      422,
+      "payable_above_material",
+      "The farmer payable is more than the material amount.",
+      { "subsidy.farmer_payable": body.farmer_payable },
+    );
+  }
+  return null;
+}
+
 // ── handlers ────────────────────────────────────────────────────────────────────
 
 /**
@@ -428,11 +585,13 @@ function createDirect(
   if (body.party == null) {
     return validation({ party: "required" });
   }
-  const lead =
-    body.lead_id == null ? undefined : mockDb.leads.find((item) => item.id === body.lead_id);
-  if (body.lead_id != null && lead === undefined) {
+  // FS-054 rule 6: a subsidised order's first named lead is its lead and routes it
+  const subsidyIds = body.subsidy === undefined ? [] : [...new Set(body.subsidy.lead_ids)];
+  const leadRef = subsidyIds[0] ?? body.lead_id;
+  const lead = leadRef == null ? undefined : mockDb.leads.find((item) => item.id === leadRef);
+  if (leadRef != null && lead === undefined) {
     return errorResponse(422, "lead_not_visible", "You cannot see that lead.", {
-      lead_id: body.lead_id,
+      lead_id: leadRef,
     });
   }
   if (lead !== undefined && !ORDERABLE_STAGES.includes(lead.stage)) {
@@ -482,6 +641,17 @@ function createDirect(
     remarks: body.remarks ?? null,
     createdAt: new Date().toISOString(),
   });
+  if (body.subsidy !== undefined) {
+    const refusal = subsidyAmountsRefusal(body.subsidy, order.totals.total);
+    if (refusal !== null) return refusal;
+    mockDb.orderSubsidies.set(order.id, {
+      material: body.subsidy.material_amount ?? null,
+      subsidy: body.subsidy.subsidy_amount,
+      payable: body.subsidy.farmer_payable ?? null,
+      leadIds: subsidyIds,
+    });
+    applySubsidy(order);
+  }
   mockDb.orders.unshift(order);
   mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
   recordOrderEvent(order, "order.created", {});
@@ -558,24 +728,7 @@ export const orderHandlers = [
     if (!statuses.every(isStatus)) {
       return validation({ status: "unknown status" });
     }
-    const orderType = url.searchParams.get("order_type");
-    const owner = url.searchParams.get("owner");
-    const leadId = url.searchParams.get("lead_id");
-    const quotationId = url.searchParams.get("quotation_id");
-    const q = url.searchParams.get("q") ?? "";
-    const matches =
-      scenario === "empty"
-        ? []
-        : mockDb.orders.filter(
-            (order) =>
-              (statuses.length === 0 || statuses.includes(order.status)) &&
-              (orderType === null || order.order_type === orderType) &&
-              (owner === null || order.owner?.id === (owner === "me" ? MOCK_CREATOR?.id : owner)) &&
-              (leadId === null || order.lead?.id === leadId) &&
-              (quotationId === null ||
-                order.quotations.some((quotation) => quotation.id === quotationId)) &&
-              matchesSearch(order, q),
-          );
+    const matches = scenario === "empty" ? [] : filteredOrders(url.searchParams, statuses);
     const counted = url.searchParams.get("include_total") === "true";
     const hasMore = offset + limit < matches.length;
     const body: OrderPageWire = {
@@ -590,14 +743,30 @@ export const orderHandlers = [
     return HttpResponse.json(body);
   }),
 
+  /** ACCT-001 · Counts by status, and submitted orders by whose step is next. Before :orderId. */
+  http.get(buildApiUrl("/orders/stats"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const matches = scenario === "empty" ? [] : filteredOrders(new URL(request.url).searchParams);
+    const byStatus = Object.fromEntries(ORDER_STATUSES.map((status) => [status, 0]));
+    const waitingOn: Record<string, number> = {};
+    for (const order of matches) {
+      byStatus[order.status] = (byStatus[order.status] ?? 0) + 1;
+      const role = toOrderSummary(order).approval_waiting_on;
+      if (role !== null) waitingOn[role] = (waitingOn[role] ?? 0) + 1;
+    }
+    return HttpResponse.json({ total: matches.length, by_status: byStatus, waiting_on: waitingOn });
+  }),
+
   /** SO-006 · The list as a file. Before /orders/:orderId. */
-  http.get(buildApiUrl("/orders/export"), async () => {
+  http.get(buildApiUrl("/orders/export"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     return mockWorkbook(
       "orders",
       ["Number", "Status", "Party", "Total"],
-      mockDb.orders.map((order) => [
+      filteredOrders(new URL(request.url).searchParams).map((order) => [
         order.order_no ?? "Draft",
         order.status,
         order.party.name,
@@ -688,7 +857,8 @@ export const orderHandlers = [
       return validation({ order_type: "check the order's fields" });
     }
     const body = parsed.data;
-    if (!orderableType(body.order_type)) {
+    const subsidised = body.order_type === "subsidised";
+    if (!orderableType(body.order_type) && !subsidised) {
       return errorResponse(
         422,
         "order_type_unsupported",
@@ -697,6 +867,53 @@ export const orderHandlers = [
           order_type: body.order_type,
         },
       );
+    }
+    if (subsidised && !isStaff()) {
+      return errorResponse(
+        403,
+        "type_staff_only",
+        "Subsidised orders are raised by Polysil staff.",
+      );
+    }
+    if (!subsidised && body.subsidy !== undefined) {
+      return errorResponse(422, "subsidy_not_allowed", "Only a subsidised order takes a subsidy.", {
+        subsidy: "not allowed",
+      });
+    }
+    if (subsidised && body.quotation_ids.length > 0 && new Set(body.quotation_ids).size !== 1) {
+      return errorResponse(
+        422,
+        "subsidised_quotation_count",
+        "A subsidised order is made from one quotation.",
+        { quotation_ids: "exactly one" },
+      );
+    }
+    if (subsidised && body.quotation_ids.length > 0 && body.subsidy !== undefined) {
+      return errorResponse(422, "subsidy_from_quotation", "The subsidy comes from the quotation.", {
+        subsidy: "not allowed",
+      });
+    }
+    if (subsidised && body.quotation_ids.length === 0) {
+      if (body.subsidy === undefined) {
+        return errorResponse(
+          422,
+          "subsidy_missing",
+          "A subsidised order needs its subsidy and leads.",
+          {
+            subsidy: "required",
+          },
+        );
+      }
+      if (body.lead_id != null) {
+        return errorResponse(
+          422,
+          "lead_from_subsidy",
+          "A subsidised order takes its leads from subsidy.lead_ids.",
+          { lead_id: "use subsidy.lead_ids" },
+        );
+      }
+      const refusal = subsidyLeadsRefusal([...new Set(body.subsidy.lead_ids)]);
+      if (refusal !== null) return refusal;
     }
     if (body.quotation_ids.length === 0) {
       return createDirect(body, replay);
@@ -727,6 +944,23 @@ export const orderHandlers = [
     if (first === undefined) {
       return validation({ quotation_ids: "at least one accepted quotation" });
     }
+    if (found.some((item) => (item.sales_type === "subsidised") !== subsidised)) {
+      return errorResponse(
+        422,
+        "type_mismatch",
+        "A subsidised order is made from a subsidised quotation, and only it.",
+        { order_type: body.order_type },
+      );
+    }
+    const fromQuote = subsidised ? first.subsidy : null;
+    if (subsidised && fromQuote == null) {
+      return errorResponse(
+        422,
+        "quotation_subsidy_missing",
+        "The quotation has no subsidy calculation.",
+        { quotation_ids: first.id },
+      );
+    }
     const disagrees = found.find(
       (item) =>
         item.partner?.id !== first.partner?.id ||
@@ -753,6 +987,16 @@ export const orderHandlers = [
     });
     const me = mockMeFor(readMockRole()).data;
     order.owner = { id: me.id, full_name: me.full_name };
+    if (fromQuote != null && first.lead !== null) {
+      // FS-057 rule 8: material is the calculation's cost; AP's state GST joins the subsidy
+      mockDb.orderSubsidies.set(order.id, {
+        material: fromQuote.total_cost,
+        subsidy: rupees(paise(fromQuote.subsidy) + paise(fromQuote.gst_paid_by_state ?? "0")),
+        payable: fromQuote.farmer_share,
+        leadIds: [first.lead.id],
+      });
+      applySubsidy(order);
+    }
     mockDb.orders.unshift(order);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.created", {});
@@ -781,6 +1025,13 @@ export const orderHandlers = [
       if (!orderableType(body.order_type)) {
         return errorResponse(422, "order_type_unsupported", "Only commercial and industrial.", {
           order_type: body.order_type,
+        });
+      }
+      // FS-042 rule 18: an order from quotations, or a subsidised one, keeps its type
+      const fixed = order.quotations.length > 0 || order.order_type === "subsidised";
+      if (body.order_type !== order.order_type && fixed) {
+        return errorResponse(422, "order_type_fixed", "This order's type is fixed.", {
+          order_type: order.order_type,
         });
       }
       order.order_type = body.order_type;
@@ -842,8 +1093,73 @@ export const orderHandlers = [
       return validation(priced.fields);
     }
     Object.assign(order, withOrderLines(orderLinesFrom(priced.lines)));
+    applySubsidy(order);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.lines_replaced", { lines: priced.lines.length });
+    return HttpResponse.json({ data: order });
+  }),
+
+  /** SO-008 · Replace a subsidised draft's subsidy (FS-054 rule 5); the first lead stays. */
+  http.put(buildApiUrl("/orders/:orderId/subsidy"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    if (!allowed(readMockRole(), "sales_orders", "edit")) {
+      return errorResponse(403, "forbidden", "You cannot change orders.");
+    }
+    const parsed = subsidySchema.safeParse(raw);
+    if (!parsed.success) {
+      const field = String(parsed.error.issues[0]?.path[0] ?? "subsidy_amount");
+      return validation({ [`subsidy.${field}`]: "Enter rupees, with at most two decimals." });
+    }
+    const order = findOrder(String(params.orderId));
+    if (order === undefined) {
+      return errorResponse(404, "not_found", "No such order.");
+    }
+    if (order.status !== "draft") {
+      return errorResponse(409, "order_not_draft", "Only a draft can be changed.", {
+        status: order.status,
+      });
+    }
+    if (order.order_type !== "subsidised") {
+      return errorResponse(
+        422,
+        "order_type_not_subsidised",
+        "Only a subsidised order takes a subsidy.",
+        { order_type: order.order_type },
+      );
+    }
+    if (!isStaff()) {
+      return errorResponse(
+        403,
+        "type_staff_only",
+        "Subsidised orders are raised by Polysil staff.",
+      );
+    }
+    const body = parsed.data;
+    const ids = [...new Set(body.lead_ids)];
+    if (order.lead === null || ids[0] !== order.lead.id) {
+      return errorResponse(
+        422,
+        "first_lead_fixed",
+        "The first lead routes the order and cannot change.",
+        { "subsidy.lead_ids": order.lead?.id ?? "none" },
+      );
+    }
+    const refusal = subsidyLeadsRefusal(ids) ?? subsidyAmountsRefusal(body, order.totals.total);
+    if (refusal !== null) return refusal;
+    mockDb.orderSubsidies.set(order.id, {
+      material: body.material_amount ?? null,
+      subsidy: body.subsidy_amount,
+      payable: body.farmer_payable ?? null,
+      leadIds: ids,
+    });
+    applySubsidy(order);
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.updated", {});
     return HttpResponse.json({ data: order });
   }),
 
@@ -953,6 +1269,64 @@ export const orderHandlers = [
     order.cancel_remark = parsed.data.remark;
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.cancelled", { remark: parsed.data.remark });
+    return HttpResponse.json({ data: order });
+  }),
+
+  // SO-007 · An approved order back to draft under its number (FS-036, migration 041).
+  http.post(buildApiUrl("/orders/:orderId/amend"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    const parsed = remarkSchema.safeParse(raw);
+    if (!parsed.success) {
+      return errorResponse(422, "remark_required", "Say why the order is amended.", {
+        remark: "Say why the order is amended.",
+      });
+    }
+    const target = orderAt(String(params.orderId), parsed.data.expected_status);
+    if (!target.ok) return target.response;
+    const { order } = target;
+    const role = readMockRole();
+    const isPartner = PARTNER_ROLES.some((partnerRole) => partnerRole === role);
+    const me = mockMeFor(role).data.id;
+    if (isPartner || !(allowed(role, "sales_orders", "edit") || order.owner?.id === me)) {
+      return errorResponse(403, "forbidden", "Not permitted to amend this order.");
+    }
+    if (order.order_type === "replacement") {
+      return errorResponse(422, "order_type_fixed", "A replacement order follows its complaint.");
+    }
+    if (order.dispatches.some((dispatch) => dispatch.voided_at === null)) {
+      return errorResponse(409, "order_dispatched", "The order has shipped.");
+    }
+    if (order.dispatches.length > 0) {
+      return errorResponse(
+        409,
+        "voided_dispatch_holds_lines",
+        "A voided dispatch still names this order's lines.",
+      );
+    }
+    if (order.status !== "approved") {
+      return errorResponse(409, "status_changed", `The order is now ${order.status}.`, {
+        status: order.status,
+      });
+    }
+    order.amend_count = (order.amend_count ?? 0) + 1;
+    order.amended_from_total = order.totals.total;
+    order.amend_reason = parsed.data.remark;
+    order.status = "draft";
+    order.approved_at = null;
+    order.pdf_state = "none";
+    order.pdf_error = null;
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.amended", {
+      from: "approved",
+      to: "draft",
+      amend: order.amend_count,
+      from_total: order.totals.total,
+    });
     return HttpResponse.json({ data: order });
   }),
 

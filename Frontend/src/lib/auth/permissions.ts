@@ -27,13 +27,15 @@ export const MODULE_CODES = [
   "partners",
   "marketing",
   "schemes",
-  "accounts",
+  "payments",
   "dispatch",
   "reports",
+  "targets",
   "masters",
   "users",
   "products",
   "pricing",
+  "targets",
 ] as const;
 
 export type ModuleCode = (typeof MODULE_CODES)[number];

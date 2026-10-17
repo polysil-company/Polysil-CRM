@@ -32,6 +32,7 @@ import {
   LEAD_INQUIRY_TYPE_LABELS,
   LEAD_PRIORITY_BADGE,
   LEAD_PRIORITY_LABELS,
+  LEAD_STAGE_LABELS,
   landText,
   partnerTypeLabel,
 } from "@/features/leads/lib/lead-labels";
@@ -39,6 +40,7 @@ import { LookupName } from "@/features/lookups/components/lookup-name";
 import { formatTerritory } from "@/features/lookups/lib/lookup-labels";
 import { toShareParam } from "@/features/messages/lib/share-attachment";
 import { LeadQuotations } from "@/features/quotations/components/lead-quotations";
+import { Lead360Card } from "@/features/reports/components/lead-360";
 import { useCan, useSession } from "@/features/session/hooks/use-session";
 import { LeadSubsidy } from "@/features/subsidy/components/lead-subsidy";
 import { LeadMinutes } from "@/features/tasks/components/lead-minutes";
@@ -134,6 +136,21 @@ function LeadNotices({
   const pending = showDuplicates
     ? lead.duplicates.filter((duplicate) => duplicate.state === "pending")
     : [];
+
+  if (lead.stage === "dormant") {
+    return (
+      <LeadNotice>
+        <p className="font-medium">Dormant: no activity for a long time</p>
+        <p className="text-muted-foreground">
+          {lead.dormantFromStage === null
+            ? "The system set it aside."
+            : `It was ${LEAD_STAGE_LABELS[lead.dormantFromStage]}.`}{" "}
+          Reopen it from Update stage to pick it up again, or mark it lost. It can still be edited,
+          assigned and given tasks; a quotation waits until it is reopened.
+        </p>
+      </LeadNotice>
+    );
+  }
 
   if (lead.mergedInto) {
     return (
@@ -269,6 +286,9 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
       <LeadNotices lead={lead} showDuplicates={staff} />
 
       <div className="flex min-w-0 flex-col gap-4">
+        {/* RPT-003 · Tiles across the top, and other leads on the same mobile. */}
+        <Lead360Card leadId={lead.id} />
+
         <Card>
           <CardHeader>
             <CardTitle level={3}>Details</CardTitle>

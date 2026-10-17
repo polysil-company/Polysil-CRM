@@ -25,6 +25,7 @@ import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
 import { useCreateOrder, useSaveOrderDraft } from "@/features/orders/api/orders.mutations";
 import {
+  ORDER_TYPES,
   ORDERABLE_TYPES,
   PAYMENT_TERMS,
   type Order,
@@ -36,6 +37,7 @@ import {
   PAYMENT_TERMS_LABELS,
   orderNumber,
 } from "@/features/orders/lib/order-labels";
+import { orderRefusal } from "@/features/orders/lib/order-lifecycle";
 import { quotationKeys } from "@/features/quotations/api/quotations.queries";
 import {
   PricedItemsCard,
@@ -52,6 +54,7 @@ import {
   type DraftLine,
   type PricingContext,
 } from "@/features/quotations/lib/builder-lines";
+import { useIsStaff } from "@/features/session/hooks/use-session";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toUserFacingError } from "@/lib/api/error-messages";
@@ -60,6 +63,15 @@ import { createRequestId } from "@/lib/api/request-id";
 import { normalizeIndianMobile } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
+
+import {
+  SubsidyFields,
+  subsidyDraftProblems,
+  subsidyFieldErrors,
+  subsidyRequest,
+  type SubsidyDraft,
+  type SubsidyProblems,
+} from "./order-subsidy-fields";
 
 const log = createLogger({
   file: "features/orders/components/order-builder.tsx",
@@ -71,7 +83,20 @@ export type OrderBuilderSource =
   | { readonly mode: "create"; readonly lead: Lead | null }
   | { readonly mode: "edit"; readonly order: Order };
 
-const OrderTypeSchema = z.enum(ORDERABLE_TYPES);
+const OrderTypeSchema = z.enum(ORDER_TYPES);
+
+type OrderableType = (typeof ORDERABLE_TYPES)[number];
+
+function orderableType(value: string): value is OrderableType {
+  return ORDERABLE_TYPES.some((type) => type === value);
+}
+
+/** SO-008 · What the builder may make: Subsidised too, for staff (FS-054). */
+type BuildableType = OrderableType | "subsidised";
+
+function buildableType(value: string): value is BuildableType {
+  return orderableType(value) || value === "subsidised";
+}
 
 const orderHeaderSchema = z.object({
   orderType: OrderTypeSchema,
@@ -129,7 +154,8 @@ function headerDefaults(source: OrderBuilderSource): OrderHeaderForm {
   }
   const { order } = source;
   return {
-    orderType: order.orderType === "industrial" ? "industrial" : "commercial",
+    // SO-008 · A subsidised draft (and any type the builder doesn't offer) keeps its type
+    orderType: order.orderType,
     partyName: order.party.name,
     partyMobile: order.party.mobile ?? "",
     partyAddress: order.party.address ?? "",
@@ -202,8 +228,29 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   const { errors } = useFormState({ control: form.control });
   const place = useWatch({ control: form.control, name: "place" });
   const fromQuotations = source.mode === "edit" && source.order.quotations.length > 0;
+  // SO-007: an amended order keeps its type (422 order_type_fixed). FS-042 rule 18: so does a
+  // draft from quotations, or one the builder can't make.
+  const amended = source.mode === "edit" && source.order.amendCount > 0;
+  const typeFixed =
+    source.mode === "edit" && (amended || fromQuotations || !orderableType(source.order.orderType));
   // The place is fixed by the lead, or by the draft once saved.
   const placeFixed = source.mode === "edit" || source.lead !== null;
+  const staff = useIsStaff();
+  const typeChoices: readonly BuildableType[] =
+    source.mode === "create" && staff ? [...ORDERABLE_TYPES, "subsidised"] : ORDERABLE_TYPES;
+  // SO-008 · A subsidised order typed in names its leads and subsidy; the lead it starts from
+  // is the first (FS-054 rule 6)
+  const [subsidyDraft, setSubsidyDraft] = useState<SubsidyDraft>(() => ({
+    leads:
+      source.mode === "create" && source.lead !== null
+        ? [{ id: source.lead.id, code: source.lead.code, name: source.lead.customerName }]
+        : [],
+    material: "",
+    amount: "",
+    payable: "",
+  }));
+  const [subsidyShown, setSubsidyShown] = useState(false);
+  const [subsidyServer, setSubsidyServer] = useState<SubsidyProblems>({});
 
   const partnerId =
     source.mode === "create"
@@ -230,6 +277,12 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   const idempotency = useIdempotencyKey();
   const create = useCreateOrder();
   const saveDraft = useSaveOrderDraft();
+  const subsidised = source.mode === "create" && orderType === "subsidised";
+  const subsidyLocal = subsidised ? subsidyDraftProblems(subsidyDraft) : {};
+  const subsidyProblems: SubsidyProblems = {
+    ...(subsidyShown ? subsidyLocal : {}),
+    ...subsidyServer,
+  };
 
   const save = useAsyncAction({
     action: async (values: OrderHeaderForm) => {
@@ -243,9 +296,15 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         remarks: orNull(values.remarks),
       };
       if (source.mode === "create") {
+        const type = buildableType(values.orderType) ? values.orderType : "commercial";
         const body = {
-          order_type: values.orderType,
-          ...(source.lead === null ? {} : { lead_id: source.lead.id }),
+          order_type: type,
+          // a subsidised order takes its leads from the subsidy (422 lead_from_subsidy)
+          ...(type === "subsidised"
+            ? { subsidy: subsidyRequest(subsidyDraft) }
+            : source.lead === null
+              ? {}
+              : { lead_id: source.lead.id }),
           ...(partnerId === null ? {} : { partner_id: partnerId }),
           party: partyFrom(values),
           place_of_supply_territory_id: values.place?.id ?? "",
@@ -255,8 +314,14 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         return create.mutateAsync({ body, idempotencyKey: idempotency.keyFor(body) });
       }
       const headerChanged = JSON.stringify(values) !== JSON.stringify(initialHeader);
+      // Only a changed type is sent: an order from quotations, or a subsidised one, keeps its
+      // own (422 order_type_fixed)
+      const newType =
+        values.orderType !== initialHeader.orderType && orderableType(values.orderType)
+          ? { order_type: values.orderType }
+          : {};
       const headerBody = {
-        order_type: values.orderType,
+        ...newType,
         ...(fromQuotations ? {} : { party: partyFrom(values) }),
         ...common,
         expected_status: "draft" as const,
@@ -290,6 +355,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
 
   function handleSaveError(error: unknown): void {
     const fields = isApiError(error) && error.details !== undefined ? readAnyFields(error) : {};
+    setSubsidyServer(subsidised ? subsidyFieldErrors(error) : {});
     const routed = routeSaveErrors(fields, priced.plan.keys);
     priced.setLineErrors(routed.lines);
     for (const [field, message] of Object.entries(routed.header)) {
@@ -322,6 +388,23 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       case "order_type_unsupported":
         setFormError({ title: "That order type isn't built yet", description: error.message });
         return;
+      case "order_type_fixed":
+        setFormError({
+          title: "The order type can't change now",
+          description: "This order was amended after approval, so it keeps its type.",
+        });
+        return;
+      // SO-008 · the subsidised order's refusals, in the order's words
+      case "subsidy_above_material":
+      case "payable_above_material":
+      case "lead_not_visible":
+      case "subsidy_missing":
+      case "lead_from_subsidy":
+      case "type_staff_only": {
+        const refusal = orderRefusal(error);
+        setFormError({ title: refusal.title, description: refusal.message });
+        return;
+      }
       case "status_changed":
       case "order_not_draft":
         setFormError({
@@ -351,7 +434,9 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       ? "Choose where the goods go first."
       : priced.rowsReady === 0
         ? "Add at least one item."
-        : saveBlocker(priced);
+        : subsidised && subsidyDraft.leads.length === 0
+          ? "Add the farmer's lead for the subsidy."
+          : saveBlocker(priced);
   const canSave = blocker === null && priced.upToDate && !save.isBusy;
 
   const title = source.mode === "create" ? "New order" : `Edit ${orderNumber(source.order)}`;
@@ -371,7 +456,10 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       className="flex flex-col gap-5"
       onSubmit={(event) => {
         setFormError(null);
+        setSubsidyShown(true);
+        setSubsidyServer({});
         void form.handleSubmit((values) => {
+          if (subsidised && Object.keys(subsidyLocal).length > 0) return;
           void save.run(values);
         })(event);
       }}
@@ -437,34 +525,52 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
             </CardHeader>
             <CardContent>
               <FieldGroup className="grid gap-4 sm:grid-cols-2">
-                <Controller
-                  control={form.control}
-                  name="orderType"
-                  render={({ field }) => (
-                    <Field className="sm:col-span-2">
-                      <FieldLabel id="order-type-label">Order type</FieldLabel>
-                      <RadioGroup<(typeof ORDERABLE_TYPES)[number]>
-                        aria-labelledby="order-type-label"
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        className="flex-row flex-wrap gap-5"
-                      >
-                        {ORDERABLE_TYPES.map((type) => (
-                          <label
-                            key={type}
-                            className="flex items-center gap-2 text-sm text-foreground"
-                          >
-                            <RadioGroupItem value={type} />
-                            {ORDER_TYPE_LABELS[type]}
-                          </label>
-                        ))}
-                      </RadioGroup>
-                      <FieldDescription>
-                        Export, sample, subsidised and the others wait on the client&apos;s rules.
-                      </FieldDescription>
-                    </Field>
-                  )}
-                />
+                {typeFixed ? (
+                  <Field className="sm:col-span-2">
+                    <FieldLabel>Order type</FieldLabel>
+                    <p className="text-sm text-foreground">{ORDER_TYPE_LABELS[orderType]}</p>
+                    <FieldDescription>
+                      {amended
+                        ? "Fixed: the order was amended after approval, so it keeps its type."
+                        : fromQuotations
+                          ? "An order made from quotations keeps its type."
+                          : "This order keeps its type."}
+                    </FieldDescription>
+                  </Field>
+                ) : (
+                  <Controller
+                    control={form.control}
+                    name="orderType"
+                    render={({ field }) => (
+                      <Field className="sm:col-span-2">
+                        <FieldLabel id="order-type-label">Order type</FieldLabel>
+                        <RadioGroup<BuildableType>
+                          aria-labelledby="order-type-label"
+                          value={buildableType(field.value) ? field.value : "commercial"}
+                          onValueChange={field.onChange}
+                          className="flex-row flex-wrap gap-5"
+                        >
+                          {typeChoices.map((type) => (
+                            <label
+                              key={type}
+                              className="flex items-center gap-2 text-sm text-foreground"
+                            >
+                              <RadioGroupItem value={type} />
+                              {ORDER_TYPE_LABELS[type]}
+                            </label>
+                          ))}
+                        </RadioGroup>
+                        <FieldDescription>
+                          {field.value === "subsidised"
+                            ? "Staff only. Name the farmers' leads and the subsidy below."
+                            : typeChoices.includes("subsidised")
+                              ? "Export, sample and the others wait on the client's rules."
+                              : "Export, sample, subsidised and the others wait on the client's rules."}
+                        </FieldDescription>
+                      </Field>
+                    )}
+                  />
+                )}
                 <TextField
                   id="order-party-name"
                   label="Party"
@@ -611,6 +717,31 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
               </FieldGroup>
             </CardContent>
           </Card>
+
+          {subsidised ? (
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-0.5">
+                  <CardTitle level={3}>Subsidy</CardTitle>
+                  <CardDescription>
+                    The leads it covers, what the scheme pays, and what the farmer pays.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <SubsidyFields
+                  idPrefix="new-order-subsidy"
+                  draft={subsidyDraft}
+                  onDraftChange={(next) => {
+                    setSubsidyDraft(next);
+                    setSubsidyServer({});
+                  }}
+                  problems={subsidyProblems}
+                  total={priced.totals?.total ?? null}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
 
         <Card className="lg:sticky lg:top-4">

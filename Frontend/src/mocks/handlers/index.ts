@@ -4,6 +4,7 @@ import { approvalHandlers } from "./approvals";
 import { authHandlers } from "./auth";
 import { complaintHandlers } from "./complaints";
 import { dashboardHandlers } from "./dashboard";
+import { dealerApplicationHandlers } from "./dealer-applications";
 import { documentHandlers } from "./documents";
 import { importHandlers } from "./imports";
 import { leadCaptureHandlers } from "./lead-capture";
@@ -15,13 +16,17 @@ import { orderHandlers } from "./orders";
 import { partnerHandlers } from "./partners";
 import { productHandlers } from "./products";
 import { quotationHandlers } from "./quotations";
+import { reportHandlers } from "./reports";
 import { schemeHandlers } from "./schemes";
+import { settingsHandlers } from "./settings";
 import { subsidyHandlers } from "./subsidy";
 import { subsidyApplicationHandlers } from "./subsidy-applications";
 import { subsidyMasterHandlers } from "./subsidy-masters";
 import { subsidyReportHandlers } from "./subsidy-reports";
 import { subsidySchemeHandlers } from "./subsidy-schemes";
+import { targetHandlers } from "./targets";
 import { taskHandlers } from "./tasks";
+import { territoryHandlers } from "./territories";
 import { userHandlers } from "./users";
 
 /**
@@ -49,12 +54,17 @@ export const handlers: readonly HttpHandler[] = [
   ...documentHandlers,
   ...orderHandlers,
   ...dashboardHandlers,
+  ...reportHandlers,
   ...notificationHandlers,
   ...messageHandlers,
   ...taskHandlers,
+  ...targetHandlers,
   ...complaintHandlers,
   ...userHandlers,
   ...partnerHandlers,
+  ...dealerApplicationHandlers,
+  ...territoryHandlers,
+  ...settingsHandlers,
   ...schemeHandlers,
   ...subsidyHandlers,
   ...subsidyApplicationHandlers,

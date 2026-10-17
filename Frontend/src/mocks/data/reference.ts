@@ -36,6 +36,7 @@ export const MOCK_ID_SPACE = {
   subsidyMaster: 0x5b,
   importBatch: 0x1b,
   document: 0xd0c,
+  dealerApplication: 0xda,
 } as const;
 
 export const MOCK_STATE = { name: "Gujarat", code: "GJ" } as const;

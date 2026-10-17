@@ -28,6 +28,11 @@ import {
   type DashboardKpi,
   type DashboardOverview as Overview,
 } from "@/features/dashboard/api/dashboard.schemas";
+import {
+  AreaBySystemCard,
+  DashboardChartsSkeleton,
+  TargetsCard,
+} from "@/features/dashboard/components/dashboard-charts";
 import { LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
 import { EMPTY_VALUE, formatInrCompact, formatNumber, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -117,6 +122,15 @@ function DashboardContent({ data }: { data: Overview }): React.JSX.Element {
         <PipelineCard pipeline={data.pipeline} className="lg:col-span-3" />
         <FollowUpsCard followUps={data.followUps} className="lg:col-span-2" />
       </div>
+
+      {data.targetsByMonth === null ? (
+        <AreaBySystemCard systems={data.areaBySystem} wide />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-5">
+          <AreaBySystemCard systems={data.areaBySystem} className="lg:col-span-2" />
+          <TargetsCard months={data.targetsByMonth} className="lg:col-span-3" />
+        </div>
+      )}
 
       <SourcesCard sources={data.sources} />
     </div>
@@ -275,7 +289,7 @@ function CardSkeletonHeader({
   );
 }
 
-/** Mirrors DashboardContent: four KPI cards, pipeline + follow-ups, sources. */
+/** Mirrors DashboardContent: four KPI cards, pipeline + follow-ups, area + targets, sources. */
 export function DashboardOverviewSkeleton(): React.JSX.Element {
   return (
     <div role="status" aria-label="Loading dashboard" className="flex flex-col gap-4">
@@ -318,6 +332,7 @@ export function DashboardOverviewSkeleton(): React.JSX.Element {
           </CardContent>
         </Card>
       </div>
+      <DashboardChartsSkeleton />
       <Card aria-hidden="true">
         <CardSkeletonHeader titleWidth="w-28" descriptionWidth="w-64" />
         <CardContent>

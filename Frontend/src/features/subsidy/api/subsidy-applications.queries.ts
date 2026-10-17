@@ -7,6 +7,7 @@ import {
   getStoredCalculation,
   listApplications,
   listChecklist,
+  listDocumentTypes,
   listStageDefs,
   listStageEntries,
 } from "./subsidy-applications.api";
@@ -26,6 +27,7 @@ export const applicationKeys = {
     [...applicationKeys.checklist(applicationId), documentId] as const,
   stageDefs: (scheme: string | null) => [...applicationKeys.all, "stage-defs", scheme] as const,
   leadScheme: (leadId: string) => [...applicationKeys.all, "lead-scheme", leadId] as const,
+  documentTypes: () => [...applicationKeys.all, "document-types"] as const,
 };
 
 /** The first page has no cursor. */
@@ -77,6 +79,16 @@ export function stageDefsQueryOptions(scheme: string | null = null) {
     queryFn: ({ signal }) => listStageDefs(scheme, signal),
     staleTime: 10 * 60_000,
     meta: { dataId: "SUBS-006" },
+  });
+}
+
+/** SUBS-007 · The document checklist every application is given. */
+export function documentTypesQueryOptions() {
+  return queryOptions({
+    queryKey: applicationKeys.documentTypes(),
+    queryFn: ({ signal }) => listDocumentTypes(signal),
+    staleTime: 10 * 60_000,
+    meta: { dataId: "SUBS-007" },
   });
 }
 

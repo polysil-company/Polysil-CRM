@@ -1,6 +1,8 @@
 import type {
   CalculateRequest,
+  SubsidyCalculation,
   Nozzle,
+  SchemeInput,
   SubsidyCropRequest,
   SubsidyLineRequest,
   SystemConfig,
@@ -43,6 +45,36 @@ export interface CalculatorDraft {
   readonly groupTotalArea: string;
   readonly installationRate: string;
   readonly nozzle: Nozzle;
+  /** The scheme's extra inputs; each is sent only when the system's config lists it. */
+  readonly scheme: SchemeInputsDraft;
+}
+
+/** What the designer chose for a scheme's extra inputs, as typed. */
+export interface SchemeInputsDraft {
+  /** "" until a set size is chosen. */
+  readonly pipeSizeMm: string;
+  readonly spacingLabel: string;
+  /** "0" is none. */
+  readonly hydrocycloneM3: string;
+  readonly gravelFilterM3: string;
+  readonly headUnitExisting: boolean;
+  readonly pvcExisting: boolean;
+  /** Rupees, as the AP MIP portal prints them. */
+  readonly guidedCost: string;
+  readonly fittingsAmount: string;
+}
+
+export function emptySchemeInputs(): SchemeInputsDraft {
+  return {
+    pipeSizeMm: "",
+    spacingLabel: "",
+    hydrocycloneM3: "0",
+    gravelFilterM3: "0",
+    headUnitExisting: false,
+    pvcExisting: false,
+    guidedCost: "",
+    fittingsAmount: "",
+  };
 }
 
 /** Field path → what is wrong, in words. */
@@ -83,6 +115,7 @@ export function emptyDraft(systemType: SystemType): CalculatorDraft {
     groupTotalArea: "",
     installationRate: "",
     nozzle: "plastic",
+    scheme: emptySchemeInputs(),
   };
 }
 
@@ -163,13 +196,16 @@ export function planCalculation(
       const at = `crops[${String(index)}]`;
       if (crop.area.trim() === "") {
         missing.push(`${at}.area`);
-      } else if (isSprinkler) {
-        if (!(system.sprinklerAreas ?? []).includes(crop.area)) {
-          problems[`${at}.area`] = "Choose one of the scheme's areas.";
-        }
       } else {
         const problem = positiveProblem(crop.area, MAX_DECIMALS.area, "the area");
+        const range = isSprinkler ? sprinklerAreaRange(system.sprinklerAreas) : null;
         if (problem !== null) problems[`${at}.area`] = problem;
+        else if (
+          range !== null &&
+          (Number(crop.area) < Number(range.min) || Number(crop.area) > Number(range.max))
+        ) {
+          problems[`${at}.area`] = `Between ${range.min} and ${range.max} Ha.`;
+        }
       }
       if (crop.lateralSpacing.trim() === "") {
         missing.push(`${at}.lateral_spacing`);
@@ -205,6 +241,8 @@ export function planCalculation(
     else problems.group_total_area = problem;
   }
 
+  const extras = schemeInputsRequest(draft.scheme, system, problems, missing);
+
   if (missing.length > 0 || Object.keys(problems).length > 0) {
     return { request: null, problems, missing };
   }
@@ -218,8 +256,67 @@ export function planCalculation(
     ...(group === undefined ? {} : { group_total_area: group }),
     ...(installation === undefined ? {} : { installation_rate_per_ha: installation }),
     ...(isSprinkler ? { nozzle: draft.nozzle } : {}),
+    ...extras,
   };
   return { request, problems, missing };
+}
+
+type SchemeInputsRequest = Pick<
+  CalculateRequest,
+  | "pipe_size_mm"
+  | "spacing_label"
+  | "hydrocyclone_m3"
+  | "gravel_filter_m3"
+  | "head_unit_existing"
+  | "pvc_existing"
+  | "guided_cost"
+  | "fittings_amount"
+>;
+
+/**
+ * The scheme's extra inputs as the request takes them: only those the config lists, so a
+ * Gujarat request is unchanged and AP's guided cost is never sent to another scheme (the
+ * backend refuses it there). A required one not given yet is missing, not a mistake.
+ */
+function schemeInputsRequest(
+  scheme: SchemeInputsDraft,
+  system: SystemConfig,
+  problems: Record<string, string>,
+  missing: string[],
+): SchemeInputsRequest {
+  const asks = (input: SchemeInput): boolean => system.inputs.includes(input);
+  const out: { -readonly [K in keyof SchemeInputsRequest]: SchemeInputsRequest[K] } = {};
+  if (asks("pipe_size_mm")) {
+    if (scheme.pipeSizeMm === "") missing.push("pipe_size_mm");
+    else out.pipe_size_mm = Number(scheme.pipeSizeMm);
+  }
+  if (asks("spacing_label")) {
+    if (scheme.spacingLabel === "") missing.push("spacing_label");
+    else if (!system.spacingLabels.includes(scheme.spacingLabel)) {
+      problems.spacing_label = "Choose one of the scheme's spacings.";
+    } else out.spacing_label = scheme.spacingLabel;
+  }
+  if (asks("hydrocyclone_m3")) out.hydrocyclone_m3 = Number(scheme.hydrocycloneM3 || "0");
+  if (asks("gravel_filter_m3")) out.gravel_filter_m3 = Number(scheme.gravelFilterM3 || "0");
+  if (asks("head_unit_existing")) out.head_unit_existing = scheme.headUnitExisting;
+  if (asks("pvc_existing")) out.pvc_existing = scheme.pvcExisting;
+  if (asks("guided_cost")) {
+    if (scheme.guidedCost.trim() === "") missing.push("guided_cost");
+    else {
+      const problem = positiveProblem(scheme.guidedCost, MAX_DECIMALS.money, "the guided cost");
+      if (problem === null) out.guided_cost = scheme.guidedCost.trim();
+      else problems.guided_cost = problem;
+    }
+  }
+  if (asks("fittings_amount")) {
+    if (scheme.fittingsAmount.trim() === "") missing.push("fittings_amount");
+    else {
+      const problem = decimalProblem(scheme.fittingsAmount, MAX_DECIMALS.money, "the amount");
+      if (problem === null) out.fittings_amount = scheme.fittingsAmount.trim();
+      else problems.fittings_amount = problem;
+    }
+  }
+  return out;
 }
 
 /**
@@ -240,9 +337,46 @@ export function linePaths(
   return paths;
 }
 
+/**
+ * Categories that apply on every crop block: the only ones an application or a subsidised
+ * quotation may take (the backend refuses the rest on `category_code`).
+ */
+export function applicableEverywhere(
+  result: SubsidyCalculation,
+): SubsidyCalculation["crops"][number]["categories"] {
+  const [first, ...rest] = result.crops;
+  if (first === undefined) return [];
+  return first.categories.filter(
+    (category) =>
+      category.applicable &&
+      rest.every(
+        (crop) => crop.categories.find((row) => row.code === category.code)?.applicable === true,
+      ),
+  );
+}
+
 /** Splits `code: sentence` on the first colon. A warning without a code is all sentence. */
 export function readWarning(warning: string): { code: string; sentence: string } {
   const at = warning.indexOf(":");
   if (at <= 0) return { code: "", sentence: warning.trim() };
   return { code: warning.slice(0, at).trim(), sentence: warning.slice(at + 1).trim() };
+}
+
+/**
+ * SUBS-002 · The Sprinkler table's range, from its steps ("0.4", "5"); null when the scheme
+ * lists none. An area between two steps is calculated too (`subsidy-completion.md` §5).
+ */
+export function sprinklerAreaRange(
+  areas: readonly string[] | null,
+): { min: string; max: string } | null {
+  const steps = (areas ?? []).map(Number).filter((area) => Number.isFinite(area));
+  if (steps.length === 0) return null;
+  return { min: String(Math.min(...steps)), max: String(Math.max(...steps)) };
+}
+
+export function sprinklerAreaHint(areas: readonly string[] | null): string {
+  const range = sprinklerAreaRange(areas);
+  return range === null
+    ? "In hectares, up to three decimals."
+    : `${range.min} to ${range.max} Ha. Between two of the table's steps, quantities use the next step up.`;
 }

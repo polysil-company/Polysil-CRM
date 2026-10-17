@@ -12,6 +12,7 @@ import {
   requestQuotationApproval,
   reviseQuotation,
   sendQuotation,
+  setQuotationSubsidy,
   transitionQuotation,
   type SaveInput,
 } from "./quotations.api";
@@ -21,6 +22,7 @@ import type {
   DeleteQuotationRequest,
   PatchQuotationRequest,
   Quotation,
+  QuotationSubsidyRequest,
   ReplaceLinesRequest,
   RequestApprovalRequest,
   ReviseQuotationRequest,
@@ -112,6 +114,27 @@ export function useSendQuotation(): UseMutationResult<
     mutationFn: ({ quotationId, input }) => sendQuotation(quotationId, input),
     meta: { dataId: "QUOT-006" },
     onSuccess: applySaved,
+  });
+}
+
+/** QUOT-014 · Calculate and store a subsidised draft's subsidy; the stored calculation is read again. */
+export function useSetQuotationSubsidy(): UseMutationResult<
+  Quotation,
+  Error,
+  QuotationActionInput<QuotationSubsidyRequest>
+> {
+  const applySaved = useApplySaved();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...quotationKeys.all, "subsidy"],
+    mutationFn: ({ quotationId, input }) => setQuotationSubsidy(quotationId, input),
+    meta: { dataId: "QUOT-014" },
+    onSuccess: (quotation) => {
+      applySaved(quotation);
+      void queryClient.invalidateQueries({
+        queryKey: quotationKeys.subsidyCalculation(quotation.id),
+      });
+    },
   });
 }
 

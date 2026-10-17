@@ -18,12 +18,19 @@ import type {
 import { readWarning } from "@/features/subsidy/lib/calculator-draft";
 import {
   BLOCK_ROWS,
+  EXTRA_BLOCK_ROWS,
   ratioAsPercent,
+  warningSentence,
   warningTitle,
   type BlockRow,
 } from "@/features/subsidy/lib/subsidy-labels";
 import { formatFullDate, formatInr } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+/** "0.00", "-0.00": a figure the summary leaves out when every column has it. */
+function isZero(value: string): boolean {
+  return /^-?0+(\.0+)?$/.test(value);
+}
 
 function rupees(value: string): string {
   return formatInr(value, { paise: true });
@@ -88,7 +95,7 @@ function CalculationWarnings({ result }: { result: SubsidyCalculation }): React.
                 <span className="text-muted-foreground">{warning.where}: </span>
               )}
               {title === null ? null : <span className="font-medium">{title}. </span>}
-              {warning.sentence}
+              {warningSentence(warning.code, warning.sentence)}
             </li>
           );
         })}
@@ -213,12 +220,16 @@ function CropResultCard({
   index,
   many,
   stale,
+  guidedCost,
 }: {
   crop: CropResult;
   index: number;
   many: boolean;
   stale: boolean;
+  /** AP drip: the figure is the portal's guided cost, a total rather than per hectare. */
+  guidedCost: boolean;
 }): React.JSX.Element {
+  const adjusted = !isZero(crop.unitCostAddOns) || !isZero(crop.unitCostDeductions);
   const name = cropName(crop, index, many);
   return (
     <Card
@@ -237,10 +248,18 @@ function CropResultCard({
         <SpacingFacts crop={crop} />
         <dl className="grid gap-2 sm:grid-cols-2">
           <div className="flex flex-col gap-0.5 rounded-md bg-muted px-3 py-2">
-            <dt className="text-xs text-muted-foreground">Unit cost the scheme allows</dt>
+            <dt className="text-xs text-muted-foreground">
+              {guidedCost ? "Guided cost (the portal's total)" : "Unit cost the scheme allows"}
+            </dt>
             <dd className="text-lg font-semibold text-foreground tabular-nums">
               {rupees(crop.unitCostForCap)}
             </dd>
+            {adjusted ? (
+              <dd className="text-xs text-muted-foreground tabular-nums">
+                Filters added {rupees(crop.unitCostAddOns)} · existing equipment taken off{" "}
+                {rupees(crop.unitCostDeductions)}
+              </dd>
+            ) : null}
           </div>
           <div className="flex flex-col gap-0.5 rounded-md border border-border px-3 py-2">
             <dt className="text-xs text-muted-foreground">Seven-year unit cost</dt>
@@ -293,7 +312,13 @@ function SummaryTable({
         { key: "total", label: "Total", blocks: result.total },
       ]
     : [{ key: "total", label: "Amount", blocks: result.total }];
-  const rows = BLOCK_ROWS.filter((row) => row.key !== "head_unit" || hasHeadUnit);
+  const extras = EXTRA_BLOCK_ROWS.filter((extra) =>
+    columns.some((column) => !isZero(column.blocks[extra.key])),
+  );
+  const rows = BLOCK_ROWS.filter((row) => row.key !== "head_unit" || hasHeadUnit).flatMap((row) => [
+    row,
+    ...extras.filter((extra) => extra.after === row.key),
+  ]);
 
   return (
     <Card className={cn("transition-opacity duration-fast", stale && "opacity-60")}>
@@ -443,6 +468,7 @@ export function CalculationFigures({
           index={index}
           many={result.crops.length > 1}
           stale={stale}
+          guidedCost={result.guidedCost}
         />
       ))}
       {result.sprinkler === null ? null : (

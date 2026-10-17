@@ -25,6 +25,7 @@ When a rule and the code disagree, fix the code — or change the rule here, in 
 | Try or demo a feature  | [Docs/Tested-Features.md](Docs/Tested-Features.md) — every user story, how far it is tested                            |
 | Commit                 | [changelog/README.md](changelog/README.md)                                                                             |
 | Continue the build     | [Docs/Frontend-Handover.md](Docs/Frontend-Handover.md) — how every feature was built, and what is left                 |
+| Pick the next task     | [Docs/plan-13oct-2026.md](Docs/plan-13oct-2026.md) — what is left, in order; tick each item in its pull request        |
 
 ### The design system has two sources — only two
 

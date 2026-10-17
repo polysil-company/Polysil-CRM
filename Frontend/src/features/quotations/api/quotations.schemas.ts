@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { LEAD_STAGES } from "@/features/leads/api/leads.schemas";
+import type { CalculateRequest } from "@/features/subsidy/api/subsidy.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 import { EMPTY_VALUE, normalizeIndianMobile } from "@/lib/format";
 
@@ -303,6 +304,24 @@ const approvalWireSchema = z.object({
   request_remark: z.string().nullish(),
 });
 
+/** QUOT-014 · What a subsidised quotation's calculation came to, for its category (FS-057). */
+const quotationSubsidyWireSchema = z.object({
+  /** The lead's scheme it ran on. */
+  scheme: z.string().min(1),
+  system_type: z.string().min(1),
+  category: z.object({ code: z.string().min(1), name: z.string(), pct: z.string() }),
+  /** The calculation's total with GST, with any flat charge. */
+  total_cost: z.string(),
+  /** CG's inspection charge outside the cap; "0.00" elsewhere. */
+  flat_charge: z.string(),
+  subsidy: z.string(),
+  farmer_share: z.string(),
+  /** AP: the state's half of the GST; subsidy + farmer share + this = the total. */
+  gst_paid_by_state: z.string().default("0.00"),
+  as_of: z.string(),
+  formula_version: z.string(),
+});
+
 export const quotationWireSchema = z.object({
   id: z.string().min(1),
   quote_no: z.string().min(1).nullable(),
@@ -339,6 +358,8 @@ export const quotationWireSchema = z.object({
   is_provisional: z.boolean(),
   /** Each is "code: sentence". */
   warnings: z.array(z.string()),
+  /** QUOT-014 · A subsidised quotation's calculation for one category; null until calculated. */
+  subsidy: quotationSubsidyWireSchema.nullish(),
   terms: z.string().nullable(),
   valid_until: isoDate.nullable(),
   sent_at: isoDateTime.nullable(),
@@ -404,6 +425,21 @@ export const quotationSchema = quotationWireSchema.transform((wire) => ({
   totals: wire.totals,
   isProvisional: wire.is_provisional,
   warnings: wire.warnings,
+  subsidy:
+    wire.subsidy == null
+      ? null
+      : {
+          scheme: wire.subsidy.scheme,
+          systemType: wire.subsidy.system_type,
+          category: wire.subsidy.category,
+          totalCost: wire.subsidy.total_cost,
+          flatCharge: wire.subsidy.flat_charge,
+          subsidy: wire.subsidy.subsidy,
+          farmerShare: wire.subsidy.farmer_share,
+          gstPaidByState: wire.subsidy.gst_paid_by_state,
+          asOf: wire.subsidy.as_of,
+          formulaVersion: wire.subsidy.formula_version,
+        },
   terms: wire.terms,
   validUntil: wire.valid_until,
   sentAt: wire.sent_at,
@@ -601,7 +637,14 @@ export interface ReplaceLinesRequest {
 export const PRICED_SALES_TYPES = [
   "commercial",
   "industrial",
+  "subsidised",
 ] as const satisfies readonly SalesType[];
+
+/** QUOT-014 · PUT /quotations/{id}/subsidy: the calculator's request, without the scheme. */
+export interface QuotationSubsidyRequest {
+  readonly category_code: string;
+  readonly calculation: Omit<CalculateRequest, "scheme">;
+}
 
 /** The builder's header form. */
 export const quotationHeaderFormSchema = z.object({

@@ -51,6 +51,8 @@ function fieldStaff(scope: Scope): MockModulePermission[] {
     grant("complaints", ["view", "create"], scope),
     grant("tasks", ["view", "create", "edit"], scope),
     grant("partners", ["view"], scope),
+    // Officers see their own targets; managers set them for their team (migration 035).
+    grant("targets", ["view"], scope),
     SCHEMES_VIEW,
     ...CATALOGUE_VIEW,
   ];
@@ -64,8 +66,11 @@ function manager(scope: Scope): MockModulePermission[] {
         entry.module !== "quotations" &&
         entry.module !== "sales_orders" &&
         entry.module !== "complaints" &&
-        entry.module !== "partners",
+        entry.module !== "partners" &&
+        entry.module !== "targets",
     ),
+    // Managers see their team's targets and set them for the people below them.
+    grant("targets", ["view", "create"], scope),
     // District and State Managers add and correct partners in their area (RBAC.md §6.1).
     grant("partners", ["view", "create", "edit"], scope),
     // Managers check complaints before QC (RBAC.md §6.1: complaints CEA).
@@ -110,7 +115,8 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
       return MODULE_CODES.map((module) => grant(module, PERMISSION_ACTIONS, "global"));
     case "account_manager":
       return [
-        grant("accounts", ["view", "edit", "approve"], "global"),
+        // Accounts records payments (RBAC.md §6.2: payments V:global CEA).
+        grant("payments", ["view", "create", "edit", "approve"], "global"),
         // Accounts sees complaints (refunds are paid through them) but decides none.
         grant("complaints", ["view"], "global"),
         // Accounts decides the payment step of every order (RBAC.md §6.2).

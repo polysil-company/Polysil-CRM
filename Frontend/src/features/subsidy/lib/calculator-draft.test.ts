@@ -19,6 +19,9 @@ const DRIP: SystemConfig = {
   cropCountMax: 2,
   formulaVersion: "v1",
   sprinklerAreas: null,
+  inputs: [],
+  unknownInputs: [],
+  spacingLabels: [],
 };
 
 const SPRINKLER: SystemConfig = {
@@ -28,6 +31,9 @@ const SPRINKLER: SystemConfig = {
   cropCountMax: 1,
   formulaVersion: "v1",
   sprinklerAreas: ["0.400", "2.010"],
+  inputs: [],
+  unknownInputs: [],
+  spacingLabels: [],
 };
 
 function dripDraft(patch: Partial<CalculatorDraft> = {}): CalculatorDraft {
@@ -95,15 +101,15 @@ describe("[SUBS-002] planCalculation", () => {
     });
   });
 
-  it("sends Sprinkler only its nozzle and a tabulated area — no lines, head unit or group", () => {
+  it("sends Sprinkler only its nozzle and an area in its range — no lines, head unit or group", () => {
     const draft = emptyDraft("sprinkler");
     const crop = draft.crops[0];
     if (crop === undefined) throw new Error("one crop");
     const off = planCalculation(
-      { ...draft, crops: [{ ...crop, area: "1.300", lateralSpacing: "12" }] },
+      { ...draft, crops: [{ ...crop, area: "5.500", lateralSpacing: "12" }] },
       SPRINKLER,
     );
-    expect(off.problems["crops[0].area"]).toBe("Choose one of the scheme's areas.");
+    expect(off.problems["crops[0].area"]).toMatch(/^Between \d/);
 
     const plan = planCalculation(
       {

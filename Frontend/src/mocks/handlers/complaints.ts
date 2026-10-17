@@ -7,6 +7,7 @@ import {
   createComplaintRequestSchema,
   patchComplaintRequestSchema,
   qcRequestSchema,
+  reopenComplaintRequestSchema,
   replaceLinesRequestSchema,
   type ComplaintPageWire,
   type ComplaintStatus,
@@ -27,7 +28,7 @@ import type { TimelineEventWire, TimelinePageWire } from "@/features/leads/api/l
 import { summarizeSchemaIssues } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
-import type { Role } from "@/lib/auth/roles";
+import { PARTNER_ROLES, type Role } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { todayInIndia } from "@/lib/format";
 import { refundManagersFor, type MockApprovalStep } from "@/mocks/data/approvals";
@@ -48,6 +49,35 @@ const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 const MANAGER_ROLES = new Set(["district_manager", "state_manager", "regional_manager", "admin"]);
 const QC_ROLES = new Set(["qa_manager", "admin"]);
+/**
+ * The backend's `complaint_reopen_roles` setting (default qc_manager and support; the mock's QC
+ * role is qa_manager), `complaint_reopen_days` (30) and `complaint_reopen_max` (2).
+ */
+const REOPEN_ROLES = new Set(["qa_manager"]);
+const REOPEN_DAYS = 30;
+const REOPEN_MAX = 2;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Why this caller can't reopen it now, as `complaint_reopen_refusal()` says; null if they can. */
+function reopenRefusal(
+  complaint: MockComplaint,
+  who: Caller,
+  now: number = Date.now(),
+): "not_reopenable" | "not_permitted" | "window_closed" | null {
+  if (complaint.status !== "closed" && complaint.status !== "qc_rejected") return "not_reopenable";
+  const raiser = complaint.status === "closed" && complaint.raised_by?.id === who.user.id;
+  if (!REOPEN_ROLES.has(who.role) && !raiser) return "not_permitted";
+  const since =
+    complaint.status === "closed" ? complaint.closed_at : (complaint.sla?.resolved_at ?? null);
+  if (
+    since == null ||
+    now > Date.parse(since) + REOPEN_DAYS * DAY_MS ||
+    (complaint.reopen_count ?? 0) >= REOPEN_MAX
+  ) {
+    return "window_closed";
+  }
+  return null;
+}
 
 interface Caller {
   readonly role: string;
@@ -86,11 +116,18 @@ function canFor(complaint: MockComplaint, who: Caller): ComplaintWire["can"] {
       complaint.status === "remedy_pending" &&
       complaint.remedy?.status === "pending" &&
       QC_ROLES.has(who.role),
+    reopen: reopenRefusal(complaint, who) === null,
   };
 }
 
 function toWire(complaint: MockComplaint, who: Caller = caller()): ComplaintWire {
-  return { ...complaint, can: canFor(complaint, who) };
+  // the reopen reason is staff only, as the backend sends it
+  const portal = PARTNER_ROLES.some((role) => role === who.role);
+  return {
+    ...complaint,
+    ...(portal ? { reopen_reason: null } : {}),
+    can: canFor(complaint, who),
+  };
 }
 
 function fieldsOf(error: Parameters<typeof summarizeSchemaIssues>[0]): Record<string, string> {
@@ -134,7 +171,7 @@ function record(
   mockDb.complaintEvents.set(complaint.id, [event, ...events]);
 }
 
-/** The history the seed implies: raised, submitted, checked, QC, cancelled. Newest first. */
+/** The history the seed implies: raised, submitted, checked, QC, cancelled, remedy, closed. Newest first. */
 function seedEvents(complaint: MockComplaint): TimelineEventWire[] {
   const events: TimelineEventWire[] = [];
   const push = (
@@ -177,6 +214,15 @@ function seedEvents(complaint: MockComplaint): TimelineEventWire[] {
     push("complaint.cancelled", complaint.cancellation.at, complaint.cancellation.by, {
       reason: complaint.cancellation.reason,
     });
+  }
+  if (complaint.remedy != null) {
+    push("complaint.remedy_chosen", complaint.remedy.chosen_at, complaint.remedy.chosen_by, {
+      kind: complaint.remedy.kind,
+      remark: complaint.remedy.remark,
+    });
+  }
+  if (complaint.closed_at != null) {
+    push("complaint.closed", complaint.closed_at, complaint.remedy?.chosen_by ?? null);
   }
   return events.sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
 }
@@ -927,6 +973,65 @@ export const complaintHandlers = [
     save(next);
     remember(key, serialized, next);
     record(next, "complaint.cancelled", { reason: parsed.data.reason });
+    return HttpResponse.json({ data: toWire(next) });
+  }),
+
+  /** CMPL-010 · Reopen a closed or rejected complaint: a new round from the manager's check. */
+  http.post(complaintPath("/reopen"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const raw: unknown = await request.json();
+    const serialized = JSON.stringify({ id: params.complaintId, raw });
+    const key = replay(request, serialized);
+    if (key instanceof Response) return key;
+    const complaint = findComplaint(params.complaintId);
+    if (complaint instanceof Response) return complaint;
+    const who = caller();
+    const why = reopenRefusal(complaint, who);
+    if (why === "not_reopenable") return moved();
+    if (why === "not_permitted") {
+      return errorResponse(403, "forbidden", "Not permitted to reopen this complaint.");
+    }
+    const parsed = reopenComplaintRequestSchema.safeParse(raw);
+    if (!parsed.success || parsed.data.reason.trim() === "") {
+      return errorResponse(422, "remark_required", "Say why it is reopened.", {
+        reason: "required",
+      });
+    }
+    if (why === "window_closed") {
+      return errorResponse(
+        422,
+        "reopen_window_closed",
+        "The time to reopen this complaint has passed, or it was reopened as often as allowed.",
+      );
+    }
+    // the history so far, before this round's fields replace the ones it is built from
+    if (!mockDb.complaintEvents.has(complaint.id)) {
+      mockDb.complaintEvents.set(complaint.id, seedEvents(complaint));
+    }
+    const now = Date.now();
+    const at = new Date(now).toISOString();
+    const next: MockComplaint = {
+      ...complaint,
+      status: "submitted",
+      submit_count: complaint.submit_count + 1,
+      submitted_at: at,
+      check: null,
+      closed_at: null,
+      sla: slaFor(complaint.severity, now, null, null, now),
+      reopen_count: (complaint.reopen_count ?? 0) + 1,
+      reopened_at: at,
+      reopen_reason: parsed.data.reason.trim(),
+      updated_at: at,
+    };
+    save(next);
+    remember(key, serialized, next);
+    record(next, "complaint.submitted", {
+      reopened: true,
+      from: complaint.status,
+      round: next.submit_count,
+      clock: "restart",
+    });
     return HttpResponse.json({ data: toWire(next) });
   }),
 

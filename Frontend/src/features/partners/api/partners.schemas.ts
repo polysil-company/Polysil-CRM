@@ -160,3 +160,39 @@ export interface PatchPartnerRequest {
   readonly credit_limit?: string | null;
   readonly payment_terms_days?: number | null;
 }
+
+/**
+ * CHNL-006 · GET /gstin/{gstin} (FS-053): what a GSTIN says about itself, and the names the GST
+ * record gives once the backend has a data provider (`lookup: found`). Until then it answers
+ * `unavailable` and the names are typed by hand (GAP-292).
+ */
+export const gstinLookupSchema = z
+  .object({
+    data: z.object({
+      gstin: z.string().min(1),
+      valid: z.boolean(),
+      /** Why it is not valid. */
+      reason: z.string().nullable(),
+      state_code: z.string().nullable(),
+      pan: z.string().nullable(),
+      lookup: z.enum(["found", "not_found", "unavailable"]),
+      legal_name: z.string().nullish(),
+      trade_name: z.string().nullish(),
+      address: z.string().nullish(),
+      status: z.string().nullish(),
+    }),
+  })
+  .transform(({ data }) => ({
+    gstin: data.gstin,
+    valid: data.valid,
+    reason: data.reason,
+    pan: data.pan,
+    lookup: data.lookup,
+    legalName: data.legal_name?.trim() || null,
+    tradeName: data.trade_name?.trim() || null,
+    address: data.address?.trim() || null,
+    status: data.status?.trim() || null,
+  }));
+
+export type GstinLookupWire = z.input<typeof gstinLookupSchema>;
+export type GstinLookup = z.output<typeof gstinLookupSchema>;

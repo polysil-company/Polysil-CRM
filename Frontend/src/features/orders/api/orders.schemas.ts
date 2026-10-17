@@ -129,7 +129,31 @@ export interface OrderListParams {
   readonly leadId: string | null;
   /** Orders this quotation is or was on (BE-019); a cancelled order released it. */
   readonly quotationId: string | null;
+  /** Territories, each with everything under it (`territory_id`, up to 20). */
+  readonly areas: readonly string[];
+  /** An office and the offices under it (`owner_org_unit_id`). */
+  readonly officeId: string | null;
+  /** ACCT-001: orders whose next approval step is this role's, e.g. `account_manager`. */
+  readonly waitingOn?: string | null;
 }
+
+/** ACCT-001 · GET /orders/stats: counts by status, and submitted orders by whose step is next. */
+export const orderStatsSchema = z
+  .object({
+    total: z.number().int().nonnegative(),
+    by_status: z.record(z.string(), z.number().int().nonnegative()),
+    waiting_on: z.record(z.string(), z.number().int().nonnegative()),
+  })
+  .transform((wire) => ({
+    total: wire.total,
+    byStatus: wire.by_status,
+    waitingOn: wire.waiting_on,
+  }));
+
+export type OrderStats = z.output<typeof orderStatsSchema>;
+
+/** The role whose step is the Accounts queue (BE-022). */
+export const ACCOUNTS_ROLE = "account_manager";
 
 // ── the document (SO-002) ─────────────────────────────────────────────────────────
 
@@ -311,6 +335,18 @@ export interface DispatchListParams {
   readonly to: string | null;
 }
 
+/** SO-008 · GET /orders/{id} `subsidy` (FS-054). */
+const subsidyBlockWireSchema = z.object({
+  /** The material amount, or the order total when `material_is_total`. */
+  material_amount: decimal,
+  subsidy_amount: decimal,
+  /** The farmer's share, material less subsidy when derived: what the order collects. */
+  farmer_payable: decimal,
+  material_is_total: z.boolean(),
+  farmer_payable_is_derived: z.boolean(),
+  leads: z.array(z.object({ id: z.string().min(1), inquiry_no: z.string().nullable() })),
+});
+
 export const orderWireSchema = z.object({
   doc_type: z.literal("sales_order").optional(),
   id: z.string().min(1),
@@ -357,6 +393,13 @@ export const orderWireSchema = z.object({
   dispatches: z.array(dispatchSchema),
   /** "code: sentence", as on a quotation. */
   warnings: z.array(z.string()),
+  /** SO-008 · A subsidised order's subsidy (FS-054, FS-057); null on every other type. */
+  subsidy: subsidyBlockWireSchema.nullish(),
+  /**
+   * What the buyer owes: the total less applied scheme benefits. On a subsidised order it is
+   * the farmer's share, at most the total, less benefits (`subsidy-completion.md` §1).
+   */
+  payable: decimal.nullish(),
   remarks: z.string().nullable(),
   pdf_state: z.enum(ORDER_PDF_STATES),
   pdf_error: z.string().nullish(),
@@ -367,6 +410,12 @@ export const orderWireSchema = z.object({
   cancel_remark: z.string().nullable(),
   closed_at: isoDateTime.nullable(),
   close_remark: z.string().nullable(),
+  /** FS-036: how many times the order was taken back to draft after approval. */
+  amend_count: z.number().int().nonnegative().default(0),
+  /** The approved total the last amend started from; null when never amended. */
+  amended_from_total: z.string().nullish(),
+  /** Why it was last amended; staff only, so a partner reads null. */
+  amend_reason: z.string().nullish(),
   created_at: isoDateTime,
 });
 
@@ -415,6 +464,19 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
   lastRejection: wire.last_rejection,
   dispatches: wire.dispatches,
   warnings: wire.warnings,
+  subsidy:
+    wire.subsidy == null
+      ? null
+      : {
+          materialAmount: wire.subsidy.material_amount,
+          subsidyAmount: wire.subsidy.subsidy_amount,
+          farmerPayable: wire.subsidy.farmer_payable,
+          materialIsTotal: wire.subsidy.material_is_total,
+          farmerPayableIsDerived: wire.subsidy.farmer_payable_is_derived,
+          /** In order; the first is the order's lead. A null number is a lead you can't see. */
+          leads: wire.subsidy.leads.map((lead) => ({ id: lead.id, code: lead.inquiry_no ?? null })),
+        },
+  payable: wire.payable ?? null,
   remarks: wire.remarks,
   pdfState: wire.pdf_state,
   pdfError: wire.pdf_error ?? null,
@@ -425,6 +487,9 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
   cancelRemark: wire.cancel_remark,
   closedAt: wire.closed_at,
   closeRemark: wire.close_remark,
+  amendCount: wire.amend_count,
+  amendedFromTotal: wire.amended_from_total ?? null,
+  amendReason: wire.amend_reason ?? null,
   createdAt: wire.created_at,
 }));
 
@@ -443,9 +508,12 @@ export const noContentSchema = z.undefined();
 
 // ── writes (SO-003, SO-004, DISP-002) ─────────────────────────────────────────────
 
-/** POST /orders from accepted quotations: the order takes the rest from them. */
+/**
+ * POST /orders from accepted quotations: the order takes the rest from them. A subsidised
+ * order is made from one subsidised quotation and takes its subsidy from it (FS-057 rule 8).
+ */
 export interface CreateOrderFromQuotations {
-  readonly order_type: (typeof ORDERABLE_TYPES)[number];
+  readonly order_type: (typeof ORDERABLE_TYPES)[number] | "subsidised";
   readonly quotation_ids: readonly string[];
   readonly delivery_address: string | null;
   readonly payment_terms: PaymentTerms;
@@ -466,8 +534,11 @@ export interface OrderPartyRequest {
  * direct sale by staff; it names the lead's dealer when there is one.
  */
 export interface CreateDirectOrder {
-  readonly order_type: (typeof ORDERABLE_TYPES)[number];
+  /** SO-008 · Subsidised (staff only) takes `subsidy` and no `lead_id` (FS-054). */
+  readonly order_type: (typeof ORDERABLE_TYPES)[number] | "subsidised";
   readonly lead_id?: string;
+  /** SO-008 · The leads (the first is the order's lead) and amounts of a subsidised order. */
+  readonly subsidy?: OrderSubsidyRequest;
   readonly partner_id?: string;
   readonly party: OrderPartyRequest;
   readonly place_of_supply_territory_id: string;
@@ -493,11 +564,22 @@ export interface PatchOrderRequest {
   readonly expected_status: "draft";
 }
 
+/** SO-008 · PUT /orders/{id}/subsidy — a subsidised draft's leads and amounts. */
+export interface OrderSubsidyRequest {
+  /** 1 to 50; the first stays the order's lead (422 first_lead_fixed). */
+  readonly lead_ids: readonly string[];
+  /** Left out: the order total, read at the time. */
+  readonly material_amount?: string;
+  readonly subsidy_amount: string;
+  /** Left out: material less subsidy. */
+  readonly farmer_payable?: string;
+}
+
 export interface ExpectedStatusRequest {
   readonly expected_status: OrderStatus;
 }
 
-/** POST /orders/{id}/cancel, /close-short and /dispatches/{id}/void: a reason is required. */
+/** POST /orders/{id}/cancel, /close-short, /amend and /dispatches/{id}/void: a reason is required. */
 export interface RemarkRequest {
   readonly remark: string;
   readonly expected_status: OrderStatus;

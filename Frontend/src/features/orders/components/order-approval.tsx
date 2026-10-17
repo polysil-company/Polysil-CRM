@@ -6,7 +6,7 @@ import type * as React from "react";
 
 import { RelativeDate } from "@/components/patterns/relative-date";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import type { Order, OrderApprovalStep } from "@/features/orders/api/orders.schemas";
 import { stalledStepText, stepRoleLabel } from "@/features/orders/lib/order-labels";
@@ -58,11 +58,20 @@ export function OrderApproval({ order }: { order: Order }): React.JSX.Element | 
     return null;
   }
   const waiting = order.status === "submitted";
+  // SO-007: an amended draft still carries the chain that approved it before; say so.
+  const before = order.status === "draft" && order.amendCount > 0 && approval.status === "approved";
 
   return (
     <Card>
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
-        <CardTitle level={3}>Approval</CardTitle>
+        <div className="flex flex-col gap-1">
+          <CardTitle level={3}>{before ? "Approval before the amend" : "Approval"}</CardTitle>
+          {before ? (
+            <CardDescription>
+              It starts again from the first step when the order is submitted.
+            </CardDescription>
+          ) : null}
+        </div>
         {waiting && canApprove ? (
           <Link href="/approvals" className={buttonVariants({ variant: "outline", size: "sm" })}>
             Open approvals

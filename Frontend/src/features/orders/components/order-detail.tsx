@@ -46,6 +46,7 @@ import { OrderApproval } from "./order-approval";
 import { OrderDispatches } from "./order-dispatches";
 import { OrderHistory } from "./order-history";
 import { OrderStatusBadge } from "./order-status-badge";
+import { isSubsidyWarning, OrderSubsidyCard } from "./order-subsidy";
 
 /** SO-002 · The order as the backend prints it. A 404 renders the route's not-found page. */
 export function OrderDetail({ orderId }: { orderId: string }): React.JSX.Element {
@@ -142,6 +143,8 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
           <TotalsBlock order={order} />
         </CardContent>
       </Card>
+
+      <OrderSubsidyCard order={order} />
 
       {shipping ? <OrderDispatches order={order} /> : null}
 
@@ -345,6 +348,28 @@ function OrderNotices({ order }: { order: Order }): React.JSX.Element | null {
       </Notice>,
     );
   }
+  // SO-007: amended back to draft, until it is approved again.
+  if (order.amendCount > 0 && (order.status === "draft" || order.status === "submitted")) {
+    notices.push(
+      <Notice key="amended" tone="info">
+        <p className="font-medium">
+          Amended after approval
+          {order.amendCount > 1 ? ` (${String(order.amendCount)} times)` : null}
+          {order.amendedFromTotal === null
+            ? null
+            : ` · it was approved at ${formatInr(order.amendedFromTotal, { paise: true })}`}
+        </p>
+        {order.amendReason === null ? null : (
+          <p className="whitespace-pre-line text-muted-foreground">{order.amendReason}</p>
+        )}
+        <p className="text-muted-foreground">
+          {order.status === "draft"
+            ? "Make the changes, then submit it for approval again. The PDF returns once it is approved."
+            : "It waits for approval again. The PDF returns once it is approved."}
+        </p>
+      </Notice>,
+    );
+  }
   if (order.status === "cancelled") {
     notices.push(
       <Notice key="cancelled" tone="danger">
@@ -410,7 +435,7 @@ function OrderNotices({ order }: { order: Order }): React.JSX.Element | null {
     );
   }
   for (const [index, warning] of parseWarnings(order.warnings)
-    .filter((item) => item.code !== "provisional_pricing")
+    .filter((item) => item.code !== "provisional_pricing" && !isSubsidyWarning(item.code))
     .entries()) {
     notices.push(
       <Notice key={`warning-${String(index)}`} tone="warning">

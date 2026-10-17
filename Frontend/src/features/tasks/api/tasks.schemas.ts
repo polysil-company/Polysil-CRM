@@ -277,6 +277,8 @@ export type MinutesWire = z.input<typeof minutesWireSchema>;
 
 const minutesSchema = minutesWireSchema.transform((wire) => ({
   id: wire.id,
+  lead: wire.lead,
+  partner: wire.partner,
   taskId: wire.task_id,
   heldAt: wire.held_at,
   attendees: wire.attendees.map((name) => name.trim()).filter((name) => name !== ""),
