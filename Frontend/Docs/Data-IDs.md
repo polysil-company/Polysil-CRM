@@ -241,5 +241,6 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSG-003 | Send a message, optionally linking a CRM record | shared | in-progress |
 | MSG-004 | Start or read one conversation — staff directory search | shared | in-progress |
 | MSG-005 | Mark a conversation as read | shared | in-progress |
+| MSG-006 | Group chats — start a group, rename it, add, remove and leave (`POST /conversations/groups`, `PATCH /conversations/{id}`, `/conversations/{id}/members`) | shared | in-progress |
 | REPO-001 | Changelog system — one entry per change, generated CHANGELOG.md | frontend | in-progress |
 | REPO-002 | Quality gates — lint rules, git hooks, CI pipeline | frontend | in-progress |

@@ -3,6 +3,7 @@ import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 import {
   getConversation,
   listConversations,
+  listMembers,
   listMessages,
   searchStaffDirectory,
 } from "./messages.api";
@@ -28,6 +29,8 @@ export const messageKeys = {
   thread: (conversationId: string) => [...messageKeys.all, "thread", conversationId] as const,
   conversation: (conversationId: string) =>
     [...messageKeys.conversations(), conversationId] as const,
+  members: (conversationId: string) =>
+    [...messageKeys.conversations(), conversationId, "members"] as const,
   directory: (q: string) => [...messageKeys.all, "directory", q] as const,
 };
 
@@ -72,5 +75,18 @@ export function staffDirectoryQueryOptions(q: string) {
     staleTime: 5 * 60_000,
     placeholderData: keepPreviousData,
     meta: { dataId: "MSG-004" },
+  });
+}
+
+/**
+ * MSG-006 · A group's members, current first, and those who have left: loaded once per thread
+ * to name each message's sender, and again when someone is added or leaves.
+ */
+export function groupMembersQueryOptions(conversationId: string) {
+  return queryOptions({
+    queryKey: messageKeys.members(conversationId),
+    queryFn: ({ signal }) => listMembers(conversationId, signal),
+    staleTime: 5 * 60_000,
+    meta: { dataId: "MSG-006" },
   });
 }

@@ -4,16 +4,27 @@ import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/r
 
 import { withConversationRead, withLastMessage } from "@/features/messages/lib/conversation-cache";
 
-import { markConversationRead, sendMessage, startConversation } from "./messages.api";
+import {
+  addMembers,
+  createGroup,
+  markConversationRead,
+  removeMember,
+  renameGroup,
+  sendMessage,
+  startConversation,
+} from "./messages.api";
 import {
   conversationListQueryOptions,
   conversationMessagesQueryOptions,
-  messageKeys,
   conversationQueryOptions,
+  groupMembersQueryOptions,
+  messageKeys,
 } from "./messages.queries";
 import type {
   Conversation,
+  CreateGroupRequest,
   MarkConversationReadResult,
+  Member,
   Message,
   SendMessageRequest,
 } from "./messages.schemas";
@@ -84,6 +95,75 @@ export function useMarkConversationRead(): UseMutationResult<
       queryClient.setQueryData(conversationListQueryOptions().queryKey, (list) =>
         list === undefined ? list : withConversationRead(list, conversationId, result.unreadTotal),
       );
+    },
+  });
+}
+
+/** MSG-006. A new group is listed at once, before anyone writes in it. */
+export function useCreateGroup(): UseMutationResult<Conversation, Error, CreateGroupRequest> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: [...messageKeys.all, "group", "create"],
+    mutationFn: createGroup,
+    meta: { dataId: "MSG-006" },
+    onSuccess: (conversation) => {
+      queryClient.setQueryData(conversationQueryOptions(conversation.id).queryKey, conversation);
+      void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+    },
+  });
+}
+
+/** MSG-006. The manager renames the group; the list and the header follow. */
+export function useRenameGroup(
+  conversationId: string,
+): UseMutationResult<Conversation, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: [...messageKeys.all, "group", "rename", conversationId],
+    mutationFn: (name: string) => renameGroup(conversationId, { name }),
+    meta: { dataId: "MSG-006" },
+    onSuccess: (conversation) => {
+      queryClient.setQueryData(conversationQueryOptions(conversationId).queryKey, conversation);
+      void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+    },
+  });
+}
+
+/** MSG-006. Any member adds colleagues; the answer is the new member list. */
+export function useAddMembers(
+  conversationId: string,
+): UseMutationResult<readonly Member[], Error, readonly string[]> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: [...messageKeys.all, "group", "add", conversationId],
+    mutationFn: (userIds: readonly string[]) =>
+      addMembers(conversationId, { user_ids: [...userIds] }),
+    meta: { dataId: "MSG-006" },
+    onSuccess: (members) => {
+      queryClient.setQueryData(groupMembersQueryOptions(conversationId).queryKey, members);
+      void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+    },
+  });
+}
+
+/**
+ * MSG-006. Leave the group (the user's own id), or, as its manager, remove someone. Leaving
+ * drops the group from the user's screens: the caller moves away from it.
+ */
+export function useRemoveMember(
+  conversationId: string,
+): UseMutationResult<undefined, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: [...messageKeys.all, "group", "remove", conversationId],
+    mutationFn: (userId: string) => removeMember(conversationId, userId),
+    meta: { dataId: "MSG-006" },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
     },
   });
 }

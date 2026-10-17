@@ -1106,6 +1106,20 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["POST /conversations/{conversationId}/read"],
   },
+  "MSG-006": {
+    domain: "MSG",
+    title: "Group chats — start a group, rename it, add, remove and leave",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "POST /conversations/groups",
+      "PATCH /conversations/{conversationId}",
+      "GET /conversations/{conversationId}/members",
+      "POST /conversations/{conversationId}/members",
+      "DELETE /conversations/{conversationId}/members/{userId}",
+    ],
+    notes: "FS-048. A conversation's `kind` and `group`; `participant` is null for a group.",
+  },
 } as const satisfies Record<string, DataIdDefinition>;
 
 export type DataId = keyof typeof DATA_IDS;

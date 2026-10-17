@@ -13,6 +13,8 @@ import { parseShareParam, toShareParam } from "./share-attachment";
 function conversation(id: string, updatedAt: string, unreadCount: number): Conversation {
   return {
     id,
+    kind: "direct",
+    group: null,
     participant: {
       id: `usr-${id}`,
       name: `Person ${id}`,
