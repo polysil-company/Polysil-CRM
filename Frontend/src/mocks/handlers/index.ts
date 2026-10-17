@@ -16,6 +16,7 @@ import { orderHandlers } from "./orders";
 import { partnerHandlers } from "./partners";
 import { productHandlers } from "./products";
 import { quotationHandlers } from "./quotations";
+import { reportHandlers } from "./reports";
 import { settingsHandlers } from "./settings";
 import { subsidyHandlers } from "./subsidy";
 import { subsidyApplicationHandlers } from "./subsidy-applications";
@@ -51,6 +52,7 @@ export const handlers: readonly HttpHandler[] = [
   ...documentHandlers,
   ...orderHandlers,
   ...dashboardHandlers,
+  ...reportHandlers,
   ...notificationHandlers,
   ...messageHandlers,
   ...taskHandlers,
