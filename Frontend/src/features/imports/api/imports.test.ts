@@ -4,7 +4,13 @@ import { isApiError } from "@/lib/api/errors";
 import { writeMockRole } from "@/lib/dev/mock-settings";
 import { mockDb, resetMockDb } from "@/mocks/db";
 
-import { checkImport, commitImport, discardImport, uploadImport } from "./imports.api";
+import {
+  checkImport,
+  commitImport,
+  discardImport,
+  downloadImportTemplate,
+  uploadImport,
+} from "./imports.api";
 import { importRefusal } from "../lib/import-refusals";
 
 let keys = 0;
@@ -156,7 +162,7 @@ describe("[MSTR-007] Excel import — price list rates", () => {
       targetId: draftList(),
       idempotencyKey: key(),
     }).catch((error: unknown) => error);
-    expect(importRefusal(unreadable).message).toMatch(/Save it as \.xlsx or \.csv/);
+    expect(importRefusal(unreadable).upload.file).toMatch(/Save it as \.xlsx or \.csv/);
 
     const big = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "big.csv", { type: "text/csv" });
     const tooBig = await uploadImport({
@@ -270,5 +276,61 @@ describe("[MSTR-007] Excel import — order and quotation lines", () => {
     expect(
       await refusal(commitImport({ batchId: batch.id, skipInvalid: true, idempotencyKey: key() })),
     ).toEqual({ status: 409, code: "import_wrong_state" });
+  });
+});
+
+describe("[MSTR-013] Import polish — template and upload refusals", () => {
+  beforeEach(() => {
+    writeMockRole("admin");
+  });
+  afterEach(() => {
+    resetMockDb();
+    writeMockRole("admin");
+  });
+
+  it("downloads the blank template under its own name, for those who may import", async () => {
+    const template = await downloadImportTemplate("price_list_items");
+    expect(template.filename).toBe("price-list-template.xlsx");
+    expect(await template.blob.text()).toMatch(/^Item code,/);
+
+    writeMockRole("employee");
+    expect(await refusal(downloadImportTemplate("price_list_items"))).toEqual({
+      status: 403,
+      code: "forbidden",
+    });
+  });
+
+  it("puts each upload refusal on its own control: the sheet, the header row, the file", async () => {
+    const workbook = new File(["xlsx"], "rates.xlsx");
+    const noSheet = await uploadImport({
+      kind: "price_list_items",
+      file: workbook,
+      targetId: draftList(),
+      sheet: "Prices",
+      idempotencyKey: key(),
+    }).catch((error: unknown) => error);
+    expect(importRefusal(noSheet).upload).toEqual({
+      sheet: "No sheet of that name in this workbook.",
+    });
+
+    const farRow = await uploadImport({
+      kind: "price_list_items",
+      file: csv("rates.csv", RATES),
+      targetId: draftList(),
+      headerRow: 40,
+      idempotencyKey: key(),
+    }).catch((error: unknown) => error);
+    expect(importRefusal(farRow).upload.headerRow).toMatch(/^This sheet has 5 rows/);
+
+    const headerOnly = await uploadImport({
+      kind: "price_list_items",
+      file: csv("rates.csv", "Item Code,Net Rate"),
+      targetId: draftList(),
+      idempotencyKey: key(),
+    }).catch((error: unknown) => error);
+    expect(importRefusal(headerOnly)).toMatchObject({
+      message: null,
+      upload: { file: expect.stringMatching(/no rows under its column names/) },
+    });
   });
 });

@@ -939,6 +939,15 @@ export const DATA_IDS = {
     endpoints: ["GET /territories", "POST /territories", "PATCH /territories/{id}"],
     notes: "A state's code numbers its leads and locks once a lead is numbered under it.",
   },
+  "MSTR-013": {
+    domain: "MSTR",
+    title:
+      "Import polish — the blank template, upload errors on their fields, and a price list started from Excel",
+    owner: "frontend",
+    status: "in-progress",
+    endpoints: ["GET /imports/template", "POST /imports", "POST /price-lists"],
+    notes: "FS-068 (excel-import.md); the shortcut starts a draft, then imports into it.",
+  },
   "MSTR-002": {
     domain: "MSTR",
     title: "Lead lookups — sources, irrigation systems, lost reasons and the territory picker",

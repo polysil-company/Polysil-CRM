@@ -4,6 +4,7 @@ import { ArrowLeft01Icon, DiscountTag01Icon, FileImportIcon } from "@hugeicons/c
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
@@ -44,7 +45,12 @@ import {
 } from "@/features/products/api/products.queries";
 import type { PriceList, PriceListItem } from "@/features/products/api/products.schemas";
 import { Pager } from "@/features/products/components/pager";
-import { PHASE_BADGE, PriceListForm } from "@/features/products/components/price-lists-panel";
+import {
+  IMPORT_PARAM,
+  IMPORT_RATES,
+  PHASE_BADGE,
+  PriceListForm,
+} from "@/features/products/components/price-lists-panel";
 import {
   dayText,
   PHASE_LABELS,
@@ -101,11 +107,34 @@ function SheetView({ list }: { list: PriceList }): React.JSX.Element {
   const [opened, setOpened] = useState<Opened>(null);
   // The import is its own dialog, not one of the shared dialog's forms.
   const [importing, setImporting] = useState(false);
+  // MSTR-013 · "Import from Excel" on the price lists lands here with `?import=rates`.
+  const [importParam, setImportParam] = useQueryState(
+    IMPORT_PARAM,
+    parseAsStringLiteral([IMPORT_RATES]),
+  );
+  const [imported, setImported] = useState(false);
   const items = useQuery(priceListItemsQueryOptions(list.id, q, unpriced, page));
   const save = useSaveRates();
   const idempotency = useIdempotencyKey();
   const phase = phaseOf(list);
   const editable = canEdit && list.status === "draft";
+  const fromShortcut = importParam === IMPORT_RATES;
+  const importOpen = importing || (fromShortcut && editable);
+  const closeImport = (open: boolean): void => {
+    if (open) {
+      setImporting(true);
+      return;
+    }
+    setImporting(false);
+    if (!fromShortcut) return;
+    void setImportParam(null);
+    // Leaving the shortcut without importing keeps the draft: say so, so it is not a surprise.
+    if (!imported && list.itemCount === 0) {
+      toast.info("The draft is kept, with no rates yet", {
+        description: "Import its rates from Excel or type them in, then publish.",
+      });
+    }
+  };
   const queryClient = useQueryClient();
   const refreshList = (): void => {
     void queryClient.invalidateQueries({ queryKey: productKeys.all });
@@ -234,12 +263,13 @@ function SheetView({ list }: { list: PriceList }): React.JSX.Element {
         <ImportDialog
           kind="price_list_items"
           targetId={list.id}
-          open={importing}
-          onOpenChange={setImporting}
+          open={importOpen}
+          onOpenChange={closeImport}
           title="Import rates from Excel"
           description={`Rates for ${list.name}, from a sheet with a product (item code or description) and a rate on each row.`}
           noun={{ one: "rate", many: "rates" }}
           onCommitted={(result) => {
+            setImported(true);
             refreshList();
             toast.success(
               `${formatCount(result.created)} ${result.created === 1 ? "rate" : "rates"} imported`,

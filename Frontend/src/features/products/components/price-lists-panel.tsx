@@ -1,6 +1,6 @@
 "use client";
 
-import { Add01Icon, DiscountTag01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, DiscountTag01Icon, FileImportIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -66,6 +66,13 @@ import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { formatCount, todayInIndia } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
+/**
+ * MSTR-013 · The URL parameter that opens a draft's import from Excel on arrival, so
+ * "Import from Excel" lands on the new draft with the file picker already open.
+ */
+export const IMPORT_PARAM = "import";
+export const IMPORT_RATES = "rates";
+
 const log = createLogger({
   file: "features/products/components/price-lists-panel.tsx",
   dataId: "MSTR-006",
@@ -103,6 +110,9 @@ const SALES_TYPE_ITEMS = [
   })),
 ];
 
+/** How a new list is being started: blank, or straight on to an import from Excel (MSTR-013). */
+type Creating = "blank" | "import" | null;
+
 /** MSTR-008 · The list filter: a sale type, or the general lists. */
 const SALES_TYPE_FILTERS: readonly { value: PriceListSalesTypeFilter; label: string }[] = [
   ...PRICE_LIST_SALES_TYPES.map((value) => ({
@@ -121,7 +131,7 @@ export function PriceListsPanel({ canEdit }: { canEdit: boolean }): React.JSX.El
   const [status, setStatus] = useState<StatusFilter>("all");
   const [salesType, setSalesType] = useState<PriceListSalesTypeFilter | null>(null);
   const [page, setPage] = useState(1);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<Creating>(null);
   const query = useQuery(
     priceListListQueryOptions(status === "all" ? null : status, salesType, page),
   );
@@ -158,14 +168,25 @@ export function PriceListsPanel({ canEdit }: { canEdit: boolean }): React.JSX.El
           />
         </div>
         {canEdit ? (
-          <Button
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            New price list
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreating("import");
+              }}
+            >
+              <Icon icon={FileImportIcon} />
+              Import from Excel
+            </Button>
+            <Button
+              onClick={() => {
+                setCreating("blank");
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              New price list
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -216,16 +237,22 @@ export function PriceListsPanel({ canEdit }: { canEdit: boolean }): React.JSX.El
         )}
       </QueryView>
 
-      <Dialog open={creating} onOpenChange={setCreating}>
+      <Dialog
+        open={creating !== null}
+        onOpenChange={(open) => {
+          if (!open) setCreating(null);
+        }}
+      >
         <DialogContent size="md">
-          {creating ? (
+          {creating === null ? null : (
             <PriceListForm
               source={null}
+              thenImport={creating === "import"}
               onClose={() => {
-                setCreating(false);
+                setCreating(null);
               }}
             />
-          ) : null}
+          )}
         </DialogContent>
       </Dialog>
     </section>
@@ -272,12 +299,15 @@ function PriceListRow({ list }: { list: PriceList }): React.JSX.Element {
 /**
  * MSTR-006 · Start a price list: a name, the day it starts, and optionally a state and a tier
  * (empty means every one). With a `source`, the new draft copies its scope and every rate.
+ * With `thenImport` (MSTR-013), the new draft opens with its import from Excel already open.
  */
 export function PriceListForm({
   source,
+  thenImport = false,
   onClose,
 }: {
   source: PriceList | null;
+  thenImport?: boolean;
   onClose: () => void;
 }): React.JSX.Element {
   const router = useRouter();
@@ -331,13 +361,18 @@ export function PriceListForm({
       createKey.reset();
       fillKey.reset();
       toast.success("Draft price list started", {
-        description:
-          source === null
+        description: thenImport
+          ? "Now choose the Excel file with its rates."
+          : source === null
             ? "Fill in its rates, then publish it."
             : "Its rates are copied: change what needs it, then publish.",
       });
       onClose();
-      router.push(`/products/price-lists/${draft.id}`);
+      router.push(
+        thenImport
+          ? `/products/price-lists/${draft.id}?${IMPORT_PARAM}=${IMPORT_RATES}`
+          : `/products/price-lists/${draft.id}`,
+      );
     },
     onError: (error) => {
       const read = readRefusal(error, { name: "name", effective_from: "from" });
@@ -349,12 +384,18 @@ export function PriceListForm({
     <>
       <DialogHeader>
         <DialogTitle>
-          {source === null ? "New price list" : `New list from ${source.name}`}
+          {source !== null
+            ? `New list from ${source.name}`
+            : thenImport
+              ? "Import a price list from Excel"
+              : "New price list"}
         </DialogTitle>
         <DialogDescription>
-          {source === null
-            ? "It starts as a draft: fill in its rates, then publish it."
-            : `Same scope (${scopeOf(source)} · ${salesTypeOf(source)}) and every rate copied, as a draft to change and publish.`}
+          {thenImport
+            ? "Name the list and say where it applies. Next you choose the file; its rates go into this draft for you to check, then publish."
+            : source === null
+              ? "It starts as a draft: fill in its rates, then publish it."
+              : `Same scope (${scopeOf(source)} · ${salesTypeOf(source)}) and every rate copied, as a draft to change and publish.`}
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
@@ -497,7 +538,7 @@ export function PriceListForm({
           successLabel="Started"
           errorLabel="Not started"
         >
-          Start the draft
+          {thenImport ? "Next: choose the file" : "Start the draft"}
         </Button>
       </DialogFooter>
     </>
