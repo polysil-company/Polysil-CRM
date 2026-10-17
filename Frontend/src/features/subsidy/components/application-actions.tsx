@@ -50,6 +50,7 @@ import {
   type Application,
   type StageField,
 } from "@/features/subsidy/api/subsidy-applications.schemas";
+import { formatBusinessDay } from "@/features/subsidy/lib/application-labels";
 import {
   changedValues,
   fieldProblem,
@@ -394,6 +395,11 @@ function RecordStageForm({
                 <StageFieldInput
                   key={`${stage.code}-${field.key}`}
                   field={field}
+                  hint={
+                    field.key === "supply" && application.dispatchedOn !== null
+                      ? supplyHint(application.dispatchedOn, formValues[field.key] ?? "")
+                      : undefined
+                  }
                   value={formValues[field.key] ?? ""}
                   today={today}
                   error={visible[`values.${field.key}`]}
@@ -461,14 +467,28 @@ function RecordStageForm({
   );
 }
 
+/**
+ * SUBS-006 · Stage 7's supply date beside the dispatch (`subsidy-completion.md` §2). Left
+ * empty and untouched, the key isn't sent and the backend takes the dispatch date.
+ */
+function supplyHint(dispatchedOn: string, value: string): string {
+  const day = formatBusinessDay(dispatchedOn);
+  return value === ""
+    ? `Dispatched on ${day}. Left empty, the supply date is taken from it.`
+    : `Dispatched on ${day}.`;
+}
+
 function StageFieldInput({
   field,
+  hint,
   value,
   today,
   error,
   onChange,
 }: {
   field: StageField;
+  /** Shown under the field while it reads right. */
+  hint?: string | undefined;
   value: string;
   today: string;
   error: string | undefined;
@@ -478,7 +498,8 @@ function StageFieldInput({
   const aria = {
     id,
     "aria-invalid": error === undefined ? undefined : true,
-    "aria-describedby": error === undefined ? undefined : `${id}-error`,
+    "aria-describedby":
+      error !== undefined ? `${id}-error` : hint === undefined ? undefined : `${id}-hint`,
   } as const;
   return (
     <Field
@@ -526,6 +547,9 @@ function StageFieldInput({
           }}
         />
       )}
+      {hint !== undefined && error === undefined ? (
+        <FieldDescription id={`${id}-hint`}>{hint}</FieldDescription>
+      ) : null}
       <FieldError id={`${id}-error`}>{error}</FieldError>
     </Field>
   );

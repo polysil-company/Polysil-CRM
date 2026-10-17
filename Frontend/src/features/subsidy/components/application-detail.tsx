@@ -179,6 +179,11 @@ function ApplicationView({ application }: { application: Application }): React.J
                   {application.documents.uploaded} of {application.documents.listed} on the
                   checklist
                 </Fact>
+                <Fact label="Dispatched on">
+                  {application.dispatchedOn === null
+                    ? "Not yet"
+                    : formatBusinessDay(application.dispatchedOn)}
+                </Fact>
               </dl>
             </CardContent>
           </Card>

@@ -395,6 +395,11 @@ export const orderWireSchema = z.object({
   warnings: z.array(z.string()),
   /** SO-008 · A subsidised order's subsidy (FS-054, FS-057); null on every other type. */
   subsidy: subsidyBlockWireSchema.nullish(),
+  /**
+   * What the buyer owes: the total less applied scheme benefits. On a subsidised order it is
+   * the farmer's share, at most the total, less benefits (`subsidy-completion.md` §1).
+   */
+  payable: decimal.nullish(),
   remarks: z.string().nullable(),
   pdf_state: z.enum(ORDER_PDF_STATES),
   pdf_error: z.string().nullish(),
@@ -471,6 +476,7 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
           /** In order; the first is the order's lead. A null number is a lead you can't see. */
           leads: wire.subsidy.leads.map((lead) => ({ id: lead.id, code: lead.inquiry_no ?? null })),
         },
+  payable: wire.payable ?? null,
   remarks: wire.remarks,
   pdfState: wire.pdf_state,
   pdfError: wire.pdf_error ?? null,

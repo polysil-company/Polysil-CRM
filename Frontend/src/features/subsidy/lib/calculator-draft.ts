@@ -196,13 +196,16 @@ export function planCalculation(
       const at = `crops[${String(index)}]`;
       if (crop.area.trim() === "") {
         missing.push(`${at}.area`);
-      } else if (isSprinkler) {
-        if (!(system.sprinklerAreas ?? []).includes(crop.area)) {
-          problems[`${at}.area`] = "Choose one of the scheme's areas.";
-        }
       } else {
         const problem = positiveProblem(crop.area, MAX_DECIMALS.area, "the area");
+        const range = isSprinkler ? sprinklerAreaRange(system.sprinklerAreas) : null;
         if (problem !== null) problems[`${at}.area`] = problem;
+        else if (
+          range !== null &&
+          (Number(crop.area) < Number(range.min) || Number(crop.area) > Number(range.max))
+        ) {
+          problems[`${at}.area`] = `Between ${range.min} and ${range.max} Ha.`;
+        }
       }
       if (crop.lateralSpacing.trim() === "") {
         missing.push(`${at}.lateral_spacing`);
@@ -357,4 +360,23 @@ export function readWarning(warning: string): { code: string; sentence: string }
   const at = warning.indexOf(":");
   if (at <= 0) return { code: "", sentence: warning.trim() };
   return { code: warning.slice(0, at).trim(), sentence: warning.slice(at + 1).trim() };
+}
+
+/**
+ * SUBS-002 · The Sprinkler table's range, from its steps ("0.4", "5"); null when the scheme
+ * lists none. An area between two steps is calculated too (`subsidy-completion.md` §5).
+ */
+export function sprinklerAreaRange(
+  areas: readonly string[] | null,
+): { min: string; max: string } | null {
+  const steps = (areas ?? []).map(Number).filter((area) => Number.isFinite(area));
+  if (steps.length === 0) return null;
+  return { min: String(Math.min(...steps)), max: String(Math.max(...steps)) };
+}
+
+export function sprinklerAreaHint(areas: readonly string[] | null): string {
+  const range = sprinklerAreaRange(areas);
+  return range === null
+    ? "In hectares, up to three decimals."
+    : `${range.min} to ${range.max} Ha. Between two of the table's steps, quantities use the next step up.`;
 }

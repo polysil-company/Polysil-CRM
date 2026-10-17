@@ -124,14 +124,14 @@ describe("[SUBS-002] SubsidyCalculator", () => {
     expect(screen.queryByRole("button", { name: "Add a crop block" })).not.toBeInTheDocument();
   });
 
-  it("runs Sprinkler from a tabulated area and a nozzle, and lists what it derived", async () => {
+  it("runs Sprinkler from an area and a nozzle, and lists what it derived", async () => {
     signInAs("employee");
     const user = show();
 
     await user.click(await screen.findByRole("tab", { name: "Sprinkler" }));
     expect(screen.queryByRole("heading", { name: "Head unit" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("combobox", { name: /^Area/ }));
-    await user.click(await screen.findByRole("option", { name: "1.200 Ha" }));
+    // SUBS-002 · between the table's 1.2 and 1.4 Ha steps (`subsidy-completion.md` §5)
+    await user.type(screen.getByRole("textbox", { name: /^Area/ }), "1.3");
     await user.type(screen.getByRole("textbox", { name: /^Lateral spacing/ }), "12");
     await user.click(screen.getByRole("radio", { name: "Brass" }));
 
@@ -140,6 +140,9 @@ describe("[SUBS-002] SubsidyCalculator", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Derived items" })).toBeInTheDocument();
     expect(screen.getByText(/Spacing outside the scheme's table/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Quantities use the next step; the unit cost is in between."),
+    ).toBeInTheDocument();
   });
 
   it("says a dealer may not see it", async () => {

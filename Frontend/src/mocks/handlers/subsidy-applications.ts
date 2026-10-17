@@ -15,7 +15,7 @@ import {
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
 import { readMockRole } from "@/lib/dev/mock-settings";
-import { todayInIndia } from "@/lib/format";
+import { calendarDayOf, todayInIndia } from "@/lib/format";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { mockMeFor } from "@/mocks/data/sessions";
@@ -230,6 +230,7 @@ function newApplication(
     documents: { uploaded: 0, listed: MOCK_DOCUMENT_TYPES.length },
     ageing: { days_in_stage: 0, days_since_inward: null },
     full_fp_received_on: null,
+    dispatched_on: null,
     created_at: new Date(`${createdOn}T10:00:00+05:30`).toISOString(),
     cancellation: null,
   };
@@ -271,6 +272,24 @@ export function latestValues(applicationId: string): Record<string, string | nul
   return values;
 }
 
+/**
+ * SUBS-006 · The first dispatch (IST day) of a subsidised order that names the lead, voided
+ * ones left out (`subsidy-completion.md` §2).
+ */
+function firstDispatchFor(leadId: string): string | null {
+  const days = mockDb.orders
+    .filter(
+      (order) =>
+        order.order_type === "subsidised" &&
+        (order.subsidy?.leads ?? []).some((lead) => lead.id === leadId),
+    )
+    .flatMap((order) => order.dispatches)
+    .filter((dispatch) => dispatch.voided_at === null)
+    .map((dispatch) => calendarDayOf(dispatch.dispatched_at))
+    .sort();
+  return days[0] ?? null;
+}
+
 /** Re-derives what follows from the entries: stage, Reg. No., ageing, closing. */
 /** The stage-16 amounts and their stage-17 dates: an entry writing one may close the file. */
 const PAYMENT_KEYS: ReadonlySet<string> = new Set(
@@ -284,6 +303,8 @@ const PAYMENT_KEYS: ReadonlySet<string> = new Set(
  * may close the file, as the backend checks closure only then (so a reopened file stays open).
  */
 function refresh(application: ApplicationWire, closeCheck = false): void {
+  // A seeded date stays until a real dispatch names the lead.
+  application.dispatched_on = firstDispatchFor(application.lead.id) ?? application.dispatched_on;
   const entries = mockDb.subsidyEntries.get(application.id) ?? [];
   const last = entries.at(-1);
   if (last !== undefined) application.current_stage = last.stage;
@@ -407,6 +428,8 @@ export function mockApplications(): ApplicationWire[] {
       const key = SEED_DATE_FIELD[stage.code];
       newEntry(application, stage, day, key === undefined ? {} : { [key]: day }, null, lead.owner);
     });
+    // One file, short of stage 7, whose subsidised order has already gone out
+    if (index === 1) application.dispatched_on = shiftDay(today, -3);
     if (index === SEED_COUNT - 1) {
       application.status = "cancelled";
       application.cancellation = { reason: "The farmer chose a commercial purchase instead." };
@@ -762,6 +785,12 @@ export const subsidyApplicationHandlers = [
     const values = Object.fromEntries(
       Object.entries(body.values).map(([key, value]) => [key, value === "" ? null : value]),
     );
+    // Stage 7 takes the dispatch date as the supply date when the key isn't sent (§2)
+    const takesSupply = stage.fields.some((field) => field.key === "supply");
+    const dispatched = application.dispatched_on ?? null;
+    if (takesSupply && !("supply" in body.values) && dispatched !== null) {
+      values.supply = dispatched;
+    }
     const before = application.current_stage.seq;
     newEntry(application, stage, body.occurred_on, values, remark, who.user);
     refresh(

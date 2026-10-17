@@ -128,6 +128,31 @@ describe("[SUBS-006] ApplicationDetail", () => {
     expect(await within(history).findByText("₹1,250.50")).toBeInTheDocument();
   });
 
+  it("shows the dispatch date, and offers it as stage 7's supply date", async () => {
+    signInAs("employee");
+    const page = await listApplications({
+      status: "open",
+      stage: null,
+      q: "",
+      leadId: null,
+      cursor: null,
+    });
+    const file = page.items.find((item) => item.dispatchedOn !== null);
+    if (file === undefined) throw new Error("No seeded file with a dispatch date");
+    const user = show(<ApplicationDetail applicationId={file.id} />);
+
+    expect(await screen.findByText("Dispatched on")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Record stage" }));
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByLabelText(/^Happened on/);
+    await user.click(within(dialog).getByRole("combobox", { name: "Stage" }));
+    await user.click(await screen.findByRole("option", { name: /^7\. Farmer share detail/ }));
+
+    expect(
+      await within(dialog).findByText(/Left empty, the supply date is taken from it\.$/),
+    ).toBeInTheDocument();
+  });
+
   it("cancels with a reason", async () => {
     signInAs("employee");
     const id = await openApplicationId();
