@@ -81,7 +81,7 @@ Walked on a desktop in light mode and a 390 px phone in dark mode: axe found not
   - Export now priced;
   - `exportCountry` on the header form.
 - `src/features/quotations/lib/builder-lines.ts`: `taxTreatment` in the pricing context; `export_country` errors routed to the field.
-- `src/features/quotations/lib/quotation-labels.ts`: `TAX_TREATMENT_LABELS`, `taxTreatmentText`.
+- `src/features/quotations/lib/quotation-labels.ts`: `TAX_TREATMENT_LABELS`.
 - `src/features/settings/hooks/use-export-sample-settings.ts`: new, the export and sample settings with their defaults.
 - Forms:
   - `src/features/orders/components/order-builder.tsx`: Export and Sample, the Country field, the refusals, `sampleHint`.

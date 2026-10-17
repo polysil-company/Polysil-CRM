@@ -45,12 +45,6 @@ export const TAX_TREATMENT_LABELS: Readonly<Record<TaxTreatment, string>> = {
   export_igst: "Export with IGST",
 };
 
-/** "Export under a LUT, no IGST · LUT AD2404260012345". */
-export function taxTreatmentText(treatment: TaxTreatment, lutArn: string | null): string {
-  const label = TAX_TREATMENT_LABELS[treatment];
-  return lutArn === null ? label : `${label} · LUT ${lutArn}`;
-}
-
 export const PDF_STATE_LABELS: Readonly<Record<PdfState, string>> = {
   pending: "Preparing the PDF…",
   ready: "PDF ready",
