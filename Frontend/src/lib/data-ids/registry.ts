@@ -1155,6 +1155,13 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["POST /users/{id}/handover", "DELETE /users/{id}"],
   },
+  "ADMN-007": {
+    domain: "ADMN",
+    title: "Company settings — how amended orders are re-approved, and complaint reopening",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /settings", "PATCH /settings"],
+  },
   "SITE-001": {
     domain: "SITE",
     title: "Public website — information, Product Master, phone-number entry",
