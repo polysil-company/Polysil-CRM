@@ -30,6 +30,7 @@ import {
   subsidyCropsQueryOptions,
 } from "@/features/subsidy/api/subsidy.queries";
 import {
+  DEFAULT_SUBSIDY_SCHEME,
   SYSTEM_TYPES,
   type SubsidyCrop,
   type SystemConfig,
@@ -47,14 +48,19 @@ import {
 } from "@/features/subsidy/lib/calculator-draft";
 import { SYSTEM_LABELS } from "@/features/subsidy/lib/subsidy-labels";
 
-import { CropBlockCard, HeadUnitCard, QuotationCostsCard } from "./calculator-inputs";
+import {
+  CropBlockCard,
+  HeadUnitCard,
+  QuotationCostsCard,
+  SchemeInputsCard,
+} from "./calculator-inputs";
 import { CalculatorResults, CalculatorResultsSkeleton } from "./calculator-results";
 
 type Drafts = Readonly<Record<SystemType, CalculatorDraft>>;
 
 /** The paths an input on screen shows; anything else is listed above the figures. */
 const PLACED_PATH =
-  /^(crops\[\d+\]\.(crop|inter_crop|area|lateral_spacing|crop_spacing|lines\[\d+\]\.(description|uom|rate|qty))|head_lines\[\d+\]\.(description|uom|rate|qty)|sump\.rate_per_ha|group_total_area|installation_rate_per_ha|nozzle)$/;
+  /^(crops\[\d+\]\.(crop|inter_crop|area|lateral_spacing|crop_spacing|lines\[\d+\]\.(description|uom|rate|qty))|head_lines\[\d+\]\.(description|uom|rate|qty)|sump\.rate_per_ha|group_total_area|installation_rate_per_ha|nozzle|pipe_size_mm|spacing_label|hydrocyclone_m3|gravel_filter_m3|head_unit_existing|pvc_existing|guided_cost|fittings_amount)$/;
 
 const UNPLACED_NAMES: Readonly<Record<string, string>> = {
   crops: "Crop blocks",
@@ -170,7 +176,10 @@ export function SubsidyCalculator(): React.JSX.Element {
   );
 }
 
-/** SUBS-014 · Which state's scheme to calculate under; the first active one stands for none. */
+/**
+ * SUBS-014 · Which state's scheme to calculate under. The backend's default (GGRC) stands for
+ * none; any other is sent by code. The list is in code order, so the default isn't always first.
+ */
 function SchemePicker({
   schemes,
   value,
@@ -180,7 +189,8 @@ function SchemePicker({
   value: string | null;
   onChange: (next: string | null) => void;
 }): React.JSX.Element {
-  const fallback = schemes[0]?.code ?? "";
+  const fallback =
+    schemes.find((row) => row.code === DEFAULT_SUBSIDY_SCHEME)?.code ?? schemes[0]?.code ?? "";
   const items = schemes.map((row) => ({
     value: row.code,
     label: `${row.code} · ${row.state?.name ?? row.name}`,
@@ -243,11 +253,14 @@ export function SystemCalculator({
   const blocks = draft.crops.slice(0, system.cropCountMax);
   const label = SYSTEM_LABELS[system.systemType];
 
-  const waitingFor =
-    plan.missing.length > 0
-      ? system.systemType === "sprinkler"
-        ? "Choose the area and enter the lateral spacing to see the subsidy."
-        : "Enter each crop's area and lateral spacing to see the subsidy."
+  const missingDesign = plan.missing.some((path) => path.startsWith("crops"));
+  const missingScheme = plan.missing.some((path) => !path.startsWith("crops"));
+  const waitingFor = missingDesign
+    ? system.systemType === "sprinkler"
+      ? "Choose the area and enter the lateral spacing to see the subsidy."
+      : "Enter each crop's area and lateral spacing to see the subsidy."
+    : missingScheme
+      ? "Fill in the scheme's inputs to see the subsidy."
       : Object.keys(problems).length > 0
         ? "Correct the marked fields to see the subsidy."
         : null;
@@ -319,6 +332,12 @@ export function SystemCalculator({
         {system.hasHeadUnit ? (
           <HeadUnitCard draft={draft} problems={problems} onChange={onDraftChange} />
         ) : null}
+        <SchemeInputsCard
+          draft={draft}
+          system={system}
+          problems={problems}
+          onChange={onDraftChange}
+        />
         <QuotationCostsCard
           draft={draft}
           system={system}
