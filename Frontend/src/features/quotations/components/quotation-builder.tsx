@@ -93,11 +93,30 @@ function contextFor(source: BuilderSource): Omit<PricingContext, "salesType"> {
       };
 }
 
+/** The lead's inquiry type sets the default; a subsidised one is quoted as subsidised. */
+function salesTypeFor(type: string | null): QuotationHeaderForm["salesType"] {
+  if (type === "industrial") return "industrial";
+  if (type === "subsidised") return "subsidised";
+  return "commercial";
+}
+
+/**
+ * QUOT-014 · Subsidised is offered for a subsidised lead, or a quotation that already is one;
+ * its subsidy is calculated on the quotation once the draft is saved.
+ */
+function salesTypesFor(source: BuilderSource): readonly QuotationHeaderForm["salesType"][] {
+  const subsidised =
+    source.mode === "create"
+      ? source.lead.type === "subsidised"
+      : source.quotation.salesType === "subsidised";
+  return PRICED_SALES_TYPES.filter((type) => type !== "subsidised" || subsidised);
+}
+
 function headerDefaults(source: BuilderSource): QuotationHeaderForm {
   if (source.mode === "create") {
     const { lead } = source;
     return {
-      salesType: lead.type === "industrial" ? "industrial" : "commercial",
+      salesType: salesTypeFor(lead.type),
       partyName: lead.customerName,
       partyMobile: lead.phone,
       partyAddress: [lead.village, lead.territory.name].filter(Boolean).join(", "),
@@ -107,7 +126,7 @@ function headerDefaults(source: BuilderSource): QuotationHeaderForm {
   }
   const { quotation } = source;
   return {
-    salesType: quotation.salesType === "industrial" ? "industrial" : "commercial",
+    salesType: salesTypeFor(quotation.salesType),
     partyName: quotation.party.name,
     partyMobile: quotation.party.mobile,
     partyAddress: quotation.party.address ?? "",
@@ -371,7 +390,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
                         onValueChange={field.onChange}
                         className="flex-row flex-wrap gap-5"
                       >
-                        {PRICED_SALES_TYPES.map((type) => (
+                        {salesTypesFor(source).map((type) => (
                           <label
                             key={type}
                             className="flex items-center gap-2 text-sm text-foreground"
@@ -382,8 +401,9 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
                         ))}
                       </RadioGroup>
                       <FieldDescription>
-                        Subsidised, export, marketing and sample quotations wait on the
-                        client&apos;s rules.
+                        {field.value === "subsidised"
+                          ? "Save the draft, then calculate its subsidy on the quotation."
+                          : "Export, marketing and sample quotations wait on the client's rules."}
                       </FieldDescription>
                     </Field>
                   )}

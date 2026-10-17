@@ -1,5 +1,6 @@
 import type {
   CalculateRequest,
+  SubsidyCalculation,
   Nozzle,
   SchemeInput,
   SubsidyCropRequest,
@@ -331,6 +332,24 @@ export function linePaths(
     index += 1;
   }
   return paths;
+}
+
+/**
+ * Categories that apply on every crop block: the only ones an application or a subsidised
+ * quotation may take (the backend refuses the rest on `category_code`).
+ */
+export function applicableEverywhere(
+  result: SubsidyCalculation,
+): SubsidyCalculation["crops"][number]["categories"] {
+  const [first, ...rest] = result.crops;
+  if (first === undefined) return [];
+  return first.categories.filter(
+    (category) =>
+      category.applicable &&
+      rest.every(
+        (crop) => crop.categories.find((row) => row.code === category.code)?.applicable === true,
+      ),
+  );
 }
 
 /** Splits `code: sentence` on the first colon. A warning without a code is all sentence. */

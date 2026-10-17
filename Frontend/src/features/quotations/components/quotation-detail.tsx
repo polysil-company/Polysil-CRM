@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { QuotationActions } from "./quotation-actions";
 import { QuotationHistory } from "./quotation-history";
 import { QuotationStatusBadge } from "./quotation-status-badge";
+import { isSubsidyWarning, QuotationSubsidyCard } from "./quotation-subsidy";
 import { QuotationVersions } from "./quotation-versions";
 
 /** QUOT-002 · The quotation as the backend prints it. A 404 renders the route's not-found page. */
@@ -134,6 +135,8 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
           <TotalsBlock quotation={quotation} />
         </CardContent>
       </Card>
+
+      {quotation.salesType === "subsidised" ? <QuotationSubsidyCard quotation={quotation} /> : null}
 
       {/* DOC-001 · The signed quotation, the purchase order and anything else on it. */}
       <RecordDocuments
@@ -295,8 +298,8 @@ function DetailItem({
 /** Everything the reader must know before trusting the figures, most important first. */
 function QuotationNotices({ quotation }: { quotation: Quotation }): React.JSX.Element | null {
   const warnings = parseWarnings(quotation.warnings).filter(
-    // The provisional banner says this one already.
-    (warning) => warning.code !== "provisional_pricing",
+    // The provisional banner and the subsidy card say these already.
+    (warning) => warning.code !== "provisional_pricing" && !isSubsidyWarning(warning.code),
   );
   const notices: React.ReactNode[] = [];
   const sendNotice = draftSendNotice(quotation);
