@@ -183,6 +183,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | CMPL-007 | Complaint remedy — refund, replacement or none; withdraw (`POST /complaints/{id}/remedy`, `POST /complaints/{id}/remedy/withdraw`) | shared | in-progress |
 | CMPL-008 | Complaint targets (SLA policies) and complaint types (`GET /complaint-sla-policies`, `POST /complaint-sla-policies`, `GET /lookups/complaint-types`, `POST /lookups/complaint-types`) | shared | in-progress |
 | CMPL-009 | Export complaints to Excel (`GET /complaints/export`) | shared | in-progress |
+| CMPL-010 | Reopen a closed or QC-rejected complaint, with a reason (`POST /complaints/{id}/reopen`) | shared | in-progress |
 | TASK-001 | My day — one person's tasks due that day and overdue (`GET /planner`) | shared | in-progress |
 | TASK-002 | Team day — due, done and overdue per person below a manager (`GET /planner/team`) | shared | in-progress |
 | TASK-003 | List tasks — a lead's tasks, and every task with filters (`GET /tasks`, `GET /tasks/{id}`) | shared | in-progress |

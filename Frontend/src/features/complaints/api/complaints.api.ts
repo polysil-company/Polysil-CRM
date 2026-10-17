@@ -30,6 +30,7 @@ import {
   type CreateComplaintRequest,
   type PatchComplaintRequest,
   type QcRequest,
+  type ReopenComplaintRequest,
   type ReplaceLinesRequest,
 } from "./complaints.schemas";
 
@@ -194,6 +195,14 @@ export function cancelComplaint(
   input: WriteInput<CancelComplaintRequest>,
 ): Promise<Complaint> {
   return write("CMPL-003", "cancelComplaint", "POST", complaintPath(complaintId, "/cancel"), input);
+}
+
+/** CMPL-010 · POST /complaints/{id}/reopen — a closed or rejected one starts a new round. */
+export function reopenComplaint(
+  complaintId: string,
+  input: WriteInput<ReopenComplaintRequest>,
+): Promise<Complaint> {
+  return write("CMPL-010", "reopenComplaint", "POST", complaintPath(complaintId, "/reopen"), input);
 }
 
 /** CMPL-003 · DELETE /complaints/{id} — a draft never submitted. */

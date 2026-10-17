@@ -602,6 +602,15 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /complaints/export"],
   },
+  "CMPL-010": {
+    domain: "CMPL",
+    title: "Reopen a closed or QC-rejected complaint, with a reason",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /complaints/{id}/reopen"],
+    notes:
+      "The raiser reopens a closed one; the complaint_reopen_roles setting's roles reopen either, within complaint_reopen_days and under complaint_reopen_max.",
+  },
   "TASK-001": {
     domain: "TASK",
     title: "My day — one person's tasks due that day and overdue",
