@@ -47,7 +47,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Channel partners](#channel-partners) | 8 | 🧪 👀 | PR #112, stacked on PR #111; GSTIN details in PR #132; dealer applications in PR #145; the applicant's page in PR #146 |
 | [Schemes](#schemes) | 5 | 🧪 👀 | PR #155; benefits on an order in PR #156 |
 | [Reward points](#reward-points) | 4 | 🧪 👀 | PR #158 |
-| [Payments](#payments) | 4 | 🧪 👀 | this pull request |
+| [Payments](#payments) | 4 | 🧪 👀 | PR #159 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |

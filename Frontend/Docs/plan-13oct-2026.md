@@ -133,7 +133,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [x] **25. Reward points** (19), **and dealer commission and TOD** (12). `rewards-contract.md`, `dealer-commission-contract.md`. In two parts, commission first because it needs nothing still open:
   - [x] **25a. Dealer commission and TOD** (SUBS-016…018): stage 18 on the application, Operations → Dealer commissions for Accounts, and Commission rates in Subsidy masters. PR #157, 17 Oct (`feature/SUBS-016-dealer-commission`, from `integration`).
   - [x] **25b. Reward points** (RWD-001…004): points and history, gifts and requests, the gift desk, earning rules, point value, gifts and adjustments for Admin, and points on a dealer's draft order. PR #158, 17 Oct (`feature/RWD-001-reward-points`, from `integration`).
-- [ ] **26. Payments, partner credit and the dealer ledger** (8). `payments-contract.md`. It goes with item 3.
+- [x] **26. Payments, partner credit and the dealer ledger** (8). `payments-contract.md`. It goes with item 3. ACCT-002…005: the order's Payments card and instalments, Record payment, Operations → Receipts (allocate the rest, void), and the dealer ledger and credit standing, with My ledger for partner users. PR #159, 17 Oct (`feature/ACCT-002-payments`, from `integration`). The payment status in the approvals inbox is still to do.
 - [ ] **27. Marketing material ordering** (11), **and campaigns** (5). MKT-001. `marketing-material-contract.md`, `campaigns.md`.
 - [ ] **28. Stock** (7): warehouses, availability on the order form, and the stock list. `stock-contract.md`.
 - [ ] **29. Warranty tracking** (3). `warranty.md`.
