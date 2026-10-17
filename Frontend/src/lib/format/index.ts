@@ -5,6 +5,7 @@ export {
   formatDate,
   formatDateTime,
   formatFullDate,
+  formatMonth,
   formatRelativeTime,
   formatTime,
   isPast,
