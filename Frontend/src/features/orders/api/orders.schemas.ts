@@ -210,6 +210,8 @@ export interface OrderListParams {
   readonly officeId: string | null;
   /** ACCT-001: orders whose next approval step is this role's, e.g. `account_manager`. */
   readonly waitingOn?: string | null;
+  /** ACCT-002: orders placed through this partner (`partner_id`). */
+  readonly partnerId?: string | null;
 }
 
 /** ACCT-001 · GET /orders/stats: counts by status, and submitted orders by whose step is next. */

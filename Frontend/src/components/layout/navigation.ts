@@ -244,6 +244,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         countSource: "accounts",
       },
       {
+        id: "receipts",
+        label: "Receipts",
+        description: "Payments received from dealers and for direct orders, and where each went.",
+        icon: Invoice03Icon,
+        module: "payments",
+        audience: "staff",
+        dataId: "ACCT-003",
+        href: "/receipts",
+      },
+      {
         id: "dealer-commissions",
         label: "Dealer commissions",
         description: "Subsidy stage 18: commissions to approve, to pay, and paid.",

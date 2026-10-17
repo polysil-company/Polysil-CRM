@@ -65,6 +65,7 @@ export async function listOrders(
       quotation_id: params.quotationId,
       territory_id: params.areas.join(","),
       owner_org_unit_id: params.officeId,
+      partner_id: params.partnerId ?? undefined,
     },
     schema: orderPageSchema,
     signal,

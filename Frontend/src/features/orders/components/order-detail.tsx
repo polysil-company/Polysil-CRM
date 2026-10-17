@@ -28,6 +28,7 @@ import {
   orderNumber,
   stepRoleLabel,
 } from "@/features/orders/lib/order-labels";
+import { OrderPaymentsCard } from "@/features/payments/components/order-payments";
 import { formatRate, parseWarnings } from "@/features/quotations/lib/quotation-labels";
 import { useCan } from "@/features/session/hooks/use-session";
 import { isApiError } from "@/lib/api/errors";
@@ -146,6 +147,9 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
       </Card>
 
       <OrderSchemesCard order={order} />
+
+      {/* ACCT-004 · Payable, received, instalments and receipts. */}
+      <OrderPaymentsCard order={order} />
 
       <OrderSubsidyCard order={order} />
 
