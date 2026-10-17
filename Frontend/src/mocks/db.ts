@@ -1,4 +1,5 @@
 import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
+import type { CommissionWire, RateWire } from "@/features/commission/api/commission.schemas";
 import type { SlaPolicyWire } from "@/features/complaints/api/complaints.schemas";
 import type { QrCodeWire } from "@/features/lead-capture/api/lead-capture.schemas";
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
@@ -25,6 +26,7 @@ import type { CalculateResponseWire } from "@/features/subsidy/api/subsidy.schem
 import type { OfficeWire } from "@/features/users/api/users.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
+import { seedCommissionRates } from "./data/commission";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
 import type { MockDealerApplication } from "./data/dealer-applications";
 import { seedDocuments, type MockDocument } from "./data/documents";
@@ -202,6 +204,10 @@ export interface MockDb {
   entitlements: EntitlementWire[];
   /** Every change to a monthly target, oldest first (TGT-002). */
   targets: MockTargetEntry[];
+  /** Dealer commissions, newest first; seeded on first use from the applications (SUBS-016, SUBS-017). */
+  commissions: CommissionWire[] | null;
+  /** Commission rates of every scheme (SUBS-018). */
+  commissionRates: RateWire[];
   /** Reward points (RWD-001…003): every ledger row, newest first, with whose points it moves. */
   rewardLedger: MockLedgerEntry[];
   rewardRules: RuleWire[];
@@ -303,6 +309,8 @@ function createMockDb(): MockDb {
       orders[0] === undefined ? null : { id: orders[0].id, order_no: orders[0].order_no },
     ),
     targets: seedTargets(),
+    commissions: null,
+    commissionRates: seedCommissionRates(),
     rewardLedger: seedLedger(
       firstDealer === undefined
         ? null

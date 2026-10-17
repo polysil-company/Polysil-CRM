@@ -3,6 +3,7 @@ import {
   BubbleChatIcon,
   CheckmarkBadge01Icon,
   Clock01Icon,
+  Coins01Icon,
   CustomerSupportIcon,
   DashboardSquare02Icon,
   Database01Icon,
@@ -251,6 +252,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         dataId: "ACCT-001",
         href: "/accounts",
         countSource: "accounts",
+      },
+      {
+        id: "dealer-commissions",
+        label: "Dealer commissions",
+        description: "Subsidy stage 18: commissions to approve, to pay, and paid.",
+        icon: Coins01Icon,
+        // Accounts approves and pays (payments); co-ordinators work from the application.
+        module: "payments",
+        audience: "staff",
+        dataId: "SUBS-017",
+        href: "/dealer-commissions",
       },
       {
         id: "dispatch",
