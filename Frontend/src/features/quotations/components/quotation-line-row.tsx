@@ -181,16 +181,19 @@ function PricedStrip({
       </div>
     ) : null;
   }
+  // SO-010 · An export is all IGST: at its slab, or at 0 % under a LUT. A line split into CGST
+  // and SGST (or a nil-rated one) keeps the split.
+  const split =
+    Number(priced.cgst.rate) > 0 || Number(priced.sgst.rate) > 0 || Number(priced.gstSlab) === 0;
   const facts: { label: string; value: string; strong?: boolean }[] = [
     { label: "Rate", value: formatInr(priced.rate, { paise: true }) },
     { label: "Taxable", value: formatInr(priced.taxable, { paise: true }) },
     {
-      label: `GST ${formatRate(priced.gstSlab)}`,
+      label: split ? `GST ${formatRate(priced.gstSlab)}` : `IGST ${formatRate(priced.igst.rate)}`,
       // Printed as the backend split it; the screen never adds money up.
-      value:
-        Number(priced.igst.amount) > 0
-          ? formatInr(priced.igst.amount, { paise: true })
-          : `${formatInr(priced.cgst.amount, { paise: true })} + ${formatInr(priced.sgst.amount, { paise: true })}`,
+      value: split
+        ? `${formatInr(priced.cgst.amount, { paise: true })} + ${formatInr(priced.sgst.amount, { paise: true })}`
+        : formatInr(priced.igst.amount, { paise: true }),
     },
     { label: "Total", value: formatInr(priced.total, { paise: true }), strong: true },
   ];

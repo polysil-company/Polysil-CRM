@@ -52,6 +52,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
 | [Stock](#stock) | 4 | 🧪 👀 | PR #162; on orders in PR #163 |
 | [Warranty](#warranty) | 3 | 🧪 👀 | PR #164 |
+| [Export and sample orders](#export-and-sample-orders) | 4 | 🧪 👀 | PR #166 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
@@ -612,6 +613,15 @@ The order's **Warranty** card, the chip on complaint lines, and Masters → **Wa
 - **SO-009 · An order's warranty** (screens: [desktop](screenshots/warranty/order-warranty-desktop-light.jpg), [on a phone](screenshots/warranty/order-warranty-mobile-dark.jpg)). On a shipped order, for those who see orders and dispatches: each line's status ("In warranty until …", "Expired …", "No warranty", "No period on record", "Not sent yet"), each dispatch's period from its DC date (or the day it left) with its months, and the complaints raised on the product, in or out of warranty. Hidden on a draft, from Accounts (no dispatch view) and on a 403. 🧪 👀
 - **CMPL-011 · Warranty on a complaint line** (screen: [complaint](screenshots/warranty/complaint-warranty-desktop-light.jpg)). Each line shows In warranty or Out of warranty, until or ended when, and whether the period ran from the dispatch or from the supply date. Out of warranty blocks nothing. 🧪 👀
 - **MSTR-017 · Warranty periods** (screens: [the list](screenshots/warranty/masters-warranty-desktop-light.jpg), [set a period](screenshots/warranty/set-period-desktop-light.jpg), [after setting](screenshots/warranty/masters-warranty-after-desktop-light.jpg), [on a phone](screenshots/warranty/masters-warranty-mobile-dark.jpg)). Everyone who sees Masters reads the default and each category's periods, in force, upcoming or ended. Admin sets one for the default or a listed category: 0 to 120 whole months, from tomorrow or later; the one in force ends the day before. Today or earlier, and a second period on the same day (409 `term_exists`), are refused on the start-day field. Only categories that already have a period are offered until the category list lands (BE-024). 🧪 👀
+
+## Export and sample orders
+
+Export and sample orders and export quotations (handover `export-sample-orders-contract.md`, FS-042). Staff only. Walked through in the mock as Admin on a desktop in light mode, and on a phone in dark mode; axe found nothing. Not yet checked on the dev API.
+
+- **SO-010 · An export order** (screens: [the builder](screenshots/orders/export-order-builder-desktop-light.jpg), [the draft](screenshots/orders/export-order-draft-desktop-light.jpg), [submitted, with its LUT](screenshots/orders/export-order-submitted-desktop-light.jpg), [on a phone](screenshots/orders/export-order-mobile-dark.jpg)). **Export** on the order type asks for the buyer's **Country** in place of the GSTIN. The preview prices with the tax the order will store: under a LUT every line is at 0 % IGST, and under the IGST setting each line pays IGST at its slab; an export is never within the state. The order page shows the country, "Export under a LUT, no IGST" and, once submitted, the LUT's ARN. No country, a GSTIN, a country on another type and no LUT for the day (`lut_missing`) are refused in words; a dealer gets neither type. 🧪 👀
+- **SO-010 · A sample order** (screens: [the builder](screenshots/orders/sample-order-builder-desktop-light.jpg), [the order](screenshots/orders/sample-order-desktop-light.jpg)). **Sample** says what the setting makes of it: free (every line 100 % off, the total ₹0, the approval on the list value) or charged, and the limit at list price. A free sample marks each line "Free sample" and submits with a total of 0; one over the limit is refused (`sample_over_limit`), and one from quotations too. 🧪 👀
+- **SO-010 · An export quotation** (screen: [the quotation](screenshots/orders/export-quotation-desktop-light.jpg)). **Export** on a new quotation takes the country, prices without GST under a LUT, and shows the tax and the LUT covering its price date. A draft keeps its treatment: an export stays an export. 🧪 👀
+- **SO-010 · An order from an export quotation.** Place order makes an export order, its type fixed and its tax taken from the quotation; a domestic quotation can't make one (`type_mismatch`). 🧪
 
 ## Masters
 
