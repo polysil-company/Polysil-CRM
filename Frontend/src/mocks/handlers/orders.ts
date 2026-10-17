@@ -399,6 +399,16 @@ const orderPartySchema = z.object({
     .nullish(),
 });
 
+const rupeesText = z.string().regex(/^\d+(\.\d{1,2})?$/);
+
+/** SO-008 · PUT /orders/{id}/subsidy (FS-054 SubsidyBlockIn). */
+const subsidySchema = z.strictObject({
+  lead_ids: z.array(z.string().min(1)).min(1).max(50),
+  material_amount: rupeesText.nullish(),
+  subsidy_amount: rupeesText,
+  farmer_payable: rupeesText.nullish(),
+});
+
 const createSchema = z.object({
   order_type: z.enum(ORDER_TYPES).default("commercial"),
   quotation_ids: z.array(z.string().min(1)).default([]),
@@ -411,17 +421,7 @@ const createSchema = z.object({
   remarks: z.string().trim().max(2000).nullish(),
   lines: z.array(lineInSchema).max(200).default([]),
   /** SO-008 · Typed in on a direct subsidised order; refused alongside quotations. */
-  subsidy: z.unknown().optional(),
-});
-
-const rupeesText = z.string().regex(/^\d+(\.\d{1,2})?$/);
-
-/** SO-008 · PUT /orders/{id}/subsidy (FS-054 SubsidyBlockIn). */
-const subsidySchema = z.strictObject({
-  lead_ids: z.array(z.string().min(1)).min(1).max(50),
-  material_amount: rupeesText.nullish(),
-  subsidy_amount: rupeesText,
-  farmer_payable: rupeesText.nullish(),
+  subsidy: subsidySchema.optional(),
 });
 
 const linesSchema = z.object({
@@ -527,6 +527,49 @@ function isStaff(): boolean {
   return mockMeFor(readMockRole()).data.user_type === "staff";
 }
 
+/** FS-054 rule 3: each named lead seen by the caller and qualified or later. */
+function subsidyLeadsRefusal(ids: readonly string[]): Response | null {
+  for (const id of ids) {
+    const lead = mockDb.leads.find((item) => item.id === id);
+    if (lead === undefined) {
+      return errorResponse(422, "lead_not_visible", "You cannot see that lead.", {
+        "subsidy.lead_ids": id,
+      });
+    }
+    if (!ORDERABLE_STAGES.includes(lead.stage)) {
+      return errorResponse(422, "lead_not_open", `A named lead is ${lead.stage}.`, {
+        "subsidy.lead_ids": id,
+      });
+    }
+  }
+  return null;
+}
+
+/** FS-054 rule 4: the subsidy and the payable at most the material, or the total now. */
+function subsidyAmountsRefusal(
+  body: z.infer<typeof subsidySchema>,
+  total: string,
+): Response | null {
+  const material = paise(body.material_amount ?? total);
+  if (paise(body.subsidy_amount) > material) {
+    return errorResponse(
+      422,
+      "subsidy_above_material",
+      "The subsidy is more than the material amount.",
+      { "subsidy.subsidy_amount": body.subsidy_amount },
+    );
+  }
+  if (body.farmer_payable != null && paise(body.farmer_payable) > material) {
+    return errorResponse(
+      422,
+      "payable_above_material",
+      "The farmer payable is more than the material amount.",
+      { "subsidy.farmer_payable": body.farmer_payable },
+    );
+  }
+  return null;
+}
+
 // ── handlers ────────────────────────────────────────────────────────────────────
 
 /**
@@ -540,11 +583,13 @@ function createDirect(
   if (body.party == null) {
     return validation({ party: "required" });
   }
-  const lead =
-    body.lead_id == null ? undefined : mockDb.leads.find((item) => item.id === body.lead_id);
-  if (body.lead_id != null && lead === undefined) {
+  // FS-054 rule 6: a subsidised order's first named lead is its lead and routes it
+  const subsidyIds = body.subsidy === undefined ? [] : [...new Set(body.subsidy.lead_ids)];
+  const leadRef = subsidyIds[0] ?? body.lead_id;
+  const lead = leadRef == null ? undefined : mockDb.leads.find((item) => item.id === leadRef);
+  if (leadRef != null && lead === undefined) {
     return errorResponse(422, "lead_not_visible", "You cannot see that lead.", {
-      lead_id: body.lead_id,
+      lead_id: leadRef,
     });
   }
   if (lead !== undefined && !ORDERABLE_STAGES.includes(lead.stage)) {
@@ -594,6 +639,17 @@ function createDirect(
     remarks: body.remarks ?? null,
     createdAt: new Date().toISOString(),
   });
+  if (body.subsidy !== undefined) {
+    const refusal = subsidyAmountsRefusal(body.subsidy, order.totals.total);
+    if (refusal !== null) return refusal;
+    mockDb.orderSubsidies.set(order.id, {
+      material: body.subsidy.material_amount ?? null,
+      subsidy: body.subsidy.subsidy_amount,
+      payable: body.subsidy.farmer_payable ?? null,
+      leadIds: subsidyIds,
+    });
+    applySubsidy(order);
+  }
   mockDb.orders.unshift(order);
   mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
   recordOrderEvent(order, "order.created", {});
@@ -800,8 +856,7 @@ export const orderHandlers = [
     }
     const body = parsed.data;
     const subsidised = body.order_type === "subsidised";
-    // TODO(SO-008): a subsidised order typed in, its leads in subsidy.lead_ids (plan item 17b)
-    if (!orderableType(body.order_type) && !(subsidised && body.quotation_ids.length > 0)) {
+    if (!orderableType(body.order_type) && !subsidised) {
       return errorResponse(
         422,
         "order_type_unsupported",
@@ -823,7 +878,7 @@ export const orderHandlers = [
         subsidy: "not allowed",
       });
     }
-    if (subsidised && new Set(body.quotation_ids).size !== 1) {
+    if (subsidised && body.quotation_ids.length > 0 && new Set(body.quotation_ids).size !== 1) {
       return errorResponse(
         422,
         "subsidised_quotation_count",
@@ -831,10 +886,32 @@ export const orderHandlers = [
         { quotation_ids: "exactly one" },
       );
     }
-    if (subsidised && body.subsidy !== undefined) {
+    if (subsidised && body.quotation_ids.length > 0 && body.subsidy !== undefined) {
       return errorResponse(422, "subsidy_from_quotation", "The subsidy comes from the quotation.", {
         subsidy: "not allowed",
       });
+    }
+    if (subsidised && body.quotation_ids.length === 0) {
+      if (body.subsidy === undefined) {
+        return errorResponse(
+          422,
+          "subsidy_missing",
+          "A subsidised order needs its subsidy and leads.",
+          {
+            subsidy: "required",
+          },
+        );
+      }
+      if (body.lead_id != null) {
+        return errorResponse(
+          422,
+          "lead_from_subsidy",
+          "A subsidised order takes its leads from subsidy.lead_ids.",
+          { lead_id: "use subsidy.lead_ids" },
+        );
+      }
+      const refusal = subsidyLeadsRefusal([...new Set(body.subsidy.lead_ids)]);
+      if (refusal !== null) return refusal;
     }
     if (body.quotation_ids.length === 0) {
       return createDirect(body, replay);
@@ -1070,36 +1147,8 @@ export const orderHandlers = [
         { "subsidy.lead_ids": order.lead?.id ?? "none" },
       );
     }
-    for (const id of ids) {
-      const lead = mockDb.leads.find((item) => item.id === id);
-      if (lead === undefined) {
-        return errorResponse(422, "lead_not_visible", "You cannot see that lead.", {
-          "subsidy.lead_ids": id,
-        });
-      }
-      if (!ORDERABLE_STAGES.includes(lead.stage)) {
-        return errorResponse(422, "lead_not_open", `A named lead is ${lead.stage}.`, {
-          "subsidy.lead_ids": id,
-        });
-      }
-    }
-    const material = paise(body.material_amount ?? order.totals.total);
-    if (paise(body.subsidy_amount) > material) {
-      return errorResponse(
-        422,
-        "subsidy_above_material",
-        "The subsidy is more than the material amount.",
-        { "subsidy.subsidy_amount": body.subsidy_amount },
-      );
-    }
-    if (body.farmer_payable != null && paise(body.farmer_payable) > material) {
-      return errorResponse(
-        422,
-        "payable_above_material",
-        "The farmer payable is more than the material amount.",
-        { "subsidy.farmer_payable": body.farmer_payable },
-      );
-    }
+    const refusal = subsidyLeadsRefusal(ids) ?? subsidyAmountsRefusal(body, order.totals.total);
+    if (refusal !== null) return refusal;
     mockDb.orderSubsidies.set(order.id, {
       material: body.material_amount ?? null,
       subsidy: body.subsidy_amount,
