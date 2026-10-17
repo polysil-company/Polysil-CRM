@@ -94,7 +94,7 @@ Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named)
   - attach a PDF and a HEIC photo, then open both.
 
   Follow `Docs/Live-Test-Plan.md`. Credentials come from the user, never from a file, and no WhatsApp messages go to real customers.
-- [~] **39. Import polish** (added 17 Oct, from the user after the staging walk: "shouldn't it be visible beside New price list?"). MSTR-013, on `feature/MSTR-013-import-polish` from `integration`. `backend/docs/api/imports.md`.
+- [x] **39. Import polish** (added 17 Oct, from the user after the staging walk: "shouldn't it be visible beside New price list?"). MSTR-013. PR #154, 17 Oct (`feature/MSTR-013-import-polish`, from `integration`). `backend/docs/api/imports.md`.
   - **Download the template** in every import: `GET /imports/template?kind=`.
   - Upload refusals on their fields: `fields.file`, `fields.sheet`, `fields.header_row`.
   - **Import from Excel** beside **New price list**: start the draft, then open its import.

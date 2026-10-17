@@ -43,7 +43,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 5 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43; area by system and targets in PR #128; group chats in PR #133 |
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
-| [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 5 | 🧪 👀 | PR #111, MSTR-013 |
+| [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 5 | 🧪 👀 | PR #111; template, upload errors and the shortcut in PR #154 |
 | [Channel partners](#channel-partners) | 8 | 🧪 👀 | PR #112, stacked on PR #111; GSTIN details in PR #132; dealer applications in PR #145; the applicant's page in PR #146 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
