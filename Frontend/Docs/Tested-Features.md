@@ -49,7 +49,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Reward points](#reward-points) | 4 | 🧪 👀 | PR #158 |
 | [Payments](#payments) | 4 | 🧪 👀 | PR #159 |
 | [Marketing material](#marketing-material) | 3 | 🧪 👀 | PR #160 |
-| [Campaigns](#campaigns) | 2 | 🧪 👀 | this pull request |
+| [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
