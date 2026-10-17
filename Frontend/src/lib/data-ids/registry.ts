@@ -705,6 +705,14 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /tasks/export"],
   },
+  "TASK-009": {
+    domain: "TASK",
+    title:
+      "Tasks for dealers — dealer users in the assignee picker, and a dealer's own tasks with Done only, while `tasks_for_dealers` is on (FS-037)",
+    owner: "shared",
+    status: "in-progress",
+  },
+
   "CHNL-001": {
     domain: "CHNL",
     title: "Channel partners list and detail, with the Excel export",

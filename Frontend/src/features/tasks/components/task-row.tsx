@@ -44,6 +44,11 @@ export interface TaskRowProps {
   showAssignee?: boolean;
   /** Not linked to the lead it is about, when already on that lead's page. */
   hideSubject?: boolean;
+  /**
+   * TASK-009 · A dealer user's row: Done is the only action (edit, cancel and reopen answer
+   * 403), and minutes, which are staff pages, aren't linked.
+   */
+  completeOnly?: boolean;
   onAction: (action: PendingTaskAction) => void;
 }
 
@@ -60,22 +65,26 @@ export function TaskRow({
   when,
   showAssignee = false,
   hideSubject = false,
+  completeOnly = false,
   onAction,
 }: TaskRowProps): React.JSX.Element {
   const subject = hideSubject ? null : taskSubjectLabel(task);
   const open = task.status === "open";
   const givenByOther =
     task.assignedBy !== null && task.assignedBy.id !== task.assignedTo?.id ? task.assignedBy : null;
-  const canCancel = canEdit && open && !(task.assignedTo?.id === meId && givenByOther !== null);
-  const canChange = canEdit && open;
+  const canCancel =
+    canEdit && !completeOnly && open && !(task.assignedTo?.id === meId && givenByOther !== null);
+  const canChange = canEdit && !completeOnly && open;
   const canRecordMinutes =
     canEdit &&
+    !completeOnly &&
     task.type === "meeting" &&
     task.status !== "cancelled" &&
     task.lead !== null &&
     !task.lead.hidden;
   const canReopen =
     canEdit &&
+    !completeOnly &&
     task.status === "done" &&
     meId !== null &&
     (task.assignedTo?.id === meId || task.assignedBy?.id === meId);
@@ -145,7 +154,7 @@ export function TaskRow({
             Given by {givenByOther.id === meId ? "you" : givenByOther.name}
           </p>
         )}
-        {task.minutesId === null ? null : (
+        {task.minutesId === null || completeOnly ? null : (
           <p className="text-xs text-muted-foreground">
             <Link
               href={`/tasks/minutes/${task.minutesId}`}
@@ -189,7 +198,7 @@ export function TaskRow({
               Done
             </Button>
           ) : null}
-          {canCancel || canReopen || canChange || canRecordMinutes ? (
+          {completeOnly ? null : canCancel || canReopen || canChange || canRecordMinutes ? (
             <TaskMenu
               task={task}
               canEdit={canChange}

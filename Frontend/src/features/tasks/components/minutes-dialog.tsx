@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateMinutes } from "@/features/tasks/api/tasks.mutations";
-import { taskAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
+import { staffAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
 import {
   ACTION_ITEMS_MAX,
   ACTION_ITEM_TYPES,
@@ -441,7 +441,7 @@ function ActionItemRow({
   const itemErrors = errors.actionItems?.[index];
   const number = index + 1;
   const prefix = `minutes-item-${String(index)}`;
-  const people = useQuery(taskAssigneesQueryOptions());
+  const people = useQuery(staffAssigneesQueryOptions());
   const peopleItems = (people.data ?? []).map((person) => ({
     value: person.id,
     label: person.id === meId ? `${person.name} (you)` : person.name,

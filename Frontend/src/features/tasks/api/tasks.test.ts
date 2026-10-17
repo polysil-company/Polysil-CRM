@@ -151,7 +151,12 @@ describe("[TASK-004] createTask", () => {
   it("offers the user first, then the people below them", async () => {
     const people = await listTaskAssignees();
 
-    expect(people[0]).toEqual({ id: MOCK_TASK_ME.id, name: MOCK_TASK_ME.full_name });
+    expect(people[0]).toEqual({
+      id: MOCK_TASK_ME.id,
+      name: MOCK_TASK_ME.full_name,
+      kind: "staff",
+      partner: null,
+    });
     expect(people).toHaveLength(1 + MOCK_TEAM.length);
   });
 

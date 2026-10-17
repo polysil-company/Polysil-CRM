@@ -71,7 +71,8 @@ function bands(key: string, value: number[], description: string): SettingWire {
   };
 }
 
-function settings(): SettingWire[] {
+/** The mock's settings, seeded on first read; other handlers read their values through it. */
+export function mockSettings(): SettingWire[] {
   if (mockDb.settings !== null) return mockDb.settings;
   mockDb.settings = [
     choice(
@@ -232,7 +233,7 @@ export const settingsHandlers = [
     if (isPartnerRole(readMockRole())) {
       return errorResponse(403, "insufficient_permission", "Settings are for staff.");
     }
-    return HttpResponse.json({ data: settings() });
+    return HttpResponse.json({ data: mockSettings() });
   }),
 
   http.patch(buildApiUrl("/settings"), async ({ request }) => {
@@ -252,7 +253,7 @@ export const settingsHandlers = [
     }
     const fields: Record<string, string> = {};
     for (const [key, value] of Object.entries(parsed.data.values)) {
-      const setting = settings().find((item) => item.key === key);
+      const setting = mockSettings().find((item) => item.key === key);
       if (setting === undefined) {
         fields[key] = "unknown setting";
         continue;
@@ -265,12 +266,12 @@ export const settingsHandlers = [
     }
     const now = new Date().toISOString();
     for (const [key, value] of Object.entries(parsed.data.values)) {
-      const setting = settings().find((item) => item.key === key);
+      const setting = mockSettings().find((item) => item.key === key);
       if (setting !== undefined) {
         setting.value = value;
         setting.updated_at = now;
       }
     }
-    return HttpResponse.json({ data: settings() });
+    return HttpResponse.json({ data: mockSettings() });
   }),
 ];

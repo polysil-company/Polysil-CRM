@@ -201,6 +201,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | TASK-006 | Edit or reassign an open task (`PATCH /tasks/{id}`) | shared | in-progress |
 | TASK-007 | Meeting minutes with action items (`POST /minutes`, `GET /minutes`, `GET /minutes/{id}`) | shared | in-progress |
 | TASK-008 | Export the task list to Excel (`GET /tasks/export`) | shared | in-progress |
+| TASK-009 | Tasks for dealers: dealer users in the assignee picker, and a dealer's own tasks with Done only, while `tasks_for_dealers` is on (FS-037) | shared | in-progress |
 | CHNL-001 | Channel partners list and detail, with the Excel export (`GET /partners`, `/partners/{id}`, `/partners/export`) | shared | in-progress |
 | CHNL-002 | Add a channel partner — a distributor, or a dealer or sub-dealer under one (`POST /partners`) | shared | in-progress |
 | CHNL-003 | Correct a channel partner's details and credit terms (`PATCH /partners/{id}`) | shared | in-progress |
