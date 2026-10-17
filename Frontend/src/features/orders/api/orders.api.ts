@@ -14,6 +14,7 @@ import {
   noContentSchema,
   orderPageSchema,
   orderResponseSchema,
+  orderStatsSchema,
   type CreateDispatchRequest,
   type CreateDirectOrder,
   type CreateOrderFromQuotations,
@@ -22,6 +23,7 @@ import {
   type Order,
   type OrderListParams,
   type OrderPage,
+  type OrderStats,
   type PatchOrderRequest,
   type RemarkRequest,
   type ReplaceOrderLinesRequest,
@@ -55,6 +57,7 @@ export async function listOrders(
       status: params.status.join(","),
       order_type: params.orderType,
       owner: params.mine ? "me" : undefined,
+      waiting_on: params.waitingOn ?? undefined,
       lead_id: params.leadId,
       quotation_id: params.quotationId,
       territory_id: params.areas.join(","),
@@ -189,6 +192,7 @@ export function exportOrders(params: OrderListParams): Promise<DownloadedFile> {
       status: params.status.join(","),
       order_type: params.orderType,
       owner: params.mine ? "me" : undefined,
+      waiting_on: params.waitingOn ?? undefined,
       lead_id: params.leadId,
       quotation_id: params.quotationId,
       territory_id: params.areas.join(","),
@@ -224,6 +228,21 @@ export function submitOrder(
     body,
     idempotencyKey,
     schema: orderResponseSchema,
+  });
+}
+
+/**
+ * ACCT-001 · GET /orders/stats — every status's count, and submitted orders by the role whose
+ * step is next. Called without `waiting_on`, `waitingOn.account_manager` is the Accounts badge.
+ */
+export function getOrderStats(signal?: AbortSignal): Promise<OrderStats> {
+  return apiRequest({
+    dataId: "ACCT-001",
+    logger: log,
+    fn: "getOrderStats",
+    path: "/orders/stats",
+    schema: orderStatsSchema,
+    signal,
   });
 }
 

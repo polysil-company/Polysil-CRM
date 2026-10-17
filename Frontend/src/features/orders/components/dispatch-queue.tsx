@@ -24,12 +24,11 @@ import {
 import type { Dispatch, OrderSummary } from "@/features/orders/api/orders.schemas";
 import { ORDER_TYPE_LABELS } from "@/features/orders/lib/order-labels";
 import { useCan } from "@/features/session/hooks/use-session";
-import { toUserFacingError } from "@/lib/api/error-messages";
 import { formatDate, formatDateTime, formatInr } from "@/lib/format";
 
 import { OrderStatusBadge } from "./order-status-badge";
+import { LoadMore, QueueSkeleton } from "./queue-parts";
 
-const SKELETON_ROWS = 4;
 const TABS = ["to-ship", "dispatched"] as const;
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -307,61 +306,11 @@ function DispatchRow({ dispatch }: { dispatch: Dispatch }): React.JSX.Element {
   );
 }
 
-function LoadMore({
-  query,
-  label,
-}: {
-  query: {
-    hasNextPage: boolean;
-    isFetchNextPageError: boolean;
-    isFetchingNextPage: boolean;
-    error: Error | null;
-    fetchNextPage: () => Promise<unknown>;
-  };
-  label: string;
-}): React.JSX.Element | null {
-  if (!query.hasNextPage) return null;
-  return (
-    <div className="flex flex-col items-start gap-2">
-      {query.isFetchNextPageError ? (
-        <p role="alert" className="text-xs text-danger">
-          {toUserFacingError(query.error).title}. The {label} above are still current.
-        </p>
-      ) : null}
-      <Button
-        variant="outline"
-        size="sm"
-        state={query.isFetchingNextPage ? "loading" : "idle"}
-        loadingLabel="Loading…"
-        onClick={() => {
-          void query.fetchNextPage();
-        }}
-      >
-        {query.isFetchNextPageError ? "Try again" : "Show more"}
-      </Button>
-    </div>
-  );
-}
-
 export function DispatchQueueSkeleton(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-5">
       <Skeleton className="h-control-sm w-52 rounded-md" />
       <QueueSkeleton label="Loading the dispatch queue" />
-    </div>
-  );
-}
-
-function QueueSkeleton({ label }: { label: string }): React.JSX.Element {
-  return (
-    <div role="status" aria-label={label} className="flex flex-col gap-2">
-      {Array.from({ length: SKELETON_ROWS }, (_, index) => (
-        <div key={index} className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:p-4">
-          <Skeleton className="h-4 w-48" />
-          <Skeleton className="h-4 w-64" />
-          <Skeleton className="h-3 w-40" />
-        </div>
-      ))}
     </div>
   );
 }

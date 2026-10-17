@@ -16,7 +16,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { approvalCountQueryOptions } from "@/features/approvals/api/approvals.queries";
 import { leadStatsQueryOptions } from "@/features/leads/api/leads.queries";
 import { conversationListQueryOptions } from "@/features/messages/api/messages.queries";
-import { useCanApprove, useSession } from "@/features/session/hooks/use-session";
+import { orderStatsQueryOptions } from "@/features/orders/api/orders.queries";
+import { ACCOUNTS_ROLE } from "@/features/orders/api/orders.schemas";
+import { useCan, useCanApprove, useSession } from "@/features/session/hooks/use-session";
 import { useModifierKeyLabel } from "@/hooks/use-modifier-key";
 import { clientEnv, type ApiMockingMode, type AppEnv } from "@/lib/env/client";
 import { formatCount, formatNumber } from "@/lib/format";
@@ -286,6 +288,8 @@ function SidebarItem({
         <UnreadMessagesCount />
       ) : item.countSource === "approvals" ? (
         <ApprovalsCount />
+      ) : item.countSource === "accounts" ? (
+        <AccountsQueueCount />
       ) : null}
     </>
   );
@@ -358,6 +362,28 @@ function ApprovalsCount(): React.JSX.Element | null {
       <Badge size="sm" variant="primary" className="tabular-nums sidebar-collapsed:hidden">
         <span className="sr-only">Waiting for your decision: </span>
         {formatCount(data.total, { atLeast: data.capped })}
+      </Badge>
+      <span
+        aria-hidden="true"
+        className="absolute top-1 right-1 hidden size-2 rounded-full bg-primary ring-2 ring-sidebar sidebar-collapsed:block"
+      />
+    </>
+  );
+}
+
+/** ACCT-001 · Orders whose next step is Accounts' payment check, from the order stats (BE-022). */
+function AccountsQueueCount(): React.JSX.Element | null {
+  const canSee = useCan("payments", "view");
+  const { data } = useQuery({ ...orderStatsQueryOptions(), enabled: canSee });
+  const waiting = data?.waitingOn[ACCOUNTS_ROLE] ?? 0;
+  if (!canSee || waiting === 0) {
+    return null;
+  }
+  return (
+    <>
+      <Badge size="sm" variant="primary" className="tabular-nums sidebar-collapsed:hidden">
+        <span className="sr-only">Waiting on Accounts: </span>
+        {formatNumber(waiting)}
       </Badge>
       <span
         aria-hidden="true"

@@ -22,7 +22,7 @@ describe("[AUTH-002] mock permission matrix", () => {
   });
 
   it("keeps the single-person queues focused on their work", () => {
-    expect(can(mockPermissionsFor("account_manager"), "accounts", "approve")).toBe(true);
+    expect(can(mockPermissionsFor("account_manager"), "payments", "approve")).toBe(true);
     expect(can(mockPermissionsFor("dispatch_manager"), "dispatch", "edit")).toBe(true);
     expect(can(mockPermissionsFor("qa_manager"), "complaints", "approve")).toBe(true);
     for (const role of ["account_manager", "dispatch_manager", "qa_manager"] as const) {

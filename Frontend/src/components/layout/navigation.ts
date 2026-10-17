@@ -45,7 +45,7 @@ export interface NavItem {
   /** "approvers": shown to whoever may approve an order or a quotation discount, whatever `module` says. */
   readonly visibleTo?: "approvers";
   /** A live count shown next to the label. */
-  readonly countSource?: "leads" | "messages" | "approvals";
+  readonly countSource?: "leads" | "messages" | "approvals" | "accounts";
 }
 
 export interface NavSection {
@@ -219,9 +219,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "accounts",
         label: "Accounts queue",
+        description: "Submitted orders waiting on Accounts' payment check.",
         icon: RupeeIcon,
-        module: "accounts",
+        // The backend has no `accounts` module: Accounts holds `payments` (RBAC.md §6.2).
+        module: "payments",
+        audience: "staff",
         dataId: "ACCT-001",
+        href: "/accounts",
+        countSource: "accounts",
       },
       {
         id: "dispatch",
