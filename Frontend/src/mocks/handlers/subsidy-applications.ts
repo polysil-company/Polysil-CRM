@@ -9,6 +9,7 @@ import {
   APPLICATION_STATUSES,
   type ApplicationDocumentWire,
   type ApplicationWire,
+  type DocumentTypeWire,
   type StageEntryWire,
 } from "@/features/subsidy/api/subsidy-applications.schemas";
 import { buildApiUrl } from "@/lib/api/url";
@@ -38,6 +39,8 @@ import { mockScheme, schemeReady } from "./subsidy-readiness";
  * SUBS-004 … SUBS-008 · Subsidy applications, with the backend's rules: who may start one, the
  * stages in any order (a remark going back or repeating), the application closing itself once
  * every stage-16 amount has its stage-17 date, cancel, the checklist's files and the PIMS sheet.
+ * SUBS-015 · Reopen a closed one (`subsidy.approve`); it closes again only on an entry that
+ * writes a stage-16 amount or a stage-17 date.
  */
 
 const SYSTEMS = ["drip", "mini_sprinkler", "sprinkler"] as const;
@@ -62,6 +65,8 @@ interface Caller {
   readonly view: boolean;
   /** Start, record, upload and cancel need create or edit; view-only users get 403. */
   readonly write: boolean;
+  /** Reopen needs `subsidy.approve`: Admin Sales and the MD. */
+  readonly approve: boolean;
   readonly user: { readonly id: string; readonly full_name: string };
 }
 
@@ -72,8 +77,19 @@ function caller(): Caller {
   return {
     view: can(permissions, "subsidy", "view"),
     write: can(permissions, "subsidy", "create") || can(permissions, "subsidy", "edit"),
+    approve: can(permissions, "subsidy", "approve"),
     user: { id: me.id, full_name: me.full_name },
   };
+}
+
+/** The checklist as `GET /subsidy-document-types` sends it. */
+function mockDocumentTypes(): DocumentTypeWire[] {
+  return MOCK_DOCUMENT_TYPES.map((type, index) => ({
+    id: mockUuid(MOCK_ID_SPACE.subsidyDocument, 0x100 + index),
+    code: type.code,
+    name: type.name,
+    is_active: true,
+  }));
 }
 
 function forbidden(): Response {
@@ -256,7 +272,18 @@ export function latestValues(applicationId: string): Record<string, string | nul
 }
 
 /** Re-derives what follows from the entries: stage, Reg. No., ageing, closing. */
-function refresh(application: ApplicationWire): void {
+/** The stage-16 amounts and their stage-17 dates: an entry writing one may close the file. */
+const PAYMENT_KEYS: ReadonlySet<string> = new Set(
+  MOCK_STAGE_DEFS.flatMap((stage) => stage.fields)
+    .filter((field) => field.pairsWith !== undefined)
+    .flatMap((field) => [field.key, field.pairsWith ?? field.key]),
+);
+
+/**
+ * Brings the derived fields up to date. With `closeCheck`, an entry that wrote a payment field
+ * may close the file, as the backend checks closure only then (so a reopened file stays open).
+ */
+function refresh(application: ApplicationWire, closeCheck = false): void {
   const entries = mockDb.subsidyEntries.get(application.id) ?? [];
   const last = entries.at(-1);
   if (last !== undefined) application.current_stage = last.stage;
@@ -282,6 +309,7 @@ function refresh(application: ApplicationWire): void {
   );
   const entered = amounts.filter((field) => (values[field.key] ?? "") !== "");
   if (
+    closeCheck &&
     application.status === "open" &&
     entered.length > 0 &&
     entered.every((field) => (values[field.pairsWith ?? ""] ?? "") !== "")
@@ -289,6 +317,50 @@ function refresh(application: ApplicationWire): void {
     application.status = "full_fp_received";
     application.full_fp_received_on = today;
   }
+}
+
+/** One file through every stage, every payment received: closed, so it can be reopened. */
+function seedClosed(lead: LeadWire, today: string): void {
+  const system = SYSTEMS.find((item) => item === lead.mis_system) ?? "drip";
+  const started = shiftDay(today, -120);
+  const application = newApplication(
+    lead,
+    seedCalculation(system, SEED_COUNT),
+    "small_farmer",
+    "214/1",
+    started,
+  );
+  mockDb.subsidyApplications?.push(application);
+  const last = MOCK_STAGE_DEFS.length - 1;
+  MOCK_STAGE_DEFS.forEach((stage, step) => {
+    const day = shiftDay(started, step * 6);
+    const key = SEED_DATE_FIELD[stage.code];
+    const values: Record<string, string | null> =
+      step === 0
+        ? { app_inward: day, reg_no: "GGRC/24/214" }
+        : key === undefined
+          ? {}
+          : { [key]: day };
+    if (stage.code === "fp_cleared_pay_pending") {
+      Object.assign(values, {
+        fp_cleared: day,
+        pfms_amt: "38500.00",
+        state_share_amt: "16500.00",
+        fp_farmer_share_amt: "9200.00",
+      });
+    }
+    if (step === last) {
+      Object.assign(values, {
+        pfms_received: day,
+        state_share_received: day,
+        farmer_share_received: day,
+      });
+    }
+    newEntry(application, stage, day, values, null, lead.owner);
+  });
+  refresh(application, true);
+  // closed on the day the last payment came in, not today
+  application.full_fp_received_on = shiftDay(started, last * 6);
 }
 
 /** Seeds a few applications from subsidised leads on first use, at different stages. */
@@ -339,8 +411,10 @@ export function mockApplications(): ApplicationWire[] {
       application.status = "cancelled";
       application.cancellation = { reason: "The farmer chose a commercial purchase instead." };
     }
-    refresh(application);
+    refresh(application, true);
   });
+  const closedLead = leads[SEED_COUNT];
+  if (closedLead !== undefined) seedClosed(closedLead, today);
   return mockDb.subsidyApplications;
 }
 
@@ -382,6 +456,7 @@ const stageSchema = z.object({
 });
 
 const cancelSchema = z.object({ reason: z.string().trim().min(1).max(500) });
+const reopenSchema = z.object({ reason: z.string().trim().min(1).max(500) });
 
 /**
  * The scheme an application on this lead uses, as `subsidy_scheme_for_lead` finds it: the active
@@ -689,7 +764,10 @@ export const subsidyApplicationHandlers = [
     );
     const before = application.current_stage.seq;
     newEntry(application, stage, body.occurred_on, values, remark, who.user);
-    refresh(application);
+    refresh(
+      application,
+      Object.entries(values).some(([key, value]) => value !== null && PAYMENT_KEYS.has(key)),
+    );
     const lead = mockDb.leads.find((item) => item.id === application.lead.id);
     if (lead !== undefined) {
       recordLeadEvent(lead, "subsidy.stage_recorded", {
@@ -728,6 +806,45 @@ export const subsidyApplicationHandlers = [
     return HttpResponse.json({ data: application });
   }),
 
+  /** SUBS-015 · Reopen a closed file: `subsidy.approve` only; its stages and values stay. */
+  http.post(base("/:applicationId/reopen"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const who = caller();
+    if (!who.view) return forbidden();
+    if (!who.approve) return errorResponse(403, "forbidden", "You may not reopen applications.");
+    const application = findApplication(params.applicationId);
+    if (application instanceof Response) return application;
+    const parsed = reopenSchema.safeParse(await request.json());
+    if (!parsed.success) return invalid({ reason: "Required." });
+    if (application.status !== "full_fp_received") {
+      return errorResponse(
+        409,
+        "application_not_closed",
+        "Only a closed application can be reopened.",
+      );
+    }
+    application.status = "open";
+    application.full_fp_received_on = null;
+    refresh(application);
+    const lead = mockDb.leads.find((item) => item.id === application.lead.id);
+    if (lead !== undefined) {
+      recordLeadEvent(lead, "subsidy.reopened", {
+        application_no: application.application_no,
+        reason: parsed.data.reason,
+      });
+    }
+    return HttpResponse.json({ data: application });
+  }),
+
+  /** SUBS-007 · The checklist every application is given. */
+  http.get(buildApiUrl("/subsidy-document-types"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!caller().view) return forbidden();
+    return HttpResponse.json({ data: mockDocumentTypes() });
+  }),
+
   http.get(base("/:applicationId/documents"), async ({ params }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
@@ -736,15 +853,7 @@ export const subsidyApplicationHandlers = [
     if (application instanceof Response) return application;
     const files = documentsOf(application.id);
     return HttpResponse.json({
-      data: MOCK_DOCUMENT_TYPES.map((type, index) => ({
-        type: {
-          id: mockUuid(MOCK_ID_SPACE.subsidyDocument, 0x100 + index),
-          code: type.code,
-          name: type.name,
-          is_active: true,
-        },
-        files: files.get(type.code) ?? [],
-      })),
+      data: mockDocumentTypes().map((type) => ({ type, files: files.get(type.code) ?? [] })),
     });
   }),
 
