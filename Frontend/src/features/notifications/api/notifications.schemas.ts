@@ -28,6 +28,8 @@ export const NOTIFICATION_KINDS = [
   "complaint_returned",
   "complaint_qc_approved",
   "complaint_qc_rejected",
+  // CMPL-012 · a complaint missed its response or resolution target
+  "complaint_escalated",
   // SUBS-006 · A subsidy file moved (`subsidy-completion.md` §3); each opens the file
   "subsidy_returned",
   "subsidy_query",

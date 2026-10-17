@@ -194,6 +194,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | CMPL-009 | Export complaints to Excel (`GET /complaints/export`) | shared | in-progress |
 | CMPL-010 | Reopen a closed or QC-rejected complaint, with a reason (`POST /complaints/{id}/reopen`) | shared | in-progress |
 | CMPL-011 | Warranty on a complaint line: in warranty, out, none or unknown, from the dispatch or the supply date (`warranty` on `GET /complaints/{id}`) | shared | in-progress |
+| CMPL-012 | Complaint escalation: a missed response or resolution target rings the bell; the complaint shows the miss (FS-028) | shared | in-progress |
 | TASK-001 | My day — one person's tasks due that day and overdue (`GET /planner`) | shared | in-progress |
 | TASK-002 | Team day — due, done and overdue per person below a manager (`GET /planner/team`) | shared | in-progress |
 | TASK-003 | List tasks — a lead's tasks, and every task with filters (`GET /tasks`, `GET /tasks/{id}`) | shared | in-progress |
@@ -243,6 +244,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-016 | Warehouses: add, change, switch off, and the default (`/warehouses`) | shared | in-progress |
 | MSTR-017 | Warranty periods: the default and each category's months, from a date (`GET`/`POST /warranty-terms`) | shared | in-progress |
 | MSTR-018 | Seller GSTINs and LUTs: our registrations, and each one's LUT by financial year (`/seller-gstins`) | shared | in-progress |
+| MSTR-019 | Holidays: the days complaint targets skip, by year; add one ahead, remove a future one (`/holidays`) | shared | in-progress |
 | DOC-001 | Documents on a lead, quotation, order or dispatch — the list, the types and opening one (`GET /documents`, `/leads/{id}/documents`, `/documents/types`, `/documents/{id}/link`) | shared | in-progress |
 | DOC-002 | Attach a document to a record (`POST /documents`) | shared | in-progress |
 | DOC-003 | Remove a document (`DELETE /documents/{id}`) | shared | in-progress |

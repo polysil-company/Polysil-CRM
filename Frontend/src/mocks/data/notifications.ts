@@ -28,11 +28,13 @@ export function generateNotifications(
   documents: {
     readonly quotation?: QuotationWire | undefined;
     readonly order?: OrderWire | undefined;
+    /** CMPL-012 · a complaint that missed its response target */
+    readonly complaint?: { readonly id: string; readonly complaint_no: string | null } | undefined;
   } = {},
   now: number = Date.now(),
 ): NotificationWire[] {
   const [firstLead, secondLead, thirdLead] = leads;
-  const { quotation, order } = documents;
+  const { quotation, order, complaint } = documents;
   const quoteLabel = documentLabel(quotation?.quote_no);
   const orderLabel = documentLabel(order?.order_no);
 
@@ -87,6 +89,24 @@ export function generateNotifications(
       created_at: minutesAgo(now, 1500),
       read_at: minutesAgo(now, 1400),
     },
+    ...(complaint === undefined
+      ? []
+      : [
+          {
+            id: "ntf-007",
+            kind: "complaint_escalated",
+            title: `Complaint ${complaint.complaint_no ?? "Draft"} missed its response target`,
+            body: null,
+            actor: null,
+            resource: {
+              type: "complaint",
+              id: complaint.id,
+              label: complaint.complaint_no ?? "Draft",
+            },
+            created_at: minutesAgo(now, 2000),
+            read_at: minutesAgo(now, 1900),
+          } satisfies NotificationWire,
+        ]),
     {
       id: "ntf-001",
       kind: "task_assigned",

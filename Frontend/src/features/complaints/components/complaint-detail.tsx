@@ -144,7 +144,18 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
             <Badge variant={SEVERITY_BADGE[complaint.severity]}>
               {SEVERITY_LABELS[complaint.severity]}
             </Badge>
-            {late ? <Badge variant="danger">Late</Badge> : null}
+            {/* CMPL-012 · an escalation names the target it missed, in place of "Late" */}
+            {late &&
+            complaint.responseEscalatedAt === null &&
+            complaint.resolutionEscalatedAt === null ? (
+              <Badge variant="danger">Late</Badge>
+            ) : null}
+            {complaint.responseEscalatedAt === null ? null : (
+              <Badge variant="danger">Response target missed</Badge>
+            )}
+            {complaint.resolutionEscalatedAt === null ? null : (
+              <Badge variant="danger">Resolution target missed</Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {complaint.type.name} · {complaint.contactName} · {complaint.territory.name}
@@ -403,12 +414,14 @@ function TargetsCard({ complaint }: { complaint: Complaint }): React.JSX.Element
               due={sla.responseDueAt}
               met={sla.respondedAt}
               breached={sla.responseBreached}
+              escalatedAt={complaint.responseEscalatedAt}
             />
             <Target
               label="Resolution"
               due={sla.resolutionDueAt}
               met={sla.resolvedAt}
               breached={sla.resolutionBreached}
+              escalatedAt={complaint.resolutionEscalatedAt}
             />
           </dl>
         )}
@@ -422,11 +435,14 @@ function Target({
   due,
   met,
   breached,
+  escalatedAt,
 }: {
   label: string;
   due: string | null;
   met: string | null;
   breached: boolean;
+  /** CMPL-012 · When the miss rang the bell for the owner and managers; null if it didn't. */
+  escalatedAt: string | null;
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-0.5">
@@ -451,6 +467,11 @@ function Target({
         {met !== null && due !== null ? (
           <span className="text-muted-foreground"> · due {formatDateTime(due)}</span>
         ) : null}
+        {escalatedAt === null ? null : (
+          <span className="block text-xs text-danger">
+            Escalated to its owner and managers {formatDateTime(escalatedAt)}
+          </span>
+        )}
       </dd>
     </div>
   );

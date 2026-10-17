@@ -306,10 +306,10 @@ describe("[CMPL-002] getComplaint and its history", () => {
     expect(complaint.can.check).toBe(true);
 
     const history = await getComplaintTimeline({ complaintId: id, cursor: null });
-    expect(history.items.map((event) => event.kind)).toEqual([
-      "complaint.submitted",
-      "complaint.created",
-    ]);
+    // CMPL-012 · a seeded complaint past its target also carries the System's escalation
+    expect(
+      history.items.map((event) => event.kind).filter((kind) => kind !== "complaint.escalated"),
+    ).toEqual(["complaint.submitted", "complaint.created"]);
   });
 
   it("reports a complaint that breaks the contract", async () => {
