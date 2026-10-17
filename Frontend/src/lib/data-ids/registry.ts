@@ -528,6 +528,13 @@ export const DATA_IDS = {
     notes:
       "FS-054, FS-057; subsidised-orders-and-small-changes.md. Staff only. Not part of go-live (13 Oct).",
   },
+  "SO-009": {
+    domain: "SO",
+    title:
+      "Warranty on an order — each line's dispatches with start, end and status, and the claims raised (`GET /orders/{id}/warranty`)",
+    owner: "shared",
+    status: "in-progress",
+  },
   "APPR-001": {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",
@@ -633,6 +640,13 @@ export const DATA_IDS = {
     endpoints: ["POST /complaints/{id}/reopen"],
     notes:
       "The raiser reopens a closed one; the complaint_reopen_roles setting's roles reopen either, within complaint_reopen_days and under complaint_reopen_max.",
+  },
+  "CMPL-011": {
+    domain: "CMPL",
+    title:
+      "Warranty on a complaint line — in warranty, out, none or unknown, from the dispatch or the supply date (`warranty` on `GET /complaints/{id}`)",
+    owner: "shared",
+    status: "in-progress",
   },
   "TASK-001": {
     domain: "TASK",
@@ -1065,6 +1079,13 @@ export const DATA_IDS = {
   "MSTR-016": {
     domain: "MSTR",
     title: "Warehouses — add, change, switch off, and the default (`/warehouses`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "MSTR-017": {
+    domain: "MSTR",
+    title:
+      "Warranty periods — the default and each category's months, from a date (`GET`/`POST /warranty-terms`)",
     owner: "shared",
     status: "in-progress",
   },

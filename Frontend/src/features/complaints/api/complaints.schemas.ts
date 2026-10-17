@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { approvalBlockSchema } from "@/features/orders/api/orders.schemas";
+import { complaintLineWarrantySchema } from "@/features/warranty/api/warranty.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 
 /**
@@ -91,6 +92,8 @@ const lineWireSchema = z.object({
   defective_qty: decimal,
   failure_frequency: z.string().nullable(),
   remark: z.string().nullable(),
+  /** CMPL-011 · Whether the product was in warranty on the day the complaint was first submitted. */
+  warranty: complaintLineWarrantySchema.nullish(),
 });
 
 const attachmentWireSchema = z.object({
@@ -252,6 +255,7 @@ export const complaintSchema = complaintWireSchema.transform((wire) => ({
     defectiveQty: line.defective_qty,
     failureFrequency: line.failure_frequency,
     remark: line.remark,
+    warranty: line.warranty ?? null,
   })),
   attachments: wire.attachments.map((attachment) => ({
     id: attachment.id,

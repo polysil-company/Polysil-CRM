@@ -28,6 +28,7 @@ import {
   timesText,
 } from "@/features/complaints/lib/complaint-labels";
 import { formatQuantity } from "@/features/quotations/lib/quotation-labels";
+import { ComplaintWarranty } from "@/features/warranty/components/warranty-chip";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
 import { formatDate, formatDateTime, formatIndianPhone } from "@/lib/format";
@@ -302,6 +303,7 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
                             .join(" · ")}
                         </p>
                       )}
+                      <ComplaintWarranty warranty={line.warranty} />
                     </div>
                     <p className="shrink-0 text-sm text-muted-foreground tabular-nums">
                       <span

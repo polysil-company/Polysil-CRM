@@ -28,6 +28,7 @@ import type {
 } from "@/features/subsidy/api/subsidy-applications.schemas";
 import type { CalculateResponseWire } from "@/features/subsidy/api/subsidy.schemas";
 import type { OfficeWire } from "@/features/users/api/users.schemas";
+import type { WarrantyTermWire } from "@/features/warranty/api/warranty.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { seedCampaigns, tagLeadsWithCampaigns, type MockCampaign } from "./data/campaigns";
@@ -71,6 +72,7 @@ import { seedTargets, type MockTargetEntry } from "./data/targets";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
 import type { MockAdminTerritory } from "./data/territories";
 import { seedOffices, seedUsers, type MockUserRecord } from "./data/users";
+import { seedWarrantyTerms } from "./data/warranty";
 
 export interface MockDb {
   /** Newest first, in the backend's wire format. */
@@ -156,6 +158,8 @@ export interface MockDb {
   campaigns: MockCampaign[];
   /** Stock (MSTR-014…016): the warehouses and every movement, newest first. */
   warehouses: WarehouseWire[];
+  /** Warranty periods (MSTR-017), the default first. */
+  warrantyTerms: WarrantyTermWire[];
   stockMovements: MovementWire[];
   /** Our GST registrations and their LUTs (MSTR-018). */
   sellerGstins: SellerGstinWire[];
@@ -307,6 +311,7 @@ function createMockDb(): MockDb {
     qrCodes: seedQrCodes(),
     campaigns,
     warehouses,
+    warrantyTerms: seedWarrantyTerms(),
     stockMovements: seedMovements(products, warehouses),
     sellerGstins: seedSellerGstins(),
     enquiryCodes: new Map(),
