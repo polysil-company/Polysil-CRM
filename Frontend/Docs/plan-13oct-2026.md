@@ -141,9 +141,9 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
   - [x] **28a. The stock screens** (MSTR-014…016): the stock list, the ledger, Record stock, and Warehouses. PR #162, 17 Oct (`feature/MSTR-014-stock`, from `integration`).
   - [x] **28b. Stock on orders** (DISP-003): Order to, availability per line, the order's warehouse and line stock, and the dispatch's warehouse. PR #163, 17 Oct (`feature/DISP-003-stock-on-orders`).
 - [x] **29. Warranty tracking** (SO-009, CMPL-011, MSTR-017): the order's Warranty card, the chip on complaint lines, and Masters → Warranty periods. PR #164, 18 Oct (`feature/SO-009-warranty`).
-- [ ] **30. Export and sample orders,** with the seller GSTINs and their LUTs (3). `export-sample-orders-contract.md`. In two parts:
+- [x] **30. Export and sample orders,** with the seller GSTINs and their LUTs (3). `export-sample-orders-contract.md`. In two parts:
   - [x] **30a. Seller GSTINs and their LUTs** (MSTR-018): Products & prices → Seller GSTINs, Add LUT and remove one not in use. PR #165, 18 Oct (`feature/MSTR-018-seller-gstins`).
-  - [ ] **30b. Export and sample orders** on the order and quotation forms, the preview's tax treatment, and the fields on their pages.
+  - [x] **30b. Export and sample orders** (SO-010) on the order and quotation forms, the preview's tax treatment, and the fields on their pages. PR #166, 18 Oct (`feature/SO-010-export-sample-orders`).
 - [x] **31. Dealer tasks** (TASK-009): a Dealers group in New task, and a dealer's own Tasks page with Done only, while `tasks_for_dealers` is on. PR #167, 18 Oct (`feature/TASK-009-dealer-tasks`).
 - [ ] **32. Complaint holidays and escalation** (3). `complaint-holidays-escalation.md`.
 - [ ] **33. The customer record** (4). `customer-record.md`.

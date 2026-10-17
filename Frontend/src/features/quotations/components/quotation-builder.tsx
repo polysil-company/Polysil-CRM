@@ -23,11 +23,13 @@ import type { Lead } from "@/features/leads/api/leads.schemas";
 import { useCreateQuotation, useUpdateDraft } from "@/features/quotations/api/quotations.mutations";
 import { quotationKeys } from "@/features/quotations/api/quotations.queries";
 import {
+  EXPORT_COUNTRY_MAX_LENGTH,
   PRICED_SALES_TYPES,
   quotationHeaderFormSchema,
   type PartyRequest,
   type Quotation,
   type QuotationHeaderForm,
+  type TaxTreatment,
 } from "@/features/quotations/api/quotations.schemas";
 import { emptyLine, usePricedLines } from "@/features/quotations/hooks/use-priced-lines";
 import {
@@ -39,9 +41,11 @@ import {
 } from "@/features/quotations/lib/builder-lines";
 import {
   SALES_TYPE_LABELS,
+  TAX_TREATMENT_LABELS,
   formatRate,
   quotationTitle,
 } from "@/features/quotations/lib/quotation-labels";
+import { useExportSampleSettings } from "@/features/settings/hooks/use-export-sample-settings";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toUserFacingError } from "@/lib/api/error-messages";
@@ -72,6 +76,7 @@ export type BuilderSource =
 /** The header fields a refusal can name. */
 const HEADER_FIELD_NAMES: readonly (keyof QuotationHeaderForm)[] = [
   "salesType",
+  "exportCountry",
   "partyName",
   "partyMobile",
   "partyAddress",
@@ -96,20 +101,27 @@ function contextFor(source: BuilderSource): Omit<PricingContext, "salesType"> {
 /** The lead's inquiry type sets the default; a subsidised one is quoted as subsidised. */
 function salesTypeFor(type: string | null): QuotationHeaderForm["salesType"] {
   if (type === "industrial") return "industrial";
+  if (type === "export") return "export";
   if (type === "subsidised") return "subsidised";
   return "commercial";
 }
 
 /**
  * QUOT-014 · Subsidised is offered for a subsidised lead, or a quotation that already is one;
- * its subsidy is calculated on the quotation once the draft is saved.
+ * its subsidy is calculated on the quotation once the draft is saved. SO-010 · A draft's tax
+ * treatment is fixed when it is made, so an export draft stays an export and a domestic one
+ * can't become one.
  */
 function salesTypesFor(source: BuilderSource): readonly QuotationHeaderForm["salesType"][] {
   const subsidised =
     source.mode === "create"
       ? source.lead.type === "subsidised"
       : source.quotation.salesType === "subsidised";
-  return PRICED_SALES_TYPES.filter((type) => type !== "subsidised" || subsidised);
+  if (source.mode === "edit" && source.quotation.salesType === "export") return ["export"];
+  return PRICED_SALES_TYPES.filter(
+    (type) =>
+      (type !== "subsidised" || subsidised) && (type !== "export" || source.mode === "create"),
+  );
 }
 
 function headerDefaults(source: BuilderSource): QuotationHeaderForm {
@@ -117,6 +129,7 @@ function headerDefaults(source: BuilderSource): QuotationHeaderForm {
     const { lead } = source;
     return {
       salesType: salesTypeFor(lead.type),
+      exportCountry: "",
       partyName: lead.customerName,
       partyMobile: lead.phone,
       partyAddress: [lead.village, lead.territory.name].filter(Boolean).join(", "),
@@ -127,6 +140,7 @@ function headerDefaults(source: BuilderSource): QuotationHeaderForm {
   const { quotation } = source;
   return {
     salesType: salesTypeFor(quotation.salesType),
+    exportCountry: quotation.exportCountry ?? "",
     partyName: quotation.party.name,
     partyMobile: quotation.party.mobile,
     partyAddress: quotation.party.address ?? "",
@@ -136,11 +150,13 @@ function headerDefaults(source: BuilderSource): QuotationHeaderForm {
 }
 
 function partyFrom(values: QuotationHeaderForm): PartyRequest {
+  const gstin = values.partyGstin.trim();
   return {
     name: values.partyName.trim(),
     mobile: normalizeIndianMobile(values.partyMobile) ?? values.partyMobile.trim(),
     address: values.partyAddress.trim() === "" ? null : values.partyAddress.trim(),
-    gstin: values.partyGstin.trim() === "" ? null : values.partyGstin.trim().toUpperCase(),
+    // SO-010 · An export buyer has no GSTIN (422 export_party_gstin).
+    gstin: values.salesType === "export" || gstin === "" ? null : gstin.toUpperCase(),
   };
 }
 
@@ -163,9 +179,19 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
   });
   // MSTR-008 · The preview prices from the sale type's own list, as the save will.
   const salesType = useWatch({ control: form.control, name: "salesType" });
+  // SO-010 · An export is priced with the tax it will store: its own once made, else the setting.
+  const exportSettings = useExportSampleSettings(
+    source.mode === "create" && salesType === "export",
+  );
+  const taxTreatment: TaxTreatment =
+    salesType !== "export"
+      ? "domestic"
+      : source.mode === "edit"
+        ? source.quotation.taxTreatment
+        : exportSettings.exportTreatment;
   const context = useMemo<PricingContext>(
-    () => ({ ...baseContext, salesType }),
-    [baseContext, salesType],
+    () => ({ ...baseContext, salesType, taxTreatment }),
+    [baseContext, salesType, taxTreatment],
   );
   const priced = usePricedLines(context, () =>
     source.mode === "edit" && source.quotation.lines.length > 0
@@ -195,6 +221,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
         const body = {
           lead_id: source.lead.id,
           sales_type: values.salesType,
+          ...(values.salesType === "export" ? { export_country: values.exportCountry.trim() } : {}),
           party,
           terms,
           lines: saved,
@@ -204,6 +231,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
       const headerChanged = JSON.stringify(values) !== JSON.stringify(initialHeader);
       const headerBody = {
         sales_type: values.salesType,
+        ...(values.salesType === "export" ? { export_country: values.exportCountry.trim() } : {}),
         party,
         terms,
         expected_status: "draft" as const,
@@ -278,6 +306,24 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
       case "sales_type_unsupported":
         setFormError({ title: "That sales type isn't priced yet", description: error.message });
         return;
+      // SO-010 · the export's refusals
+      case "export_country_required":
+        form.setError("exportCountry", { type: "server", message: "Enter the buyer's country." });
+        setFormError(null);
+        return;
+      case "export_party_gstin":
+        setFormError({
+          title: "An export buyer has no GSTIN",
+          description: "Leave the GSTIN empty for an export.",
+        });
+        return;
+      case "lut_missing":
+        setFormError({
+          title: "No LUT covers this date",
+          description:
+            "Ask an admin to record this year's LUT in Products & prices → Seller GSTINs.",
+        });
+        return;
       case "status_changed":
       case "quotation_not_draft":
         setFormError({
@@ -321,6 +367,13 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
       onSubmit={(event) => {
         setFormError(null);
         void form.handleSubmit((values) => {
+          if (values.salesType === "export" && values.exportCountry.trim() === "") {
+            form.setError("exportCountry", {
+              type: "required",
+              message: "Enter the buyer's country.",
+            });
+            return;
+          }
           void save.run(values);
         })(event);
       }}
@@ -403,7 +456,9 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
                       <FieldDescription>
                         {field.value === "subsidised"
                           ? "Save the draft, then calculate its subsidy on the quotation."
-                          : "Export, marketing and sample quotations wait on the client's rules."}
+                          : field.value === "export"
+                            ? `${TAX_TREATMENT_LABELS[taxTreatment]}. The tax is fixed when the draft is saved.`
+                            : "Marketing and sample quotations wait on the client's rules."}
                       </FieldDescription>
                     </Field>
                   )}
@@ -433,21 +488,39 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
                     />
                   )}
                 </TextField>
-                <TextField
-                  id="quote-party-gstin"
-                  label="GSTIN"
-                  optional
-                  error={errors.partyGstin?.message}
-                >
-                  {(aria) => (
-                    <Input
-                      autoComplete="off"
-                      className="uppercase"
-                      {...aria}
-                      {...form.register("partyGstin")}
-                    />
-                  )}
-                </TextField>
+                {salesType === "export" ? (
+                  <TextField
+                    id="quote-export-country"
+                    label="Country"
+                    error={errors.exportCountry?.message}
+                    description="Where the buyer is. An export buyer has no GSTIN."
+                  >
+                    {(aria) => (
+                      <Input
+                        autoComplete="country-name"
+                        maxLength={EXPORT_COUNTRY_MAX_LENGTH}
+                        {...aria}
+                        {...form.register("exportCountry")}
+                      />
+                    )}
+                  </TextField>
+                ) : (
+                  <TextField
+                    id="quote-party-gstin"
+                    label="GSTIN"
+                    optional
+                    error={errors.partyGstin?.message}
+                  >
+                    {(aria) => (
+                      <Input
+                        autoComplete="off"
+                        className="uppercase"
+                        {...aria}
+                        {...form.register("partyGstin")}
+                      />
+                    )}
+                  </TextField>
+                )}
                 <TextField
                   id="quote-party-address"
                   label="Address"

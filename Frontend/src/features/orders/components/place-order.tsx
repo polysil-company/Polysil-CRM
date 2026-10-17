@@ -56,7 +56,7 @@ import { RefusalAlert } from "./order-dialog-shared";
 const log = createLogger({ file: "features/orders/components/place-order.tsx", dataId: "SO-003" });
 
 const placeOrderFormSchema = orderHeaderFormSchema.extend({
-  orderType: z.enum([...ORDERABLE_TYPES, "subsidised"]),
+  orderType: z.enum([...ORDERABLE_TYPES, "subsidised", "export"]),
 });
 type PlaceOrderForm = z.infer<typeof placeOrderFormSchema>;
 
@@ -140,9 +140,11 @@ function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Elem
   const [refusal, setRefusal] = useState<OrderRefusal | null>(null);
   // SO-008 · A subsidised quotation makes a subsidised order, its subsidy with it (FS-057).
   const subsidised = quotation.salesType === "subsidised";
-  const defaultType = subsidised
-    ? "subsidised"
-    : (ORDERABLE_TYPES.find((type) => type === quotation.salesType) ?? "commercial");
+  // SO-010 · An export quotation makes an export order, and only an export one (type_mismatch).
+  const exported = quotation.salesType === "export";
+  const fixedType = subsidised ? "subsidised" : exported ? "export" : null;
+  const defaultType =
+    fixedType ?? ORDERABLE_TYPES.find((type) => type === quotation.salesType) ?? "commercial";
   const form = useForm<PlaceOrderForm>({
     resolver: zodResolver(placeOrderFormSchema),
     defaultValues: {
@@ -204,14 +206,16 @@ function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Elem
       </DialogHeader>
       <DialogBody>
         <div className="flex flex-col gap-4">
-          {subsidised ? (
+          {fixedType !== null ? (
             <Field>
               <FieldLabel>Order type</FieldLabel>
-              <p className="text-sm text-foreground">{ORDER_TYPE_LABELS.subsidised}</p>
+              <p className="text-sm text-foreground">{ORDER_TYPE_LABELS[fixedType]}</p>
               <FieldDescription>
-                {quotation.subsidy === null
-                  ? "The quotation has no subsidy yet."
-                  : `The subsidy comes from the quotation: ${formatInr(quotation.subsidy.subsidy, { paise: true })} from the scheme, ${formatInr(quotation.subsidy.farmerShare, { paise: true })} from the farmer.`}
+                {exported
+                  ? `An export quotation makes an export order${quotation.exportCountry === null ? "" : ` to ${quotation.exportCountry}`}, taxed as the quotation is.`
+                  : quotation.subsidy === null
+                    ? "The quotation has no subsidy yet."
+                    : `The subsidy comes from the quotation: ${formatInr(quotation.subsidy.subsidy, { paise: true })} from the scheme, ${formatInr(quotation.subsidy.farmerShare, { paise: true })} from the farmer.`}
               </FieldDescription>
             </Field>
           ) : (
@@ -237,7 +241,9 @@ function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Elem
                   </div>
                 ))}
               </RadioGroup>
-              <FieldDescription>Export, sample and the other types come later.</FieldDescription>
+              <FieldDescription>
+                A sample is typed in on a new order; an export comes from an export quotation.
+              </FieldDescription>
             </Field>
           )}
           <Field data-invalid={errors.deliveryAddress ? true : undefined}>

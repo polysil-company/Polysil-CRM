@@ -535,6 +535,13 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
   },
+  "SO-010": {
+    domain: "SO",
+    title:
+      "Export and sample orders — the buyer's country, the tax treatment and LUT, and free or charged samples, on orders and quotations (FS-042)",
+    owner: "shared",
+    status: "in-progress",
+  },
   "APPR-001": {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",
