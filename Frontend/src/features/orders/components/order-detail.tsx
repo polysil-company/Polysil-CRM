@@ -28,6 +28,7 @@ import {
   orderNumber,
   stepRoleLabel,
 } from "@/features/orders/lib/order-labels";
+import { OrderPaymentsCard } from "@/features/payments/components/order-payments";
 import { formatRate, parseWarnings } from "@/features/quotations/lib/quotation-labels";
 import { OrderPoints } from "@/features/rewards/components/order-points";
 import { useCan } from "@/features/session/hooks/use-session";
@@ -150,6 +151,8 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
 
       {/* RWD-004 · A dealer pays part of its draft with points. */}
       <OrderPoints order={order} />
+      {/* ACCT-004 · Payable, received, instalments and receipts. */}
+      <OrderPaymentsCard order={order} />
 
       <OrderSubsidyCard order={order} />
 

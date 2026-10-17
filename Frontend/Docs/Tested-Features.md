@@ -47,6 +47,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Channel partners](#channel-partners) | 8 | 🧪 👀 | PR #112, stacked on PR #111; GSTIN details in PR #132; dealer applications in PR #145; the applicant's page in PR #146 |
 | [Schemes](#schemes) | 5 | 🧪 👀 | PR #155; benefits on an order in PR #156 |
 | [Reward points](#reward-points) | 4 | 🧪 👀 | PR #158 |
+| [Payments](#payments) | 4 | 🧪 👀 | PR #159 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
@@ -565,6 +566,15 @@ Channel → **Rewards** (`/rewards`; FS-032, handover `rewards-contract.md`, `do
 - **RWD-002 · The gift desk** (screens: [waiting](screenshots/rewards/rewards-desk-desktop-light.jpg), [refusing](screenshots/rewards/rewards-refuse-desktop-light.jpg)). `rewards.approve`: waiting requests or all; Mark sent with an optional note, Refuse with a reason (the points go back); one already decided says so. 🧪 👀
 - **RWD-003 · Reward admin** (screens: [rules](screenshots/rewards/rewards-rules-desktop-light.jpg), [a new rule's checks](screenshots/rewards/rewards-rule-add-desktop-light.jpg), [point value](screenshots/rewards/rewards-settings-desktop-light.jpg), [an adjustment](screenshots/rewards/rewards-adjust-desktop-light.jpg)). Earning rules in words with their dates and expiry, Active, Scheduled or Switched off; add one (what's missing named first, a taken code on its field); a rule that has awarded points changes only its end date and switch. The point value and the order limit, from today, once a day. Gifts added, changed or switched off. Adjust a balance with a reason, seeing the new balance first. 🧪 👀
 - **RWD-004 · Points on a dealer's order** (screens: [using points](screenshots/rewards/order-points-use-dealer-phone-dark.jpg), [held](screenshots/rewards/order-points-held-dealer-phone-dark.jpg)). On its own draft, a dealer puts points up to the limit (10% of the total, GST included) and its balance, with "Use N points"; they are held and can be taken off. At submit they come off To pay as "Reward points redeemed"; points not needed go back. 🧪 👀
+
+## Payments
+
+Money received against sales orders (handover `payments-contract.md`). Walked through in the mock as Accounts and Admin on a desktop in light mode and as a dealer on a 390 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
+
+- **ACCT-002 · Record a payment** (screen: [the form](screenshots/payments/record-payment-desktop-light.jpg)). `payments.create`: dealer, mode, reference (required for NEFT, UPI and cheque), date, amount, short-payment flag, remark, and an amount per open order of the dealer with its balance, showing what stays on account. A direct order's payment goes on it in full. A reference already recorded, more spread than received, a no-dealer payment not fully spread, and an order of another dealer are each refused on their field. 🧪 👀
+- **ACCT-003 · Receipts** (screens: [the list](screenshots/payments/receipts-desktop-light.jpg), [putting the rest on orders](screenshots/payments/receipts-allocate-desktop-light.jpg), [voiding](screenshots/payments/receipts-void-desktop-light.jpg)). Operations → Receipts: newest first, a dealer filter, voided on request; each with the orders it went on and what is on account. Put the rest on orders (never more than is left), and Void with a reason (a second void, or spreading a voided receipt, is refused). Managers read only. 🧪 👀
+- **ACCT-004 · Payments on the order** (screen: [the card](screenshots/payments/order-payments-desktop-light.jpg)). To pay, Received, Balance and the status; instalments with an overdue notice; its receipts; Record payment and Plan instalments (up to five, adding up to what is left). Hidden on a draft. 🧪 👀
+- **ACCT-005 · Ledger and credit** (screens: [credit standing](screenshots/payments/partner-credit-desktop-light.jpg), [a dealer's ledger](screenshots/payments/partner-ledger-desktop-light.jpg), [My ledger on a phone](screenshots/payments/my-ledger-dealer-phone-dark.jpg)). On a partner's page, staff see the credit limit, exposure and what is available ("Over the limit" when negative), and the ledger: approved orders, benefits and receipts with a running balance, a date range with the balance brought forward. Partner users open My ledger for their own; credit standing is refused to them (403) and hidden. 🧪 👀
 
 ## Masters
 

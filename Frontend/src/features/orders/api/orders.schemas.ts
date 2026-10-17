@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { orderPaymentsSchema } from "@/features/payments/api/payments.schemas";
 import type { QuotationLineRequest } from "@/features/quotations/api/quotations.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 import { EMPTY_VALUE } from "@/lib/format";
@@ -209,6 +210,8 @@ export interface OrderListParams {
   readonly officeId: string | null;
   /** ACCT-001: orders whose next approval step is this role's, e.g. `account_manager`. */
   readonly waitingOn?: string | null;
+  /** ACCT-002: orders placed through this partner (`partner_id`). */
+  readonly partnerId?: string | null;
 }
 
 /** ACCT-001 · GET /orders/stats: counts by status, and submitted orders by whose step is next. */
@@ -476,6 +479,8 @@ export const orderWireSchema = z.object({
   payable: decimal.nullish(),
   /** SCHM-005 · Scheme benefits, applied at submit (FS-031). */
   benefits: z.array(orderBenefitSchema).nullish(),
+  /** ACCT-004 · Payable, received, balance, instalments, receipts; null without `payments`. */
+  payments: orderPaymentsSchema.nullish(),
   remarks: z.string().nullable(),
   pdf_state: z.enum(ORDER_PDF_STATES),
   pdf_error: z.string().nullish(),
@@ -554,6 +559,7 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
         },
   payable: wire.payable ?? null,
   benefits: wire.benefits ?? [],
+  payments: wire.payments ?? null,
   remarks: wire.remarks,
   pdfState: wire.pdf_state,
   pdfError: wire.pdf_error ?? null,
