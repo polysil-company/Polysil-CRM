@@ -54,7 +54,6 @@ const instalmentSchema = z
     note: wire.note,
     covered: wire.covered,
   }));
-export type Instalment = z.output<typeof instalmentSchema>;
 
 const receiptSchema = z
   .object({
@@ -74,7 +73,6 @@ const receiptSchema = z
     amount: wire.amount,
     shortPayment: wire.is_short_payment,
   }));
-export type OrderReceipt = z.output<typeof receiptSchema>;
 
 /** `payments` on GET /orders/{id}: null for a caller who may not see payments (hide it). */
 export const orderPaymentsSchema = z
@@ -281,7 +279,6 @@ const creditSchema = z.object({
     check: z.string(),
   }),
 });
-export type PartnerCreditWire = z.input<typeof creditSchema>["data"];
 
 export const partnerCreditSchema = creditSchema.transform(({ data }) => ({
   partnerId: data.partner_id,

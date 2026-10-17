@@ -54,7 +54,7 @@ export function PartnerLedgerCard({
   }
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-col gap-1">
         <CardTitle level={2}>{title}</CardTitle>
         <CardDescription>
           Approved orders, less scheme and reward benefits, less payments received.

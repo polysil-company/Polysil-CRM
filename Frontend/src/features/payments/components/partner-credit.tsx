@@ -28,7 +28,7 @@ export function PartnerCreditCard({ partnerId }: { partnerId: string }): React.J
   }
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-col gap-1">
         <CardTitle level={2}>Credit standing</CardTitle>
         <CardDescription>Owed on open orders, less payments received.</CardDescription>
       </CardHeader>

@@ -67,18 +67,6 @@ export function listPayments(
   });
 }
 
-/** ACCT-003 · One receipt. */
-export function getPayment(paymentId: string, signal?: AbortSignal): Promise<Payment> {
-  return apiRequest({
-    dataId: "ACCT-003",
-    logger: log,
-    fn: "getPayment",
-    path: `/payments/${encodeURIComponent(paymentId)}`,
-    schema: paymentResponseSchema,
-    signal,
-  });
-}
-
 /** ACCT-003 · Spread what is left of a receipt over more orders. */
 export function allocatePayment(
   paymentId: string,
