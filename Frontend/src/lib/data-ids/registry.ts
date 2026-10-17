@@ -517,6 +517,15 @@ export const DATA_IDS = {
     notes:
       "Staff only, before anything ships or is paid: back to draft under its number, with a remark (FS-036).",
   },
+  "SO-008": {
+    domain: "SO",
+    title: "A subsidised order — from a subsidised quotation, its subsidy block and editing it",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders", "PUT /orders/{orderId}/subsidy"],
+    notes:
+      "FS-054, FS-057; subsidised-orders-and-small-changes.md. Staff only. Not part of go-live (13 Oct).",
+  },
   "APPR-001": {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",

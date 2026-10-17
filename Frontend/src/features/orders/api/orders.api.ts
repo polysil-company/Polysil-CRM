@@ -26,6 +26,7 @@ import {
   type OrderStats,
   type PatchOrderRequest,
   type RemarkRequest,
+  type OrderSubsidyRequest,
   type ReplaceOrderLinesRequest,
   type DispatchListParams,
   type DispatchPage,
@@ -174,6 +175,23 @@ export function replaceOrderLines(
     fn: "replaceOrderLines",
     method: "PUT",
     path: `/orders/${encodeURIComponent(orderId)}/lines`,
+    body,
+    idempotencyKey,
+    schema: orderResponseSchema,
+  });
+}
+
+/** SO-008 · PUT /orders/{id}/subsidy — a subsidised draft's leads and amounts. */
+export function setOrderSubsidy(
+  orderId: string,
+  { body, idempotencyKey }: WriteInput<OrderSubsidyRequest>,
+): Promise<Order> {
+  return apiRequest({
+    dataId: "SO-008",
+    logger: log,
+    fn: "setOrderSubsidy",
+    method: "PUT",
+    path: `/orders/${encodeURIComponent(orderId)}/subsidy`,
     body,
     idempotencyKey,
     schema: orderResponseSchema,

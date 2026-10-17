@@ -173,6 +173,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SO-005 | A direct order typed in line by line, and a draft's lines (`POST /orders`, `PUT /orders/{orderId}/lines`, `POST /pricing/quote-lines`) | shared | in-progress |
 | SO-006 | Export the order list to Excel (`GET /orders/export`) | shared | in-progress |
 | SO-007 | Amend an approved order (`POST /orders/{orderId}/amend`) | shared | in-progress |
+| SO-008 | A subsidised order: from a subsidised quotation, its subsidy block, and editing it on a draft (`POST /orders`, `PUT /orders/{id}/subsidy`) | shared | in-progress |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
 | CMPL-001 | Complaints list — filters, waiting on me, counts (`GET /complaints`, `GET /complaints/stats`) | shared | in-progress |
