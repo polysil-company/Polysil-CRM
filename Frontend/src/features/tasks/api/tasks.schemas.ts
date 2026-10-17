@@ -207,8 +207,6 @@ const assigneeWireSchema = z.object({
   partner: z.object({ id, name: z.string(), partner_type: z.string().nullish() }).nullish(),
 });
 
-export type TaskAssigneeWire = z.input<typeof assigneeWireSchema>;
-
 export const taskAssigneesSchema = z
   .object({ data: z.array(assigneeWireSchema) })
   .transform(({ data }) =>
