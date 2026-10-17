@@ -36,12 +36,16 @@ function signInAs(role: Role): void {
   server.use(http.get(buildApiUrl("/auth/me"), () => HttpResponse.json(mockMeFor(role))));
 }
 
-async function failureOf(call: Promise<unknown>): Promise<{ status?: number; code?: string }> {
+async function failureOf(
+  call: Promise<unknown>,
+): Promise<{ status: number | undefined; code: string | undefined }> {
   const error = await call.then(
     () => null,
     (caught: unknown) => caught,
   );
-  return isApiError(error) ? { status: error.status, code: error.code } : {};
+  return isApiError(error)
+    ? { status: error.status, code: error.code }
+    : { status: undefined, code: undefined };
 }
 
 let keys = 0;
