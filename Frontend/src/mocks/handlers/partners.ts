@@ -251,7 +251,7 @@ const MOCK_GST_RECORDS: Readonly<
   },
 };
 
-function gstinLookup(gstin: string): GstinLookupWire["data"] {
+export function gstinLookup(gstin: string): GstinLookupWire["data"] {
   const shape = GSTIN_PATTERN.test(gstin);
   const base = {
     gstin,
