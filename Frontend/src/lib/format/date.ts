@@ -63,6 +63,12 @@ const weekdayDayMonth = new Intl.DateTimeFormat("en-IN", {
   month: "long",
 });
 
+const monthYear = new Intl.DateTimeFormat("en-IN", {
+  timeZone: APP_TIME_ZONE,
+  month: "short",
+  year: "numeric",
+});
+
 export type DateInput = string | Date | null | undefined;
 
 /** Returns a valid Date or null. Never throws. */
@@ -133,6 +139,13 @@ export function formatCalendarDay(day: string): string {
   // Midday in India keeps the day the same whatever the browser's own time zone.
   const date = toDate(`${day}T12:00:00+05:30`);
   return date ? weekdayDayMonth.format(date) : EMPTY_VALUE;
+}
+
+/** A calendar month ("YYYY-MM") as a label: "Oct 2026". */
+export function formatMonth(month: string): string {
+  // The middle of the month keeps it the same whatever the browser's own time zone.
+  const date = /^\d{4}-\d{2}$/.test(month) ? toDate(`${month}-15T12:00:00+05:30`) : null;
+  return date ? monthYear.format(date) : EMPTY_VALUE;
 }
 
 /** True when both fall on the same calendar day in India. */
