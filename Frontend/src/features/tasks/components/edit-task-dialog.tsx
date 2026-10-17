@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { usePatchTask } from "@/features/tasks/api/tasks.mutations";
-import { taskAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
+import { staffAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
 import {
   DEFAULT_DUE_TIME,
   TASK_TEXT_MAX,
@@ -347,7 +347,7 @@ function ReassignField({
   current: Task["assignedTo"];
   error: string | undefined;
 }): React.JSX.Element {
-  const query = useQuery(taskAssigneesQueryOptions());
+  const query = useQuery(staffAssigneesQueryOptions());
   const people = query.data ?? [];
   const listed =
     current === null || people.some((person) => person.id === current.id)

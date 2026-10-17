@@ -8,7 +8,7 @@ import {
   listTaskAssignees,
   listTasks,
 } from "./tasks.api";
-import type { PlannerParams, TaskListParams } from "./tasks.schemas";
+import type { PlannerParams, TaskAssignee, TaskListParams } from "./tasks.schemas";
 
 /**
  * Query keys for tasks. A change to one task can move it between a day, a team's counts and
@@ -64,6 +64,17 @@ export function taskAssigneesQueryOptions() {
     queryFn: ({ signal }) => listTaskAssignees(signal),
     staleTime: 5 * 60_000,
     meta: { dataId: "TASK-004" },
+  });
+}
+
+/**
+ * TASK-004 · The same people without the dealers' users (TASK-009): for filters, reports,
+ * minutes and reassigning, which are about the team.
+ */
+export function staffAssigneesQueryOptions() {
+  return queryOptions({
+    ...taskAssigneesQueryOptions(),
+    select: (people: TaskAssignee[]) => people.filter((person) => person.kind === "staff"),
   });
 }
 

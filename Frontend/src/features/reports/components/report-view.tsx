@@ -21,7 +21,7 @@ import {
   type ReportParams,
 } from "@/features/reports/api/reports.schemas";
 import { REPORTS } from "@/features/reports/lib/report-catalogue";
-import { taskAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
+import { staffAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
 import { createLogger } from "@/lib/logger";
 
 import { ReportBody } from "./report-bodies";
@@ -228,7 +228,7 @@ function PersonFilter({
   selected: string | null;
   onChange: (owner: string | null) => void;
 }): React.JSX.Element {
-  const people = useQuery(taskAssigneesQueryOptions());
+  const people = useQuery(staffAssigneesQueryOptions());
   return (
     <SingleFilterPill
       label="Person"

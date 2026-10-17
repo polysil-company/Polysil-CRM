@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 
 import { useCommandMenu } from "./command-menu-context";
 import { isNavItemActive, visibleNavSections, type NavItem } from "./navigation";
+import { useNavGates } from "./use-nav-gates";
 
 const ENVIRONMENT_LABELS: Readonly<Record<AppEnv, string>> = {
   development: "Local",
@@ -166,6 +167,7 @@ function SidebarNav({
 }): React.JSX.Element {
   const pathname = usePathname();
   const session = useSession();
+  const gates = useNavGates();
 
   if (session.status === "pending") {
     return <SidebarNavSkeleton />;
@@ -208,7 +210,12 @@ function SidebarNav({
     );
   }
 
-  const sections = visibleNavSections(session.data.permissions, session.data.userType);
+  const sections = visibleNavSections(
+    session.data.permissions,
+    session.data.userType,
+    undefined,
+    gates,
+  );
   const items = sections.flatMap((section) => section.items);
   const activeIndex = items.findIndex((item) => isNavItemActive(item, pathname));
 

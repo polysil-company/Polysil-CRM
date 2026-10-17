@@ -20,6 +20,7 @@ import { can } from "@/lib/auth/permissions";
 import { useTheme } from "@/lib/theme/use-theme";
 
 import { visibleNavSections } from "./navigation";
+import { useNavGates } from "./use-nav-gates";
 
 export interface CommandMenuProps {
   open: boolean;
@@ -33,10 +34,11 @@ export interface CommandMenuProps {
 export function CommandMenu({ open, onOpenChange }: CommandMenuProps): React.JSX.Element {
   const router = useRouter();
   const { data: session } = useSession();
+  const gates = useNavGates();
   const { setPreference } = useTheme();
 
   const pages = session
-    ? visibleNavSections(session.permissions, session.userType)
+    ? visibleNavSections(session.permissions, session.userType, undefined, gates)
         .flatMap((section) => section.items)
         .filter((item) => item.href !== undefined)
     : [];

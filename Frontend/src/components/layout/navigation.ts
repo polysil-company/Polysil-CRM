@@ -55,7 +55,15 @@ export interface NavItem {
   readonly visibleTo?: "approvers";
   /** A live count shown next to the label. */
   readonly countSource?: "leads" | "messages" | "approvals" | "accounts";
+  /**
+   * Shown only while this gate is open, beyond `module` and `audience`: something the backend
+   * switches on that the permissions don't show (TASK-009: tasks for dealers).
+   */
+  readonly gate?: NavGate;
 }
+
+/** A condition outside the permissions that an item waits on; see `useNavGates`. */
+export type NavGate = "dealer-tasks";
 
 export interface NavSection {
   readonly id: string;
@@ -207,6 +215,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         audience: "staff",
         dataId: "TASK-001",
         href: "/tasks",
+      },
+      {
+        id: "dealer-tasks",
+        label: "Tasks",
+        description: "Calls, visits and follow-ups Polysil has given you.",
+        icon: Task01Icon,
+        module: "tasks",
+        audience: "partner",
+        gate: "dealer-tasks",
+        dataId: "TASK-009",
+        href: "/my-tasks",
       },
     ],
   },
@@ -432,8 +451,13 @@ export function canSeeNavItem(
   permissions: readonly ModulePermission[],
   userType: string | null = null,
   navOnly: readonly string[] | null = clientEnv.navOnly,
+  gates: ReadonlySet<NavGate> | null = null,
 ): boolean {
   if (!isReleased(item, navOnly)) {
+    return false;
+  }
+  // A gated item waits on its gate; with no gates given (the route guard), the page decides.
+  if (item.gate !== undefined && gates !== null && !gates.has(item.gate)) {
     return false;
   }
   if (item.audience === "staff" && userType !== "staff") {
@@ -453,10 +477,13 @@ export function visibleNavSections(
   permissions: readonly ModulePermission[],
   userType: string | null = null,
   navOnly: readonly string[] | null = clientEnv.navOnly,
+  gates: ReadonlySet<NavGate> = new Set(),
 ): NavSection[] {
   return NAV_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => canSeeNavItem(item, permissions, userType, navOnly)),
+    items: section.items.filter((item) =>
+      canSeeNavItem(item, permissions, userType, navOnly, gates),
+    ),
   })).filter((section) => section.items.length > 0);
 }
 

@@ -109,7 +109,8 @@ describe("[MSTR-012] The Territories tab", () => {
     expect(within(gujarat).getByText(/can't change/)).toBeInTheDocument();
 
     await user.click(within(gujarat).getByRole("button", { name: "Districts in Gujarat" }));
-    expect(await screen.findByText("In Gujarat")).toBeInTheDocument();
+    // Every district row says "In Gujarat"; how many are drawn by now depends on timing.
+    expect((await screen.findAllByText("In Gujarat")).length).toBeGreaterThan(0);
     expect(await screen.findByText("Rajkot")).toBeInTheDocument();
   });
 
