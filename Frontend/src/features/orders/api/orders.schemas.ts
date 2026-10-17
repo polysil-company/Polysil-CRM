@@ -438,6 +438,8 @@ export const orderWireSchema = z.object({
   }),
   partner: partnerRef.nullable(),
   lead: z.object({ id: z.string().min(1), inquiry_no: z.string().min(1) }).nullable(),
+  /** DISP-003 · Where the order is served from ("Order to"); null means the default warehouse. */
+  warehouse: z.object({ id: z.string().min(1), code: z.string(), name: z.string() }).nullish(),
   quotations: z.array(
     z.object({
       id: z.string().min(1),
@@ -515,6 +517,7 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
   },
   partner: wire.partner,
   lead: wire.lead === null ? null : { id: wire.lead.id, code: wire.lead.inquiry_no },
+  warehouse: wire.warehouse ?? null,
   quotations: wire.quotations.map((quotation) => ({
     id: quotation.id,
     quoteNo: quotation.quote_no,

@@ -1035,6 +1035,25 @@ export const DATA_IDS = {
     endpoints: ["GET /imports/template", "POST /imports", "POST /price-lists"],
     notes: "FS-068 (excel-import.md); the shortcut starts a draft, then imports into it.",
   },
+  "MSTR-014": {
+    domain: "MSTR",
+    title:
+      "Stock — on hand, committed and available by warehouse and product, and the stock ledger (`GET /stock`, `GET /stock/movements`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "MSTR-015": {
+    domain: "MSTR",
+    title: "Record stock — a receipt or a correction, by warehouse (`POST /stock/movements`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "MSTR-016": {
+    domain: "MSTR",
+    title: "Warehouses — add, change, switch off, and the default (`/warehouses`)",
+    owner: "shared",
+    status: "in-progress",
+  },
   "MSTR-002": {
     domain: "MSTR",
     title: "Lead lookups — sources, irrigation systems, lost reasons and the territory picker",
@@ -1338,6 +1357,13 @@ export const DATA_IDS = {
     ],
     notes:
       "Line by line, at most the open quantity, in the unit's precision; the system records invoices, never issues them.",
+  },
+  "DISP-003": {
+    domain: "DISP",
+    title:
+      "Stock on orders — Order to, availability per line, the order's warehouse and the dispatch's (`GET /stock/availability`, `warehouse_id`)",
+    owner: "shared",
+    status: "in-progress",
   },
   "DISP-001": {
     domain: "DISP",

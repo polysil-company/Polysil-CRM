@@ -233,6 +233,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-011 | Offices — the office tree: add, rename, move, close and reopen (`/org-units*`) | shared | in-progress |
 | MSTR-012 | Territories — the state, district, taluka and village tree: add, rename, set codes (`GET /territories`, `POST /territories`, `PATCH /territories/{id}`) | shared | in-progress |
 | MSTR-013 | Import polish — the blank template, upload errors on their fields, and a price list started from Excel (`GET /imports/template`, `POST /imports`, `POST /price-lists`) | frontend | in-progress |
+| MSTR-014 | Stock: on hand, committed and available by warehouse and product, and the stock ledger (`GET /stock`, `GET /stock/movements`) | shared | in-progress |
+| MSTR-015 | Record stock: a receipt or a correction, by warehouse (`POST /stock/movements`) | shared | in-progress |
+| MSTR-016 | Warehouses: add, change, switch off, and the default (`/warehouses`) | shared | in-progress |
 | DOC-001 | Documents on a lead, quotation, order or dispatch — the list, the types and opening one (`GET /documents`, `/leads/{id}/documents`, `/documents/types`, `/documents/{id}/link`) | shared | in-progress |
 | DOC-002 | Attach a document to a record (`POST /documents`) | shared | in-progress |
 | DOC-003 | Remove a document (`DELETE /documents/{id}`) | shared | in-progress |
@@ -261,6 +264,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SUBS-018 | Commission rates by scheme, from a date (`GET`/`POST /commission-rates`) | shared | in-progress |
 | DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |
 | DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |
+| DISP-003 | Stock on orders: Order to, availability per line, the order's warehouse and the dispatch's (`GET /stock/availability`, `warehouse_id`) | shared | in-progress |
 | ADMN-001 | People — the list of staff and partner users, with filters and an Excel export (`GET /users`, `GET /users/export`) | shared | in-progress |
 | ADMN-002 | A person — identity, role, office or partner, territories, sign-in state (`GET /users/{id}`) | shared | in-progress |
 | ADMN-003 | Add a person — a staff member with a temporary password, or a partner user (`POST /users`, `GET /lookups/roles`, `GET /org-units`) | shared | in-progress |

@@ -1,3 +1,4 @@
+import type { MovementWire, WarehouseWire } from "@/features/stock/api/stock.schemas";
 import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
 import type { CommissionWire, RateWire } from "@/features/commission/api/commission.schemas";
 import type { SlaPolicyWire } from "@/features/complaints/api/complaints.schemas";
@@ -65,6 +66,7 @@ import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data
 import { seedTargets, type MockTargetEntry } from "./data/targets";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
 import type { MockAdminTerritory } from "./data/territories";
+import { seedMovements, seedWarehouses } from "./data/stock";
 import { seedOffices, seedUsers, type MockUserRecord } from "./data/users";
 
 export interface MockDb {
@@ -147,6 +149,9 @@ export interface MockDb {
   slaPolicies: SlaPolicyWire[];
   /** Lead QR codes (LEAD-013). */
   qrCodes: QrCodeWire[];
+  /** Stock (MSTR-014…016): the warehouses and every movement, newest first. */
+  warehouses: WarehouseWire[];
+  stockMovements: MovementWire[];
   /** The enquiry page's WhatsApp codes sent, by mobile (LEAD-014). */
   enquiryCodes: Map<string, number>;
   /** Today's enquiry per mobile: a second one answers the first number (LEAD-014). */
@@ -231,6 +236,7 @@ export interface MockDb {
 
 function createMockDb(): MockDb {
   const products = seedProducts();
+  const warehouses = seedWarehouses();
   const leads = generateLeads();
   const direct = generateConversations(leads);
   const groups = generateGroups();
@@ -290,6 +296,8 @@ function createMockDb(): MockDb {
     complaintFiles: new Map(),
     slaPolicies: seedSlaPolicies(),
     qrCodes: seedQrCodes(),
+    warehouses,
+    stockMovements: seedMovements(products, warehouses),
     enquiryCodes: new Map(),
     enquiriesToday: new Map(),
     subsidyApplications: null,

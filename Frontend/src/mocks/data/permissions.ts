@@ -42,6 +42,9 @@ const CATALOGUE_VIEW = [
   grant("pricing", ["view"], "global"),
 ];
 
+/** Every staff role reads stock; dealers see none (stock contract). */
+const STOCK_VIEW = grant("stock", ["view"], "global");
+
 function fieldStaff(scope: Scope): MockModulePermission[] {
   return [
     grant("leads", ["view", "create", "edit"], scope),
@@ -55,6 +58,7 @@ function fieldStaff(scope: Scope): MockModulePermission[] {
     grant("targets", ["view"], scope),
     // RBAC.md §6.1: rewards V:own for a field officer, V:org for managers.
     grant("rewards", ["view"], scope),
+    STOCK_VIEW,
     // Marketing material: anyone orders for a dealer or their office (handover).
     grant("marketing_material", ["view", "create"], scope),
     SCHEMES_VIEW,
@@ -134,6 +138,7 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
         grant("sales_orders", ["view", "approve"], "global"),
         // Accounts follows subsidy applications without changing them (handover).
         grant("subsidy", ["view"], "global"),
+        STOCK_VIEW,
         SCHEMES_VIEW,
         ...CATALOGUE_VIEW,
       ];
@@ -142,12 +147,15 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
         // Dispatch approves the last step, then records what left (RBAC.md §6.2).
         grant("dispatch", ["view", "create", "edit", "approve"], "global"),
         grant("sales_orders", ["view", "approve"], "global"),
+        // Dispatch records stock received and corrections (stock contract).
+        grant("stock", ["view", "create"], "global"),
         SCHEMES_VIEW,
         ...CATALOGUE_VIEW,
       ];
     case "qa_manager":
       return [
         grant("complaints", ["view", "edit", "approve"], "global"),
+        STOCK_VIEW,
         SCHEMES_VIEW,
         ...CATALOGUE_VIEW,
       ];
