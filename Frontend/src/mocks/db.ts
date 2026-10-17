@@ -4,6 +4,7 @@ import type { SlaPolicyWire } from "@/features/complaints/api/complaints.schemas
 import type { QrCodeWire } from "@/features/lead-capture/api/lead-capture.schemas";
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { LookupList, LookupListWire } from "@/features/lookups/api/lookups.schemas";
+import type { MaterialWire } from "@/features/marketing/api/marketing.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
@@ -34,6 +35,7 @@ import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
 import { generateLeads } from "./data/leads";
 import { seedLookups, seedScoring } from "./data/lookups";
+import { seedMarketingOrders, seedMaterials, type MockMarketingOrder } from "./data/marketing";
 import { generateConversations, generateGroups, type MockGroupMember } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
@@ -216,6 +218,9 @@ export interface MockDb {
   gifts: GiftWire[];
   /** Gift (and order) redemptions, newest first. */
   rewardRedemptions: RedemptionWire[];
+  /** Marketing material (MKT-002…004): the catalogue and the orders, newest first. */
+  materials: MaterialWire[];
+  marketingOrders: MockMarketingOrder[];
 }
 
 function createMockDb(): MockDb {
@@ -230,6 +235,7 @@ function createMockDb(): MockDb {
   );
   const orders = generateOrders(leads, quotations, thresholds);
   const gifts = seedGifts();
+  const materials = seedMaterials();
   const partners = seedPartners();
   const firstDealer = partners.find((partner) => partner.partner_type === "dealer");
   const approvalSteps = seedApprovals(quotations, orders, thresholds);
@@ -320,6 +326,8 @@ function createMockDb(): MockDb {
     rewardSettings: seedRewardSettings(),
     gifts,
     rewardRedemptions: seedRedemptions(gifts),
+    materials,
+    marketingOrders: seedMarketingOrders(materials),
   };
 }
 

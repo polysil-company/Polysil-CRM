@@ -772,6 +772,27 @@ export const DATA_IDS = {
     owner: "shared",
     status: "planned",
   },
+  "MKT-002": {
+    domain: "MKT",
+    title:
+      "Marketing material catalogue — today's price and company share; Admin adds, changes and switches off items (`/marketing-materials`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "MKT-003": {
+    domain: "MKT",
+    title:
+      "Marketing material orders — order with company and dealer shares, the lists and their Excel (`/marketing-orders`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "MKT-004": {
+    domain: "MKT",
+    title:
+      "Marketing material order decisions — approve, reject, cancel, dispatch (`/marketing-orders/{id}/approve`, `/reject`, `/cancel`, `/dispatch`)",
+    owner: "shared",
+    status: "in-progress",
+  },
   "SCHM-001": {
     domain: "SCHM",
     title: "Schemes — the list and a scheme, for staff and the dealers they're aimed at",
