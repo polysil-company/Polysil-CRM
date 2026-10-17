@@ -36,7 +36,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Approvals](#approvals) | 5 | 🧪 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 12 | 🧪 👀 | PR #34; the Dispatch queue in PR #56; amend in PR #124; subsidised orders in PR #142; and PR #143 |
 | [Documents on records](#documents-on-records) | 4 | 🧪 👀 | PR #113, stacked on PR #111 |
-| [Tasks and the day planner](#tasks-and-the-day-planner) | 11 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55; the minutes page in PR #138; tasks for dealers in PR #167 |
+| [Tasks and the day planner](#tasks-and-the-day-planner) | 11 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55; the minutes page in PR #138; tasks for dealers in PR #168 |
 | [Complaints](#complaints) | 7 | 🧪 👀 | PR #57, PR #136 |
 | [Subsidy](#subsidy) | 17 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79; reopen and the checklist in PR #137; each scheme's inputs in PR #140; subsidy completion in PR #144 |
 | [Users and roles](#users-and-roles) | 7 | 🧪 👀 | PR #90; company settings in PR #148 |

@@ -144,7 +144,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [x] **30. Export and sample orders,** with the seller GSTINs and their LUTs (3). `export-sample-orders-contract.md`. In two parts:
   - [x] **30a. Seller GSTINs and their LUTs** (MSTR-018): Products & prices → Seller GSTINs, Add LUT and remove one not in use. PR #165, 18 Oct (`feature/MSTR-018-seller-gstins`).
   - [x] **30b. Export and sample orders** (SO-010) on the order and quotation forms, the preview's tax treatment, and the fields on their pages. PR #166, 18 Oct (`feature/SO-010-export-sample-orders`).
-- [x] **31. Dealer tasks** (TASK-009): a Dealers group in New task, and a dealer's own Tasks page with Done only, while `tasks_for_dealers` is on. PR #167, 18 Oct (`feature/TASK-009-dealer-tasks`).
+- [x] **31. Dealer tasks** (TASK-009): a Dealers group in New task, and a dealer's own Tasks page with Done only, while `tasks_for_dealers` is on. PR #168, 18 Oct (`feature/TASK-009-dealer-tasks`).
 - [ ] **32. Complaint holidays and escalation** (3). `complaint-holidays-escalation.md`.
 - [ ] **33. The customer record** (4). `customer-record.md`.
 - [ ] **34. Ratings, and the consumer portal** (4 + 8). `ratings-contract.md`, `consumer-portal.md`.
