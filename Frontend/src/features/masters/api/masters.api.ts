@@ -1,12 +1,19 @@
 import type { LookupItem, LookupList } from "@/features/lookups/api/lookups.schemas";
 import { apiRequest } from "@/lib/api/client";
+import type { CursorPage } from "@/lib/api/pagination";
 import { createLogger } from "@/lib/logger";
 
 import {
   lookupItemResponseSchema,
+  officeListSchema,
+  officeResponseSchema,
   scoringResponseSchema,
   type LookupCreateRequest,
   type LookupUpdateRequest,
+  type Office,
+  type OfficeCreateRequest,
+  type OfficeListParams,
+  type OfficePatchRequest,
   type ScoringItem,
   type ScoringPatchRequest,
 } from "./masters.schemas";
@@ -65,5 +72,71 @@ export function patchScoring(body: ScoringPatchRequest): Promise<ScoringItem[]> 
     path: "/lookups/scoring",
     body,
     schema: scoringResponseSchema,
+  });
+}
+
+/** Offices per page. */
+export const OFFICE_PAGE_SIZE = 50;
+
+function officePath(officeId: string): `/org-units/${string}` {
+  return `/org-units/${encodeURIComponent(officeId)}`;
+}
+
+/** MSTR-011 · GET /org-units: the office tree, newest first, by name and open or closed. */
+export function listOffices(
+  params: OfficeListParams,
+  signal?: AbortSignal,
+): Promise<CursorPage<Office>> {
+  return apiRequest({
+    dataId: "MSTR-011",
+    logger: log,
+    fn: "listOffices",
+    path: "/org-units",
+    query: {
+      q: params.q.trim() === "" ? undefined : params.q.trim(),
+      is_open: params.state === "all" ? undefined : params.state === "open",
+      limit: OFFICE_PAGE_SIZE,
+      cursor: params.cursor ?? undefined,
+    },
+    schema: officeListSchema,
+    signal,
+  });
+}
+
+/** MSTR-011 · POST /org-units: under an open office, or as a root. */
+export function createOffice(body: OfficeCreateRequest): Promise<Office> {
+  return apiRequest({
+    dataId: "MSTR-011",
+    logger: log,
+    fn: "createOffice",
+    method: "POST",
+    path: "/org-units",
+    body,
+    schema: officeResponseSchema,
+  });
+}
+
+/** MSTR-011 · PATCH /org-units/{id}: only what changes. */
+export function patchOffice(officeId: string, body: OfficePatchRequest): Promise<Office> {
+  return apiRequest({
+    dataId: "MSTR-011",
+    logger: log,
+    fn: "patchOffice",
+    method: "PATCH",
+    path: officePath(officeId),
+    body,
+    schema: officeResponseSchema,
+  });
+}
+
+/** MSTR-011 · Close (refused while people are anchored on it) or reopen an office. */
+export function setOfficeOpen(officeId: string, open: boolean): Promise<Office> {
+  return apiRequest({
+    dataId: "MSTR-011",
+    logger: log,
+    fn: open ? "reopenOffice" : "closeOffice",
+    method: "POST",
+    path: `${officePath(officeId)}/${open ? "reopen" : "close"}`,
+    schema: officeResponseSchema,
   });
 }
