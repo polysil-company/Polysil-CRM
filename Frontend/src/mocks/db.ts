@@ -8,6 +8,7 @@ import type { NotificationWire } from "@/features/notifications/api/notification
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { HsnRowWire, TaxRateWire } from "@/features/products/api/products.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
+import type { SettingWire } from "@/features/settings/api/settings.schemas";
 import type {
   ApplicationDocumentWire,
   ApplicationWire,
@@ -133,6 +134,8 @@ export interface MockDb {
   dealerApplications: MockDealerApplication[] | null;
   /** MSTR-012 · The territory tree as Masters edits it, copied from the seed on first use. */
   territories: MockAdminTerritory[] | null;
+  /** ADMN-007 · Company settings, seeded on first use (`handlers/settings.ts`). */
+  settings: SettingWire[] | null;
   /** Each application's stage history, oldest first (SUBS-006). */
   subsidyEntries: Map<string, StageEntryWire[]>;
   /** Each application's calculation as stored at create (SUBS-006). */
@@ -240,6 +243,7 @@ function createMockDb(): MockDb {
     subsidyApplications: null,
     dealerApplications: null,
     territories: null,
+    settings: null,
     subsidyEntries: new Map(),
     subsidyCalculations: new Map(),
     subsidyDocuments: new Map(),

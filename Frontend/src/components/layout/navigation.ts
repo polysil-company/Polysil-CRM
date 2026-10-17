@@ -17,6 +17,7 @@ import {
   QrCodeIcon,
   RupeeIcon,
   Settings02Icon,
+  Settings05Icon,
   SlidersHorizontalIcon,
   Store01Icon,
   Task01Icon,
@@ -302,6 +303,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         audience: "staff",
         dataId: "MSTR-001",
         href: "/masters",
+      },
+      {
+        id: "company-settings",
+        label: "Company settings",
+        description: "Rules for orders, complaints, dealers and the farmers' portal.",
+        icon: Settings05Icon,
+        module: "masters",
+        // GET /settings is staff only (settings-amend-reopen-contract.md).
+        audience: "staff",
+        dataId: "ADMN-007",
+        href: "/settings",
       },
       {
         id: "users",
