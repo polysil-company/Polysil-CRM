@@ -7,7 +7,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-78 changes, newest first. Each title opens its entry.
+79 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
