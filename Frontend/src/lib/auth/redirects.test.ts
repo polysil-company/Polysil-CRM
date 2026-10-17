@@ -63,6 +63,10 @@ describe("[AUTH-006] decideAuthRedirect", () => {
       decideAuthRedirect({ pathname: "/enquiry", search: "?qr=K7M2PX", hasSession: false }),
     ).toBeNull();
     expect(decideAuthRedirect({ pathname: "/enquiry", search: "", hasSession: true })).toBeNull();
+    // CHNL-008 · a dealer applicant's link
+    expect(
+      decideAuthRedirect({ pathname: "/dealer-apply/apply-k2p9", search: "", hasSession: false }),
+    ).toBeNull();
     // Only the link itself: "/q" and look-alikes still need a session.
     expect(decideAuthRedirect({ pathname: "/quotations", search: "", hasSession: false })).toBe(
       "/sign-in?next=%2Fquotations",

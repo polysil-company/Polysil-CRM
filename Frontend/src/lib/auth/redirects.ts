@@ -13,10 +13,11 @@ const PUBLIC_PATHS: readonly string[] = [SIGN_IN_PATH];
 
 /**
  * Pages anyone may open, signed in or not, and never redirected: the link a customer gets
- * with their quotation (QUOT-012), and the enquiry page a printed QR code opens (LEAD-014).
+ * with their quotation (QUOT-012), the enquiry page a printed QR code opens (LEAD-014), and
+ * a dealer applicant's form (CHNL-008).
  * They call only the backend's `/public` endpoints.
  */
-const OPEN_PATH_PREFIXES: readonly string[] = ["/q/"];
+const OPEN_PATH_PREFIXES: readonly string[] = ["/q/", "/dealer-apply/"];
 const OPEN_PATHS: readonly string[] = ["/enquiry"];
 
 export function isOpenPath(pathname: string): boolean {

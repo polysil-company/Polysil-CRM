@@ -10,9 +10,10 @@ import {
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
 import { isPartnerRole } from "@/lib/auth/roles";
-import { readMockRole } from "@/lib/dev/mock-settings";
+import { MOCK_OTP_CODE, readMockRole } from "@/lib/dev/mock-settings";
 import { normalizeIndianMobile } from "@/lib/format";
 import type { MockDealerApplication } from "@/mocks/data/dealer-applications";
+import type { MockDocument } from "@/mocks/data/documents";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
 import { mockMeFor } from "@/mocks/data/sessions";
@@ -21,7 +22,7 @@ import { mockDb } from "@/mocks/db";
 
 import { addMockPartner, gstinLookup } from "./partners";
 import { applyScenario } from "./scenario";
-import { errorResponse } from "./shared";
+import { errorResponse, readMultipart } from "./shared";
 
 /**
  * CHNL-007 · Dealer applications for the mock backend, following `dealer_applications.py`:
@@ -125,7 +126,7 @@ export function dealerApplicationWire(
   application: MockDealerApplication,
   withLink = false,
 ): DealerApplicationWire {
-  const { token, ...stored } = application;
+  const { token, session: _session, lastCodeAt: _lastCodeAt, ...stored } = application;
   const open = OPEN_STATUSES.some((status) => status === application.status);
   const decide = mayDecide(application);
   const seesBank = decide || can(mockPermissionsFor(readMockRole()), "partners", "edit");
@@ -277,6 +278,10 @@ export function mockDealerApplications(): MockDealerApplication[] {
       decision_remark: "The cancelled cheque is unreadable. Upload a clearer photo.",
     },
   ];
+  // fixed links for the seeds, so a demo can open /dealer-apply/apply-demo-1 after a reload
+  rows.forEach((row, index) => {
+    row.token = `apply-demo-${String(index + 1)}`;
+  });
   mockDb.dealerApplications = rows;
   // the submitted one has its documents, so it is complete
   const submitted = rows[1];
@@ -703,4 +708,256 @@ export const dealerApplicationHandlers = [
     const wire = dealerApplicationWire(application);
     return remember(request, raw, () => HttpResponse.json({ data: wire }));
   }),
+
+  ...applicantHandlers(),
 ];
+
+// ── CHNL-008 · the applicant's page (public) ─────────────────────────────────────
+
+const SESSION_MS = 2 * 60 * 60 * 1000;
+const CODE_GAP_MS = 60 * 1000;
+const APPLICANT_DOC_TYPES = new Set([
+  "gst_certificate",
+  "pan_card",
+  "cancelled_cheque",
+  "shop_photo",
+  "shop_licence",
+  "other",
+]);
+
+/** The application a live link opens: draft, returned or submitted, not expired. */
+function byToken(token: unknown): MockDealerApplication | undefined {
+  return mockDealerApplications().find(
+    (item) =>
+      item.token === String(token) &&
+      ["draft", "returned", "submitted"].includes(item.status) &&
+      Date.parse(item.link_expires_at) > Date.now(),
+  );
+}
+
+function linkGone(): Response {
+  return errorResponse(404, "not_found", "This link is not valid.");
+}
+
+function verified(application: MockDealerApplication, request: Request): boolean {
+  const sent = request.headers.get("x-apply-session");
+  const session = application.session ?? null;
+  return (
+    sent !== null && session !== null && session.value === sent && session.expiresAt > Date.now()
+  );
+}
+
+function noSession(): Response {
+  return errorResponse(403, "no_session", "Verify your mobile first.");
+}
+
+function applicantDocuments(application: MockDealerApplication): MockDocument[] {
+  return mockDb.documents.filter(
+    (document) =>
+      !document.removed &&
+      document.record_type === "dealer_application" &&
+      document.record_id === application.id,
+  );
+}
+
+/** `dealer_apply_view`: the outline without a session, every field and document with one. */
+function applicantView(application: MockDealerApplication, withSession: boolean): unknown {
+  const outline = {
+    firm_name: application.firm_name,
+    status: application.status,
+    mobile_masked: `+91 xxxxxx${application.mobile.slice(-4)}`,
+    missing: missingOf(application),
+    session: withSession,
+  };
+  if (!withSession) return outline;
+  return {
+    ...outline,
+    remark: application.status === "returned" ? application.decision_remark : null,
+    id: application.id,
+    contact_name: application.contact_name,
+    firm_type: application.firm_type,
+    gst_registered: application.gst_registered,
+    gstin: application.gstin,
+    pan: application.pan,
+    address: application.address,
+    pincode: application.pincode,
+    email: application.email,
+    godown_address: application.godown_address,
+    years_in_business: application.years_in_business,
+    current_brands: application.current_brands,
+    notes: application.notes,
+    bank_account_name: application.bank_account_name,
+    bank_account_no: application.bank_account_no,
+    bank_ifsc: application.bank_ifsc,
+    documents: applicantDocuments(application).map((document) => ({
+      id: document.id,
+      doc_type: document.doc_type,
+      name: document.name,
+      filename: document.filename,
+      mine: document.uploaded_by === null,
+    })),
+  };
+}
+
+function applicantHandlers(): ReturnType<typeof http.get>[] {
+  const apply = (rest = ""): string => buildApiUrl(`/public/dealer-apply/:token${rest}`);
+  return [
+    http.get(apply(), async ({ params, request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      const application = byToken(params.token);
+      if (application === undefined) return linkGone();
+      return HttpResponse.json({
+        data: applicantView(application, verified(application, request)),
+      });
+    }),
+
+    http.post(apply("/verify"), async ({ params }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      const application = byToken(params.token);
+      if (application === undefined || application.status === "submitted") return linkGone();
+      const last = application.lastCodeAt ?? null;
+      if (last !== null && Date.now() - last < CODE_GAP_MS) {
+        return errorResponse(422, "rate_limited", "Wait a minute before asking for another code.");
+      }
+      application.lastCodeAt = Date.now();
+      return HttpResponse.json({ data: { sent: true } }, { status: 202 });
+    }),
+
+    http.post(apply("/verify/check"), async ({ params, request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      const application = byToken(params.token);
+      if (application === undefined) return linkGone();
+      const parsed = z.object({ code: z.string() }).safeParse(await bodyOf(request));
+      if (!parsed.success || parsed.data.code.trim() !== MOCK_OTP_CODE) {
+        return errorResponse(
+          422,
+          "invalid_code",
+          "That code didn't work. Check it, or ask for a new one.",
+        );
+      }
+      const value = `sess-${newToken()}`;
+      application.session = { value, expiresAt: Date.now() + SESSION_MS };
+      return HttpResponse.json({ data: { session: value } });
+    }),
+
+    http.patch(apply(), async ({ params, request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      const application = byToken(params.token);
+      if (application === undefined) return linkGone();
+      if (!verified(application, request)) return noSession();
+      if (application.status !== "draft" && application.status !== "returned") return closed();
+      const parsed = fieldsSchema.safeParse(await bodyOf(request));
+      if (!parsed.success) {
+        const fields: Record<string, string> = {};
+        for (const issue of parsed.error.issues) fields[String(issue.path[0])] = issue.message;
+        return invalid(fields);
+      }
+      const problems = applyFields(application, parsed.data);
+      if (problems !== null) return invalid(problems);
+      return HttpResponse.json({ data: applicantView(application, true) });
+    }),
+
+    http.get(apply("/gstin/:gstin"), async ({ params }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      if (byToken(params.token) === undefined) return linkGone();
+      return HttpResponse.json({ data: gstinLookup(String(params.gstin).toUpperCase()) });
+    }),
+
+    http.post(apply("/documents"), async ({ params, request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      const application = byToken(params.token);
+      if (application === undefined) return linkGone();
+      if (!verified(application, request)) return noSession();
+      if (application.status !== "draft" && application.status !== "returned") return closed();
+      const form = await readMultipart(request);
+      const docType = form.get("doc_type");
+      const nameField = form.get("name");
+      const file = form.get("file");
+      if (typeof docType !== "string" || !APPLICANT_DOC_TYPES.has(docType)) {
+        return invalid({ doc_type: "not a document type" });
+      }
+      if (file === undefined || typeof file === "string" || file.size === 0) {
+        return invalid({ file: "1 byte to 10 MB" });
+      }
+      if (file.size > 10 * 1024 * 1024)
+        return errorResponse(413, "attachment_too_large", "Up to 10 MB.");
+      const name =
+        typeof nameField === "string" && nameField.trim() !== "" ? nameField.trim() : null;
+      if (docType === "other" && name === null) return invalid({ name: "name the document" });
+      const accepted = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/heic",
+        "image/heif",
+        "application/pdf",
+      ];
+      if (!accepted.includes(file.type) && !/\.(heic|heif)$/i.test(file.name)) {
+        return errorResponse(422, "attachment_type", "JPEG, PNG, WebP, HEIC or PDF only.", {
+          file: "not an allowed type",
+        });
+      }
+      const document: MockDocument = {
+        id: mockUuid(MOCK_ID_SPACE.document, 0x2000 + mockDb.documents.length + 1),
+        record_type: "dealer_application",
+        record_id: application.id,
+        record_label: null,
+        doc_type: docType,
+        doc_type_label: docType.replaceAll("_", " "),
+        name,
+        filename: file.name,
+        content_type: file.type || "image/heic",
+        size_bytes: file.size,
+        preview: !/heic|heif/.test(file.type),
+        uploaded_by: null,
+        uploaded_at: new Date().toISOString(),
+        fingerprint: `${file.name}:${String(file.size)}`,
+        removed: false,
+      };
+      mockDb.documents.unshift(document);
+      return HttpResponse.json({ data: { id: document.id, created: true } }, { status: 201 });
+    }),
+
+    http.delete(apply("/documents/:documentId"), async ({ params, request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      const application = byToken(params.token);
+      if (application === undefined) return linkGone();
+      if (!verified(application, request)) return noSession();
+      const document = applicantDocuments(application).find(
+        (item) => item.id === String(params.documentId) && item.uploaded_by === null,
+      );
+      if (document === undefined)
+        return errorResponse(404, "not_found", "No such document of yours.");
+      document.removed = true;
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    http.post(apply("/submit"), async ({ params, request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      const application = byToken(params.token);
+      if (application === undefined) return linkGone();
+      if (!verified(application, request)) return noSession();
+      if (application.status === "submitted") {
+        return HttpResponse.json({ data: { submitted: true } });
+      }
+      const missing = missingOf(application);
+      if (missing.length > 0) {
+        return invalid(
+          Object.fromEntries(missing.map((key) => [key, "required"])),
+          "application_incomplete",
+        );
+      }
+      application.status = "submitted";
+      application.submitted_at = new Date().toISOString();
+      return HttpResponse.json({ data: { submitted: true } });
+    }),
+  ];
+}

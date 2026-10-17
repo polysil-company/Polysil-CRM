@@ -91,6 +91,28 @@ describe("[OBS-002] apiRequest", () => {
     expect(records[1]?.requestId).toBe(received?.get("x-request-id"));
   });
 
+  it("sends a dealer applicant's session as X-Apply-Session only when given (CHNL-008)", async () => {
+    const seen: (string | null)[] = [];
+    server.use(
+      http.get(buildApiUrl("/test/item"), ({ request }) => {
+        seen.push(request.headers.get("x-apply-session"));
+        return HttpResponse.json({ id: "a", total: 3 });
+      }),
+    );
+
+    await getItem();
+    await apiRequest({
+      dataId: "OBS-002",
+      logger: log,
+      fn: "getItem",
+      path: "/test/item",
+      schema: itemSchema,
+      auth: "none",
+      applicantSession: "sess-1",
+    });
+    expect(seen).toEqual([null, "sess-1"]);
+  });
+
   it("serialises query parameters: arrays repeat, empty values are skipped", async () => {
     let url = "";
     server.use(

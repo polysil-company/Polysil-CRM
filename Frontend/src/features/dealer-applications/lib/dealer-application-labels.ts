@@ -57,3 +57,13 @@ export const DEALER_APPLICATION_STATUS_BADGE: Readonly<
   rejected: "danger",
   withdrawn: "neutral",
 };
+
+/** CHNL-008 · The documents an applicant uploads. */
+export const APPLICANT_DOCUMENT_LABELS: Readonly<Record<string, string>> = {
+  gst_certificate: "GST certificate",
+  pan_card: "PAN card",
+  cancelled_cheque: "Cancelled cheque",
+  shop_photo: "Shop photo",
+  shop_licence: "Shop licence",
+  other: "Other",
+};
