@@ -405,6 +405,8 @@ Walked as Admin, then switched to Dealer on a desktop in light mode and a phone 
 
 #### Tests
 
+- `src/features/masters/components/territories-ui.test.tsx`: `findAllByText("In Gujarat")` instead of `findByText`. Every district row says it, so the test failed on `integration` (run 39074675410, issue #167) whenever several rows were already drawn.
+
 - `src/features/tasks/components/dealer-tasks.test.tsx`, 7 tests:
   - off means 403 for a dealer;
   - assignees with dealers once the setting is on, the dealer's list, PATCH refused, and complete;
