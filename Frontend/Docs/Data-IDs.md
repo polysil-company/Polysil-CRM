@@ -26,6 +26,7 @@ ID tells you *which functionality*, and the request ID tells you *which request*
 | `DOC` | Documents on records — purchase orders, payment slips, invoices, photos |
 | `TASK` | Tasks and daily work |
 | `CHNL` | Channel partners — distributor, dealer, sub-dealer |
+| `TGT` | Sales targets and achievement |
 | `MKT` | Marketing and promotional offers |
 | `SCHM` | Schemes |
 | `MSTR` | Masters — products, stock, price lists, territories |
@@ -153,6 +154,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
 | RPT-002 | Reports — conversion, people, lost leads, follow-ups, dealers, campaigns, areas, complaints (`GET /reports/*`) | shared | in-progress |
 | RPT-003 | A lead's 360° view (`GET /leads/{id}/360`) | shared | in-progress |
+| TGT-001 | Targets — the month's achievement, yours and your team's (`GET /targets/achievement`) | shared | in-progress |
+| TGT-002 | Set a person's monthly targets, with their history (`GET /targets`, `PUT /targets`) | shared | in-progress |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |

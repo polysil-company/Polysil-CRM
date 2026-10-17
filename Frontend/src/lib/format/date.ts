@@ -69,6 +69,12 @@ const monthYear = new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
 });
 
+const monthYearLong = new Intl.DateTimeFormat("en-IN", {
+  timeZone: APP_TIME_ZONE,
+  month: "long",
+  year: "numeric",
+});
+
 export type DateInput = string | Date | null | undefined;
 
 /** Returns a valid Date or null. Never throws. */
@@ -146,6 +152,19 @@ export function formatMonth(month: string): string {
   // The middle of the month keeps it the same whatever the browser's own time zone.
   const date = /^\d{4}-\d{2}$/.test(month) ? toDate(`${month}-15T12:00:00+05:30`) : null;
   return date ? monthYear.format(date) : EMPTY_VALUE;
+}
+
+/** A calendar month ("YYYY-MM") in words, for headings: "October 2026". */
+export function formatMonthLong(month: string): string {
+  const date = /^\d{4}-\d{2}$/.test(month) ? toDate(`${month}-15T12:00:00+05:30`) : null;
+  return date ? monthYearLong.format(date) : EMPTY_VALUE;
+}
+
+/** A month ("YYYY-MM") moved by a number of months: 2026-12 + 1 → 2027-01. */
+export function shiftMonth(month: string, months: number): string {
+  const [year = 0, index = 1] = month.split("-").map(Number);
+  const total = year * 12 + (index - 1) + months;
+  return `${String(Math.floor(total / 12))}-${String((total % 12) + 1).padStart(2, "0")}`;
 }
 
 /** True when both fall on the same calendar day in India. */
