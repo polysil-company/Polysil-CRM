@@ -32,6 +32,7 @@ import { OrderPaymentsCard } from "@/features/payments/components/order-payments
 import { formatRate, parseWarnings } from "@/features/quotations/lib/quotation-labels";
 import { OrderPoints } from "@/features/rewards/components/order-points";
 import { useCan } from "@/features/session/hooks/use-session";
+import { OrderWarrantyCard } from "@/features/warranty/components/order-warranty";
 import { isApiError } from "@/lib/api/errors";
 import {
   EMPTY_VALUE,
@@ -153,6 +154,7 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
       <OrderPoints order={order} />
       {/* ACCT-004 · Payable, received, instalments and receipts. */}
       <OrderPaymentsCard order={order} />
+      <OrderWarrantyCard order={order} />
 
       <OrderSubsidyCard order={order} />
 
