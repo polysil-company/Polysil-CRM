@@ -79,6 +79,9 @@ export const leadWireSchema = z.object({
   land_acres: z.string().nullish(),
   /** The land as the client measures it (FS-052); acres are derived from it. */
   land_hectares: z.string().nullish(),
+  /** MKT-006 · The campaign the lead came from; both null for a dealer (FS-040). */
+  campaign_id: z.string().nullish(),
+  campaign_name: z.string().nullish(),
   lost_reason: refSchema.extend({ code: z.string().min(1) }).nullable(),
   lost_note: z.string().nullable(),
   reopen_count: z.number().int().nonnegative(),
@@ -152,6 +155,10 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   })),
   landAcres: wire.land_acres ?? null,
   landHectares: wire.land_hectares ?? null,
+  campaign:
+    wire.campaign_id == null
+      ? null
+      : { id: wire.campaign_id, name: wire.campaign_name ?? "A campaign" },
   lostReason: wire.lost_reason,
   lostNote: wire.lost_note,
   reopenCount: wire.reopen_count,
@@ -483,6 +490,8 @@ export interface LeadListParams {
   readonly type: LeadInquiryType | null;
   /** Territory ids from GET /leads/areas: leads in any of them or under them. At most 20. */
   readonly areas: readonly string[];
+  /** MKT-006 · A campaign id, `none` for leads without one, or null for any. */
+  readonly campaign: string | null;
 }
 
 // ── the area filter (LEAD-001, backend #50) ──────────────────────────────────────
@@ -562,6 +571,8 @@ export const createLeadRequestSchema = z.object({
   land_hectares: z.string().regex(HECTARES_PATTERN).nullable(),
   /** Becomes the first entry on the lead's timeline. */
   note: z.string().min(1).max(2000).nullable(),
+  /** MKT-006 · An active campaign from GET /campaigns?active=true; null for none. Staff only. */
+  campaign_id: z.string().min(1).nullable().optional(),
 });
 
 export type CreateLeadRequest = z.infer<typeof createLeadRequestSchema>;
@@ -649,6 +660,8 @@ export const createLeadFormSchema = z
       .trim()
       .max(2000, "Keep the note under 2,000 characters.")
       .transform(emptyToNull),
+    /** MKT-006 · Staff only; a dealer's form leaves it out. */
+    campaign: z.string().nullish(),
   })
   .transform((values): CreateLeadRequest => ({
     farmer_name: values.customerName,
@@ -663,6 +676,7 @@ export const createLeadFormSchema = z
     crops: values.crops,
     land_hectares: values.landHectares,
     note: values.note,
+    ...(values.campaign === undefined ? {} : { campaign_id: values.campaign }),
   }));
 
 export type CreateLeadFormValues = z.input<typeof createLeadFormSchema>;

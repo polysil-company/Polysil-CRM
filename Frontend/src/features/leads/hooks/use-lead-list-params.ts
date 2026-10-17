@@ -62,6 +62,8 @@ export const leadListSearchParams = {
   source: parseAsLookupCode,
   type: parseAsStringLiteral(LEAD_INQUIRY_TYPES),
   area: parseAsArrayOf(parseAsAreaId).withDefault([]),
+  /** MKT-006 · A campaign id, or `none`. */
+  campaign: parseAsAreaId,
 };
 
 export interface LeadFilterPatch {
@@ -70,6 +72,7 @@ export interface LeadFilterPatch {
   readonly source?: string | null;
   readonly type?: LeadInquiryType | null;
   readonly areas?: readonly string[];
+  readonly campaign?: string | null;
 }
 
 export interface LeadListParamsControls {
@@ -112,6 +115,7 @@ export function useLeadListParams(): LeadListParamsControls {
     type: values.type,
     // A hand-edited URL may repeat an area or carry more than the backend takes.
     areas: [...new Set(values.area)].slice(0, MAX_LEAD_AREAS),
+    campaign: values.campaign,
   };
 
   const activeFilterCount = [
@@ -120,6 +124,7 @@ export function useLeadListParams(): LeadListParamsControls {
     params.source !== null,
     params.type !== null,
     params.areas.length > 0,
+    params.campaign !== null,
   ].filter(Boolean).length;
 
   return {
@@ -134,6 +139,7 @@ export function useLeadListParams(): LeadListParamsControls {
         ...(patch.source === undefined ? {} : { source: patch.source }),
         ...(patch.type === undefined ? {} : { type: patch.type }),
         ...(patch.areas === undefined ? {} : { area: [...patch.areas] }),
+        ...(patch.campaign === undefined ? {} : { campaign: patch.campaign }),
       });
     },
     setSort: (sort, order) => {
@@ -152,7 +158,15 @@ export function useLeadListParams(): LeadListParamsControls {
       void setValues({ pageSize: normalizePageSize(pageSize), cursors: null });
     },
     resetFilters: () => {
-      void setValues({ q: null, stage: null, source: null, type: null, area: null, cursors: null });
+      void setValues({
+        q: null,
+        stage: null,
+        source: null,
+        type: null,
+        area: null,
+        campaign: null,
+        cursors: null,
+      });
     },
   };
 }

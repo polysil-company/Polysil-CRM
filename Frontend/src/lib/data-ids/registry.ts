@@ -793,6 +793,20 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
   },
+  "MKT-005": {
+    domain: "MKT",
+    title:
+      "Campaigns — the list with lead counts and cost, a campaign's summary; Marketing adds, changes, switches off and deletes (`/campaigns`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "MKT-006": {
+    domain: "MKT",
+    title:
+      "A campaign on a lead and a QR code — the picker, the name on the lead, the lead list's campaign filter (`campaign_id`)",
+    owner: "shared",
+    status: "in-progress",
+  },
   "SCHM-001": {
     domain: "SCHM",
     title: "Schemes — the list and a scheme, for staff and the dealers they're aimed at",

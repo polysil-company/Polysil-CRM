@@ -46,6 +46,7 @@ const FIRST_PAGE: LeadListParams = {
   source: null,
   type: null,
   areas: [],
+  campaign: null,
 };
 
 function territoryNamed(name: string): (typeof MOCK_TERRITORIES)[number] {

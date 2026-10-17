@@ -39,6 +39,7 @@ import {
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
+import { campaignRefFor } from "./campaigns";
 import { dealerApplicationWire, startMockDealerApplicationFor } from "./dealer-applications";
 import { MOCK_CREATOR, leadEventsOf, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
@@ -133,6 +134,7 @@ function filterLeads(params: URLSearchParams): LeadWire[] {
     .map((stage) => stage.trim())
     .filter(isStage);
   const source = params.get("source");
+  const campaign = params.get("campaign_id");
   const inquiryType = params.get("inquiry_type");
   const q = params.get("q") ?? "";
   const areas = new Set(
@@ -147,6 +149,15 @@ function filterLeads(params: URLSearchParams): LeadWire[] {
       return false;
     }
     if (source !== null && source !== "" && lead.source !== source) return false;
+    if (campaign === "none" && lead.campaign_id != null) return false;
+    if (
+      campaign !== null &&
+      campaign !== "" &&
+      campaign !== "none" &&
+      lead.campaign_id !== campaign
+    ) {
+      return false;
+    }
     if (inquiryType !== null && inquiryType !== "" && lead.inquiry_type !== inquiryType) {
       return false;
     }
@@ -232,6 +243,14 @@ export function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
     );
   }
 
+  // MKT-006 · A dealer's leads carry no campaign; staff name a running one.
+  const linked = isPartnerRole(readMockRole()) ? null : campaignRefFor(body.campaign_id);
+  if (linked === "bad") {
+    return errorResponse(422, "validation_error", "Some fields need correcting.", {
+      campaign_id: "Not a running campaign.",
+    });
+  }
+
   const activeCrops = mockLookupRows("crops").filter((crop) => crop.is_active !== false);
   const unknownCrop = body.crops.findIndex(
     (code) => !activeCrops.some((crop) => crop.code === code),
@@ -273,6 +292,8 @@ export function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
       is_active: true,
     })),
     ...mockLand(body.land_hectares),
+    campaign_id: linked?.id ?? null,
+    campaign_name: linked?.name ?? null,
     lost_reason: null,
     lost_note: null,
     reopen_count: 0,
@@ -982,6 +1003,13 @@ export const leadHandlers = [
       }
       lead.territory = toTerritoryRef(territory);
       changed.territory_id = body.territory_id;
+    }
+    if (body.campaign_id !== undefined && body.campaign_id !== lead.campaign_id) {
+      const linked = isPartnerRole(readMockRole()) ? null : campaignRefFor(body.campaign_id);
+      if (linked === "bad") return validationError({ campaign_id: "Not a running campaign." });
+      lead.campaign_id = linked?.id ?? null;
+      lead.campaign_name = linked?.name ?? null;
+      changed.campaign_id = body.campaign_id;
     }
     if (body.crops !== undefined) {
       const crops = mockLookupRows("crops");

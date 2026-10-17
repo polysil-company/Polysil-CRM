@@ -28,6 +28,7 @@ import type { CalculateResponseWire } from "@/features/subsidy/api/subsidy.schem
 import type { OfficeWire } from "@/features/users/api/users.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
+import { seedCampaigns, tagLeadsWithCampaigns, type MockCampaign } from "./data/campaigns";
 import { seedCommissionRates } from "./data/commission";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
 import type { MockDealerApplication } from "./data/dealer-applications";
@@ -147,6 +148,8 @@ export interface MockDb {
   slaPolicies: SlaPolicyWire[];
   /** Lead QR codes (LEAD-013). */
   qrCodes: QrCodeWire[];
+  /** Campaigns (MKT-005): the mock adds lead counts and summaries per call. */
+  campaigns: MockCampaign[];
   /** The enquiry page's WhatsApp codes sent, by mobile (LEAD-014). */
   enquiryCodes: Map<string, number>;
   /** Today's enquiry per mobile: a second one answers the first number (LEAD-014). */
@@ -232,6 +235,8 @@ export interface MockDb {
 function createMockDb(): MockDb {
   const products = seedProducts();
   const leads = generateLeads();
+  const campaigns = seedCampaigns();
+  tagLeadsWithCampaigns(leads, campaigns);
   const direct = generateConversations(leads);
   const groups = generateGroups();
   const quotations = generateQuotations(leads);
@@ -290,6 +295,7 @@ function createMockDb(): MockDb {
     complaintFiles: new Map(),
     slaPolicies: seedSlaPolicies(),
     qrCodes: seedQrCodes(),
+    campaigns,
     enquiryCodes: new Map(),
     enquiriesToday: new Map(),
     subsidyApplications: null,

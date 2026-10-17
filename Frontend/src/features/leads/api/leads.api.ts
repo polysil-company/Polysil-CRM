@@ -60,6 +60,7 @@ export async function listLeads(params: LeadListParams, signal?: AbortSignal): P
       sort: LEAD_SORT_WIRE_FIELDS[params.sort],
       order: params.order,
       territory_id: params.areas.join(","),
+      campaign_id: params.campaign,
     },
     schema: leadPageSchema,
     signal,
@@ -95,6 +96,7 @@ export function exportLeads(params: LeadListParams): Promise<DownloadedFile> {
       sort: LEAD_SORT_WIRE_FIELDS[params.sort],
       order: params.order,
       territory_id: params.areas.join(","),
+      campaign_id: params.campaign,
     },
   });
 }
