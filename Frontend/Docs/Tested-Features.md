@@ -45,6 +45,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
 | [Channel partners](#channel-partners) | 5 | 🧪 👀 | PR #112, stacked on PR #111 |
+| [Schemes](#schemes) | 4 | 🧪 👀 | PR #NNN |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -468,6 +469,19 @@ Screens:
   - **Import good rows only** adds the rest, parents first. 🧪 👀
 
 Open with the client: whether distributors and dealers should add their own dealers and sub-dealers from the portal, as the backend allows.
+
+## Schemes
+
+Channel → **Schemes** (`/schemes`), on the backend's contract (handover `schemes-contract.md`, read against `api/schemas/schemes.py`), PR #NNN. Walked through in the mock as Admin on a desktop in light mode, and as a dealer on a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API. Benefits on an order come next, in item 24b.
+
+- **SCHM-001 · The list and a scheme:** newest first, with what it gives and who qualifies in words ("5% off, up to ₹50,000 · Orders of ₹2,00,000 or more"), its dates and whether it's running, scheduled, ended or switched off. Staff filter by status, type and a search; a dealer sees only the running schemes aimed at it, and never who else they're for. A scheme's page shows its terms and, to staff, who it's for (any one name on a line, every line). Screens: [list](screenshots/schemes/schemes-list-desktop-light.jpg), [a used scheme](screenshots/schemes/scheme-detail-used-desktop-light.jpg), [a dealer's list, phone dark](screenshots/schemes/schemes-dealer-phone-dark.jpg). 🧪 👀
+- **SCHM-002 · New scheme and Edit** (Admin):
+  - The type decides the benefits offered (points only for a points scheme, no cap on points) and whether a credit's life and a month or quarter are asked. Who it's for adds territories, partner types, partners and products; product categories wait on BE-027.
+  - What's wrong is named on its field first, and the backend's refusals land on theirs; a taken code says so.
+  - A scheme that has given benefits keeps its terms: the form says why and offers only an earlier end date. **Switch off** stops new benefits; credits already earned stay usable.
+  - Screens: [what's missing](screenshots/schemes/scheme-new-errors-desktop-light.jpg), [filled in](screenshots/schemes/scheme-new-filled-desktop-light.jpg), [created](screenshots/schemes/scheme-created-desktop-light.jpg), [a used scheme's form](screenshots/schemes/scheme-edit-used-desktop-light.jpg). 🧪 👀
+- **SCHM-003 · Standing** in a period scheme: what has been delivered so far this month or quarter against the target, with a bar and what's left to go. A dealer sees its own; staff pick a partner. Screens: [staff](screenshots/schemes/scheme-period-standing-desktop-light.jpg), [a dealer, phone dark](screenshots/schemes/scheme-standing-dealer-phone-dark.jpg). 🧪 👀
+- **SCHM-004 · Credits:** each credit's value, scheme, status, when it was earned and on which order or for which period, when it must be used by, and the order it was used on. A dealer sees its available ones first; staff see all and may narrow to one partner. Screens: [staff](screenshots/schemes/scheme-credits-desktop-light.jpg), [a dealer, phone dark](screenshots/schemes/scheme-credits-dealer-phone-dark.jpg). 🧪 👀
 
 ## Not built yet
 

@@ -7,6 +7,7 @@ import type { NotificationWire } from "@/features/notifications/api/notification
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { HsnRowWire, TaxRateWire } from "@/features/products/api/products.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
+import type { EntitlementWire, SchemeWire } from "@/features/schemes/api/schemes.schemas";
 import type {
   ApplicationDocumentWire,
   ApplicationWire,
@@ -34,6 +35,7 @@ import {
   type MockProductRecord,
 } from "./data/products";
 import { generateQuotations } from "./data/quotations";
+import { seedEntitlements, seedSchemes } from "./data/schemes";
 import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
 import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
@@ -152,6 +154,10 @@ export interface MockDb {
   partners: MockPartnerRecord[];
   /** POST /partners replays: Idempotency-Key → the request and the partner made. */
   partnerWrites: Map<string, { body: string; partnerId: string }>;
+  /** Promotional schemes, newest first (SCHM-001, SCHM-002). */
+  schemes: SchemeWire[];
+  /** Scheme credits, newest first (SCHM-004). */
+  entitlements: EntitlementWire[];
 }
 
 function createMockDb(): MockDb {
@@ -228,6 +234,10 @@ function createMockDb(): MockDb {
     userWrites: new Map(),
     partners: seedPartners(),
     partnerWrites: new Map(),
+    schemes: seedSchemes(products[0]?.id ?? null),
+    entitlements: seedEntitlements(
+      orders[0] === undefined ? null : { id: orders[0].id, order_no: orders[0].order_no },
+    ),
   };
 }
 
