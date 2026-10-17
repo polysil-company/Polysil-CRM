@@ -238,6 +238,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-014 | Stock: on hand, committed and available by warehouse and product, and the stock ledger (`GET /stock`, `GET /stock/movements`) | shared | in-progress |
 | MSTR-015 | Record stock: a receipt or a correction, by warehouse (`POST /stock/movements`) | shared | in-progress |
 | MSTR-016 | Warehouses: add, change, switch off, and the default (`/warehouses`) | shared | in-progress |
+| MSTR-018 | Seller GSTINs and LUTs: our registrations, and each one's LUT by financial year (`/seller-gstins`) | shared | in-progress |
 | DOC-001 | Documents on a lead, quotation, order or dispatch — the list, the types and opening one (`GET /documents`, `/leads/{id}/documents`, `/documents/types`, `/documents/{id}/link`) | shared | in-progress |
 | DOC-002 | Attach a document to a record (`POST /documents`) | shared | in-progress |
 | DOC-003 | Remove a document (`DELETE /documents/{id}`) | shared | in-progress |

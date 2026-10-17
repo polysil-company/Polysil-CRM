@@ -23,6 +23,7 @@ import { quotationHandlers } from "./quotations";
 import { reportHandlers } from "./reports";
 import { orderPointsHandlers, rewardHandlers } from "./rewards";
 import { schemeHandlers } from "./schemes";
+import { sellerGstinHandlers } from "./seller-gstins";
 import { settingsHandlers } from "./settings";
 import { stockHandlers } from "./stock";
 import { subsidyHandlers } from "./subsidy";
@@ -78,6 +79,7 @@ export const handlers: readonly HttpHandler[] = [
   ...marketingHandlers,
   ...campaignHandlers,
   ...stockHandlers,
+  ...sellerGstinHandlers,
   ...schemeHandlers,
   ...subsidyHandlers,
   ...subsidyApplicationHandlers,

@@ -1068,6 +1068,13 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
   },
+  "MSTR-018": {
+    domain: "MSTR",
+    title:
+      "Seller GSTINs and LUTs — our registrations, and each one's LUT by financial year (`/seller-gstins`)",
+    owner: "shared",
+    status: "in-progress",
+  },
   "MSTR-002": {
     domain: "MSTR",
     title: "Lead lookups — sources, irrigation systems, lost reasons and the territory picker",
