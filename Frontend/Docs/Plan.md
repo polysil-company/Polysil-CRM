@@ -290,7 +290,7 @@ REQ-901/902 (360° timeline, drop-off identification) · REQ-1001 (role dashboar
 | Lead count — sidebar badge and Sales tab, exact | LEAD-004 | `GET /leads/stats` |
 | Lookups — sources, irrigation systems, lost reasons, territories | MSTR-002 | `/lookups/*`, `/territories` |
 | Lead history and notes — the Activity card on the lead page; assignments name the people (BE-006) | LEAD-005, LEAD-006 | `GET /leads/{id}/timeline`, `POST /leads/{id}/notes` |
-| Stage change and reopen — Update stage menu, lost reason, won and reopen dialogs | LEAD-007 | `POST /leads/{id}/transition`, `POST /leads/{id}/reopen` |
+| Stage change and reopen — Update stage menu, lost reason, won and reopen dialogs; a dormant lead's banner, reopened to where it stood or marked lost (PR #139) | LEAD-007 | `POST /leads/{id}/transition`, `POST /leads/{id}/reopen`, `dormant_from_stage` |
 | Assign owner and channel partner | LEAD-008 | `POST /leads/{id}/assign`, `GET /leads/assignees`, `GET /lookups/partners` |
 | Channel partners (Channel → Channel partners) — the list with search, type, status and parent filters and an Excel export; a partner's page; add a distributor, or a dealer or sub-dealer under one; correct; close and reopen; import from Excel; the GST record's names for a GSTIN (CHNL-006, PR #132) | CHNL-001…006 | `GET/POST /partners`, `GET /partners/export`, `GET/PATCH /partners/{id}`, `POST /partners/{id}/close`, `/reopen`, `/imports` with `kind=partners`, `GET /gstin/{gstin}` |
 | Quotations list — the Quotations page and a lead's quotations; drafts waiting on a manager read "Awaiting approval" | QUOT-001 | `GET /quotations` |

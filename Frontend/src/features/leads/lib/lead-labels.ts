@@ -35,7 +35,8 @@ export const LEAD_STAGE_DESCRIPTIONS: Readonly<Record<LeadStage, string>> = {
   lost: "The farmer won't buy now; the reason is recorded. It can be reopened.",
   merged:
     "A duplicate, folded into another lead that carries its history. Hidden from the list unless chosen here.",
-  dormant: "Set by the system after a long time with no activity. It can't be moved by hand.",
+  dormant:
+    "Set by the system after a long time with no activity. Reopen it to pick it up again, or mark it lost.",
 };
 
 /** The label always travels with the colour, so colour is never the only signal. */

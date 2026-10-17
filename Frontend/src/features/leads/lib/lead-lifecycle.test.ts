@@ -58,10 +58,17 @@ describe("[LEAD-007] stageMenuFor", () => {
     );
   });
 
-  it("offers nothing on a closed or dormant lead", () => {
-    for (const stage of ["won", "merged", "dormant"] as const) {
+  it("offers nothing on a closed lead", () => {
+    for (const stage of ["won", "merged"] as const) {
       expect(stageMenuFor(stage)).toEqual({ actions: [], hint: null });
     }
+  });
+
+  it("offers reopen or lost on a dormant lead (FS-035)", () => {
+    expect(stageMenuFor("dormant")).toEqual({
+      actions: [{ kind: "reopen" }, { kind: "lost" }],
+      hint: null,
+    });
   });
 
   it("says where the quotation-driven steps happen", () => {
