@@ -147,6 +147,30 @@ describe("[SO-005] OrderBuilder", () => {
     expect(mockDb.orders.find((order) => order.id === draft.id)?.lines).toHaveLength(before + 1);
   });
 
+  it("[SO-008] keeps a subsidised draft's type when its header changes", async () => {
+    signInAs("admin");
+    const draft = mockDb.orders.find((order) => order.status === "draft");
+    if (draft === undefined) throw new Error("No draft order in the mock database");
+    draft.order_type = "subsidised";
+    const user = show(<EditOrderDraft orderId={draft.id} />);
+
+    await screen.findByRole("form", { name: /^Edit / });
+    expect(screen.getByText(/keeps its type\.$/)).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Commercial" })).not.toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /^Remarks/ }), "Deliver before sowing");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    }, PRICED);
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith(`/sales-orders/${draft.id}`);
+    });
+    const saved = mockDb.orders.find((order) => order.id === draft.id);
+    expect(saved?.order_type).toBe("subsidised");
+    expect(saved?.remarks).toBe("Deliver before sowing");
+  });
+
   it("refuses to edit an order that was submitted", async () => {
     signInAs("admin");
     const submitted = mockDb.orders.find((order) => order.status === "submitted");

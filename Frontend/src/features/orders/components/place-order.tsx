@@ -56,7 +56,7 @@ import { RefusalAlert } from "./order-dialog-shared";
 const log = createLogger({ file: "features/orders/components/place-order.tsx", dataId: "SO-003" });
 
 const placeOrderFormSchema = orderHeaderFormSchema.extend({
-  orderType: z.enum(ORDERABLE_TYPES),
+  orderType: z.enum([...ORDERABLE_TYPES, "subsidised"]),
 });
 type PlaceOrderForm = z.infer<typeof placeOrderFormSchema>;
 
@@ -138,7 +138,11 @@ function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Elem
   const idempotency = useIdempotencyKey();
   const router = useRouter();
   const [refusal, setRefusal] = useState<OrderRefusal | null>(null);
-  const defaultType = ORDERABLE_TYPES.find((type) => type === quotation.salesType) ?? "commercial";
+  // SO-008 · A subsidised quotation makes a subsidised order, its subsidy with it (FS-057).
+  const subsidised = quotation.salesType === "subsidised";
+  const defaultType = subsidised
+    ? "subsidised"
+    : (ORDERABLE_TYPES.find((type) => type === quotation.salesType) ?? "commercial");
   const form = useForm<PlaceOrderForm>({
     resolver: zodResolver(placeOrderFormSchema),
     defaultValues: {
@@ -200,30 +204,42 @@ function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Elem
       </DialogHeader>
       <DialogBody>
         <div className="flex flex-col gap-4">
-          <Field>
-            <FieldLabel id="place-order-type-label">Order type</FieldLabel>
-            <RadioGroup
-              aria-labelledby="place-order-type-label"
-              value={orderType}
-              onValueChange={(value) => {
-                const type = ORDERABLE_TYPES.find((item) => item === value);
-                if (type !== undefined) {
-                  form.setValue("orderType", type, { shouldDirty: true });
-                }
-              }}
-              className="flex flex-wrap gap-4"
-            >
-              {ORDERABLE_TYPES.map((type) => (
-                <div key={type} className="flex items-center gap-2">
-                  <RadioGroupItem id={`place-order-type-${type}`} value={type} />
-                  <Label htmlFor={`place-order-type-${type}`} className="font-normal">
-                    {ORDER_TYPE_LABELS[type]}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-            <FieldDescription>Export, sample and the other types come later.</FieldDescription>
-          </Field>
+          {subsidised ? (
+            <Field>
+              <FieldLabel>Order type</FieldLabel>
+              <p className="text-sm text-foreground">{ORDER_TYPE_LABELS.subsidised}</p>
+              <FieldDescription>
+                {quotation.subsidy === null
+                  ? "The quotation has no subsidy yet."
+                  : `The subsidy comes from the quotation: ${formatInr(quotation.subsidy.subsidy, { paise: true })} from the scheme, ${formatInr(quotation.subsidy.farmerShare, { paise: true })} from the farmer.`}
+              </FieldDescription>
+            </Field>
+          ) : (
+            <Field>
+              <FieldLabel id="place-order-type-label">Order type</FieldLabel>
+              <RadioGroup
+                aria-labelledby="place-order-type-label"
+                value={orderType}
+                onValueChange={(value) => {
+                  const type = ORDERABLE_TYPES.find((item) => item === value);
+                  if (type !== undefined) {
+                    form.setValue("orderType", type, { shouldDirty: true });
+                  }
+                }}
+                className="flex flex-wrap gap-4"
+              >
+                {ORDERABLE_TYPES.map((type) => (
+                  <div key={type} className="flex items-center gap-2">
+                    <RadioGroupItem id={`place-order-type-${type}`} value={type} />
+                    <Label htmlFor={`place-order-type-${type}`} className="font-normal">
+                      {ORDER_TYPE_LABELS[type]}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+              <FieldDescription>Export, sample and the other types come later.</FieldDescription>
+            </Field>
+          )}
           <Field data-invalid={errors.deliveryAddress ? true : undefined}>
             <FieldLabel htmlFor="place-order-address">Deliver to</FieldLabel>
             <Textarea
