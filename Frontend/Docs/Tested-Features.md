@@ -37,7 +37,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 12 | 🧪 👀 | PR #34; the Dispatch queue in PR #56; amend in PR #124; subsidised orders in PR #142; and PR #143 |
 | [Documents on records](#documents-on-records) | 4 | 🧪 👀 | PR #113, stacked on PR #111 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 9 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55; the minutes page in PR #138 |
-| [Complaints](#complaints) | 7 | 🧪 👀 | PR #57, PR #136 |
+| [Complaints](#complaints) | 8 | 🧪 👀 | PR #57, PR #136; escalation in PR #169 |
 | [Subsidy](#subsidy) | 17 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79; reopen and the checklist in PR #137; each scheme's inputs in PR #140; subsidy completion in PR #144 |
 | [Users and roles](#users-and-roles) | 7 | 🧪 👀 | PR #90; company settings in PR #148 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 5 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43; area by system and targets in PR #128; group chats in PR #133 |
@@ -53,7 +53,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Stock](#stock) | 4 | 🧪 👀 | PR #162; on orders in PR #163 |
 | [Warranty](#warranty) | 3 | 🧪 👀 | PR #164 |
 | [Export and sample orders](#export-and-sample-orders) | 4 | 🧪 👀 | PR #166 |
-| [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
+| [Masters](#masters) | 5 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147; holidays in PR #169 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
 | [Dealer commission](#dealer-commission) | 3 | 🧪 👀 | PR #157 |
@@ -276,6 +276,7 @@ Reopen a closed or QC-rejected complaint (PR #136; [changelog](../changelog/entr
 Complaint types are set with the other lookups, in the admin masters.
 
 ---
+- **CMPL-012 · Escalation** (screens: [the complaint](screenshots/complaints/complaint-escalated-desktop-light.jpg), [on a phone](screenshots/complaints/complaint-escalated-mobile-dark.jpg), [the bell](screenshots/complaints/bell-escalated-desktop-light.jpg)). While **Complaint escalation** rings the bell (Company settings), a complaint that misses a target says "Response target missed" or "Resolution target missed" by its status (in place of "Late"), and its Targets card says when it was escalated to its owner and managers. Its history shows "… target missed: escalated" by no one; the bell has a `complaint_escalated` kind with its own icon, opening the complaint. Dealers never get the fields or the bell. 🧪 👀
 
 ## Subsidy
 
@@ -641,6 +642,7 @@ Admin → **Masters** (`/masters`), for staff who see masters (`backend/docs/api
   - **Edit** renames, moves or re-covers an open office, sending only what changed ("Nothing changed yet" until then).
   - **Close** is refused while people work from it: "2 people still work from Rajkot District. Move them to another office, or deactivate them in Users & roles, then close it." **Reopen** a closed one from All.
   - Screens: [desktop](screenshots/masters/offices-desktop-light.jpg), [edit, phone dark](screenshots/masters/office-edit-phone-dark.jpg), [new office](screenshots/masters/office-new-desktop-light.jpg). 🧪 👀
+- **MSTR-019 · Holidays** (screens: [the year](screenshots/masters/holidays-desktop-light.jpg), [add one](screenshots/masters/add-holiday-desktop-light.jpg)). The **Holidays** tab lists a year's holidays with a year switcher; complaint targets skip them as they skip Sundays. Admin adds one from tomorrow on (not a Sunday) and removes one still ahead; a past one shows "Past" and stays. The past, a Sunday and a repeat are refused on the day field. "A new holiday applies to complaints submitted after it is added." Walked in the mock; axe found nothing. 🧪 👀
 
 ## Reports and the lead's 360° view
 

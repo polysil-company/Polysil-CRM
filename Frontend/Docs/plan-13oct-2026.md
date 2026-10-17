@@ -145,7 +145,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
   - [x] **30a. Seller GSTINs and their LUTs** (MSTR-018): Products & prices → Seller GSTINs, Add LUT and remove one not in use. PR #165, 18 Oct (`feature/MSTR-018-seller-gstins`).
   - [x] **30b. Export and sample orders** (SO-010) on the order and quotation forms, the preview's tax treatment, and the fields on their pages. PR #166, 18 Oct (`feature/SO-010-export-sample-orders`).
 - [ ] **31. Dealer tasks** (tasks for partner users). `dealer-tasks-contract.md`.
-- [ ] **32. Complaint holidays and escalation** (3). `complaint-holidays-escalation.md`.
+- [x] **32. Complaint holidays and escalation** (MSTR-019, CMPL-012): Masters → Holidays, and a missed target marked on the complaint, in its history and in the bell. PR #169, 18 Oct (`feature/CMPL-012-holidays-escalation`).
 - [ ] **33. The customer record** (4). `customer-record.md`.
 - [ ] **34. Ratings, and the consumer portal** (4 + 8). `ratings-contract.md`, `consumer-portal.md`.
 - [ ] **35. Field tracking map screens** (16; the Android app is separate). `field-tracking-contract.md`.
