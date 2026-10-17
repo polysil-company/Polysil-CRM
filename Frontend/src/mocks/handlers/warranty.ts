@@ -6,6 +6,7 @@ import {
   MAX_WARRANTY_MONTHS,
   type ComplaintLineWarranty,
   type OrderWarrantyWire,
+  type WarrantyStatus,
   type WarrantyTermWire,
 } from "@/features/warranty/api/warranty.schemas";
 import { buildApiUrl } from "@/lib/api/url";
@@ -53,8 +54,6 @@ function endOf(start: string, months: number): string {
   return shiftCalendarDay(date.toISOString().slice(0, 10), -1);
 }
 
-type Status = "active" | "expired" | "none" | "unknown";
-
 function periodFor(
   categoryCode: string | null,
   start: string,
@@ -62,7 +61,7 @@ function periodFor(
 ): {
   end: string | null;
   months: number | null;
-  status: Status;
+  status: WarrantyStatus;
 } {
   const months = monthsOn(categoryCode, start);
   if (months === null) return { end: null, months: null, status: "unknown" };
