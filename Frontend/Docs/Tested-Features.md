@@ -36,7 +36,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Approvals](#approvals) | 5 | 🧪 👀 | `integration`; limits in PR #35 |
 | [Sales orders and dispatch](#sales-orders-and-dispatch) | 12 | 🧪 👀 | PR #34; the Dispatch queue in PR #56; amend in PR #124; subsidised orders in PR #142; and PR #143 |
 | [Documents on records](#documents-on-records) | 4 | 🧪 👀 | PR #113, stacked on PR #111 |
-| [Tasks and the day planner](#tasks-and-the-day-planner) | 9 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55; the minutes page in PR #138 |
+| [Tasks and the day planner](#tasks-and-the-day-planner) | 11 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55; the minutes page in PR #138; tasks for dealers in PR #167 |
 | [Complaints](#complaints) | 7 | 🧪 👀 | PR #57, PR #136 |
 | [Subsidy](#subsidy) | 17 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79; reopen and the checklist in PR #137; each scheme's inputs in PR #140; subsidy completion in PR #144 |
 | [Users and roles](#users-and-roles) | 7 | 🧪 👀 | PR #90; company settings in PR #148 |
@@ -247,6 +247,8 @@ On the backend's contract (`backend/docs/api/tasks.md`) since PR #54 ([changelog
 - **TASK-008 · All tasks** (PR #55; screens: [desktop](screenshots/tasks/all-tasks-desktop-light.jpg), [phone, dark](screenshots/tasks/all-tasks-phone-dark.jpg)): everything the user can see, earliest due first, with a count; filters for status, kind, person (managers) and overdue only, all in the URL; **Download Excel** saves the same tasks as a file named by the backend (`tasks-2026-10-04.xlsx`), every page. More than 5,000 rows: "Too many tasks to download — narrow the filters". States: skeleton, "No tasks match these filters" with Reset, a later page failing. 🧪 👀
 
 ---
+- **TASK-009 · Give a dealer a task** (screen: [the Dealers group](screenshots/tasks/assignee-dealers-desktop-light.jpg)). While the admin has `tasks_for_dealers` on, New task's **For** lists the users of the dealers the manager can see under **Dealers**, each with their firm ("Bhavesh Shah · Shah Agro Traders"). A task about a lead or order the dealer can't open is refused on the field (`link_not_visible_to_assignee`). Filters, reports, minutes and reassigning keep to the team. 🧪 👀
+- **TASK-009 · A dealer's Tasks** (screens: [to do](screenshots/tasks/dealer-tasks-desktop-light.jpg), [marking one done](screenshots/tasks/dealer-task-done-desktop-light.jpg), [done, on a phone](screenshots/tasks/dealer-tasks-done-mobile-dark.jpg)). Dealer users get a **Tasks** item (`/my-tasks`) only while the setting is on: the menu asks for their open tasks and shows the item when that works. To do and Done; each task says when, what it is about and who gave it, with **Done** (what happened) as the only action. Off, there is no item, and the page says tasks aren't switched on. Walked in the mock as Admin then Dealer, on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
 
 ## Complaints
 
