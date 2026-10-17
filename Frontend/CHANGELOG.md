@@ -7,7 +7,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-64 changes, newest first. Each title opens its entry.
+65 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
@@ -17,6 +17,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-10-15 | [Masters: the lists and lead scoring](changelog/entries/2026-10-15--feature--MSTR-009--masters-the-lists-and-lead-scoring.md) | `feature` | `MSTR-009` `MSTR-010` `MSTR-001` |
 | 2026-10-15 | [Masters: the offices](changelog/entries/2026-10-15--feature--MSTR-011--masters-the-offices.md) | `feature` | `MSTR-011` |
 | 2026-10-15 | [Reopen a closed subsidy file, and the document checklist](changelog/entries/2026-10-15--feature--SUBS-015--reopen-a-closed-subsidy-file.md) | `feature` | `SUBS-015` `SUBS-007` |
+| 2026-10-15 | [One set of meeting minutes on its own page](changelog/entries/2026-10-15--feature--TASK-007--one-set-of-minutes-on-its-own-page.md) | `feature` | `TASK-007` |
 | 2026-10-14 | [The Accounts queue, and the order counts behind its badge](changelog/entries/2026-10-14--feature--ACCT-001--the-accounts-queue-and-the-order-counts-behind-its-badge.md) | `feature` | `ACCT-001` |
 | 2026-10-14 | [An empty conversation names its colleague after a reload](changelog/entries/2026-10-14--feature--MSG-004--an-empty-conversation-names-its-colleague-after-a-reload.md) | `feature` | `MSG-004` `MSG-002` |
 | 2026-10-14 | [Dashboard: area by irrigation system, and orders against target](changelog/entries/2026-10-14--feature--RPT-001--dashboard-area-by-irrigation-system-and-orders-against-target.md) | `feature` | `RPT-001` |
@@ -473,6 +474,52 @@ The backend added `POST /subsidy-applications/{id}/reopen` (`subsidy-completion.
   - a settled commission explained in the dialog;
   - a file no longer closed closes the dialog;
   - the masters checklist, with an item no longer asked for.
+- Walked through in the mock: desktop light and phone dark.
+
+### One set of meeting minutes on its own page
+
+`feature` · `TASK-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--TASK-007--one-set-of-minutes-on-its-own-page.md)
+
+#### Before
+
+A task created from meeting minutes said "From meeting minutes" as plain text. The minutes themselves showed only on the lead's page, in a list. From My day, Team or All tasks there was no way to read the meeting a task came from without finding the lead first. The backend's `GET /minutes/{id}` (`tasks-and-planner-contract.md`) was registered under TASK-007 but unused.
+
+#### Now
+
+- **"From meeting minutes"** on an action item's task is a link, wherever the task shows: My day, Team, All tasks and a lead's tasks.
+- **It opens `/tasks/minutes/{id}`**, which shows:
+  - the meeting's date;
+  - the lead it was about, as a link, or the partner;
+  - who was there and the notes;
+  - each action item as its task stands now ("1 of 2 done", overdue in red);
+  - who recorded the minutes.
+- **The page sits under Tasks,** so the Tasks menu rule decides who opens it (APP-006), and Tasks stays highlighted. Minutes out of scope (`404`) show "Page not found"; other failures show the error with a retry.
+- **Shared view:** the lead's minutes card and the page show the same view (`MinutesContent`). The minutes now carry their lead and partner.
+- **The mock** serves `GET /minutes/{id}`.
+- Checked on a desktop in light mode and a phone in dark mode: the link on a task, the page, and minutes not found. axe found nothing.
+
+#### Discussion
+
+- **Under `/tasks`, not `/minutes`:** a page outside the menu map is open to anyone signed in, and minutes are staff only.
+- **No new Data ID:** `GET /minutes/{id}` was already listed under TASK-007.
+
+#### Files changed
+
+- `src/features/tasks/api/tasks.schemas.ts`, `tasks.api.ts`, `tasks.queries.ts`: the minutes' lead and partner, `getMinutes`, `minutesQueryOptions`.
+- `src/features/tasks/components/minutes-detail.tsx`: new, the page.
+- `src/app/(app)/tasks/minutes/[minutesId]/page.tsx`: new, the route.
+- `src/features/tasks/components/lead-minutes.tsx`: `MinutesContent`, shared with the page.
+- `src/features/tasks/components/task-row.tsx`: the link.
+- `src/mocks/handlers/tasks.ts`: `GET /minutes/{id}`.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/tasks/minutes-*`: records and screens.
+
+#### Tests
+
+- `src/features/tasks/components/minutes-detail.test.tsx`:
+  - `getMinutes` reads the minutes with each action item as it stands, and a 404 for unknown ones;
+  - the page shows the meeting, the linked lead, "1 of 2 done", the action items and the notes;
+  - minutes out of scope are not found;
+  - a lead's action-item task links to the page.
 - Walked through in the mock: desktop light and phone dark.
 
 ## 14 October 2026

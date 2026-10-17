@@ -537,6 +537,16 @@ export const taskHandlers = [
     return HttpResponse.json({ data: rows.map(minutesWire) });
   }),
 
+  /** TASK-007 · One set of minutes; a partner user has no minutes (staff only). */
+  http.get(buildApiUrl("/minutes/:minutesId"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (taskScope() === null) return noTasksModule();
+    const minutes = mockDb.minutes.find((item) => item.id === params.minutesId);
+    if (minutes === undefined) return errorResponse(404, "not_found", "No such minutes.");
+    return HttpResponse.json({ data: minutesWire(minutes) });
+  }),
+
   /**
    * TASK-007 · The minutes and a task per action item, in one save; one bad item refuses the
    * whole save with `fields.action_items.i…`. The meeting it records is completed if open.
