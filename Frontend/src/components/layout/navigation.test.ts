@@ -144,6 +144,13 @@ describe("[APP-006] route guards", () => {
     expect(canOpenPath("/partners", mockPermissionsFor("qa_manager"), "staff")).toBe(false);
   });
 
+  it("opens the Accounts queue to whoever may view payments, as the backend names it (ACCT-001)", () => {
+    expect(canOpenPath("/accounts", mockPermissionsFor("account_manager"), "staff")).toBe(true);
+    expect(canOpenPath("/accounts", admin, "staff")).toBe(true);
+    expect(canOpenPath("/accounts", mockPermissionsFor("employee"), "staff")).toBe(false);
+    expect(canOpenPath("/accounts", dealer, "partner_user")).toBe(false);
+  });
+
   it("leaves pages outside the nav map open", () => {
     expect(canOpenPath("/account", [], "partner_user")).toBe(true);
   });

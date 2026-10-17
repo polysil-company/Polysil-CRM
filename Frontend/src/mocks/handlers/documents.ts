@@ -82,7 +82,7 @@ function mayAdd(type: RecordType): boolean {
     case "dispatch":
       return can(permissions, "dispatch", "create") || can(permissions, "sales_orders", "edit");
     case "payment":
-      return can(permissions, "accounts", "edit");
+      return can(permissions, "payments", "edit");
     default:
       return false;
   }

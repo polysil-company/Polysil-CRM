@@ -110,7 +110,8 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
       return MODULE_CODES.map((module) => grant(module, PERMISSION_ACTIONS, "global"));
     case "account_manager":
       return [
-        grant("accounts", ["view", "edit", "approve"], "global"),
+        // Accounts records payments (RBAC.md §6.2: payments V:global CEA).
+        grant("payments", ["view", "create", "edit", "approve"], "global"),
         // Accounts sees complaints (refunds are paid through them) but decides none.
         grant("complaints", ["view"], "global"),
         // Accounts decides the payment step of every order (RBAC.md §6.2).

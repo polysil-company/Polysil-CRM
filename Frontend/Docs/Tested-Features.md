@@ -171,8 +171,17 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-30--feature--S
   - axe found nothing on the dialog, the amended order or the edit screen. 🧪 👀
 - **DISP-002 · Record a dispatch** (Dispatch, `dispatch.create`): each open item's quantity (or "Everything open"), when it left, challan, invoice, transporter, vehicle. Refused on the field: nothing entered, more than is open, decimals on a whole-unit item, a time in the future. An invoice dated before its challan, or an invoice number already used, is recorded with a warning. The order moves to Partly dispatched or Dispatched. 🧪 👀
 - **DISP-002 · Void a dispatch** with a reason — it stays on record, struck through, and its quantities are open again — and **close the rest short** with a reason. Managers see neither. When someone else moved the order first, the dialog closes, a toast says what happened, and the page shows the latest. 🧪 👀
+- **ACCT-001 · The Accounts queue** (whoever may view payments: Accounts and Admin; screens: [desktop](screenshots/accounts/queue-desktop-light.jpg), [phone, dark](screenshots/accounts/queue-phone-dark.jpg)):
+  - **The list:** every submitted order whose next approval step is Accounts' payment check (BE-022). Each shows its number (linked), party and dealer, type, owner, when it was submitted and its value.
+  - **Deciding:** **Decide in Approvals** for those who decide.
+  - **The count:** "1 order waits on Accounts' payment check".
+  - **Download Excel** saves the queue.
+  - **The sidebar badge** counts the waiting orders from `GET /orders/stats` and is checked again each minute.
+  - **Who sees it:** a field officer has no menu item, and the page refuses them.
+  - **States:** skeleton, "Nothing waits on Accounts", an error, a later page failing.
+  - Recording payments comes with the payments screens. 🧪 👀
 - **DISP-001 · The Dispatch queue** (Dispatch, or anyone with `dispatch`; PR #56; screens: [to ship](screenshots/dispatch/to-ship-desktop-light.jpg), [to ship, phone dark](screenshots/dispatch/to-ship-phone-dark.jpg), [record from the queue](screenshots/dispatch/record-from-queue-desktop-light.jpg)): **To ship** lists every approved order still waiting to leave, partly sent ones with how much has gone ("46% sent"), with the count. **Record a dispatch** opens the order with the form already open (`?record=dispatch`); someone who may only look sees no button, and the link does nothing for them. States: skeleton, "Nothing waiting to ship", an error, a later page failing. 🧪 👀
-- **DISP-001 · The dispatch log** (PR #56; screens: [desktop](screenshots/dispatch/dispatched-desktop-light.jpg), [phone, dark](screenshots/dispatch/dispatched-phone-dark.jpg)): **Dispatched** lists what left, newest first — dispatch number, the order (linked) and party, items, challan, invoice, transporter and vehicle, who recorded it — voided ones marked with their reason. Between two days (in the URL), or any day; "Nothing sent on these days" otherwise. The **Accounts queue** waits on the backend (BE-022); Accounts' steps are in their Approvals inbox meanwhile. 🧪 👀
+- **DISP-001 · The dispatch log** (PR #56; screens: [desktop](screenshots/dispatch/dispatched-desktop-light.jpg), [phone, dark](screenshots/dispatch/dispatched-phone-dark.jpg)): **Dispatched** lists what left, newest first — dispatch number, the order (linked) and party, items, challan, invoice, transporter and vehicle, who recorded it — voided ones marked with their reason. Between two days (in the URL), or any day; "Nothing sent on these days" otherwise. 🧪 👀
 
 ## Documents on records
 

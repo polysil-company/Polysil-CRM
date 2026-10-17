@@ -27,7 +27,7 @@ export const MODULE_CODES = [
   "partners",
   "marketing",
   "schemes",
-  "accounts",
+  "payments",
   "dispatch",
   "reports",
   "masters",
