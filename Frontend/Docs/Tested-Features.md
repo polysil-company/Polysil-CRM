@@ -50,6 +50,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Payments](#payments) | 4 | 🧪 👀 | PR #159 |
 | [Marketing material](#marketing-material) | 3 | 🧪 👀 | PR #160 |
 | [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
+| [Stock](#stock) | 3 | 🧪 👀 | PR #162 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
@@ -592,6 +593,14 @@ Channel → **Campaigns** (`/campaigns`; FS-040, handover `campaigns.md`). Walke
 
 - **MKT-005 · Campaigns** (screens: [the list](screenshots/campaigns/campaigns-desktop-light.jpg), [a summary](screenshots/campaigns/campaign-summary-desktop-light.jpg), [a new one's checks](screenshots/campaigns/campaign-new-desktop-light.jpg)). Running ones by default, newest first, with search, kind and running/switched off/all in the URL; each with its leads and cost (cost only with `campaigns.view`). A campaign's leads, won, lost, open, sales, cost per lead and per win, and See its leads. Add or change (a taken name, case ignored, and an end before the start refused on their fields), switch off or on, delete; one that leads or codes name offers Switch off instead. Partners get 403. 🧪 👀
 - **MKT-006 · A campaign on a lead and a QR code** (screens: [the lead](screenshots/campaigns/lead-campaign-phone-dark.jpg), [Edit lead](screenshots/campaigns/lead-edit-campaign-phone-dark.jpg), [the lead list filtered](screenshots/campaigns/leads-campaign-filter-desktop-light.jpg), [a QR code](screenshots/campaigns/qr-code-campaign-desktop-light.jpg)). Staff pick a running campaign on New and Edit lead (a switched-off one stays named); the lead shows it; the lead list filters by a campaign or by none; a QR code links one, and leads from it get it; a switched-off campaign is refused on a lead. 🧪 👀
+
+## Stock
+
+Operations → **Stock** (`/stock`; handover `stock-contract.md`). Walked through in the mock as Dispatch and Admin on a desktop in light mode and a field officer on a phone in dark mode; axe found nothing. Not yet checked on the dev API.
+
+- **MSTR-014 · Stock and the ledger** (screens: [stock](screenshots/stock/stock-desktop-light.jpg), [on a phone](screenshots/stock/stock-phone-dark.jpg), [the ledger](screenshots/stock/stock-ledger-desktop-light.jpg)). Every staff role sees on hand, committed and available by warehouse and product; short is "Short by …" in red; filters by warehouse, product and short only. The ledger lists receipts, corrections and dispatches newest first, with reference, dispatch, order and who. Dealers get 403. 🧪 👀
+- **MSTR-015 · Record stock** (screen: [the form](screenshots/stock/record-stock-desktop-light.jpg)). Dispatch and Admin: warehouse, received or a correction, reference, note, a quantity per product; received above 0, a correction not 0; below zero, a switched-off warehouse or product, and decimals on a whole-unit product are refused in words. 🧪 👀
+- **MSTR-016 · Warehouses** (screen: [the list](screenshots/stock/warehouses-desktop-light.jpg)). Admin adds, renames, makes default, switches off or on; a taken code on its field; the default can't be switched off until another is the default. 🧪 👀
 
 ## Masters
 

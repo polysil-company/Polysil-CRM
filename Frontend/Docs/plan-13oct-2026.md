@@ -137,7 +137,9 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [x] **27. Marketing material ordering** (11), **and campaigns** (5). MKT-001. `marketing-material-contract.md`, `campaigns.md`. In two parts:
   - [x] **27a. Marketing material ordering** (MKT-002…004): the catalogue and basket with both shares, the orders and their Excel, approve, refuse, cancel and dispatch, and the catalogue for the marketing team; BE-028 asked. PR #160, 17 Oct (`feature/MKT-002-marketing-material`, from `integration`).
   - [x] **27b. Campaigns** (MKT-005, MKT-006): the list, a campaign's summary, the form, switch off and delete, and a campaign on leads (picker, name, list filter) and QR codes; the performance report was already built. PR #161, 17 Oct (`feature/MKT-005-campaigns`, from `integration`).
-- [ ] **28. Stock** (7): warehouses, availability on the order form, and the stock list. `stock-contract.md`.
+- [ ] **28. Stock** (7): warehouses, availability on the order form, and the stock list. `stock-contract.md`. In two parts:
+  - [x] **28a. The stock screens** (MSTR-014…016): the stock list, the ledger, Record stock, and Warehouses. PR #162, 17 Oct (`feature/MSTR-014-stock`, from `integration`).
+  - [ ] **28b. Stock on orders** (DISP-003): Order to, availability per line, the order's warehouse and line stock, and the dispatch's warehouse.
 - [ ] **29. Warranty tracking** (3). `warranty.md`.
 - [ ] **30. Export and sample orders,** with the seller GSTINs and their LUTs (3). `export-sample-orders-contract.md`.
 - [ ] **31. Dealer tasks** (tasks for partner users). `dealer-tasks-contract.md`.

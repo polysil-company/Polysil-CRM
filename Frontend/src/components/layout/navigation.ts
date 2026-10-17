@@ -26,6 +26,7 @@ import {
   Target02Icon,
   Task01Icon,
   UserMultiple02Icon,
+  WarehouseIcon,
 } from "@hugeicons/core-free-icons";
 import type { Route } from "next";
 
@@ -310,6 +311,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         audience: "staff",
         dataId: "DISP-001",
         href: "/dispatch",
+      },
+      {
+        id: "stock",
+        label: "Stock",
+        description: "What each warehouse holds, what open orders need, and every movement.",
+        icon: WarehouseIcon,
+        module: "stock",
+        audience: "staff",
+        dataId: "MSTR-014",
+        href: "/stock",
       },
     ],
   },
