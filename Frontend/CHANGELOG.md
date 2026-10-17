@@ -11,7 +11,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
-| 2026-10-18 | [Warranty on orders and complaints, and warranty periods in Masters](changelog/entries/2026-10-18--feature--SO-009--warranty.md) | `feature` | `SO-009` `CMPL-011` `MSTR-017` |
+| 2026-10-18 | [Seller GSTINs and their LUTs](changelog/entries/2026-10-18--feature--MSTR-018--seller-gstins.md) | `feature` | `MSTR-018` |
 | 2026-10-17 | [Payments: on the order, record a payment, receipts for Accounts, and the dealer ledger and credit standing](changelog/entries/2026-10-17--feature--ACCT-002--payments.md) | `feature` | `ACCT-002` `ACCT-003` `ACCT-004` `ACCT-005` |
 | 2026-10-17 | [Stock on orders: Order to, availability per line, and where a dispatch left from](changelog/entries/2026-10-17--feature--DISP-003--stock-on-orders.md) | `feature` | `DISP-003` |
 | 2026-10-17 | [Marketing material: order from the catalogue with both shares, approve and send, and keep the catalogue](changelog/entries/2026-10-17--feature--MKT-002--marketing-material.md) | `feature` | `MKT-002` `MKT-003` `MKT-004` |
@@ -102,56 +102,73 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## 18 October 2026
 
-### Warranty on orders and complaints, and warranty periods in Masters
+### Seller GSTINs and their LUTs
 
-`feature` · `SO-009` `CMPL-011` `MSTR-017` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--SO-009--warranty.md)
+`feature` · `MSTR-018` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--MSTR-018--seller-gstins.md)
 
 #### Before
 
-Nothing. Nobody could see whether goods sent on an order were still in warranty, a complaint said nothing about warranty, and there was nowhere to set how long a warranty lasts.
+Nothing. Our GST registrations and their LUTs could be set only in the database. An export under the LUT setting can't be submitted without a LUT covering its date.
 
 #### Now
 
-- **The order's Warranty card (SO-009).** On a shipped order, for those who see orders and dispatches, after the Payments card. Each line shows its status from its latest-ending dispatch: "In warranty until …", "Expired …", "No warranty", "No period on record" or "Not sent yet". Under it, each dispatch's period (from its DC date, or the day it left, for the months in force then) and the complaints raised on the product, in or out of warranty. A replacement order links the complaint it replaces. Skeleton while loading, `ErrorState` with retry on failure; hidden on a draft, from roles without dispatch view, and on a 403.
-- **Warranty on complaint lines (CMPL-011).** Each product on a complaint shows In warranty or Out of warranty, until or ended when, and whether the period ran from the dispatch or from the supply date. Out of warranty blocks nothing.
-- **Masters → Warranty periods (MSTR-017).** Everyone who sees Masters reads the default and each category's periods: in force, upcoming or ended, with their dates. Those who edit masters use **Set a period** to set one for the default or a listed category: 0 to 120 whole months, from tomorrow or later. The period in force ends the day before the new one starts. Today or earlier, and a second period on the same day (409 `term_exists`), are refused on the start-day field. Other field errors from the backend land on their fields, anything else in a toast.
-- The mock answers all three endpoints. Its sample periods are 12 months by default and 24 for drip components, from 1 Apr 2026.
+Products & prices has a fourth tab, **Seller GSTINs** (`/products?tab=seller-gstins`), for everyone with `products.view`:
 
-Walked in light and dark, on a desktop and a 390 px phone: axe found nothing, no console errors, no sideways scroll.
+- Each registration, the default first, shows its GSTIN, legal name, state, and Default or Inactive.
+- Under it, its LUTs by financial year, newest first: "2026-27", the ARN, the dates, **Current** when it covers today, and **On a document** when a quotation or order carries it.
+- An active registration with no LUT covering today gets a warning: an export under the LUT setting can't be submitted from it.
+
+With `products.edit` (Admin in the mock):
+
+- **Add LUT** opens a form with this financial year's dates filled in and the ARN to type. The ARN must be 10 to 20 letters and digits. The dates must stay within one financial year and end after they start.
+- The backend's refusals land on their fields: `lut_overlap` on Valid from, `lut_duplicate` on the ARN, `lut_dates` on Valid to. Anything else goes to a toast.
+- A LUT no document carries can be removed after a confirmation. `lut_in_use` shows in the dialog.
+
+States covered:
+
+- A skeleton while loading.
+- `ErrorState` with a retry.
+- An empty state.
+- Async buttons with loading, success and failure.
+
+Checked on a 390 px phone in dark mode with no sideways scroll; axe found nothing.
 
 #### Discussion
 
-- A period never restates goods already sent, so a new one starts tomorrow at the earliest (`warranty.md`). The form starts on tomorrow and says why.
-- The category picker offers the default and only the categories that already have a period. The backend has no category list yet (BE-024). `TODO(MSTR-017)` in `warranty-terms-panel.tsx` marks where every category goes once it does.
-- The card is gated on `sales_orders.view` and `dispatch.view` together, as the endpoint is. Accounts (no dispatch view) doesn't see it.
-- Quantities use the order line's unit and decimals ("7 NOS sent").
+- The contract calls this "Admin › Seller GSTINs". It sits as a tab of Products & prices because it is gated on `products.view` and `products.edit`, like that page, and Products & prices is already under Admin.
+- A LUT is never edited, per the contract. The remove dialog says to add it again if it was mistyped.
+- No seeded backend role holds `products.edit`, so an admin grants it first (contract note). The mock gives it to Admin.
+- This is part 30a. Export and sample orders on the forms and pages follow in 30b.
 
 #### Files changed
 
-- `src/features/warranty/components/order-warranty.tsx`: new, the order's Warranty card.
-- `src/features/warranty/components/warranty-chip.tsx`: new, the complaint line's warranty.
-- `src/features/warranty/components/warranty-terms-panel.tsx`: new, the periods list, the Set a period form, and its rules (`termPhase`, `termProblems`, `requestOfTerm`).
-- `src/features/warranty/api/*`, `src/features/warranty/lib/warranty-labels.ts`: the contract, calls, queries, mutation and labels.
-- `src/features/orders/components/order-detail.tsx`: the card after Payments.
-- `src/features/complaints/components/complaint-detail.tsx`: the chip under each product.
-- `src/features/complaints/api/complaints.schemas.ts`: `warranty` on complaint lines.
-- `src/features/masters/components/masters.tsx`: the Warranty periods tab.
-- `src/mocks/data/warranty.ts`, `src/mocks/handlers/warranty.ts`, `src/mocks/db.ts`, `src/mocks/handlers/index.ts`, `src/mocks/handlers/complaints.ts`: the mock.
-- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-009, CMPL-011, MSTR-017.
-- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/warranty/`: records.
+- `src/features/products/api/seller-gstins.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: the contract, the three calls, the list query, and the add and remove mutations.
+- `src/features/products/components/seller-gstins-panel.tsx`: the tab, the Add LUT form and the remove dialog, with their rules (`financialYearOf`, `lutProblems`, `lutRefusal`).
+- `src/features/products/components/product-master.tsx`, `src/features/products/hooks/use-product-master-params.ts`: the new tab.
+- `src/components/layout/navigation.ts`: the Products & prices description.
+- `src/mocks/data/seller-gstins.ts`, `src/mocks/handlers/seller-gstins.ts`, `src/mocks/db.ts`, `src/mocks/handlers/index.ts`: the mock, with two registrations.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: MSTR-018.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/products/`: records.
 
 #### Tests
 
-- `src/features/warranty/components/warranty.test.tsx`, 15 tests:
-  - `[SO-009] Order warranty (contract)`: periods from dispatches; 403 without dispatch view.
-  - `[SO-009] OrderWarrantyCard`: shown on a shipped order; hidden from Accounts and on a 403.
-  - `[CMPL-011] ComplaintWarranty`: in warranty from the dispatch, out of warranty from the supply date, nothing without an answer.
-  - `[MSTR-017] Warranty periods (rules)` and `(contract)`: phases, months and start-day checks, closing the period in force, `validation_failed`, `term_exists` and `forbidden`.
-  - `[MSTR-017] WarrantyTermsPanel`: lists and sets a period, a clash on the start day, read-only.
-- By hand, in the mock:
-  1. As Admin, open SO/GJ/2026-27/00001 and find the Warranty card.
-  2. Open complaint Poly/Comp./2026-27/GJ/02 and find the chip on each product.
-  3. Open Masters → Warranty periods and Set a period.
+`src/features/products/components/seller-gstins.test.tsx` has 9 tests:
+
+- `[MSTR-018] LUT rules`: financial years, ARN and date checks.
+- `[MSTR-018] Seller GSTINs (contract)`:
+  - the list's order;
+  - next year's LUT added, then `lut_overlap`, `lut_duplicate` and `lut_dates`;
+  - remove refused to a reader, `lut_in_use`, then removed.
+- `[MSTR-018] SellerGstinsPanel`:
+  - read-only;
+  - a clash on its field, then the LUT added;
+  - a LUT removed and the warning shown.
+
+To check by hand, in the mock as Admin, open Products & prices → Seller GSTINs:
+
+1. Add LUT with an ARN on this year's dates, and see the clash.
+2. Move the dates to 2027-28 and add it.
+3. Remove the Rajasthan LUT.
 
 ## 17 October 2026
 

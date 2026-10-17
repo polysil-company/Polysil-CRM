@@ -7,7 +7,12 @@ import {
   type ProductListParams,
 } from "@/features/products/api/products.schemas";
 
-export const PRODUCT_MASTER_TABS = ["products", "price-lists", "tax-rates"] as const;
+export const PRODUCT_MASTER_TABS = [
+  "products",
+  "price-lists",
+  "tax-rates",
+  "seller-gstins",
+] as const;
 export type ProductMasterTab = (typeof PRODUCT_MASTER_TABS)[number];
 
 export const PRODUCT_STATUSES = ["active", "off", "all"] as const;

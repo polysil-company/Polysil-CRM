@@ -10,6 +10,7 @@ import type { NotificationWire } from "@/features/notifications/api/notification
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { PaymentWire } from "@/features/payments/api/payments.schemas";
 import type { HsnRowWire, TaxRateWire } from "@/features/products/api/products.schemas";
+import type { SellerGstinWire } from "@/features/products/api/seller-gstins.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
 import type {
   GiftWire,
@@ -63,6 +64,7 @@ import {
   type MockLedgerEntry,
 } from "./data/rewards";
 import { seedEntitlements, seedSchemes } from "./data/schemes";
+import { seedSellerGstins } from "./data/seller-gstins";
 import { seedMovements, seedWarehouses } from "./data/stock";
 import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
 import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
@@ -159,6 +161,8 @@ export interface MockDb {
   /** Warranty periods (MSTR-017), the default first. */
   warrantyTerms: WarrantyTermWire[];
   stockMovements: MovementWire[];
+  /** Our GST registrations and their LUTs (MSTR-018). */
+  sellerGstins: SellerGstinWire[];
   /** The enquiry page's WhatsApp codes sent, by mobile (LEAD-014). */
   enquiryCodes: Map<string, number>;
   /** Today's enquiry per mobile: a second one answers the first number (LEAD-014). */
@@ -309,6 +313,7 @@ function createMockDb(): MockDb {
     warehouses,
     warrantyTerms: seedWarrantyTerms(),
     stockMovements: seedMovements(products, warehouses),
+    sellerGstins: seedSellerGstins(),
     enquiryCodes: new Map(),
     enquiriesToday: new Map(),
     subsidyApplications: null,
