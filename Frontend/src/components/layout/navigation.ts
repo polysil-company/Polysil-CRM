@@ -372,7 +372,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "products",
         label: "Products & prices",
-        description: "The catalogue, its price lists and the GST rate for each HSN code.",
+        description:
+          "The catalogue, its price lists, the GST rate for each HSN code, and our GSTINs and LUTs.",
         icon: PackageOpenIcon,
         module: "products",
         audience: "staff",

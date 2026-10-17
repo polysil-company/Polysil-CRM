@@ -8,6 +8,7 @@ import {
   ProductCatalogue,
   ProductCatalogueSkeleton,
 } from "@/features/products/components/product-catalogue";
+import { SellerGstinsPanel } from "@/features/products/components/seller-gstins-panel";
 import { TaxRatesPanel } from "@/features/products/components/tax-rates-panel";
 import {
   PRODUCT_MASTER_TABS,
@@ -16,8 +17,8 @@ import {
 import { useCan } from "@/features/session/hooks/use-session";
 
 /**
- * MSTR-004…006 · Products & prices: the catalogue, the price lists and the GST rates, one tab
- * each, the tab kept in the URL. Admin-Sales and the MD change them; everyone else reads.
+ * MSTR-004…006, MSTR-018 · Products & prices: the catalogue, the price lists, the GST rates and
+ * our GST registrations with their LUTs, one tab each, the tab kept in the URL. Admin-Sales and the MD change them; everyone else reads.
  */
 export function ProductMaster(): React.JSX.Element {
   const { tab, setTab } = useProductMasterParams();
@@ -37,6 +38,7 @@ export function ProductMaster(): React.JSX.Element {
         <TabsTrigger value="products">Products</TabsTrigger>
         <TabsTrigger value="price-lists">Price lists</TabsTrigger>
         <TabsTrigger value="tax-rates">Tax rates</TabsTrigger>
+        <TabsTrigger value="seller-gstins">Seller GSTINs</TabsTrigger>
       </TabsList>
       <TabsContent value="products">
         <ProductCatalogue canEdit={canEditProducts} />
@@ -46,6 +48,9 @@ export function ProductMaster(): React.JSX.Element {
       </TabsContent>
       <TabsContent value="tax-rates">
         <TaxRatesPanel canEdit={canEditProducts} />
+      </TabsContent>
+      <TabsContent value="seller-gstins">
+        <SellerGstinsPanel canEdit={canEditProducts} />
       </TabsContent>
     </Tabs>
   );
