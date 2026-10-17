@@ -53,6 +53,8 @@ function fieldStaff(scope: Scope): MockModulePermission[] {
     grant("partners", ["view"], scope),
     // Officers see their own targets; managers set them for their team (migration 035).
     grant("targets", ["view"], scope),
+    // RBAC.md §6.1: rewards V:own for a field officer, V:org for managers.
+    grant("rewards", ["view"], scope),
     SCHEMES_VIEW,
     ...CATALOGUE_VIEW,
   ];
@@ -89,6 +91,8 @@ function channelPartner(): MockModulePermission[] {
     grant("sales_orders", ["view", "create", "edit"], "partner_subtree"),
     grant("complaints", ["view", "create"], "partner_subtree"),
     grant("marketing", ["view"], "global"),
+    // RBAC.md §6.3: "V + redeem", view and create (GAP-043).
+    grant("rewards", ["view", "create"], "partner_subtree"),
     SCHEMES_VIEW,
     ...CATALOGUE_VIEW,
   ];
