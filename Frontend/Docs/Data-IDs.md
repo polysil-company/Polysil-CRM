@@ -211,6 +211,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | MKT-002 | Marketing material catalogue: today's price and company share; Admin adds, changes and switches off items (`/marketing-materials`) | shared | in-progress |
 | MKT-003 | Marketing material orders: order with company and dealer shares, the lists and their Excel (`/marketing-orders`) | shared | in-progress |
 | MKT-004 | Marketing material order decisions: approve, reject, cancel, dispatch (`/marketing-orders/{id}/approve`, `/reject`, `/cancel`, `/dispatch`) | shared | in-progress |
+| MKT-005 | Campaigns: the list with lead counts and cost, a campaign's summary; Marketing adds, changes, switches off and deletes (`/campaigns`) | shared | in-progress |
+| MKT-006 | A campaign on a lead and a QR code: the picker, the name on the lead, the lead list's campaign filter (`campaign_id`) | shared | in-progress |
 | SCHM-001 | Schemes — the list and a scheme (`GET /schemes`, `GET /schemes/{id}`) | shared | in-progress |
 | SCHM-002 | Create and change a scheme (`POST /schemes`, `PATCH /schemes/{id}`) | shared | in-progress |
 | SCHM-003 | A period scheme's standing (`GET /schemes/{id}/standing`) | shared | in-progress |

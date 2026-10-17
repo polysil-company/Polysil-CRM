@@ -16,6 +16,7 @@ const FORM_FIELD_BY_REQUEST_FIELD: Readonly<Record<keyof CreateLeadRequest, Crea
     crops: "crops",
     land_hectares: "landHectares",
     note: "note",
+    campaign_id: "campaign",
   };
 
 /**

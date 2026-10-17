@@ -237,6 +237,7 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
           <p className="text-sm text-muted-foreground">
             <span className="font-mono">{lead.code}</span> · {LEAD_INQUIRY_TYPE_LABELS[lead.type]} ·{" "}
             <LookupName list="lead-sources" code={lead.source} />
+            {lead.campaign === null ? null : <> · Campaign: {lead.campaign.name}</>}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

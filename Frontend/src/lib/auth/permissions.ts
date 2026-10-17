@@ -37,6 +37,7 @@ export const MODULE_CODES = [
   "pricing",
   "rewards",
   "marketing_material",
+  "campaigns",
 ] as const;
 
 export type ModuleCode = (typeof MODULE_CODES)[number];
