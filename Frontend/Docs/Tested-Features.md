@@ -50,7 +50,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Payments](#payments) | 4 | 🧪 👀 | PR #159 |
 | [Marketing material](#marketing-material) | 3 | 🧪 👀 | PR #160 |
 | [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
-| [Stock](#stock) | 3 | 🧪 👀 | PR #162 |
+| [Stock](#stock) | 4 | 🧪 👀 | PR #162; on orders in this pull request |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
@@ -601,6 +601,7 @@ Operations → **Stock** (`/stock`; handover `stock-contract.md`). Walked throug
 - **MSTR-014 · Stock and the ledger** (screens: [stock](screenshots/stock/stock-desktop-light.jpg), [on a phone](screenshots/stock/stock-phone-dark.jpg), [the ledger](screenshots/stock/stock-ledger-desktop-light.jpg)). Every staff role sees on hand, committed and available by warehouse and product; short is "Short by …" in red; filters by warehouse, product and short only. The ledger lists receipts, corrections and dispatches newest first, with reference, dispatch, order and who. Dealers get 403. 🧪 👀
 - **MSTR-015 · Record stock** (screen: [the form](screenshots/stock/record-stock-desktop-light.jpg)). Dispatch and Admin: warehouse, received or a correction, reference, note, a quantity per product; received above 0, a correction not 0; below zero, a switched-off warehouse or product, and decimals on a whole-unit product are refused in words. 🧪 👀
 - **MSTR-016 · Warehouses** (screen: [the list](screenshots/stock/warehouses-desktop-light.jpg)). Admin adds, renames, makes default, switches off or on; a taken code on its field; the default can't be switched off until another is the default. 🧪 👀
+- **DISP-003 · Stock on orders** (screens: [Order to and availability](screenshots/stock/order-to-desktop-light.jpg), [line stock on an order](screenshots/stock/order-line-stock-desktop-light.jpg), [Left from](screenshots/stock/dispatch-left-from-desktop-light.jpg)). Staff pick Order to (the default shown as chosen) and see each line's availability, "Short by …" in amber, never blocking; dealers see neither and can't send one. The order page names its warehouse and each open line's stock. A dispatch picks Left from (the order's by default), takes the stock out, and voiding puts it back. 🧪 👀
 
 ## Masters
 
