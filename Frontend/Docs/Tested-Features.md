@@ -45,7 +45,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
 | [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
 | [Channel partners](#channel-partners) | 8 | 🧪 👀 | PR #112, stacked on PR #111; GSTIN details in PR #132; dealer applications in PR #145; the applicant's page in PR #146 |
-| [Schemes](#schemes) | 4 | 🧪 👀 | PR #155 |
+| [Schemes](#schemes) | 5 | 🧪 👀 | PR #155; benefits on an order in item 24b |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
@@ -539,7 +539,7 @@ Open with the client: whether distributors and dealers should add their own deal
 
 ## Schemes
 
-Channel → **Schemes** (`/schemes`), on the backend's contract (handover `schemes-contract.md`, read against `api/schemas/schemes.py`), PR #155. Walked through in the mock as Admin on a desktop in light mode, and as a dealer on a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API. Benefits on an order come next, in item 24b.
+Channel → **Schemes** (`/schemes`), on the backend's contract (handover `schemes-contract.md`, read against `api/schemas/schemes.py`), PR #155. Walked through in the mock as Admin on a desktop in light mode, and as a dealer on a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API. Benefits on an order follow in item 24b (SCHM-005).
 
 - **SCHM-001 · The list and a scheme:** newest first, with what it gives and who qualifies in words ("5% off, up to ₹50,000 · Orders of ₹2,00,000 or more"), its dates and whether it's running, scheduled, ended or switched off. Staff filter by status, type and a search; a dealer sees only the running schemes aimed at it, and never who else they're for. A scheme's page shows its terms and, to staff, who it's for (any one name on a line, every line). Screens: [list](screenshots/schemes/schemes-list-desktop-light.jpg), [a used scheme](screenshots/schemes/scheme-detail-used-desktop-light.jpg), [a dealer's list, phone dark](screenshots/schemes/schemes-dealer-phone-dark.jpg). 🧪 👀
 - **SCHM-002 · New scheme and Edit** (Admin):
@@ -549,6 +549,7 @@ Channel → **Schemes** (`/schemes`), on the backend's contract (handover `schem
   - Screens: [what's missing](screenshots/schemes/scheme-new-errors-desktop-light.jpg), [filled in](screenshots/schemes/scheme-new-filled-desktop-light.jpg), [created](screenshots/schemes/scheme-created-desktop-light.jpg), [a used scheme's form](screenshots/schemes/scheme-edit-used-desktop-light.jpg). 🧪 👀
 - **SCHM-003 · Standing** in a period scheme: what has been delivered so far this month or quarter against the target, with a bar and what's left to go. A dealer sees its own; staff pick a partner. Screens: [staff](screenshots/schemes/scheme-period-standing-desktop-light.jpg), [a dealer, phone dark](screenshots/schemes/scheme-standing-dealer-phone-dark.jpg). 🧪 👀
 - **SCHM-004 · Credits:** each credit's value, scheme, status, when it was earned and on which order or for which period, when it must be used by, and the order it was used on. A dealer sees its available ones first; staff see all and may narrow to one partner. Screens: [staff](screenshots/schemes/scheme-credits-desktop-light.jpg), [a dealer, phone dark](screenshots/schemes/scheme-credits-dealer-phone-dark.jpg). 🧪 👀
+- **SCHM-005 · Benefits on an order** (item 24b; screens: [a draft's preview](screenshots/schemes/order-schemes-preview-desktop-light.jpg), [phone, dark](screenshots/schemes/order-schemes-preview-phone-dark.jpg), [no scheme yet](screenshots/schemes/order-schemes-none-desktop-light.jpg), [applied](screenshots/schemes/order-schemes-applied-desktop-light.jpg), [applied, phone dark](screenshots/schemes/order-schemes-applied-phone-dark.jpg)). A Schemes card under Items. On a draft: each discount submit would take off (the scheme, what it was worked on, the amount), each credit it would use, the points or next-order credit earned on delivery, and "To pay, once submitted"; read again as the lines change; "No scheme applies to this order as it stands" on a partner's draft, nothing on a direct sale without one. After submit: the benefits applied, a reversed one struck through with "Reversed", and To pay (from the farmer's share on a subsidised order). The invoice never changes. Walked through in the mock as Admin at desktop light and phone dark, through submit; axe found nothing. 🧪 👀
 
 ## Masters
 

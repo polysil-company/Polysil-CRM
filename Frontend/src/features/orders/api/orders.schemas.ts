@@ -69,6 +69,80 @@ const totalsSchema = z.object({
   total: decimal,
 });
 
+// ── scheme benefits (SCHM-005, `schemes-contract.md`, FS-031) ─────────────────────────
+
+export const ORDER_BENEFIT_KINDS = ["discount", "entitlement_used", "reward_redemption"] as const;
+export type OrderBenefitKind = (typeof ORDER_BENEFIT_KINDS)[number];
+
+export const ORDER_BENEFIT_STATUSES = ["applied", "reversed"] as const;
+
+const schemeRef = z.object({ id: z.string().min(1), code: z.string(), name: displayText });
+export type SchemeRef = z.output<typeof schemeRef>;
+
+/**
+ * A benefit on a submitted order: applied at submit, reversed when the order goes back to draft
+ * or is cancelled. It lowers `payable`, never the invoice.
+ */
+const orderBenefitSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(ORDER_BENEFIT_KINDS),
+    /** Null for reward points (FS-032). */
+    scheme: schemeRef.nullable(),
+    amount: decimal,
+    status: z.enum(ORDER_BENEFIT_STATUSES),
+    applied_at: isoDateTime,
+  })
+  .transform((wire) => ({
+    id: wire.id,
+    kind: wire.kind,
+    scheme: wire.scheme,
+    amount: wire.amount,
+    status: wire.status,
+    appliedAt: wire.applied_at,
+  }));
+export type OrderBenefit = z.output<typeof orderBenefitSchema>;
+
+export const ON_DELIVERY_KINDS = ["points", "next_order_credit"] as const;
+
+/**
+ * SCHM-005 · GET /orders/{id}/schemes, on a draft only: what submit would take off now
+ * (discounts and credits), what delivery would earn, and the payable.
+ */
+export const orderSchemePreviewSchema = z
+  .object({
+    data: z.object({
+      discounts: z.array(z.object({ scheme: schemeRef, basis: decimal, amount: decimal })),
+      entitlements: z.array(
+        z.object({ entitlement_id: z.string().min(1), scheme: schemeRef, amount: decimal }),
+      ),
+      /** Worked on the full quantity; the real figure uses what is dispatched. */
+      on_delivery: z.array(
+        z.object({
+          scheme: schemeRef,
+          kind: z.enum(ON_DELIVERY_KINDS),
+          points: z.number().int().nullable(),
+          basis: decimal,
+        }),
+      ),
+      total_benefit: decimal,
+      payable: decimal,
+    }),
+  })
+  .transform(({ data }) => ({
+    discounts: data.discounts,
+    credits: data.entitlements.map((credit) => ({
+      entitlementId: credit.entitlement_id,
+      scheme: credit.scheme,
+      amount: credit.amount,
+    })),
+    onDelivery: data.on_delivery,
+    totalBenefit: data.total_benefit,
+    payable: data.payable,
+  }));
+export type OrderSchemePreview = z.output<typeof orderSchemePreviewSchema>;
+export type OrderSchemePreviewWire = z.input<typeof orderSchemePreviewSchema>["data"];
+
 // ── the list (SO-001) ────────────────────────────────────────────────────────────
 
 const orderSummaryWireSchema = z.object({
@@ -400,6 +474,8 @@ export const orderWireSchema = z.object({
    * the farmer's share, at most the total, less benefits (`subsidy-completion.md` §1).
    */
   payable: decimal.nullish(),
+  /** SCHM-005 · Scheme benefits, applied at submit (FS-031). */
+  benefits: z.array(orderBenefitSchema).nullish(),
   remarks: z.string().nullable(),
   pdf_state: z.enum(ORDER_PDF_STATES),
   pdf_error: z.string().nullish(),
@@ -477,6 +553,7 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
           leads: wire.subsidy.leads.map((lead) => ({ id: lead.id, code: lead.inquiry_no ?? null })),
         },
   payable: wire.payable ?? null,
+  benefits: wire.benefits ?? [],
   remarks: wire.remarks,
   pdfState: wire.pdf_state,
   pdfError: wire.pdf_error ?? null,
