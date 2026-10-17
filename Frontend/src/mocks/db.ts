@@ -29,6 +29,7 @@ import type { CalculateResponseWire } from "@/features/subsidy/api/subsidy.schem
 import type { OfficeWire } from "@/features/users/api/users.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
+import { seedCampaigns, tagLeadsWithCampaigns, type MockCampaign } from "./data/campaigns";
 import { seedCommissionRates } from "./data/commission";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
 import type { MockDealerApplication } from "./data/dealer-applications";
@@ -149,6 +150,8 @@ export interface MockDb {
   slaPolicies: SlaPolicyWire[];
   /** Lead QR codes (LEAD-013). */
   qrCodes: QrCodeWire[];
+  /** Campaigns (MKT-005): the mock adds lead counts and summaries per call. */
+  campaigns: MockCampaign[];
   /** Stock (MSTR-014…016): the warehouses and every movement, newest first. */
   warehouses: WarehouseWire[];
   stockMovements: MovementWire[];
@@ -238,6 +241,8 @@ function createMockDb(): MockDb {
   const products = seedProducts();
   const warehouses = seedWarehouses();
   const leads = generateLeads();
+  const campaigns = seedCampaigns();
+  tagLeadsWithCampaigns(leads, campaigns);
   const direct = generateConversations(leads);
   const groups = generateGroups();
   const quotations = generateQuotations(leads);
@@ -296,6 +301,7 @@ function createMockDb(): MockDb {
     complaintFiles: new Map(),
     slaPolicies: seedSlaPolicies(),
     qrCodes: seedQrCodes(),
+    campaigns,
     warehouses,
     stockMovements: seedMovements(products, warehouses),
     enquiryCodes: new Map(),

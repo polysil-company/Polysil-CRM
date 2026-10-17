@@ -18,7 +18,11 @@ const qrCodeWireSchema = z.object({
   /** What the printed QR encodes: `<web app>/enquiry?qr=<code>`. Never changes. */
   url: z.string().min(1),
   label: z.string().min(1),
+  /** Free text, from before campaigns; kept beside the linked one. */
   campaign: z.string().nullable(),
+  /** MKT-006 · The linked campaign: leads from the code get it. */
+  campaign_id: z.string().nullish(),
+  campaign_name: z.string().nullish(),
   partner: z.object({ id, name: z.string(), partner_type: z.string() }).nullable(),
   territory: z.object({ id, name: z.string(), level: z.string() }).nullable(),
   is_active: z.boolean(),
@@ -35,6 +39,10 @@ const qrCodeSchema = qrCodeWireSchema.transform((wire) => ({
   url: wire.url,
   label: wire.label,
   campaign: wire.campaign,
+  linkedCampaign:
+    wire.campaign_id == null
+      ? null
+      : { id: wire.campaign_id, name: wire.campaign_name ?? "A campaign" },
   partner: wire.partner,
   territory: wire.territory,
   isActive: wire.is_active,
@@ -54,6 +62,8 @@ export const qrCodeResponseSchema = z.object({ data: qrCodeSchema }).transform((
 export interface CreateQrCodeRequest {
   readonly label: string;
   readonly campaign: string | null;
+  /** MKT-006 · An active campaign; null for none. */
+  readonly campaign_id: string | null;
   readonly partner_id: string | null;
   readonly territory_id: string | null;
 }

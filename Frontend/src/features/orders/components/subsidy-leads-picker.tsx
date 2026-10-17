@@ -70,6 +70,7 @@ export function SubsidyLeadsPicker({
       source: null,
       type: null,
       areas: [],
+      campaign: null,
     }),
   );
   const chosen = new Set(leads.map((lead) => lead.id));
