@@ -66,11 +66,11 @@ function reset(): void {
   signInAs("account_manager");
 }
 
-afterEach(() => {
-  reset();
-});
-
 describe("[ACCT-002] Record a payment (contract)", () => {
+  afterEach(() => {
+    reset();
+  });
+
   it("refuses a reference already recorded for the dealer", async () => {
     reset();
     const order = approvedDealerOrder();
