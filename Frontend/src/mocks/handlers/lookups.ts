@@ -1,13 +1,19 @@
 import { http, HttpResponse } from "msw";
+import { z } from "zod";
 
 import type { PartnerPickListWire } from "@/features/leads/api/leads.schemas";
 import {
   LOOKUP_LISTS,
+  type LookupList,
   type LookupListWire,
   type TerritoryListWire,
 } from "@/features/lookups/api/lookups.schemas";
+import type { LookupItemResponse, ScoringResponse } from "@/features/masters/api/masters.schemas";
 import { buildApiUrl } from "@/lib/api/url";
-import { mockLookupRows } from "@/mocks/data/lookups";
+import { can } from "@/lib/auth/permissions";
+import { readMockRole } from "@/lib/dev/mock-settings";
+import { mockPermissionsFor } from "@/mocks/data/permissions";
+import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { mockDb } from "@/mocks/db";
 
@@ -18,6 +24,54 @@ const DEFAULT_TERRITORY_LIMIT = 50;
 const MAX_TERRITORY_LIMIT = 100;
 const TERRITORY_LEVELS: readonly string[] = ["state", "district", "taluka", "village"];
 const DEFAULT_PARTNER_LIMIT = 50;
+
+/** Where each list's added rows take their mock ids from. */
+const LIST_SLOT: Readonly<Record<LookupList, number>> = {
+  "lead-sources": 1,
+  "mis-systems": 2,
+  "lost-reasons": 3,
+  crops: 4,
+  "meeting-types": 5,
+  "complaint-types": 6,
+};
+
+/** Caps and hour bands must stay above zero (the backend's rule 7). */
+const POSITIVE_SCORING_KEYS: ReadonlySet<string> = new Set([
+  "value_cap",
+  "engagement_cap",
+  "speed_fast_hours",
+  "speed_slow_hours",
+  "dormant_after_days",
+]);
+
+const lookupCreateSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_]{1,50}$/),
+  name: z.string().trim().min(1).max(100),
+  sort_order: z.number().int().nullish(),
+  quality: z.union([z.string(), z.number()]).nullish(),
+  kind: z.enum(["won", "lost"]).nullish(),
+});
+
+const lookupUpdateSchema = z.object({
+  is_active: z.boolean().nullish(),
+  sort_order: z.number().int().nullish(),
+  quality: z.union([z.string(), z.number()]).nullish(),
+});
+
+const scoringPatchSchema = z.object({
+  values: z.record(z.string(), z.union([z.string(), z.number()])),
+});
+
+function mayEditMasters(): boolean {
+  return can(mockPermissionsFor(readMockRole()), "masters", "edit");
+}
+
+function forbidden(): Response {
+  return errorResponse(403, "insufficient_permission", "The action is not in your permissions.");
+}
 
 /**
  * MSTR-002 · GET /lookups/* as the backend serves them (backend/docs/api/lookups.md). The
@@ -30,10 +84,101 @@ export const lookupHandlers = [
       const { failure } = await applyScenario();
       if (failure) return failure;
 
-      const body: LookupListWire = { data: mockLookupRows(list) };
+      const body: LookupListWire = { data: mockDb.lookups[list] };
       return HttpResponse.json(body);
     }),
   ),
+
+  // MSTR-009 · Add a row; switch one on or off. Rows are never renamed or deleted.
+  ...LOOKUP_LISTS.map((list) =>
+    http.post(buildApiUrl(`/lookups/${list}`), async ({ request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      if (!mayEditMasters()) return forbidden();
+
+      const parsed = lookupCreateSchema.safeParse(await request.json());
+      if (!parsed.success) {
+        return errorResponse(422, "validation_error", "Some fields need correcting.", {
+          code: "lowercase letters, digits and underscores, 1 to 50",
+        });
+      }
+      const rows = mockDb.lookups[list];
+      if (rows.some((row) => row.code === parsed.data.code)) {
+        return errorResponse(422, "validation_error", "Some fields need correcting.", {
+          code: "already in use",
+        });
+      }
+      const row = {
+        id: mockUuid(MOCK_ID_SPACE.lookup, 9000 + LIST_SLOT[list] * 100 + rows.length + 1),
+        code: parsed.data.code,
+        name: parsed.data.name,
+        is_active: true,
+      };
+      mockDb.lookups[list] = [...rows, row];
+      const body: LookupItemResponse = { data: row };
+      return HttpResponse.json(body, { status: 201 });
+    }),
+  ),
+  ...LOOKUP_LISTS.map((list) =>
+    http.patch(buildApiUrl(`/lookups/${list}/:itemId`), async ({ params, request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      if (!mayEditMasters()) return forbidden();
+
+      const row = mockDb.lookups[list].find((item) => item.id === String(params.itemId));
+      if (row === undefined) return errorResponse(404, "not_found", "No such row.");
+      const parsed = lookupUpdateSchema.safeParse(await request.json());
+      if (!parsed.success) {
+        return errorResponse(422, "validation_error", "Some fields need correcting.", {
+          quality: "0 to 1",
+        });
+      }
+      const updated = { ...row, is_active: parsed.data.is_active ?? row.is_active ?? true };
+      mockDb.lookups[list] = mockDb.lookups[list].map((item) =>
+        item.id === row.id ? updated : item,
+      );
+      const body: LookupItemResponse = { data: updated };
+      return HttpResponse.json(body);
+    }),
+  ),
+
+  // MSTR-010 · The lead score's settings: readable by anyone signed in, changed with masters.edit.
+  http.get(buildApiUrl("/lookups/scoring"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const body: ScoringResponse = { data: mockDb.scoring };
+    return HttpResponse.json(body);
+  }),
+  http.patch(buildApiUrl("/lookups/scoring"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!mayEditMasters()) return forbidden();
+
+    const parsed = scoringPatchSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        values: "numbers, by key",
+      });
+    }
+    const fields: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed.data.values)) {
+      const number = Number(value);
+      if (!mockDb.scoring.some((item) => item.key === key)) fields[key] = "unknown setting";
+      else if (!Number.isFinite(number) || number < 0) fields[key] = "must not be negative";
+      else if (POSITIVE_SCORING_KEYS.has(key) && Number(number.toFixed(2)) <= 0) {
+        fields[key] = "must be more than 0";
+      }
+    }
+    if (Object.keys(fields).length > 0) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+    }
+    mockDb.scoring = mockDb.scoring.map((item) => {
+      const value = parsed.data.values[item.key];
+      return value === undefined ? item : { ...item, value: Number(value).toFixed(2) };
+    });
+    const body: ScoringResponse = { data: mockDb.scoring };
+    return HttpResponse.json(body);
+  }),
 
   /**
    * LEAD-008 · GET /lookups/partners — every mock partner, those added in the admin too (the

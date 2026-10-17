@@ -2,6 +2,7 @@ import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
 import type { SlaPolicyWire } from "@/features/complaints/api/complaints.schemas";
 import type { QrCodeWire } from "@/features/lead-capture/api/lead-capture.schemas";
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
+import type { LookupList, LookupListWire } from "@/features/lookups/api/lookups.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
@@ -21,6 +22,7 @@ import { seedDocuments, type MockDocument } from "./data/documents";
 import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
 import { generateLeads } from "./data/leads";
+import { seedLookups, seedScoring } from "./data/lookups";
 import { generateConversations, generateGroups, type MockGroupMember } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
@@ -75,6 +77,13 @@ export interface MockDb {
   messages: MessageWire[];
   /** Who is, or was, in each group, by conversation id (MSG-006). */
   groupMembers: Map<string, MockGroupMember[]>;
+  /**
+   * The admin lists as Masters edits them (MSTR-009). GET /lookups/{list} reads these; other
+   * mock handlers still read the seeded rows, so a row added here shows in Masters and pickers.
+   */
+  lookups: Record<LookupList, LookupListWire["data"]>;
+  /** The lead score's settings (MSTR-010), as `GET /lookups/scoring` lists them. */
+  scoring: { key: string; value: string }[];
   /** POST /leads replays: Idempotency-Key → the request body and the lead it created. */
   leadCreations: Map<string, { body: string; leadId: string }>;
   /** Events written through the mock (notes, stage changes), by lead, newest first. */
@@ -194,6 +203,8 @@ function createMockDb(): MockDb {
     conversations: [...direct.conversations, ...groups.conversations],
     messages: [...direct.messages, ...groups.messages],
     groupMembers: groups.members,
+    lookups: seedLookups(),
+    scoring: seedScoring(),
     leadCreations: new Map(),
     leadEvents: new Map(),
     noteCreations: new Map(),

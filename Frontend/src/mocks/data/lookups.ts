@@ -90,3 +90,31 @@ export function mockLookupRows(list: LookupList): LookupRow[] {
 export function mockLookupCodes(list: LookupList): string[] {
   return SEEDS[list].map(([code]) => code);
 }
+
+/** Every list, editable, as Masters starts them (MSTR-009). */
+export function seedLookups(): Record<LookupList, LookupRow[]> {
+  return {
+    "lead-sources": mockLookupRows("lead-sources"),
+    "mis-systems": mockLookupRows("mis-systems"),
+    "lost-reasons": mockLookupRows("lost-reasons"),
+    crops: mockLookupRows("crops"),
+    "meeting-types": mockLookupRows("meeting-types"),
+    "complaint-types": mockLookupRows("complaint-types"),
+  };
+}
+
+/** The backend's seeded score settings (migration 006), in its order (by key). */
+export function seedScoring(): { key: string; value: string }[] {
+  return [
+    ["engagement_cap", "10.00"],
+    ["speed_fast_hours", "24.00"],
+    ["speed_slow_hours", "72.00"],
+    ["threshold_hot", "70.00"],
+    ["threshold_warm", "40.00"],
+    ["value_cap", "500000.00"],
+    ["w_engagement", "20.00"],
+    ["w_source", "25.00"],
+    ["w_speed", "20.00"],
+    ["w_value", "35.00"],
+  ].map(([key = "", value = ""]) => ({ key, value }));
+}
