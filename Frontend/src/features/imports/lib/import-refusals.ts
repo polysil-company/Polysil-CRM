@@ -18,12 +18,34 @@ export interface ImportRefusal {
   }[];
   /** Nothing more can be done with this import: upload the file again. */
   readonly finished: boolean;
+  /**
+   * MSTR-013 · What the upload itself was refused on, shown under its own control: the file
+   * (unreadable, a header with no rows under it), the sheet, or the column-names row.
+   */
+  readonly upload: {
+    readonly file?: string;
+    readonly sheet?: string;
+    readonly headerRow?: string;
+  };
 }
 
 const MAPPING_PATH = /^mapping\.(.+)$/;
 const ROW_PATH = /^rows\[(\d+)\]\.(.+)$/;
 
-const NO_FIELDS: ImportRefusal = { message: null, mapping: {}, rows: [], finished: false };
+const NO_FIELDS: ImportRefusal = {
+  message: null,
+  mapping: {},
+  rows: [],
+  finished: false,
+  upload: {},
+};
+
+/** Where an upload refusal's `fields` key lands. */
+const UPLOAD_FIELDS: Readonly<Record<string, keyof ImportRefusal["upload"]>> = {
+  file: "file",
+  sheet: "sheet",
+  header_row: "headerRow",
+};
 
 export function importRefusal(error: unknown): ImportRefusal {
   if (!isApiError(error)) {
@@ -34,8 +56,11 @@ export function importRefusal(error: unknown): ImportRefusal {
   }
   switch (error.code) {
     case "import_unreadable":
-    case "import_too_many_rows":
-      return { ...NO_FIELDS, message: error.message };
+    case "import_too_many_rows": {
+      // The backend's own words name the fix ("save it as .xlsx"); they go under the file.
+      const onFile = readFieldErrors(error)?.file;
+      return { ...NO_FIELDS, upload: { file: onFile ?? error.message } };
+    }
     case "import_wrong_state":
       return {
         ...NO_FIELDS,
@@ -59,10 +84,13 @@ export function importRefusal(error: unknown): ImportRefusal {
     const mapping: Record<string, string> = {};
     const rows: { row: number; field: string; reason: string }[] = [];
     const rest: string[] = [];
+    const upload: { file?: string; sheet?: string; headerRow?: string } = {};
     for (const [path, reason] of Object.entries(fields)) {
       const onMapping = MAPPING_PATH.exec(path);
       const onRow = ROW_PATH.exec(path);
-      if (onMapping?.[1] !== undefined) mapping[onMapping[1]] = reason;
+      const onUpload = UPLOAD_FIELDS[path];
+      if (onUpload !== undefined) upload[onUpload] = reason;
+      else if (onMapping?.[1] !== undefined) mapping[onMapping[1]] = reason;
       else if (onRow?.[1] !== undefined && onRow[2] !== undefined)
         rows.push({ row: Number(onRow[1]), field: onRow[2], reason });
       else rest.push(reason);
@@ -75,7 +103,7 @@ export function importRefusal(error: unknown): ImportRefusal {
           : Object.keys(mapping).length > 0
             ? "Match the columns named below, then check again."
             : null;
-    return { message, mapping, rows, finished: false };
+    return { message, mapping, rows, finished: false, upload };
   }
   return { ...NO_FIELDS, message: toUserFacingError(error).title };
 }

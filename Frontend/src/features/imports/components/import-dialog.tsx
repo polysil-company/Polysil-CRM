@@ -3,11 +3,13 @@
 import {
   ArrowLeft01Icon,
   CheckmarkCircle02Icon,
+  Download04Icon,
   FileImportIcon,
   FileSpreadsheetIcon,
 } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from "react";
 import type * as React from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,7 +35,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { discardImport } from "@/features/imports/api/imports.api";
+import {
+  discardImport,
+  downloadImportTemplate,
+  TEMPLATE_FILE_NAMES,
+} from "@/features/imports/api/imports.api";
 import {
   useCheckImport,
   useCommitImport,
@@ -53,7 +59,9 @@ import {
 import { importRefusal, type ImportRefusal } from "@/features/imports/lib/import-refusals";
 import { useAsyncAction, type AsyncActionState } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
+import { toUserFacingError } from "@/lib/api/error-messages";
 import { createRequestId } from "@/lib/api/request-id";
+import { saveFile } from "@/lib/api/save-file";
 import { formatCount, formatFileSize } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
@@ -278,7 +286,9 @@ function ImportFlow({
       <DialogBody>
         {step.kind === "upload" ? (
           <UploadStep
+            kind={kind}
             file={source?.file ?? null}
+            fileProblem={refusal?.upload.file ?? null}
             onFile={(file) => {
               setRefusal(null);
               setSource(file === null ? null : { file });
@@ -291,6 +301,7 @@ function ImportFlow({
             mapping={mapping}
             onMapping={setMapping}
             mapProblems={refusal?.mapping ?? {}}
+            uploadProblems={refusal?.upload ?? {}}
             mode={kind === "price_list_items" ? mode : null}
             onMode={setMode}
             busy={busy}
@@ -427,14 +438,32 @@ function StepTrail({ step }: { step: Step["kind"] }): React.JSX.Element | null {
 // ── step 1 · upload ─────────────────────────────────────────────────────────
 
 function UploadStep({
+  kind,
   file,
+  fileProblem,
   onFile,
 }: {
+  kind: ImportKind;
   file: File | null;
+  /** The backend's refusal of this file, in its own words (MSTR-013). */
+  fileProblem: string | null;
   onFile: (file: File | null) => void;
 }): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const tooBig = file !== null && file.size > MAX_BYTES;
+  const template = useAsyncAction({
+    action: () => downloadImportTemplate(kind),
+    logger: log,
+    fn: "handleDownloadTemplate",
+    dataId: "MSTR-013",
+    onSuccess: (downloaded) => {
+      saveFile(downloaded, TEMPLATE_FILE_NAMES[kind]);
+    },
+    onError: (error) => {
+      const view = toUserFacingError(error);
+      toast.error("The template didn't download", { description: view.title });
+    },
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -490,7 +519,33 @@ function UploadStep({
         <p role="alert" className="text-sm text-danger">
           Files up to 10 MB.
         </p>
-      ) : null}
+      ) : fileProblem === null ? null : (
+        <p role="alert" className="text-sm text-danger">
+          {fileProblem}
+        </p>
+      )}
+      {/* MSTR-013 · a blank file in our layout, which uploads with every column matched. */}
+      <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <p className="text-sm text-muted-foreground">
+          No file in this layout yet? The template has our column names, and a sheet on how to fill
+          each one.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          state={template.state}
+          loadingLabel="Downloading…"
+          successLabel="Downloaded"
+          errorLabel="Not downloaded"
+          onClick={() => {
+            void template.run();
+          }}
+        >
+          <Icon icon={Download04Icon} />
+          Download the template
+        </Button>
+      </div>
     </div>
   );
 }
@@ -520,6 +575,7 @@ function MatchStep({
   mapping,
   onMapping,
   mapProblems,
+  uploadProblems,
   mode,
   onMode,
   busy,
@@ -529,6 +585,8 @@ function MatchStep({
   mapping: ImportMapping;
   onMapping: (next: ImportMapping) => void;
   mapProblems: Readonly<Record<string, string>>;
+  /** A re-read refused on its sheet, its column-names row, or the file (MSTR-013). */
+  uploadProblems: ImportRefusal["upload"];
   /** Price imports only. */
   mode: ImportMode | null;
   onMode: (mode: ImportMode) => void;
@@ -582,7 +640,14 @@ function MatchStep({
                 if (typeof next === "string" && next !== batch.sheet) onReread(next, undefined);
               }}
             >
-              <SelectTrigger id="import-sheet" className="w-full">
+              <SelectTrigger
+                id="import-sheet"
+                className="w-full"
+                aria-invalid={uploadProblems.sheet === undefined ? undefined : true}
+                aria-describedby={
+                  uploadProblems.sheet === undefined ? undefined : "import-sheet-error"
+                }
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -593,19 +658,27 @@ function MatchStep({
                 ))}
               </SelectContent>
             </Select>
+            <FieldError id="import-sheet-error">{uploadProblems.sheet}</FieldError>
           </Field>
         ) : null}
-        <Field className="sm:w-40" data-invalid={rowValid ? undefined : true}>
+        <Field
+          className="sm:w-40"
+          data-invalid={rowValid && uploadProblems.headerRow === undefined ? undefined : true}
+        >
           <FieldLabel htmlFor="import-header-row">Column names on row</FieldLabel>
           <Input
             id="import-header-row"
             inputMode="numeric"
             value={headerRow}
-            aria-invalid={rowValid ? undefined : true}
+            aria-invalid={rowValid && uploadProblems.headerRow === undefined ? undefined : true}
+            aria-describedby={
+              uploadProblems.headerRow === undefined ? undefined : "import-header-row-error"
+            }
             onChange={(event) => {
               setHeaderRow(event.target.value);
             }}
           />
+          <FieldError id="import-header-row-error">{uploadProblems.headerRow}</FieldError>
         </Field>
         <Button
           variant="outline"
@@ -617,6 +690,12 @@ function MatchStep({
           Read again
         </Button>
       </div>
+
+      {uploadProblems.file === undefined ? null : (
+        <p role="alert" className="text-sm text-danger">
+          {uploadProblems.file}
+        </p>
+      )}
 
       <ul
         aria-label="Columns in your file"

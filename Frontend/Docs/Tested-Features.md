@@ -43,7 +43,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 5 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43; area by system and targets in PR #128; group chats in PR #133 |
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
 | [Go-live fixes from the 10 Oct walk](#go-live-fixes-from-the-10-oct-walk) | 9 | 🧪 🌐 👀 | PR #109 |
-| [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 4 | 🧪 👀 | PR #111 |
+| [Excel import and price lists by sale type](#excel-import-and-price-lists-by-sale-type) | 5 | 🧪 👀 | PR #111, MSTR-013 |
 | [Channel partners](#channel-partners) | 8 | 🧪 👀 | PR #112, stacked on PR #111; GSTIN details in PR #132; dealer applications in PR #145; the applicant's page in PR #146 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
@@ -496,6 +496,10 @@ Screens:
   - A file too big or unreadable, a mapping refused on a field, rows changed since the check, a published list, and no permission each say what to do. Closing before importing discards the upload. 🧪 👀
 - **MSTR-007 · Items from Excel into a quotation or order.** **Import from Excel** on the Items card. Upload, match and check as above, then **Add to quotation** (or order) adds the good rows as lines with quantity and discounts, priced live. Nothing is saved until the quotation or order is. 🧪 👀
 - **MSTR-007 · Keyboard and screen readers.** The step trail names the current step. The error and preview tables scroll in regions that take focus. Every async button shows working, then done or failed. 🧪 👀
+- **MSTR-013 · The template, upload errors on their fields, and Import from Excel beside New price list** (17 Oct; screens: [the two buttons](screenshots/imports/import-polish-buttons-desktop-light.jpg), [phone, dark](screenshots/imports/import-polish-buttons-mobile-dark.jpg), [the form](screenshots/imports/import-polish-form-desktop-light.jpg), [the import open on arrival](screenshots/imports/import-polish-upload-desktop-light.jpg), [a file with no rows](screenshots/imports/import-polish-file-error-desktop-light.jpg), [the draft kept](screenshots/imports/import-polish-kept-mobile-dark.jpg)).
+  - **Download the template** in every import's first step saves `price-list-template.xlsx` (or the partner or lines template).
+  - An unreadable file, too many rows or a header with no rows under it is named under the file picker; an unknown sheet under **Sheet**; a row past the end under **Column names on row**.
+  - **Import from Excel** beside **New price list** (`pricing.edit`) opens the form as "Import a price list from Excel". **Next: choose the file** starts the draft and opens it with its import open. Closing without importing keeps the draft and says so. Walked through in the mock as Admin at desktop light and phone dark. 🧪 👀
 
 In the mock, any `.xlsx` gets a sample workbook (the mock reads CSV only). The backend reads both.
 
