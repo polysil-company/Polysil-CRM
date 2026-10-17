@@ -157,7 +157,13 @@ function LedgerBody({ ledger }: { ledger: PartnerLedger }): React.JSX.Element {
             : "Nothing yet: an order shows here once it is approved."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div
+          role="region"
+          aria-label="Ledger entries"
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by keyboard (WCAG 2.1.1)
+          tabIndex={0}
+          className="overflow-x-auto rounded-lg border border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
           <table className="w-full min-w-xl text-sm">
             <caption className="sr-only">
               Ledger entries, oldest first, with the balance after each

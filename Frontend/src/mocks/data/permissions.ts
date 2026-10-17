@@ -55,6 +55,8 @@ function fieldStaff(scope: Scope): MockModulePermission[] {
     grant("targets", ["view"], scope),
     // RBAC.md §6.1: rewards V:own for a field officer, V:org for managers.
     grant("rewards", ["view"], scope),
+    // Marketing material: anyone orders for a dealer or their office (handover).
+    grant("marketing_material", ["view", "create"], scope),
     SCHEMES_VIEW,
     ...CATALOGUE_VIEW,
   ];
@@ -69,8 +71,11 @@ function manager(scope: Scope): MockModulePermission[] {
         entry.module !== "sales_orders" &&
         entry.module !== "complaints" &&
         entry.module !== "partners" &&
-        entry.module !== "targets",
+        entry.module !== "targets" &&
+        entry.module !== "marketing_material",
     ),
+    // The District Manager over the office approves marketing material (handover).
+    grant("marketing_material", ["view", "create", "approve"], scope),
     // Managers see their team's targets and set them for the people below them.
     grant("targets", ["view", "create"], scope),
     // District and State Managers add and correct partners in their area (RBAC.md §6.1).
@@ -91,6 +96,8 @@ function channelPartner(): MockModulePermission[] {
     grant("sales_orders", ["view", "create", "edit"], "partner_subtree"),
     grant("complaints", ["view", "create"], "partner_subtree"),
     grant("marketing", ["view"], "global"),
+    // A dealer orders marketing material for itself (handover).
+    grant("marketing_material", ["view", "create"], "partner_subtree"),
     // RBAC.md §6.3: "V + redeem", view and create (GAP-043).
     grant("rewards", ["view", "create"], "partner_subtree"),
     SCHEMES_VIEW,

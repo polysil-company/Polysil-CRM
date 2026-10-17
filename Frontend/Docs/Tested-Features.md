@@ -48,6 +48,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Schemes](#schemes) | 5 | 🧪 👀 | PR #155; benefits on an order in PR #156 |
 | [Reward points](#reward-points) | 4 | 🧪 👀 | PR #158 |
 | [Payments](#payments) | 4 | 🧪 👀 | PR #159 |
+| [Marketing material](#marketing-material) | 3 | 🧪 👀 | PR #160 |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
@@ -575,6 +576,14 @@ Money received against sales orders (handover `payments-contract.md`). Walked th
 - **ACCT-003 · Receipts** (screens: [the list](screenshots/payments/receipts-desktop-light.jpg), [putting the rest on orders](screenshots/payments/receipts-allocate-desktop-light.jpg), [voiding](screenshots/payments/receipts-void-desktop-light.jpg)). Operations → Receipts: newest first, a dealer filter, voided on request; each with the orders it went on and what is on account. Put the rest on orders (never more than is left), and Void with a reason (a second void, or spreading a voided receipt, is refused). Managers read only. 🧪 👀
 - **ACCT-004 · Payments on the order** (screen: [the card](screenshots/payments/order-payments-desktop-light.jpg)). To pay, Received, Balance and the status; instalments with an overdue notice; its receipts; Record payment and Plan instalments (up to five, adding up to what is left). Hidden on a draft. 🧪 👀
 - **ACCT-005 · Ledger and credit** (screens: [credit standing](screenshots/payments/partner-credit-desktop-light.jpg), [a dealer's ledger](screenshots/payments/partner-ledger-desktop-light.jpg), [My ledger on a phone](screenshots/payments/my-ledger-dealer-phone-dark.jpg)). On a partner's page, staff see the credit limit, exposure and what is available ("Over the limit" when negative), and the ledger: approved orders, benefits and receipts with a running balance, a date range with the balance brought forward. Partner users open My ledger for their own; credit standing is refused to them (403) and hidden. 🧪 👀
+
+## Marketing material
+
+Channel → **Marketing material** (`/marketing`; FS-034, handover `marketing-material-contract.md`). Walked through in the mock as a dealer on a 390 px phone in dark mode, and as a District Manager and Admin on a desktop in light mode; axe found nothing. Not yet checked on the dev API; the role grants wait on BE-028.
+
+- **MKT-002 · The catalogue** (screens: [the list](screenshots/marketing/catalogue-admin-desktop-light.jpg), [changing an item](screenshots/marketing/catalogue-change-desktop-light.jpg)). `marketing_material.edit`: every item with today's price and the company's share, switched-off ones marked; add one (a taken code on its field), change one (a new price starts today; a second change after an order used it is refused on the price), switch off or offer again. 🧪 👀
+- **MKT-003 · Ordering and the orders** (screens: [the catalogue](screenshots/marketing/order-catalogue-dealer-phone-dark.jpg), [the basket](screenshots/marketing/order-basket-dealer-phone-dark.jpg), [placed](screenshots/marketing/order-placed-dealer-phone-dark.jpg), [to approve](screenshots/marketing/orders-to-approve-desktop-light.jpg)). Add items and quantities; the basket shows value, company and dealer shares live; staff order for a dealer or their office (the company pays all); a dealer for itself. The order goes straight to approval and opens. Orders by Mine, To approve, To send and All, with Excel; a dealer sees only its own. An item switched off meanwhile is refused. 🧪 👀
+- **MKT-004 · Deciding and sending** (screens: [an order](screenshots/marketing/order-dialog-desktop-light.jpg), [refusing](screenshots/marketing/order-refuse-desktop-light.jpg), [dispatch](screenshots/marketing/order-dispatch-desktop-light.jpg)). Buttons from the order's `can`: Approve, Refuse with a reason, Cancel (a reason once approved), Record dispatch with a date not ahead and a reference. Nobody approves their own order (`own_order`); acting second says someone was first; a dealer never sees who decided. 🧪 👀
 
 ## Masters
 

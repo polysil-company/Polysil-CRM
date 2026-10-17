@@ -11,6 +11,7 @@ import { importHandlers } from "./imports";
 import { leadCaptureHandlers } from "./lead-capture";
 import { leadHandlers } from "./leads";
 import { lookupHandlers } from "./lookups";
+import { marketingHandlers } from "./marketing";
 import { messageHandlers } from "./messages";
 import { notificationHandlers } from "./notifications";
 import { orderHandlers } from "./orders";
@@ -72,6 +73,7 @@ export const handlers: readonly HttpHandler[] = [
   ...commissionHandlers,
   ...rewardHandlers,
   ...orderPointsHandlers,
+  ...marketingHandlers,
   ...schemeHandlers,
   ...subsidyHandlers,
   ...subsidyApplicationHandlers,

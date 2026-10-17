@@ -226,10 +226,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         id: "marketing",
-        label: "Marketing",
+        label: "Marketing material",
+        description: "Order caps, banners and kits, with the company's and the dealer's shares.",
         icon: Megaphone02Icon,
-        module: "marketing",
-        dataId: "MKT-001",
+        module: "marketing_material",
+        dataId: "MKT-003",
+        href: "/marketing",
       },
       {
         id: "schemes",
