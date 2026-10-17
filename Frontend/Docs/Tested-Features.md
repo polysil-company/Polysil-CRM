@@ -49,6 +49,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Reward points](#reward-points) | 4 | 🧪 👀 | PR #158 |
 | [Payments](#payments) | 4 | 🧪 👀 | PR #159 |
 | [Marketing material](#marketing-material) | 3 | 🧪 👀 | PR #160 |
+| [Campaigns](#campaigns) | 2 | 🧪 👀 | this pull request |
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
@@ -584,6 +585,13 @@ Channel → **Marketing material** (`/marketing`; FS-034, handover `marketing-ma
 - **MKT-002 · The catalogue** (screens: [the list](screenshots/marketing/catalogue-admin-desktop-light.jpg), [changing an item](screenshots/marketing/catalogue-change-desktop-light.jpg)). `marketing_material.edit`: every item with today's price and the company's share, switched-off ones marked; add one (a taken code on its field), change one (a new price starts today; a second change after an order used it is refused on the price), switch off or offer again. 🧪 👀
 - **MKT-003 · Ordering and the orders** (screens: [the catalogue](screenshots/marketing/order-catalogue-dealer-phone-dark.jpg), [the basket](screenshots/marketing/order-basket-dealer-phone-dark.jpg), [placed](screenshots/marketing/order-placed-dealer-phone-dark.jpg), [to approve](screenshots/marketing/orders-to-approve-desktop-light.jpg)). Add items and quantities; the basket shows value, company and dealer shares live; staff order for a dealer or their office (the company pays all); a dealer for itself. The order goes straight to approval and opens. Orders by Mine, To approve, To send and All, with Excel; a dealer sees only its own. An item switched off meanwhile is refused. 🧪 👀
 - **MKT-004 · Deciding and sending** (screens: [an order](screenshots/marketing/order-dialog-desktop-light.jpg), [refusing](screenshots/marketing/order-refuse-desktop-light.jpg), [dispatch](screenshots/marketing/order-dispatch-desktop-light.jpg)). Buttons from the order's `can`: Approve, Refuse with a reason, Cancel (a reason once approved), Record dispatch with a date not ahead and a reference. Nobody approves their own order (`own_order`); acting second says someone was first; a dealer never sees who decided. 🧪 👀
+
+## Campaigns
+
+Channel → **Campaigns** (`/campaigns`; FS-040, handover `campaigns.md`). Walked through in the mock as Admin on a desktop in light mode and on a phone in dark mode; axe found nothing. Not yet checked on the dev API.
+
+- **MKT-005 · Campaigns** (screens: [the list](screenshots/campaigns/campaigns-desktop-light.jpg), [a summary](screenshots/campaigns/campaign-summary-desktop-light.jpg), [a new one's checks](screenshots/campaigns/campaign-new-desktop-light.jpg)). Running ones by default, newest first, with search, kind and running/switched off/all in the URL; each with its leads and cost (cost only with `campaigns.view`). A campaign's leads, won, lost, open, sales, cost per lead and per win, and See its leads. Add or change (a taken name, case ignored, and an end before the start refused on their fields), switch off or on, delete; one that leads or codes name offers Switch off instead. Partners get 403. 🧪 👀
+- **MKT-006 · A campaign on a lead and a QR code** (screens: [the lead](screenshots/campaigns/lead-campaign-phone-dark.jpg), [Edit lead](screenshots/campaigns/lead-edit-campaign-phone-dark.jpg), [the lead list filtered](screenshots/campaigns/leads-campaign-filter-desktop-light.jpg), [a QR code](screenshots/campaigns/qr-code-campaign-desktop-light.jpg)). Staff pick a running campaign on New and Edit lead (a switched-off one stays named); the lead shows it; the lead list filters by a campaign or by none; a QR code links one, and leads from it get it; a switched-off campaign is refused on a lead. 🧪 👀
 
 ## Masters
 

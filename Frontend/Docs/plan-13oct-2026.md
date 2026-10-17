@@ -136,7 +136,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [x] **26. Payments, partner credit and the dealer ledger** (8). `payments-contract.md`. It goes with item 3. ACCT-002…005: the order's Payments card and instalments, Record payment, Operations → Receipts (allocate the rest, void), and the dealer ledger and credit standing, with My ledger for partner users. PR #159, 17 Oct (`feature/ACCT-002-payments`, from `integration`). The payment status in the approvals inbox is still to do.
 - [ ] **27. Marketing material ordering** (11), **and campaigns** (5). MKT-001. `marketing-material-contract.md`, `campaigns.md`. In two parts:
   - [x] **27a. Marketing material ordering** (MKT-002…004): the catalogue and basket with both shares, the orders and their Excel, approve, refuse, cancel and dispatch, and the catalogue for the marketing team; BE-028 asked. PR #160, 17 Oct (`feature/MKT-002-marketing-material`, from `integration`).
-  - [ ] **27b. Campaigns** (5): the list and form, the picker on leads and QR codes, and the performance report.
+  - [ ] **27b. Campaigns** (MKT-005, MKT-006): the list, a campaign's summary, the form, switch off and delete, and a campaign on leads (picker, name, list filter) and QR codes; the performance report was already built. `feature/MKT-005-campaigns`, from `integration`.
 - [ ] **28. Stock** (7): warehouses, availability on the order form, and the stock list. `stock-contract.md`.
 - [ ] **29. Warranty tracking** (3). `warranty.md`.
 - [ ] **30. Export and sample orders,** with the seller GSTINs and their LUTs (3). `export-sample-orders-contract.md`.
