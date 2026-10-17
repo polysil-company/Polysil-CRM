@@ -52,8 +52,8 @@ import { paymentsBlockFor } from "./payments";
 import { lineInSchema, priceLines, rateChanges } from "./quotations";
 import { applyOrderPoints, releaseOrderPoints } from "./rewards";
 import { applyScenario } from "./scenario";
-import { dispatchWarehouseFor, orderStockFor, recordDispatchStock, warehouseChoice } from "./stock";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
+import { dispatchWarehouseFor, orderStockFor, recordDispatchStock, warehouseChoice } from "./stock";
 
 /**
  * SO-001 … SO-004, DISP-002 · The backend's sales orders (backend/docs/api/orders.md,

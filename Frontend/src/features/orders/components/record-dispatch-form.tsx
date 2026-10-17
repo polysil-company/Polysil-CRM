@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import type * as React from "react";
 import { useForm, useFormState, type UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
@@ -28,6 +29,8 @@ import {
   formatOrderQty,
   orderNumber,
 } from "@/features/orders/lib/order-labels";
+import { useCan } from "@/features/session/hooks/use-session";
+import { LeftFromField } from "@/features/stock/components/order-stock";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
@@ -70,6 +73,9 @@ export function RecordDispatchForm({
   const { refusal, handle, clear } = useOrderRefusal(order.id, onClose);
   const closeSoon = useCloseAfterSuccess(onClose);
   const openLines = order.lines.filter((line) => Number(line.qtyOpen) > 0);
+  // DISP-003 · Where the goods leave from: the order's warehouse unless Dispatch picks another.
+  const seesStock = useCan("stock", "view");
+  const [warehouseId, setWarehouseId] = useState<string | null>(order.warehouse?.id ?? null);
   const form = useForm<DispatchForm>({
     resolver: zodResolver(dispatchFormSchemaFor(openLines)),
     defaultValues: {
@@ -98,6 +104,7 @@ export function RecordDispatchForm({
         transporter: orNull(values.transporter),
         vehicle_no: orNull(values.vehicleNo)?.toUpperCase() ?? null,
         lines: sent.map((line) => ({ order_line_id: line.orderLineId, qty: line.qty })),
+        ...(seesStock && warehouseId !== null ? { warehouse_id: warehouseId } : {}),
       };
       return record.mutateAsync({
         id: order.id,
@@ -226,6 +233,9 @@ export function RecordDispatchForm({
           </fieldset>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            {seesStock ? (
+              <LeftFromField value={warehouseId} onValueChange={setWarehouseId} />
+            ) : null}
             <Field data-invalid={errors.dispatchedAt ? true : undefined} className="sm:col-span-2">
               <FieldLabel htmlFor="dispatch-at">Left on</FieldLabel>
               <Input
