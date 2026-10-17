@@ -90,4 +90,6 @@ export interface TerritorySearchParams {
   readonly level: string | null;
   readonly levels: readonly string[] | null;
   readonly limit: number;
+  /** Only the children of this territory: an area filter drills down so. */
+  readonly parentId?: string | null;
 }

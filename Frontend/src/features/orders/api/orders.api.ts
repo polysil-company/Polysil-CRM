@@ -57,6 +57,8 @@ export async function listOrders(
       owner: params.mine ? "me" : undefined,
       lead_id: params.leadId,
       quotation_id: params.quotationId,
+      territory_id: params.areas.join(","),
+      owner_org_unit_id: params.officeId,
     },
     schema: orderPageSchema,
     signal,
@@ -189,6 +191,8 @@ export function exportOrders(params: OrderListParams): Promise<DownloadedFile> {
       owner: params.mine ? "me" : undefined,
       lead_id: params.leadId,
       quotation_id: params.quotationId,
+      territory_id: params.areas.join(","),
+      owner_org_unit_id: params.officeId,
     },
   });
 }

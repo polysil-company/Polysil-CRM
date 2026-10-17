@@ -6,6 +6,7 @@ import { isApiError } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import { writeMockRole } from "@/lib/dev/mock-settings";
+import { MOCK_TERRITORIES, mockTerritoryLineage } from "@/mocks/data/territories";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 
@@ -54,6 +55,8 @@ const ALL: OrderListParams = {
   mine: false,
   leadId: null,
   quotationId: null,
+  areas: [],
+  officeId: null,
 };
 
 function seeded(status: Order["status"]): string {
@@ -133,6 +136,54 @@ describe("[SO-001] listOrders", () => {
     const live = ORDER_STATUSES.filter((status) => status !== "cancelled");
     const free = await listOrders({ ...ALL, status: live, quotationId: freeAcceptedQuotation() });
     expect(free.items).toEqual([]);
+  });
+
+  it("filters by areas, each with everything under it, and by an office with its sub-offices", async () => {
+    const district = (name: string): string => {
+      const found = MOCK_TERRITORIES.find(
+        (item) => item.level === "district" && item.name === name,
+      );
+      if (found === undefined) throw new Error(`No ${name} district in the mock`);
+      return found.id;
+    };
+    const office = (name: string): string => {
+      const found = mockDb.offices.find((item) => item.name === name);
+      if (found === undefined) throw new Error(`No ${name} office in the mock`);
+      return found.id;
+    };
+    let sent: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/orders"), ({ request }) => {
+        sent = new URL(request.url);
+      }),
+    );
+
+    const amreli = await listOrders({ ...ALL, areas: [district("Amreli")] });
+    expect(amreli.items.length).toBeGreaterThan(0);
+    expect(amreli.items.length).toBeLessThan((await listOrders(ALL)).items.length);
+    expect(
+      amreli.items.every((row) => {
+        const order = mockDb.orders.find((item) => item.id === row.id);
+        return mockTerritoryLineage(order?.territory.id ?? "").some(
+          (item) => item.name === "Amreli",
+        );
+      }),
+    ).toBe(true);
+
+    const two = await listOrders({ ...ALL, areas: [district("Amreli"), district("Jamnagar")] });
+    expect(sent?.searchParams.get("territory_id")).toBe(
+      `${district("Amreli")},${district("Jamnagar")}`,
+    );
+    expect(two.items.length).toBeGreaterThan(amreli.items.length);
+
+    const officeOrders = await listOrders({ ...ALL, officeId: office("Amreli District") });
+    expect(sent?.searchParams.get("owner_org_unit_id")).toBe(office("Amreli District"));
+    expect(officeOrders.items.map((order) => order.id).sort()).toEqual(
+      amreli.items.map((order) => order.id).sort(),
+    );
+    // The state office covers the district offices under it.
+    const state = await listOrders({ ...ALL, officeId: office("Gujarat State") });
+    expect(state.items.length).toBe((await listOrders(ALL)).items.length);
   });
 
   it("shows how much has shipped", async () => {

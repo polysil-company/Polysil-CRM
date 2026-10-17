@@ -74,6 +74,8 @@ function quotationOrderParams(quotationId: string): OrderListParams {
     mine: false,
     leadId: null,
     quotationId,
+    areas: [],
+    officeId: null,
   };
 }
 

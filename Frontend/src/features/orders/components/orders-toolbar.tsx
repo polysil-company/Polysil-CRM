@@ -1,6 +1,7 @@
 "use client";
 
 import { Add01Icon } from "@hugeicons/core-free-icons";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import type * as React from "react";
 
@@ -13,11 +14,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LeadAreaFilter } from "@/features/leads/components/lead-area-filter";
 import { exportOrders } from "@/features/orders/api/orders.api";
 import { ORDER_STATUSES, ORDER_TYPES } from "@/features/orders/api/orders.schemas";
 import { useOrderListParams } from "@/features/orders/hooks/use-order-list-params";
 import { ORDER_STATUS_LABELS, ORDER_TYPE_LABELS } from "@/features/orders/lib/order-labels";
-import { useCan } from "@/features/session/hooks/use-session";
+import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
+import { officeSearchQueryOptions } from "@/features/users/api/users.queries";
+import { toUserFacingError } from "@/lib/api/error-messages";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger({
@@ -32,13 +36,15 @@ const STATUS_OPTIONS = ORDER_STATUSES.map((status) => ({
 const TYPE_OPTIONS = ORDER_TYPES.map((type) => ({ value: type, label: ORDER_TYPE_LABELS[type] }));
 
 /**
- * SO-001 · Search, filters and "only mine". The backend filters by several statuses at once
- * and by one order type. "New order" types one in without a quotation (SO-005); "Download
- * Excel" saves the list with these filters (SO-006).
+ * SO-001 · Search, filters and "only mine". The backend filters by several statuses at once,
+ * by one order type, by areas (each with everything under it) and, for staff, by an office
+ * with the offices under it. "New order" types one in without a quotation (SO-005);
+ * "Download Excel" saves the list with these filters (SO-006).
  */
 export function OrdersToolbar(): React.JSX.Element {
   const { params, setFilters, resetFilters, activeFilterCount } = useOrderListParams();
   const canCreate = useCan("sales_orders", "create");
+  const isStaff = useIsStaff();
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -68,6 +74,21 @@ export function OrdersToolbar(): React.JSX.Element {
               setFilters({ type });
             }}
           />
+          <LeadAreaFilter
+            source="territories"
+            selected={params.areas}
+            onChange={(areas) => {
+              setFilters({ areas });
+            }}
+          />
+          {isStaff ? (
+            <OfficeFilter
+              selected={params.officeId}
+              onChange={(officeId) => {
+                setFilters({ officeId });
+              }}
+            />
+          ) : null}
           <div className="flex items-center gap-2 px-1">
             <Checkbox
               id="orders-only-mine"
@@ -106,7 +127,41 @@ export function OrdersToolbar(): React.JSX.Element {
   );
 }
 
-/** Mirrors OrdersToolbar: search field, two filter pills and the "only mine" switch. */
+/**
+ * SO-001 · The Office pill: open offices by name, each covering the offices under it. The list
+ * loads when the toolbar does; while it loads or if it fails, the pill says so.
+ */
+function OfficeFilter({
+  selected,
+  onChange,
+}: {
+  selected: string | null;
+  onChange: (next: string | null) => void;
+}): React.JSX.Element {
+  const offices = useQuery(officeSearchQueryOptions(""));
+  const options = (offices.data ?? []).map((office) => ({
+    value: office.id,
+    label: office.name,
+    description: office.parentName === null ? undefined : `Under ${office.parentName}`,
+  }));
+  return (
+    <SingleFilterPill
+      label="Office"
+      options={options}
+      selected={selected}
+      onChange={onChange}
+      emptyMessage={
+        offices.isPending
+          ? "Loading offices…"
+          : offices.isError
+            ? `${toUserFacingError(offices.error).title}.`
+            : "No open offices."
+      }
+    />
+  );
+}
+
+/** Mirrors OrdersToolbar: search field, the filter pills and the "only mine" switch. */
 export function OrdersToolbarSkeleton(): React.JSX.Element {
   return (
     <div
@@ -116,6 +171,7 @@ export function OrdersToolbarSkeleton(): React.JSX.Element {
       <Skeleton className="h-control-md w-full rounded-md md:w-72 pointer-coarse:h-control-lg" />
       <div className="flex flex-wrap items-center gap-2">
         <Skeleton className="h-control-sm w-20 rounded-full" />
+        <Skeleton className="h-control-sm w-16 rounded-full" />
         <Skeleton className="h-control-sm w-16 rounded-full" />
         <Skeleton className="h-5 w-32" />
       </div>
