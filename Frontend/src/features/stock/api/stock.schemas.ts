@@ -217,7 +217,6 @@ export const availabilitySchema = z
     })),
   }));
 export type Availability = z.output<typeof availabilitySchema>;
-export type AvailabilityWire = z.input<typeof availabilitySchema>["data"];
 
 /** `GET /stock/availability` takes at most this many products. */
 export const MAX_AVAILABILITY_PRODUCTS = 100;
