@@ -87,6 +87,24 @@ export function searchStaffDirectory(q: string, signal?: AbortSignal): Promise<r
   });
 }
 
+/**
+ * MSG-004 · GET /conversations/{conversationId}: one of the user's conversations, whether or
+ * not anyone has written in it yet (BE-021). 404 when it is not theirs.
+ */
+export function getConversation(
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<Conversation> {
+  return apiRequest({
+    dataId: "MSG-004",
+    logger: log,
+    fn: "getConversation",
+    path: conversationPath(conversationId),
+    schema: conversationResponseSchema,
+    signal,
+  });
+}
+
 /** MSG-004 · POST /conversations */
 export function startConversation(participantId: string): Promise<Conversation> {
   const body: StartConversationRequest = { participant_id: participantId };

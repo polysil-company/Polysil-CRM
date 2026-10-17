@@ -1074,10 +1074,14 @@ export const DATA_IDS = {
   },
   "MSG-004": {
     domain: "MSG",
-    title: "Start a conversation — staff directory search",
+    title: "Start or read one conversation — staff directory search",
     owner: "shared",
     status: "in-progress",
-    endpoints: ["GET /staff-directory", "POST /conversations"],
+    endpoints: [
+      "GET /staff-directory",
+      "POST /conversations",
+      "GET /conversations/{conversationId}",
+    ],
   },
   "MSG-005": {
     domain: "MSG",

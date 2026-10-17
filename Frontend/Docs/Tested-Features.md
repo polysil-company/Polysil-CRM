@@ -403,7 +403,7 @@ The dashboard reads the backend's real shape since the demo-walk fixes ([changel
   - The thread, grouped by day. Opening it marks read up to the newest message on screen, so one that arrives meanwhile stays unread.
   - Enter sends, Shift + Enter adds a line; a failed send puts the text back.
   - A lead the sender can't see is refused with a reason.
-  - A new conversation keeps its colleague's name until the first message lists it.
+  - A conversation nobody has written in yet names its colleague: just started, after a reload, or from a link, read on its own from `GET /conversations/{id}` (BE-021, PR #131). If that read fails, the header says "Conversation" and the thread still works. Screens: [desktop](screenshots/messages-notifications/new-conversation-desktop-light.jpg), [phone, dark](screenshots/messages-notifications/new-conversation-phone-dark.jpg).
   - A colleague who has left: the conversation stays readable and closed. If the backend refuses a send because they have left, the draft stays to copy.
   - Screens: [thread](screenshots/messages-notifications/messages-thread-desktop-light.jpg), [colleague who has left, phone dark](screenshots/messages-notifications/messages-colleague-left-phone-dark.jpg). 🧪 👀
 

@@ -9,7 +9,7 @@ import {
   conversationListQueryOptions,
   conversationMessagesQueryOptions,
   messageKeys,
-  startedConversationQueryOptions,
+  conversationQueryOptions,
 } from "./messages.queries";
 import type {
   Conversation,
@@ -55,10 +55,7 @@ export function useStartConversation(): UseMutationResult<Conversation, Error, s
     mutationFn: (participantId: string) => startConversation(participantId),
     meta: { dataId: "MSG-004" },
     onSuccess: (conversation) => {
-      queryClient.setQueryData(
-        startedConversationQueryOptions(conversation.id).queryKey,
-        conversation,
-      );
+      queryClient.setQueryData(conversationQueryOptions(conversation.id).queryKey, conversation);
       void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
     },
   });
