@@ -1,4 +1,3 @@
-import type { MovementWire, WarehouseWire } from "@/features/stock/api/stock.schemas";
 import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
 import type { CommissionWire, RateWire } from "@/features/commission/api/commission.schemas";
 import type { SlaPolicyWire } from "@/features/complaints/api/complaints.schemas";
@@ -20,6 +19,7 @@ import type {
 } from "@/features/rewards/api/rewards.schemas";
 import type { EntitlementWire, SchemeWire } from "@/features/schemes/api/schemes.schemas";
 import type { SettingWire } from "@/features/settings/api/settings.schemas";
+import type { MovementWire, WarehouseWire } from "@/features/stock/api/stock.schemas";
 import type {
   ApplicationDocumentWire,
   ApplicationWire,
@@ -61,12 +61,12 @@ import {
   type MockLedgerEntry,
 } from "./data/rewards";
 import { seedEntitlements, seedSchemes } from "./data/schemes";
+import { seedMovements, seedWarehouses } from "./data/stock";
 import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
 import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
 import { seedTargets, type MockTargetEntry } from "./data/targets";
 import { generateTasks, seedMinutes, type MockMinutes, type MockTask } from "./data/tasks";
 import type { MockAdminTerritory } from "./data/territories";
-import { seedMovements, seedWarehouses } from "./data/stock";
 import { seedOffices, seedUsers, type MockUserRecord } from "./data/users";
 
 export interface MockDb {
