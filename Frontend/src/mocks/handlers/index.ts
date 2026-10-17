@@ -2,6 +2,7 @@ import type { HttpHandler } from "msw";
 
 import { approvalHandlers } from "./approvals";
 import { authHandlers } from "./auth";
+import { commissionHandlers } from "./commission";
 import { complaintHandlers } from "./complaints";
 import { dashboardHandlers } from "./dashboard";
 import { dealerApplicationHandlers } from "./dealer-applications";
@@ -65,6 +66,7 @@ export const handlers: readonly HttpHandler[] = [
   ...dealerApplicationHandlers,
   ...territoryHandlers,
   ...settingsHandlers,
+  ...commissionHandlers,
   ...schemeHandlers,
   ...subsidyHandlers,
   ...subsidyApplicationHandlers,

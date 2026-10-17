@@ -244,6 +244,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | SUBS-014 | Subsidy schemes — a state's scheme set up, its readiness, stage names and switching off (`GET /subsidy-schemes`, `POST /subsidy-schemes`, `GET /subsidy-schemes/{code}`, `PATCH /subsidy-schemes/{code}`, `PATCH /subsidy-schemes/{code}/stages/{stageCode}`) | shared | in-progress |
 | ACCT-001 | Accounts work queue (`GET /orders?waiting_on=account_manager`, `GET /orders/stats`, `GET /orders/export`) | shared | in-progress |
 | SUBS-015 | Reopen a closed subsidy application, with a reason (`POST /subsidy-applications/{id}/reopen`) | shared | in-progress |
+| SUBS-016 | Dealer commission and TOD on an application, stage 18 (`GET`/`POST /subsidy-applications/{id}/commission`, `/commission/preview`) | shared | in-progress |
+| SUBS-017 | Dealer commissions for Accounts: approve, return, cancel, pay, Excel (`/dealer-commissions*`) | shared | in-progress |
+| SUBS-018 | Commission rates by scheme, from a date (`GET`/`POST /commission-rates`) | shared | in-progress |
 | DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |
 | DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |
 | ADMN-001 | People — the list of staff and partner users, with filters and an Excel export (`GET /users`, `GET /users/export`) | shared | in-progress |

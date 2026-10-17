@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CommissionRatesPanel } from "@/features/commission/components/commission-rates-panel";
 import { useCan } from "@/features/session/hooks/use-session";
 import { schemeListQueryOptions } from "@/features/subsidy/api/subsidy-schemes.queries";
 import { todayInIndia } from "@/lib/format";
@@ -43,6 +44,7 @@ const TABLES = [
   "unit-costs",
   "quantities",
   "documents",
+  "commission",
 ] as const;
 type Table = (typeof TABLES)[number];
 
@@ -55,6 +57,7 @@ const TABLE_LABELS: Readonly<Record<Table, string>> = {
   "unit-costs": "Unit costs",
   quantities: "Quantities",
   documents: "Documents",
+  commission: "Commission rates",
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -219,6 +222,10 @@ export function SubsidyMasters(): React.JSX.Element {
         </TabsContent>
         <TabsContent value="documents">
           <DocumentChecklistPanel />
+        </TabsContent>
+        {/* SUBS-018 · The dealer's commission and TOD at stage 18. */}
+        <TabsContent value="commission">
+          <CommissionRatesPanel scheme={scheme} canEdit={canEdit} />
         </TabsContent>
       </Tabs>
 

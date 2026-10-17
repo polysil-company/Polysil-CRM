@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ApplicationCommission } from "@/features/commission/components/application-commission";
 import { useCan } from "@/features/session/hooks/use-session";
 import {
   applicationDetailQueryOptions,
@@ -152,6 +153,9 @@ function ApplicationView({ application }: { application: Application }): React.J
           </p>
         </Notice>
       ) : null}
+
+      {/* SUBS-016 · Stage 18, once every payment is in. */}
+      <ApplicationCommission application={application} />
 
       <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
