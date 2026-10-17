@@ -19,6 +19,9 @@ const DRIP: SystemConfig = {
   cropCountMax: 2,
   formulaVersion: "v1",
   sprinklerAreas: null,
+  inputs: [],
+  unknownInputs: [],
+  spacingLabels: [],
 };
 
 const SPRINKLER: SystemConfig = {
@@ -28,6 +31,9 @@ const SPRINKLER: SystemConfig = {
   cropCountMax: 1,
   formulaVersion: "v1",
   sprinklerAreas: ["0.400", "2.010"],
+  inputs: [],
+  unknownInputs: [],
+  spacingLabels: [],
 };
 
 function dripDraft(patch: Partial<CalculatorDraft> = {}): CalculatorDraft {
