@@ -9,6 +9,12 @@ import type { NotificationWire } from "@/features/notifications/api/notification
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
 import type { HsnRowWire, TaxRateWire } from "@/features/products/api/products.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
+import type {
+  GiftWire,
+  RedemptionWire,
+  RewardSettingsWire,
+  RuleWire,
+} from "@/features/rewards/api/rewards.schemas";
 import type { EntitlementWire, SchemeWire } from "@/features/schemes/api/schemes.schemas";
 import type { SettingWire } from "@/features/settings/api/settings.schemas";
 import type {
@@ -41,6 +47,14 @@ import {
   type MockProductRecord,
 } from "./data/products";
 import { generateQuotations } from "./data/quotations";
+import {
+  seedGifts,
+  seedLedger,
+  seedRedemptions,
+  seedRewardRules,
+  seedRewardSettings,
+  type MockLedgerEntry,
+} from "./data/rewards";
 import { seedEntitlements, seedSchemes } from "./data/schemes";
 import { seedSubsidyMasters, type MockSubsidyMasters } from "./data/subsidy-masters";
 import { MOCK_DEFAULT_SCHEME, seedSubsidySchemes, type MockScheme } from "./data/subsidy-schemes";
@@ -194,6 +208,14 @@ export interface MockDb {
   commissions: CommissionWire[] | null;
   /** Commission rates of every scheme (SUBS-018). */
   commissionRates: RateWire[];
+  /** Reward points (RWD-001…003): every ledger row, newest first, with whose points it moves. */
+  rewardLedger: MockLedgerEntry[];
+  rewardRules: RuleWire[];
+  /** Every settings row; the latest started is in force. */
+  rewardSettings: RewardSettingsWire[];
+  gifts: GiftWire[];
+  /** Gift (and order) redemptions, newest first. */
+  rewardRedemptions: RedemptionWire[];
 }
 
 function createMockDb(): MockDb {
@@ -207,6 +229,9 @@ function createMockDb(): MockDb {
     district === undefined ? null : { id: district.id, name: district.name, level: district.level },
   );
   const orders = generateOrders(leads, quotations, thresholds);
+  const gifts = seedGifts();
+  const partners = seedPartners();
+  const firstDealer = partners.find((partner) => partner.partner_type === "dealer");
   const approvalSteps = seedApprovals(quotations, orders, thresholds);
   const { tasks, minutes } = seedMinutes(generateTasks(leads));
   return {
@@ -277,7 +302,7 @@ function createMockDb(): MockDb {
     users: seedUsers(),
     offices: seedOffices(),
     userWrites: new Map(),
-    partners: seedPartners(),
+    partners,
     partnerWrites: new Map(),
     schemes: seedSchemes(products[0]?.id ?? null),
     entitlements: seedEntitlements(
@@ -286,6 +311,15 @@ function createMockDb(): MockDb {
     targets: seedTargets(),
     commissions: null,
     commissionRates: seedCommissionRates(),
+    rewardLedger: seedLedger(
+      firstDealer === undefined
+        ? null
+        : { type: "partner", id: firstDealer.id, name: firstDealer.name },
+    ),
+    rewardRules: seedRewardRules(),
+    rewardSettings: seedRewardSettings(),
+    gifts,
+    rewardRedemptions: seedRedemptions(gifts),
   };
 }
 

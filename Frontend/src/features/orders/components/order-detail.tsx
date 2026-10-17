@@ -29,6 +29,7 @@ import {
   stepRoleLabel,
 } from "@/features/orders/lib/order-labels";
 import { formatRate, parseWarnings } from "@/features/quotations/lib/quotation-labels";
+import { OrderPoints } from "@/features/rewards/components/order-points";
 import { useCan } from "@/features/session/hooks/use-session";
 import { isApiError } from "@/lib/api/errors";
 import {
@@ -146,6 +147,9 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
       </Card>
 
       <OrderSchemesCard order={order} />
+
+      {/* RWD-004 · A dealer pays part of its draft with points. */}
+      <OrderPoints order={order} />
 
       <OrderSubsidyCard order={order} />
 
