@@ -19,6 +19,7 @@ import codecs
 import csv
 import io
 import zipfile
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 from api.domain.imports.cells import cell_text, clean_text
@@ -28,14 +29,21 @@ MAX_PHYSICAL_ROWS = 50_000
 MAX_COLUMNS = 60
 MAX_UNZIPPED_BYTES = 100 * 1024 * 1024
 MAX_CELL_CHARS = 1000
+HEADER_SCAN = 10         # non-blank rows searched for the header (FS-067 rule 1)
+MAX_LABEL_CHARS = 20
+MAX_NAME_CHARS = 200
+
+Score = Callable[[Sequence[str]], int]
 
 
 class ImportUnreadableError(ValueError):
     """The file is not one this reads. `code` is the API's error code."""
 
-    def __init__(self, message: str, code: str = "import_unreadable") -> None:
+    def __init__(self, message: str, code: str = "import_unreadable",
+                 field: str = "file") -> None:
         super().__init__(message)
         self.code = code
+        self.field = field  # the upload input the API reports it on
 
 
 @dataclass(frozen=True)
@@ -54,10 +62,13 @@ class Sheet:
 
 
 def read_upload(data: bytes, filename: str, *, sheet: str | None = None,
-                header_row: int | None = None) -> Sheet:
-    """An `.xlsx` or a `.csv`, judged by content first and the name second."""
+                header_row: int | None = None, score: Score | None = None) -> Sheet:
+    """An `.xlsx` or a `.csv`, judged by content first and the name second.
+
+    `score` rates a row as a header: how many of an import kind's column names it
+    holds. Without it, or with `header_row`, the header is found as before."""
     if data[:4] == b"PK\x03\x04":
-        return _read_xlsx(data, sheet=sheet, header_row=header_row)
+        return _read_xlsx(data, sheet=sheet, header_row=header_row, score=score)
     if data[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
         raise ImportUnreadableError("This is an old .xls file, or a password-protected workbook. "
                                "Open it in Excel and save it as .xlsx.")
@@ -68,12 +79,13 @@ def read_upload(data: bytes, filename: str, *, sheet: str | None = None,
     if name.endswith(".xls"):
         raise ImportUnreadableError("Old .xls files are not read. Open it in Excel and save it as "
                                ".xlsx.")
-    return _read_csv(data, header_row=header_row)
+    return _read_csv(data, header_row=header_row, score=score)
 
 
 # ── xlsx ─────────────────────────────────────────────────────────────────────
 
-def _read_xlsx(data: bytes, *, sheet: str | None, header_row: int | None) -> Sheet:
+def _read_xlsx(data: bytes, *, sheet: str | None, header_row: int | None,
+               score: Score | None) -> Sheet:
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             if sum(i.file_size for i in z.infolist()) > MAX_UNZIPPED_BYTES:
@@ -102,7 +114,8 @@ def _read_xlsx(data: bytes, *, sheet: str | None, header_row: int | None) -> She
         elif sheet in wb.sheetnames:
             title = sheet
         else:
-            raise ImportUnreadableError(f"No sheet named {sheet!r}.", code="validation_error")
+            raise ImportUnreadableError(f"No sheet named {sheet!r}.", code="validation_error",
+                                        field="sheet")
         ws = wb[title]
         raw: list[tuple[int, list[str]]] = []
         filled = 0
@@ -117,13 +130,16 @@ def _read_xlsx(data: bytes, *, sheet: str | None, header_row: int | None) -> She
                 break
     finally:
         wb.close()
-    return _assemble(raw, sheets=list(wb.sheetnames), sheet=title, header_row=header_row)
+    return _assemble(raw, sheets=list(wb.sheetnames), sheet=title, header_row=header_row,
+                     score=score)
 
 
 def _read_ceiling(header_row: int | None) -> int:
     """Stop reading once this many non-blank rows are in: one past the data cap,
-    plus the header and any title rows above it. `_assemble` applies the exact cap."""
-    return MAX_DATA_ROWS + 1 + (header_row or 1)
+    plus the header and any title rows above it. `_assemble` applies the exact cap.
+    A header still to be found may be any of the first `HEADER_SCAN` rows (FS-067
+    rule 1a): a lower one must not shrink the room for the over-cap check."""
+    return MAX_DATA_ROWS + 1 + (header_row or HEADER_SCAN)
 
 
 # ── csv ──────────────────────────────────────────────────────────────────────
@@ -141,7 +157,7 @@ def _decode(data: bytes) -> str:
         return data.decode("cp1252", errors="replace")
 
 
-def _read_csv(data: bytes, *, header_row: int | None) -> Sheet:
+def _read_csv(data: bytes, *, header_row: int | None, score: Score | None) -> Sheet:
     text = _decode(data)
     sample = text[:16384]
     try:
@@ -163,32 +179,43 @@ def _read_csv(data: bytes, *, header_row: int | None) -> Sheet:
                 break
     except csv.Error as exc:
         raise ImportUnreadableError(f"This CSV could not be read: {exc}.") from exc
-    return _assemble(raw, sheets=[], sheet=None, header_row=header_row)
+    return _assemble(raw, sheets=[], sheet=None, header_row=header_row, score=score)
 
 
 # ── both ─────────────────────────────────────────────────────────────────────
 
 def _assemble(raw: list[tuple[int, list[str]]], *, sheets: list[str], sheet: str | None,
-              header_row: int | None) -> Sheet:
+              header_row: int | None, score: Score | None = None) -> Sheet:
+    labelled = False
+    chosen = header_row is not None
     if header_row is None:
-        found = next((n for n, cells in raw if any(cells)), None)
-        if found is None:
+        filled = [n for n, cells in raw if any(cells)]
+        if not filled:
             raise ImportUnreadableError("This sheet is empty.")
-        header_row = found
+        header_row = _best_header(raw, filled, score)
+        labelled = header_row != filled[0]
     by_row = dict(raw)
     if header_row not in by_row or not any(by_row[header_row]):
         raise ImportUnreadableError(f"Row {header_row} is empty, so it cannot be the header row.",
-                               code="validation_error")
+                                    code="validation_error", field="header_row")
     header_cells = by_row[header_row]
     width = max([len(header_cells)] + [len(c) for n, c in raw if n > header_row])
     width = min(width, MAX_COLUMNS)
-    headers = _header_names(header_cells, width)
+    labels = _labels(raw, header_row, width) if labelled else [""] * width
+    headers = _header_names(header_cells, width, labels)
     rows = []
     for n, cells in raw:
         if n <= header_row or not any(cells):
             continue
         padded = (list(cells) + [""] * width)[:width]
         rows.append(SheetRow(row=n, cells=tuple(padded)))
+    if not rows:
+        # FS-068 rule 7: the blank template uploads cleanly and checks as 0 of 0
+        if chosen:
+            raise ImportUnreadableError(f"Row {header_row} has no rows under it.",
+                                        code="validation_error", field="header_row")
+        raise ImportUnreadableError("This sheet has column names but no rows under them. Fill "
+                                    "it in and upload again.")
     if len(rows) > MAX_DATA_ROWS:
         raise ImportUnreadableError(f"This sheet has more than {MAX_DATA_ROWS:,} rows. Split it "
                                     f"into smaller files.", code="import_too_many_rows")
@@ -204,12 +231,50 @@ def _letters(index: int) -> str:
     return out
 
 
-def _header_names(cells: list[str], width: int) -> list[str]:
-    """A blank header becomes "Column C"; a repeated one gets " (2)" (EC-20)."""
+def _best_header(raw: list[tuple[int, list[str]]], filled: list[int],
+                 score: Score | None) -> int:
+    """FS-067 rule 1. A row below the first non-blank one is the header only when it
+    holds at least two of the kind's column names, and more than the first row
+    does: a data cell such as "Nos" or "Distributor" must not win on its own."""
+    if score is None:
+        return filled[0]
+    by_row = dict(raw)
+    first = score(by_row[filled[0]])
+    best, best_score = filled[0], first
+    for n in filled[1:HEADER_SCAN]:
+        s = score(by_row[n])
+        if s > best_score:
+            best, best_score = n, s
+    return best if best == filled[0] or (best_score >= 2 and best_score > first) else filled[0]
+
+
+def _labels(raw: list[tuple[int, list[str]]], header_row: int, width: int) -> list[str]:
+    """FS-067 rule 2: short text above the header names its column, as the state codes
+    over the client's price columns do. A row's first filled cell is its title, and a
+    cell with a colon or a digit is a note or a date ("Date: 16-10-2026", "w.e.f.
+    01-04-2026"): neither is a label, or the names would change with every list."""
+    out = [""] * width
+    for n, cells in raw:
+        if n >= header_row or not any(cells):
+            continue
+        first = next(i for i, c in enumerate(cells) if c)
+        for i, c in enumerate(cells[:width]):
+            if (c and i != first and len(c) <= MAX_LABEL_CHARS and ":" not in c
+                    and not any(ch.isdigit() for ch in c)):
+                out[i] = f"{out[i]} {c}".strip()
+    return out
+
+
+def _header_names(cells: list[str], width: int, labels: list[str] | None = None) -> list[str]:
+    """A blank header becomes "Column C"; a repeated one gets " (2)" (EC-20). A label
+    from above names a blank header, or follows a filled one in brackets."""
     out: list[str] = []
     seen: dict[str, int] = {}
     for i in range(width):
-        name = cells[i] if i < len(cells) and cells[i] else f"Column {_letters(i)}"
+        head = cells[i] if i < len(cells) else ""
+        label = labels[i] if labels else ""
+        name = f"{head} ({label})" if head and label else head or label or f"Column {_letters(i)}"
+        name = name[:MAX_NAME_CHARS]
         key = name.casefold()
         seen[key] = seen.get(key, 0) + 1
         out.append(name if seen[key] == 1 else f"{name} ({seen[key]})")

@@ -2490,21 +2490,46 @@ def f_excel_import() -> None:
     _columns(
         "69-excel-import", "Excel import with column matching",
         "Partners, a draft list's rates, or order lines. Nothing is saved before the check.",
-        "BUILT. FS-062: migration 074, /imports.",
+        "BUILT. FS-062: migration 074, /imports. FS-067: matching fixes. FS-068: template.",
         [("i1", "POST /imports (multipart): kind, file, target_id?\n.xlsx or .csv, 10 MB, 5,000 rows", BLUE),
-         ("i2", "read: caps checked BEFORE openpyxl; rows stored\nas text in import_batch (owner only)", GREEN),
-         ("i3", "answer: headers, sample, fields,\nsuggested_mapping (your last, then common names)", GREY),
+         ("i2", "read: caps checked BEFORE openpyxl; header = the row\nwith the most known names (2+); rows stored as text", GREEN),
+         ("i3", "answer: headers (labels from above: Price (GJ), UP),\nsuggested_mapping: last SAVED, never the rate, no empty\ncolumn, never another field's own name", GREY),
          ("i4", "POST /imports/{id}/check {mapping}\nevery row, every error, sheet row numbers", BLUE),
          ("i5", "POST /imports/{id}/commit: re-check in the\ntransaction; all or nothing, or skip_invalid", GREEN),
          ("i6", "partners: one INSERT per type tier, parents first;\nrates: delete + insert into the DRAFT list", BLUE)],
         [("d1", "lines: the check returns them; the order or\nquotation form saves them. No commit.", GREY),
          ("d2", "area: a placeholder insert per territory in a\nsavepoint asks the real policy (42501 = outside)", YELLOW),
          ("d3", "codes: partner_codes_taken() sees hidden partners", YELLOW),
-         ("d4", "purge after 7 days: import_batch_purge(),\nsystem principal only", GREY)],
+         ("d4", "purge after 7 days: import_batch_purge(),\nsystem principal only", GREY),
+         ("d5", "products: names cleaned as the loader did (_x000D_,\nspaces); unknown code + known name: by name if uncoded", GREEN),
+         ("d6", "discard: rows gone; the check kept with cell values\ntaken out (partners: counts only)", GREY),
+         ("d7", "GET /imports/template?kind=: our names in row 1, no\nrows, codes as text; uploaded blank it is refused", GREEN)],
         [("n1", "NO LOGIN IS CREATED\n\nEvery dealer can be a record. Portal access is a\nseparate POST /users per dealer.", RED),
          ("n2", "FLOATS ARE NOT MONEY\n\nrepr -> Decimal, 9 places, no exponent. A % cell is read\nas shown. More than 2 decimals on a rate is refused.", RED),
          ("n3", "A CHILD OF A BAD ROW IS A BAD ROW\n\nSkipping a distributor strands its dealers; the check\nsays so before commit (EC-12).", RED),
-         ("n4", "Not yet: updating partners, a template file,\nfuzzy product match (GAP-471 to 473, 476).", YELLOW)])
+         ("n4", "Not yet: updating partners, fuzzy match, codes from\na sheet, a template under the wrong kind (GAP-471, 473,\n476, 503 to 507).", YELLOW),
+         ("n5", "LOOK AT THE FILE FIRST\n\n16 Oct: names under Item Code, no rates. Every row\nnow says: match this column to Description.", RED)])
+
+
+def f_live_checks() -> None:
+    _columns(
+        "70-live-checks", "Live checks on a deployed box",
+        "deploy_staging.py verify: pass or fail after a deploy. Read-only on production.",
+        "BUILT. FS-065: not yet run on a deployed box.",
+        [("v1", "deploy, health answers, then verify\n(a production deploy runs it itself)", BLUE),
+         ("v2", "box checks: compose run --rm --no-deps worker\npython -m worker.live_check, one JSON line each", GREEN),
+         ("v3", "base URL: https://APP_DOMAIN on production,\nan SSH tunnel to the API port on staging", GREY),
+         ("v4", "guard: /health through that same URL names\nthe target; containment on; app_role", GREEN),
+         ("v5", "read-only: one sign-in, every parameterless GET\nwith a token and without, one sign-out", BLUE),
+         ("v6", "report: PASS, FAIL or SKIP per check;\nexit 1 on any FAIL. Nothing rolled back", GREY)],
+        [("j1", "staging only: the journey. Lead, two stages,\nquotation, send (channel none), PDF", YELLOW),
+         ("j2", "accept, order (never submitted), document,\neach record's timeline", YELLOW),
+         ("j3", "negatives: another office reads no lead;\na role without view gets 403", GREEN),
+         ("j4", "live/inventory.json: 119 paths, each checked\nor skipped with a reason; 47 forbidden on prod", GREY)],
+        [("n1", "TWO GETS WRITE\n\n/tracking/team/latest and /visits insert view-log\nrows. Never called on production. The normal suite\ncalls every checked GET in a READ ONLY transaction.", RED),
+         ("n2", "STAGING SENDS REAL WHATSAPP\n\nEvery record carries LIVE_TEST_MOBILE: one message\nper run, the lead acknowledgement.", RED),
+         ("n3", "THE GUARD READS THE SAME URL THE WRITES USE\n\nA wrong address fails the guard instead of passing it.", GREEN),
+         ("n4", "Not yet: a production account (GAP-498), a storage\nwrite (499), the dealer steps (500), a browser (501).", YELLOW)])
 
 
 if __name__ == "__main__":
@@ -2520,5 +2545,5 @@ if __name__ == "__main__":
     f_settings_amend_reopen(); f_dealer_tasks(); f_whatsapp_webhook(); f_new_state_scheme()
     f_export_sample_orders(); f_ratings(); f_warranty()
     f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
-    f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy()
+    f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy(); f_live_checks()
     print(f"\nwrote to {OUT}")
