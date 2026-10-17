@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
+import type * as NextNavigation from "next/navigation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -13,13 +14,13 @@ import { writeMockRole } from "@/lib/dev/mock-settings";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockStockId } from "@/mocks/data/stock";
 import { mockDb, resetMockDb } from "@/mocks/db";
-import { warehouseChoice } from "@/mocks/handlers/stock";
+import { orderStockFor, warehouseChoice } from "@/mocks/handlers/stock";
 import { server } from "@/mocks/node";
 import { renderWithProviders } from "@/test/render";
 
 const push = vi.fn();
 vi.mock("next/navigation", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("next/navigation")>()),
+  ...(await importOriginal<typeof NextNavigation>()),
   useRouter: () => ({ push, back: vi.fn(), replace: vi.fn() }),
 }));
 
@@ -61,14 +62,11 @@ describe("[DISP-003] Stock on orders (contract)", () => {
     const open = read.lines.filter((line) => Number(line.qtyOpen) > 0);
     expect(open.every((line) => line.stock !== null)).toBe(true);
 
+    // Without stock access (a dealer), the lines carry none.
     reset("dealer");
-    const mine = mockDb.orders.find(
-      (item) => item.partner?.id === "prt-201" && item.status !== "draft",
-    );
-    if (mine !== undefined) {
-      const dealerView = await getOrder(mine.id);
-      expect(dealerView.lines.every((line) => line.stock === null)).toBe(true);
-    }
+    const copy = structuredClone(order);
+    orderStockFor(copy);
+    expect(copy.lines.every((line) => line.stock === null)).toBe(true);
   });
 
   it("takes a dispatch's goods out of the warehouse it left from", async () => {
