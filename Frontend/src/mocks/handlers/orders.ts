@@ -52,6 +52,7 @@ import { paymentsBlockFor } from "./payments";
 import { lineInSchema, priceLines, rateChanges } from "./quotations";
 import { applyOrderPoints, releaseOrderPoints } from "./rewards";
 import { applyScenario } from "./scenario";
+import { dispatchWarehouseFor, orderStockFor, recordDispatchStock, warehouseChoice } from "./stock";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
 
 /**
@@ -88,6 +89,8 @@ function settle(order: OrderWire): OrderWire {
   }
   // ACCT-004 · worked out on every read, as the backend does.
   order.payments = paymentsBlockFor(order);
+  // DISP-003 · each open line's stock in the order's warehouse, for those who may see stock.
+  orderStockFor(order);
   return order;
 }
 
@@ -435,6 +438,8 @@ const createSchema = z.object({
   lines: z.array(lineInSchema).max(200).default([]),
   /** SO-008 · Typed in on a direct subsidised order; refused alongside quotations. */
   subsidy: subsidySchema.optional(),
+  /** DISP-003 · "Order to"; staff only. */
+  warehouse_id: z.string().min(1).nullish(),
 });
 
 const linesSchema = z.object({
@@ -451,6 +456,8 @@ const patchSchema = z.object({
   delivery_address: z.string().trim().max(500).nullish(),
   payment_terms: z.enum(PAYMENT_TERMS).nullish(),
   remarks: z.string().trim().max(2000).nullish(),
+  /** DISP-003 · "Order to"; staff only. */
+  warehouse_id: z.string().min(1).nullish(),
   expected_status: expectedStatus,
 });
 
@@ -467,6 +474,8 @@ const dispatchSchema = z.object({
   lines: z.array(
     z.object({ order_line_id: z.string().min(1), qty: z.string().regex(/^\d+(\.\d+)?$/) }),
   ),
+  /** DISP-003 · Where the goods left from; else the order's warehouse, then the default. */
+  warehouse_id: z.string().min(1).nullish(),
 });
 
 function orderableType(value: string): value is (typeof ORDERABLE_TYPES)[number] {
@@ -665,10 +674,13 @@ function createDirect(
     });
     applySubsidy(order);
   }
+  const warehouse = warehouseChoice(body.warehouse_id);
+  if (warehouse instanceof Response) return warehouse;
+  order.warehouse = warehouse;
   mockDb.orders.unshift(order);
   mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
   recordOrderEvent(order, "order.created", {});
-  return HttpResponse.json({ data: order }, { status: 201 });
+  return HttpResponse.json({ data: settle(order) }, { status: 201 });
 }
 
 export const orderHandlers = [
@@ -1025,10 +1037,13 @@ export const orderHandlers = [
       });
       applySubsidy(order);
     }
+    const warehouse = warehouseChoice(body.warehouse_id);
+    if (warehouse instanceof Response) return warehouse;
+    order.warehouse = warehouse;
     mockDb.orders.unshift(order);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.created", {});
-    return HttpResponse.json({ data: order }, { status: 201 });
+    return HttpResponse.json({ data: settle(order) }, { status: 201 });
   }),
 
   http.patch(buildApiUrl("/orders/:orderId"), async ({ params, request }) => {
@@ -1063,6 +1078,11 @@ export const orderHandlers = [
         });
       }
       order.order_type = body.order_type;
+    }
+    if (body.warehouse_id !== undefined) {
+      const warehouse = warehouseChoice(body.warehouse_id);
+      if (warehouse instanceof Response) return warehouse;
+      order.warehouse = warehouse;
     }
     if (body.party != null) {
       if (order.quotations.length > 0) {
@@ -1507,7 +1527,10 @@ export const orderHandlers = [
     }
     const sequence = order.dispatches.length + 1;
     const me = mockMeFor(readMockRole()).data;
+    const leftFrom = dispatchWarehouseFor(order, body.warehouse_id);
+    if (leftFrom instanceof Response) return leftFrom;
     const dispatch: DispatchWire = {
+      warehouse: leftFrom,
       id: nextMockId("dispatch"),
       order: { id: order.id, order_no: order.order_no, party_name: order.party.name },
       dispatch_no: `D/${order.order_no ?? "draft"}/${String(sequence)}`,
@@ -1530,6 +1553,7 @@ export const orderHandlers = [
     };
     order.dispatches = [...order.dispatches, dispatch];
     applyDispatch(order, dispatch, 1);
+    recordDispatchStock(order, dispatch, 1);
     mockDb.orderWrites.set(key, { body: serialized, orderId: order.id });
     recordOrderEvent(order, "dispatch.recorded", { dispatch_no: dispatch.dispatch_no });
     return HttpResponse.json({ data: dispatch }, { status: 201 });
@@ -1577,6 +1601,7 @@ export const orderHandlers = [
     };
     order.dispatches = order.dispatches.map((item) => (item.id === dispatch.id ? voided : item));
     applyDispatch(order, dispatch, -1);
+    recordDispatchStock(order, dispatch, -1);
     order.status = statusFromLines(order.lines);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "dispatch.voided", {

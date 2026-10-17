@@ -268,6 +268,11 @@ const orderLineWireSchema = z.object({
   qty_dispatched: decimal,
   qty_short: decimal,
   qty_open: decimal,
+  /**
+   * DISP-003 · What the order's warehouse has left for this product; `short` when it is
+   * over-committed. Null once the line has shipped, or for a user without stock access.
+   */
+  stock: z.object({ available: decimal, short: z.boolean() }).nullish(),
 });
 
 export type OrderLineWire = z.input<typeof orderLineWireSchema>;
@@ -299,6 +304,7 @@ const orderLineSchema = orderLineWireSchema.transform((wire) => ({
   qtyDispatched: wire.qty_dispatched,
   qtyShort: wire.qty_short,
   qtyOpen: wire.qty_open,
+  stock: wire.stock ?? null,
 }));
 
 export type OrderLine = z.output<typeof orderLineSchema>;
@@ -363,6 +369,8 @@ const dispatchWireSchema = z.object({
   ),
   /** invoice_before_dc, duplicate_invoice_no: recorded anyway. */
   warnings: z.array(z.string()).optional(),
+  /** DISP-003 · Where the goods left from. */
+  warehouse: z.object({ id: z.string().min(1), code: z.string(), name: z.string() }).nullish(),
 });
 
 export type DispatchWire = z.input<typeof dispatchWireSchema>;
@@ -393,6 +401,7 @@ const dispatchSchema = dispatchWireSchema.transform((wire) => ({
     qty: line.qty,
   })),
   warnings: wire.warnings ?? [],
+  warehouse: wire.warehouse ?? null,
 }));
 
 export type Dispatch = z.output<typeof dispatchSchema>;
@@ -632,6 +641,8 @@ export interface CreateDirectOrder {
   readonly payment_terms: PaymentTerms;
   readonly remarks: string | null;
   readonly lines: readonly QuotationLineRequest[];
+  /** DISP-003 · "Order to"; null or left out means the default. Staff only (a dealer gets 422). */
+  readonly warehouse_id?: string | null;
 }
 
 /** SO-005 · PUT /orders/{id}/lines — every line of a draft, priced as new. */
@@ -647,6 +658,8 @@ export interface PatchOrderRequest {
   readonly delivery_address?: string | null;
   readonly payment_terms?: PaymentTerms;
   readonly remarks?: string | null;
+  /** DISP-003 · "Order to"; null means the default. Staff only. */
+  readonly warehouse_id?: string | null;
   readonly expected_status: "draft";
 }
 
@@ -681,6 +694,8 @@ export interface CreateDispatchRequest {
   readonly transporter: string | null;
   readonly vehicle_no: string | null;
   readonly lines: readonly { readonly order_line_id: string; readonly qty: string }[];
+  /** DISP-003 · Where the goods left from; left out means the order's warehouse, then the default. */
+  readonly warehouse_id?: string | null;
 }
 
 export const ORDER_REMARK_MAX_LENGTH = 1000;
