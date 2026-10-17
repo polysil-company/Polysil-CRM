@@ -8,6 +8,7 @@ import {
   cancelApplication,
   createApplication,
   recordStage,
+  reopenApplication,
   uploadApplicationDocument,
   type WriteInput,
 } from "./subsidy-applications.api";
@@ -17,6 +18,7 @@ import type {
   CancelApplicationRequest,
   CreateApplicationRequest,
   RecordStageRequest,
+  ReopenApplicationRequest,
 } from "./subsidy-applications.schemas";
 
 /** Puts the answer in the cache, and refreshes the lists, the history and the lead. */
@@ -76,6 +78,21 @@ export function useCancelApplication(): UseMutationResult<
     mutationKey: [...applicationKeys.all, "cancel"],
     mutationFn: ({ applicationId, ...input }) => cancelApplication(applicationId, input),
     meta: { dataId: "SUBS-006" },
+    onSuccess: settle,
+  });
+}
+
+/** SUBS-015 · Reopen a closed file, with a reason. */
+export function useReopenApplication(): UseMutationResult<
+  Application,
+  Error,
+  { applicationId: string } & WriteInput<ReopenApplicationRequest>
+> {
+  const settle = useSettle();
+  return useMutation({
+    mutationKey: [...applicationKeys.all, "reopen"],
+    mutationFn: ({ applicationId, ...input }) => reopenApplication(applicationId, input),
+    meta: { dataId: "SUBS-015" },
     onSuccess: settle,
   });
 }

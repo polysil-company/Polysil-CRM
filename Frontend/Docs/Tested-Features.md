@@ -38,7 +38,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Documents on records](#documents-on-records) | 4 | 🧪 👀 | PR #113, stacked on PR #111 |
 | [Tasks and the day planner](#tasks-and-the-day-planner) | 8 | 🧪 👀 | PR #54; minutes, edit and All tasks in PR #55 |
 | [Complaints](#complaints) | 7 | 🧪 👀 | PR #57, PR #136 |
-| [Subsidy](#subsidy) | 12 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79 |
+| [Subsidy](#subsidy) | 14 | 🧪 👀 | calculator in PR #77; applications in PR #78; reports in PR #79; reopen and the checklist in PR #137 |
 | [Users and roles](#users-and-roles) | 6 | 🧪 👀 | PR #90 |
 | [Dashboard, notifications, messages](#dashboard-notifications-messages) | 5 | 🧪 👀 | dashboard on the backend's contract in PR #41; bell and messages connected in PR #43; area by system and targets in PR #128; group chats in PR #133 |
 | [Products and prices](#products-and-prices) | 6 | 🧪 👀 | PR #95 |
@@ -367,6 +367,11 @@ Subsidy masters and state schemes (PR #86, stacked on #79; [changelog](../change
 - **SUBS-012 · Tables:** the rows in force on the date; Revise from a date sends only changed rows, from today or later; an empty table offers Add rows from a date; a refusal lands on its row. 🧪
 - **SUBS-013 · Matrices:** each as a grid with Copy as grid; New matrix from blank or from the one in force, pasted from Excel, each bad cell named. 🧪
 - **SUBS-014 · The calculator's scheme picker:** shown once two schemes are active; a scheme's own systems only. 🧪 👀
+
+Reopening a closed file, and the document checklist (PR #137; [changelog](../changelog/entries/2026-10-15--feature--SUBS-015--reopen-a-closed-subsidy-file.md); `subsidy-completion.md` §4). Walked through in the mock as Admin at desktop light and phone dark: a closed file reopened, first without a reason; the checklist under Subsidy masters; and a District Manager on a closed file. axe found nothing. Not yet checked on staging. Screens: [closed](screenshots/subsidy/reopen-closed-desktop-light.jpg), [the dialog](screenshots/subsidy/reopen-dialog-desktop-light.jpg), [reopened](screenshots/subsidy/reopen-done-desktop-light.jpg), [the dialog, phone dark](screenshots/subsidy/reopen-dialog-phone-dark.jpg), [reopened, phone dark](screenshots/subsidy/reopen-done-phone-dark.jpg), [the checklist](screenshots/subsidy/documents-checklist-desktop-light.jpg), [the checklist, phone dark](screenshots/subsidy/documents-checklist-phone-dark.jpg).
+
+- **SUBS-015 · Reopen a closed file** (those with `subsidy.approve`: Admin Sales and the MD; nobody else sees the button). The closed file's note says it can be reopened to correct an entry. Reopen asks why (1 to 500 characters; the file's owner and the lead's owner are told); the file is open again with its stages and figures, and closes again only when an entry writes a stage-16 amount or a stage-17 date. Refused when the dealer's commission on it is approved or paid ("The dealer's commission is settled", the file stays closed); a file no longer closed closes the dialog and refreshes. 🧪 👀
+- **SUBS-007 · The document checklist** (Admin → Subsidy masters → Documents, `GET /subsidy-document-types`): the items every application collects, the same for every scheme, numbered with their codes; an item no longer asked for is marked. Read only. 🧪 👀
 
 ## Users and roles
 
