@@ -748,6 +748,22 @@ export const DATA_IDS = {
       "POST /dealer-applications/{id}/decision",
     ],
   },
+  "CHNL-008": {
+    domain: "CHNL",
+    title: "The dealer applicant's own page — verify the mobile, fill in, upload, submit",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /public/dealer-apply/{token}",
+      "POST /public/dealer-apply/{token}/verify",
+      "POST /public/dealer-apply/{token}/verify/check",
+      "PATCH /public/dealer-apply/{token}",
+      "GET /public/dealer-apply/{token}/gstin/{gstin}",
+      "POST /public/dealer-apply/{token}/documents",
+      "DELETE /public/dealer-apply/{token}/documents/{id}",
+      "POST /public/dealer-apply/{token}/submit",
+    ],
+  },
   "MKT-001": {
     domain: "MKT",
     title: "Marketing offers — set by Admin, visible to channel partners only",

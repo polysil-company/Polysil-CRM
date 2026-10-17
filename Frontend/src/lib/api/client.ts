@@ -66,6 +66,11 @@ export interface ApiRequest<TSchema extends z.ZodType> {
    * user's retry of the same action safe to replay.
    */
   readonly idempotencyKey?: string;
+  /**
+   * CHNL-008 · A dealer applicant's session, sent as `X-Apply-Session` on the public
+   * `/public/dealer-apply/{token}` calls after they verify their mobile. Not an access token.
+   */
+  readonly applicantSession?: string | null;
 }
 
 const MUTATING_METHODS: ReadonlySet<HttpMethod> = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -105,6 +110,7 @@ interface RequestContext {
   readonly startedAt: number;
   /** A JSON body, or a file to download (`apiDownload`). Error bodies are JSON either way. */
   readonly readAs: "json" | "file";
+  readonly applicantSession: string | null;
 }
 
 interface RawResponse {
@@ -207,6 +213,7 @@ async function execute<TSchema extends z.ZodType>(
     timeoutMs: request.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     startedAt: performance.now(),
     readAs,
+    applicantSession: request.applicantSession ?? null,
   };
 
   context.logger.debug(context.fn, `→ ${context.label}`, {
@@ -415,6 +422,9 @@ function buildHeaders(context: RequestContext, token: string | null): Headers {
   }
   if (context.idempotencyKey !== undefined) {
     headers.set("idempotency-key", context.idempotencyKey);
+  }
+  if (context.applicantSession !== null) {
+    headers.set("x-apply-session", context.applicantSession);
   }
   return headers;
 }
