@@ -49,6 +49,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Masters](#masters) | 4 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147 |
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
+| [Dealer commission](#dealer-commission) | 3 | 🧪 👀 | item 25a |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -581,6 +582,14 @@ Admin → **Reports** (`/reports`), on the backend's contract (handover `reports
   - **Download Excel** sends the same filters with `format=xlsx`.
   - Screens: [conversion](screenshots/reports/report-conversion-desktop-light.jpg), [by person](screenshots/reports/report-conversion-person-desktop-light.jpg), [salespeople, as a State Manager](screenshots/reports/report-people-hidden-desktop-light.jpg), [dealers](screenshots/reports/report-dealers-desktop-light.jpg), [lost leads, phone dark](screenshots/reports/report-lost-phone-dark.jpg), [follow-ups](screenshots/reports/report-follow-ups-desktop-light.jpg), [territories](screenshots/reports/report-territory-desktop-light.jpg), [complaints by status](screenshots/reports/report-complaints-desktop-light.jpg), [campaigns](screenshots/reports/report-campaigns-desktop-light.jpg), [a window too long](screenshots/reports/report-window-too-long-desktop-light.jpg). 🧪 👀
 - **RPT-003 · At a glance** on a lead, for those who see reports: quotations, orders and their value, received, complaints, visits, open tasks and the subsidy stage, each a dash when withheld; then the other leads on the same mobile ("same mobile", never "same customer"), each linked with its stage. Screens: [desktop](screenshots/reports/lead-360-desktop-light.jpg), [phone, dark](screenshots/reports/lead-360-phone-dark.jpg). 🧪 👀
+
+## Dealer commission
+
+Subsidy stage 18 (FS-033; handover `dealer-commission-contract.md`, `docs/api/dealer-commission.md`). Walked through in the mock as Admin on a desktop in light mode, and as the Account Manager on a 390 px phone in dark mode and on a desktop; axe found nothing. Not yet checked on the dev API.
+
+- **SUBS-016 · Stage 18 on the application** (screens: [recorded](screenshots/commission/commission-recorded-desktop-light.jpg), [recording again](screenshots/commission/commission-form-desktop-light.jpg), [fittings above the cost](screenshots/commission/commission-form-error-desktop-light.jpg)). A Dealer commission card on a fully paid application. Not recorded: GI fittings, PVC and HDPE fittings, the installation (empty takes the calculation's) and the TOD base (empty is the commission base), with the working beside them as typed: cost before GST, less each, the base, commission and TOD at the rate in force on the full-FP date, and the total. A bad amount, or fittings and installation above the cost, is named on its field. Recorded: the server's figures, its status, who recorded and decided it, a return's remark, and Record it again while it waits or after a return. No rate in force says so, with a link to Commission rates for an admin; no dealer says no commission is due; an open application shows nothing. 🧪 👀
+- **SUBS-017 · Dealer commissions for Accounts** (screens: [to approve, phone dark](screenshots/commission/commissions-to-approve-phone-dark.jpg), [desktop](screenshots/commission/commissions-to-approve-desktop-light.jpg), [recording a payment](screenshots/commission/commission-pay-phone-dark.jpg), [paid](screenshots/commission/commissions-paid-desktop-light.jpg)). Operations → Dealer commissions (`payments`): To approve, To pay, Returned, Paid and All, with Download Excel. Approve (not one you recorded), Return and Cancel it with a remark, and Record payment with its date (not in the future) and reference; each says what happened, and a refusal says why. 🧪 👀
+- **SUBS-018 · Commission rates** (screens: [the rates](screenshots/commission/commission-rates-desktop-light.jpg), [adding one](screenshots/commission/commission-rate-add-desktop-light.jpg)). Subsidy masters → Commission rates: a scheme's rates newest first, each In force, Scheduled or Superseded, with what it covers. Add a rate (`masters.edit`): system, partner type or one partner, commission and TOD percentages, and the start date; a percentage over 100 or missing is named on its field, and the same scope on the same day is refused. 🧪 👀
 
 ## Targets
 

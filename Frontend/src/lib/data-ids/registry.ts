@@ -1126,6 +1126,43 @@ export const DATA_IDS = {
     notes:
       "subsidy.approve only. Refused while the dealer's commission on it is approved or paid. It closes again on a stage-16 amount or a stage-17 date.",
   },
+  "SUBS-016": {
+    domain: "SUBS",
+    title: "Dealer commission and TOD on an application — subsidy stage 18, recorded after full FP",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /subsidy-applications/{id}/commission/preview",
+      "GET /subsidy-applications/{id}/commission",
+      "POST /subsidy-applications/{id}/commission",
+    ],
+    notes:
+      "subsidy.edit records. The server works out the base (cost before GST less the fittings and installation), both amounts and the total.",
+  },
+  "SUBS-017": {
+    domain: "SUBS",
+    title: "Dealer commissions for Accounts — approve, return, cancel, pay, and the Excel report",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /dealer-commissions",
+      "GET /dealer-commissions/export",
+      "POST /dealer-commissions/{id}/approve",
+      "POST /dealer-commissions/{id}/return",
+      "POST /dealer-commissions/{id}/cancel",
+      "POST /dealer-commissions/{id}/pay",
+    ],
+    notes:
+      "payments.approve approves and returns, never on one you recorded (403 own_decision); payments.edit pays. Dealers don't see commissions yet (GAP-330).",
+  },
+  "SUBS-018": {
+    domain: "SUBS",
+    title: "Commission rates — per scheme, by system, partner type or partner, from a date",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /commission-rates", "POST /commission-rates"],
+    notes: "masters.edit adds. Rates are never edited: a later one supersedes, a 0% one retires.",
+  },
 
   "REPO-001": {
     domain: "REPO",
