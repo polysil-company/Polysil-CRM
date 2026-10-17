@@ -208,6 +208,12 @@ export const complaintWireSchema = z.object({
   cancellation: z.object({ reason: z.string(), by: userRef.nullable(), at: isoDateTime }).nullish(),
   /** Null before the first submit. */
   sla: slaWireSchema.nullable(),
+  /**
+   * CMPL-012 · When the complaint was escalated for missing each target (the bell rang for its
+   * owner and managers); null if not. Staff only: always null for a dealer.
+   */
+  response_escalated_at: isoDateTime.nullish(),
+  resolution_escalated_at: isoDateTime.nullish(),
   submit_count: z.number().int().nonnegative(),
   owner: userRef.nullable(),
   owner_org_unit: ref,
@@ -291,6 +297,8 @@ export const complaintSchema = complaintWireSchema.transform((wire) => ({
           internalNote: wire.quality.internal_note ?? null,
         },
   cancellation: wire.cancellation ?? null,
+  responseEscalatedAt: wire.response_escalated_at ?? null,
+  resolutionEscalatedAt: wire.resolution_escalated_at ?? null,
   sla:
     wire.sla === null
       ? null

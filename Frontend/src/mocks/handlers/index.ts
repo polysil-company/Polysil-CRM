@@ -8,6 +8,7 @@ import { complaintHandlers } from "./complaints";
 import { dashboardHandlers } from "./dashboard";
 import { dealerApplicationHandlers } from "./dealer-applications";
 import { documentHandlers } from "./documents";
+import { holidayHandlers } from "./holidays";
 import { importHandlers } from "./imports";
 import { leadCaptureHandlers } from "./lead-capture";
 import { leadHandlers } from "./leads";
@@ -81,6 +82,7 @@ export const handlers: readonly HttpHandler[] = [
   ...campaignHandlers,
   ...stockHandlers,
   ...warrantyHandlers,
+  ...holidayHandlers,
   ...sellerGstinHandlers,
   ...schemeHandlers,
   ...subsidyHandlers,

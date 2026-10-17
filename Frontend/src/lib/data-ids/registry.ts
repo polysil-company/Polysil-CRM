@@ -654,7 +654,14 @@ export const DATA_IDS = {
       "Warranty on a complaint line — in warranty, out, none or unknown, from the dispatch or the supply date (`warranty` on `GET /complaints/{id}`)",
     owner: "shared",
     status: "in-progress",
+  },  "CMPL-012": {
+    domain: "CMPL",
+    title:
+      "Complaint escalation — a missed response or resolution target rings the bell; the complaint shows the miss (FS-028)",
+    owner: "shared",
+    status: "in-progress",
   },
+
   "TASK-001": {
     domain: "TASK",
     title: "My day — one person's tasks due that day and overdue",
@@ -1110,7 +1117,14 @@ export const DATA_IDS = {
       "Seller GSTINs and LUTs — our registrations, and each one's LUT by financial year (`/seller-gstins`)",
     owner: "shared",
     status: "in-progress",
+  },  "MSTR-019": {
+    domain: "MSTR",
+    title:
+      "Holidays — the days complaint targets skip, by year; add one ahead, remove a future one (`/holidays`)",
+    owner: "shared",
+    status: "in-progress",
   },
+
   "MSTR-002": {
     domain: "MSTR",
     title: "Lead lookups — sources, irrigation systems, lost reasons and the territory picker",

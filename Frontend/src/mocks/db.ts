@@ -5,6 +5,7 @@ import type { QrCodeWire } from "@/features/lead-capture/api/lead-capture.schema
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { LookupList, LookupListWire } from "@/features/lookups/api/lookups.schemas";
 import type { MaterialWire } from "@/features/marketing/api/marketing.schemas";
+import type { HolidayWire } from "@/features/masters/api/holidays.schemas";
 import type { ConversationWire, MessageWire } from "@/features/messages/api/messages.schemas";
 import type { NotificationWire } from "@/features/notifications/api/notifications.schemas";
 import type { OrderWire } from "@/features/orders/api/orders.schemas";
@@ -36,6 +37,7 @@ import { seedCommissionRates } from "./data/commission";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
 import type { MockDealerApplication } from "./data/dealer-applications";
 import { seedDocuments, type MockDocument } from "./data/documents";
+import { seedHolidays } from "./data/holidays";
 import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
 import { generateLeads } from "./data/leads";
@@ -144,6 +146,8 @@ export interface MockDb {
   minutesWrites: Map<string, { body: string; minutesId: string }>;
   /** Complaints, newest first (CMPL-001…). */
   complaints: MockComplaint[];
+  /** MSTR-019 · The days complaint targets skip. */
+  holidays: HolidayWire[];
   /** Complaint writes: Idempotency-Key → the request and the complaint it made or changed. */
   complaintWrites: Map<string, { body: string; complaintId: string }>;
   /** Each complaint's history, newest first. */
@@ -259,6 +263,7 @@ function createMockDb(): MockDb {
     district === undefined ? null : { id: district.id, name: district.name, level: district.level },
   );
   const orders = generateOrders(leads, quotations, thresholds);
+  const complaints = generateComplaints(leads, orders);
   const gifts = seedGifts();
   const materials = seedMaterials();
   const partners = seedPartners();
@@ -288,6 +293,7 @@ function createMockDb(): MockDb {
         (quotation) => quotation.status === "draft" && quotation.approval?.status === "pending",
       ),
       order: orders.find((order) => order.status === "approved"),
+      complaint: complaints.find((complaint) => complaint.sla?.response_breached === true),
     }),
     conversations: [...direct.conversations, ...groups.conversations],
     messages: [...direct.messages, ...groups.messages],
@@ -303,7 +309,8 @@ function createMockDb(): MockDb {
     taskWrites: new Map(),
     minutes,
     minutesWrites: new Map(),
-    complaints: generateComplaints(leads, orders),
+    complaints,
+    holidays: seedHolidays(),
     complaintWrites: new Map(),
     complaintEvents: new Map(),
     complaintFiles: new Map(),
