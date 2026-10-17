@@ -54,7 +54,6 @@ const balanceWireSchema = z.object({
   balance: z.number().int(),
   point_value: decimal,
 });
-export type BalanceWire = z.input<typeof balanceWireSchema>;
 
 export interface Balance {
   readonly holder: Holder;
