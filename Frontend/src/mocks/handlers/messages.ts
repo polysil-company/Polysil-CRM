@@ -208,6 +208,18 @@ export const messageHandlers = [
     return HttpResponse.json(body, { status: 201 });
   }),
 
+  // BE-021: one conversation, written in or not; 404 when it is not the caller's.
+  http.get(buildApiUrl("/conversations/:conversationId"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (isPartnerRole(readMockRole())) return forbidden();
+
+    const conversation = findConversation(String(params.conversationId));
+    if (conversation === undefined) return conversationNotFound();
+    const body: ConversationResponse = { data: conversation };
+    return HttpResponse.json(body);
+  }),
+
   http.get(buildApiUrl("/conversations/:conversationId/messages"), async ({ params, request }) => {
     const { scenario, failure } = await applyScenario();
     if (failure) return failure;

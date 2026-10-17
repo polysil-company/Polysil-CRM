@@ -237,7 +237,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSG-001 | Conversation list with unread counts | shared | in-progress |
 | MSG-002 | Messages in a conversation | shared | in-progress |
 | MSG-003 | Send a message, optionally linking a CRM record | shared | in-progress |
-| MSG-004 | Start a conversation — staff directory search | shared | in-progress |
+| MSG-004 | Start or read one conversation — staff directory search | shared | in-progress |
 | MSG-005 | Mark a conversation as read | shared | in-progress |
 | REPO-001 | Changelog system — one entry per change, generated CHANGELOG.md | frontend | in-progress |
 | REPO-002 | Quality gates — lint rules, git hooks, CI pipeline | frontend | in-progress |
