@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Add01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { Controller, useFieldArray, useForm, useFormState } from "react-hook-form";
 import { toast } from "sonner";
@@ -46,6 +46,7 @@ import {
 } from "@/features/tasks/api/tasks.schemas";
 import { TASK_TYPE_LABELS, taskRefusal } from "@/features/tasks/lib/task-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { calendarDayOf, timeOfDayOf, todayInIndia } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
@@ -55,8 +56,6 @@ const log = createLogger({
   dataId: "TASK-007",
 });
 
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -213,12 +212,7 @@ function MinutesFormBody({
   });
   const { errors } = useFormState({ control: form.control });
   const items = useFieldArray({ control: form.control, name: "actionItems" });
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
+  const closeSoon = useCloseAfterSuccess(onClose);
 
   const submit = useAsyncAction({
     action: (body: CreateMinutesRequest) =>
@@ -239,7 +233,7 @@ function MinutesFormBody({
             ? subject.leadName
             : `${subject.leadName} · ${String(count)} ${count === 1 ? "task" : "tasks"} added`,
       });
-      timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
+      closeSoon();
     },
     onError: (error) => {
       const view = taskRefusal(error);

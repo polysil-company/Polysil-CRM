@@ -29,11 +29,12 @@ import {
   orderNumber,
 } from "@/features/orders/lib/order-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { readFieldErrors } from "@/lib/api/errors";
 import { createLogger } from "@/lib/logger";
 
-import { RefusalAlert, useCloseAfterSuccess, useOrderRefusal } from "./order-dialog-shared";
+import { RefusalAlert, useOrderRefusal } from "./order-dialog-shared";
 
 const log = createLogger({
   file: "features/orders/components/record-dispatch-form.tsx",

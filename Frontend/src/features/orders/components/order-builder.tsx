@@ -202,6 +202,8 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   const { errors } = useFormState({ control: form.control });
   const place = useWatch({ control: form.control, name: "place" });
   const fromQuotations = source.mode === "edit" && source.order.quotations.length > 0;
+  // SO-007: an amended order keeps its type (422 order_type_fixed).
+  const typeFixed = source.mode === "edit" && source.order.amendCount > 0;
   // The place is fixed by the lead, or by the draft once saved.
   const placeFixed = source.mode === "edit" || source.lead !== null;
 
@@ -321,6 +323,12 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         return;
       case "order_type_unsupported":
         setFormError({ title: "That order type isn't built yet", description: error.message });
+        return;
+      case "order_type_fixed":
+        setFormError({
+          title: "The order type can't change now",
+          description: "This order was amended after approval, so it keeps its type.",
+        });
         return;
       case "status_changed":
       case "order_not_draft":
@@ -447,6 +455,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
                         aria-labelledby="order-type-label"
                         value={field.value}
                         onValueChange={field.onChange}
+                        disabled={typeFixed}
                         className="flex-row flex-wrap gap-5"
                       >
                         {ORDERABLE_TYPES.map((type) => (
@@ -460,7 +469,9 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
                         ))}
                       </RadioGroup>
                       <FieldDescription>
-                        Export, sample, subsidised and the others wait on the client&apos;s rules.
+                        {typeFixed
+                          ? "Fixed: the order was amended after approval, so it keeps its type."
+                          : "Export, sample, subsidised and the others wait on the client's rules."}
                       </FieldDescription>
                     </Field>
                   )}

@@ -16,7 +16,7 @@ import {
 import type { PdfLinkWire } from "@/features/quotations/api/quotations.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
-import type { Role } from "@/lib/auth/roles";
+import { PARTNER_ROLES, type Role } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { calendarDayOf } from "@/lib/format";
 import { orderQueueStep, type MockApprovalStep } from "@/mocks/data/approvals";
@@ -953,6 +953,64 @@ export const orderHandlers = [
     order.cancel_remark = parsed.data.remark;
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.cancelled", { remark: parsed.data.remark });
+    return HttpResponse.json({ data: order });
+  }),
+
+  // SO-007 · An approved order back to draft under its number (FS-036, migration 041).
+  http.post(buildApiUrl("/orders/:orderId/amend"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    const parsed = remarkSchema.safeParse(raw);
+    if (!parsed.success) {
+      return errorResponse(422, "remark_required", "Say why the order is amended.", {
+        remark: "Say why the order is amended.",
+      });
+    }
+    const target = orderAt(String(params.orderId), parsed.data.expected_status);
+    if (!target.ok) return target.response;
+    const { order } = target;
+    const role = readMockRole();
+    const isPartner = PARTNER_ROLES.some((partnerRole) => partnerRole === role);
+    const me = mockMeFor(role).data.id;
+    if (isPartner || !(allowed(role, "sales_orders", "edit") || order.owner?.id === me)) {
+      return errorResponse(403, "forbidden", "Not permitted to amend this order.");
+    }
+    if (order.order_type === "replacement") {
+      return errorResponse(422, "order_type_fixed", "A replacement order follows its complaint.");
+    }
+    if (order.dispatches.some((dispatch) => dispatch.voided_at === null)) {
+      return errorResponse(409, "order_dispatched", "The order has shipped.");
+    }
+    if (order.dispatches.length > 0) {
+      return errorResponse(
+        409,
+        "voided_dispatch_holds_lines",
+        "A voided dispatch still names this order's lines.",
+      );
+    }
+    if (order.status !== "approved") {
+      return errorResponse(409, "status_changed", `The order is now ${order.status}.`, {
+        status: order.status,
+      });
+    }
+    order.amend_count = (order.amend_count ?? 0) + 1;
+    order.amended_from_total = order.totals.total;
+    order.amend_reason = parsed.data.remark;
+    order.status = "draft";
+    order.approved_at = null;
+    order.pdf_state = "none";
+    order.pdf_error = null;
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.amended", {
+      from: "approved",
+      to: "draft",
+      amend: order.amend_count,
+      from_total: order.totals.total,
+    });
     return HttpResponse.json({ data: order });
   }),
 

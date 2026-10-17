@@ -2,7 +2,7 @@
 
 import { UserSwitchIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
@@ -39,6 +39,7 @@ import type { AssignLeadRequest, Lead } from "@/features/leads/api/leads.schemas
 import { partnerTypeLabel } from "@/features/leads/lib/lead-labels";
 import { stageChangeError } from "@/features/leads/lib/lead-lifecycle";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { readFieldErrors } from "@/lib/api/errors";
@@ -51,8 +52,6 @@ const log = createLogger({
 
 /** Search once typing pauses for this long. */
 const SEARCH_DEBOUNCE_MS = 250;
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
 
 /** A picker's choice: a person or partner, or explicitly nobody. */
 interface Choice {
@@ -141,13 +140,7 @@ function AssignForm({ lead, onClose }: { lead: Lead; onClose: () => void }): Rea
   const [formError, setFormError] = useState<string | null>(null);
   const assign = useAssignLead();
   const idempotency = useIdempotencyKey();
-  const closeTimer = useRef<number | undefined>(undefined);
-
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(closeTimer.current);
-    };
-  }, []);
+  const closeSoon = useCloseAfterSuccess(onClose);
 
   const ownerChanged = !sameChoice(owner, ownerOf(lead));
   const partnerChanged = !sameChoice(partner, partnerOf(lead));
@@ -168,7 +161,7 @@ function AssignForm({ lead, onClose }: { lead: Lead; onClose: () => void }): Rea
           ? `${updated.customerName} · owner ${updated.owner.name}`
           : `${updated.customerName} · unassigned`,
       });
-      closeTimer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
+      closeSoon();
     },
     onError: (error) => {
       const fields = readFieldErrors(error);

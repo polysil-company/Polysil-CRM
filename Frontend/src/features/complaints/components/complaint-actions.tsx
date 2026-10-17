@@ -50,11 +50,12 @@ import {
 } from "@/features/complaints/api/complaints.schemas";
 import { complaintRefusal, SEVERITY_LABELS } from "@/features/complaints/lib/complaint-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { formatIndianPhone, todayInIndia } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
-import { COMPLAINT_TEXT_MAX, Refusal, useCloseLater } from "./complaint-dialog-parts";
+import { COMPLAINT_TEXT_MAX, Refusal } from "./complaint-dialog-parts";
 
 const log = createLogger({
   file: "features/complaints/components/complaint-actions.tsx",
@@ -184,7 +185,7 @@ function SubmitForm({
 }): React.JSX.Element {
   const submit = useSubmitComplaint();
   const idempotency = useIdempotencyKey();
-  const closeLater = useCloseLater(onClose);
+  const closeLater = useCloseAfterSuccess(onClose);
   const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
   const again = complaint.submitCount > 0;
   const run = useAsyncAction({
@@ -281,7 +282,7 @@ function CheckForm({
 }): React.JSX.Element {
   const check = useCheckComplaint();
   const idempotency = useIdempotencyKey();
-  const closeLater = useCloseLater(onClose);
+  const closeLater = useCloseAfterSuccess(onClose);
   const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
   const form = useForm<CheckForm>({
     resolver: zodResolver(checkSchema),
@@ -573,7 +574,7 @@ function QcForm({
 }): React.JSX.Element {
   const qc = useQcComplaint();
   const idempotency = useIdempotencyKey();
-  const closeLater = useCloseLater(onClose);
+  const closeLater = useCloseAfterSuccess(onClose);
   const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
   const form = useForm<QcForm>({
     resolver: zodResolver(qcSchema(complaint.supplyDate)),
@@ -765,7 +766,7 @@ function CancelForm({
 }): React.JSX.Element {
   const cancel = useCancelComplaint();
   const idempotency = useIdempotencyKey();
-  const closeLater = useCloseLater(onClose);
+  const closeLater = useCloseAfterSuccess(onClose);
   const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
   const form = useForm<{ reason: string }>({
     resolver: zodResolver(reasonSchema),

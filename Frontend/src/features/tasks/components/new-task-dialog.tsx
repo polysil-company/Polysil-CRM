@@ -99,6 +99,7 @@ export function NewTaskDialog({
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<unknown>(null);
   const timer = useRef<number | undefined>(undefined);
+  const mounted = useRef(false);
   const idempotency = useIdempotencyKey();
   const createTask = useCreateTask();
 
@@ -119,8 +120,12 @@ export function NewTaskDialog({
   const { errors } = useFormState({ control: form.control });
   const type = useWatch({ control: form.control, name: "type" });
 
+  // The close timer never outlives the dialog, and never starts once it has gone: a save can
+  // finish after the page was left.
   useEffect(() => {
+    mounted.current = true;
     return () => {
+      mounted.current = false;
       window.clearTimeout(timer.current);
     };
   }, []);
@@ -136,6 +141,7 @@ export function NewTaskDialog({
       toast.success("Task added", {
         description: `${task.title} · ${formatFullDate(task.dueAt)}`,
       });
+      if (!mounted.current) return;
       timer.current = window.setTimeout(() => {
         setOpen(false);
         form.reset(blank());
