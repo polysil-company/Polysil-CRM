@@ -228,8 +228,10 @@ describe("[LEAD-007] LeadStageMenu", () => {
     await user.click(within(dialog).getByRole("button", { name: "Mark as won" }));
 
     const started = await screen.findByRole("dialog", { name: "Dealer application started" });
-    const url = `https://crm.polysil.example/dealer-apply/apply-${lead.id.slice(-8)}`;
-    expect(within(started).getByText(url)).toBeInTheDocument();
+    // CHNL-007 · the mock starts a real application, on this app's own applicant page
+    const link = within(started).getByText(/\/dealer-apply\/apply-/);
+    const url = link.textContent;
+    expect(mockDb.dealerApplications?.some((item) => item.lead_id === lead.id)).toBe(true);
     expect(
       within(started).getByRole("button", { name: "Copy the application link" }),
     ).toBeInTheDocument();

@@ -732,6 +732,22 @@ export const DATA_IDS = {
     endpoints: ["GET /gstin/{gstin}"],
     notes: "`lookup` is unavailable until the backend has a GST data provider key (GAP-292).",
   },
+  "CHNL-007": {
+    domain: "CHNL",
+    title: "Dealer applications — start one, fill it for the applicant, and decide",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /dealer-applications",
+      "POST /dealer-applications",
+      "GET /dealer-applications/{id}",
+      "PATCH /dealer-applications/{id}",
+      "POST /dealer-applications/{id}/submit",
+      "POST /dealer-applications/{id}/withdraw",
+      "POST /dealer-applications/{id}/link",
+      "POST /dealer-applications/{id}/decision",
+    ],
+  },
   "MKT-001": {
     domain: "MKT",
     title: "Marketing offers — set by Admin, visible to channel partners only",

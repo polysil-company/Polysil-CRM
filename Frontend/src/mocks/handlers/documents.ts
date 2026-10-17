@@ -23,6 +23,7 @@ import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb } from "@/mocks/db";
 
+import { mockDealerApplications } from "./dealer-applications";
 import { applyScenario } from "./scenario";
 import { errorResponse, readMultipart } from "./shared";
 
@@ -64,6 +65,16 @@ function recordOf(type: RecordType, id: string): MockRecord | undefined {
         ? undefined
         : { label: dispatch.dispatch_no, closed: dispatch.voided_at !== null };
     }
+    // CHNL-007 · open applications take documents; decided ones are closed
+    case "dealer_application": {
+      const application = mockDealerApplications().find((item) => item.id === id);
+      return application === undefined
+        ? undefined
+        : {
+            label: application.firm_name,
+            closed: !["draft", "returned", "submitted"].includes(application.status),
+          };
+    }
     default:
       return undefined;
   }
@@ -83,6 +94,8 @@ function mayAdd(type: RecordType): boolean {
       return can(permissions, "dispatch", "create") || can(permissions, "sales_orders", "edit");
     case "payment":
       return can(permissions, "payments", "edit");
+    case "dealer_application":
+      return !isPartnerRole(role) && can(permissions, "partners", "view");
     default:
       return false;
   }

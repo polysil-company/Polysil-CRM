@@ -18,6 +18,7 @@ import type { OfficeWire } from "@/features/users/api/users.schemas";
 
 import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/approvals";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
+import type { MockDealerApplication } from "./data/dealer-applications";
 import { seedDocuments, type MockDocument } from "./data/documents";
 import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
@@ -127,6 +128,8 @@ export interface MockDb {
   enquiriesToday: Map<string, string>;
   /** Subsidy applications, newest first; seeded from the leads on first use (SUBS-005). */
   subsidyApplications: ApplicationWire[] | null;
+  /** CHNL-007 · Dealer applications, seeded on first use (`handlers/dealer-applications.ts`). */
+  dealerApplications: MockDealerApplication[] | null;
   /** Each application's stage history, oldest first (SUBS-006). */
   subsidyEntries: Map<string, StageEntryWire[]>;
   /** Each application's calculation as stored at create (SUBS-006). */
@@ -232,6 +235,7 @@ function createMockDb(): MockDb {
     enquiryCodes: new Map(),
     enquiriesToday: new Map(),
     subsidyApplications: null,
+    dealerApplications: null,
     subsidyEntries: new Map(),
     subsidyCalculations: new Map(),
     subsidyDocuments: new Map(),
