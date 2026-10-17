@@ -10,7 +10,9 @@ This is for the next developer or AI session that picks up the Polysil CRM web f
 
 Read it once, end to end, before writing code. Then keep it open.
 
-_Written 11 October 2026, against `integration` at `ed010e1` (PR #95 merged). The status in §9 and §10 is as of that commit; check `git log origin/integration` for anything newer._
+_Written 11 October 2026, against `integration` at `ed010e1` (PR #95 merged). Updated 13 October 2026 at `b8632ed` (PR #121 merged): §9, the measured gap in §10, §11 and §12. Check `git log origin/integration` for anything newer._
+
+**The working plan is [`Docs/plan-13oct-2026.md`](plan-13oct-2026.md):** every item left, in the order to build it, ticked as each PR lands. §10 below keeps the detail and the background.
 
 ---
 
@@ -24,7 +26,7 @@ _Written 11 October 2026, against `integration` at `ed010e1` (PR #95 merged). Th
 2. **Fetch and branch from the latest `integration`:** `git fetch origin && git checkout -B <branch> origin/integration`. Never branch from `main` or `staging`.
 3. **Check what the backend shipped since the date above.** Run `git log origin/integration --oneline`, read any new file in `backend/docs/handover/`, and look for newly ticked boxes in `docs/Backend-Tasks.md`. A ticked box is work for you: pick it up (§4.1).
 4. **Install and prove the toolchain** (§3): `npm ci`, then `npm run verify` on a clean checkout. It must pass before you change anything.
-5. **Take the next item** from §10, top first, unless the user says otherwise.
+5. **Take the next unticked item** from [`Docs/plan-13oct-2026.md`](plan-13oct-2026.md), top first, unless the user says otherwise. Mark it in progress when you start, and ticked in its PR.
 
 ---
 
@@ -488,7 +490,7 @@ If the user asks for one, a read-only `Explore` agent is reasonable for a broad 
 
 ---
 
-## 9. What is built (as of `ed010e1`)
+## 9. What is built (as of `b8632ed`, 13 October 2026)
 
 Everything below is merged into `integration`. Each one has unit and UI tests and was walked through in the mock (👀). Sign-in and the lead list are also checked on the real backend (🔌).
 
@@ -508,25 +510,27 @@ Everything below is merged into `integration`. Each one has unit and UI tests an
 | Subsidy: calculator, applications (stages, documents, PIMS sheet), reports, masters, state schemes | SUBS-002…014 | #77, #78, #79, #86 |
 | Users and roles (people, accounts, leavers), offices | ADMN-001…006 | #90 |
 | Products and prices: catalogue, HSN and GST, price lists | MSTR-004…006 | #95 |
+| Go-live fixes from the 10 Oct walk: route guards and the access-denied page, partner users' view of leads, timeline text, the stalled approval step, first-click and PDF-poll fixes, copy | APP-006 | #109 |
+| Excel import with column matching (price list rates, partners, quotation and order lines), and price lists by sale type | MSTR-007, MSTR-008 | #111 |
+| Channel partners admin: list, detail, add under a parent, edit, close and reopen, export, import (staff only) | CHNL-001…005 | #112, via #114 |
+| Documents on leads, quotations, orders and dispatches: attach, open, remove | DOC-001…003 | #113, via #114 |
+| The release menu: `NEXT_PUBLIC_NAV_ONLY` shows only the screens a deployment releases | APP-007 | #118 |
 
-**Open PRs at the time of writing:**
-
-- #98 `portal-ratings` is a backend PR.
-- #11 and #7 are the standing integration → staging → main PRs.
-
-No frontend PR is open.
+**Open PRs on 13 October:** only #7, staging → main. No frontend PR is open.
 
 ---
 
 ## 10. Everything left to build, in order
 
-**How complete this list is.** §10 was checked two ways on 11 October 2026:
+**How complete this list is.** §10 was checked two ways on 11 October 2026, and the endpoint count again on 13 October:
 
-1. **Endpoint by endpoint.** Every endpoint in `backend/docs/api/*.md` (372) was compared with every endpoint the frontend's mock serves (178). Every call the frontend makes must be mocked, because an unhandled request fails a test, so the mock is a reliable list of what the frontend uses. **194 endpoints have no frontend yet.** The coverage table is in "The measured gap" below, the full list in §12, and the script to measure it again in §12.2.
+1. **Endpoint by endpoint.** Every endpoint in `backend/docs/api/*.md` (379 on 13 October) was compared with every endpoint the frontend's mock serves (197). Every call the frontend makes must be mocked, because an unhandled request fails a test, so the mock is a reliable list of what the frontend uses. **183 endpoints have no frontend yet** (194 on 11 October). The coverage table is in "The measured gap" below, the full list in §12, and the script to measure it again in §12.2.
 2. **Field by field,** from the recent handovers. Built endpoints have also gained fields and filters the screens don't use yet. These are in P1 under "New fields on screens already built". The endpoint comparison can't see them, so read every new handover for this kind of change.
 
 
 The client is going live on **leads, quotations and sales orders** first, so P0 is what that go-live needs. Within each tier, top first.
+
+**From 13 October the order to build in is [`Docs/plan-13oct-2026.md`](plan-13oct-2026.md),** which the user agreed. It takes the open items below, puts the go-live screens' gaps first, and moves subsidised quotations and orders after them (not part of go-live). Tick items there; this section keeps the background.
 
 ### P0: go-live fixes for leads, quotations and orders
 
@@ -600,8 +604,8 @@ Ship these as one or two `fix(...)` PRs ("Go-live fixes from the 10 Oct walk"), 
 - [ ] **New fields on screens already built** (the endpoint comparison can't see these):
   - **Dashboard** (`GET /dashboard/overview`): `area_by_system: [{system, name, leads, hectares}]`, and `targets_by_month: [{month, target, achieved}]` (6 months, null without a targets permission). Two new charts (`dealer-recruitment-and-small-changes.md`, "Five small changes").
   - **Order list filters:** `territory_id` (a comma list; a state selects its districts) and `owner_org_unit_id` on `GET /orders`, `/orders/stats` and `/orders/export`, as the lead list already has.
-  - **Land in hectares:** leads take and return `land_hectares` (`land_acres` still works). Ask for hectares on the lead forms and show it on the lead page.
-  - **Lead score** as a whole number, and the other P0 items above.
+  - ~~**Land in hectares:** leads take and return `land_hectares` (`land_acres` still works). Ask for hectares on the lead forms and show it on the lead page.~~ Done in #109.
+  - ~~**Lead score** as a whole number, and the other P0 items above.~~ Done in #109.
   - **Dormant leads and "assign moves the office":** `lead-small-gaps-contract.md`. Dormant is already in the lead schemas; check the "Screens" section of that file against what is on screen.
   - **List exports:** `list-exports.md`. Leads, quotations and orders have export buttons; check the rest of the lists it names.
 
@@ -619,8 +623,9 @@ Ship these as one or two `fix(...)` PRs ("Go-live fixes from the 10 Oct walk"), 
 | `dealer-applications` | 0 / 17 | 17 |
 | `dealer-commission` | 0 / 12 | 12 |
 | `dispatch` | 2 / 2 | 0 |
-| `documents` | 0 / 6 | 6 |
+| `documents` | 6 / 6 | 0 |
 | `holidays` | 0 / 3 | 3 |
+| `imports` | 5 / 5 | 0 |
 | `leads` | 20 / 20 | 0 |
 | `lookups` | 9 / 23 | 14 |
 | `marketing-material` | 0 / 11 | 11 |
@@ -628,9 +633,9 @@ Ship these as one or two `fix(...)` PRs ("Go-live fixes from the 10 Oct walk"), 
 | `notifications` | 2 / 2 | 0 |
 | `orders` | 13 / 18 | 5 |
 | `org-units` | 1 / 6 | 5 |
-| `partners` | 0 / 7 | 7 |
+| `partners` | 7 / 7 | 0 |
 | `payments` | 0 / 8 | 8 |
-| `portal` | 0 / 6 | 6 |
+| `portal` | 0 / 8 | 8 |
 | `pricing` | 8 / 8 | 0 |
 | `products` | 8 / 8 | 0 |
 | `public` | 6 / 6 | 0 |
@@ -654,7 +659,7 @@ Ship these as one or two `fix(...)` PRs ("Go-live fixes from the 10 Oct walk"), 
 | `users` | 10 / 10 | 0 |
 | `warranty` | 0 / 3 | 3 |
 
-The modules at 0 are the P2 table below. A partly built module has its missing pieces listed in P1 above. All 194 endpoints are listed in §12.
+Measured 13 October 2026 at `b8632ed`. The modules at 0 are the P2 table below. A partly built module has its missing pieces listed in P1 above. All 183 endpoints are listed in §12.
 
 ### P2: modules the backend serves with no screens yet
 
@@ -662,7 +667,7 @@ Each has a handover in `backend/docs/handover/` and an API file in `backend/docs
 
 | # | Module | Handover(s) | Nav item |
 | --- | --- | --- | --- |
-| 1 | **Channel partners admin:** partners list and detail, onboarding, credit limit (built in PR #112, staff only; the portal's own dealers wait on the client) | `dealer-credit-limit.md`, `backend/docs/api/partners.md` | Channel → Channel partners (CHNL-001, "Soon") |
+| 1 | ~~**Channel partners admin**~~ **Done in #112:** partners list and detail, onboarding, credit limit, staff only; the portal's own dealers wait on the client (CHNL-002) | `dealer-credit-limit.md`, `backend/docs/api/partners.md` | Channel → Channel partners (CHNL-001, "Soon") |
 | 2 | **Dealer recruitment:** staff screens, and the public applicant page `/dealer-apply/<token>` | `dealer-recruitment-and-small-changes.md` | Channel |
 | 3 | **Admin masters:** offices (org units), territories, the admin lookups (lead sources, crops, lost reasons, meeting and complaint types, lead scoring), company settings | `backend/docs/api/org-units.md`, `territories.md`, `lookups.md`, `settings-amend-reopen-contract.md` | Admin → Masters (MSTR-001, "Soon") |
 | 4 | **Amend an approved order; reopen a complaint** | `settings-amend-reopen-contract.md` | — |
@@ -672,7 +677,7 @@ Each has a handover in `backend/docs/handover/` and an API file in `backend/docs
 | 8 | **Reward points; dealer commission and TOD** | `rewards-contract.md`, `dealer-commission-contract.md` | — |
 | 9 | **Marketing material ordering; campaigns** | `marketing-material-contract.md`, `campaigns.md` | Channel → Marketing (MKT-001, "Soon") |
 | 10 | **Stock:** warehouses, availability on the order form, the stock list | `stock-contract.md` | — |
-| 11 | **Documents on records** (built in PR #113: lead, quotation, order, dispatch); the replacement order's approvers (nothing to build) | `documents-and-replacement-chain.md` | — |
+| 11 | ~~**Documents on records**~~ **Done in #113:** lead, quotation, order, dispatch; payments wait for a payments screen. The replacement order's approvers need nothing built | `documents-and-replacement-chain.md` | — |
 | 12 | **Warranty tracking** | `warranty.md` | — |
 | 13 | **Group chats** | `group-chat.md` | Messages |
 | 14 | **Export and sample orders**, with the seller GSTINs and their LUTs (`/seller-gstins`) | `export-sample-orders-contract.md`, `backend/docs/api/seller-gstins.md` | — |
@@ -701,15 +706,15 @@ Each has a handover in `backend/docs/handover/` and an API file in `backend/docs
 
 Paste this to start:
 
-> You are continuing the Polysil CRM web frontend in `polysil-company/polysil-crm` (`Frontend/`). First read `Frontend/AGENTS.md`, then `Frontend/Docs/Frontend-Handover.md` end to end, and follow its process exactly: branch from `origin/integration`, mocks first, a browser walk with screenshots and axe, tests, records, then verify, knip, prettier and build, then a PR to `integration`. Check `git log origin/integration` and `docs/Backend-Tasks.md` for anything newer than the handover's date. Then start on §10 P0, the go-live fixes from the 10 Oct walk, as one `fix` PR. Follow the user's rules in §2.
+> You are continuing the Polysil CRM web frontend in `polysil-company/polysil-crm` (`Frontend/`). First read `Frontend/AGENTS.md`, then `Frontend/Docs/Frontend-Handover.md` end to end, and follow its process exactly: branch from `origin/integration`, mocks first, a browser walk with screenshots and axe, tests, records, then verify, knip, prettier and build, then a PR to `integration`. Check `git log origin/integration` and `docs/Backend-Tasks.md` for anything newer than the handover's date. Then take the first unticked item in `Frontend/Docs/plan-13oct-2026.md`, mark it in progress, and tick it in its PR. Follow the user's rules in §2.
 
 ---
 
-## 12. Appendix: every backend endpoint without a frontend (11 October 2026)
+## 12. Appendix: every backend endpoint without a frontend (13 October 2026)
 
 ### 12.1 The list
 
-194 endpoints, grouped by `backend/docs/api` module.
+183 endpoints, grouped by `backend/docs/api` module.
 
 **`approvals (1)`**
 
@@ -724,9 +729,9 @@ Paste this to start:
 
 - `GET /campaigns`
 - `POST /campaigns`
-- `DELETE /campaigns/{campaign_id}`
 - `GET /campaigns/{campaign_id}`
 - `PATCH /campaigns/{campaign_id}`
+- `DELETE /campaigns/{campaign_id}`
 
 **`complaints (1)`**
 
@@ -773,15 +778,6 @@ Paste this to start:
 - `GET /subsidy-applications/{app_id}/commission`
 - `POST /subsidy-applications/{app_id}/commission`
 - `GET /subsidy-applications/{app_id}/commission/preview`
-
-**`documents (6)`**
-
-- `GET /documents`
-- `POST /documents`
-- `GET /documents/types`
-- `DELETE /documents/{document_id}`
-- `GET /documents/{document_id}/link`
-- `GET /leads/{lead_id}/documents`
 
 **`holidays (3)`**
 
@@ -845,16 +841,6 @@ Paste this to start:
 - `POST /org-units/{item_id}/close`
 - `POST /org-units/{item_id}/reopen`
 
-**`partners (7)`**
-
-- `GET /partners`
-- `POST /partners`
-- `GET /partners/export`
-- `GET /partners/{item_id}`
-- `PATCH /partners/{item_id}`
-- `POST /partners/{item_id}/close`
-- `POST /partners/{item_id}/reopen`
-
 **`payments (8)`**
 
 - `PUT /orders/{order_id}/payment-schedule`
@@ -866,7 +852,7 @@ Paste this to start:
 - `POST /payments/{payment_id}/allocations`
 - `POST /payments/{payment_id}/void`
 
-**`portal (6)`**
+**`portal (8)`**
 
 - `GET /portal/complaints`
 - `GET /portal/enquiries`
@@ -874,6 +860,8 @@ Paste this to start:
 - `PATCH /portal/me`
 - `GET /portal/orders`
 - `GET /portal/quotations`
+- `GET /portal/ratings`
+- `POST /portal/ratings`
 
 **`quotations (2)`**
 
@@ -904,8 +892,8 @@ Paste this to start:
 - `GET /gifts`
 - `POST /gifts`
 - `PATCH /gifts/{gift_id}`
-- `DELETE /orders/{order_id}/reward-redemption`
 - `POST /orders/{order_id}/reward-redemption`
+- `DELETE /orders/{order_id}/reward-redemption`
 - `GET /reward-rules`
 - `POST /reward-rules`
 - `GET /reward-rules/{rule_id}`
