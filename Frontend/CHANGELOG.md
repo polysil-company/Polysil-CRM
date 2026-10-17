@@ -7,15 +7,17 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-52 changes, newest first. Each title opens its entry.
+54 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-14 | [No dialog close timer once the dialog has gone](changelog/entries/2026-10-14--fix--APP-003--no-dialog-close-timer-once-the-dialog-has-gone.md) | `fix` | `APP-003` |
 | 2026-10-13 | [A working plan from 13 October, and the handover's gap measured again](changelog/entries/2026-10-13--docs--REPO-001--a-working-plan-from-13-october-and-the-handover-s-gap.md) | `docs` | `REPO-001` |
 | 2026-10-13 | [The release's menu: only the screens a deployment releases](changelog/entries/2026-10-13--feature--APP-007--the-release-s-menu-only-the-screens-a-deployment-releases.md) | `feature` | `APP-007` |
 | 2026-10-13 | [Channel partners: list, add, correct, close and import](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md) | `feature` | `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` |
 | 2026-10-13 | [Documents on leads, quotations, orders and dispatches](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md) | `feature` | `DOC-001` `DOC-002` `DOC-003` |
 | 2026-10-13 | [Excel import with column matching, and price lists by sale type](changelog/entries/2026-10-13--feature--MSTR-007--excel-import-with-column-matching-and-price-lists-by-sale.md) | `feature` | `MSTR-007` `MSTR-008` |
+| 2026-10-13 | [Amend an approved order](changelog/entries/2026-10-13--feature--SO-007--amend-an-approved-order.md) | `feature` | `SO-007` |
 | 2026-10-13 | [CI green again: CHANGELOG.md regenerated, and two tests that depended on timing](changelog/entries/2026-10-13--fix--REPO-001--ci-green-again-changelog-md-regenerated-and-the-approval.md) | `fix` | `REPO-001` `QUOT-007` `TASK-005` |
 | 2026-10-12 | [A frontend handover: the build process, step by step, and everything left](changelog/entries/2026-10-12--docs--REPO-001--a-frontend-handover-the-build-process-step-by-step-and.md) | `docs` | `REPO-001` |
 | 2026-10-12 | [Go-live fixes from the 10 Oct staging walk](changelog/entries/2026-10-12--fix--APP-006--go-live-fixes-from-the-10-oct-walk.md) | `fix` | `APP-006` `APP-003` `LEAD-003` `LEAD-005` `LEAD-008` `LEAD-013` `LEAD-014` `APPR-001` `APPR-002` `QUOT-002` `SO-002` `CMPL-003` `AUTH-001` |
@@ -63,6 +65,61 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 14 October 2026
+
+### No dialog close timer once the dialog has gone
+
+`fix` · `APP-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-14--fix--APP-003--no-dialog-close-timer-once-the-dialog-has-gone.md)
+
+#### Before
+
+After a save, eleven dialogs show "Saved" and close themselves 600 ms later:
+
+- leads: assign, stage, new lead;
+- orders: every action;
+- quotations;
+- complaints;
+- tasks: new, edit, action, minutes;
+- approval limits.
+
+Each cleared its timer when it went away, but none checked whether it had gone before starting one. `useAsyncAction` runs a success handler even after its component has unmounted, on purpose, so that the toast still shows. So a save that finished after the dialog was closed, or after the user left the page, started a timer that nothing would ever clear. It then closed a dialog that no longer existed.
+
+In the browser this did nothing visible. In the unit tests, a timer could outlive its test file. On 13 October, CI on PR #124 failed after all 1010 tests had passed, with "ReferenceError: window is not defined" from the lead assign dialog's timer, firing after jsdom was torn down (`lead-assign.test.tsx`).
+
+#### Now
+
+- **One hook,** `useCloseAfterSuccess` in `src/hooks/`, closes a dialog a moment after a save:
+  - its timer is cleared when the dialog goes;
+  - it is never started once the dialog has gone.
+- **Nine dialogs use it.** Their own copies are gone: three local hooks, the complaints' `useCloseLater`, and five inline timers.
+- **The new-lead and new-task dialogs** also reset their form when they close. They keep their own timer, with the same never-after-it-has-gone guard.
+- Nothing changes on screen.
+
+#### Discussion
+
+- **Why the timers and not `useAsyncAction`.** Not calling `onSuccess` after unmount would also stop the leak. But it would lose the toast, and the page change after a delete, when the user had closed the dialog mid-save. The timer is the only part that must not outlive the dialog.
+- **Ported into PR #124,** whose CI it failed. The change is identical there, so it merges cleanly whichever lands first. Any other open PR picks it up from `integration`.
+
+#### Files changed
+
+- `src/hooks/use-close-after-success.ts`: new, the hook and `CLOSE_AFTER_SUCCESS_MS`.
+- **Using the hook:**
+  - `src/features/orders/components/order-dialog-shared.tsx`, `order-action-dialog.tsx`, `record-dispatch-form.tsx`;
+  - `src/features/leads/components/lead-assign-dialog.tsx`, `lead-stage-dialog.tsx`;
+  - `src/features/quotations/components/quotation-action-dialog.tsx`;
+  - `src/features/complaints/components/complaint-dialog-parts.tsx`, `complaint-actions.tsx`, `complaint-targets.tsx`, `remedy-card.tsx`;
+  - `src/features/tasks/components/edit-task-dialog.tsx`, `minutes-dialog.tsx`, `task-action-dialog.tsx`;
+  - `src/features/approvals/components/approval-limit-dialog.tsx`.
+- **Guarded in place:** `src/features/leads/components/new-lead-dialog.tsx`, `src/features/tasks/components/new-task-dialog.tsx`.
+
+#### Tests
+
+- `src/hooks/use-close-after-success.test.ts`, `[APP-003] useCloseAfterSuccess`:
+  - closes after the moment;
+  - forgets the close when the dialog goes first;
+  - starts no timer when a save finishes after the dialog has gone (the case CI hit).
+- The dialogs' own tests pass unchanged: leads, orders, quotations, complaints, tasks and approvals, 272 tests.
 
 ## 13 October 2026
 
@@ -368,6 +425,79 @@ The backend's Excel import (FS-062, `backend/docs/api/imports.md`) and price lis
 - `src/features/quotations/lib/builder-lines.test.ts` — the sale type in previews; `draftLinesFromImport`.
 - `src/lib/format/format.test.ts` — `formatFileSize`.
 - Walked through in the mock: new list with a sale type, filter, a rate import at desktop light and phone dark, items into a quotation. axe found nothing on the dialog's four steps.
+
+### Amend an approved order
+
+`feature` · `SO-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--SO-007--amend-an-approved-order.md)
+
+#### Before
+
+Once an order was approved, nothing on it could change. The only way out was to cancel it and type a new one, which lost its number and its history. The backend has served `POST /orders/{id}/amend` since FS-036 (`settings-amend-reopen-contract.md`, migration 041), with "Amend after a voided dispatch" added in migration 064. The frontend had no screen for it.
+
+#### Now
+
+- **Amend order…** sits in an approved order's More menu, next to Cancel.
+  - **Who sees it:** staff who edit orders, or who own the order.
+  - **When:** while nothing has shipped.
+  - **Never offered:** to partner users, on a replacement order, or once something has shipped.
+- **The dialog.** It asks what needs to change, and why. The reason is required, and is kept on the order and its history. It explains what follows:
+  - the order goes back to draft under the same number;
+  - it needs approval again;
+  - its PDF is withdrawn until then;
+  - any payment instalments are cleared for Accounts to set again.
+- **The amended draft** shows a banner: "Amended after approval · it was approved at ₹…".
+  - It counts the amends when there were several.
+  - It shows the reason, for staff; a partner user reads none.
+  - It says what to do next; while the order waits again, it says that too.
+- **The old approval chain** stays visible as "Approval before the amend", saying it starts again from the first step on submit.
+- **The history** reads "Amended: back to draft" with the approved total. The lead's history reads "Sales order amended, back to draft".
+- **The edit screen** fixes the order type of an amended order, and says why. A refused change (`422 order_type_fixed`) has its own sentence.
+- **Refusals, each in words:**
+  - `409 voided_dispatch_holds_lines`: "This order had a dispatch voided. Cancel it and create a new one.", as the backend's handover asks;
+  - `409 order_has_payments`;
+  - `422 order_type_fixed`;
+  - `409 order_dispatched`;
+  - `409 status_changed`, which closes the dialog and shows the latest.
+- Checked on a desktop in light mode and a phone in dark mode. axe found nothing on the dialog, the amended order or the edit screen.
+
+#### Discussion
+
+- **In the More menu, beside Cancel,** as the contract's "Screens" section puts it. It is rare, and it undoes an approval, so it doesn't sit with the everyday buttons.
+- **What the screen checks first:** staff only (the backend refuses portal roles, GAP-352), the order approved, nothing shipped, not a replacement.
+- **What only the backend knows:** whether money is allocated, or a voided dispatch still names the lines. The order carries neither, so the backend's refusal says it in words.
+- **The old chain on a draft.** `GET /orders/{id}` returns the order's latest approval request. After an amend that is the chain that approved it before, so a draft showed four green steps. Retitling it keeps the record without suggesting the draft is approved.
+- **The setting `order_amend_reapproval`** (`always` or `value_rises`) decides whether a total that didn't rise goes straight to Accounts on resubmit. The screen doesn't read it. The wording says "needs approval again", which holds either way. The settings screen is plan item 21.
+- **Plan records:** `Docs/Plan.md` had two copies of the §9 paragraph after #114. They are merged into one, so partners and documents both appear once.
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`: `amend_count`, `amended_from_total`, `amend_reason` on the order (defaulted, so older responses still parse).
+- `src/features/orders/api/orders.api.ts`, `orders.mutations.ts`: `amendOrder`, `useAmendOrder`.
+- `src/features/orders/lib/order-lifecycle.ts`: the `amend` action, `isStaff` in the permissions, four refusals, the `order.amended` history line.
+- `src/features/orders/hooks/use-order-actions.ts`: passes `isStaff`.
+- `src/features/orders/components/order-actions.tsx`, `order-action-dialog.tsx`: the menu item and the dialog.
+- `src/features/orders/components/order-detail.tsx`: the amended banner.
+- `src/features/orders/components/order-approval.tsx`: "Approval before the amend".
+- `src/features/orders/components/order-builder.tsx`: the order type fixed after an amend; `order_type_fixed`.
+- `src/features/leads/lib/timeline-entries.ts`: the lead's history line.
+- `src/mocks/handlers/orders.ts`: `POST /orders/:id/amend` with the backend's rules, in its order.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-007.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/orders/`: records and screens.
+
+#### Tests
+
+- `src/features/orders/lib/order-lifecycle.test.ts`, `[SO-007] Amend an approved order`:
+  - who is offered it, and who isn't (partner, Dispatch, shipped, replacement, not approved);
+  - the refusals in words;
+  - the history line.
+- `src/features/orders/api/orders.test.ts`, `[SO-007] amendOrder`:
+  - back to draft under its number, with the approved total, the reason and the history event;
+  - 409 `order_dispatched`, 409 `status_changed`, 403 for a dealer.
+- `src/features/orders/components/orders-ui.test.tsx`, `[SO-007] Amend an approved order`:
+  - the whole flow, with the empty reason refused, the banner and the retitled chain;
+  - the voided-dispatch refusal in the dialog;
+  - nothing offered to a dealer.
+- Walked through in the mock as admin: desktop light (menu, dialog with the empty reason, the amended draft, the edit screen) and phone dark (dialog, amended draft).
 
 ### CI green again: CHANGELOG.md regenerated, and two tests that depended on timing
 
