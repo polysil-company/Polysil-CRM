@@ -10,12 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
-import { leadAreasQueryOptions } from "@/features/leads/api/leads.queries";
 import {
-  MAX_LEAD_AREAS,
-  type LeadArea,
-  type LeadAreaLevel,
-} from "@/features/leads/api/leads.schemas";
+  areaRowsQueryOptions,
+  type AreaRow,
+  type AreaSource,
+} from "@/features/leads/api/leads.queries";
+import { MAX_LEAD_AREAS, type LeadAreaLevel } from "@/features/leads/api/leads.schemas";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -43,16 +43,26 @@ export interface LeadAreaFilterProps {
   /** Selected territory ids, from the URL. */
   selected: readonly string[];
   onChange: (next: string[]) => void;
+  /**
+   * Where the areas come from: "leads" (the default) offers only areas holding a lead you can
+   * see, with counts; "territories" offers the whole tree, for lists such as orders (SO-001).
+   */
+  source?: AreaSource;
 }
 
 /**
- * LEAD-001 · The Area pill on the leads list: pick states, districts or talukas, drilling down
- * from the top. Only areas that hold a lead you can see are offered, each with how many.
+ * LEAD-001, SO-001 · The Area pill: pick states, districts or talukas, drilling down from the
+ * top. On the leads list only areas that hold a lead you can see are offered, each with how
+ * many; on the orders list (`source="territories"`) the whole territory tree is.
  * Choosing a district includes every taluka and village under it. The backend takes at most
  * 20 areas; past that the rest are disabled. With a single state (Gujarat today) the picker
  * starts at its districts, since choosing the state would filter nothing.
  */
-export function LeadAreaFilter({ selected, onChange }: LeadAreaFilterProps): React.JSX.Element {
+export function LeadAreaFilter({
+  selected,
+  onChange,
+  source = "leads",
+}: LeadAreaFilterProps): React.JSX.Element {
   // Kept outside the popover so it reopens where it was left.
   const [path, setPath] = useState<readonly OpenedArea[]>([]);
   // Names of areas picked in this visit, for the pill's summary; a shared link shows a count.
@@ -76,6 +86,7 @@ export function LeadAreaFilter({ selected, onChange }: LeadAreaFilterProps): Rea
       }}
     >
       <AreaPicker
+        source={source}
         path={path}
         onPathChange={setPath}
         selected={selected}
@@ -90,17 +101,19 @@ export function LeadAreaFilter({ selected, onChange }: LeadAreaFilterProps): Rea
 
 /** The popover body. It mounts when the popover opens, so nothing loads until then. */
 function AreaPicker({
+  source,
   path,
   onPathChange,
   selected,
   onToggle,
 }: {
+  source: AreaSource;
   path: readonly OpenedArea[];
   onPathChange: (next: readonly OpenedArea[]) => void;
   selected: readonly string[];
-  onToggle: (area: LeadArea, checked: boolean) => void;
+  onToggle: (area: AreaRow, checked: boolean) => void;
 }): React.JSX.Element {
-  const states = useQuery(leadAreasQueryOptions({ level: "state", parentId: null }));
+  const states = useQuery(areaRowsQueryOptions(source, { level: "state", parentId: null }));
   const onlyState = states.data?.length === 1 ? states.data[0] : undefined;
 
   // With one state, its districts are the top of the picker.
@@ -112,7 +125,7 @@ function AreaPicker({
     opened === undefined ? "state" : (CHILD_LEVEL[opened.level] ?? "taluka");
 
   const areas = useQuery({
-    ...leadAreasQueryOptions({ level, parentId: opened?.id ?? null }),
+    ...areaRowsQueryOptions(source, { level, parentId: opened?.id ?? null }),
     enabled: states.isSuccess && (level !== "state" || onlyState === undefined),
   });
   // At the top with several states, the states query is the list itself.
@@ -165,9 +178,13 @@ function AreaPicker({
         </div>
       ) : list.data.length === 0 ? (
         <p className="px-2 py-1.5 text-sm text-muted-foreground">
-          {opened === undefined
-            ? "No leads in any area yet."
-            : `No lead in ${opened.name} is filed under a ${singular(CHILD_NOUN[opened.level])} yet. Go back and choose ${opened.name} itself.`}
+          {source === "territories"
+            ? opened === undefined
+              ? "No areas are set up yet."
+              : `${opened.name} has no ${CHILD_NOUN[opened.level]}. Go back and choose ${opened.name} itself.`
+            : opened === undefined
+              ? "No leads in any area yet."
+              : `No lead in ${opened.name} is filed under a ${singular(CHILD_NOUN[opened.level])} yet. Go back and choose ${opened.name} itself.`}
         </p>
       ) : (
         <ul
@@ -188,11 +205,13 @@ function AreaPicker({
                     }}
                   />
                   <span className="flex-1 truncate">{area.name}</span>
-                  <span className="text-xs text-subtle-foreground tabular-nums">
-                    <span className="sr-only">, </span>
-                    {formatNumber(area.leadCount)}
-                    <span className="sr-only"> {area.leadCount === 1 ? "lead" : "leads"}</span>
-                  </span>
+                  {area.count === null ? null : (
+                    <span className="text-xs text-subtle-foreground tabular-nums">
+                      <span className="sr-only">, </span>
+                      {formatNumber(area.count)}
+                      <span className="sr-only"> {area.count === 1 ? "lead" : "leads"}</span>
+                    </span>
+                  )}
                 </label>
                 {child === null ? null : (
                   <Button

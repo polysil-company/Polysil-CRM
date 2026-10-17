@@ -38,7 +38,7 @@ import {
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { mockMeFor } from "@/mocks/data/sessions";
-import { findMockTerritory } from "@/mocks/data/territories";
+import { findMockTerritory, mockTerritoryLineage } from "@/mocks/data/territories";
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
@@ -156,6 +156,52 @@ function replayWrite(
         ? new HttpResponse(null, { status: 204 })
         : HttpResponse.json({ data: order }, { status }),
   };
+}
+
+/**
+ * SO-001, SO-006 · The orders a list or its export asks for: statuses, type, owner, lead,
+ * quotation, search, areas (an order sits in an area when its territory or any above it is
+ * one) and an office (the order's office, or any office above it, is the one asked for).
+ */
+function filteredOrders(params: URLSearchParams, statuses?: readonly string[]): OrderWire[] {
+  const wanted =
+    statuses ?? (params.get("status") ?? "").split(",").filter((value) => value !== "");
+  const orderType = params.get("order_type");
+  const owner = params.get("owner");
+  const leadId = params.get("lead_id");
+  const quotationId = params.get("quotation_id");
+  const q = params.get("q") ?? "";
+  const areas = new Set(
+    (params.get("territory_id") ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id !== ""),
+  );
+  const officeId = params.get("owner_org_unit_id");
+  return mockDb.orders.filter(
+    (order) =>
+      (wanted.length === 0 || wanted.includes(order.status)) &&
+      (orderType === null || order.order_type === orderType) &&
+      (owner === null || order.owner?.id === (owner === "me" ? MOCK_CREATOR?.id : owner)) &&
+      (leadId === null || order.lead?.id === leadId) &&
+      (quotationId === null ||
+        order.quotations.some((quotation) => quotation.id === quotationId)) &&
+      (areas.size === 0 ||
+        mockTerritoryLineage(order.territory.id).some((territory) => areas.has(territory.id))) &&
+      (officeId === null || officeId === "" || inOfficeTree(order.owner_org_unit.id, officeId)) &&
+      matchesSearch(order, q),
+  );
+}
+
+/** True when the office is the one asked for, or sits anywhere under it. */
+function inOfficeTree(officeId: string, ancestorId: string): boolean {
+  let current: string | null = officeId;
+  for (let hops = 0; current !== null && hops < 10; hops += 1) {
+    if (current === ancestorId) return true;
+    const id: string = current;
+    current = mockDb.offices.find((office) => office.id === id)?.parent?.id ?? null;
+  }
+  return false;
 }
 
 /** 404, or 409 status_changed when the screen showed another status. */
@@ -558,24 +604,7 @@ export const orderHandlers = [
     if (!statuses.every(isStatus)) {
       return validation({ status: "unknown status" });
     }
-    const orderType = url.searchParams.get("order_type");
-    const owner = url.searchParams.get("owner");
-    const leadId = url.searchParams.get("lead_id");
-    const quotationId = url.searchParams.get("quotation_id");
-    const q = url.searchParams.get("q") ?? "";
-    const matches =
-      scenario === "empty"
-        ? []
-        : mockDb.orders.filter(
-            (order) =>
-              (statuses.length === 0 || statuses.includes(order.status)) &&
-              (orderType === null || order.order_type === orderType) &&
-              (owner === null || order.owner?.id === (owner === "me" ? MOCK_CREATOR?.id : owner)) &&
-              (leadId === null || order.lead?.id === leadId) &&
-              (quotationId === null ||
-                order.quotations.some((quotation) => quotation.id === quotationId)) &&
-              matchesSearch(order, q),
-          );
+    const matches = scenario === "empty" ? [] : filteredOrders(url.searchParams, statuses);
     const counted = url.searchParams.get("include_total") === "true";
     const hasMore = offset + limit < matches.length;
     const body: OrderPageWire = {
@@ -591,13 +620,13 @@ export const orderHandlers = [
   }),
 
   /** SO-006 · The list as a file. Before /orders/:orderId. */
-  http.get(buildApiUrl("/orders/export"), async () => {
+  http.get(buildApiUrl("/orders/export"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     return mockWorkbook(
       "orders",
       ["Number", "Status", "Party", "Total"],
-      mockDb.orders.map((order) => [
+      filteredOrders(new URL(request.url).searchParams).map((order) => [
         order.order_no ?? "Draft",
         order.status,
         order.party.name,

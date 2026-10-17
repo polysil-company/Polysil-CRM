@@ -38,6 +38,7 @@ export function searchTerritories(
       q: params.q,
       level: params.level,
       levels: params.levels === null ? null : params.levels.join(","),
+      parent_id: params.parentId ?? null,
       limit: params.limit,
     },
     schema: territoryListResponseSchema,
