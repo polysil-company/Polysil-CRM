@@ -44,8 +44,11 @@ export interface NavItem {
   readonly dataId: DataId;
   /** Built modules have a route. Planned modules are listed (as "Soon") but are not links. */
   readonly href?: Route;
-  /** Who the item is for. "staff" hides it from partner users, whatever their permissions. */
-  readonly audience?: "staff";
+  /**
+   * Who the item is for. "staff" hides it from partner users, whatever their permissions;
+   * "partner" shows it to partner users only.
+   */
+  readonly audience?: "staff" | "partner";
   /** "approvers": shown to whoever may approve an order or a quotation discount, whatever `module` says. */
   readonly visibleTo?: "approvers";
   /** A live count shown next to the label. */
@@ -124,6 +127,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "sales_orders",
         dataId: "SO-001",
         href: "/sales-orders",
+      },
+      {
+        id: "ledger",
+        label: "My ledger",
+        description: "What you owe on approved orders, less benefits and payments made.",
+        icon: Invoice03Icon,
+        // Every partner user sees its own ledger (payments contract: dealer, own ledger).
+        module: null,
+        audience: "partner",
+        dataId: "ACCT-005",
+        href: "/ledger",
       },
       {
         id: "qr-codes",
@@ -254,6 +268,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         dataId: "ACCT-001",
         href: "/accounts",
         countSource: "accounts",
+      },
+      {
+        id: "receipts",
+        label: "Receipts",
+        description: "Payments received from dealers and for direct orders, and where each went.",
+        icon: Invoice03Icon,
+        module: "payments",
+        audience: "staff",
+        dataId: "ACCT-003",
+        href: "/receipts",
       },
       {
         id: "dealer-commissions",
@@ -390,6 +414,9 @@ export function canSeeNavItem(
     return false;
   }
   if (item.audience === "staff" && userType !== "staff") {
+    return false;
+  }
+  if (item.audience === "partner" && userType !== "partner_user") {
     return false;
   }
   if (item.visibleTo === "approvers") {

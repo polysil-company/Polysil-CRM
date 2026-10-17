@@ -1285,6 +1285,47 @@ export const DATA_IDS = {
     notes:
       "BE-022: submitted orders whose next step is Accounts', decided in Approvals; the badge is stats waiting_on.account_manager. Recording payments comes with the payments screens.",
   },
+  "ACCT-002": {
+    domain: "ACCT",
+    title:
+      "Record a payment — a receipt from a dealer (or for a direct order), spread over its orders",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /payments", "GET /orders?partner_id="],
+    notes:
+      "payments.create. A reference for NEFT, UPI and cheque; a direct order's receipt is allocated in full; what isn't allocated stays on the dealer's account.",
+  },
+  "ACCT-003": {
+    domain: "ACCT",
+    title: "Receipts — the list for Accounts, allocate what is left, void a mistake",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /payments",
+      "GET /payments/{id}",
+      "POST /payments/{id}/allocations",
+      "POST /payments/{id}/void",
+    ],
+    notes: "A receipt is voided and re-entered, never edited (409 already_void).",
+  },
+  "ACCT-004": {
+    domain: "ACCT",
+    title: "An order's payments — payable, received, balance, instalments and receipts",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /orders/{id}", "PUT /orders/{id}/payment-schedule"],
+    notes:
+      "`payments` is null for a reader who may not see payments (a field officer): the section is hidden. Up to five instalments.",
+  },
+  "ACCT-005": {
+    domain: "ACCT",
+    title: "A dealer's ledger and credit standing",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /partners/{id}/ledger", "GET /partners/{id}/credit"],
+    notes:
+      "Positive balance: the dealer owes. Credit is never shown to partners or field officers (403).",
+  },
   "DISP-002": {
     domain: "DISP",
     title: "Record a dispatch on an order, void it, close the rest short",
