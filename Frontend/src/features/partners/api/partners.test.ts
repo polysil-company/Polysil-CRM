@@ -1,15 +1,19 @@
+import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { checkImport, commitImport, uploadImport } from "@/features/imports/api/imports.api";
 import { isApiError, readFieldErrors } from "@/lib/api/errors";
+import { buildApiUrl } from "@/lib/api/url";
 import { writeMockRole } from "@/lib/dev/mock-settings";
 import { MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { mockDb, resetMockDb } from "@/mocks/db";
+import { server } from "@/mocks/node";
 
 import {
   createPartner,
   getPartner,
   listPartners,
+  lookupGstin,
   patchPartner,
   searchParents,
   setPartnerOpen,
@@ -298,5 +302,56 @@ describe("[CHNL-005] Import partners from Excel", () => {
     expect(result).toEqual({ created: 2, skipped: 3 });
     const added = await listPartners({ ...ALL, q: "Gondal" });
     expect(added.items[0]?.parent?.name).toBe("Mehsana Agro Distributors");
+  });
+});
+
+describe("[CHNL-006] lookupGstin", () => {
+  afterEach(() => {
+    writeMockRole("admin");
+  });
+
+  it("reads a GST record the backend found, trimming empty names to null", async () => {
+    server.use(
+      http.get(buildApiUrl("/gstin/:gstin"), () =>
+        HttpResponse.json({
+          data: {
+            gstin: "24AAACP1234F1Z5",
+            valid: true,
+            reason: null,
+            state_code: "24",
+            pan: "AAACP1234F",
+            lookup: "found",
+            legal_name: "Patel Agro Irrigation Private Limited",
+            trade_name: " ",
+            address: null,
+            status: "Active",
+          },
+        }),
+      ),
+    );
+
+    expect(await lookupGstin("24AAACP1234F1Z5")).toEqual({
+      gstin: "24AAACP1234F1Z5",
+      valid: true,
+      reason: null,
+      pan: "AAACP1234F",
+      lookup: "found",
+      legalName: "Patel Agro Irrigation Private Limited",
+      tradeName: null,
+      address: null,
+      status: "Active",
+    });
+  });
+
+  it("answers unavailable for a GSTIN the mock has no record of, as the backend without a provider", async () => {
+    const lookup = await lookupGstin("24ABCDE1234F1Z5");
+    expect(lookup).toMatchObject({ valid: true, lookup: "unavailable", legalName: null });
+  });
+
+  it("is refused to partner users", async () => {
+    writeMockRole("dealer");
+    await expect(lookupGstin("24AAACP1234F1Z5")).rejects.toSatisfy(
+      (error) => isApiError(error) && error.status === 403,
+    );
   });
 });

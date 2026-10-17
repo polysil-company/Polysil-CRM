@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   PARTNER_TYPES,
+  type GstinLookupWire,
   type PartnerPageWire,
   type PartnerType,
   type PartnerWire,
@@ -231,7 +232,50 @@ export function addMockPartner(record: Omit<MockPartnerRecord, "id" | "created_a
 
 const base = (rest = ""): string => buildApiUrl(`/partners${rest}`);
 
+/**
+ * CHNL-006 · The GST records the mock "finds" (FS-053). Any other well-formed GSTIN answers
+ * `unavailable`, as the backend does until it has a GST data provider key (GAP-292).
+ */
+const MOCK_GST_RECORDS: Readonly<
+  Record<string, { legal_name: string; trade_name: string | null; address: string }>
+> = {
+  "24AAACP1234F1Z5": {
+    legal_name: "Patel Agro Irrigation Private Limited",
+    trade_name: "Patel Agro",
+    address: "Plot 14, GIDC Estate, Anand, Gujarat 388001",
+  },
+  "09AABCK5678M1Z2": {
+    legal_name: "Kisan Jal Sinchai LLP",
+    trade_name: null,
+    address: "Station Road, Bareilly, Uttar Pradesh 243001",
+  },
+};
+
+function gstinLookup(gstin: string): GstinLookupWire["data"] {
+  const shape = GSTIN_PATTERN.test(gstin);
+  const base = {
+    gstin,
+    valid: shape,
+    reason: shape ? null : "A GSTIN is 15 characters, like 24ABCDE1234F1Z5.",
+    state_code: shape ? gstin.slice(0, 2) : null,
+    pan: shape ? gstin.slice(2, 12) : null,
+  };
+  const record = MOCK_GST_RECORDS[gstin];
+  if (!shape) return { ...base, lookup: "unavailable" };
+  if (record === undefined) return { ...base, lookup: "unavailable" };
+  return { ...base, lookup: "found", ...record, status: "Active" };
+}
+
 export const partnerHandlers = [
+  http.get(buildApiUrl("/gstin/:gstin"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!staffCaller() || !allowed("view")) return forbidden();
+
+    const body: GstinLookupWire = { data: gstinLookup(String(params.gstin).toUpperCase()) };
+    return HttpResponse.json(body);
+  }),
+
   http.get(base(), async ({ request }) => {
     const { scenario, failure } = await applyScenario();
     if (failure) return failure;

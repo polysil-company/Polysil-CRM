@@ -23,6 +23,16 @@ function leadAt(stage: LeadStage): (typeof mockDb.leads)[number] {
   return lead;
 }
 
+function dealershipAt(stage: LeadStage): (typeof mockDb.leads)[number] {
+  const lead = mockDb.leads.find(
+    (item) => item.stage === stage && item.inquiry_type === "dealership",
+  );
+  if (lead === undefined) {
+    throw new Error(`No ${stage} dealership lead in the mock database`);
+  }
+  return lead;
+}
+
 /** Unit tests have no access token, so the session is served directly for one role. */
 function signInAs(role: Role): void {
   server.use(http.get(buildApiUrl("/auth/me"), () => HttpResponse.json(mockMeFor(role))));
@@ -200,6 +210,63 @@ describe("[LEAD-007] LeadStageMenu", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: "Update stage" })).not.toBeInTheDocument();
     });
+  });
+
+  it("wins a qualified dealership lead and shows its application link once (LEAD-015)", async () => {
+    signInAs("employee");
+    const lead = dealershipAt("qualified");
+    const user = showLead(lead.id);
+    expect(await screen.findByText(/Dealership/)).toBeInTheDocument();
+
+    const menu = await openStageMenu(user);
+    expect(within(menu).getByRole("menuitem", { name: "Mark as won" })).toHaveAccessibleDescription(
+      "They're to become a dealer. Closes the lead and starts their dealer application.",
+    );
+    await user.click(within(menu).getByRole("menuitem", { name: "Mark as won" }));
+    const dialog = await screen.findByRole("dialog", { name: "Mark as won" });
+    expect(within(dialog).getByText(/A dealership lead needs no quotation/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Mark as won" }));
+
+    const started = await screen.findByRole("dialog", { name: "Dealer application started" });
+    const url = `https://crm.polysil.example/dealer-apply/apply-${lead.id.slice(-8)}`;
+    expect(within(started).getByText(url)).toBeInTheDocument();
+    expect(
+      within(started).getByRole("button", { name: "Copy the application link" }),
+    ).toBeInTheDocument();
+    const share = within(started).getByRole("link", { name: "Share on WhatsApp" });
+    expect(share.getAttribute("href")).toContain(
+      `https://wa.me/${lead.mobile.replace(/\D/g, "")}?text=`,
+    );
+    expect(decodeURIComponent(share.getAttribute("href") ?? "")).toContain(url);
+    expect(lead.stage).toBe("won");
+
+    await user.click(within(started).getByRole("button", { name: "Done" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Update stage" })).not.toBeInTheDocument();
+  });
+
+  it("says why winning a dealership lead started no application (LEAD-015)", async () => {
+    signInAs("employee");
+    const lead = dealershipAt("qualified");
+    const partner = mockDb.partners[0];
+    if (partner === undefined) throw new Error("No partner");
+    lead.mobile = `+${partner.mobile ?? ""}`;
+    const user = showLead(lead.id);
+
+    const menu = await openStageMenu(user);
+    await user.click(within(menu).getByRole("menuitem", { name: "Mark as won" }));
+    const dialog = await screen.findByRole("dialog", { name: "Mark as won" });
+    await user.click(within(dialog).getByRole("button", { name: "Mark as won" }));
+
+    const won = await screen.findByRole("dialog", { name: "Lead won, no application started" });
+    expect(
+      within(won).getByText(
+        "Their mobile number already belongs to a channel partner, so no application was started.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(won).queryByRole("link", { name: "Share on WhatsApp" })).not.toBeInTheDocument();
   });
 
   it("shows no menu on a won lead, or to someone who cannot edit leads", async () => {

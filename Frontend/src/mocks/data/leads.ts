@@ -246,6 +246,20 @@ export function generateLeads(
     leads.push(lead);
   }
 
+  // A few prospective dealers (FS-053), chosen without drawing on `random`, so every other
+  // lead stays as it was: two qualified, ready to be won, and one new.
+  for (const [stage, take] of [
+    ["qualified", 2],
+    ["new", 1],
+  ] as const) {
+    leads
+      .filter((lead) => lead.stage === stage && lead.inquiry_type === "commercial")
+      .slice(0, take)
+      .forEach((lead) => {
+        lead.inquiry_type = "dealership";
+      });
+  }
+
   // Newest first, as the backend lists them; every lead must satisfy the contract.
   return leads
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))

@@ -313,6 +313,14 @@ export const DATA_IDS = {
     notes:
       "No sign-in. The mobile is checked with a six-digit WhatsApp code before the lead is made.",
   },
+  "LEAD-015": {
+    domain: "LEAD",
+    title: "Dealership enquiries — won from qualified, starting a dealer application",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{id}/transition"],
+    notes: "FS-053: `inquiry_type: dealership`; the winning answer carries `dealer_application`.",
+  },
   "RPT-001": {
     domain: "RPT",
     title: "Dashboard overview — KPIs, pipeline, follow-ups, area by system, targets",
@@ -685,6 +693,14 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     endpoints: ["POST /imports", "POST /imports/{id}/check", "POST /imports/{id}/commit"],
+  },
+  "CHNL-006": {
+    domain: "CHNL",
+    title: "GSTIN details — fill a partner's names from the GST record",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /gstin/{gstin}"],
+    notes: "`lookup` is unavailable until the backend has a GST data provider key (GAP-292).",
   },
   "MKT-001": {
     domain: "MKT",

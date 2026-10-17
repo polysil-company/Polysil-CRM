@@ -37,6 +37,11 @@ import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { readFieldErrors } from "@/lib/api/errors";
 import { createLogger } from "@/lib/logger";
 
+import {
+  DealerApplicationStarted,
+  type DealerApplicationStart,
+} from "./dealer-application-started";
+
 const log = createLogger({
   file: "features/leads/components/lead-stage-dialog.tsx",
   dataId: "LEAD-007",
@@ -254,6 +259,9 @@ function MarkWonForm({ lead, onClose }: FormProps): React.JSX.Element {
   const idempotency = useIdempotencyKey();
   const refusal = useRefusal(onClose);
   const closeSoon = useCloseAfterSuccess(onClose);
+  // LEAD-015 · Winning a dealership lead answers with its dealer application, shown once.
+  const [started, setStarted] = useState<DealerApplicationStart | null>(null);
+  const dealership = lead.type === "dealership";
 
   const submit = useAsyncAction({
     action: () => {
@@ -272,12 +280,20 @@ function MarkWonForm({ lead, onClose }: FormProps): React.JSX.Element {
     logger: log,
     fn: "handleMarkWon",
     dataId: "LEAD-007",
-    onSuccess: () => {
+    onSuccess: (won) => {
       toast.success("Lead won", { description: lead.customerName });
-      closeSoon();
+      if (won.dealerApplication === null) {
+        closeSoon();
+      } else {
+        setStarted(won.dealerApplication);
+      }
     },
     onError: refusal.handle,
   });
+
+  if (started !== null) {
+    return <DealerApplicationStarted lead={lead} started={started} />;
+  }
 
   return (
     <form
@@ -298,7 +314,9 @@ function MarkWonForm({ lead, onClose }: FormProps): React.JSX.Element {
       </DialogHeader>
       <DialogBody>
         <p className="text-sm text-muted-foreground">
-          The lead needs an accepted quotation. If it has none yet, accept the quotation first.
+          {dealership
+            ? "A dealership lead needs no quotation. Winning it starts their dealer application, with a link to send them."
+            : "The lead needs an accepted quotation. If it has none yet, accept the quotation first."}
         </p>
         <RefusalAlert message={refusal.message} />
       </DialogBody>
