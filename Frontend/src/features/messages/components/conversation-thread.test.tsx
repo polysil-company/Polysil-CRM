@@ -16,7 +16,8 @@ import { createTestQueryClient, renderWithProviders } from "@/test/render";
 
 import { ConversationThread } from "./conversation-thread";
 
-vi.mock("next/navigation", () => ({ notFound: vi.fn() }));
+const replace = vi.fn();
+vi.mock("next/navigation", () => ({ notFound: vi.fn(), useRouter: () => ({ replace }) }));
 
 function signedInClient(): QueryClient {
   const queryClient = createTestQueryClient();
@@ -145,7 +146,7 @@ describe("[MSG-002] ConversationThread", () => {
       http.post(buildApiUrl("/conversations/:conversationId/messages"), () => {
         left = true;
         const conversation = mockDb.conversations.find((item) => item.id === "conv-003");
-        if (conversation !== undefined) {
+        if (conversation?.participant) {
           conversation.participant = { ...conversation.participant, is_active: false };
         }
         return HttpResponse.json(

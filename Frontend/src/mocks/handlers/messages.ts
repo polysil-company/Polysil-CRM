@@ -2,15 +2,21 @@ import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
 import {
+  addMembersRequestSchema,
+  createGroupRequestSchema,
+  GROUP_MAX_MEMBERS,
+  renameGroupRequestSchema,
   sendMessageRequestSchema,
   startConversationRequestSchema,
   type ConversationListResponse,
   type ConversationResponse,
   type ConversationWire,
   type MarkConversationReadResponse,
+  type MemberListResponse,
   type MessageListResponse,
   type MessageResponse,
   type MessageWire,
+  type PersonWire,
   type StaffDirectoryResponse,
 } from "@/features/messages/api/messages.schemas";
 import { buildApiUrl } from "@/lib/api/url";
@@ -19,8 +25,10 @@ import { readMockRole } from "@/lib/dev/mock-settings";
 import {
   findMockStaff,
   MOCK_CURRENT_STAFF_ID,
+  MOCK_CURRENT_STAFF_PERSON,
   MOCK_STAFF_DIRECTORY,
   mockLeadLabel,
+  type MockGroupMember,
 } from "@/mocks/data/messages";
 import { mockDb } from "@/mocks/db";
 
@@ -71,13 +79,86 @@ function unreadAfter(conversation: ConversationWire, upTo: string | null): numbe
     .filter((message) => message.conversation_id === conversation.id)
     .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
   const from = upTo === null ? thread.length : thread.findIndex((message) => message.id === upTo);
-  return thread
-    .slice(from + 1)
-    .filter((message) => message.sender_id === conversation.participant.id).length;
+  return thread.slice(from + 1).filter((message) => message.sender_id !== MOCK_CURRENT_STAFF_ID)
+    .length;
+}
+
+// ── MSG-006 · groups ──────────────────────────────────────────────────────────
+
+function membersOf(conversationId: string): MockGroupMember[] {
+  return mockDb.groupMembers.get(conversationId) ?? [];
+}
+
+function currentMembersOf(conversationId: string): MockGroupMember[] {
+  return membersOf(conversationId).filter((member) => member.leftAt === null);
+}
+
+function inGroup(conversationId: string, userId: string): boolean {
+  return currentMembersOf(conversationId).some((member) => member.userId === userId);
+}
+
+function personOf(userId: string): PersonWire {
+  return userId === MOCK_CURRENT_STAFF_ID
+    ? MOCK_CURRENT_STAFF_PERSON
+    : (findMockStaff(userId) ?? { id: userId, full_name: "Former colleague", is_active: false });
+}
+
+/** A group's name, size and manager, as they stand now. */
+function withGroupInfo(conversation: ConversationWire): ConversationWire {
+  if (conversation.kind !== "group" || !conversation.group) return conversation;
+  const current = currentMembersOf(conversation.id);
+  const managerId = current.find((member) => member.isManager)?.userId ?? null;
+  return {
+    ...conversation,
+    group: {
+      ...conversation.group,
+      member_count: current.length,
+      manager_id: managerId,
+      i_manage: managerId === MOCK_CURRENT_STAFF_ID,
+    },
+  };
+}
+
+/** Someone who leaves sees nothing of the group: it isn't theirs while they are out. */
+function isMine(conversation: ConversationWire): boolean {
+  return conversation.kind !== "group" || inGroup(conversation.id, MOCK_CURRENT_STAFF_ID);
 }
 
 function findConversation(conversationId: string): ConversationWire | undefined {
-  return mockDb.conversations.find((conversation) => conversation.id === conversationId);
+  const conversation = mockDb.conversations.find((item) => item.id === conversationId);
+  return conversation !== undefined && isMine(conversation)
+    ? withGroupInfo(conversation)
+    : undefined;
+}
+
+function findGroup(conversationId: string): ConversationWire | undefined {
+  const conversation = findConversation(conversationId);
+  return conversation?.kind === "group" ? conversation : undefined;
+}
+
+function memberList(conversationId: string): MemberListResponse {
+  // Current members first, then those who have left; each by when they were added.
+  const members = [...membersOf(conversationId)].sort(
+    (a, b) =>
+      Number(a.leftAt !== null) - Number(b.leftAt !== null) ||
+      Date.parse(a.addedAt) - Date.parse(b.addedAt),
+  );
+  return {
+    data: members.map((member) => ({
+      person: personOf(member.userId),
+      added_at: member.addedAt,
+      left_at: member.leftAt,
+      is_manager: member.isManager,
+    })),
+  };
+}
+
+/** Colleagues who may join a group: active staff in the directory, not the user. */
+function joinable(userIds: readonly string[]): boolean {
+  return userIds.every((id) => {
+    const person = findMockStaff(id);
+    return person !== undefined && person.is_active !== false;
+  });
 }
 
 function unreadTotal(): number {
@@ -105,6 +186,14 @@ function scheduleReply(conversation: ConversationWire): void {
     return;
   }
   const body = AUTO_REPLIES[sequence % AUTO_REPLIES.length] ?? "Okay.";
+  // In a group, the first other member answers.
+  const replierId =
+    conversation.participant?.id ??
+    currentMembersOf(conversation.id).find((member) => member.userId !== MOCK_CURRENT_STAFF_ID)
+      ?.userId;
+  if (replierId === undefined) {
+    return;
+  }
   setTimeout(() => {
     if (findConversation(conversation.id) === undefined) {
       return;
@@ -113,7 +202,7 @@ function scheduleReply(conversation: ConversationWire): void {
       {
         id: nextId("msg"),
         conversation_id: conversation.id,
-        sender_id: conversation.participant.id,
+        sender_id: replierId,
         body,
         resource: null,
         created_at: new Date().toISOString(),
@@ -139,7 +228,13 @@ export const messageHandlers = [
       scenario === "empty"
         ? []
         : mockDb.conversations
-            .filter((conversation) => conversation.last_message !== null)
+            // A group is listed from the moment it is made, while the user is in it.
+            .filter((conversation) =>
+              conversation.kind === "group"
+                ? isMine(conversation)
+                : conversation.last_message !== null,
+            )
+            .map(withGroupInfo)
             .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
     const body: ConversationListResponse = {
       data: conversations,
@@ -189,7 +284,8 @@ export const messageHandlers = [
     }
 
     const existing = mockDb.conversations.find(
-      (conversation) => conversation.participant.id === participant.id,
+      (conversation) =>
+        conversation.kind !== "group" && conversation.participant?.id === participant.id,
     );
     if (existing) {
       const body: ConversationResponse = { data: existing };
@@ -198,6 +294,7 @@ export const messageHandlers = [
 
     const conversation: ConversationWire = {
       id: nextId("conv"),
+      kind: "direct",
       participant,
       last_message: null,
       unread_count: 0,
@@ -255,7 +352,8 @@ export const messageHandlers = [
       return conversationNotFound();
     }
 
-    if (conversation.participant.is_active === false) {
+    // Never in a group: a member who leaves the company stays listed.
+    if (conversation.kind !== "group" && conversation.participant?.is_active === false) {
       return errorResponse(422, "participant_inactive", "That colleague has left.", {
         participant: "no longer active",
       });
@@ -321,5 +419,150 @@ export const messageHandlers = [
     );
     const body: MarkConversationReadResponse = { data: { unread_total: unreadTotal() } };
     return HttpResponse.json(body);
+  }),
+
+  http.post(buildApiUrl("/conversations/groups"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (isPartnerRole(readMockRole())) return forbidden();
+
+    const parsed = createGroupRequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return validation({ name: "a name of 1 to 80", member_ids: "1 to 49 colleagues" });
+    }
+    const memberIds = [...new Set(parsed.data.member_ids)].filter(
+      (id) => id !== MOCK_CURRENT_STAFF_ID,
+    );
+    if (memberIds.length === 0 || !joinable(memberIds)) {
+      return validation({ member_ids: "not everyone chosen is active staff" });
+    }
+
+    const now = new Date().toISOString();
+    const id = nextId("grp");
+    mockDb.groupMembers.set(id, [
+      { userId: MOCK_CURRENT_STAFF_ID, addedAt: now, leftAt: null, isManager: true },
+      ...memberIds.map((userId) => ({ userId, addedAt: now, leftAt: null, isManager: false })),
+    ]);
+    const conversation: ConversationWire = {
+      id,
+      kind: "group",
+      participant: null,
+      group: {
+        name: parsed.data.name,
+        member_count: memberIds.length + 1,
+        manager_id: MOCK_CURRENT_STAFF_ID,
+        i_manage: true,
+      },
+      last_message: null,
+      unread_count: 0,
+      updated_at: now,
+    };
+    mockDb.conversations = [conversation, ...mockDb.conversations];
+    const body: ConversationResponse = { data: conversation };
+    return HttpResponse.json(body, { status: 201 });
+  }),
+
+  http.patch(buildApiUrl("/conversations/:conversationId"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (isPartnerRole(readMockRole())) return forbidden();
+
+    const conversation = findConversation(String(params.conversationId));
+    if (conversation === undefined) return conversationNotFound();
+    if (conversation.kind !== "group" || !conversation.group) {
+      return errorResponse(422, "not_a_group", "Only a group has a name.");
+    }
+    if (!conversation.group.i_manage) {
+      return errorResponse(403, "insufficient_permission", "Only the group's manager renames it.");
+    }
+    const parsed = renameGroupRequestSchema.safeParse(await request.json());
+    if (!parsed.success) return validation({ name: "a name of 1 to 80" });
+
+    const { name } = parsed.data;
+    mockDb.conversations = mockDb.conversations.map((item) =>
+      item.id === conversation.id && item.group
+        ? { ...item, group: { ...item.group, name } }
+        : item,
+    );
+    const renamed = findConversation(conversation.id);
+    if (renamed === undefined) return conversationNotFound();
+    const body: ConversationResponse = { data: renamed };
+    return HttpResponse.json(body);
+  }),
+
+  http.get(buildApiUrl("/conversations/:conversationId/members"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (isPartnerRole(readMockRole())) return forbidden();
+
+    const group = findGroup(String(params.conversationId));
+    if (group === undefined) return conversationNotFound();
+    return HttpResponse.json(memberList(group.id));
+  }),
+
+  http.post(buildApiUrl("/conversations/:conversationId/members"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (isPartnerRole(readMockRole())) return forbidden();
+
+    const group = findGroup(String(params.conversationId));
+    if (group === undefined) return conversationNotFound();
+    const parsed = addMembersRequestSchema.safeParse(await request.json());
+    if (!parsed.success || !joinable(parsed.data.user_ids)) {
+      return validation({ user_ids: "not everyone chosen is active staff" });
+    }
+
+    const members = membersOf(group.id);
+    const joining = [...new Set(parsed.data.user_ids)].filter((id) => !inGroup(group.id, id));
+    if (currentMembersOf(group.id).length + joining.length > GROUP_MAX_MEMBERS) {
+      return errorResponse(422, "group_full", "A group takes 50 people.", {
+        user_ids: "the group would be over 50",
+      });
+    }
+    const now = new Date().toISOString();
+    for (const userId of joining) {
+      const before = members.find((member) => member.userId === userId);
+      if (before === undefined) {
+        members.push({ userId, addedAt: now, leftAt: null, isManager: false });
+      } else {
+        // Back again: they see the whole history.
+        before.leftAt = null;
+        before.addedAt = now;
+      }
+    }
+    mockDb.groupMembers.set(group.id, members);
+    return HttpResponse.json(memberList(group.id));
+  }),
+
+  http.delete(buildApiUrl("/conversations/:conversationId/members/:userId"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (isPartnerRole(readMockRole())) return forbidden();
+
+    const group = findGroup(String(params.conversationId));
+    const userId = String(params.userId);
+    if (group === undefined || !inGroup(group.id, userId)) return conversationNotFound();
+    const leaving = userId === MOCK_CURRENT_STAFF_ID;
+    if (!leaving && group.group?.i_manage !== true) {
+      return errorResponse(
+        403,
+        "insufficient_permission",
+        "Only the group's manager removes people.",
+      );
+    }
+
+    const members = membersOf(group.id);
+    const member = members.find((item) => item.userId === userId && item.leftAt === null);
+    if (member === undefined) return conversationNotFound();
+    member.leftAt = new Date().toISOString();
+    if (member.isManager) {
+      // The longest-standing active member takes over.
+      member.isManager = false;
+      const next = members
+        .filter((item) => item.leftAt === null)
+        .sort((a, b) => Date.parse(a.addedAt) - Date.parse(b.addedAt))[0];
+      if (next !== undefined) next.isManager = true;
+    }
+    return new HttpResponse(null, { status: 204 });
   }),
 ];

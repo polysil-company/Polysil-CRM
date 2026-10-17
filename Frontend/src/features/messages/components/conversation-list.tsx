@@ -1,6 +1,6 @@
 "use client";
 
-import { BubbleChatIcon } from "@hugeicons/core-free-icons";
+import { BubbleChatIcon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -11,16 +11,19 @@ import { QueryView } from "@/components/patterns/query-view";
 import { Avatar, AvatarFallback, getInitials } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { conversationListQueryOptions } from "@/features/messages/api/messages.queries";
-import type { Conversation } from "@/features/messages/api/messages.schemas";
+import { conversationName, type Conversation } from "@/features/messages/api/messages.schemas";
 import { formatConversationTime } from "@/features/messages/lib/format-messages";
 import { useSession } from "@/features/session/hooks/use-session";
 import { useNow } from "@/hooks/use-now";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { memberCountLabel } from "./group-info-dialog";
 import { NewConversationLauncher } from "./new-conversation-dialog";
+import { NewGroupDialog } from "./new-group-dialog";
 
 export interface ConversationListProps {
   activeConversationId: string | null;
@@ -40,16 +43,19 @@ export function ConversationList({
     <div className={cn("min-h-0 flex-col", className)}>
       <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
         <h2 className="text-sm font-semibold text-foreground">Conversations</h2>
-        {/* Reading the shared lead from the URL needs a Suspense boundary during prerendering. */}
-        <Suspense
-          fallback={
-            <Button variant="outline" size="sm" disabled>
-              New message
-            </Button>
-          }
-        >
-          <NewConversationLauncher activeConversationId={activeConversationId} />
-        </Suspense>
+        <div className="flex items-center gap-1.5">
+          {/* Reading the shared lead from the URL needs a Suspense boundary during prerendering. */}
+          <Suspense
+            fallback={
+              <Button variant="outline" size="sm" disabled>
+                New message
+              </Button>
+            }
+          >
+            <NewConversationLauncher activeConversationId={activeConversationId} />
+          </Suspense>
+          <NewGroupDialog />
+        </div>
       </div>
       <div className="min-h-0 flex-1 scrollbar-thin overflow-y-auto">
         <QueryView
@@ -96,12 +102,18 @@ function ConversationRow({
   myId: string | null;
 }): React.JSX.Element {
   const now = new Date(useNow());
-  const { participant, lastMessage, unreadCount } = conversation;
+  const { lastMessage, unreadCount } = conversation;
+  const name = conversationName(conversation);
   const unread = unreadCount > 0;
-  const preview =
+  const message =
     lastMessage === null
       ? "No messages yet"
       : `${lastMessage.senderId === myId ? "You: " : ""}${lastMessage.body}`;
+  // A group row shows how many are in it (MSG-006).
+  const preview =
+    conversation.kind === "group"
+      ? `${memberCountLabel(conversation.group.memberCount)} · ${message}`
+      : message;
 
   return (
     <Link
@@ -113,7 +125,13 @@ function ConversationRow({
       )}
     >
       <Avatar size="lg">
-        <AvatarFallback>{getInitials(participant.name)}</AvatarFallback>
+        <AvatarFallback>
+          {conversation.kind === "group" ? (
+            <Icon icon={UserGroupIcon} label="Group" />
+          ) : (
+            getInitials(name)
+          )}
+        </AvatarFallback>
       </Avatar>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-baseline justify-between gap-2">
@@ -123,7 +141,7 @@ function ConversationRow({
               unread ? "font-semibold" : "font-medium",
             )}
           >
-            {participant.name}
+            {name}
           </span>
           <time
             dateTime={conversation.updatedAt}

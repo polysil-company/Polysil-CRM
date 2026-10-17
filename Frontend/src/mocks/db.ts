@@ -21,7 +21,7 @@ import { seedDocuments, type MockDocument } from "./data/documents";
 import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
 import { generateLeads } from "./data/leads";
-import { generateConversations } from "./data/messages";
+import { generateConversations, generateGroups, type MockGroupMember } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
 import { seedPartners, type MockPartnerRecord } from "./data/partners";
@@ -73,6 +73,8 @@ export interface MockDb {
   notifications: NotificationWire[];
   conversations: ConversationWire[];
   messages: MessageWire[];
+  /** Who is, or was, in each group, by conversation id (MSG-006). */
+  groupMembers: Map<string, MockGroupMember[]>;
   /** POST /leads replays: Idempotency-Key → the request body and the lead it created. */
   leadCreations: Map<string, { body: string; leadId: string }>;
   /** Events written through the mock (notes, stage changes), by lead, newest first. */
@@ -157,7 +159,8 @@ export interface MockDb {
 function createMockDb(): MockDb {
   const products = seedProducts();
   const leads = generateLeads();
-  const { conversations, messages } = generateConversations(leads);
+  const direct = generateConversations(leads);
+  const groups = generateGroups();
   const quotations = generateQuotations(leads);
   const district = leads.find((lead) => lead.territory.level === "district")?.territory;
   const thresholds = seedThresholds(
@@ -188,8 +191,9 @@ function createMockDb(): MockDb {
       ),
       order: orders.find((order) => order.status === "approved"),
     }),
-    conversations,
-    messages,
+    conversations: [...direct.conversations, ...groups.conversations],
+    messages: [...direct.messages, ...groups.messages],
+    groupMembers: groups.members,
     leadCreations: new Map(),
     leadEvents: new Map(),
     noteCreations: new Map(),
