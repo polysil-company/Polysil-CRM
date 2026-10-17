@@ -29,6 +29,7 @@ ID tells you *which functionality*, and the request ID tells you *which request*
 | `TGT` | Sales targets and achievement |
 | `MKT` | Marketing and promotional offers |
 | `SCHM` | Schemes |
+| `RWD` | Reward points — balances, gifts, rules and points on an order |
 | `MSTR` | Masters — products, stock, price lists, territories |
 | `RPT` | Reports and dashboards |
 | `SUBS` | Subsidy forms and case status |
@@ -212,6 +213,10 @@ The registry file is the source of truth; this snapshot helps reading.
 | SCHM-003 | A period scheme's standing (`GET /schemes/{id}/standing`) | shared | in-progress |
 | SCHM-004 | Scheme credits (`GET /scheme-entitlements`) | shared | in-progress |
 | SCHM-005 | Scheme benefits on an order: the preview on a draft, the benefits and To pay after submit (`GET /orders/{id}/schemes`, `benefits` and `payable` on `GET /orders/{id}`) | shared | in-progress |
+| RWD-001 | Reward points: a balance, its history, the gifts, and asking for one (`/rewards/balance`, `/rewards/ledger`, `/gifts`, `/rewards/gift-redemptions`) | shared | in-progress |
+| RWD-002 | The gift desk: fulfil or reject (`/rewards/gift-redemptions/{id}/fulfil`, `/reject`) | shared | in-progress |
+| RWD-003 | Reward admin: rules, settings, gifts, adjustments (`/reward-rules`, `/reward-settings`, `/gifts`, `/rewards/adjustments`) | shared | in-progress |
+| RWD-004 | Reward points on a dealer's draft order (`POST`/`DELETE /orders/{id}/reward-redemption`) | shared | in-progress |
 | MSTR-001 | Masters — the Admin → Masters area: lists, lead scoring and offices (`/masters`) | shared | in-progress |
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |

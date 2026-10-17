@@ -38,6 +38,7 @@ export const DATA_ID_DOMAINS = {
   TGT: "Sales targets and achievement",
   MKT: "Marketing and promotional offers",
   SCHM: "Schemes",
+  RWD: "Reward points — balances, gifts, rules and points on an order",
   MSTR: "Masters — products, stock, price lists, territories",
   RPT: "Reports and dashboards",
   SUBS: "Subsidy forms and case status",
@@ -811,6 +812,61 @@ export const DATA_IDS = {
     endpoints: ["GET /orders/{id}/schemes", "GET /orders/{id}"],
     notes:
       "A benefit lowers payable, never the invoice. The preview is draft only (409 order_not_draft); a reversed benefit shows struck through.",
+  },
+  "RWD-001": {
+    domain: "RWD",
+    title: "Reward points — a balance and its history, the gift catalogue, and asking for a gift",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /rewards/balance",
+      "GET /rewards/ledger",
+      "GET /gifts",
+      "GET /rewards/gift-redemptions",
+      "POST /rewards/gift-redemptions",
+      "POST /rewards/gift-redemptions/{id}/withdraw",
+      "GET /reward-settings",
+    ],
+    notes:
+      "rewards.create redeems: every partner user holds it (GAP-043); staff below Admin can't redeem yet (GAP-336). A field officer sees only their own points.",
+  },
+  "RWD-002": {
+    domain: "RWD",
+    title: "The gift desk — fulfil or reject the gifts dealers asked for",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /rewards/gift-redemptions?status=pending",
+      "POST /rewards/gift-redemptions/{id}/fulfil",
+      "POST /rewards/gift-redemptions/{id}/reject",
+    ],
+    notes: "rewards.approve; not the requester. A reject needs a remark and gives the points back.",
+  },
+  "RWD-003": {
+    domain: "RWD",
+    title: "Reward admin — earning rules, point settings, the gift catalogue and adjustments",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /reward-rules",
+      "POST /reward-rules",
+      "PATCH /reward-rules/{id}",
+      "PUT /reward-settings",
+      "POST /gifts",
+      "PATCH /gifts/{id}",
+      "POST /rewards/adjustments",
+    ],
+    notes:
+      "rewards.edit. A rule that has awarded points changes only its end date and active flag (409 rule_in_use); settings change once a day (409 settings_changed_today).",
+  },
+  "RWD-004": {
+    domain: "RWD",
+    title: "Reward points on a dealer's draft order — held now, taken off To pay at submit",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /orders/{id}/reward-redemption", "DELETE /orders/{id}/reward-redemption"],
+    notes:
+      "The dealer's own user, on its draft. At most max_redeem_pct of the order total; whole points only; points not needed go back. 422 insufficient_points, over_redeem_limit; 409 points_on_order.",
   },
   "MSTR-001": {
     domain: "MSTR",
