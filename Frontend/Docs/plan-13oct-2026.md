@@ -146,7 +146,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
   - [x] **30b. Export and sample orders** (SO-010) on the order and quotation forms, the preview's tax treatment, and the fields on their pages. PR #166, 18 Oct (`feature/SO-010-export-sample-orders`).
 - [x] **31. Dealer tasks** (TASK-009): a Dealers group in New task, and a dealer's own Tasks page with Done only, while `tasks_for_dealers` is on. PR #168, 18 Oct (`feature/TASK-009-dealer-tasks`).
 - [x] **32. Complaint holidays and escalation** (MSTR-019, CMPL-012): Masters → Holidays, and a missed target marked on the complaint, in its history and in the bell. PR #169, 18 Oct (`feature/CMPL-012-holidays-escalation`).
-- [ ] **33. The customer record** (4). `customer-record.md`.
+- [x] **33. The customer record** (LEAD-016…018): Sales → Customers, a customer's page with its leads, quotations, orders and timeline, Edit and consent, and the link from a lead. PR #170, 18 Oct (`feature/LEAD-016-customer-record`).
 - [ ] **34. Ratings, and the consumer portal** (4 + 8). `ratings-contract.md`, `consumer-portal.md`.
 - [ ] **35. Field tracking map screens** (16; the Android app is separate). `field-tracking-contract.md`.
 - [ ] **36. The in-app assistant** (2). `in-app-assistant.md`.

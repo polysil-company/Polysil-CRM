@@ -304,6 +304,17 @@ function LeadDetailView({ lead }: { lead: Lead }): React.JSX.Element {
           <CardContent>
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
               <DetailItem label="Mobile">{formatIndianPhone(lead.phone)}</DetailItem>
+              {/* LEAD-017 · set once the lead is qualified */}
+              {lead.customerId === null ? null : (
+                <DetailItem label="Customer">
+                  <Link
+                    href={`/customers/${lead.customerId}`}
+                    className="font-medium text-primary-text underline-offset-4 hover:underline"
+                  >
+                    Open the customer
+                  </Link>
+                </DetailItem>
+              )}
               <DetailItem label="Email">{lead.email ?? EMPTY_VALUE}</DetailItem>
               <DetailItem label="Territory">{formatTerritory(lead.territory)}</DetailItem>
               <DetailItem label="Village">{lead.village ?? EMPTY_VALUE}</DetailItem>

@@ -28,7 +28,7 @@ describe("[APP-001] navigation", () => {
   it("shows the modules the user may view, and the dashboard to everyone", () => {
     expect(
       visibleIds([{ module: "leads", actions: ["view", "create"], scope: "org_subtree" }]),
-    ).toEqual(["dashboard", "leads"]);
+    ).toEqual(["dashboard", "leads", "customers"]);
     expect(visibleIds([])).toEqual(["dashboard"]);
   });
 

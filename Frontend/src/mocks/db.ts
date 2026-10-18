@@ -1,6 +1,7 @@
 import type { ThresholdWire } from "@/features/approvals/api/approvals.schemas";
 import type { CommissionWire, RateWire } from "@/features/commission/api/commission.schemas";
 import type { SlaPolicyWire } from "@/features/complaints/api/complaints.schemas";
+import type { CustomerWire } from "@/features/customers/api/customers.schemas";
 import type { QrCodeWire } from "@/features/lead-capture/api/lead-capture.schemas";
 import type { LeadStage, LeadWire, TimelineEventWire } from "@/features/leads/api/leads.schemas";
 import type { LookupList, LookupListWire } from "@/features/lookups/api/lookups.schemas";
@@ -35,6 +36,7 @@ import { seedApprovals, seedThresholds, type MockApprovalStep } from "./data/app
 import { seedCampaigns, tagLeadsWithCampaigns, type MockCampaign } from "./data/campaigns";
 import { seedCommissionRates } from "./data/commission";
 import { generateComplaints, seedSlaPolicies, type MockComplaint } from "./data/complaints";
+import { deriveCustomers } from "./data/customers";
 import type { MockDealerApplication } from "./data/dealer-applications";
 import { seedDocuments, type MockDocument } from "./data/documents";
 import { seedHolidays } from "./data/holidays";
@@ -146,6 +148,9 @@ export interface MockDb {
   minutesWrites: Map<string, { body: string; minutesId: string }>;
   /** Complaints, newest first (CMPL-001…). */
   complaints: MockComplaint[];
+  /** LEAD-016 · One per mobile among qualified leads; their own edits on the timeline. */
+  customers: CustomerWire[];
+  customerEvents: Map<string, TimelineEventWire[]>;
   /** MSTR-019 · The days complaint targets skip. */
   holidays: HolidayWire[];
   /** Complaint writes: Idempotency-Key → the request and the complaint it made or changed. */
@@ -253,6 +258,7 @@ function createMockDb(): MockDb {
   const products = seedProducts();
   const warehouses = seedWarehouses();
   const leads = generateLeads();
+  const customers = deriveCustomers(leads);
   const campaigns = seedCampaigns();
   tagLeadsWithCampaigns(leads, campaigns);
   const direct = generateConversations(leads);
@@ -272,6 +278,8 @@ function createMockDb(): MockDb {
   const { tasks, minutes } = seedMinutes(generateTasks(leads));
   return {
     leads,
+    customers,
+    customerEvents: new Map(),
     quotations,
     quotationWrites: new Map(),
     priceVersion: 0,

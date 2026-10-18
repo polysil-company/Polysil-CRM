@@ -25,6 +25,7 @@ import {
   Store01Icon,
   Target02Icon,
   Task01Icon,
+  UserAccountIcon,
   UserMultiple02Icon,
   WarehouseIcon,
 } from "@hugeicons/core-free-icons";
@@ -118,6 +119,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         dataId: "LEAD-001",
         href: "/leads",
         countSource: "leads",
+      },
+      {
+        id: "customers",
+        label: "Customers",
+        description:
+          "Everyone a qualified lead came from: their leads, quotations, orders and history.",
+        icon: UserAccountIcon,
+        module: "leads",
+        dataId: "LEAD-016",
+        href: "/customers",
       },
       {
         id: "quotations",

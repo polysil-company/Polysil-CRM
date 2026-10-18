@@ -152,6 +152,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-013 | Lead QR codes — make, print, rename or switch off (`GET /lead-qr-codes`, `POST /lead-qr-codes`, `PATCH /lead-qr-codes/{qrId}`) | shared | in-progress |
 | LEAD-014 | The public enquiry page — /enquiry, with or without a QR code (`GET /public/lead-form`, `GET /public/territories`, `POST /public/leads/verify`, `POST /public/leads`) | shared | in-progress |
 | LEAD-015 | Dealership enquiries — won from qualified, starting a dealer application (`POST /leads/{id}/transition`) | shared | in-progress |
+| LEAD-016 | Customers: find one by name or mobile, with an area filter (`GET /customers`) | shared | in-progress |
+| LEAD-017 | A customer's page: details, its leads, quotations and orders, and the timeline across them (`GET /customers/{id}`, `/timeline`) | shared | in-progress |
+| LEAD-018 | Edit a customer and record or withdraw consent: staff with leads edit (`PATCH /customers/{id}`) | shared | in-progress |
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
 | RPT-002 | Reports — conversion, people, lost leads, follow-ups, dealers, campaigns, areas, complaints (`GET /reports/*`) | shared | in-progress |
 | RPT-003 | A lead's 360° view (`GET /leads/{id}/360`) | shared | in-progress |
