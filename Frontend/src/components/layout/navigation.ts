@@ -22,6 +22,7 @@ import {
   Settings02Icon,
   Settings05Icon,
   SlidersHorizontalIcon,
+  StarIcon,
   Store01Icon,
   Target02Icon,
   Task01Icon,
@@ -216,6 +217,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "complaints",
         dataId: "CMPL-001",
         href: "/complaints",
+      },
+      {
+        id: "ratings",
+        label: "Ratings",
+        description:
+          "What farmers and dealers said, the unhappy ones first to hand, and by dealer.",
+        icon: StarIcon,
+        module: "sales_orders",
+        audience: "staff",
+        dataId: "RATE-002",
+        href: "/ratings",
       },
       {
         id: "tasks",

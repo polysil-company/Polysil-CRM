@@ -28,6 +28,7 @@ import {
   timesText,
 } from "@/features/complaints/lib/complaint-labels";
 import { formatQuantity } from "@/features/quotations/lib/quotation-labels";
+import { RecordRatingsCard } from "@/features/ratings/components/record-ratings";
 import { ComplaintWarranty } from "@/features/warranty/components/warranty-chip";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
@@ -349,6 +350,7 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
         <div className="flex min-w-0 flex-col gap-4">
           <RemedyCard complaint={complaint} />
           <TargetsCard complaint={complaint} />
+          <RecordRatingsCard kind="complaint" complaint={complaint} />
           {complaint.check === null || returned ? null : (
             <DecisionCard
               title="Manager's check"
