@@ -100,6 +100,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-028** · Say which roles may order, approve and send marketing material: default grants for `marketing_material` · MKT-002, MKT-003, MKT-004 · normal
 
+**Partner portal** — added from the dealer portal walk (item 38).
+
+- [ ] **BE-030** · Say on `GET /auth/me` whether tasks are on for dealers (`tasks_for_dealers`) · TASK-009, AUTH-002 · low
+
 ---
 
 ## Details
@@ -581,5 +585,21 @@ in the same shape. Never renumber or reuse a number.
   when `POST /orders` answers `409 quotation_on_order`; it then unticks and marks that quotation.
 - **Done when:** the filter (or the field) is in `quotations.md`. The frontend then lists only the
   free ones.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-030 · Say on `GET /auth/me` whether tasks are on for dealers (`tasks_for_dealers`)
+
+- **Status:** ⬜ Open
+- **Asked:** 18 Oct 2026 · TASK-009, AUTH-002
+- **What:**
+  - A partner user can't read `GET /settings`. To learn whether `tasks_for_dealers` is on, the
+    frontend asks for the user's open tasks and reads a `403` as "off".
+  - Return the switch with the session instead, for example `features: { tasks_for_dealers: true }`
+    on `GET /auth/me`, or leave the `tasks` grant out of a partner user's permissions while it is off.
+- **Why:** while the switch is off, every page a dealer, distributor or sub-dealer opens makes one
+  refused `GET /tasks` call. The browser logs that as an error, which hides real ones in a walk.
+- **Done when:** `GET /auth/me` says whether tasks are on, or the grant follows the switch. The
+  frontend then drops the probe.
 - **Done in:** —
 - **Backend notes:** —

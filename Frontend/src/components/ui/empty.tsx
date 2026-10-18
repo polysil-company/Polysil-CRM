@@ -37,7 +37,7 @@ export function EmptyMedia({
 
 export interface EmptyTitleProps extends React.ComponentProps<"h3"> {
   /** 2 when the empty state is the whole page, under the top bar's h1; 3 inside a section. */
-  level?: 2 | 3;
+  level?: 1 | 2 | 3;
 }
 
 export function EmptyTitle({
@@ -46,7 +46,7 @@ export function EmptyTitle({
   children,
   ...props
 }: EmptyTitleProps): React.JSX.Element {
-  const Heading = level === 2 ? "h2" : "h3";
+  const Heading = level === 1 ? "h1" : level === 2 ? "h2" : "h3";
   return (
     <Heading
       data-slot="empty-title"

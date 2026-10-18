@@ -32,9 +32,12 @@ export function windowText(days: number): string {
 export function DealerRatingCard({
   partnerId,
   title = "Dealer rating",
+  level = 3,
 }: {
   partnerId: string;
   title?: string;
+  /** 2 where the card opens the page (My ledger), 3 under a page's own sections. */
+  level?: 2 | 3;
 }): React.JSX.Element | null {
   const query = useQuery(dealerRatingQueryOptions(partnerId));
   if (query.status === "error" && isApiError(query.error) && query.error.status === 403) {
@@ -45,7 +48,7 @@ export function DealerRatingCard({
     <section aria-labelledby={TITLE_ID}>
       <Card>
         <CardHeader className="flex-col gap-0.5">
-          <CardTitle level={3} id={TITLE_ID} className="flex items-center gap-2">
+          <CardTitle level={level} id={TITLE_ID} className="flex items-center gap-2">
             <Icon icon={StarAward01Icon} size="sm" className="text-muted-foreground" />
             {title}
           </CardTitle>

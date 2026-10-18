@@ -449,6 +449,12 @@ describe("[LEAD-003] LeadDetail details", () => {
       (item) =>
         (item.duplicates ?? []).some((link) => link.state === "pending") && item.score !== null,
     );
+    // A partner user reads only the leads their dealership holds (APP-007).
+    const partner = mockMeFor("dealer").data.partner;
+    lead.assigned_partner =
+      partner === null || partner === undefined
+        ? null
+        : { id: partner.id, name: partner.name ?? "Dealer", partner_type: "dealer" };
     renderWithProviders(<LeadDetail leadId={lead.id} />);
 
     expect(

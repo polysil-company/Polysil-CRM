@@ -35,6 +35,7 @@ import { refundManagersFor, type MockApprovalStep } from "@/mocks/data/approvals
 import { slaFor, type MockComplaint } from "@/mocks/data/complaints";
 import { mockLookupRows } from "@/mocks/data/lookups";
 import { chainSteps } from "@/mocks/data/orders";
+import { partnerInScope } from "@/mocks/data/partner-scope";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_PRODUCTS } from "@/mocks/data/quotations";
 import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
@@ -172,7 +173,7 @@ function findComplaint(complaintId: unknown): MockComplaint | Response {
   const who = caller();
   if (!who.view) return errorResponse(403, "forbidden", "Complaints are not in your permissions.");
   return (
-    mockDb.complaints.find((item) => item.id === complaintId) ??
+    mockDb.complaints.find((item) => item.id === complaintId && partnerInScope(item.partner)) ??
     errorResponse(404, "not_found", "No such complaint.")
   );
 }
@@ -578,6 +579,7 @@ export const complaintHandlers = [
         : mockDb.complaints.filter((complaint) => {
             const can = canFor(complaint, who);
             return (
+              partnerInScope(complaint.partner) &&
               (statuses.length === 0 || statuses.includes(complaint.status)) &&
               (severity === null || complaint.severity === severity) &&
               (typeId === null || complaint.complaint_type.id === typeId) &&

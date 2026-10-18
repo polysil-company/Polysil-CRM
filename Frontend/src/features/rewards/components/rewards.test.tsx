@@ -318,11 +318,17 @@ describe("[RWD-003] Reward admin — the screen", () => {
 describe("[RWD-004] Points on an order", () => {
   afterEach(reset);
 
-  function dealerDraft(): string {
+  /** A dealer's draft; `own` hands it to the signed-in dealer, whose screens read only their own. */
+  function dealerDraft(own = false): string {
     const order = mockDb.orders.find(
       (item) => item.status === "draft" && item.partner?.partner_type === "dealer",
     );
-    if (order === undefined) throw new Error("No dealer draft");
+    if (order === undefined || order.partner === null) throw new Error("No dealer draft");
+    // A partner user reads only their own dealership's orders (APP-008).
+    const mine = mockMeFor("dealer").data.partner;
+    if (own && mine !== null && mine !== undefined) {
+      order.partner = { ...order.partner, id: mine.id, name: mine.name ?? order.partner.name };
+    }
     return order.id;
   }
 
@@ -377,7 +383,7 @@ describe("[RWD-004] Points on an order", () => {
     const user = userEvent.setup();
     renderWithProviders(
       <>
-        <OrderDetail orderId={dealerDraft()} />
+        <OrderDetail orderId={dealerDraft(true)} />
         <Toaster />
       </>,
     );

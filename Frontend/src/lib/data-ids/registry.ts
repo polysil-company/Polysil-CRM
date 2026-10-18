@@ -123,6 +123,13 @@ export const DATA_IDS = {
     owner: "frontend",
     status: "in-progress",
   },
+  "APP-008": {
+    domain: "APP",
+    title:
+      "Partner portal — what a dealer, distributor or sub-dealer sees: their own leads and dashboard, and no staff screens",
+    owner: "frontend",
+    status: "in-progress",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",

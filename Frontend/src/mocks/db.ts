@@ -52,6 +52,7 @@ import { seedMarketingOrders, seedMaterials, type MockMarketingOrder } from "./d
 import { generateConversations, generateGroups, type MockGroupMember } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
+import { handLeadsToSessionPartners } from "./data/partner-scope";
 import { seedPartners, type MockPartnerRecord } from "./data/partners";
 import { seedPayments, seedSchedules, type MockInstalment } from "./data/payments";
 import {
@@ -275,6 +276,7 @@ function createMockDb(): MockDb {
   const products = seedProducts();
   const warehouses = seedWarehouses();
   const leads = generateLeads();
+  handLeadsToSessionPartners(leads);
   const customers = deriveCustomers(leads);
   const campaigns = seedCampaigns();
   tagLeadsWithCampaigns(leads, campaigns);
