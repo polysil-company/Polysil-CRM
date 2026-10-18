@@ -20,6 +20,7 @@ import { mockMeFor } from "@/mocks/data/sessions";
 import { TRACKING_SPACE } from "@/mocks/data/tracking";
 import { mockDb } from "@/mocks/db";
 
+import { currentPolicy, logView } from "./policy";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse } from "./shared";
 
@@ -29,9 +30,6 @@ import { decodeCursor, encodeCursor, errorResponse } from "./shared";
  * visit at a time; up to three photos within 24 hours of check-in.
  */
 
-const CONSENT_VERSION = "v1";
-const CONSENT_TEXT =
-  "While you are on duty, Polysil records your phone's location to plan visits and show your route to your manager. Off duty, nothing is recorded. Location history is kept for 90 days. You can withdraw this consent at any time, which ends your duty.";
 const PHOTO_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** The files themselves, so a photo opens as it was taken; lost on a reload, like the mock. */
@@ -100,12 +98,13 @@ export const visitHandlers = [
     const { failure } = await applyScenario();
     if (failure) return failure;
     const caller = me();
+    const policy = currentPolicy();
     const config: TrackingConfigWire = {
       tracking_allowed: caller.tracks,
       consent: {
-        required_version: CONSENT_VERSION,
+        required_version: policy.consent_version,
         accepted_version: mockDb.trackingConsent.get(caller.id) ?? null,
-        text: CONSENT_TEXT,
+        text: policy.consent_text,
       },
       interval_seconds: 120,
       distance_filter_m: 50,
@@ -116,7 +115,7 @@ export const visitHandlers = [
         timezone: "Asia/Kolkata",
       },
       max_batch_points: 500,
-      visit_photo_required: false,
+      visit_photo_required: policy.visit_photo_required,
       on_duty: null,
     };
     return HttpResponse.json({ data: config });
@@ -164,6 +163,7 @@ export const visitHandlers = [
     const userId = url.searchParams.get("user_id");
     const date = url.searchParams.get("date");
     const who = userId === null || userId === "me" ? caller.id : userId;
+    logView("visits", who, date);
     const matches =
       scenario === "empty"
         ? []
@@ -209,7 +209,7 @@ export const visitHandlers = [
     const body = parsed.data;
     const replay = mockDb.visits.find((visit) => visit.id === body.id);
     if (replay !== undefined) return HttpResponse.json({ data: replay });
-    if (mockDb.trackingConsent.get(caller.id) !== CONSENT_VERSION) {
+    if (mockDb.trackingConsent.get(caller.id) !== currentPolicy().consent_version) {
       return errorResponse(409, "consent_required", "Accept the tracking consent first.");
     }
     const place = body.place_name?.trim() || null;
@@ -268,6 +268,9 @@ export const visitHandlers = [
     if (visit === undefined) return errorResponse(404, "not_found", "Not yours.");
     if (visit.checkout_at !== null) {
       return errorResponse(409, "visit_closed", "This visit is already closed.");
+    }
+    if (currentPolicy().visit_photo_required && visit.photo_count === 0) {
+      return errorResponse(409, "photo_required", "Add a photo of the visit first.");
     }
     const parsed = checkOutSchema.safeParse(await request.json());
     if (!parsed.success) {

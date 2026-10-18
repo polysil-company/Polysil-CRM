@@ -8,6 +8,7 @@ import { mockMeFor } from "@/mocks/data/sessions";
 import { MOCK_TRACKED, mockRoute, mockTeamLatest } from "@/mocks/data/tracking";
 import { mockDb } from "@/mocks/db";
 
+import { logView } from "./policy";
 import { applyScenario } from "./scenario";
 import { errorResponse } from "./shared";
 
@@ -40,6 +41,7 @@ export const trackingHandlers = [
     if (allowed instanceof Response) return allowed;
     const data =
       scenario === "empty" ? [] : mockTeamLatest().filter((row) => allowed.has(row.user.id));
+    logView("team", null, null);
     return HttpResponse.json({ data });
   }),
 
@@ -58,6 +60,7 @@ export const trackingHandlers = [
         date: "A date like 2026-10-18.",
       });
     }
+    logView("route", person.id, date);
     const leads = mockDb.leads
       .slice(0, 12)
       .map((lead) => ({ id: lead.id, label: lead.inquiry_no }));

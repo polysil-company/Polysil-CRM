@@ -467,6 +467,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         href: "/settings",
       },
       {
+        id: "tracking-settings",
+        label: "Tracking settings",
+        description: "Location tracking's hours, intervals, retention and consent, and who looked.",
+        icon: Location01Icon,
+        module: "masters",
+        audience: "staff",
+        dataId: "TRK-006",
+        href: "/tracking-settings",
+      },
+      {
         id: "users",
         label: "Users & roles",
         icon: Settings02Icon,
