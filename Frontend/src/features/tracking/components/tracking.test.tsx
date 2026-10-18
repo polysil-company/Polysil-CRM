@@ -38,7 +38,7 @@ async function statusOf(call: Promise<unknown>): Promise<number | null> {
     () => null,
     (caught: unknown) => caught,
   );
-  return isApiError(error) ? error.status : null;
+  return isApiError(error) ? (error.status ?? null) : null;
 }
 
 const YESTERDAY = shiftCalendarDay(todayInIndia(), -1);
