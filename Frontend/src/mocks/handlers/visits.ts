@@ -95,6 +95,40 @@ function fieldErrors(issues: readonly z.core.$ZodIssue[]): Record<string, string
   );
 }
 
+/** The `file` part as the mock needs it: its type, its size and its bytes. */
+interface PhotoPart {
+  readonly type: string;
+  readonly size: number;
+  readonly blob: Blob;
+}
+
+/**
+ * The uploaded `file` part, or null. `request.formData()` is tried first; Node 24's parser
+ * refuses to build a `File` while jsdom owns the global one (component tests), so the
+ * multipart body is then read by hand: one part, its Content-Type and its bytes.
+ */
+async function readPhoto(request: Request): Promise<PhotoPart | null> {
+  const copy = request.clone();
+  try {
+    const part = (await request.formData()).get("file");
+    if (part === null || typeof part === "string") return null;
+    return { type: part.type, size: part.size, blob: part };
+  } catch {
+    const boundary = /boundary=([^;]+)/.exec(copy.headers.get("content-type") ?? "")?.[1];
+    if (boundary === undefined) return null;
+    const bytes = new Uint8Array(await copy.arrayBuffer());
+    const text = new TextDecoder("latin1").decode(bytes);
+    const start = text.indexOf('name="file"');
+    if (start === -1) return null;
+    const headerEnd = text.indexOf("\r\n\r\n", start);
+    const end = text.indexOf(`\r\n--${boundary}`, headerEnd);
+    if (headerEnd === -1 || end === -1) return null;
+    const type = /Content-Type: ([^\r\n]+)/i.exec(text.slice(start, headerEnd))?.[1] ?? "";
+    const body = bytes.slice(headerEnd + 4, end);
+    return { type, size: body.length, blob: new Blob([body], { type }) };
+  }
+}
+
 export const visitHandlers = [
   http.get(buildApiUrl("/me/tracking-config"), async () => {
     const { failure } = await applyScenario();
@@ -299,9 +333,8 @@ export const visitHandlers = [
     if (!caller.tracks) return noTracking();
     const visit = ownVisit(params.visitId, caller.id);
     if (visit === undefined) return errorResponse(404, "not_found", "Not yours.");
-    const file = (await request.formData()).get("file");
-    // A shape check, not `instanceof Blob`: the parsed part may come from another realm.
-    if (file === null || typeof file === "string") {
+    const file = await readPhoto(request);
+    if (file === null) {
       return errorResponse(422, "validation_error", "Some fields need correcting.", {
         file: "Choose a photo.",
       });
@@ -329,7 +362,7 @@ export const visitHandlers = [
       size_bytes: file.size,
       uploaded_at: new Date().toISOString(),
     };
-    photoFiles.set(photo.id, file);
+    photoFiles.set(photo.id, file.blob);
     mockDb.visitPhotos.set(visit.id, [...photos, photo]);
     visit.photo_count = photos.length + 1;
     return HttpResponse.json({ data: photo }, { status: 201 });
