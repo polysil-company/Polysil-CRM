@@ -9,11 +9,13 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Frame-Options", value: "DENY" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  // TRK-003: this app's own pages read the location for a visit check-in; no frame may.
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
 ];
 
 // TODO(OBS-002): add a Content-Security-Policy with a nonce once hosting is decided.
-// The theme init script in the root layout is inline and will need that nonce.
+// The theme init script in the root layout is inline and will need that nonce, and the map
+// (TRK-001) needs its tile host in img-src.
 
 /** Where the backend listens in local development (backend/infra/docker-compose.yml). */
 const DEFAULT_API_PROXY_TARGET = "http://127.0.0.1:8000";

@@ -91,28 +91,19 @@ export function OpenVisitCard({
   const [checkingOut, setCheckingOut] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const upload = useUploadVisitPhoto();
-  const [pending, setPending] = useState<(Blob & { readonly name: string }) | null>(null);
   const full = visit.photoCount >= VISIT_PHOTO_MAX;
 
   const send = useAsyncAction({
-    action: () => {
-      if (pending === null) throw new Error("No photo chosen");
-      return upload.mutateAsync({
-        visitId: visit.id,
-        file: pending,
-        idempotencyKey: createRequestId(),
-      });
-    },
+    action: (file: Blob & { readonly name: string }) =>
+      upload.mutateAsync({ visitId: visit.id, file, idempotencyKey: createRequestId() }),
     logger: log,
     fn: "handleAddPhoto",
     dataId: "TRK-004",
     onSuccess: (photo) => {
       setPhotos((before) => [...before, photo]);
-      setPending(null);
       toast.success("Photo added");
     },
     onError: (error) => {
-      setPending(null);
       toast.error("Photo not added", {
         description: photoRefusal(error) ?? toUserFacingError(error).description,
       });
@@ -184,10 +175,7 @@ export function OpenVisitCard({
                 toast.error("Photo not added", { description: problem });
                 return;
               }
-              setPending(file);
-              queueMicrotask(() => {
-                void send.run();
-              });
+              void send.run(file);
             }}
           />
           <Button

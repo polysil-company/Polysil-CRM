@@ -221,6 +221,13 @@ describe("[TRK-005] MyVisits", () => {
     await user.click(within(form).getByRole("button", { name: "Check in" }));
     expect(await screen.findByText("Checked in", { selector: "[data-title]" })).toBeInTheDocument();
 
+    await user.upload(
+      await screen.findByLabelText("Choose a photo"),
+      new File(["jpeg"], "visit.jpg", { type: "image/jpeg" }),
+    );
+    expect(await screen.findByText("1 of 3 photos")).toBeInTheDocument();
+    expect(await screen.findByRole("list", { name: "Photos added" })).toBeInTheDocument();
+
     await user.click(await screen.findByRole("button", { name: "Check out" }));
     const out = await screen.findByRole("form", { name: "Check out" });
     await user.click(within(out).getByRole("radio", { name: "Met" }));
