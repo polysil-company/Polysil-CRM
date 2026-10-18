@@ -9,6 +9,7 @@ import { customerHandlers } from "./customers";
 import { dashboardHandlers } from "./dashboard";
 import { dealerApplicationHandlers } from "./dealer-applications";
 import { documentHandlers } from "./documents";
+import { holidayHandlers } from "./holidays";
 import { importHandlers } from "./imports";
 import { leadCaptureHandlers } from "./lead-capture";
 import { leadHandlers } from "./leads";
@@ -83,6 +84,7 @@ export const handlers: readonly HttpHandler[] = [
   ...stockHandlers,
   ...customerHandlers,
   ...warrantyHandlers,
+  ...holidayHandlers,
   ...sellerGstinHandlers,
   ...schemeHandlers,
   ...subsidyHandlers,

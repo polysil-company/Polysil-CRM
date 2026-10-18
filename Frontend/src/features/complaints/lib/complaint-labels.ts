@@ -5,7 +5,7 @@ import type {
 } from "@/features/complaints/api/complaints.schemas";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError, readFieldErrors } from "@/lib/api/errors";
-import { formatInr } from "@/lib/format";
+import { formatDateTime, formatInr } from "@/lib/format";
 
 export const COMPLAINT_STATUS_LABELS: Readonly<Record<ComplaintStatus, string>> = {
   draft: "Draft",
@@ -257,6 +257,19 @@ export function complaintHistoryEntry(
       return { title: "Remedy withdrawn", detail: remark, tone: "warning" };
     case "complaint.closed":
       return { title: "Closed", detail: remark, tone: "success" };
+    // CMPL-012 · by System, naming no person
+    case "complaint.escalated":
+      return {
+        title:
+          payload.target === "resolution"
+            ? "Resolution target missed: escalated"
+            : "Response target missed: escalated",
+        detail:
+          typeof payload.due_at === "string"
+            ? `It was due ${formatDateTime(payload.due_at)}`
+            : null,
+        tone: "danger",
+      };
     default: {
       const words = kind.replace(/^complaint\./, "").replace(/_/g, " ");
       return {

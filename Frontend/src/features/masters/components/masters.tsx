@@ -8,6 +8,7 @@ import { LOOKUP_LISTS } from "@/features/lookups/api/lookups.schemas";
 import { useCan } from "@/features/session/hooks/use-session";
 import { WarrantyTermsPanel } from "@/features/warranty/components/warranty-terms-panel";
 
+import { HolidaysPanel } from "./holidays-panel";
 import { LIST_COPY, LookupListPanel } from "./lookup-list-panel";
 import { OfficesPanel } from "./offices-panel";
 import { ScoringPanel } from "./scoring-panel";
@@ -20,6 +21,7 @@ export const MASTER_TABS = [
   "offices",
   "territories",
   "warranty",
+  "holidays",
 ] as const;
 export type MasterTab = (typeof MASTER_TABS)[number];
 
@@ -30,12 +32,13 @@ function tabLabel(tab: MasterTab): string {
   if (tab === "offices") return "Offices";
   if (tab === "territories") return "Territories";
   if (tab === "warranty") return "Warranty periods";
+  if (tab === "holidays") return "Holidays";
   return LIST_COPY[tab].title;
 }
 
 /**
  * MSTR-001 · Admin → Masters: the lists behind the pickers (MSTR-009), the lead score's
- * settings (MSTR-010), the offices (MSTR-011), the territories (MSTR-012) and the warranty periods (MSTR-017), one tab each, the open tab kept in the URL. Everyone who sees Masters
+ * settings (MSTR-010), the offices (MSTR-011), the territories (MSTR-012), the warranty periods (MSTR-017) and the holidays (MSTR-019), one tab each, the open tab kept in the URL. Everyone who sees Masters
  * reads them; those who may edit masters add rows, switch them on or off, and retune the score.
  */
 export function Masters(): React.JSX.Element {
@@ -48,9 +51,9 @@ export function Masters(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <p className="max-w-prose text-sm text-muted-foreground">
-        The lists every form picks from, how a lead is scored, the office tree, the territories and
-        the warranty periods. A list row is never deleted: one no longer wanted is switched off, so
-        records that use it keep it.
+        The lists every form picks from, how a lead is scored, the office tree, the territories, the
+        warranty periods and the holidays. A list row is never deleted: one no longer wanted is
+        switched off, so records that use it keep it.
         {canEdit ? "" : " Only administrators of masters change them."}
       </p>
       <Tabs
@@ -82,6 +85,9 @@ export function Masters(): React.JSX.Element {
         </TabsContent>
         <TabsContent value="warranty">
           <WarrantyTermsPanel canEdit={canEdit} />
+        </TabsContent>
+        <TabsContent value="holidays">
+          <HolidaysPanel canEdit={canEdit} />
         </TabsContent>
       </Tabs>
     </div>
