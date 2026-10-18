@@ -168,7 +168,7 @@ export function MyVisits(): React.JSX.Element {
         />
       ) : (
         <Card>
-          <CardContent>
+          <CardContent className="pt-4">
             <ol aria-label="Visits" className="flex flex-col divide-y divide-border">
               {list.map((visit) => (
                 <VisitRow key={visit.id} visit={visit} />

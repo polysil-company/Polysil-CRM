@@ -127,7 +127,7 @@ function PolicyPanel(): React.JSX.Element {
       <Card>
         <CardHeader className="flex-wrap">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <CardTitle level={3}>The policy in force</CardTitle>
+            <CardTitle level={2}>The policy in force</CardTitle>
             <CardDescription>Since {formatDateTime(policy.effectiveFrom)}</CardDescription>
           </div>
           {canEdit ? (
@@ -158,7 +158,7 @@ function PolicyPanel(): React.JSX.Element {
       </Card>
       <Card>
         <CardHeader className="flex-col gap-0.5">
-          <CardTitle level={3}>Consent, version {policy.consentVersion}</CardTitle>
+          <CardTitle level={2}>Consent, version {policy.consentVersion}</CardTitle>
           <CardDescription>
             What staff agree to before their first duty or check-in.
           </CardDescription>
@@ -502,7 +502,7 @@ function ViewLogPanel(): React.JSX.Element {
         />
       ) : (
         <Card>
-          <CardContent>
+          <CardContent className="pt-4">
             <ol
               aria-label="Who looked, newest first"
               className="flex flex-col divide-y divide-border"
