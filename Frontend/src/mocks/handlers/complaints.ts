@@ -43,6 +43,7 @@ import { findMockTerritory } from "@/mocks/data/territories";
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
+import { mockSettings } from "./settings";
 import { decodeCursor, encodeCursor, errorResponse } from "./shared";
 import { complaintLineWarranty } from "./warranty";
 
@@ -121,6 +122,24 @@ function canFor(complaint: MockComplaint, who: Caller): ComplaintWire["can"] {
   };
 }
 
+/**
+ * CMPL-012 · When each missed target was escalated: at its due time, while the
+ * `complaint_escalation` setting rings the bell. Null when it was met, has no target, or the
+ * setting is off.
+ */
+function escalations(complaint: MockComplaint): {
+  response: string | null;
+  resolution: string | null;
+} {
+  const on =
+    mockSettings().find((setting) => setting.key === "complaint_escalation")?.value !== "off";
+  const sla = complaint.sla;
+  return {
+    response: on && sla?.response_breached === true ? sla.response_due_at : null,
+    resolution: on && sla?.resolution_breached === true ? sla.resolution_due_at : null,
+  };
+}
+
 function toWire(complaint: MockComplaint, who: Caller = caller()): ComplaintWire {
   // the reopen reason is staff only, as the backend sends it
   const portal = PARTNER_ROLES.some((role) => role === who.role);
@@ -132,6 +151,9 @@ function toWire(complaint: MockComplaint, who: Caller = caller()): ComplaintWire
       warranty: complaintLineWarranty(complaint, line.product.id),
     })),
     ...(portal ? { reopen_reason: null } : {}),
+    // CMPL-012 · staff only: always null for a dealer
+    response_escalated_at: portal ? null : escalations(complaint).response,
+    resolution_escalated_at: portal ? null : escalations(complaint).resolution,
     can: canFor(complaint, who),
   };
 }
@@ -229,6 +251,20 @@ function seedEvents(complaint: MockComplaint): TimelineEventWire[] {
   }
   if (complaint.closed_at != null) {
     push("complaint.closed", complaint.closed_at, complaint.remedy?.chosen_by ?? null);
+  }
+  // CMPL-012 · by System: no actor, so a dealer sees no person either
+  const missed = escalations(complaint);
+  if (missed.response !== null) {
+    push("complaint.escalated", missed.response, null, {
+      target: "response",
+      due_at: missed.response,
+    });
+  }
+  if (missed.resolution !== null) {
+    push("complaint.escalated", missed.resolution, null, {
+      target: "resolution",
+      due_at: missed.resolution,
+    });
   }
   return events.sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
 }
