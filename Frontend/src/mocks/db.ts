@@ -14,6 +14,7 @@ import type { PaymentWire } from "@/features/payments/api/payments.schemas";
 import type { HsnRowWire, TaxRateWire } from "@/features/products/api/products.schemas";
 import type { SellerGstinWire } from "@/features/products/api/seller-gstins.schemas";
 import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
+import type { RatingWire } from "@/features/ratings/api/ratings.schemas";
 import type {
   GiftWire,
   RedemptionWire,
@@ -59,6 +60,7 @@ import {
   type MockProductRecord,
 } from "./data/products";
 import { generateQuotations } from "./data/quotations";
+import { seedRatings } from "./data/ratings";
 import {
   seedGifts,
   seedLedger,
@@ -151,6 +153,8 @@ export interface MockDb {
   /** LEAD-016 · One per mobile among qualified leads; their own edits on the timeline. */
   customers: CustomerWire[];
   customerEvents: Map<string, TimelineEventWire[]>;
+  /** RATE-001 · Every rating, newest first. */
+  ratings: RatingWire[];
   /** MSTR-019 · The days complaint targets skip. */
   holidays: HolidayWire[];
   /** Complaint writes: Idempotency-Key → the request and the complaint it made or changed. */
@@ -319,6 +323,7 @@ function createMockDb(): MockDb {
     minutesWrites: new Map(),
     complaints,
     holidays: seedHolidays(),
+    ratings: seedRatings(orders, complaints),
     complaintWrites: new Map(),
     complaintEvents: new Map(),
     complaintFiles: new Map(),

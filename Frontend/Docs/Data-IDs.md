@@ -39,6 +39,7 @@ ID tells you *which functionality*, and the request ID tells you *which request*
 | `NOTIF` | Notifications — in-app bell, WhatsApp and email |
 | `MSG` | Messages — direct conversations between staff |
 | `BOT` | AI assistant |
+| `RATE` | Ratings — customers' and dealers' feedback, and the dealer rating |
 | `SITE` | Public website |
 | `REPO` | Repository tooling — changelog, lint rules, git hooks, CI |
 
@@ -155,6 +156,10 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-016 | Customers: find one by name or mobile, with an area filter (`GET /customers`) | shared | in-progress |
 | LEAD-017 | A customer's page: details, its leads, quotations and orders, and the timeline across them (`GET /customers/{id}`, `/timeline`) | shared | in-progress |
 | LEAD-018 | Edit a customer and record or withdraw consent: staff with leads edit (`PATCH /customers/{id}`) | shared | in-progress |
+| RATE-001 | Rate an installation, a shipped product or a closed complaint's service (`POST /ratings`) | shared | in-progress |
+| RATE-002 | Ratings on an order or complaint, and the list with the low ones (`GET /ratings`) | shared | in-progress |
+| RATE-003 | Ratings by dealer, product or kind (`GET /ratings/summary`) | shared | in-progress |
+| RATE-004 | A dealer's rating from days to payment and order value (`GET /partners/{id}/dealer-rating`) | shared | in-progress |
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
 | RPT-002 | Reports — conversion, people, lost leads, follow-ups, dealers, campaigns, areas, complaints (`GET /reports/*`) | shared | in-progress |
 | RPT-003 | A lead's 360° view (`GET /leads/{id}/360`) | shared | in-progress |

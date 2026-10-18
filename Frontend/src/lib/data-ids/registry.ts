@@ -48,6 +48,7 @@ export const DATA_ID_DOMAINS = {
   NOTIF: "Notifications — in-app bell, WhatsApp and email templates and history",
   MSG: "Messages — direct conversations between staff",
   BOT: "AI assistant",
+  RATE: "Ratings — customers' and dealers' feedback, and the dealer rating",
   SITE: "Public website",
   REPO: "Repository tooling — changelog, lint rules, git hooks, CI",
 } as const;
@@ -1597,6 +1598,36 @@ export const DATA_IDS = {
       "DELETE /conversations/{conversationId}/members/{userId}",
     ],
     notes: "FS-048. A conversation's `kind` and `group`; `participant` is null for a group.",
+  },
+  "RATE-001": {
+    domain: "RATE",
+    title:
+      "Rate an installation, a shipped product or a closed complaint's service (`POST /ratings`)",
+    owner: "shared",
+    status: "in-progress",
+    notes:
+      "FS-043. Staff record the farmer's rating, a dealer's user its own; one per thing per kind of rater, never changed.",
+  },
+  "RATE-002": {
+    domain: "RATE",
+    title: "Ratings on an order or complaint, and the list with the low ones (`GET /ratings`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "A dealer reads a customer's rating as the score only.",
+  },
+  "RATE-003": {
+    domain: "RATE",
+    title: "Ratings by dealer, product or kind (`GET /ratings/summary`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "RATE-004": {
+    domain: "RATE",
+    title:
+      "A dealer's rating from days to payment and order value (`GET /partners/{id}/dealer-rating`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "Staff who see payments, and the dealer itself; 403 `rating_not_permitted` hides it.",
   },
 } as const satisfies Record<string, DataIdDefinition>;
 

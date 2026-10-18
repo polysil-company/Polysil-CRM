@@ -5,6 +5,7 @@ import type * as React from "react";
 
 import { EmptyState } from "@/components/patterns/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DealerRatingCard } from "@/features/ratings/components/dealer-rating";
 import { useSession } from "@/features/session/hooks/use-session";
 
 import { PartnerLedgerCard } from "./partner-ledger";
@@ -24,5 +25,10 @@ export function MyLedger(): React.JSX.Element | null {
       />
     );
   }
-  return <PartnerLedgerCard partnerId={partner.id} title="Your ledger" />;
+  return (
+    <div className="flex flex-col gap-4">
+      <DealerRatingCard partnerId={partner.id} title="Your rating" />
+      <PartnerLedgerCard partnerId={partner.id} title="Your ledger" />
+    </div>
+  );
 }
