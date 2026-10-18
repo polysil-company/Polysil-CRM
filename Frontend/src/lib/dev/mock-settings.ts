@@ -39,6 +39,7 @@ const SCENARIO_KEY = "polysil:mock-scenario";
 const ROLE_KEY = "polysil:mock-role";
 const MUST_CHANGE_PASSWORD_KEY = "polysil:mock-must-change-password";
 const STAFF_PASSWORD_KEY = "polysil:mock-staff-password";
+const CONSUMER_KEY = "polysil:mock-consumer-mobile";
 
 function readStorage(key: string): string | null {
   if (typeof window === "undefined") {
@@ -48,6 +49,14 @@ function readStorage(key: string): string | null {
     return window.localStorage.getItem(key);
   } catch {
     return null;
+  }
+}
+
+function removeStorage(key: string): void {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Storage unavailable — nothing to remove.
   }
 }
 
@@ -75,6 +84,24 @@ export function readMockRole(): Role {
 
 export function writeMockRole(role: Role): void {
   writeStorage(ROLE_KEY, role);
+  // Previewing a role ends a farmer's session (FARM-001).
+  removeStorage(CONSUMER_KEY);
+}
+
+/**
+ * FARM-001 · The mobile of the farmer signed in to the mock, or null. Set when a customer's
+ * number signs in by OTP; while set, `/auth/me` answers as that farmer.
+ */
+export function readMockConsumerMobile(): string | null {
+  return readStorage(CONSUMER_KEY);
+}
+
+export function writeMockConsumerMobile(mobile: string | null): void {
+  if (mobile === null) {
+    removeStorage(CONSUMER_KEY);
+  } else {
+    writeStorage(CONSUMER_KEY, mobile);
+  }
 }
 
 /**

@@ -119,7 +119,12 @@ const COPY: Readonly<Record<string, SettingCopy>> = {
     title: "Dealer rating: rupees ordered",
     section: "dealers",
   },
-  consumer_portal: { title: "The farmers' portal", section: "customers", choices: OFF_ON },
+  consumer_portal: {
+    title: "The farmers' portal",
+    section: "customers",
+    choices: OFF_ON,
+    note: "On, every customer's number can be sent a WhatsApp sign-in code, and each code is paid for. Off signs every farmer out.",
+  },
   portal_otp_hourly_cap: {
     title: "Sign-in codes to customers in an hour",
     section: "customers",
