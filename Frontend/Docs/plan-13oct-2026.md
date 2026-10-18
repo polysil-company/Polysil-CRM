@@ -156,7 +156,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
   - [x] **35c. Tracking settings and the view log** (TRK-006, TRK-007). PR #175, 18 Oct (`feature/TRK-006-tracking-admin`).
 - [x] **36. The in-app assistant** (2). `in-app-assistant.md`. BOT-001, BOT-002: the Ctrl+K search with Actions and Records, and the Help page. PR #176, 18 Oct (`feature/BOT-001-assistant`).
 - [x] **37. A consolidated order** from several quotations of one dealer: `POST /orders` with several `quotation_ids` (`orders-api-contract.md`). SO-011, in Place order; BE-029 asks for an `orderable` filter. PR #177, 18 Oct (`feature/SO-011-consolidated-order`).
-- [ ] **38. The dealer portal walk:** sign in as `dealer`, `distributor` and `sub_dealer`, walk every screen, and fix what leaks or breaks.
+- [x] **38. The dealer portal walk:** sign in as `dealer`, `distributor` and `sub_dealer`, walk every screen, and fix what leaks or breaks. APP-008: the mock now scopes leads, orders, complaints and the dashboard to the partner's own; two heading fixes and the 404 page's heading; BE-030 asks for the dealer-tasks switch on `/auth/me`. PR #178, 18 Oct (`feature/APP-008-partner-walk`).
 
 ## Waiting on someone else
 
