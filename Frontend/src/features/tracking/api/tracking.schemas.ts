@@ -137,8 +137,6 @@ export function visitOf(wire: z.output<typeof visitWireSchema>): Visit {
   };
 }
 
-export const DUTY_END_REASONS = ["user", "auto", "consent_withdrawn", "deactivated"] as const;
-
 const routeWireSchema = z.object({
   user: userRef,
   date: z.iso.date(),
