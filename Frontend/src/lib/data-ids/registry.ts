@@ -566,6 +566,15 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
   },
+  "SO-011": {
+    domain: "SO",
+    title:
+      "A consolidated order: one draft from several accepted quotations of one dealer (`POST /orders` with several `quotation_ids`)",
+    owner: "shared",
+    status: "in-progress",
+    notes:
+      "422 `quotations_disagree` names the field; 409 `quotation_on_order` names the quotation.",
+  },
   "APPR-001": {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",

@@ -103,6 +103,25 @@ const refusalSchema = z.object({
   fields: z.record(z.string(), z.string()).optional(),
 });
 
+const DISAGREEMENT_LABELS: Readonly<Record<string, string>> = {
+  partner_id: "the partner",
+  partner: "the partner",
+  place_of_supply: "the place of supply",
+  place_of_supply_territory_id: "the place of supply",
+  seller: "the seller registration",
+  seller_gstin_id: "the seller registration",
+  price_effective_date: "the price date",
+  office: "the office",
+  owner_org_unit_id: "the office",
+  territory: "the territory",
+  territory_id: "the territory",
+};
+
+/** A field `quotations_disagree` names, in words; one this app doesn't know reads from its key. */
+function disagreementLabel(field: string): string {
+  return DISAGREEMENT_LABELS[field] ?? `the ${field.replace(/_/g, " ")}`;
+}
+
 /** Why the backend refused a save, a submit, a cancel, a dispatch, a void or a close. */
 export function orderRefusal(error: unknown): OrderRefusal {
   if (!isApiError(error)) {
@@ -227,13 +246,15 @@ export function orderRefusal(error: unknown): OrderRefusal {
         message: error.message,
         stale: true,
       };
-    case "quotations_disagree":
+    case "quotations_disagree": {
+      // SO-011 · the backend names the field the quotations differ on
+      const differs = Object.keys(fields).map(disagreementLabel);
       return {
         title: "The quotations don't match",
-        message:
-          "Quotations on one order must share the partner, place of supply, seller, price date, office and territory.",
+        message: `${differs.length > 0 ? `They differ in ${differs.join(" and ")}. ` : ""}Quotations on one order must share the partner, place of supply, seller, price date, office and territory.`,
         stale: false,
       };
+    }
     case "partner_required":
       return {
         title: "A dealer is needed",

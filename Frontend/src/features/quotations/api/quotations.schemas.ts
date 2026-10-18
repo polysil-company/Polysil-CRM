@@ -169,6 +169,8 @@ export interface QuotationListParams {
   readonly currentOnly: boolean;
   /** Quotations on one lead, and on leads merged into it. */
   readonly leadId: string | null;
+  /** SO-011 · Quotations of one channel partner; left out, every partner's. */
+  readonly partnerId?: string | null;
   /** Ask for the matching total ("1–25 of 49"). It costs the backend a count; off where unused. */
   readonly countTotal?: boolean;
 }
