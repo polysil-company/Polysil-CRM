@@ -30,6 +30,7 @@ import type {
   StageEntryWire,
 } from "@/features/subsidy/api/subsidy-applications.schemas";
 import type { CalculateResponseWire } from "@/features/subsidy/api/subsidy.schemas";
+import type { PolicyWire, ViewLogRowWire } from "@/features/tracking/api/policy.schemas";
 import type { VisitWire } from "@/features/tracking/api/tracking.schemas";
 import type { VisitPhotoWire } from "@/features/tracking/api/visits.schemas";
 import type { OfficeWire } from "@/features/users/api/users.schemas";
@@ -159,6 +160,10 @@ export interface MockDb {
   trackingConsent: Map<string, string>;
   /** TRK-003 … TRK-005 · Visits checked in on the web, newest first. */
   visits: VisitWire[];
+  /** TRK-006 · Tracking policy versions, oldest first; seeded on first read. */
+  trackingPolicies: PolicyWire[];
+  /** TRK-007 · Who looked at whose location, newest first; seeded on first read. */
+  viewLog: ViewLogRowWire[] | null;
   /** TRK-004 · Each visit's photos. */
   visitPhotos: Map<string, VisitPhotoWire[]>;
   /** RATE-001 · Every rating, newest first. */
@@ -335,6 +340,8 @@ function createMockDb(): MockDb {
     trackingConsent: new Map(),
     visits: [],
     visitPhotos: new Map(),
+    trackingPolicies: [],
+    viewLog: null,
     complaintWrites: new Map(),
     complaintEvents: new Map(),
     complaintFiles: new Map(),

@@ -138,7 +138,7 @@ function RatingsList(): React.JSX.Element {
         />
       ) : (
         <Card>
-          <CardContent>
+          <CardContent className="pt-4">
             <ul aria-label="Ratings, newest first" className="flex flex-col divide-y divide-border">
               {ratings.map((rating) => (
                 <RatingRow key={rating.id} rating={rating} staff={staff} showDocument />
@@ -226,7 +226,7 @@ function RatingsSummary(): React.JSX.Element {
         />
       ) : (
         <Card>
-          <CardContent className="overflow-x-auto">
+          <CardContent className="overflow-x-auto pt-4">
             <table className="w-full text-sm">
               <caption className="sr-only">
                 Ratings {SUMMARY_GROUP_LABELS[group].toLowerCase()}, lowest average first
