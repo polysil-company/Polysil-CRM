@@ -25,22 +25,24 @@ function visibleIds(
 }
 
 describe("[APP-001] navigation", () => {
-  it("shows the modules the user may view, and the dashboard to everyone", () => {
+  it("shows the modules the user may view, and the dashboard and help to everyone", () => {
     expect(
       visibleIds([{ module: "leads", actions: ["view", "create"], scope: "org_subtree" }]),
-    ).toEqual(["dashboard", "leads", "customers"]);
-    expect(visibleIds([])).toEqual(["dashboard"]);
+    ).toEqual(["dashboard", "help", "leads", "customers"]);
+    expect(visibleIds([])).toEqual(["dashboard", "help"]);
   });
 
   it("needs the view action, not just any grant", () => {
     expect(visibleIds([{ module: "leads", actions: ["create"], scope: null }])).toEqual([
       "dashboard",
+      "help",
     ]);
   });
 
   it("ignores modules the app does not know yet", () => {
     expect(visibleIds([{ module: "warehouse", actions: ["view"], scope: "global" }])).toEqual([
       "dashboard",
+      "help",
     ]);
   });
 

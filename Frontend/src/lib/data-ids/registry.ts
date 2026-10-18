@@ -1691,6 +1691,19 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
   },
+  "BOT-001": {
+    domain: "BOT",
+    title: "Find an action or a record from the command menu (`GET /assistant?q=`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "FS-045. A search box, not a chatbot. Records from 3 characters; debounced 250 ms.",
+  },
+  "BOT-002": {
+    domain: "BOT",
+    title: "Help: everything the user may do here (`GET /assistant/actions`)",
+    owner: "shared",
+    status: "in-progress",
+  },
 } as const satisfies Record<string, DataIdDefinition>;
 
 export type DataId = keyof typeof DATA_IDS;
