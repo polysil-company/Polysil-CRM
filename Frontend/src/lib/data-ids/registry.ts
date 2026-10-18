@@ -49,6 +49,7 @@ export const DATA_ID_DOMAINS = {
   MSG: "Messages — direct conversations between staff",
   BOT: "AI assistant",
   FARM: "The farmers' portal — a customer's own record, consent and ratings",
+  TRK: "Field tracking — duty, locations, visits, the team map and routes",
   RATE: "Ratings — customers' and dealers' feedback, and the dealer rating",
   SITE: "Public website",
   REPO: "Repository tooling — changelog, lint rules, git hooks, CI",
@@ -1651,6 +1652,22 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     notes: "FS-060. By the order or complaint number; 409 `rating_exists`, 422 `not_rateable`.",
+  },
+  "TRK-001": {
+    domain: "TRK",
+    title: "The team map: where each person on duty was last seen (`GET /tracking/team/latest`)",
+    owner: "shared",
+    status: "in-progress",
+    notes:
+      "Field tracking contract (migration 030). Polled every 60 seconds at most; the read is logged.",
+  },
+  "TRK-002": {
+    domain: "TRK",
+    title:
+      "One person's day: path, stops, visits, duty and distance (`GET /tracking/users/{id}/route`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "404 outside the user's team. Another person's route is logged.",
   },
 } as const satisfies Record<string, DataIdDefinition>;
 

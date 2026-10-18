@@ -52,6 +52,8 @@ function fieldStaff(scope: Scope): MockModulePermission[] {
     grant("sales_orders", ["view", "create", "edit"], scope),
     grant("subsidy", ["view", "create"], scope),
     grant("complaints", ["view", "create"], scope),
+    // Field tracking (migration 030): staff track themselves; view reaches by scope.
+    grant("tracking", ["view", "create"], scope),
     grant("tasks", ["view", "create", "edit"], scope),
     grant("partners", ["view"], scope),
     // Officers see their own targets; managers set them for their team (migration 035).
