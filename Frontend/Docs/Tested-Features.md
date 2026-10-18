@@ -52,7 +52,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
 | [Stock](#stock) | 4 | 🧪 👀 | PR #162; on orders in PR #163 |
 | [Customers](#customers) | 3 | 🧪 👀 | PR #170 |
-| [Field tracking](#field-tracking) | 2 | 🧪 👀 | PR #173 |
+| [Field tracking](#field-tracking) | 5 | 🧪 👀 | PR #173; visits in PR #174 |
 | [The farmers' portal](#the-farmers-portal) | 3 | 🧪 👀 | PR #172 |
 | [Ratings](#ratings) | 4 | 🧪 👀 | PR #171 |
 | [Warranty](#warranty) | 3 | 🧪 👀 | PR #164 |
@@ -149,6 +149,9 @@ Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--T
 
 - **TRK-001 · The team map** (Sales → Team map, `tracking.view`; screens: [desktop](screenshots/tracking/team-map-desktop-light.jpg), [phone, dark](screenshots/tracking/team-map-phone-dark.jpg)). Each person in words and on the map: on duty, not heard from in 15 minutes, or off duty; last seen; battery, warned under 20 %; an open visit; a faked location as a red ring and a badge. Refreshes every minute. A field officer sees themselves; a role without tracking is told so. 🧪 👀
 - **TRK-002 · A day's route** (screens: [desktop](screenshots/tracking/route-desktop-light.jpg), [phone, dark](screenshots/tracking/route-phone-dark.jpg)). The day in the URL with the day before and after (never past today); distance, time on duty, stops, visits and points left out; the path with stops, visits, start and last point; duty spans; each visit with its lead, outcome, note and photos. Walked in the mock as Admin on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
+- **TRK-003 · Check in** (Sales → Visits, for those who track; screens: [consent](screenshots/tracking/visit-consent-desktop-light.jpg), [check in](screenshots/tracking/visit-check-in-desktop-light.jpg), [phone, dark](screenshots/tracking/visit-check-in-phone-dark.jpg)). At a lead, a dealer or a named place, with **Locate me** (accuracy shown, a warning above 100 m, blocked or failed location explained). The consent first, the first time. Another open visit is named with **Open that visit**. 🧪 👀
+- **TRK-004 · The open visit and check-out** (screens: [open visit](screenshots/tracking/visit-open-desktop-light.jpg), [phone](screenshots/tracking/visit-open-phone-dark.jpg), [check out](screenshots/tracking/visit-check-out-desktop-light.jpg)). Up to three photos (the camera on a phone), each opened by a ten-minute link; **Check out** with Met, Not available, Follow up or Other, a note and the location; a required photo said before sending. 🧪 👀
+- **TRK-005 · My visits** (screens: [desktop](screenshots/tracking/visits-desktop-light.jpg), [phone, dark](screenshots/tracking/visits-phone-dark.jpg)). The day's visits with time, lead, outcome, length, photos and note; the day in the URL. Walked in the mock as a field officer with the location granted, on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
 
 ## Quotations — reading
 

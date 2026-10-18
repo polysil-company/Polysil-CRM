@@ -152,7 +152,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
   - [x] **34b. The farmers' portal** (FARM-001…003): sign in by mobile, their own orders, quotations, complaints and enquiries, consent and ratings. PR #172, 18 Oct (`feature/FARM-001-consumer-portal`).
 - [ ] **35. Field tracking map screens** (16; the Android app is separate). `field-tracking-contract.md`.
   - [x] **35a. The team map and a day's route** (TRK-001, TRK-002), on Leaflet and OpenStreetMap. PR #173, 18 Oct (`feature/TRK-001-team-map`).
-  - [ ] **35b. Visit check-in and check-out on the web**, with photos.
+  - [x] **35b. Visits on the web** (TRK-003…005): check in with the location and consent, photos, check out, My visits. PR #174, 18 Oct (`feature/TRK-003-visits`).
   - [ ] **35c. Tracking settings and the view log** (admin).
 - [ ] **36. The in-app assistant** (2). `in-app-assistant.md`.
 - [ ] **37. A consolidated order** from several quotations of one dealer: `POST /orders` with several `quotation_ids` (`orders-api-contract.md`).

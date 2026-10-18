@@ -172,6 +172,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | TGT-002 | Set a person's monthly targets, with their history (`GET /targets`, `PUT /targets`) | shared | in-progress |
 | TRK-001 | The team map: where each person on duty was last seen (`GET /tracking/team/latest`) | shared | in-progress |
 | TRK-002 | One person's day: path, stops, visits, duty and distance (`GET /tracking/users/{id}/route`) | shared | in-progress |
+| TRK-003 | Check in at a lead, a dealer or a place, with consent first (`POST /visits`, `GET /me/tracking-config`, `POST /tracking/consent`) | shared | in-progress |
+| TRK-004 | An open visit: photos and check-out (`POST /visits/{id}/check-out`, `/photos`, `GET /visits/{id}/photos/{photo_id}`) | shared | in-progress |
+| TRK-005 | My visits of a day, and one visit (`GET /visits`, `GET /visits/{id}`) | shared | in-progress |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
