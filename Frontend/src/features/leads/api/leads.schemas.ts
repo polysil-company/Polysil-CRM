@@ -59,6 +59,8 @@ export const leadWireSchema = z.object({
   farmer_name: z.string().min(1),
   /** E.164, e.g. "+919876543210". */
   mobile: z.string().min(1),
+  /** LEAD-017 · The customer this lead belongs to; null until it is qualified (FS-041). */
+  customer_id: z.string().nullish(),
   email: z.string().nullable(),
   territory: refSchema.extend({ level: z.string().min(1) }),
   village: z.string().nullable(),
@@ -133,6 +135,7 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   source: wire.source,
   customerName: wire.farmer_name,
   phone: wire.mobile,
+  customerId: wire.customer_id ?? null,
   email: wire.email,
   territory: wire.territory,
   village: wire.village,

@@ -323,6 +323,27 @@ export const DATA_IDS = {
     endpoints: ["POST /leads/{id}/transition"],
     notes: "FS-053: `inquiry_type: dealership`; the winning answer carries `dealer_application`.",
   },
+  "LEAD-016": {
+    domain: "LEAD",
+    title: "Customers — find one by name or mobile, with an area filter (`GET /customers`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "LEAD-017": {
+    domain: "LEAD",
+    title:
+      "A customer's page — details, its leads, quotations and orders, and the timeline across them (`GET /customers/{id}`, `/timeline`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "LEAD-018": {
+    domain: "LEAD",
+    title:
+      "Edit a customer and record or withdraw consent — staff with leads edit (`PATCH /customers/{id}`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+
   "RPT-001": {
     domain: "RPT",
     title: "Dashboard overview — KPIs, pipeline, follow-ups, area by system, targets",

@@ -5,6 +5,7 @@ import { authHandlers } from "./auth";
 import { campaignHandlers } from "./campaigns";
 import { commissionHandlers } from "./commission";
 import { complaintHandlers } from "./complaints";
+import { customerHandlers } from "./customers";
 import { dashboardHandlers } from "./dashboard";
 import { dealerApplicationHandlers } from "./dealer-applications";
 import { documentHandlers } from "./documents";
@@ -80,6 +81,7 @@ export const handlers: readonly HttpHandler[] = [
   ...marketingHandlers,
   ...campaignHandlers,
   ...stockHandlers,
+  ...customerHandlers,
   ...warrantyHandlers,
   ...sellerGstinHandlers,
   ...schemeHandlers,
