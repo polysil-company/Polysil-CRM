@@ -172,7 +172,7 @@ function ConsentCard({ me }: { me: PortalMe }): React.JSX.Element {
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <CardContent className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-sm font-medium text-foreground">Updates from Polysil</h2>
           <p className="text-sm text-muted-foreground">

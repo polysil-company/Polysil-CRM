@@ -1691,6 +1691,22 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
   },
+  "TRK-006": {
+    domain: "TRK",
+    title:
+      "Tracking settings: the policy in force, and a new version from a date (`GET /tracking/policy`, `PUT /tracking/policy`)",
+    owner: "shared",
+    status: "in-progress",
+    notes:
+      "Versions are never edited. A new consent version asks everyone again; 409 `policy_exists`.",
+  },
+  "TRK-007": {
+    domain: "TRK",
+    title: "Who looked at whose route, visits or the team map (`GET /tracking/view-log`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "Admin and MD read it; for anyone else it is empty.",
+  },
   "BOT-001": {
     domain: "BOT",
     title: "Find an action or a record from the command menu (`GET /assistant?q=`)",

@@ -150,10 +150,10 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [x] **34. Ratings, and the consumer portal** (4 + 8). `ratings-contract.md`, `consumer-portal.md`.
   - [x] **34a. Ratings** (RATE-001…004): rating an installation, a product or a service, the Ratings page with its summary, and the dealer rating. PR #171, 18 Oct (`feature/RATE-001-ratings`).
   - [x] **34b. The farmers' portal** (FARM-001…003): sign in by mobile, their own orders, quotations, complaints and enquiries, consent and ratings. PR #172, 18 Oct (`feature/FARM-001-consumer-portal`).
-- [ ] **35. Field tracking map screens** (16; the Android app is separate). `field-tracking-contract.md`.
+- [x] **35. Field tracking map screens** (16; the Android app is separate). `field-tracking-contract.md`.
   - [x] **35a. The team map and a day's route** (TRK-001, TRK-002), on Leaflet and OpenStreetMap. PR #173, 18 Oct (`feature/TRK-001-team-map`).
   - [x] **35b. Visits on the web** (TRK-003…005): check in with the location and consent, photos, check out, My visits. PR #174, 18 Oct (`feature/TRK-003-visits`).
-  - [ ] **35c. Tracking settings and the view log** (admin).
+  - [x] **35c. Tracking settings and the view log** (TRK-006, TRK-007). PR #175, 18 Oct (`feature/TRK-006-tracking-admin`).
 - [x] **36. The in-app assistant** (2). `in-app-assistant.md`. BOT-001, BOT-002: the Ctrl+K search with Actions and Records, and the Help page. PR #176, 18 Oct (`feature/BOT-001-assistant`).
 - [ ] **37. A consolidated order** from several quotations of one dealer: `POST /orders` with several `quotation_ids` (`orders-api-contract.md`).
 - [ ] **38. The dealer portal walk:** sign in as `dealer`, `distributor` and `sub_dealer`, walk every screen, and fix what leaks or breaks.

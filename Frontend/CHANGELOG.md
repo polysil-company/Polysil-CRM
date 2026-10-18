@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-97 changes, newest first. Each title opens its entry.
+99 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-18 | [Search and help](changelog/entries/2026-10-18--feature--BOT-001--assistant.md) | `feature` | `BOT-001` `BOT-002` |
 | 2026-10-18 | [Holidays, and complaint escalation](changelog/entries/2026-10-18--feature--CMPL-012--holidays-escalation.md) | `feature` | `CMPL-012` `MSTR-019` |
 | 2026-10-18 | [The farmers' portal](changelog/entries/2026-10-18--feature--FARM-001--consumer-portal.md) | `feature` | `FARM-001` `FARM-002` `FARM-003` |
 | 2026-10-18 | [The customer record](changelog/entries/2026-10-18--feature--LEAD-016--customer-record.md) | `feature` | `LEAD-016` `LEAD-017` `LEAD-018` |
@@ -21,6 +22,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-10-18 | [Tasks for dealers](changelog/entries/2026-10-18--feature--TASK-009--dealer-tasks.md) | `feature` | `TASK-009` |
 | 2026-10-18 | [The team map and a day's route](changelog/entries/2026-10-18--feature--TRK-001--team-map.md) | `feature` | `TRK-001` `TRK-002` |
 | 2026-10-18 | [Visits on the web](changelog/entries/2026-10-18--feature--TRK-003--web-visits.md) | `feature` | `TRK-003` `TRK-004` `TRK-005` |
+| 2026-10-18 | [Tracking settings and who looked](changelog/entries/2026-10-18--feature--TRK-006--tracking-settings.md) | `feature` | `TRK-006` `TRK-007` |
 | 2026-10-17 | [Payments: on the order, record a payment, receipts for Accounts, and the dealer ledger and credit standing](changelog/entries/2026-10-17--feature--ACCT-002--payments.md) | `feature` | `ACCT-002` `ACCT-003` `ACCT-004` `ACCT-005` |
 | 2026-10-17 | [Stock on orders: Order to, availability per line, and where a dispatch left from](changelog/entries/2026-10-17--feature--DISP-003--stock-on-orders.md) | `feature` | `DISP-003` |
 | 2026-10-17 | [Marketing material: order from the catalogue with both shares, approve and send, and keep the catalogue](changelog/entries/2026-10-17--feature--MKT-002--marketing-material.md) | `feature` | `MKT-002` `MKT-003` `MKT-004` |
@@ -110,6 +112,101 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
 
 ## 18 October 2026
+
+### Search and help
+
+`feature` · `BOT-001` `BOT-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--BOT-001--assistant.md)
+
+#### Before
+
+The Ctrl+K menu could jump to a page, start a new lead or switch the theme. It couldn't find a record or anything else the user may do. Nothing in the app listed everything a role can do.
+
+#### Now
+
+Built to `in-app-assistant.md` (FS-045) and the generated `assistant.md`. As the spec says, this is a search box, not a chatbot.
+
+**The Ctrl+K menu** (BOT-001)
+
+- It opens as before with Ctrl+K or ⌘K, with `/`, or from the search button on a phone. It now searches pages, actions and records.
+- **Actions** come from `GET /assistant`, so they follow the user's permissions. A starter set shows before anything is typed, then the best matches. An action that starts something ("New quotation") shows a plus.
+- **Records** appear from 3 characters:
+  - leads and customers by number, mobile or name;
+  - quotations, orders and complaints by number, or by serial alone.
+  - Each shows its label and its kind, and choosing one opens its page.
+- The request waits for a 250 ms pause. A newer search drops the older one, and the last answer stays on screen meanwhile.
+- **Go to** (pages) and **Preferences** (theme, and Help) still filter in the browser. If the search fails, a line says records can't be searched just now and the pages still work.
+- The backend names a screen with a stable key, and `assistant-routes.ts` maps each key to this app's route. A "new" screen without a route of its own opens the page whose button starts it:
+  - a new task opens Tasks;
+  - a new campaign opens Campaigns;
+  - recording a payment opens Receipts;
+  - ordering marketing material opens Marketing material.
+- A key or record kind this app doesn't know yet is left out, never shown broken.
+- The menu's long-standing separator broke the listbox's accessibility rules (axe: `aria-required-children`). The group headings already separate the groups, so it is gone.
+
+**Help** (`/help`, BOT-002)
+
+- **Help** under Overview, for everyone signed in, and in the menu.
+- Everything the user may do (`GET /assistant/actions`), grouped by module, each a link to where it starts, with a filter.
+- It says how to open the search: the keys on a computer, the search button on a touch screen.
+- Loading, empty ("Nothing matches", or no actions for this role), and error with a retry.
+
+**Mock**
+
+- A stand-in for the backend's catalogue of 37 actions, each with the grant it needs. Messages and Company settings are staff only.
+- Words in any order, best first.
+- Records are scoped like their lists: a dealer finds only what its dealership holds.
+- 422 for a `q` over 100 characters or with control characters, and for a `limit` outside 1 to 20. A farmer gets the portal's 403, as for every route outside the portal.
+
+Walked as an admin on a desktop in light mode and a touch phone in dark mode: the starter set, "new quo", "patel" opening Nilesh Patel's lead, "SO/" finding orders, and Help. Axe found nothing, with no sideways scroll. The only console errors came from the lead page's server-side fetch, which tries to reach a real backend that the mock sandbox doesn't run.
+
+#### Discussion
+
+- **The walk found three things, all fixed here:**
+  - the separator's axe violation;
+  - the record kind's contrast on a selected row in dark mode;
+  - "Sales order" wrapping on a phone.
+- **Server results are kept by cmdk with the typed text as a keyword.** The server has already matched them, and cmdk's own filter would otherwise hide a record found by mobile. Pages still filter locally, so they rank among the results as before.
+- **"Create a new lead" is no longer a fixed item.** The server's **New lead** replaces it, and it shows only to those who may create leads.
+- **The catalogue is the backend's.** The mock's titles, hints and grants stand in for it. Staging will show the real wording.
+- **This is item 36.** Items 37 (a consolidated order) and 38 (the dealer portal walk) follow.
+
+#### Files changed
+
+- `src/features/assistant/api/assistant.schemas.ts`, `.api.ts`, `.queries.ts`: new. These hold the contract with its screen keys, the search and the action list.
+- `src/features/assistant/lib/assistant-routes.ts`: new, screen keys to routes, and opening a record.
+- `src/features/assistant/lib/assistant-labels.ts`: new, module headings and grouping.
+- `src/features/assistant/components/help-page.tsx`: new; `src/app/(app)/help/page.tsx`: new route.
+- `src/components/layout/command-menu.tsx`: the server search, Actions and Records, Preferences, no separator.
+- `src/components/layout/navigation.ts`: the Help item; `navigation.test.ts`: Help shows to everyone.
+- `src/components/layout/app-header.tsx`: the search button's name.
+- Mock: `src/mocks/data/assistant.ts`, `src/mocks/handlers/assistant.ts` (new), `src/mocks/handlers/index.ts`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: BOT-001, BOT-002.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/assistant/*`.
+
+#### Tests
+
+`src/features/assistant/components/assistant.test.tsx`, 11 tests:
+
+- `[BOT-001] Assistant search (contract)`:
+  - a starter set, and records only from 3 characters;
+  - words in any order, best first;
+  - a quotation by its serial alone;
+  - a dealer's records and actions scoped;
+  - 422 for a long `q` or a `limit` out of range;
+  - an unknown screen or kind left out.
+- `[BOT-001] CommandMenu`:
+  - an action the server matched opens its page;
+  - a lead found by its number opens, and the menu closes;
+  - pages still work when the search fails.
+- `[BOT-002] Help page`:
+  - actions by module, and the filter;
+  - a dealer sees only their own.
+
+To check by hand in the mock, as an admin:
+
+1. Press Ctrl+K and type `patel`. Choose a lead.
+2. Press Ctrl+K and type `new quo`. Choose **New quotation**.
+3. Open Overview → **Help** and filter by `payment`.
 
 ### Holidays, and complaint escalation
 
@@ -1000,6 +1097,88 @@ To check by hand in the mock, as a field officer (Preview as role → Field offi
 
 1. Open Sales → **Visits** → **Check in**, agree, choose **Another place**, and select **Locate me**.
 2. Check in, add a photo, then **Check out** as **Met**.
+
+### Tracking settings and who looked
+
+`feature` · `TRK-006` `TRK-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--TRK-006--tracking-settings.md)
+
+#### Before
+
+The tracking policy (how often a location is taken, working hours, how long history is kept, the photo rule, the consent text) could only be changed in the database. Nobody could see who had looked at whose location.
+
+#### Now
+
+Built to `field-tracking-contract.md` §3 Admin and the generated `tracking.md`. This completes the web screens of item 35.
+
+**Tracking settings** (`/tracking-settings`, Admin, `masters.view`)
+
+- **Policy** tab: the policy in force and since when, in words.
+  - "A location every 2 min, or every 50 m moved"
+  - "09:00 to 19:00, monday to saturday"
+  - "Location history kept: 90 days"
+  - "Photo at check-out: Optional"
+  - The consent version and its full text.
+- **Save a new version** (for those with `masters.edit`):
+  - It opens on a copy of the version in force, taking over at the start of tomorrow, India time. A version is never edited, and the form says so.
+  - Fields: when it takes over, seconds between locations, the distance filter, the days kept, the working hours and days, the photo rule, and the consent version and text.
+  - Each field is checked against the backend's bounds before sending: 15 to 3,600 seconds, 0 to 5,000 m and 7 to 3,650 days. The day must end after it starts, at least one day must be chosen, the version must be letters, digits, dots, dashes or underscores, and nothing may start in the past.
+  - When the consent version changes, the form says everyone will be asked to agree again.
+  - `policy_exists` lands on **Takes over**; other field refusals land on their fields.
+- **Who looked** tab: "Hetal Shah looked at the route of Ravi Patel for Friday 16 October", "… the visits of …", "… the team map", newest first, with **Show more**.
+  - **Whose location** narrows it to one person.
+  - The backend shows it to Admin and the MD only. For anyone else the list is empty, and the empty state says so.
+- The tab is in the URL.
+
+**The mock**
+
+- Policy versions are kept. The one in force is the latest that has started, and the check-in config, the consent asked and the photo rule all follow it.
+- Saving refuses the same start, the past, out-of-range values and anyone without `masters.edit`.
+- Reading the team map, someone else's route or someone else's visits adds a row to the view log. It starts with a few rows by the District Manager.
+
+**Polish on screens from the last three PRs**
+
+- A card without a header now has room above its content: the ratings list and summary, the portal's consent card, My visits and the view log.
+- The policy cards use level-2 headings, which axe asked for.
+
+Walked as Admin on a desktop in light mode and a 390 px phone in dark mode: the policy, a new version with a new consent version, and who looked. Axe found nothing once the headings were fixed, with no console errors and no sideways scroll.
+
+#### Discussion
+
+- **Admin, under masters.** Saving needs `masters.edit` (the policy table's own row rule), so the page sits beside Company settings and is gated the same way.
+- **A copy of the version in force.** Most saves change one or two figures, so the form starts from what is in force rather than from blanks.
+- **The people filter comes from the log itself.** A list of the team would itself be a look at the team map and add a row to the log, so the filter uses the people already named in it.
+
+#### Files changed
+
+- `src/features/tracking/api/policy.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: new, the policy and the view log.
+- `src/features/tracking/lib/policy-form.ts`: new, the draft, its checks, the request and the working days in words.
+- `src/features/tracking/components/tracking-settings.tsx`: new, both tabs and the form.
+- `src/app/(app)/tracking-settings/page.tsx`: new route; `src/components/layout/navigation.ts`: the Tracking settings item.
+- Mock: `src/mocks/handlers/policy.ts` (new); `src/mocks/handlers/visits.ts` (the config, consent and photo rule from the policy in force), `src/mocks/handlers/tracking.ts` (logging), `src/mocks/db.ts`, `src/mocks/handlers/index.ts`.
+- `src/features/ratings/components/ratings-page.tsx`, `src/features/portal/components/portal-home.tsx`, `src/features/tracking/components/my-visits.tsx`: room above headerless card content.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: TRK-006 and TRK-007.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/tracking/tracking-*`.
+
+#### Tests
+
+`src/features/tracking/components/policy.test.tsx`, 7 tests:
+
+- `[TRK-006] The new-version form's rules`:
+  - it starts tomorrow from the version in force, and every field is checked;
+  - the working days in words.
+- `[TRK-006] Tracking policy (contract)`:
+  - a version added, then `policy_exists`, the past and no `masters.edit` refused;
+  - a new consent version asks again, with its text.
+- `[TRK-007] View log (contract)`: the team map and a route logged, the filter by person, and empty for a District Manager.
+- `[TRK-006] TrackingSettings`:
+  - the policy in words, then a version saved after fixing a field;
+  - who looked, filtered by person.
+
+To check by hand in the mock as Admin:
+
+1. Open Admin → **Tracking settings**.
+2. Choose **Save a new version**, change the consent version, and save.
+3. Open **Team map** and a route, then come back to **Who looked**.
 
 ## 17 October 2026
 
