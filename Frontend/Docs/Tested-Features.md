@@ -52,6 +52,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
 | [Stock](#stock) | 4 | 🧪 👀 | PR #162; on orders in PR #163 |
 | [Customers](#customers) | 3 | 🧪 👀 | PR #170 |
+| [The farmers' portal](#the-farmers-portal) | 3 | 🧪 👀 | PR #172 |
 | [Ratings](#ratings) | 4 | 🧪 👀 | PR #171 |
 | [Warranty](#warranty) | 3 | 🧪 👀 | PR #164 |
 | [Export and sample orders](#export-and-sample-orders) | 4 | 🧪 👀 | PR #166 |
@@ -132,6 +133,14 @@ Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--R
 - **RATE-002 · Read ratings** (screens: [an order's](screenshots/ratings/order-ratings-desktop-light.jpg), [a complaint's, phone](screenshots/ratings/complaint-ratings-phone-dark.jpg), [the page](screenshots/ratings/ratings-desktop-light.jpg), [1 or 2 stars](screenshots/ratings/ratings-low-desktop-light.jpg), [phone](screenshots/ratings/ratings-phone-dark.jpg)). On the record, and under Service → **Ratings** for staff who see orders: newest first, by kind, and **1 or 2 stars** for the unhappy customers. A dealer sees a customer's rating as the score only. 🧪 👀
 - **RATE-003 · The summary** (screens: [desktop](screenshots/ratings/ratings-summary-desktop-light.jpg), [phone](screenshots/ratings/ratings-summary-phone-dark.jpg)). By dealer, product or kind: average, count and the 1 or 2 star ones, lowest average first. 🧪 👀
 - **RATE-004 · The dealer rating** (screens: [desktop](screenshots/ratings/dealer-rating-desktop-light.jpg), [phone](screenshots/ratings/dealer-rating-phone-dark.jpg)). On a partner's page for staff who see payments, and as **Your rating** in a partner user's ledger: the rating out of 5, days to full payment and order value each scored, and customers' feedback apart; **Not rated yet** when nothing counts. Hidden on a 403. Walked in the mock as Admin on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
+
+## The farmers' portal
+
+Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--FARM-001--consumer-portal.md). Built to `consumer-portal.md` (FS-044). Off by default: [the setting, with its cost warning](screenshots/portal/portal-setting-desktop-light.jpg).
+
+- **FARM-001 · A farmer's own record** (`/portal`; screens: [desktop](screenshots/portal/portal-home-desktop-light.jpg), [phone, dark](screenshots/portal/portal-home-phone-dark.jpg), [switched off](screenshots/portal/portal-off-phone-light.jpg)). The farmer signs in with **Mobile number** and the WhatsApp code; a farmer who lands in the staff app goes to `/portal`. Their orders with each dispatch, quotations with **Open** for the link they were sent, complaints and enquiries; "Through your dealer" in place of a dealer's totals. Staff who open it are pointed back to the main app; while off, it says it is closed. 🧪 👀
+- **FARM-002 · Consent.** **Yes, contact me** and **Stop updates**, with the date it was given. 🧪 👀
+- **FARM-003 · Rating** (screens: [the form](screenshots/portal/portal-rate-desktop-light.jpg), [rated, phone](screenshots/portal/portal-rated-phone-dark.jpg)). **Rate** beside an order with a dispatch or a closed complaint; then "Your rating", or "Rated with our officer". Walked in the mock on a desktop in light mode and a phone in dark mode, signing in as a farmer by OTP; axe found nothing. 🧪 👀
 
 ## Quotations — reading
 
