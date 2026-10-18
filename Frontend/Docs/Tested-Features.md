@@ -52,6 +52,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
 | [Stock](#stock) | 4 | 🧪 👀 | PR #162; on orders in PR #163 |
 | [Customers](#customers) | 3 | 🧪 👀 | PR #170 |
+| [Field tracking](#field-tracking) | 2 | 🧪 👀 | PR #173 |
 | [The farmers' portal](#the-farmers-portal) | 3 | 🧪 👀 | PR #172 |
 | [Ratings](#ratings) | 4 | 🧪 👀 | PR #171 |
 | [Warranty](#warranty) | 3 | 🧪 👀 | PR #164 |
@@ -141,6 +142,13 @@ Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--F
 - **FARM-001 · A farmer's own record** (`/portal`; screens: [desktop](screenshots/portal/portal-home-desktop-light.jpg), [phone, dark](screenshots/portal/portal-home-phone-dark.jpg), [switched off](screenshots/portal/portal-off-phone-light.jpg)). The farmer signs in with **Mobile number** and the WhatsApp code; a farmer who lands in the staff app goes to `/portal`. Their orders with each dispatch, quotations with **Open** for the link they were sent, complaints and enquiries; "Through your dealer" in place of a dealer's totals. Staff who open it are pointed back to the main app; while off, it says it is closed. 🧪 👀
 - **FARM-002 · Consent.** **Yes, contact me** and **Stop updates**, with the date it was given. 🧪 👀
 - **FARM-003 · Rating** (screens: [the form](screenshots/portal/portal-rate-desktop-light.jpg), [rated, phone](screenshots/portal/portal-rated-phone-dark.jpg)). **Rate** beside an order with a dispatch or a closed complaint; then "Your rating", or "Rated with our officer". Walked in the mock on a desktop in light mode and a phone in dark mode, signing in as a farmer by OTP; axe found nothing. 🧪 👀
+
+## Field tracking
+
+Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--TRK-001--team-map.md). Built to `field-tracking-contract.md`; the Android app that sends locations is separate. The sandbox blocks OpenStreetMap, so the screenshots show a blank map under the markers: check the tiles on staging.
+
+- **TRK-001 · The team map** (Sales → Team map, `tracking.view`; screens: [desktop](screenshots/tracking/team-map-desktop-light.jpg), [phone, dark](screenshots/tracking/team-map-phone-dark.jpg)). Each person in words and on the map: on duty, not heard from in 15 minutes, or off duty; last seen; battery, warned under 20 %; an open visit; a faked location as a red ring and a badge. Refreshes every minute. A field officer sees themselves; a role without tracking is told so. 🧪 👀
+- **TRK-002 · A day's route** (screens: [desktop](screenshots/tracking/route-desktop-light.jpg), [phone, dark](screenshots/tracking/route-phone-dark.jpg)). The day in the URL with the day before and after (never past today); distance, time on duty, stops, visits and points left out; the path with stops, visits, start and last point; duty spans; each visit with its lead, outcome, note and photos. Walked in the mock as Admin on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
 
 ## Quotations — reading
 

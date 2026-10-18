@@ -38,6 +38,7 @@ import { subsidySchemeHandlers } from "./subsidy-schemes";
 import { targetHandlers } from "./targets";
 import { taskHandlers } from "./tasks";
 import { territoryHandlers } from "./territories";
+import { trackingHandlers } from "./tracking";
 import { userHandlers } from "./users";
 import { warrantyHandlers } from "./warranty";
 
@@ -88,6 +89,7 @@ export const handlers: readonly HttpHandler[] = [
   ...stockHandlers,
   ...customerHandlers,
   ...ratingHandlers,
+  ...trackingHandlers,
   ...warrantyHandlers,
   ...holidayHandlers,
   ...sellerGstinHandlers,

@@ -40,6 +40,7 @@ ID tells you *which functionality*, and the request ID tells you *which request*
 | `MSG` | Messages — direct conversations between staff |
 | `BOT` | AI assistant |
 | `FARM` | The farmers' portal — a customer's own record, consent and ratings |
+| `TRK` | Field tracking — duty, locations, visits, the team map and routes |
 | `RATE` | Ratings — customers' and dealers' feedback, and the dealer rating |
 | `SITE` | Public website |
 | `REPO` | Repository tooling — changelog, lint rules, git hooks, CI |
@@ -169,6 +170,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | RPT-003 | A lead's 360° view (`GET /leads/{id}/360`) | shared | in-progress |
 | TGT-001 | Targets — the month's achievement, yours and your team's (`GET /targets/achievement`) | shared | in-progress |
 | TGT-002 | Set a person's monthly targets, with their history (`GET /targets`, `PUT /targets`) | shared | in-progress |
+| TRK-001 | The team map: where each person on duty was last seen (`GET /tracking/team/latest`) | shared | in-progress |
+| TRK-002 | One person's day: path, stops, visits, duty and distance (`GET /tracking/users/{id}/route`) | shared | in-progress |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
