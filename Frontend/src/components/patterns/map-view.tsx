@@ -32,6 +32,16 @@ const TONE_CLASSES = {
   muted: "fill-muted-foreground stroke-muted-foreground",
 } as const;
 
+/** A path is a line: its colour on the stroke only, never filled in. */
+const PATH_CLASSES = {
+  primary: "fill-none stroke-primary",
+  success: "fill-none stroke-success",
+  warning: "fill-none stroke-warning",
+  danger: "fill-none stroke-danger",
+  info: "fill-none stroke-info",
+  muted: "fill-none stroke-muted-foreground",
+} as const satisfies Record<keyof typeof TONE_CLASSES, string>;
+
 export type MapTone = keyof typeof TONE_CLASSES;
 
 export interface MapMarker {
@@ -117,7 +127,12 @@ export function MapView({
         if (path.points.length < 2) continue;
         const latLngs = path.points.map(([lat, lng]): [number, number] => [lat, lng]);
         leaflet
-          .polyline(latLngs, { weight: 3, opacity: 0.85, className: TONE_CLASSES[path.tone] })
+          .polyline(latLngs, {
+            weight: 3,
+            opacity: 0.85,
+            fill: false,
+            className: PATH_CLASSES[path.tone],
+          })
           .addTo(group);
         bounds.push(...latLngs);
       }
