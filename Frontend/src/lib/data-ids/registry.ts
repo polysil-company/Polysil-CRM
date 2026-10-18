@@ -48,6 +48,7 @@ export const DATA_ID_DOMAINS = {
   NOTIF: "Notifications — in-app bell, WhatsApp and email templates and history",
   MSG: "Messages — direct conversations between staff",
   BOT: "AI assistant",
+  FARM: "The farmers' portal — a customer's own record, consent and ratings",
   RATE: "Ratings — customers' and dealers' feedback, and the dealer rating",
   SITE: "Public website",
   REPO: "Repository tooling — changelog, lint rules, git hooks, CI",
@@ -1628,6 +1629,28 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     notes: "Staff who see payments, and the dealer itself; 403 `rating_not_permitted` hides it.",
+  },
+  "FARM-001": {
+    domain: "FARM",
+    title:
+      "The farmers' portal: their details, enquiries, quotations, orders and complaints (`GET /portal/me`, `/portal/enquiries`, `/portal/quotations`, `/portal/orders`, `/portal/complaints`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "FS-044. Off by default (`consumer_portal`); 403 `portal_off`, `not_a_consumer`.",
+  },
+  "FARM-002": {
+    domain: "FARM",
+    title: "A farmer records or withdraws their own consent (`PATCH /portal/me`)",
+    owner: "shared",
+    status: "in-progress",
+  },
+  "FARM-003": {
+    domain: "FARM",
+    title:
+      "A farmer rates an installation or a service (`GET /portal/ratings`, `POST /portal/ratings`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "FS-060. By the order or complaint number; 409 `rating_exists`, 422 `not_rateable`.",
   },
 } as const satisfies Record<string, DataIdDefinition>;
 

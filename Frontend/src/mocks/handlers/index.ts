@@ -20,6 +20,7 @@ import { notificationHandlers } from "./notifications";
 import { orderHandlers } from "./orders";
 import { partnerHandlers } from "./partners";
 import { paymentHandlers } from "./payments";
+import { consumerFenceHandlers, portalHandlers } from "./portal";
 import { productHandlers } from "./products";
 import { quotationHandlers } from "./quotations";
 import { ratingHandlers } from "./ratings";
@@ -54,7 +55,9 @@ export const unbuiltHandlers: readonly HttpHandler[] = [];
  * by the backend, so in partial mode it goes to the real API.
  */
 export const handlers: readonly HttpHandler[] = [
+  ...consumerFenceHandlers,
   ...authHandlers,
+  ...portalHandlers,
   ...approvalHandlers,
   ...leadHandlers,
   ...leadCaptureHandlers,

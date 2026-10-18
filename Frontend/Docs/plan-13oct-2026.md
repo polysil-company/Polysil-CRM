@@ -147,9 +147,9 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [x] **31. Dealer tasks** (TASK-009): a Dealers group in New task, and a dealer's own Tasks page with Done only, while `tasks_for_dealers` is on. PR #168, 18 Oct (`feature/TASK-009-dealer-tasks`).
 - [x] **32. Complaint holidays and escalation** (MSTR-019, CMPL-012): Masters → Holidays, and a missed target marked on the complaint, in its history and in the bell. PR #169, 18 Oct (`feature/CMPL-012-holidays-escalation`).
 - [x] **33. The customer record** (LEAD-016…018): Sales → Customers, a customer's page with its leads, quotations, orders and timeline, Edit and consent, and the link from a lead. PR #170, 18 Oct (`feature/LEAD-016-customer-record`).
-- [ ] **34. Ratings, and the consumer portal** (4 + 8). `ratings-contract.md`, `consumer-portal.md`.
+- [x] **34. Ratings, and the consumer portal** (4 + 8). `ratings-contract.md`, `consumer-portal.md`.
   - [x] **34a. Ratings** (RATE-001…004): rating an installation, a product or a service, the Ratings page with its summary, and the dealer rating. PR #171, 18 Oct (`feature/RATE-001-ratings`).
-  - [ ] **34b. The consumer portal** (`consumer-portal.md`).
+  - [x] **34b. The farmers' portal** (FARM-001…003): sign in by mobile, their own orders, quotations, complaints and enquiries, consent and ratings. PR #172, 18 Oct (`feature/FARM-001-consumer-portal`).
 - [ ] **35. Field tracking map screens** (16; the Android app is separate). `field-tracking-contract.md`.
 - [ ] **36. The in-app assistant** (2). `in-app-assistant.md`.
 - [ ] **37. A consolidated order** from several quotations of one dealer: `POST /orders` with several `quotation_ids` (`orders-api-contract.md`).
