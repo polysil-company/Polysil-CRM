@@ -286,6 +286,7 @@ function createMockDb(): MockDb {
     district === undefined ? null : { id: district.id, name: district.name, level: district.level },
   );
   const orders = generateOrders(leads, quotations, thresholds);
+  shareADealer(quotations, orders);
   const complaints = generateComplaints(leads, orders);
   const gifts = seedGifts();
   const materials = seedMaterials();
@@ -406,4 +407,24 @@ export const mockDb: MockDb = createMockDb();
 
 export function resetMockDb(): void {
   Object.assign(mockDb, createMockDb());
+}
+
+/**
+ * SO-011 · So a consolidated order can be tried: the first dealer with an accepted quotation
+ * waiting gets a second one, on another lead, to the same place.
+ */
+function shareADealer(quotations: QuotationWire[], orders: readonly OrderWire[]): void {
+  const ordered = new Set(orders.flatMap((order) => order.quotations.map((item) => item.id)));
+  const free = quotations.filter(
+    (item) =>
+      item.status === "accepted" &&
+      item.superseded_by === null &&
+      item.sales_type === "commercial" &&
+      !ordered.has(item.id),
+  );
+  const held = free.find((item) => item.partner !== null);
+  const other = free.find((item) => item.partner === null && item.lead?.id !== held?.lead?.id);
+  if (held === undefined || other === undefined) return;
+  other.partner = held.partner;
+  other.place_of_supply = held.place_of_supply;
 }

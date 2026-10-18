@@ -66,6 +66,7 @@ in the same shape. Never renumber or reuse a number.
 
 - [x] **BE-019** · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders` · SO-003 · low
 - [x] **BE-020** · Name the order on its events in the lead's timeline · SO-002, LEAD-005 · normal
+- [ ] **BE-029** · List only the quotations still free to order: an `orderable` filter on `GET /quotations` · SO-011 · low
 
 **Messages** — added as the message screens are connected (MSG-001…).
 
@@ -563,5 +564,22 @@ in the same shape. Never renumber or reuse a number.
   them as above for now; without seeded grants the page is hidden for everyone on staging.
 - **Done when:** `GET /auth/me` returns `marketing_material` for those roles on a fresh database.
   The frontend then checks the mock against the seeded grants.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-029 · List only the quotations still free to order: an `orderable` filter on `GET /quotations`
+
+- **Status:** ⬜ Open
+- **Asked:** 18 Oct 2026 · SO-011
+- **What:**
+  - Place order now offers the dealer's other accepted quotations, to make one consolidated
+    order (`POST /orders` with several `quotation_ids`). The list comes from
+    `GET /quotations?status=accepted&partner_id=…`.
+  - That list can't tell which of them are already on a live order. Add `orderable=true`
+    (accepted, current, and not on a live order), or an `order` reference on each row.
+- **Why:** today a quotation already on an order shows as a choice. The frontend learns it only
+  when `POST /orders` answers `409 quotation_on_order`; it then unticks and marks that quotation.
+- **Done when:** the filter (or the field) is in `quotations.md`. The frontend then lists only the
+  free ones.
 - **Done in:** —
 - **Backend notes:** —

@@ -546,6 +546,7 @@ export const quotationHandlers = [
       .filter(isStatus);
     const salesType = url.searchParams.get("sales_type");
     const leadId = url.searchParams.get("lead_id");
+    const partnerId = url.searchParams.get("partner_id");
     const q = url.searchParams.get("q") ?? "";
     const currentOnly = url.searchParams.get("current_only") !== "false";
 
@@ -557,6 +558,7 @@ export const quotationHandlers = [
               (statuses.length === 0 || statuses.includes(quotation.status)) &&
               (salesType === null || salesType === "" || quotation.sales_type === salesType) &&
               (leadId === null || leadId === "" || onLead(quotation, leadId)) &&
+              (partnerId === null || partnerId === "" || quotation.partner?.id === partnerId) &&
               (!currentOnly || quotation.superseded_by === null) &&
               matchesSearch(quotation, q),
           );

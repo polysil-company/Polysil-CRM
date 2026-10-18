@@ -48,9 +48,11 @@ import { quotationTitle } from "@/features/quotations/lib/quotation-labels";
 import { useCan } from "@/features/session/hooks/use-session";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
+import { isApiError } from "@/lib/api/errors";
 import { formatInr } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
+import { canConsolidate, ConsolidateQuotations } from "./consolidate-quotations";
 import { RefusalAlert } from "./order-dialog-shared";
 
 const log = createLogger({ file: "features/orders/components/place-order.tsx", dataId: "SO-003" });
@@ -132,12 +134,23 @@ export function PlaceOrder({ quotation }: { quotation: Quotation }): React.JSX.E
   );
 }
 
+const takenSchema = z.object({ fields: z.object({ quotation_ids: z.string() }) });
+
+/** SO-011 · The quotation a `quotation_on_order` refusal names, if any. */
+function takenQuotationId(error: unknown): string | null {
+  if (!isApiError(error) || error.code !== "quotation_on_order") return null;
+  return takenSchema.safeParse(error.details).data?.fields.quotation_ids ?? null;
+}
+
 /** The draft's type and header; on success the new order's page opens. */
 function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Element {
   const create = useCreateOrder();
   const idempotency = useIdempotencyKey();
   const router = useRouter();
   const [refusal, setRefusal] = useState<OrderRefusal | null>(null);
+  // SO-011 · The dealer's other quotations ticked to join this one, and those found on an order.
+  const [others, setOthers] = useState<string[]>([]);
+  const [onOrder, setOnOrder] = useState<string[]>([]);
   // SO-008 · A subsidised quotation makes a subsidised order, its subsidy with it (FS-057).
   const subsidised = quotation.salesType === "subsidised";
   // SO-010 · An export quotation makes an export order, and only an export one (type_mismatch).
@@ -165,7 +178,7 @@ function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Elem
     action: (values: PlaceOrderForm) => {
       const body = {
         order_type: values.orderType,
-        quotation_ids: [quotation.id],
+        quotation_ids: [quotation.id, ...others],
         delivery_address: values.deliveryAddress === "" ? null : values.deliveryAddress,
         payment_terms: values.paymentTerms,
         remarks: values.remarks === "" ? null : values.remarks,
@@ -183,6 +196,19 @@ function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Elem
       router.push(`/sales-orders/${order.id}`);
     },
     onError: (error) => {
+      // SO-011 · A ticked quotation already on an order is unticked and marked, so a retry works.
+      const taken = takenQuotationId(error);
+      if (taken !== null && others.includes(taken)) {
+        setOthers((current) => current.filter((id) => id !== taken));
+        setOnOrder((current) => [...current, taken]);
+        setRefusal({
+          title: "One of the added quotations is on an order already",
+          message:
+            "It is now unticked and marked. Make the order without it, or tick another quotation.",
+          stale: false,
+        });
+        return;
+      }
       setRefusal(orderRefusal(error));
     },
   });
@@ -200,8 +226,12 @@ function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Elem
         <DialogTitle>Place an order</DialogTitle>
         <DialogDescription>
           From {quotationTitle(quotation)} · {quotation.party.name} ·{" "}
-          {formatInr(quotation.totals.total, { paise: true })}. The items and prices come from the
-          quotation. The order starts as a draft.
+          {formatInr(quotation.totals.total, { paise: true })}
+          {others.length > 0
+            ? `, and ${String(others.length)} more quotation${others.length === 1 ? "" : "s"}`
+            : ""}
+          . The items and prices come from the quotation{others.length > 0 ? "s" : ""}. The order
+          starts as a draft.
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
@@ -246,6 +276,18 @@ function PlaceOrderForm({ quotation }: { quotation: Quotation }): React.JSX.Elem
               </FieldDescription>
             </Field>
           )}
+          {canConsolidate(quotation) ? (
+            <ConsolidateQuotations
+              quotation={quotation}
+              selected={others}
+              onSelectedChange={(next) => {
+                setRefusal(null);
+                setOthers(next);
+              }}
+              onOrder={onOrder}
+              disabled={submit.isBusy}
+            />
+          ) : null}
           <Field data-invalid={errors.deliveryAddress ? true : undefined}>
             <FieldLabel htmlFor="place-order-address">Deliver to</FieldLabel>
             <Textarea

@@ -62,6 +62,7 @@ export async function listQuotations(
       status: params.status.join(","),
       sales_type: params.salesType,
       lead_id: params.leadId,
+      partner_id: params.partnerId ?? undefined,
       current_only: params.currentOnly ? undefined : false,
     },
     schema: quotationPageSchema,
