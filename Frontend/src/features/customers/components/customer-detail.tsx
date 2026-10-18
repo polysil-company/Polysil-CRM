@@ -371,6 +371,11 @@ function customerEventText(event: CustomerTimelineEvent): string {
   }
 }
 
+/** An entry with nobody behind it reads on its own: "Became a customer". */
+function sentenceCase(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
 /**
  * LEAD-017 · Everything on the customer's leads, and to the customer, newest first. Each lead
  * entry names the lead it happened on.
@@ -410,8 +415,14 @@ function CustomerTimeline({ customerId }: { customerId: string }): React.JSX.Ele
                     </span>
                     <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
                       <p className="text-sm text-foreground">
-                        <span className="font-medium">{event.actor?.name ?? "Polysil"}</span>{" "}
-                        {customerEventText(event)}
+                        {event.actor?.name == null ? (
+                          sentenceCase(customerEventText(event))
+                        ) : (
+                          <>
+                            <span className="font-medium">{event.actor.name}</span>{" "}
+                            {customerEventText(event)}
+                          </>
+                        )}
                       </p>
                       <RelativeDate
                         value={event.occurredAt}

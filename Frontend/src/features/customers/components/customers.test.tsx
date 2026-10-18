@@ -119,8 +119,8 @@ describe("[LEAD-017] Customer record (contract)", () => {
     const customer = seeded(false);
     const leadId = mockDb.leads.find((lead) => lead.customer_id === customer.id)?.id ?? "";
     expect((await getLead(leadId)).customerId).toBe(customer.id);
-    const open = mockDb.leads.find((lead) => lead.stage === "new");
-    if (open !== undefined) expect((await getLead(open.id)).customerId).toBeNull();
+    const open = mockDb.leads.find((lead) => lead.stage === "new")?.id ?? "";
+    expect((await getLead(open)).customerId).toBeNull();
   });
 });
 
@@ -223,7 +223,7 @@ describe("[LEAD-017] CustomerDetail", () => {
     expect(
       await screen.findByRole("list", { name: "Customer timeline, newest first" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("became a customer")).toBeInTheDocument();
+    expect(screen.getByText("Became a customer")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Record consent" }));
     const dialog = await screen.findByRole("dialog");
@@ -263,7 +263,7 @@ describe("[LEAD-017] CustomerDetail", () => {
     const lead = mockDb.leads.find((item) => item.customer_id === customer.id);
     const partner = mockMeFor("dealer").data.partner;
     if (lead === undefined || partner == null) throw new Error("No lead or dealer");
-    lead.assigned_partner = { id: partner.id, name: partner.name, partner_type: "dealer" };
+    lead.assigned_partner = { id: partner.id, name: partner.name ?? "", partner_type: "dealer" };
     signInAs("dealer");
     renderWithProviders(<CustomerDetail customerId={customer.id} />);
     expect(await screen.findByRole("heading", { name: customer.name })).toBeInTheDocument();
