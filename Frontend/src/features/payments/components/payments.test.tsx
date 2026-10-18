@@ -315,7 +315,7 @@ describe("[ACCT-005] Ledger and credit cards", () => {
       </>,
     );
     expect(await screen.findByRole("heading", { name: "Your ledger" })).toBeInTheDocument();
-    await screen.findByText(/owed|in credit|Settled/);
+    expect((await screen.findAllByText(/owed|in credit|Settled/)).length).toBeGreaterThan(0);
     expect(screen.queryByRole("heading", { name: "Credit standing" })).toBeNull();
   });
 

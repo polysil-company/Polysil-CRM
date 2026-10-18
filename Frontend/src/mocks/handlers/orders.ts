@@ -45,6 +45,7 @@ import {
   toOrderSummary,
   withOrderLines,
 } from "@/mocks/data/orders";
+import { partnerInScope } from "@/mocks/data/partner-scope";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { mockMeFor } from "@/mocks/data/sessions";
@@ -222,6 +223,7 @@ function filteredOrders(params: URLSearchParams, statuses?: readonly string[]): 
         waitingOn === "" ||
         toOrderSummary(order).approval_waiting_on === waitingOn) &&
       (partnerId === null || partnerId === "" || order.partner?.id === partnerId) &&
+      partnerInScope(order.partner) &&
       matchesSearch(order, q),
   );
 }
@@ -877,7 +879,7 @@ export const orderHandlers = [
     if (failure) return failure;
 
     const order = findOrder(String(params.orderId));
-    return order === undefined
+    return order === undefined || !partnerInScope(order.partner)
       ? errorResponse(404, "not_found", "No such order.")
       : HttpResponse.json({ data: settle(order) });
   }),

@@ -429,6 +429,12 @@ describe("[SO-007] Amend an approved order", () => {
   it("isn't offered to a dealer", async () => {
     signInAs("dealer");
     const { id } = approvedUnshipped();
+    // A partner user reads only their own dealership's orders (APP-008).
+    const order = mockDb.orders.find((item) => item.id === id);
+    const mine = mockMeFor("dealer").data.partner;
+    if (order !== undefined && mine !== null && mine !== undefined) {
+      order.partner = { id: mine.id, name: mine.name ?? "Dealer", partner_type: "dealer" };
+    }
     showOrder(id);
 
     // An approved order offers its PDF to anyone who can see it: the page has loaded.

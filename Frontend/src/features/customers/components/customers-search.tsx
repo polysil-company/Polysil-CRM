@@ -92,6 +92,7 @@ export function CustomersSearch(): React.JSX.Element {
               ? "Try part of the name, the last digits of the mobile, or another area."
               : "A lead becomes a customer when it is qualified."
           }
+          level={2}
           className="py-12"
         />
       ) : (

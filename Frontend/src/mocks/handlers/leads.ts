@@ -27,6 +27,7 @@ import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { mockLand } from "@/mocks/data/leads";
 import { mockLookupRows } from "@/mocks/data/lookups";
+import { leadInPartnerScope } from "@/mocks/data/partner-scope";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
 import {
@@ -145,6 +146,7 @@ function filterLeads(params: URLSearchParams): LeadWire[] {
   );
 
   return mockDb.leads.filter((lead) => {
+    if (!leadInPartnerScope(lead)) return false;
     if (stages.length > 0 ? !stages.includes(lead.stage) : lead.stage === "merged") {
       return false;
     }
@@ -640,7 +642,7 @@ export const leadHandlers = [
     if (failure) return failure;
 
     const lead = mockDb.leads.find((item) => item.id === params.leadId);
-    if (!lead) {
+    if (!lead || !leadInPartnerScope(lead)) {
       return errorResponse(404, "not_found", "No such lead.");
     }
     const body: LeadResponseWire = { data: forReader(lead) };

@@ -113,6 +113,12 @@ describe("[CMPL-010] reopenComplaint", () => {
     const id = seeded("closed");
     await reopenComplaint(id, { body: { reason: "Internal: repeat site" }, idempotencyKey: "r-7" });
 
+    // A partner user reads only their own dealership's complaints (APP-008).
+    const complaint = mockDb.complaints.find((item) => item.id === id);
+    const mine = mockMeFor("dealer").data.partner;
+    if (complaint !== undefined && mine !== null && mine !== undefined) {
+      complaint.partner = { id: mine.id, name: mine.name ?? "Dealer" };
+    }
     signInAs("dealer");
     const seen = await getComplaint(id);
     expect(seen.reopenCount).toBe(1);

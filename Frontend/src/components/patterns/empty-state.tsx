@@ -15,8 +15,11 @@ export interface EmptyStateProps {
   /** Say why it is empty and what to do next. */
   description?: React.ReactNode;
   action?: React.ReactNode;
-  /** The title's heading level: 2 when the state fills the page, 3 (default) inside a section. */
-  level?: 2 | 3;
+  /**
+   * The title's heading level: 1 when the state is the whole page (a standalone 404), 2 when it
+   * fills a page under the top bar's title, 3 (default) inside a section.
+   */
+  level?: 1 | 2 | 3;
   className?: string;
 }
 

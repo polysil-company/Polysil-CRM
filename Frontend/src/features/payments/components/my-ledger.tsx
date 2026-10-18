@@ -27,7 +27,7 @@ export function MyLedger(): React.JSX.Element | null {
   }
   return (
     <div className="flex flex-col gap-4">
-      <DealerRatingCard partnerId={partner.id} title="Your rating" />
+      <DealerRatingCard partnerId={partner.id} title="Your rating" level={2} />
       <PartnerLedgerCard partnerId={partner.id} title="Your ledger" />
     </div>
   );

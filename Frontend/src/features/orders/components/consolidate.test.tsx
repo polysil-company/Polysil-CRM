@@ -115,16 +115,22 @@ describe("[SO-011] A consolidated order from several quotations of one dealer", 
     );
     const { user, dialog } = await openPlaceOrder(first.id);
     const others = await within(dialog).findByRole("list", { name: "Other accepted quotations" });
-    await user.click(within(others).getByRole("checkbox"));
+    await user.click(
+      within(others).getByRole("checkbox", { name: new RegExp(second.quote_no ?? "") }),
+    );
     await user.click(within(dialog).getByRole("button", { name: "Make draft order" }));
 
     expect(
       await within(dialog).findByText("One of the added quotations is on an order already"),
     ).toBeVisible();
-    const box = within(others).getByRole("checkbox");
+    const box = within(others).getByRole("checkbox", { name: new RegExp(second.quote_no ?? "") });
     expect(box).not.toBeChecked();
     expect(box).toHaveAttribute("aria-disabled", "true");
-    expect(within(others).getByText(/already on an order/)).toBeInTheDocument();
+    expect(
+      within(others).getByText(
+        new RegExp(`${second.lead?.inquiry_no ?? ""} · already on an order`),
+      ),
+    ).toBeInTheDocument();
   });
 
   it("names the field when the quotations don't match", async () => {
@@ -137,7 +143,9 @@ describe("[SO-011] A consolidated order from several quotations of one dealer", 
     second.place_of_supply = other.place_of_supply;
     const { user, dialog } = await openPlaceOrder(first.id);
     const others = await within(dialog).findByRole("list", { name: "Other accepted quotations" });
-    await user.click(within(others).getByRole("checkbox"));
+    await user.click(
+      within(others).getByRole("checkbox", { name: new RegExp(second.quote_no ?? "") }),
+    );
     await user.click(within(dialog).getByRole("button", { name: "Make draft order" }));
 
     expect(await within(dialog).findByText("The quotations don't match")).toBeVisible();

@@ -7,6 +7,7 @@ import { can } from "@/lib/auth/permissions";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { sumRupees, todayInIndia } from "@/lib/format";
 import { mockLookupRows } from "@/mocks/data/lookups";
+import { leadInPartnerScope } from "@/mocks/data/partner-scope";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { findMockTerritory } from "@/mocks/data/territories";
 import { mockDb } from "@/mocks/db";
@@ -100,7 +101,7 @@ export const dashboardHandlers = [
     const { scenario, failure } = await applyScenario();
     if (failure) return failure;
 
-    const leads = scenario === "empty" ? [] : mockDb.leads;
+    const leads = scenario === "empty" ? [] : mockDb.leads.filter(leadInPartnerScope);
     const now = Date.now();
     const open = leads.filter((lead) => !CLOSED_STAGES.includes(lead.stage));
     const closed = leads.filter((lead) => lead.stage === "won" || lead.stage === "lost");

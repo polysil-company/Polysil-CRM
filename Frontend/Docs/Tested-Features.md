@@ -155,6 +155,17 @@ Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--T
 - **TRK-006 · Tracking settings** (Admin → Tracking settings, `masters.view`; screens: [the policy](screenshots/tracking/tracking-policy-desktop-light.jpg), [a new version](screenshots/tracking/tracking-new-version-desktop-light.jpg), [phone, dark](screenshots/tracking/tracking-policy-phone-dark.jpg)). The policy in force in words; **Save a new version** (`masters.edit`) from a copy of it, taking over tomorrow, every field checked against the backend's bounds; a new consent version asks everyone again. 🧪 👀
 - **TRK-007 · Who looked** (screens: [desktop](screenshots/tracking/tracking-views-desktop-light.jpg), [phone, dark](screenshots/tracking/tracking-views-phone-dark.jpg)). Who looked at whose route, visits or the team map, newest first, by person; Admin and the MD only. Walked in the mock as Admin on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
 
+## Partner portal
+
+Details and tests: [changelog entry](../changelog/entries/2026-10-18--fix--APP-008--partner-portal-walk.md). A dealer, a distributor and a sub-dealer each walked every screen in their menu, and every staff screen by its address, in the mock.
+
+- **APP-008 · What a partner user sees** (screens: [dashboard](screenshots/partner-portal/dealer-dashboard-desktop-light.jpg), [dashboard, phone, dark](screenshots/partner-portal/dealer-dashboard-phone-dark.jpg), [leads](screenshots/partner-portal/dealer-leads-desktop-light.jpg), [leads, phone, dark](screenshots/partner-portal/dealer-leads-phone-dark.jpg), [My ledger](screenshots/partner-portal/dealer-ledger-desktop-light.jpg), [a distributor's orders](screenshots/partner-portal/distributor-orders-desktop-light.jpg), [a sub-dealer's complaints](screenshots/partner-portal/sub-dealer-complaints-desktop-light.jpg), [a staff page by address](screenshots/partner-portal/dealer-staff-page-denied-desktop-light.jpg)).
+  - The menu has ten items: Dashboard, Help, Leads, Customers, Sales orders, My ledger, Complaints, Marketing material, Schemes and Rewards.
+  - The leads, the dashboard, the orders and the complaints are the dealership's own.
+  - Each of 22 staff screens, opened by its address, says "You don't have access to this page".
+  - Axe found nothing on any screen, with no sideways scroll.
+  - Each page logs one refused `GET /tasks` while tasks for dealers are off (BE-030). 🧪 👀
+
 ## Search and help
 
 Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--BOT-001--assistant.md). Built to `in-app-assistant.md` (FS-045): a search box, not a chatbot. The actions and records come from the backend, which decides what each user may see.
