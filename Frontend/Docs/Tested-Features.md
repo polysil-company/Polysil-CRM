@@ -52,7 +52,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
 | [Stock](#stock) | 4 | 🧪 👀 | PR #162; on orders in PR #163 |
 | [Customers](#customers) | 3 | 🧪 👀 | PR #170 |
-| [Field tracking](#field-tracking) | 5 | 🧪 👀 | PR #173; visits in PR #174 |
+| [Field tracking](#field-tracking) | 7 | 🧪 👀 | PR #173; visits in PR #174; settings in PR #175 |
 | [The farmers' portal](#the-farmers-portal) | 3 | 🧪 👀 | PR #172 |
 | [Ratings](#ratings) | 4 | 🧪 👀 | PR #171 |
 | [Warranty](#warranty) | 3 | 🧪 👀 | PR #164 |
@@ -152,6 +152,8 @@ Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--T
 - **TRK-003 · Check in** (Sales → Visits, for those who track; screens: [consent](screenshots/tracking/visit-consent-desktop-light.jpg), [check in](screenshots/tracking/visit-check-in-desktop-light.jpg), [phone, dark](screenshots/tracking/visit-check-in-phone-dark.jpg)). At a lead, a dealer or a named place, with **Locate me** (accuracy shown, a warning above 100 m, blocked or failed location explained). The consent first, the first time. Another open visit is named with **Open that visit**. 🧪 👀
 - **TRK-004 · The open visit and check-out** (screens: [open visit](screenshots/tracking/visit-open-desktop-light.jpg), [phone](screenshots/tracking/visit-open-phone-dark.jpg), [check out](screenshots/tracking/visit-check-out-desktop-light.jpg)). Up to three photos (the camera on a phone), each opened by a ten-minute link; **Check out** with Met, Not available, Follow up or Other, a note and the location; a required photo said before sending. 🧪 👀
 - **TRK-005 · My visits** (screens: [desktop](screenshots/tracking/visits-desktop-light.jpg), [phone, dark](screenshots/tracking/visits-phone-dark.jpg)). The day's visits with time, lead, outcome, length, photos and note; the day in the URL. Walked in the mock as a field officer with the location granted, on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
+- **TRK-006 · Tracking settings** (Admin → Tracking settings, `masters.view`; screens: [the policy](screenshots/tracking/tracking-policy-desktop-light.jpg), [a new version](screenshots/tracking/tracking-new-version-desktop-light.jpg), [phone, dark](screenshots/tracking/tracking-policy-phone-dark.jpg)). The policy in force in words; **Save a new version** (`masters.edit`) from a copy of it, taking over tomorrow, every field checked against the backend's bounds; a new consent version asks everyone again. 🧪 👀
+- **TRK-007 · Who looked** (screens: [desktop](screenshots/tracking/tracking-views-desktop-light.jpg), [phone, dark](screenshots/tracking/tracking-views-phone-dark.jpg)). Who looked at whose route, visits or the team map, newest first, by person; Admin and the MD only. Walked in the mock as Admin on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
 
 ## Quotations — reading
 
