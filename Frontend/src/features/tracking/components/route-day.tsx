@@ -4,7 +4,6 @@ import { ArrowLeft01Icon, ArrowRight01Icon, Route01Icon } from "@hugeicons/core-
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { parseAsString, useQueryState } from "nuqs";
 import { useMemo } from "react";
 import type * as React from "react";
 
@@ -20,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routeQueryOptions } from "@/features/tracking/api/tracking.queries";
 import type { Route } from "@/features/tracking/api/tracking.schemas";
+import { isCalendarDay, useDayParam } from "@/features/tracking/hooks/use-day-param";
 import {
   dutyEndText,
   minutesText,
@@ -34,28 +34,13 @@ import {
   todayInIndia,
 } from "@/lib/format";
 
-const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-/** TRK-002 · The day in the URL, so a route can be sent to a colleague; today by default. */
-function useRouteDay(): [string, (day: string) => void] {
-  const today = todayInIndia();
-  const [value, setValue] = useQueryState("date", parseAsString);
-  const day = value !== null && DAY_PATTERN.test(value) && value <= today ? value : today;
-  return [
-    day,
-    (next) => {
-      void setValue(next === today ? null : next);
-    },
-  ];
-}
-
 /**
  * TRK-002 · One person's day: the path, their stops and visits, their duty, and how far they
  * went. Everything on the map is also listed in words. Another person's route is logged by
  * the backend; 404 opens the not-found page.
  */
 export function RouteDay({ userId }: { userId: string }): React.JSX.Element {
-  const [day, setDay] = useRouteDay();
+  const [day, setDay] = useDayParam();
   const today = todayInIndia();
   const query = useQuery(routeQueryOptions(userId, day));
   if (query.status === "error" && isApiError(query.error) && query.error.status === 404) {
@@ -98,7 +83,7 @@ export function RouteDay({ userId }: { userId: string }): React.JSX.Element {
               value={day}
               max={today}
               onChange={(event) => {
-                if (DAY_PATTERN.test(event.target.value)) setDay(event.target.value);
+                if (isCalendarDay(event.target.value)) setDay(event.target.value);
               }}
               className="w-40"
             />

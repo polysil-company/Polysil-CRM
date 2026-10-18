@@ -1669,6 +1669,28 @@ export const DATA_IDS = {
     status: "in-progress",
     notes: "404 outside the user's team. Another person's route is logged.",
   },
+  "TRK-003": {
+    domain: "TRK",
+    title:
+      "Check in at a lead, a dealer or a place, with consent first (`POST /visits`, `GET /me/tracking-config`, `POST /tracking/consent`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "409 `visit_open` names the open visit; 409 `consent_required` asks for consent.",
+  },
+  "TRK-004": {
+    domain: "TRK",
+    title:
+      "An open visit: photos and check-out (`POST /visits/{id}/check-out`, `POST /visits/{id}/photos`, `GET /visits/{id}/photos/{photo_id}`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "409 `photo_required`, `visit_closed`, `photo_limit`, `photo_window_closed`.",
+  },
+  "TRK-005": {
+    domain: "TRK",
+    title: "My visits of a day, and one visit (`GET /visits`, `GET /visits/{id}`)",
+    owner: "shared",
+    status: "in-progress",
+  },
 } as const satisfies Record<string, DataIdDefinition>;
 
 export type DataId = keyof typeof DATA_IDS;

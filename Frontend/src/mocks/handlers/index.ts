@@ -40,6 +40,7 @@ import { taskHandlers } from "./tasks";
 import { territoryHandlers } from "./territories";
 import { trackingHandlers } from "./tracking";
 import { userHandlers } from "./users";
+import { visitHandlers } from "./visits";
 import { warrantyHandlers } from "./warranty";
 
 /**
@@ -90,6 +91,7 @@ export const handlers: readonly HttpHandler[] = [
   ...customerHandlers,
   ...ratingHandlers,
   ...trackingHandlers,
+  ...visitHandlers,
   ...warrantyHandlers,
   ...holidayHandlers,
   ...sellerGstinHandlers,
