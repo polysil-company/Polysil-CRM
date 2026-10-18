@@ -53,7 +53,7 @@ export function AppHeader({ className }: { className?: string }): React.JSX.Elem
           variant="ghost"
           size="icon-md"
           className="lg:hidden"
-          aria-label="Search pages and actions"
+          aria-label="Search pages, actions and records"
           onClick={open}
         >
           <Icon icon={Search01Icon} />
