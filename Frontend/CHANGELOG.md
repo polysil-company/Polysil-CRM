@@ -964,6 +964,7 @@ Walked as a field officer on a desktop in light mode and a 390 px phone in dark 
 - **The walk found two bugs, both fixed here.**
   - The `geolocation=()` header blocked the location everywhere, in production too.
   - The first photo upload ran before the chosen file was stored. The file is now passed straight to the upload. The UI test adds a photo, so this stays caught.
+- **CI runs Node 24; this sandbox runs Node 22.** Node 24's form parser won't build a `File` while jsdom owns the global one, so the mock's photo upload answered 500 in CI's component tests. It now reads the multipart body by hand when that happens, and the tests pass on both versions.
 - **Locate me is a tap, not automatic.** Browsers show the permission prompt more willingly after a tap, and the user sees why it's asked.
 - **Photos of earlier visits can't be listed.** The contract returns a photo's id only when it's uploaded, so the card opens the photos added in this session. A visit's count is always shown.
 - **This is part 35b.** The tracking settings and the view log (35c) follow.
