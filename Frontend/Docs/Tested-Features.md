@@ -52,6 +52,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Campaigns](#campaigns) | 2 | 🧪 👀 | PR #161 |
 | [Stock](#stock) | 4 | 🧪 👀 | PR #162; on orders in PR #163 |
 | [Customers](#customers) | 3 | 🧪 👀 | PR #170 |
+| [Ratings](#ratings) | 4 | 🧪 👀 | PR #171 |
 | [Warranty](#warranty) | 3 | 🧪 👀 | PR #164 |
 | [Export and sample orders](#export-and-sample-orders) | 4 | 🧪 👀 | PR #166 |
 | [Masters](#masters) | 5 | 🧪 👀 | lists and lead scoring in PR #134; offices in PR #135; territories in PR #147; holidays in PR #169 |
@@ -122,6 +123,15 @@ Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--L
 - **LEAD-016 · Find a customer** (Sales → Customers, `/customers`, everyone with `leads.view`; screens: [the list](screenshots/customers/customers-desktop-light.jpg), [a search](screenshots/customers/customers-search-desktop-light.jpg), [phone, dark](screenshots/customers/customers-phone-dark.jpg)). By name or mobile from three letters or digits (below that the page says so), and by area. Each card: name, mobile, village or area, type, lead count and **Consent**. Newest first, with **Show more**, an empty state and an error with a retry. 🧪 👀
 - **LEAD-017 · A customer's page** (screens: [desktop](screenshots/customers/customer-detail-desktop-light.jpg), [phone, dark](screenshots/customers/customer-detail-phone-dark.jpg), [from a lead](screenshots/customers/lead-customer-link-desktop-light.jpg)). Its leads with source and campaign, its quotations and orders, the details, and one timeline across the leads, each entry naming its lead. A customer the user can't see opens the not-found page. A lead with a customer shows **Open the customer**. 🧪 👀
 - **LEAD-018 · Correct a customer, and consent** (staff with `leads.edit`; hidden from dealers; screens: [Edit](screenshots/customers/customer-edit-desktop-light.jpg), [Record consent](screenshots/customers/customer-consent-desktop-light.jpg), [recorded, phone](screenshots/customers/customer-consent-recorded-phone-dark.jpg)). **Edit** sends only what changed; the mobile stays. **Record consent** asks how it was given; **Withdraw consent** asks first. Both show on the timeline. Walked in the mock as Admin on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
+
+## Ratings
+
+Details and tests: [changelog entry](../changelog/entries/2026-10-18--feature--RATE-001--ratings.md). Built to `ratings-contract.md` (FS-043).
+
+- **RATE-001 · Rate an installation, a product or a service** (screens: [the form](screenshots/ratings/rate-installation-desktop-light.jpg), [rated](screenshots/ratings/order-rated-desktop-light.jpg)). The **Ratings** card on a shipped order offers **Rate installation** and **Rate** on each product sent; on a closed complaint, **Rate service**. The form asks for 1 to 5 stars with words for each, and an optional comment. Staff record the farmer's rating (orders or complaints edit); a dealer's user rates for its firm on its own documents. Each button goes once rated. Refusals show in words. 🧪 👀
+- **RATE-002 · Read ratings** (screens: [an order's](screenshots/ratings/order-ratings-desktop-light.jpg), [a complaint's, phone](screenshots/ratings/complaint-ratings-phone-dark.jpg), [the page](screenshots/ratings/ratings-desktop-light.jpg), [1 or 2 stars](screenshots/ratings/ratings-low-desktop-light.jpg), [phone](screenshots/ratings/ratings-phone-dark.jpg)). On the record, and under Service → **Ratings** for staff who see orders: newest first, by kind, and **1 or 2 stars** for the unhappy customers. A dealer sees a customer's rating as the score only. 🧪 👀
+- **RATE-003 · The summary** (screens: [desktop](screenshots/ratings/ratings-summary-desktop-light.jpg), [phone](screenshots/ratings/ratings-summary-phone-dark.jpg)). By dealer, product or kind: average, count and the 1 or 2 star ones, lowest average first. 🧪 👀
+- **RATE-004 · The dealer rating** (screens: [desktop](screenshots/ratings/dealer-rating-desktop-light.jpg), [phone](screenshots/ratings/dealer-rating-phone-dark.jpg)). On a partner's page for staff who see payments, and as **Your rating** in a partner user's ledger: the rating out of 5, days to full payment and order value each scored, and customers' feedback apart; **Not rated yet** when nothing counts. Hidden on a 403. Walked in the mock as Admin on a desktop in light mode and a phone in dark mode; axe found nothing. 🧪 👀
 
 ## Quotations — reading
 

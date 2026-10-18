@@ -40,7 +40,7 @@ export function StarRating({
           key={star}
           icon={StarIcon}
           size={size}
-          className={star <= shown ? "fill-current text-warning" : "text-muted-foreground/50"}
+          className={star <= shown ? "fill-current text-rating" : "text-muted-foreground/50"}
         />
       ))}
     </span>
@@ -106,7 +106,7 @@ export function StarRatingInput({
                 className={cn(
                   "transition-colors duration-fast",
                   on
-                    ? "fill-current text-warning"
+                    ? "fill-current text-rating"
                     : invalid === true
                       ? "text-danger"
                       : "text-muted-foreground",
