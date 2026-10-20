@@ -28,7 +28,8 @@ export const LEAD_STAGES = [
 ] as const;
 export type LeadStage = (typeof LEAD_STAGES)[number];
 
-export const LEAD_INQUIRY_TYPES = ["commercial", "subsidised", "industrial"] as const;
+/** dealership (FS-053): someone asking to become a dealer; won from qualified, without a quotation. */
+export const LEAD_INQUIRY_TYPES = ["commercial", "subsidised", "industrial", "dealership"] as const;
 export type LeadInquiryType = (typeof LEAD_INQUIRY_TYPES)[number];
 
 export const LEAD_PRIORITIES = ["hot", "warm", "cold"] as const;
@@ -58,6 +59,8 @@ export const leadWireSchema = z.object({
   farmer_name: z.string().min(1),
   /** E.164, e.g. "+919876543210". */
   mobile: z.string().min(1),
+  /** LEAD-017 · The customer this lead belongs to; null until it is qualified (FS-041). */
+  customer_id: z.string().nullish(),
   email: z.string().nullable(),
   territory: refSchema.extend({ level: z.string().min(1) }),
   village: z.string().nullable(),
@@ -78,15 +81,32 @@ export const leadWireSchema = z.object({
   land_acres: z.string().nullish(),
   /** The land as the client measures it (FS-052); acres are derived from it. */
   land_hectares: z.string().nullish(),
+  /** MKT-006 · The campaign the lead came from; both null for a dealer (FS-040). */
+  campaign_id: z.string().nullish(),
+  campaign_name: z.string().nullish(),
   lost_reason: refSchema.extend({ code: z.string().min(1) }).nullable(),
   lost_note: z.string().nullable(),
   reopen_count: z.number().int().nonnegative(),
+  /** Set while the lead is dormant: the stage Reopen returns it to (FS-035). */
+  dormant_from_stage: z.enum(LEAD_STAGES).nullish(),
   /** Set on a merged lead; points at the lead that absorbed it. */
   merged_into: z.object({ id: z.string().min(1), inquiry_no: z.string().min(1) }).nullable(),
   first_contacted_at: isoDateTime.nullable(),
   last_activity_at: isoDateTime,
   created_at: isoDateTime,
   created_by: userRefSchema.nullable(),
+  /**
+   * LEAD-015 · Only on the answer that wins a dealership lead (FS-053): the dealer application
+   * it started and the link to send the applicant, shown once; or why none was started.
+   */
+  dealer_application: z
+    .object({
+      id: z.string().min(1).nullable(),
+      apply_url: z.string().min(1).nullable(),
+      /** mobile_in_use, application_open or mobile_invalid. */
+      not_started: z.string().min(1).nullable(),
+    })
+    .nullish(),
   /** Pending duplicate links whose other lead the caller can also see. */
   duplicates: z
     .array(
@@ -115,6 +135,7 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   source: wire.source,
   customerName: wire.farmer_name,
   phone: wire.mobile,
+  customerId: wire.customer_id ?? null,
   email: wire.email,
   territory: wire.territory,
   village: wire.village,
@@ -137,9 +158,14 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   })),
   landAcres: wire.land_acres ?? null,
   landHectares: wire.land_hectares ?? null,
+  campaign:
+    wire.campaign_id == null
+      ? null
+      : { id: wire.campaign_id, name: wire.campaign_name ?? "A campaign" },
   lostReason: wire.lost_reason,
   lostNote: wire.lost_note,
   reopenCount: wire.reopen_count,
+  dormantFromStage: wire.dormant_from_stage ?? null,
   mergedInto: wire.merged_into
     ? { id: wire.merged_into.id, code: wire.merged_into.inquiry_no }
     : null,
@@ -147,6 +173,13 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   lastActivityAt: wire.last_activity_at,
   createdAt: wire.created_at,
   createdBy: wire.created_by ? { id: wire.created_by.id, name: wire.created_by.full_name } : null,
+  dealerApplication: wire.dealer_application
+    ? {
+        id: wire.dealer_application.id,
+        applyUrl: wire.dealer_application.apply_url,
+        notStarted: wire.dealer_application.not_started,
+      }
+    : null,
   duplicates: (wire.duplicates ?? []).map((duplicate) => ({
     linkId: duplicate.link_id,
     leadId: duplicate.lead_id,
@@ -460,6 +493,8 @@ export interface LeadListParams {
   readonly type: LeadInquiryType | null;
   /** Territory ids from GET /leads/areas: leads in any of them or under them. At most 20. */
   readonly areas: readonly string[];
+  /** MKT-006 · A campaign id, `none` for leads without one, or null for any. */
+  readonly campaign: string | null;
 }
 
 // ── the area filter (LEAD-001, backend #50) ──────────────────────────────────────
@@ -539,6 +574,8 @@ export const createLeadRequestSchema = z.object({
   land_hectares: z.string().regex(HECTARES_PATTERN).nullable(),
   /** Becomes the first entry on the lead's timeline. */
   note: z.string().min(1).max(2000).nullable(),
+  /** MKT-006 · An active campaign from GET /campaigns?active=true; null for none. Staff only. */
+  campaign_id: z.string().min(1).nullable().optional(),
 });
 
 export type CreateLeadRequest = z.infer<typeof createLeadRequestSchema>;
@@ -626,6 +663,8 @@ export const createLeadFormSchema = z
       .trim()
       .max(2000, "Keep the note under 2,000 characters.")
       .transform(emptyToNull),
+    /** MKT-006 · Staff only; a dealer's form leaves it out. */
+    campaign: z.string().nullish(),
   })
   .transform((values): CreateLeadRequest => ({
     farmer_name: values.customerName,
@@ -640,6 +679,7 @@ export const createLeadFormSchema = z
     crops: values.crops,
     land_hectares: values.landHectares,
     note: values.note,
+    ...(values.campaign === undefined ? {} : { campaign_id: values.campaign }),
   }));
 
 export type CreateLeadFormValues = z.input<typeof createLeadFormSchema>;

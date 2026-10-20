@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { approvalBlockSchema } from "@/features/orders/api/orders.schemas";
+import { complaintLineWarrantySchema } from "@/features/warranty/api/warranty.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 
 /**
@@ -91,6 +92,8 @@ const lineWireSchema = z.object({
   defective_qty: decimal,
   failure_frequency: z.string().nullable(),
   remark: z.string().nullable(),
+  /** CMPL-011 · Whether the product was in warranty on the day the complaint was first submitted. */
+  warranty: complaintLineWarrantySchema.nullish(),
 });
 
 const attachmentWireSchema = z.object({
@@ -172,6 +175,8 @@ const canWireSchema = z.object({
   upload: z.boolean().optional(),
   remedy: z.boolean().optional(),
   withdraw: z.boolean().optional(),
+  /** CMPL-010 · Reopen a closed or rejected complaint, now. */
+  reopen: z.boolean().optional(),
 });
 
 export const complaintWireSchema = z.object({
@@ -203,12 +208,23 @@ export const complaintWireSchema = z.object({
   cancellation: z.object({ reason: z.string(), by: userRef.nullable(), at: isoDateTime }).nullish(),
   /** Null before the first submit. */
   sla: slaWireSchema.nullable(),
+  /**
+   * CMPL-012 · When the complaint was escalated for missing each target (the bell rang for its
+   * owner and managers); null if not. Staff only: always null for a dealer.
+   */
+  response_escalated_at: isoDateTime.nullish(),
+  resolution_escalated_at: isoDateTime.nullish(),
   submit_count: z.number().int().nonnegative(),
   owner: userRef.nullable(),
   owner_org_unit: ref,
   raised_by: userRef.nullable(),
   remedy: remedyWireSchema.nullish(),
   closed_at: isoDateTime.nullish(),
+  /** CMPL-010 · Times reopened. */
+  reopen_count: z.number().int().nonnegative().optional(),
+  reopened_at: isoDateTime.nullish(),
+  /** Why it was last reopened. Staff only: absent or null for a dealer. */
+  reopen_reason: z.string().nullish(),
   can: canWireSchema,
   created_at: isoDateTime,
   updated_at: isoDateTime,
@@ -245,6 +261,7 @@ export const complaintSchema = complaintWireSchema.transform((wire) => ({
     defectiveQty: line.defective_qty,
     failureFrequency: line.failure_frequency,
     remark: line.remark,
+    warranty: line.warranty ?? null,
   })),
   attachments: wire.attachments.map((attachment) => ({
     id: attachment.id,
@@ -280,6 +297,8 @@ export const complaintSchema = complaintWireSchema.transform((wire) => ({
           internalNote: wire.quality.internal_note ?? null,
         },
   cancellation: wire.cancellation ?? null,
+  responseEscalatedAt: wire.response_escalated_at ?? null,
+  resolutionEscalatedAt: wire.resolution_escalated_at ?? null,
   sla:
     wire.sla === null
       ? null
@@ -327,6 +346,9 @@ export const complaintSchema = complaintWireSchema.transform((wire) => ({
           completedAt: wire.remedy.completed_at,
         },
   closedAt: wire.closed_at ?? null,
+  reopenCount: wire.reopen_count ?? 0,
+  reopenedAt: wire.reopened_at ?? null,
+  reopenReason: wire.reopen_reason ?? null,
   can: {
     edit: wire.can.edit,
     submit: wire.can.submit,
@@ -337,6 +359,7 @@ export const complaintSchema = complaintWireSchema.transform((wire) => ({
     upload: wire.can.upload ?? false,
     remedy: wire.can.remedy ?? false,
     withdraw: wire.can.withdraw ?? false,
+    reopen: wire.can.reopen ?? false,
   },
   createdAt: wire.created_at,
   submittedAt: wire.submitted_at,
@@ -504,6 +527,10 @@ export type QcRequest = z.infer<typeof qcRequestSchema>;
 /** POST /complaints/{id}/cancel */
 export const cancelComplaintRequestSchema = z.object({ reason: z.string().min(1) });
 export type CancelComplaintRequest = z.infer<typeof cancelComplaintRequestSchema>;
+
+/** CMPL-010 · POST /complaints/{id}/reopen — the reason is required. */
+export const reopenComplaintRequestSchema = z.object({ reason: z.string().min(1) });
+export type ReopenComplaintRequest = z.infer<typeof reopenComplaintRequestSchema>;
 
 /** POST /complaints/{id}/remedy — amount, payee and dealer belong to a refund only. */
 export const remedyRequestSchema = z.object({

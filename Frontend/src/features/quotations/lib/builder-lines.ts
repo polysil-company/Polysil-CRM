@@ -5,6 +5,7 @@ import type {
   QuotationLineRequest,
   QuoteLinesRequest,
   QuotePreview,
+  TaxTreatment,
 } from "@/features/quotations/api/quotations.schemas";
 
 /**
@@ -81,6 +82,11 @@ export interface PricingContext {
    * same lists the save will: a list for that sale type comes before the general ones.
    */
   readonly salesType: string | null;
+  /**
+   * SO-010 · An export's tax treatment, so the preview shows the tax the document will store.
+   * Left out (or domestic) for everything else.
+   */
+  readonly taxTreatment?: TaxTreatment;
 }
 
 /** The pricing request for every row that can be priced; unfinished rows wait. */
@@ -105,6 +111,9 @@ export function previewRequestFor(
       ...(context.asOf === null ? {} : { as_of: context.asOf }),
       ...(context.partnerId === null ? {} : { partner_id: context.partnerId }),
       ...(context.salesType === null ? {} : { sales_type: context.salesType }),
+      ...(context.taxTreatment === undefined || context.taxTreatment === "domestic"
+        ? {}
+        : { tax_treatment: context.taxTreatment }),
     },
     keys: priceable.map((line) => line.key),
   };
@@ -215,6 +224,7 @@ export interface SaveErrors {
 
 const HEADER_FIELDS: Readonly<Record<string, string>> = {
   sales_type: "salesType",
+  export_country: "exportCountry",
   "party.name": "partyName",
   "party.mobile": "partyMobile",
   "party.address": "partyAddress",

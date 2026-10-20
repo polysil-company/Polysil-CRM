@@ -59,6 +59,80 @@ function live(): MockUserRecord[] {
   return mockDb.users.filter((user) => user.deleted_at === null);
 }
 
+// ── MSTR-011 · offices ────────────────────────────────────────────────────────
+
+function mayEditMasters(): boolean {
+  return can(mockPermissionsFor(readMockRole()), "masters", "edit");
+}
+
+type MockOffice = (typeof mockDb.offices)[number];
+
+/** An office with its live count of active people, as the backend answers it. */
+function withPeople(office: MockOffice): MockOffice {
+  return {
+    ...office,
+    active_users: live().filter((user) => user.is_active && user.org_unit?.id === office.id).length,
+  };
+}
+
+function territoryRef(territoryId: string | null): MockOffice["territory"] {
+  if (territoryId === null) return null;
+  const territory = findMockTerritory(territoryId);
+  return territory === undefined
+    ? null
+    : { id: territory.id, name: territory.name, level: territory.level };
+}
+
+/** The office below `officeId` in the tree: a move under one of them would make a loop. */
+function isBelow(candidateId: string, officeId: string): boolean {
+  let current = mockDb.offices.find((item) => item.id === candidateId);
+  while (current?.parent) {
+    if (current.parent.id === officeId) return true;
+    const parentId = current.parent.id;
+    current = mockDb.offices.find((item) => item.id === parentId);
+  }
+  return false;
+}
+
+/** The backend's refusals for an office's place and name, on their fields. */
+function officeProblem(
+  name: string,
+  parentId: string | null,
+  territoryId: string | null,
+  selfId: string | null,
+): Record<string, string> | null {
+  if (parentId !== null) {
+    const parent = mockDb.offices.find((item) => item.id === parentId);
+    if (parent === undefined || !parent.is_open) return { parent_id: "not an open office" };
+    if (selfId !== null && (parentId === selfId || isBelow(parentId, selfId))) {
+      return { parent_id: "an office can't sit under itself or one of its own" };
+    }
+  }
+  if (territoryId !== null && findMockTerritory(territoryId) === undefined) {
+    return { territory_id: "no such territory" };
+  }
+  const sibling = mockDb.offices.find(
+    (item) =>
+      item.id !== selfId &&
+      (item.parent?.id ?? null) === parentId &&
+      item.name.trim().toLowerCase() === name.trim().toLowerCase(),
+  );
+  return sibling === undefined ? null : { name: "already used beside it" };
+}
+
+const officeCreateSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  role_level: z.number().int().min(1).max(5),
+  parent_id: z.string().min(1).nullish(),
+  territory_id: z.string().min(1).nullish(),
+});
+
+const officePatchSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  parent_id: z.string().min(1).nullable().optional(),
+  territory_id: z.string().min(1).nullable().optional(),
+});
+
 function openLeadsOf(userId: string): number {
   return mockDb.leads.filter(
     (lead) => lead.owner?.id === userId && !OPEN_STAGES_EXCLUDED.has(lead.stage),
@@ -228,16 +302,103 @@ export const userHandlers = [
     const params = new URL(request.url).searchParams;
     const q = (params.get("q") ?? "").trim().toLowerCase();
     const open = params.get("is_open");
+    const parentId = params.get("parent_id");
     const rows = mockDb.offices
       .filter((office) => (q === "" ? true : office.name.toLowerCase().includes(q)))
       .filter((office) => (open === null ? true : String(office.is_open) === open))
-      .map((office) => ({
-        ...office,
-        active_users: live().filter((user) => user.is_active && user.org_unit?.id === office.id)
-          .length,
-      }));
+      .filter((office) => (parentId === null ? true : office.parent?.id === parentId))
+      .map(withPeople);
     return HttpResponse.json({ data: rows, meta: { limit: 50 } });
   }),
+
+  // MSTR-011 · Offices: anyone signed in reads them; writes need masters.edit.
+  http.get(buildApiUrl("/org-units/:officeId"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const office = mockDb.offices.find((item) => item.id === String(params.officeId));
+    if (office === undefined) return errorResponse(404, "not_found", "No such row in your scope.");
+    return HttpResponse.json({ data: withPeople(office) });
+  }),
+
+  http.post(buildApiUrl("/org-units"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!mayEditMasters()) return forbidden();
+    const parsed = officeCreateSchema.safeParse(await request.json());
+    if (!parsed.success) return invalid({ name: "1 to 120 characters", role_level: "1 to 5" });
+    const {
+      name,
+      role_level: roleLevel,
+      parent_id: parentId,
+      territory_id: territoryId,
+    } = parsed.data;
+    const problem = officeProblem(name, parentId ?? null, territoryId ?? null, null);
+    if (problem !== null) return invalid(problem);
+
+    const parent = parentId ? (mockDb.offices.find((item) => item.id === parentId) ?? null) : null;
+    const office = {
+      id: mockUuid(MOCK_ID_SPACE.orgUnit, 100 + mockDb.offices.length),
+      name: name.trim(),
+      role_level: roleLevel,
+      parent: parent === null ? null : { id: parent.id, name: parent.name },
+      territory: territoryRef(territoryId ?? null),
+      is_open: true,
+      closed_at: null,
+      active_users: 0,
+      created_at: new Date().toISOString(),
+    };
+    mockDb.offices = [office, ...mockDb.offices];
+    return HttpResponse.json({ data: office }, { status: 201 });
+  }),
+
+  http.patch(buildApiUrl("/org-units/:officeId"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!mayEditMasters()) return forbidden();
+    const office = mockDb.offices.find((item) => item.id === String(params.officeId));
+    if (office === undefined) return errorResponse(404, "not_found", "No such row in your scope.");
+    const parsed = officePatchSchema.safeParse(await request.json());
+    if (!parsed.success) return invalid({ name: "1 to 120 characters" });
+    const body = parsed.data;
+    const name = body.name ?? office.name;
+    const parentId = body.parent_id === undefined ? (office.parent?.id ?? null) : body.parent_id;
+    const territoryId =
+      body.territory_id === undefined ? (office.territory?.id ?? null) : body.territory_id;
+    const problem = officeProblem(name, parentId, territoryId, office.id);
+    if (problem !== null) return invalid(problem);
+
+    const parent = parentId === null ? null : mockDb.offices.find((item) => item.id === parentId);
+    const updated = {
+      ...office,
+      name: name.trim(),
+      parent: parent === undefined || parent === null ? null : { id: parent.id, name: parent.name },
+      territory: territoryRef(territoryId),
+    };
+    mockDb.offices = mockDb.offices.map((item) => (item.id === office.id ? updated : item));
+    return HttpResponse.json({ data: withPeople(updated) });
+  }),
+
+  ...(["close", "reopen"] as const).map((action) =>
+    http.post(buildApiUrl(`/org-units/:officeId/${action}`), async ({ params }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      if (!mayEditMasters()) return forbidden();
+      const office = mockDb.offices.find((item) => item.id === String(params.officeId));
+      if (office === undefined) {
+        return errorResponse(404, "not_found", "No such row in your scope.");
+      }
+      if (action === "close" && withPeople(office).active_users > 0) {
+        return invalid({ id: "active people are anchored on this office" });
+      }
+      const updated = {
+        ...office,
+        is_open: action === "reopen",
+        closed_at: action === "reopen" ? null : (office.closed_at ?? new Date().toISOString()),
+      };
+      mockDb.offices = mockDb.offices.map((item) => (item.id === office.id ? updated : item));
+      return HttpResponse.json({ data: withPeople(updated) });
+    }),
+  ),
 
   http.get(base(), async ({ request }) => {
     const { scenario, failure } = await applyScenario();

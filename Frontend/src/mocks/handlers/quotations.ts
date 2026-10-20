@@ -8,6 +8,7 @@ import type {
 } from "@/features/leads/api/leads.schemas";
 import {
   PRICED_SALES_TYPES,
+  TAX_TREATMENTS,
   QUOTATION_ANSWERS,
   QUOTATION_STATUSES,
   SALES_TYPES,
@@ -37,9 +38,12 @@ import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
+import { exportTreatment, lutArnOn, withTaxTreatment } from "./export-sample";
 import { MOCK_CREATOR, newMockEvent, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
+import { calculate, checkCalculation } from "./subsidy";
+import { schemeForLead } from "./subsidy-applications";
 
 /**
  * QUOT-001 … QUOT-003 · The backend's quotation reads (backend/docs/api/quotations.md): the
@@ -485,6 +489,34 @@ function sharedQuotation(token: string): QuotationWire | undefined {
   return mockDb.quotations.find((item) => item.share_url?.endsWith(`/q/${token}`) === true);
 }
 
+/**
+ * SO-010 · An export's header: it needs the buyer's country, takes no GSTIN, and no other type
+ * takes a country.
+ */
+function exportHeaderRefusal(
+  salesType: string,
+  country: string | null | undefined,
+  gstin: string | null | undefined,
+): Response | null {
+  const named = country !== null && country !== undefined && country.trim() !== "";
+  if (salesType === "export" && !named) {
+    return errorResponse(422, "export_country_required", "An export needs the buyer's country.", {
+      export_country: "Enter the buyer's country.",
+    });
+  }
+  if (salesType !== "export" && named) {
+    return errorResponse(422, "export_country_not_export", "Only an export takes a country.", {
+      export_country: "Only an export takes a country.",
+    });
+  }
+  if (salesType === "export" && gstin !== null && gstin !== undefined && gstin !== "") {
+    return errorResponse(422, "export_party_gstin", "An export buyer has no GSTIN.", {
+      "party.gstin": "An export buyer has no GSTIN.",
+    });
+  }
+  return null;
+}
+
 export const quotationHandlers = [
   http.get(buildApiUrl("/quotations"), async ({ request }) => {
     const { scenario, failure } = await applyScenario();
@@ -514,6 +546,7 @@ export const quotationHandlers = [
       .filter(isStatus);
     const salesType = url.searchParams.get("sales_type");
     const leadId = url.searchParams.get("lead_id");
+    const partnerId = url.searchParams.get("partner_id");
     const q = url.searchParams.get("q") ?? "";
     const currentOnly = url.searchParams.get("current_only") !== "false";
 
@@ -525,6 +558,7 @@ export const quotationHandlers = [
               (statuses.length === 0 || statuses.includes(quotation.status)) &&
               (salesType === null || salesType === "" || quotation.sales_type === salesType) &&
               (leadId === null || leadId === "" || onLead(quotation, leadId)) &&
+              (partnerId === null || partnerId === "" || quotation.partner?.id === partnerId) &&
               (!currentOnly || quotation.superseded_by === null) &&
               matchesSearch(quotation, q),
           );
@@ -551,20 +585,26 @@ export const quotationHandlers = [
       .object({
         place_of_supply_territory_id: z.string().min(1),
         lines: z.array(lineInSchema).min(1),
+        tax_treatment: z.enum(TAX_TREATMENTS).default("domestic"),
       })
       .safeParse(await request.json());
     if (!parsed.success) {
       return validation({ lines: "at least one line with a product and a quantity" });
     }
-    const priced = priceLines(parsed.data.lines);
-    if (!priced.ok) {
-      return validation(priced.fields);
+    const domestic = priceLines(parsed.data.lines);
+    if (!domestic.ok) {
+      return validation(domestic.fields);
     }
+    // SO-010 · the preview shows the tax an export will store
+    const treatment = parsed.data.tax_treatment;
+    const priced = {
+      lines: domestic.lines.map((line) => withTaxTreatment(line, treatment)),
+    };
     const provisional = priced.lines.filter((line) => line.provisional_fields.length > 0).length;
     const body: QuotePreviewWire = {
       data: {
         as_of: new Date().toISOString().slice(0, 10),
-        intra_state: true,
+        intra_state: treatment === "domestic",
         price_list_ids: [priced.lines[0]?.price_list_id ?? ""],
         lines: priced.lines.map(({ line_no: _lineNo, ...line }) => line),
         totals: totalsOf(priced.lines),
@@ -591,6 +631,7 @@ export const quotationHandlers = [
       .object({
         lead_id: z.string().min(1),
         sales_type: z.enum(SALES_TYPES).optional(),
+        export_country: z.string().trim().max(100).nullish(),
         party: partySchema.optional(),
         terms: z.string().max(2000).nullish(),
         lines: z.array(lineInSchema).max(200).default([]),
@@ -618,6 +659,9 @@ export const quotationHandlers = [
         { sales_type: "not priced yet" },
       );
     }
+    // SO-010 · an export names the buyer's country, and its buyer has no GSTIN
+    const exportRefusal = exportHeaderRefusal(salesType, body.export_country, body.party?.gstin);
+    if (exportRefusal !== null) return exportRefusal;
     const changed = rateChanges(body.lines);
     if (Object.keys(changed).length > 0) {
       return errorResponse(
@@ -627,10 +671,12 @@ export const quotationHandlers = [
         changed,
       );
     }
-    const priced = priceLines(body.lines);
-    if (!priced.ok) {
-      return validation(priced.fields);
+    const domestic = priceLines(body.lines);
+    if (!domestic.ok) {
+      return validation(domestic.fields);
     }
+    const treatment = salesType === "export" ? exportTreatment() : "domestic";
+    const priced = { lines: domestic.lines.map((line) => withTaxTreatment(line, treatment)) };
 
     const quotation = mockDraft({
       id: mockUuid(MOCK_ID_SPACE.quotation, 50_000 + mockDb.quotations.length),
@@ -648,6 +694,13 @@ export const quotationHandlers = [
       lines: priced.lines,
       createdAt: new Date().toISOString(),
     });
+    if (treatment !== "domestic") {
+      quotation.tax_treatment = treatment;
+      quotation.export_country = body.export_country ?? null;
+      quotation.intra_state = false;
+      quotation.lut_arn =
+        treatment === "export_lut" ? lutArnOn(quotation.price_effective_date) : null;
+    }
     mockDb.quotations.unshift(quotation);
     // A new quotation has no seeded history to derive; this event starts it.
     mockDb.quotationEvents.set(quotation.id, []);
@@ -667,6 +720,7 @@ export const quotationHandlers = [
     const parsed = z
       .object({
         sales_type: z.enum(SALES_TYPES).optional(),
+        export_country: z.string().trim().max(100).nullish(),
         party: partySchema.optional(),
         terms: z.string().max(2000).nullish(),
         expected_status: z.string().optional(),
@@ -680,6 +734,22 @@ export const quotationHandlers = [
 
     const { quotation } = draft;
     const body = parsed.data;
+    // SO-010 · the tax treatment is fixed at create: an export stays one, a domestic one can't become one
+    const nextType = body.sales_type ?? quotation.sales_type;
+    if ((nextType === "export") !== (quotation.sales_type === "export")) {
+      return errorResponse(
+        422,
+        "type_mismatch",
+        "An export quotation stays an export, and a domestic one domestic.",
+      );
+    }
+    const exportRefusal = exportHeaderRefusal(
+      nextType,
+      body.export_country === undefined ? quotation.export_country : body.export_country,
+      body.party === undefined ? quotation.party.gstin : body.party.gstin,
+    );
+    if (exportRefusal !== null) return exportRefusal;
+    if (body.export_country !== undefined) quotation.export_country = body.export_country ?? null;
     if (body.sales_type !== undefined) {
       if (!PRICED_SALES_TYPES.some((type) => type === body.sales_type)) {
         return errorResponse(422, "sales_type_unsupported", "Not priced yet.", {
@@ -736,7 +806,11 @@ export const quotationHandlers = [
     if (!priced.ok) {
       return validation(priced.fields);
     }
-    const updated = withLines(draft.quotation, priced.lines);
+    const treatment = draft.quotation.tax_treatment ?? "domestic";
+    const updated = withLines(
+      draft.quotation,
+      priced.lines.map((line) => withTaxTreatment(line, treatment)),
+    );
     mockDb.quotations = mockDb.quotations.map((item) => (item.id === updated.id ? updated : item));
     voidApproval(updated, "edited");
     recordQuotationEvent(updated, "quotation.lines_replaced", { line_count: updated.lines.length });
@@ -767,6 +841,11 @@ export const quotationHandlers = [
 
     if (quotation.lines.length === 0) {
       return errorResponse(422, "no_lines", "Add at least one item before sending.");
+    }
+    if (quotation.sales_type === "subsidised" && quotation.subsidy == null) {
+      return errorResponse(422, "subsidy_missing", "Calculate the subsidy before sending.", {
+        subsidy: "required",
+      });
     }
     const closed = leadNotOpen(quotation);
     if (closed !== null) return closed;
@@ -928,6 +1007,102 @@ export const quotationHandlers = [
       return HttpResponse.json({ data: quotation });
     },
   ),
+
+  /**
+   * QUOT-014 · A subsidised draft's subsidy for one category, calculated on the lead's scheme
+   * and stored with it (FS-057). The calculation's total is compared with the lines.
+   */
+  http.put(buildApiUrl("/quotations/:quotationId/subsidy"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    const parsed = z
+      .object({ category_code: z.string().min(1), calculation: z.record(z.string(), z.unknown()) })
+      .safeParse(raw);
+    if (!parsed.success) return validation({ category_code: "required", calculation: "required" });
+    const draft = editableDraft(String(params.quotationId), undefined);
+    if (!draft.ok) return draft.response;
+    const quotation = draft.quotation;
+    if (quotation.sales_type !== "subsidised") {
+      return errorResponse(422, "not_subsidised", "Only a subsidised quotation takes a subsidy.", {
+        sales_type: quotation.sales_type,
+      });
+    }
+    const lead = mockDb.leads.find((item) => item.id === quotation.lead?.id);
+    if (lead === undefined) return errorResponse(404, "not_found", "No such lead.");
+    const scheme = schemeForLead(lead.territory.id);
+    if (scheme instanceof Response) return scheme;
+    if ("scheme" in parsed.data.calculation && parsed.data.calculation.scheme !== scheme.code) {
+      return validation({ "calculation.scheme": `This lead's scheme is ${scheme.code}.` });
+    }
+    const checked = checkCalculation({ ...parsed.data.calculation, scheme: scheme.code });
+    if ("fields" in checked) {
+      return validation(
+        Object.fromEntries(
+          Object.entries(checked.fields).map(([path, message]) => [`calculation.${path}`, message]),
+        ),
+      );
+    }
+    const calc = calculate(checked.body);
+    const everywhere = (code: string): boolean =>
+      calc.crops.every(
+        (crop) => crop.categories.find((row) => row.code === code)?.applicable === true,
+      );
+    const category = calc.crops[0]?.categories.find(
+      (row) => row.code === parsed.data.category_code,
+    );
+    if (category === undefined || !everywhere(category.code)) {
+      return validation({ category_code: "does not apply on every crop" });
+    }
+    const subsidy = calc.crops.reduce(
+      (sum, crop) =>
+        sum + Number(crop.categories.find((row) => row.code === category.code)?.subsidy ?? "0"),
+      0,
+    );
+    const total = Number(calc.total.blocks.total_incl_gst);
+    const flat = Number(calc.total.blocks.flat_inspection ?? "0");
+    const stateGst = Number(calc.total.blocks.gst_paid_by_state ?? "0");
+    quotation.subsidy = {
+      scheme: scheme.code,
+      system_type: checked.body.system_type,
+      category: { code: category.code, name: category.name, pct: category.pct },
+      total_cost: (total + flat).toFixed(2),
+      flat_charge: flat.toFixed(2),
+      subsidy: subsidy.toFixed(2),
+      farmer_share: Math.max(0, total + flat - subsidy - stateGst).toFixed(2),
+      gst_paid_by_state: stateGst.toFixed(2),
+      as_of: calc.masters.as_of,
+      formula_version: calc.masters.formula_version,
+    };
+    // the lines are what is sold; the calculation is what the scheme pays on (rule 4)
+    const lines = Number(quotation.totals.total);
+    quotation.warnings = [
+      ...quotation.warnings.filter((warning) => !warning.startsWith("calculation_total_differs")),
+      ...(lines <= 0 || Math.abs(total + flat - lines) > lines * 0.01
+        ? [
+            `calculation_total_differs: the calculation's total ${(total + flat).toFixed(2)} differs from the quotation's ${lines.toFixed(2)}`,
+          ]
+        : []),
+    ];
+    quotation.updated_at = new Date().toISOString();
+    mockDb.quotationSubsidyCalculations.set(quotation.id, calc);
+    recordQuotationEvent(quotation, "quotation.subsidy_set", { category: category.name });
+    mockDb.quotationWrites.set(replay.key, { body: replay.serialized, quotationId: quotation.id });
+    return HttpResponse.json({ data: quotation });
+  }),
+
+  /** QUOT-014 · The full calculation stored with a subsidised quotation. */
+  http.get(buildApiUrl("/quotations/:quotationId/subsidy/calculation"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const calc = mockDb.quotationSubsidyCalculations.get(String(params.quotationId));
+    if (calc === undefined) {
+      return errorResponse(404, "not_found", "This quotation has no subsidy calculation.");
+    }
+    return HttpResponse.json({ data: calc });
+  }),
 
   http.post(buildApiUrl("/quotations/:quotationId/transition"), async ({ params, request }) => {
     const { failure } = await applyScenario();

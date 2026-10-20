@@ -99,6 +99,7 @@ In light mode `text-subtle-foreground` is as dark as `text-muted-foreground`: a 
 | `bg-scan-surface` | Behind a QR code: white in light and dark, so a camera reads it | Anything else |
 | `text-success` / `bg-success-soft` | Won, completed, positive change | Brand accents |
 | `text-warning` / `bg-warning-soft` | Needs attention, negotiation | — |
+| `text-rating` | Filled rating stars (`StarRating`). Decoration only: the score is always in words too | — |
 | `text-danger` / `bg-danger-soft` | Errors, lost, overdue | Destructive *buttons* |
 | `text-info` / `bg-info-soft` | New, informational | — |
 

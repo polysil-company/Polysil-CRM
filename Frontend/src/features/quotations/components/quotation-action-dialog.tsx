@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { useForm, useFormState, type UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
@@ -45,6 +45,7 @@ import {
   roleLabel,
 } from "@/features/quotations/lib/quotation-lifecycle";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { isApiError } from "@/lib/api/errors";
 import { formatIndianPhone, formatInr } from "@/lib/format";
@@ -54,9 +55,6 @@ const log = createLogger({
   file: "features/quotations/components/quotation-action-dialog.tsx",
   dataId: "QUOT-006",
 });
-
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
 
 /** Which action's dialog is open. */
 export type QuotationDialog =
@@ -111,19 +109,6 @@ export function QuotationActionDialog({
 interface FormProps {
   quotation: Quotation;
   onClose: () => void;
-}
-
-/** Closes the dialog a moment after success, and never after the dialog is gone. */
-function useCloseAfterSuccess(onClose: () => void): () => void {
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
-  return () => {
-    timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
-  };
 }
 
 interface Refusal {

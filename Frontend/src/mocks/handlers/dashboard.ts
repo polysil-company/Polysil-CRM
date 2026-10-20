@@ -3,8 +3,12 @@ import { http, HttpResponse } from "msw";
 import type { DashboardOverviewWire } from "@/features/dashboard/api/dashboard.schemas";
 import type { LeadStage, LeadWire } from "@/features/leads/api/leads.schemas";
 import { buildApiUrl } from "@/lib/api/url";
-import { sumRupees } from "@/lib/format";
+import { can } from "@/lib/auth/permissions";
+import { readMockRole } from "@/lib/dev/mock-settings";
+import { sumRupees, todayInIndia } from "@/lib/format";
 import { mockLookupRows } from "@/mocks/data/lookups";
+import { leadInPartnerScope } from "@/mocks/data/partner-scope";
+import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { findMockTerritory } from "@/mocks/data/territories";
 import { mockDb } from "@/mocks/db";
 
@@ -43,6 +47,51 @@ function assumedFollowUp(lead: LeadWire): number {
   return Date.parse(lead.last_activity_at) + 3 * DAY;
 }
 
+/** FS-052: open and won leads now, by irrigation system, in name order; empty systems left out. */
+function areaBySystem(leads: readonly LeadWire[]): DashboardOverviewWire["area_by_system"] {
+  const counted = leads.filter(
+    (lead) => !CLOSED_STAGES.includes(lead.stage) || lead.stage === "won",
+  );
+  return mockLookupRows("mis-systems")
+    .map((system) => {
+      const withSystem = counted.filter((lead) => lead.mis_system === system.code);
+      const hectares = withSystem.reduce((sum, lead) => sum + Number(lead.land_hectares ?? 0), 0);
+      return {
+        system: system.code,
+        name: system.name,
+        leads: withSystem.length,
+        hectares: hectares.toFixed(2),
+      };
+    })
+    .filter((system) => system.leads > 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** What the team sold against its target, as a share; the last month is under way. */
+const MONTH_ACHIEVEMENT: readonly number[] = [0.82, 1.08, 0.64, 0.91, 1.15, 0.38];
+
+/**
+ * FS-052: this month and the five before it, oldest first. Null without a targets
+ * permission; `achieved` null without a sales orders one, as on the backend.
+ */
+function targetsByMonth(empty: boolean): DashboardOverviewWire["targets_by_month"] {
+  const permissions = mockPermissionsFor(readMockRole());
+  if (!can(permissions, "targets")) return null;
+  const seesSales = can(permissions, "sales_orders");
+  // An officer's own target; a manager's or Admin's is their team's.
+  const own = permissions.some((entry) => entry.module === "targets" && entry.scope === "own");
+  const target = own ? 600_000 : 2_400_000;
+  const [year = 2026, month = 1] = todayInIndia().split("-").map(Number);
+  return MONTH_ACHIEVEMENT.map((share, index) => {
+    const date = new Date(Date.UTC(year, month - 1 - (5 - index), 1));
+    return {
+      month: date.toISOString().slice(0, 7),
+      target: empty ? "0.00" : target.toFixed(2),
+      achieved: seesSales ? (empty ? 0 : target * share).toFixed(2) : null,
+    };
+  });
+}
+
 function districtOf(lead: LeadWire): string | null {
   return findMockTerritory(lead.territory.id)?.district ?? null;
 }
@@ -52,7 +101,7 @@ export const dashboardHandlers = [
     const { scenario, failure } = await applyScenario();
     if (failure) return failure;
 
-    const leads = scenario === "empty" ? [] : mockDb.leads;
+    const leads = scenario === "empty" ? [] : mockDb.leads.filter(leadInPartnerScope);
     const now = Date.now();
     const open = leads.filter((lead) => !CLOSED_STAGES.includes(lead.stage));
     const closed = leads.filter((lead) => lead.stage === "won" || lead.stage === "lost");
@@ -97,6 +146,8 @@ export const dashboardHandlers = [
         const inStage = leads.filter((lead) => lead.stage === stage);
         return { stage, count: inStage.length, value: totalValue(inStage) };
       }),
+      area_by_system: areaBySystem(leads),
+      targets_by_month: targetsByMonth(scenario === "empty"),
       sources: mockLookupRows("lead-sources").map((source) => ({
         source: source.code,
         name: source.name,

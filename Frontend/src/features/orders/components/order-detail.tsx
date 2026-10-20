@@ -28,8 +28,16 @@ import {
   orderNumber,
   stepRoleLabel,
 } from "@/features/orders/lib/order-labels";
-import { formatRate, parseWarnings } from "@/features/quotations/lib/quotation-labels";
+import { OrderPaymentsCard } from "@/features/payments/components/order-payments";
+import {
+  TAX_TREATMENT_LABELS,
+  formatRate,
+  parseWarnings,
+} from "@/features/quotations/lib/quotation-labels";
+import { RecordRatingsCard } from "@/features/ratings/components/record-ratings";
+import { OrderPoints } from "@/features/rewards/components/order-points";
 import { useCan } from "@/features/session/hooks/use-session";
+import { OrderWarrantyCard } from "@/features/warranty/components/order-warranty";
 import { isApiError } from "@/lib/api/errors";
 import {
   EMPTY_VALUE,
@@ -45,7 +53,9 @@ import { OrderActions } from "./order-actions";
 import { OrderApproval } from "./order-approval";
 import { OrderDispatches } from "./order-dispatches";
 import { OrderHistory } from "./order-history";
+import { OrderSchemesCard } from "./order-schemes";
 import { OrderStatusBadge } from "./order-status-badge";
+import { isSubsidyWarning, OrderSubsidyCard } from "./order-subsidy";
 
 /** SO-002 · The order as the backend prints it. A 404 renders the route's not-found page. */
 export function OrderDetail({ orderId }: { orderId: string }): React.JSX.Element {
@@ -135,13 +145,34 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
             <p className="text-sm text-muted-foreground">No items yet. This draft is empty.</p>
           ) : (
             <>
-              <LineCards lines={order.lines} intraState={order.intraState} shipping={shipping} />
-              <LineTable lines={order.lines} intraState={order.intraState} shipping={shipping} />
+              <LineCards
+                lines={order.lines}
+                intraState={order.intraState}
+                shipping={shipping}
+                freeSample={order.samplePricing === "free"}
+              />
+              <LineTable
+                lines={order.lines}
+                intraState={order.intraState}
+                shipping={shipping}
+                freeSample={order.samplePricing === "free"}
+              />
             </>
           )}
           <TotalsBlock order={order} />
         </CardContent>
       </Card>
+
+      <OrderSchemesCard order={order} />
+
+      {/* RWD-004 · A dealer pays part of its draft with points. */}
+      <OrderPoints order={order} />
+      {/* ACCT-004 · Payable, received, instalments and receipts. */}
+      <OrderPaymentsCard order={order} />
+      <OrderWarrantyCard order={order} />
+      <RecordRatingsCard kind="order" order={order} />
+
+      <OrderSubsidyCard order={order} />
 
       {shipping ? <OrderDispatches order={order} /> : null}
 
@@ -168,6 +199,9 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
                     : formatIndianPhone(order.party.mobile)}
                 </DetailItem>
                 <DetailItem label="Address">{order.party.address ?? EMPTY_VALUE}</DetailItem>
+                {order.exportCountry === null ? null : (
+                  <DetailItem label="Country">{order.exportCountry}</DetailItem>
+                )}
                 {order.party.gstin === null ? null : (
                   <DetailItem label="GSTIN">
                     <span className="font-mono">{order.party.gstin}</span>
@@ -239,12 +273,50 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
                     Recorded, not checked: there is no credit check.
                   </span>
                 </DetailItem>
+                {order.warehouse === null ? null : (
+                  <DetailItem label="Order to">
+                    {order.warehouse.name}
+                    <span className="block text-xs text-muted-foreground">
+                      The warehouse it ships from.
+                    </span>
+                  </DetailItem>
+                )}
                 <DetailItem label="Place of supply">
                   {order.placeOfSupply.name}
                   <span className="block text-xs text-muted-foreground">
-                    {order.intraState ? "Within the state: CGST and SGST" : "Across states: IGST"}
+                    {order.taxTreatment !== "domestic"
+                      ? "An export: never within the state"
+                      : order.intraState
+                        ? "Within the state: CGST and SGST"
+                        : "Across states: IGST"}
                   </span>
                 </DetailItem>
+                {order.taxTreatment === "domestic" ? null : (
+                  <DetailItem label="Tax">
+                    {TAX_TREATMENT_LABELS[order.taxTreatment]}
+                    <span className="block text-xs text-muted-foreground">
+                      {order.taxTreatment === "export_igst" ? (
+                        "IGST at each line's rate."
+                      ) : order.lutArn === null ? (
+                        "The LUT is taken when the order is submitted."
+                      ) : (
+                        <>
+                          Under LUT <span className="font-mono">{order.lutArn}</span>
+                        </>
+                      )}
+                    </span>
+                  </DetailItem>
+                )}
+                {order.samplePricing === null ? null : (
+                  <DetailItem label="Sample">
+                    {order.samplePricing === "free" ? "Free sample" : "Charged sample"}
+                    <span className="block text-xs text-muted-foreground">
+                      {order.samplePricing === "free"
+                        ? "Every line is 100 % off; the approval runs on the list value."
+                        : "Priced like a commercial order."}
+                    </span>
+                  </DetailItem>
+                )}
                 <DetailItem label="Seller">
                   {order.seller === null ? (
                     "Set when submitted"
@@ -297,6 +369,15 @@ function OrderDetailView({ order }: { order: Order }): React.JSX.Element {
   );
 }
 
+/** SO-010 · Marks a line given free on a sample order. */
+function FreeSampleBadge(): React.JSX.Element {
+  return (
+    <Badge variant="info" size="sm" className="mt-1">
+      Free sample
+    </Badge>
+  );
+}
+
 function DetailItem({
   label,
   children,
@@ -342,6 +423,28 @@ function OrderNotices({ order }: { order: Order }): React.JSX.Element | null {
         </p>
         <p className="whitespace-pre-line text-muted-foreground">{order.lastRejection.remark}</p>
         <p className="text-muted-foreground">Make the changes asked for, then submit it again.</p>
+      </Notice>,
+    );
+  }
+  // SO-007: amended back to draft, until it is approved again.
+  if (order.amendCount > 0 && (order.status === "draft" || order.status === "submitted")) {
+    notices.push(
+      <Notice key="amended" tone="info">
+        <p className="font-medium">
+          Amended after approval
+          {order.amendCount > 1 ? ` (${String(order.amendCount)} times)` : null}
+          {order.amendedFromTotal === null
+            ? null
+            : ` · it was approved at ${formatInr(order.amendedFromTotal, { paise: true })}`}
+        </p>
+        {order.amendReason === null ? null : (
+          <p className="whitespace-pre-line text-muted-foreground">{order.amendReason}</p>
+        )}
+        <p className="text-muted-foreground">
+          {order.status === "draft"
+            ? "Make the changes, then submit it for approval again. The PDF returns once it is approved."
+            : "It waits for approval again. The PDF returns once it is approved."}
+        </p>
       </Notice>,
     );
   }
@@ -410,7 +513,7 @@ function OrderNotices({ order }: { order: Order }): React.JSX.Element | null {
     );
   }
   for (const [index, warning] of parseWarnings(order.warnings)
-    .filter((item) => item.code !== "provisional_pricing")
+    .filter((item) => item.code !== "provisional_pricing" && !isSubsidyWarning(item.code))
     .entries()) {
     notices.push(
       <Notice key={`warning-${String(index)}`} tone="warning">
@@ -443,10 +546,13 @@ function LineTable({
   lines,
   intraState,
   shipping,
+  freeSample,
 }: {
   lines: readonly OrderLine[];
   intraState: boolean;
   shipping: boolean;
+  /** SO-010 · A free sample: every line is 100 % off. */
+  freeSample: boolean;
 }): React.JSX.Element {
   const headCell = "px-3 py-2 text-left text-xs font-medium text-muted-foreground";
   const numHead = cn(headCell, "text-right");
@@ -503,10 +609,12 @@ function LineTable({
               <td className={cn(cell, "text-muted-foreground tabular-nums")}>{line.lineNo}</td>
               <th scope="row" className={cn(cell, "min-w-56 text-left font-normal")}>
                 <span className="block font-medium text-foreground">{line.description}</span>
+                {freeSample ? <FreeSampleBadge /> : null}
                 <span className="block text-xs text-muted-foreground">
                   HSN {line.hsnCode} · {line.uom}
                   {line.provisionalFields.length > 0 ? " · indicative" : ""}
                 </span>
+                <LineStock line={line} />
               </th>
               <td className={numCell}>{qty(line, line.qty)}</td>
               {shipping ? (
@@ -544,15 +652,38 @@ function LineTable({
   );
 }
 
+/**
+ * DISP-003 · An open line's stock in the order's warehouse: what is available, in amber when
+ * the warehouse is over-committed. Nothing once the line has shipped, or without stock access.
+ */
+function LineStock({ line }: { line: OrderLine }): React.JSX.Element | null {
+  if (line.stock === null) return null;
+  return (
+    <span
+      className={cn(
+        "block text-xs tabular-nums",
+        line.stock.short ? "font-medium text-warning" : "text-muted-foreground",
+      )}
+    >
+      {line.stock.short
+        ? `Warehouse short: ${qty(line, line.stock.available)} ${line.uom} available`
+        : `${qty(line, line.stock.available)} ${line.uom} available`}
+    </span>
+  );
+}
+
 /** Phones: one card per line, the same figures in reading order. */
 function LineCards({
   lines,
   intraState,
   shipping,
+  freeSample,
 }: {
   lines: readonly OrderLine[];
   intraState: boolean;
   shipping: boolean;
+  /** SO-010 · A free sample: every line is 100 % off. */
+  freeSample: boolean;
 }): React.JSX.Element {
   return (
     <ol aria-label="Order items" className="flex flex-col gap-3 md:hidden">
@@ -562,10 +693,12 @@ function LineCards({
             <span className="text-sm font-medium text-foreground">
               {line.lineNo}. {line.description}
             </span>
+            {freeSample ? <FreeSampleBadge /> : null}
             <span className="text-xs text-muted-foreground">
               HSN {line.hsnCode}
               {line.provisionalFields.length > 0 ? " · indicative" : ""}
             </span>
+            <LineStock line={line} />
           </div>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
             <dt className="text-muted-foreground">Qty × rate</dt>

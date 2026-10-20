@@ -42,6 +42,9 @@ const CATALOGUE_VIEW = [
   grant("pricing", ["view"], "global"),
 ];
 
+/** Every staff role reads stock; dealers see none (stock contract). */
+const STOCK_VIEW = grant("stock", ["view"], "global");
+
 function fieldStaff(scope: Scope): MockModulePermission[] {
   return [
     grant("leads", ["view", "create", "edit"], scope),
@@ -49,8 +52,17 @@ function fieldStaff(scope: Scope): MockModulePermission[] {
     grant("sales_orders", ["view", "create", "edit"], scope),
     grant("subsidy", ["view", "create"], scope),
     grant("complaints", ["view", "create"], scope),
+    // Field tracking (migration 030): staff track themselves; view reaches by scope.
+    grant("tracking", ["view", "create"], scope),
     grant("tasks", ["view", "create", "edit"], scope),
     grant("partners", ["view"], scope),
+    // Officers see their own targets; managers set them for their team (migration 035).
+    grant("targets", ["view"], scope),
+    // RBAC.md §6.1: rewards V:own for a field officer, V:org for managers.
+    grant("rewards", ["view"], scope),
+    STOCK_VIEW,
+    // Marketing material: anyone orders for a dealer or their office (handover).
+    grant("marketing_material", ["view", "create"], scope),
     SCHEMES_VIEW,
     ...CATALOGUE_VIEW,
   ];
@@ -64,8 +76,14 @@ function manager(scope: Scope): MockModulePermission[] {
         entry.module !== "quotations" &&
         entry.module !== "sales_orders" &&
         entry.module !== "complaints" &&
-        entry.module !== "partners",
+        entry.module !== "partners" &&
+        entry.module !== "targets" &&
+        entry.module !== "marketing_material",
     ),
+    // The District Manager over the office approves marketing material (handover).
+    grant("marketing_material", ["view", "create", "approve"], scope),
+    // Managers see their team's targets and set them for the people below them.
+    grant("targets", ["view", "create"], scope),
     // District and State Managers add and correct partners in their area (RBAC.md §6.1).
     grant("partners", ["view", "create", "edit"], scope),
     // Managers check complaints before QC (RBAC.md §6.1: complaints CEA).
@@ -84,6 +102,12 @@ function channelPartner(): MockModulePermission[] {
     grant("sales_orders", ["view", "create", "edit"], "partner_subtree"),
     grant("complaints", ["view", "create"], "partner_subtree"),
     grant("marketing", ["view"], "global"),
+    // A dealer orders marketing material for itself (handover).
+    grant("marketing_material", ["view", "create"], "partner_subtree"),
+    // RBAC.md §6.3: "V + redeem", view and create (GAP-043).
+    grant("rewards", ["view", "create"], "partner_subtree"),
+    // RBAC.md §6.3: their own tasks, completed, while `tasks_for_dealers` is on (FS-037).
+    grant("tasks", ["view", "edit"], "own"),
     SCHEMES_VIEW,
     ...CATALOGUE_VIEW,
   ];
@@ -110,13 +134,15 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
       return MODULE_CODES.map((module) => grant(module, PERMISSION_ACTIONS, "global"));
     case "account_manager":
       return [
-        grant("accounts", ["view", "edit", "approve"], "global"),
+        // Accounts records payments (RBAC.md §6.2: payments V:global CEA).
+        grant("payments", ["view", "create", "edit", "approve"], "global"),
         // Accounts sees complaints (refunds are paid through them) but decides none.
         grant("complaints", ["view"], "global"),
         // Accounts decides the payment step of every order (RBAC.md §6.2).
         grant("sales_orders", ["view", "approve"], "global"),
         // Accounts follows subsidy applications without changing them (handover).
         grant("subsidy", ["view"], "global"),
+        STOCK_VIEW,
         SCHEMES_VIEW,
         ...CATALOGUE_VIEW,
       ];
@@ -125,12 +151,15 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
         // Dispatch approves the last step, then records what left (RBAC.md §6.2).
         grant("dispatch", ["view", "create", "edit", "approve"], "global"),
         grant("sales_orders", ["view", "approve"], "global"),
+        // Dispatch records stock received and corrections (stock contract).
+        grant("stock", ["view", "create"], "global"),
         SCHEMES_VIEW,
         ...CATALOGUE_VIEW,
       ];
     case "qa_manager":
       return [
         grant("complaints", ["view", "edit", "approve"], "global"),
+        STOCK_VIEW,
         SCHEMES_VIEW,
         ...CATALOGUE_VIEW,
       ];

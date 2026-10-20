@@ -5,7 +5,7 @@ import type {
 } from "@/features/complaints/api/complaints.schemas";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError, readFieldErrors } from "@/lib/api/errors";
-import { formatInr } from "@/lib/format";
+import { formatDateTime, formatInr } from "@/lib/format";
 
 export const COMPLAINT_STATUS_LABELS: Readonly<Record<ComplaintStatus, string>> = {
   draft: "Draft",
@@ -53,6 +53,13 @@ export const SEVERITY_BADGE: Readonly<Record<ComplaintSeverity, BadgeVariant>> =
   high: "danger",
 };
 
+/** "once", "twice", "3 times": how often a complaint was reopened (CMPL-010). */
+export function timesText(count: number): string {
+  if (count === 1) return "once";
+  if (count === 2) return "twice";
+  return `${String(count)} times`;
+}
+
 /** The backend's field names for the complaint form's labels, for "fill these in" messages. */
 const FIELD_NAMES: Readonly<Record<string, string>> = {
   dc_no: "the challan number",
@@ -73,8 +80,8 @@ export interface ComplaintRefusal {
  * The backend's complaint refusals in plain words: `status_changed` and `complaint_not_draft`
  * (someone acted first), `missing_for_submit`, `nothing_defective`, `no_checker`,
  * `territory_without_state_code`, the file refusals (`attachment_too_large`, `attachment_type`,
- * `too_many_attachments`, `storage_unavailable`, `complaint_closed_for_upload`), and a 403
- * (not this user's step).
+ * `too_many_attachments`, `storage_unavailable`, `complaint_closed_for_upload`),
+ * `reopen_window_closed`, and a 403 (not this user's step).
  */
 export function complaintRefusal(error: unknown): ComplaintRefusal {
   const fields = readFieldErrors(error);
@@ -146,6 +153,14 @@ export function complaintRefusal(error: unknown): ComplaintRefusal {
           stale: false,
           fields: null,
         };
+      case "reopen_window_closed":
+        return {
+          title: "It can no longer be reopened",
+          message:
+            "The time to reopen it has passed, or it was reopened as often as allowed. Raise a new complaint instead.",
+          stale: true,
+          fields: null,
+        };
       case "complaint_closed_for_upload":
         return {
           title: "Files can no longer be added",
@@ -200,6 +215,13 @@ export function complaintHistoryEntry(
     case "complaint.lines_replaced":
       return { title: "Draft edited", detail: null, tone: "neutral" };
     case "complaint.submitted":
+      if (payload.reopened === true) {
+        return {
+          title: payload.from === "qc_rejected" ? "Reopened after QC rejected it" : "Reopened",
+          detail: payload.clock === "continue" ? "Its targets run on" : "Its targets start again",
+          tone: "warning",
+        };
+      }
       return { title: "Submitted", detail: textOf(payload.complaint_no), tone: "info" };
     case "complaint.approved":
       return { title: "Approved by the manager, sent to QC", detail: remark, tone: "success" };
@@ -235,6 +257,19 @@ export function complaintHistoryEntry(
       return { title: "Remedy withdrawn", detail: remark, tone: "warning" };
     case "complaint.closed":
       return { title: "Closed", detail: remark, tone: "success" };
+    // CMPL-012 · by System, naming no person
+    case "complaint.escalated":
+      return {
+        title:
+          payload.target === "resolution"
+            ? "Resolution target missed: escalated"
+            : "Response target missed: escalated",
+        detail:
+          typeof payload.due_at === "string"
+            ? `It was due ${formatDateTime(payload.due_at)}`
+            : null,
+        tone: "danger",
+      };
     default: {
       const words = kind.replace(/^complaint\./, "").replace(/_/g, " ");
       return {

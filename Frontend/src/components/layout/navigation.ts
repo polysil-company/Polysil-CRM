@@ -3,24 +3,35 @@ import {
   BubbleChatIcon,
   CheckmarkBadge01Icon,
   Clock01Icon,
+  Coins01Icon,
   CustomerSupportIcon,
   DashboardSquare02Icon,
   Database01Icon,
   DeliveryTruck01Icon,
   DiscountTag01Icon,
+  GiftIcon,
   GridTableIcon,
+  HelpCircleIcon,
   Invoice03Icon,
   LegalDocument01Icon,
+  Location01Icon,
+  MapPinIcon,
+  Megaphone01Icon,
   Megaphone02Icon,
   PackageIcon,
   PackageOpenIcon,
   QrCodeIcon,
   RupeeIcon,
   Settings02Icon,
+  Settings05Icon,
   SlidersHorizontalIcon,
+  StarIcon,
   Store01Icon,
+  Target02Icon,
   Task01Icon,
+  UserAccountIcon,
   UserMultiple02Icon,
+  WarehouseIcon,
 } from "@hugeicons/core-free-icons";
 import type { Route } from "next";
 
@@ -40,13 +51,24 @@ export interface NavItem {
   readonly dataId: DataId;
   /** Built modules have a route. Planned modules are listed (as "Soon") but are not links. */
   readonly href?: Route;
-  /** Who the item is for. "staff" hides it from partner users, whatever their permissions. */
-  readonly audience?: "staff";
+  /**
+   * Who the item is for. "staff" hides it from partner users, whatever their permissions;
+   * "partner" shows it to partner users only.
+   */
+  readonly audience?: "staff" | "partner";
   /** "approvers": shown to whoever may approve an order or a quotation discount, whatever `module` says. */
   readonly visibleTo?: "approvers";
   /** A live count shown next to the label. */
-  readonly countSource?: "leads" | "messages" | "approvals";
+  readonly countSource?: "leads" | "messages" | "approvals" | "accounts";
+  /**
+   * Shown only while this gate is open, beyond `module` and `audience`: something the backend
+   * switches on that the permissions don't show (TASK-009: tasks for dealers).
+   */
+  readonly gate?: NavGate;
 }
+
+/** A condition outside the permissions that an item waits on; see `useNavGates`. */
+export type NavGate = "dealer-tasks";
 
 export interface NavSection {
   readonly id: string;
@@ -86,6 +108,15 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         href: "/messages",
         countSource: "messages",
       },
+      {
+        id: "help",
+        label: "Help",
+        description: "Everything you can do here, and how to find it fast.",
+        icon: HelpCircleIcon,
+        module: null,
+        dataId: "BOT-002",
+        href: "/help",
+      },
     ],
   },
   {
@@ -101,6 +132,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         dataId: "LEAD-001",
         href: "/leads",
         countSource: "leads",
+      },
+      {
+        id: "customers",
+        label: "Customers",
+        description:
+          "Everyone a qualified lead came from: their leads, quotations, orders and history.",
+        icon: UserAccountIcon,
+        module: "leads",
+        dataId: "LEAD-016",
+        href: "/customers",
       },
       {
         id: "quotations",
@@ -120,6 +161,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "sales_orders",
         dataId: "SO-001",
         href: "/sales-orders",
+      },
+      {
+        id: "ledger",
+        label: "My ledger",
+        description: "What you owe on approved orders, less benefits and payments made.",
+        icon: Invoice03Icon,
+        // Every partner user sees its own ledger (payments contract: dealer, own ledger).
+        module: null,
+        audience: "partner",
+        dataId: "ACCT-005",
+        href: "/ledger",
       },
       {
         id: "qr-codes",
@@ -153,6 +205,36 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         dataId: "SUBS-005",
         href: "/subsidy",
       },
+      {
+        id: "targets",
+        label: "Targets",
+        description: "Your month against its targets, and your team's.",
+        icon: Target02Icon,
+        module: "targets",
+        audience: "staff",
+        dataId: "TGT-001",
+        href: "/targets",
+      },
+      {
+        id: "team-map",
+        label: "Team map",
+        description: "Where your field team is now, and the route of any day.",
+        icon: Location01Icon,
+        module: "tracking",
+        audience: "staff",
+        dataId: "TRK-001",
+        href: "/team-map",
+      },
+      {
+        id: "visits",
+        label: "Visits",
+        description: "Check in where you are, add photos, and check out.",
+        icon: MapPinIcon,
+        module: "tracking",
+        audience: "staff",
+        dataId: "TRK-005",
+        href: "/visits",
+      },
     ],
   },
   {
@@ -169,6 +251,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         href: "/complaints",
       },
       {
+        id: "ratings",
+        label: "Ratings",
+        description:
+          "What farmers and dealers said, the unhappy ones first to hand, and by dealer.",
+        icon: StarIcon,
+        module: "sales_orders",
+        audience: "staff",
+        dataId: "RATE-002",
+        href: "/ratings",
+      },
+      {
         id: "tasks",
         label: "Tasks",
         description: "Your calls, visits and meetings for the day, and your team's.",
@@ -177,6 +270,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         audience: "staff",
         dataId: "TASK-001",
         href: "/tasks",
+      },
+      {
+        id: "dealer-tasks",
+        label: "Tasks",
+        description: "Calls, visits and follow-ups Polysil has given you.",
+        icon: Task01Icon,
+        module: "tasks",
+        audience: "partner",
+        gate: "dealer-tasks",
+        dataId: "TASK-009",
+        href: "/my-tasks",
       },
     ],
   },
@@ -198,17 +302,40 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         id: "marketing",
-        label: "Marketing",
+        label: "Marketing material",
+        description: "Order caps, banners and kits, with the company's and the dealer's shares.",
         icon: Megaphone02Icon,
-        module: "marketing",
-        dataId: "MKT-001",
+        module: "marketing_material",
+        dataId: "MKT-003",
+        href: "/marketing",
+      },
+      {
+        id: "campaigns",
+        label: "Campaigns",
+        description: "Fairs, meetings and drives, the leads each brought, and what it cost.",
+        icon: Megaphone01Icon,
+        module: "campaigns",
+        audience: "staff",
+        dataId: "MKT-005",
+        href: "/campaigns",
       },
       {
         id: "schemes",
         label: "Schemes",
+        description: "Discounts, points and credits for dealers, and the credits earned.",
         icon: DiscountTag01Icon,
         module: "schemes",
         dataId: "SCHM-001",
+        href: "/schemes",
+      },
+      {
+        id: "rewards",
+        label: "Rewards",
+        description: "Reward points: the balance, its history, and the gifts they buy.",
+        icon: GiftIcon,
+        module: "rewards",
+        dataId: "RWD-001",
+        href: "/rewards",
       },
     ],
   },
@@ -219,9 +346,35 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "accounts",
         label: "Accounts queue",
+        description: "Submitted orders waiting on Accounts' payment check.",
         icon: RupeeIcon,
-        module: "accounts",
+        // The backend has no `accounts` module: Accounts holds `payments` (RBAC.md §6.2).
+        module: "payments",
+        audience: "staff",
         dataId: "ACCT-001",
+        href: "/accounts",
+        countSource: "accounts",
+      },
+      {
+        id: "receipts",
+        label: "Receipts",
+        description: "Payments received from dealers and for direct orders, and where each went.",
+        icon: Invoice03Icon,
+        module: "payments",
+        audience: "staff",
+        dataId: "ACCT-003",
+        href: "/receipts",
+      },
+      {
+        id: "dealer-commissions",
+        label: "Dealer commissions",
+        description: "Subsidy stage 18: commissions to approve, to pay, and paid.",
+        icon: Coins01Icon,
+        // Accounts approves and pays (payments); co-ordinators work from the application.
+        module: "payments",
+        audience: "staff",
+        dataId: "SUBS-017",
+        href: "/dealer-commissions",
       },
       {
         id: "dispatch",
@@ -233,6 +386,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         dataId: "DISP-001",
         href: "/dispatch",
       },
+      {
+        id: "stock",
+        label: "Stock",
+        description: "What each warehouse holds, what open orders need, and every movement.",
+        icon: WarehouseIcon,
+        module: "stock",
+        audience: "staff",
+        dataId: "MSTR-014",
+        href: "/stock",
+      },
     ],
   },
   {
@@ -242,9 +405,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "reports",
         label: "Reports",
+        description:
+          "Conversion, people, lost leads, follow-ups, dealers, campaigns, areas and complaints.",
         icon: Analytics01Icon,
         module: "reports",
         dataId: "RPT-002",
+        href: "/reports",
       },
       {
         id: "approval-limits",
@@ -280,7 +446,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "products",
         label: "Products & prices",
-        description: "The catalogue, its price lists and the GST rate for each HSN code.",
+        description:
+          "The catalogue, its price lists, the GST rate for each HSN code, and our GSTINs and LUTs.",
         icon: PackageOpenIcon,
         module: "products",
         audience: "staff",
@@ -290,9 +457,34 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         id: "masters",
         label: "Masters",
+        description:
+          "The lists every form picks from, lead scoring, offices, territories, warranty periods and holidays.",
         icon: Database01Icon,
         module: "masters",
+        audience: "staff",
         dataId: "MSTR-001",
+        href: "/masters",
+      },
+      {
+        id: "company-settings",
+        label: "Company settings",
+        description: "Rules for orders, complaints, dealers and the farmers' portal.",
+        icon: Settings05Icon,
+        module: "masters",
+        // GET /settings is staff only (settings-amend-reopen-contract.md).
+        audience: "staff",
+        dataId: "ADMN-007",
+        href: "/settings",
+      },
+      {
+        id: "tracking-settings",
+        label: "Tracking settings",
+        description: "Location tracking's hours, intervals, retention and consent, and who looked.",
+        icon: Location01Icon,
+        module: "masters",
+        audience: "staff",
+        dataId: "TRK-006",
+        href: "/tracking-settings",
       },
       {
         id: "users",
@@ -324,11 +516,19 @@ export function canSeeNavItem(
   permissions: readonly ModulePermission[],
   userType: string | null = null,
   navOnly: readonly string[] | null = clientEnv.navOnly,
+  gates: ReadonlySet<NavGate> | null = null,
 ): boolean {
   if (!isReleased(item, navOnly)) {
     return false;
   }
+  // A gated item waits on its gate; with no gates given (the route guard), the page decides.
+  if (item.gate !== undefined && gates !== null && !gates.has(item.gate)) {
+    return false;
+  }
   if (item.audience === "staff" && userType !== "staff") {
+    return false;
+  }
+  if (item.audience === "partner" && userType !== "partner_user") {
     return false;
   }
   if (item.visibleTo === "approvers") {
@@ -342,10 +542,13 @@ export function visibleNavSections(
   permissions: readonly ModulePermission[],
   userType: string | null = null,
   navOnly: readonly string[] | null = clientEnv.navOnly,
+  gates: ReadonlySet<NavGate> = new Set(),
 ): NavSection[] {
   return NAV_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => canSeeNavItem(item, permissions, userType, navOnly)),
+    items: section.items.filter((item) =>
+      canSeeNavItem(item, permissions, userType, navOnly, gates),
+    ),
   })).filter((section) => section.items.length > 0);
 }
 

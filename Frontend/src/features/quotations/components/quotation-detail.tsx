@@ -22,6 +22,7 @@ import type { Quotation, QuotationLine } from "@/features/quotations/api/quotati
 import {
   PDF_STATE_LABELS,
   SALES_TYPE_LABELS,
+  TAX_TREATMENT_LABELS,
   formatQuantity,
   formatRate,
   parseWarnings,
@@ -43,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { QuotationActions } from "./quotation-actions";
 import { QuotationHistory } from "./quotation-history";
 import { QuotationStatusBadge } from "./quotation-status-badge";
+import { isSubsidyWarning, QuotationSubsidyCard } from "./quotation-subsidy";
 import { QuotationVersions } from "./quotation-versions";
 
 /** QUOT-002 · The quotation as the backend prints it. A 404 renders the route's not-found page. */
@@ -135,6 +137,8 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
         </CardContent>
       </Card>
 
+      {quotation.salesType === "subsidised" ? <QuotationSubsidyCard quotation={quotation} /> : null}
+
       {/* DOC-001 · The signed quotation, the purchase order and anything else on it. */}
       <RecordDocuments
         scope={{ kind: "record", recordType: "quotation", recordId: quotation.id }}
@@ -156,6 +160,9 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
                     : formatIndianPhone(quotation.party.mobile)}
                 </DetailItem>
                 <DetailItem label="Address">{quotation.party.address ?? EMPTY_VALUE}</DetailItem>
+                {quotation.exportCountry === null ? null : (
+                  <DetailItem label="Country">{quotation.exportCountry}</DetailItem>
+                )}
                 {quotation.party.gstin === null ? null : (
                   <DetailItem label="GSTIN">
                     <span className="font-mono">{quotation.party.gstin}</span>
@@ -204,11 +211,29 @@ function QuotationDetailView({ quotation }: { quotation: Quotation }): React.JSX
                 <DetailItem label="Place of supply">
                   {quotation.placeOfSupply.territory.name} · {quotation.placeOfSupply.state}
                   <span className="block text-xs text-muted-foreground">
-                    {quotation.intraState
-                      ? "Within the state: CGST and SGST"
-                      : "Across states: IGST"}
+                    {quotation.taxTreatment !== "domestic"
+                      ? "An export: never within the state"
+                      : quotation.intraState
+                        ? "Within the state: CGST and SGST"
+                        : "Across states: IGST"}
                   </span>
                 </DetailItem>
+                {quotation.taxTreatment === "domestic" ? null : (
+                  <DetailItem label="Tax">
+                    {TAX_TREATMENT_LABELS[quotation.taxTreatment]}
+                    <span className="block text-xs text-muted-foreground">
+                      {quotation.taxTreatment === "export_igst" ? (
+                        "IGST at each line's rate."
+                      ) : quotation.lutArn === null ? (
+                        "No LUT covers its price date yet."
+                      ) : (
+                        <>
+                          Under LUT <span className="font-mono">{quotation.lutArn}</span>
+                        </>
+                      )}
+                    </span>
+                  </DetailItem>
+                )}
                 <DetailItem label="Seller">
                   {quotation.seller.legalName}
                   <span className="block font-mono text-xs text-muted-foreground">
@@ -295,8 +320,8 @@ function DetailItem({
 /** Everything the reader must know before trusting the figures, most important first. */
 function QuotationNotices({ quotation }: { quotation: Quotation }): React.JSX.Element | null {
   const warnings = parseWarnings(quotation.warnings).filter(
-    // The provisional banner says this one already.
-    (warning) => warning.code !== "provisional_pricing",
+    // The provisional banner and the subsidy card say these already.
+    (warning) => warning.code !== "provisional_pricing" && !isSubsidyWarning(warning.code),
   );
   const notices: React.ReactNode[] = [];
   const sendNotice = draftSendNotice(quotation);

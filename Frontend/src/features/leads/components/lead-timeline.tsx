@@ -122,12 +122,18 @@ export function LeadTimeline({ leadId }: LeadTimelineProps): React.JSX.Element {
   );
 }
 
-function TimelineItem({
+/**
+ * One lead timeline entry. LEAD-017 · The customer's timeline draws its leads' entries with it,
+ * passing `on` to name the lead each happened on.
+ */
+export function TimelineItem({
   event,
   leadId,
+  on,
 }: {
   event: TimelineEvent;
   leadId: string;
+  on?: React.ReactNode;
 }): React.JSX.Element {
   const entry = toTimelineEntry(event, leadId);
   const { icon, tone } = appearanceOf(entry);
@@ -157,7 +163,15 @@ function TimelineItem({
           )}
           <EntrySentence entry={entry} />
         </p>
-        <RelativeDate value={event.occurredAt} className="text-xs text-muted-foreground" />
+        <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+          <RelativeDate value={event.occurredAt} />
+          {on === undefined ? null : (
+            <>
+              <span aria-hidden="true">·</span>
+              {on}
+            </>
+          )}
+        </p>
         <EntryDetail entry={entry} />
       </div>
     </li>

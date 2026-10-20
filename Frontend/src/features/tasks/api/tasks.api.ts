@@ -111,13 +111,17 @@ export function exportTasks(params: TaskListParams): Promise<DownloadedFile> {
   });
 }
 
-/** TASK-004 · GET /tasks/assignees — the user first, then the active staff below them. */
+/**
+ * TASK-004, TASK-009 · GET /tasks/assignees — the user first, then the active staff below them,
+ * then the users of dealers they can see while `tasks_for_dealers` is on.
+ */
 export function listTaskAssignees(signal?: AbortSignal): Promise<TaskAssignee[]> {
   return apiRequest({
     dataId: "TASK-004",
     logger: log,
     fn: "listTaskAssignees",
     path: "/tasks/assignees",
+    query: { include_partners: "true" },
     schema: taskAssigneesSchema,
     signal,
   });
@@ -237,6 +241,18 @@ export function listLeadMinutes(leadId: string, signal?: AbortSignal): Promise<M
     path: "/minutes",
     query: { lead_id: leadId },
     schema: minutesListSchema,
+    signal,
+  });
+}
+
+/** TASK-007 · GET /minutes/{id} — one set of minutes, each action item as its task stands now. */
+export function getMinutes(minutesId: string, signal?: AbortSignal): Promise<Minutes> {
+  return apiRequest({
+    dataId: "TASK-007",
+    logger: log,
+    fn: "getMinutes",
+    path: `/minutes/${encodeURIComponent(minutesId)}`,
+    schema: minutesResponseSchema,
     signal,
   });
 }

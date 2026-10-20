@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
 import { toast } from "sonner";
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { usePatchTask } from "@/features/tasks/api/tasks.mutations";
-import { taskAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
+import { staffAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
 import {
   DEFAULT_DUE_TIME,
   TASK_TEXT_MAX,
@@ -40,6 +40,7 @@ import {
 } from "@/features/tasks/api/tasks.schemas";
 import { TASK_TYPE_LABELS, taskRefusal, taskSubjectLabel } from "@/features/tasks/lib/task-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { calendarDayOf, timeOfDayOf } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
@@ -48,9 +49,6 @@ const log = createLogger({
   file: "features/tasks/components/edit-task-dialog.tsx",
   dataId: "TASK-006",
 });
-
-/** Long enough to see the success check before the dialog closes. */
-const CLOSE_AFTER_SUCCESS_MS = 600;
 
 interface EditForm {
   title: string;
@@ -163,12 +161,7 @@ function EditForm({
     mode: "onTouched",
   });
   const { errors } = useFormState({ control: form.control });
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(timer.current);
-    };
-  }, []);
+  const closeSoon = useCloseAfterSuccess(onClose);
   const subject = taskSubjectLabel(task);
 
   const submit = useAsyncAction({
@@ -189,7 +182,7 @@ function EditForm({
           : `Given to ${saved.assignedTo?.name ?? "someone else"}`,
         { description: saved.title },
       );
-      timer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
+      closeSoon();
     },
     onError: (error) => {
       const view = taskRefusal(error);
@@ -354,7 +347,7 @@ function ReassignField({
   current: Task["assignedTo"];
   error: string | undefined;
 }): React.JSX.Element {
-  const query = useQuery(taskAssigneesQueryOptions());
+  const query = useQuery(staffAssigneesQueryOptions());
   const people = query.data ?? [];
   const listed =
     current === null || people.some((person) => person.id === current.id)

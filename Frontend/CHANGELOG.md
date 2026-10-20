@@ -7,14 +7,64 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-51 changes, newest first. Each title opens its entry.
+101 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-18 | [Search and help](changelog/entries/2026-10-18--feature--BOT-001--assistant.md) | `feature` | `BOT-001` `BOT-002` |
+| 2026-10-18 | [Holidays, and complaint escalation](changelog/entries/2026-10-18--feature--CMPL-012--holidays-escalation.md) | `feature` | `CMPL-012` `MSTR-019` |
+| 2026-10-18 | [The farmers' portal](changelog/entries/2026-10-18--feature--FARM-001--consumer-portal.md) | `feature` | `FARM-001` `FARM-002` `FARM-003` |
+| 2026-10-18 | [The customer record](changelog/entries/2026-10-18--feature--LEAD-016--customer-record.md) | `feature` | `LEAD-016` `LEAD-017` `LEAD-018` |
+| 2026-10-18 | [Seller GSTINs and their LUTs](changelog/entries/2026-10-18--feature--MSTR-018--seller-gstins.md) | `feature` | `MSTR-018` |
+| 2026-10-18 | [Ratings and the dealer rating](changelog/entries/2026-10-18--feature--RATE-001--ratings.md) | `feature` | `RATE-001` `RATE-002` `RATE-003` `RATE-004` |
+| 2026-10-18 | [Warranty on orders and complaints, and warranty periods in Masters](changelog/entries/2026-10-18--feature--SO-009--warranty.md) | `feature` | `SO-009` `CMPL-011` `MSTR-017` |
+| 2026-10-18 | [Export and sample orders](changelog/entries/2026-10-18--feature--SO-010--export-sample-orders.md) | `feature` | `SO-010` |
+| 2026-10-18 | [A consolidated order from several quotations of one dealer](changelog/entries/2026-10-18--feature--SO-011--consolidated-order.md) | `feature` | `SO-011` |
+| 2026-10-18 | [Tasks for dealers](changelog/entries/2026-10-18--feature--TASK-009--dealer-tasks.md) | `feature` | `TASK-009` |
+| 2026-10-18 | [The team map and a day's route](changelog/entries/2026-10-18--feature--TRK-001--team-map.md) | `feature` | `TRK-001` `TRK-002` |
+| 2026-10-18 | [Visits on the web](changelog/entries/2026-10-18--feature--TRK-003--web-visits.md) | `feature` | `TRK-003` `TRK-004` `TRK-005` |
+| 2026-10-18 | [Tracking settings and who looked](changelog/entries/2026-10-18--feature--TRK-006--tracking-settings.md) | `feature` | `TRK-006` `TRK-007` |
+| 2026-10-18 | [The dealer portal walk](changelog/entries/2026-10-18--fix--APP-008--partner-portal-walk.md) | `fix` | `APP-008` |
+| 2026-10-17 | [Payments: on the order, record a payment, receipts for Accounts, and the dealer ledger and credit standing](changelog/entries/2026-10-17--feature--ACCT-002--payments.md) | `feature` | `ACCT-002` `ACCT-003` `ACCT-004` `ACCT-005` |
+| 2026-10-17 | [Stock on orders: Order to, availability per line, and where a dispatch left from](changelog/entries/2026-10-17--feature--DISP-003--stock-on-orders.md) | `feature` | `DISP-003` |
+| 2026-10-17 | [Marketing material: order from the catalogue with both shares, approve and send, and keep the catalogue](changelog/entries/2026-10-17--feature--MKT-002--marketing-material.md) | `feature` | `MKT-002` `MKT-003` `MKT-004` |
+| 2026-10-17 | [Campaigns: the list and a campaign's summary for Marketing, and a campaign on leads and QR codes](changelog/entries/2026-10-17--feature--MKT-005--campaigns.md) | `feature` | `MKT-005` `MKT-006` |
+| 2026-10-17 | [Import polish: the template, upload errors on their fields, and Import from Excel beside New price list](changelog/entries/2026-10-17--feature--MSTR-013--import-polish.md) | `feature` | `MSTR-013` `MSTR-007` |
+| 2026-10-17 | [Stock: what each warehouse holds, the ledger, recording stock, and the warehouses](changelog/entries/2026-10-17--feature--MSTR-014--stock.md) | `feature` | `MSTR-014` `MSTR-015` `MSTR-016` |
+| 2026-10-17 | [Reward points: balances, gifts and the gift desk, earning rules and point value, and points on a dealer's order](changelog/entries/2026-10-17--feature--RWD-001--reward-points.md) | `feature` | `RWD-001` `RWD-002` `RWD-003` `RWD-004` |
+| 2026-10-17 | [Scheme benefits on an order: the preview on a draft, the benefits and To pay after submit](changelog/entries/2026-10-17--feature--SCHM-005--order-scheme-benefits.md) | `feature` | `SCHM-005` |
+| 2026-10-17 | [Dealer commission and TOD: stage 18 on the application, Accounts' approvals and payments, and the rates](changelog/entries/2026-10-17--feature--SUBS-016--dealer-commission.md) | `feature` | `SUBS-016` `SUBS-017` `SUBS-018` |
+| 2026-10-16 | [Company settings](changelog/entries/2026-10-16--feature--ADMN-007--company-settings.md) | `feature` | `ADMN-007` |
+| 2026-10-16 | [Reports, and a lead's 360° view](changelog/entries/2026-10-16--feature--RPT-002--reports-and-the-leads-360-view.md) | `feature` | `RPT-002` `RPT-003` |
+| 2026-10-16 | [Schemes for Admin and dealers](changelog/entries/2026-10-16--feature--SCHM-001--schemes-for-admin-and-dealers.md) | `feature` | `SCHM-001` `SCHM-002` `SCHM-003` `SCHM-004` |
+| 2026-10-16 | [Targets and achievement](changelog/entries/2026-10-16--feature--TGT-001--targets-and-achievement.md) | `feature` | `TGT-001` `TGT-002` |
+| 2026-10-15 | [Dealer applications: start one, fill it in, and decide](changelog/entries/2026-10-15--feature--CHNL-007--dealer-applications.md) | `feature` | `CHNL-007` |
+| 2026-10-15 | [The dealer applicant's own page: verify, fill in, upload, submit](changelog/entries/2026-10-15--feature--CHNL-008--dealer-apply-page.md) | `feature` | `CHNL-008` |
+| 2026-10-15 | [Reopen a closed complaint](changelog/entries/2026-10-15--feature--CMPL-010--reopen-a-closed-complaint.md) | `feature` | `CMPL-010` |
+| 2026-10-15 | [Dormant leads: the banner, reopen and lost](changelog/entries/2026-10-15--feature--LEAD-007--dormant-leads.md) | `feature` | `LEAD-007` |
+| 2026-10-15 | [Dealership enquiries, and a partner's names from the GST record](changelog/entries/2026-10-15--feature--LEAD-015--dealership-enquiries-and-gstin-details.md) | `feature` | `LEAD-015` `CHNL-006` |
+| 2026-10-15 | [Group chats](changelog/entries/2026-10-15--feature--MSG-006--group-chats.md) | `feature` | `MSG-006` |
+| 2026-10-15 | [Masters: the lists and lead scoring](changelog/entries/2026-10-15--feature--MSTR-009--masters-the-lists-and-lead-scoring.md) | `feature` | `MSTR-009` `MSTR-010` `MSTR-001` |
+| 2026-10-15 | [Masters: the offices](changelog/entries/2026-10-15--feature--MSTR-011--masters-the-offices.md) | `feature` | `MSTR-011` |
+| 2026-10-15 | [Masters: the territories](changelog/entries/2026-10-15--feature--MSTR-012--territories.md) | `feature` | `MSTR-012` |
+| 2026-10-15 | [Subsidised quotations: the subsidy step and card](changelog/entries/2026-10-15--feature--QUOT-014--subsidised-quotations.md) | `feature` | `QUOT-014` |
+| 2026-10-15 | [Subsidised orders typed in, with their leads](changelog/entries/2026-10-15--feature--SO-008--subsidised-orders-typed-in.md) | `feature` | `SO-008` |
+| 2026-10-15 | [Subsidised orders: placed from a subsidised quotation, and the subsidy card](changelog/entries/2026-10-15--feature--SO-008--subsidised-orders.md) | `feature` | `SO-008` |
+| 2026-10-15 | [The calculator asks for each scheme's own inputs (CG, RJ, UP, AP)](changelog/entries/2026-10-15--feature--SUBS-002--each-schemes-own-inputs.md) | `feature` | `SUBS-002` `SUBS-003` |
+| 2026-10-15 | [Subsidy completion: the farmer's share, the dispatch date, the bells, Sprinkler steps](changelog/entries/2026-10-15--feature--SUBS-006--subsidy-completion.md) | `feature` | `SUBS-006` `SUBS-002` `NOTIF-001` `SO-008` |
+| 2026-10-15 | [Reopen a closed subsidy file, and the document checklist](changelog/entries/2026-10-15--feature--SUBS-015--reopen-a-closed-subsidy-file.md) | `feature` | `SUBS-015` `SUBS-007` |
+| 2026-10-15 | [One set of meeting minutes on its own page](changelog/entries/2026-10-15--feature--TASK-007--one-set-of-minutes-on-its-own-page.md) | `feature` | `TASK-007` |
+| 2026-10-14 | [The Accounts queue, and the order counts behind its badge](changelog/entries/2026-10-14--feature--ACCT-001--the-accounts-queue-and-the-order-counts-behind-its-badge.md) | `feature` | `ACCT-001` |
+| 2026-10-14 | [An empty conversation names its colleague after a reload](changelog/entries/2026-10-14--feature--MSG-004--an-empty-conversation-names-its-colleague-after-a-reload.md) | `feature` | `MSG-004` `MSG-002` |
+| 2026-10-14 | [Dashboard: area by irrigation system, and orders against target](changelog/entries/2026-10-14--feature--RPT-001--dashboard-area-by-irrigation-system-and-orders-against-target.md) | `feature` | `RPT-001` |
+| 2026-10-14 | [Order list filters by area and office](changelog/entries/2026-10-14--feature--SO-001--order-list-filters-by-area-and-office.md) | `feature` | `SO-001` |
+| 2026-10-14 | [No dialog close timer once the dialog has gone](changelog/entries/2026-10-14--fix--APP-003--no-dialog-close-timer-once-the-dialog-has-gone.md) | `fix` | `APP-003` |
+| 2026-10-13 | [A working plan from 13 October, and the handover's gap measured again](changelog/entries/2026-10-13--docs--REPO-001--a-working-plan-from-13-october-and-the-handover-s-gap.md) | `docs` | `REPO-001` |
 | 2026-10-13 | [The release's menu: only the screens a deployment releases](changelog/entries/2026-10-13--feature--APP-007--the-release-s-menu-only-the-screens-a-deployment-releases.md) | `feature` | `APP-007` |
 | 2026-10-13 | [Channel partners: list, add, correct, close and import](changelog/entries/2026-10-13--feature--CHNL-001--channel-partners-list-add-correct-close-and-import.md) | `feature` | `CHNL-001` `CHNL-002` `CHNL-003` `CHNL-004` `CHNL-005` |
 | 2026-10-13 | [Documents on leads, quotations, orders and dispatches](changelog/entries/2026-10-13--feature--DOC-001--documents-on-leads-quotations-orders-and-dispatches.md) | `feature` | `DOC-001` `DOC-002` `DOC-003` |
 | 2026-10-13 | [Excel import with column matching, and price lists by sale type](changelog/entries/2026-10-13--feature--MSTR-007--excel-import-with-column-matching-and-price-lists-by-sale.md) | `feature` | `MSTR-007` `MSTR-008` |
+| 2026-10-13 | [Amend an approved order](changelog/entries/2026-10-13--feature--SO-007--amend-an-approved-order.md) | `feature` | `SO-007` |
 | 2026-10-13 | [CI green again: CHANGELOG.md regenerated, and two tests that depended on timing](changelog/entries/2026-10-13--fix--REPO-001--ci-green-again-changelog-md-regenerated-and-the-approval.md) | `fix` | `REPO-001` `QUOT-007` `TASK-005` |
 | 2026-10-12 | [A frontend handover: the build process, step by step, and everything left](changelog/entries/2026-10-12--docs--REPO-001--a-frontend-handover-the-build-process-step-by-step-and.md) | `docs` | `REPO-001` |
 | 2026-10-12 | [Go-live fixes from the 10 Oct staging walk](changelog/entries/2026-10-12--fix--APP-006--go-live-fixes-from-the-10-oct-walk.md) | `fix` | `APP-006` `APP-003` `LEAD-003` `LEAD-005` `LEAD-008` `LEAD-013` `LEAD-014` `APPR-001` `APPR-002` `QUOT-002` `SO-002` `CMPL-003` `AUTH-001` |
@@ -63,7 +113,3591 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
 
+## 18 October 2026
+
+### Search and help
+
+`feature` · `BOT-001` `BOT-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--BOT-001--assistant.md)
+
+#### Before
+
+The Ctrl+K menu could jump to a page, start a new lead or switch the theme. It couldn't find a record or anything else the user may do. Nothing in the app listed everything a role can do.
+
+#### Now
+
+Built to `in-app-assistant.md` (FS-045) and the generated `assistant.md`. As the spec says, this is a search box, not a chatbot.
+
+**The Ctrl+K menu** (BOT-001)
+
+- It opens as before with Ctrl+K or ⌘K, with `/`, or from the search button on a phone. It now searches pages, actions and records.
+- **Actions** come from `GET /assistant`, so they follow the user's permissions. A starter set shows before anything is typed, then the best matches. An action that starts something ("New quotation") shows a plus.
+- **Records** appear from 3 characters:
+  - leads and customers by number, mobile or name;
+  - quotations, orders and complaints by number, or by serial alone.
+  - Each shows its label and its kind, and choosing one opens its page.
+- The request waits for a 250 ms pause. A newer search drops the older one, and the last answer stays on screen meanwhile.
+- **Go to** (pages) and **Preferences** (theme, and Help) still filter in the browser. If the search fails, a line says records can't be searched just now and the pages still work.
+- The backend names a screen with a stable key, and `assistant-routes.ts` maps each key to this app's route. A "new" screen without a route of its own opens the page whose button starts it:
+  - a new task opens Tasks;
+  - a new campaign opens Campaigns;
+  - recording a payment opens Receipts;
+  - ordering marketing material opens Marketing material.
+- A key or record kind this app doesn't know yet is left out, never shown broken.
+- The menu's long-standing separator broke the listbox's accessibility rules (axe: `aria-required-children`). The group headings already separate the groups, so it is gone.
+
+**Help** (`/help`, BOT-002)
+
+- **Help** under Overview, for everyone signed in, and in the menu.
+- Everything the user may do (`GET /assistant/actions`), grouped by module, each a link to where it starts, with a filter.
+- It says how to open the search: the keys on a computer, the search button on a touch screen.
+- Loading, empty ("Nothing matches", or no actions for this role), and error with a retry.
+
+**Mock**
+
+- A stand-in for the backend's catalogue of 37 actions, each with the grant it needs. Messages and Company settings are staff only.
+- Words in any order, best first.
+- Records are scoped like their lists: a dealer finds only what its dealership holds.
+- 422 for a `q` over 100 characters or with control characters, and for a `limit` outside 1 to 20. A farmer gets the portal's 403, as for every route outside the portal.
+
+Walked as an admin on a desktop in light mode and a touch phone in dark mode: the starter set, "new quo", "patel" opening Nilesh Patel's lead, "SO/" finding orders, and Help. Axe found nothing, with no sideways scroll. The only console errors came from the lead page's server-side fetch, which tries to reach a real backend that the mock sandbox doesn't run.
+
+#### Discussion
+
+- **The walk found three things, all fixed here:**
+  - the separator's axe violation;
+  - the record kind's contrast on a selected row in dark mode;
+  - "Sales order" wrapping on a phone.
+- **Server results are kept by cmdk with the typed text as a keyword.** The server has already matched them, and cmdk's own filter would otherwise hide a record found by mobile. Pages still filter locally, so they rank among the results as before.
+- **"Create a new lead" is no longer a fixed item.** The server's **New lead** replaces it, and it shows only to those who may create leads.
+- **The catalogue is the backend's.** The mock's titles, hints and grants stand in for it. Staging will show the real wording.
+- **This is item 36.** Items 37 (a consolidated order) and 38 (the dealer portal walk) follow.
+
+#### Files changed
+
+- `src/features/assistant/api/assistant.schemas.ts`, `.api.ts`, `.queries.ts`: new. These hold the contract with its screen keys, the search and the action list.
+- `src/features/assistant/lib/assistant-routes.ts`: new, screen keys to routes, and opening a record.
+- `src/features/assistant/lib/assistant-labels.ts`: new, module headings and grouping.
+- `src/features/assistant/components/help-page.tsx`: new; `src/app/(app)/help/page.tsx`: new route.
+- `src/components/layout/command-menu.tsx`: the server search, Actions and Records, Preferences, no separator.
+- `src/components/layout/navigation.ts`: the Help item; `navigation.test.ts`: Help shows to everyone.
+- `src/components/layout/app-header.tsx`: the search button's name.
+- Mock: `src/mocks/data/assistant.ts`, `src/mocks/handlers/assistant.ts` (new), `src/mocks/handlers/index.ts`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: BOT-001, BOT-002.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/assistant/*`.
+
+#### Tests
+
+`src/features/assistant/components/assistant.test.tsx`, 11 tests:
+
+- `[BOT-001] Assistant search (contract)`:
+  - a starter set, and records only from 3 characters;
+  - words in any order, best first;
+  - a quotation by its serial alone;
+  - a dealer's records and actions scoped;
+  - 422 for a long `q` or a `limit` out of range;
+  - an unknown screen or kind left out.
+- `[BOT-001] CommandMenu`:
+  - an action the server matched opens its page;
+  - a lead found by its number opens, and the menu closes;
+  - pages still work when the search fails.
+- `[BOT-002] Help page`:
+  - actions by module, and the filter;
+  - a dealer sees only their own.
+
+To check by hand in the mock, as an admin:
+
+1. Press Ctrl+K and type `patel`. Choose a lead.
+2. Press Ctrl+K and type `new quo`. Choose **New quotation**.
+3. Open Overview → **Help** and filter by `payment`.
+
+### Holidays, and complaint escalation
+
+`feature` · `CMPL-012` `MSTR-019` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--CMPL-012--holidays-escalation.md)
+
+#### Before
+
+Complaint targets skipped Sundays but no holidays, and nobody could set any. A complaint that missed a target showed only "Late", and nothing told its owner or managers.
+
+#### Now
+
+Built to `complaint-holidays-escalation.md` (FS-028).
+
+**Masters → Holidays (MSTR-019)**
+
+- Shows a year's holidays: name and weekday date, with a year switcher.
+- Those who edit masters can **Add holiday**: a day from tomorrow on, not a Sunday, and a name.
+- A holiday still ahead can be removed after confirming. A past one shows "Past" and stays.
+- `holiday_in_past`, `holiday_sunday` and `holiday_exists` show on the day field.
+- The note "A new holiday applies to complaints submitted after it is added." sits under the list.
+- Loading, empty, error, read-only, phone and dark states are covered.
+
+**Escalation (CMPL-012)**
+
+- While the **Complaint escalation** setting is "Ring the bell", a complaint that misses a target says so:
+  - by its status, **Response target missed** or **Resolution target missed**, in place of "Late";
+  - on its Targets card, "Escalated to its owner and managers" with the time.
+- Its history reads "Response target missed: escalated" (or Resolution), by no one, with when it was due.
+- The bell gains the `complaint_escalated` kind, with an alarm-clock icon, opening the complaint.
+- The fields are staff only; a dealer always reads null.
+- The setting was already on Company settings.
+
+**Mock**
+
+- Seeds sample holidays for 2026–27 and serves the three endpoints with their refusals.
+- Escalates complaints past their targets while the setting is on, with their history events.
+- Adds one read escalation to the bell.
+- Generates complaints before notifications, so the notification can name one.
+
+The Masters subtitle now lists warranty periods and holidays.
+
+Walked in the mock as Admin on a desktop in light mode, and on a phone in dark mode. Axe found nothing, with no console errors and no sideways scroll.
+
+#### Discussion
+
+- A past holiday can't be removed and only future ones can be added, because targets already counted with a day must not move (contract). The panel shows only what may change.
+- "Target missed" replaces "Late" only when the backend says it escalated; otherwise "Late" stays as before.
+
+#### Files changed
+
+- Holidays:
+  - `src/features/masters/api/holidays.{schemas,api,queries,mutations}.ts`: new.
+  - `src/features/masters/components/holidays-panel.tsx`: new, with `holidayProblems` and `holidayRefusal`.
+  - `src/features/masters/components/masters.tsx`: the Holidays tab.
+  - `src/components/layout/navigation.ts`: the Masters subtitle.
+- Escalation:
+  - `src/features/complaints/api/complaints.schemas.ts`: `response_escalated_at` and `resolution_escalated_at`.
+  - `src/features/complaints/components/complaint-detail.tsx`: the badges and the Targets card line.
+  - `src/features/complaints/lib/complaint-labels.ts`: `complaint.escalated`.
+  - `src/features/notifications/api/notifications.schemas.ts`, `src/features/notifications/components/notification-bell.tsx`: the `complaint_escalated` kind and its icon.
+- Mock:
+  - `src/mocks/data/holidays.ts` and `src/mocks/handlers/holidays.ts`: new.
+  - `src/mocks/handlers/complaints.ts`, `src/mocks/data/notifications.ts`, `src/mocks/db.ts`, `src/mocks/handlers/index.ts`: escalation, the bell sample, the holidays table and the new handlers.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: MSTR-019 and CMPL-012.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/masters/*holiday*`, `Docs/screenshots/complaints/*escalated*`.
+
+#### Tests
+
+- `src/features/complaints/components/complaints-escalation.test.tsx`, 6 tests:
+  - `holidayProblems`;
+  - the holiday contract: a year, add, `holiday_exists`, `holiday_in_past`, `holiday_sunday`, remove, a past one kept, `forbidden`;
+  - the panel: lists, Past without remove, adds one;
+  - escalation on, and off by the setting;
+  - the history line;
+  - the badge and Targets card line on the complaint.
+- `src/features/complaints/api/complaints.test.ts`: a seeded complaint past its target now also carries the escalation event.
+- To check by hand in the mock as Admin:
+  1. Open Masters → Holidays and add a day.
+  2. Open complaint Poly/Comp./2026-27/GJ/01 and check the missed-target badge.
+  3. Open the bell and find the escalation.
+
+### The farmers' portal
+
+`feature` · `FARM-001` `FARM-002` `FARM-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--FARM-001--consumer-portal.md)
+
+#### Before
+
+A farmer couldn't see anything themselves. A farmer who signed in with their mobile would have landed in the staff app, where the backend refuses every call to a farmer.
+
+#### Now
+
+Built to `consumer-portal.md` (FS-044) and the generated `portal.md`, including the portal ratings (FS-060). It is off by default; the admin switches it on in Company settings. The portal gets a new Data ID domain, `FARM`.
+
+**Switching it on**
+
+- **The farmers' portal** in Company settings now carries the cost warning: "On, every customer's number can be sent a WhatsApp sign-in code, and each code is paid for. Off signs every farmer out."
+
+**Signing in**
+
+- A farmer signs in with the existing **Mobile number** sign-in: their number, then the WhatsApp code.
+- A farmer's session works only in the portal, so the staff app sends them straight to `/portal` (`FarmersToPortal`).
+- Staff or a dealer who opens `/portal` is told it is the farmers' portal, with a link back to the main app.
+
+**The portal** (`/portal`, FARM-001)
+
+- Its own simple frame: the brand, "Your irrigation record", the theme switch and **Sign out**, in one narrow column. There is no sidebar or search.
+- "Namaste, {name}" with their mobile, village and area.
+- **Your orders**: each order's status in words, its total (or "Through your dealer"), when it was placed, and every dispatch with its challan.
+- **Your quotations**: status, total (or "Through your dealer"), sent and valid until. **Open** opens the page they were sent, in a new tab.
+- **Your complaints**: status and when it was raised.
+- **Your enquiries**: number, system, date and status.
+- Each list has its own loading, empty and error state.
+- While the portal is off, it says "The portal is closed for now" and to call their officer or dealer.
+
+**Consent** (FARM-002)
+
+- **Updates from Polysil** shows whether they agreed to be contacted, and when. **Yes, contact me** and **Stop updates** switch it (`aria-pressed`).
+
+**Rating** (FARM-003)
+
+- **Rate** appears beside an order with a dispatch and beside a closed complaint.
+- The form asks for 1 to 5 stars, with words for each, and optional words of their own. It says a rating can't be changed later.
+- Once rated, the row shows the stars with "Your rating", or "Rated with our officer" when an officer recorded it for them.
+- If the backend refuses (`not_rateable`, `rating_exists`), the form says why in words and the button goes.
+
+**Mock**
+
+- A customer's number signs in by OTP as that farmer, with code `123456`. Signing out, staff sign-in and **Preview as role** end that session.
+- While a farmer is signed in, every route outside `/auth` and `/portal` answers 403 `consumer_not_allowed`.
+- `/portal` answers `portal_off` while the setting is off, and `not_a_consumer` to staff and dealers.
+- The lists come from the farmer's own leads. A dealer's documents have no total or link. Consent is recorded on the portal channel, and ratings follow the contract.
+
+Walked on a desktop in light mode and a 390 px phone in dark mode: Admin switches the portal on and signs out, Hitesh Jadeja signs in by OTP, rates his installation and agrees to updates. The portal-off notice was checked on a phone in light mode. Axe found nothing and there was no sideways scroll. The only console line was the browser noting the 403 while the portal is off.
+
+#### Discussion
+
+- **One sign-in page for everyone.** The contract reuses the OTP endpoints, so a farmer uses the existing **Mobile number** sign-in and is sent on by session type. Question 10.4 suggests a separate app; this frame keeps the portal apart without a second sign-in to maintain.
+- **Read-only, plus consent and ratings.** Question 10.3 (what farmers should do there) is unanswered, so this round does no more, as the contract says.
+- **The mock keeps the farmer in browser storage.** Like the previewed role, so a reload keeps the session. The portal setting resets on reload, so a demo switches it on first.
+
+#### Files changed
+
+- `src/features/portal/`: new.
+  - `api/portal.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: the contract, the eight calls, queries and the consent and rating mutations.
+  - `lib/portal-labels.ts`: statuses in words, and the refusals.
+  - `components/portal-home.tsx`: the page.
+  - `components/portal-rating-form.tsx`: rating.
+- `src/components/layout/portal-shell.tsx`, `src/components/layout/farmers-to-portal.tsx`: new, the portal's frame and the redirect out of the staff app.
+- `src/app/(portal)/portal/layout.tsx`, `page.tsx`: new routes; `src/app/(app)/layout.tsx`: `FarmersToPortal`.
+- `src/features/settings/components/company-settings.tsx`: the cost warning.
+- `src/lib/dev/mock-settings.ts`: the mock farmer session.
+- Mock: `src/mocks/handlers/portal.ts` (new), `src/mocks/handlers/auth.ts`, `src/mocks/handlers/index.ts`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: the `FARM` domain and FARM-001…003.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/portal/`.
+
+#### Tests
+
+`src/features/portal/components/portal.test.tsx`, 10 tests:
+
+- `[FARM-001] The farmers' portal (contract)`:
+  - off by default, `not_a_consumer` and `consumer_not_allowed`;
+  - their own orders with dispatches, with no total through a dealer.
+- `[FARM-002] Consent from the portal (contract)`: the portal channel, the first date kept, withdrawn.
+- `[FARM-003] Rating from the portal (contract)`: once, then `rating_exists` and `not_found`, and an officer's rating without its comment.
+- `[FARM-001] PortalHome`:
+  - closed while off;
+  - an installation rated;
+  - consent given;
+  - a complaint rated with an officer, with no Rate button.
+- `[FARM-001] PortalShell and FarmersToPortal`: staff pointed back, and a farmer sent to `/portal`.
+
+To check by hand in the mock:
+
+1. As Admin, set **The farmers' portal** to On in Company settings and save.
+2. Sign out, choose **Mobile number**, enter 6798273387 and code 123456.
+3. Rate the installation, then choose **Yes, contact me**.
+
+### The customer record
+
+`feature` · `LEAD-016` `LEAD-017` `LEAD-018` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--LEAD-016--customer-record.md)
+
+#### Before
+
+Each lead stood alone. Someone who enquired twice had two unrelated leads, and nothing showed their quotations and orders together. The lead's "At a glance" listed other leads on the same mobile, but never as one customer.
+
+#### Now
+
+Built to `customer-record.md` (FS-041). A lead that reaches qualified gets a customer, found by mobile or made new; later leads from that number join it. A user sees a customer when they can see one of its leads.
+
+**Customers** (`/customers`, LEAD-016)
+
+- A **Customers** tab in Sales, after Leads, and a menu item for everyone with `leads.view`.
+- **Find a customer** by name or mobile. The search starts at three letters or digits; below that the page says so and keeps the full list.
+- An **Area** filter, using the territory picker.
+- Each card shows the name, mobile, village or area, type, lead count, and **Consent** once it is given. Newest first, 50 at a time, with **Show more**.
+- Loading skeletons, an empty state (none yet, or no match with what to try), and an error with a retry.
+
+**A customer's page** (`/customers/{id}`, LEAD-017)
+
+- The name with its type and **Consent given** or **No consent**, then the mobile, area and lead count.
+- **Leads**: each lead's number, source, campaign, date and stage.
+- **Quotations** and **Orders**: number, total, the lead it is on, when it was sent or submitted, and its status.
+- **Details**: mobile, email, area, village, address, survey number, consent (when, and how it was given) and the customer-since date.
+- **Timeline**: everything on the customer's leads, newest first. Each lead entry reads as on the lead's own timeline and names its lead with a link. The customer's own entries read "Became a customer", "Asha Patel recorded the customer's consent", and so on. Older entries come with **Show older**.
+- A customer the user can't see opens the not-found page.
+
+**Correcting it** (LEAD-018, staff with `leads.edit`; hidden from dealers)
+
+- **Edit**: type, name, email, area, village, survey number and address. Only what changed is sent. The mobile is the customer's identity and isn't offered. The name must be filled in and the email must look like one; the backend's refusals land on their fields.
+- **Record consent** asks how it was given (on WhatsApp, on a form, spoken, in writing). **Withdraw consent** confirms first. Both go on the timeline.
+
+**On a lead**
+
+- A **Customer** line with **Open the customer** once the lead has one.
+
+**Mock**
+
+- One customer per mobile among qualified, quoted, negotiation and won leads; the first has consent.
+- Search by name or mobile digits, and by area through its lineage.
+- The page and timeline cover only the leads the role can see.
+- PATCH refuses a dealer and wants the channel with consent.
+
+Walked as Admin on a desktop in light mode and a 390 px phone in dark mode: search, the page, Edit, consent recorded, and the lead's link. Axe found nothing, with no console errors and no sideways scroll.
+
+#### Discussion
+
+- **"Became a customer" has no name.** The backend makes the customer, so the entry has no actor. "Polysil became a customer" would read as if Polysil were the customer.
+- **A consent switch, as two buttons.** The contract asks for a consent switch. Recording consent needs the channel, so it opens a short form; withdrawing it asks first. A bare toggle couldn't ask for either.
+- **The lead's "At a glance" still says "same mobile".** It is RPT-003's own summary, and its wording stays until the report contract says otherwise.
+
+#### Files changed
+
+- `src/features/customers/api/customers.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: new, the contract, the four calls, the list, page and timeline queries, and the edit mutation.
+- `src/features/customers/lib/customer-labels.ts`: new, the type and consent channel labels.
+- `src/features/customers/components/customers-search.tsx`: new, the search page.
+- `src/features/customers/components/customer-detail.tsx`: new, the page, its cards and timeline.
+- `src/features/customers/components/customer-edit-dialog.tsx`: new, Edit (`draftOf`, `patchOf`, `draftProblems`).
+- `src/features/customers/components/consent-dialog.tsx`: new, record or withdraw consent.
+- `src/app/(app)/(sales)/customers/page.tsx`, `src/app/(app)/(sales)/customers/[customerId]/page.tsx`: new routes.
+- `src/features/leads/api/leads.schemas.ts`: `customer_id` on a lead.
+- `src/features/leads/components/lead-detail.tsx`: the Customer line.
+- `src/features/leads/components/lead-timeline.tsx`: `TimelineItem` exported, with an optional `on` that names the lead.
+- `src/features/leads/components/sales-tabs.tsx`, `src/components/layout/navigation.ts`: the Customers tab and menu item.
+- Mock: `src/mocks/data/customers.ts`, `src/mocks/handlers/customers.ts` (new), `src/mocks/db.ts`, `src/mocks/handlers/index.ts`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: LEAD-016, LEAD-017, LEAD-018.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/customers/`.
+
+#### Tests
+
+`src/features/customers/components/customers.test.tsx`, 10 tests:
+
+- `[LEAD-016] Customers search (contract)`:
+  - newest first, and a short search ignored;
+  - by name, mobile digits and area, and no match.
+- `[LEAD-017] Customer record (contract)`:
+  - leads, documents and a timeline that names each lead;
+  - 404, and `customer_id` on a qualified lead but not a new one.
+- `[LEAD-018] Editing a customer and consent (contract)`:
+  - a dealer refused, the channel required, consent recorded then withdrawn, both on the timeline;
+  - only changes sent, and the name and email checks.
+- `[LEAD-016] CustomersSearch`: the list, the three-character hint, no match, then a match by mobile.
+- `[LEAD-017] CustomerDetail`:
+  - the cards and timeline, then consent recorded;
+  - the village corrected through Edit;
+  - a dealer sees the customer of their lead without Edit or consent.
+
+`src/components/layout/navigation.test.ts`: a leads-only user now also gets **Customers**.
+
+To check by hand in the mock as Admin:
+
+1. Open Sales → Customers and search by part of a name.
+2. Open a customer, record consent as Spoken, and see it on the timeline.
+3. Edit the village.
+4. Open one of its leads and follow **Open the customer** back.
+
+### Seller GSTINs and their LUTs
+
+`feature` · `MSTR-018` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--MSTR-018--seller-gstins.md)
+
+#### Before
+
+Nothing. Our GST registrations and their LUTs could be set only in the database. An export under the LUT setting can't be submitted without a LUT covering its date.
+
+#### Now
+
+Products & prices has a fourth tab, **Seller GSTINs** (`/products?tab=seller-gstins`), for everyone with `products.view`:
+
+- Each registration, the default first, shows its GSTIN, legal name, state, and Default or Inactive.
+- Under it, its LUTs by financial year, newest first: "2026-27", the ARN, the dates, **Current** when it covers today, and **On a document** when a quotation or order carries it.
+- An active registration with no LUT covering today gets a warning: an export under the LUT setting can't be submitted from it.
+
+With `products.edit` (Admin in the mock):
+
+- **Add LUT** opens a form with this financial year's dates filled in and the ARN to type. The ARN must be 10 to 20 letters and digits. The dates must stay within one financial year and end after they start.
+- The backend's refusals land on their fields: `lut_overlap` on Valid from, `lut_duplicate` on the ARN, `lut_dates` on Valid to. Anything else goes to a toast.
+- A LUT no document carries can be removed after a confirmation. `lut_in_use` shows in the dialog.
+
+States covered:
+
+- A skeleton while loading.
+- `ErrorState` with a retry.
+- An empty state.
+- Async buttons with loading, success and failure.
+
+Checked on a 390 px phone in dark mode with no sideways scroll; axe found nothing.
+
+#### Discussion
+
+- The contract calls this "Admin › Seller GSTINs". It sits as a tab of Products & prices because it is gated on `products.view` and `products.edit`, like that page, and Products & prices is already under Admin.
+- A LUT is never edited, per the contract. The remove dialog says to add it again if it was mistyped.
+- No seeded backend role holds `products.edit`, so an admin grants it first (contract note). The mock gives it to Admin.
+- This is part 30a. Export and sample orders on the forms and pages follow in 30b.
+
+#### Files changed
+
+- `src/features/products/api/seller-gstins.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: the contract, the three calls, the list query, and the add and remove mutations.
+- `src/features/products/components/seller-gstins-panel.tsx`: the tab, the Add LUT form and the remove dialog, with their rules (`financialYearOf`, `lutProblems`, `lutRefusal`).
+- `src/features/products/components/product-master.tsx`, `src/features/products/hooks/use-product-master-params.ts`: the new tab.
+- `src/components/layout/navigation.ts`: the Products & prices description.
+- `src/mocks/data/seller-gstins.ts`, `src/mocks/handlers/seller-gstins.ts`, `src/mocks/db.ts`, `src/mocks/handlers/index.ts`: the mock, with two registrations.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: MSTR-018.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/products/`: records.
+
+#### Tests
+
+`src/features/products/components/seller-gstins.test.tsx` has 9 tests:
+
+- `[MSTR-018] LUT rules`: financial years, ARN and date checks.
+- `[MSTR-018] Seller GSTINs (contract)`:
+  - the list's order;
+  - next year's LUT added, then `lut_overlap`, `lut_duplicate` and `lut_dates`;
+  - remove refused to a reader, `lut_in_use`, then removed.
+- `[MSTR-018] SellerGstinsPanel`:
+  - read-only;
+  - a clash on its field, then the LUT added;
+  - a LUT removed and the warning shown.
+
+To check by hand, in the mock as Admin, open Products & prices → Seller GSTINs:
+
+1. Add LUT with an ARN on this year's dates, and see the clash.
+2. Move the dates to 2027-28 and add it.
+3. Remove the Rajasthan LUT.
+
+### Ratings and the dealer rating
+
+`feature` · `RATE-001` `RATE-002` `RATE-003` `RATE-004` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--RATE-001--ratings.md)
+
+#### Before
+
+Nothing recorded what a farmer or a dealer thought of an installation, a product or a service visit. Nothing showed how well a dealer pays or how much it orders.
+
+#### Now
+
+Built to `ratings-contract.md` (FS-043) and the generated `ratings.md`. Ratings get a new Data ID domain, `RATE`.
+
+**Rating something** (RATE-001)
+
+- A **Ratings** card on the order, beside Warranty, once something has shipped:
+  - **Rate installation** in its header;
+  - **Rate a product shipped**, with **Rate** on each product sent.
+- The same card on a closed complaint, with **Rate service**.
+- The form asks for 1 to 5 stars, with words for each ("4 stars: Good"), and an optional comment of up to 1,000 characters.
+  - Staff record what the farmer said; it needs orders edit (complaints edit for a service).
+  - A dealer's user rates for its firm, on its own orders and complaints.
+  - The form says a rating is never changed.
+- Each button goes once this kind of rater has rated it.
+- These refusals show in the form, in words: `not_rateable`, `product_not_shipped`, `rating_exists`, `not_your_order`.
+
+**Reading them** (RATE-002)
+
+- The card lists each rating: who rated it and what, the stars with their word, the comment, and who entered it.
+- A dealer sees a customer's rating as the score only ("Customer rating", stars, "2 stars").
+- **Ratings** under Service (`/ratings`, staff who see orders) lists every rating newest first, each linked to its order or complaint and naming the dealer. It filters by kind, and **1 or 2 stars** shows the unhappy customers.
+- Loading, empty ("No unhappy customers"), error with a retry, and **Show more**.
+
+**Summary** (RATE-003)
+
+- The page's **Summary** tab groups ratings **by dealer**, **by product** or **by kind**. Each row has the average with stars, the count, and the 1 or 2 star ratings in red. The lowest average comes first.
+
+**The dealer rating** (RATE-004)
+
+- On a channel partner's page for staff, and as **Your rating** above a partner user's own ledger. It is hidden on a 403 (`rating_not_permitted`).
+- It shows:
+  - the rating out of 5, with stars;
+  - days to full payment, and order value before GST, each scored "n of 5";
+  - how many orders were counted and paid in full;
+  - customers' feedback, shown apart.
+- With no order counted, or none paid in full, it says **Not rated yet** and why.
+- The footnote: "From days to full payment and order value over the last year. Feedback is shown apart."
+- The three settings it uses were already editable in Company settings (the `bands` kind).
+
+**A new pattern and token**
+
+- `StarRating` shows a score as stars, read out as "4 out of 5 stars".
+- `StarRatingInput` uses native radio buttons in a fieldset, so arrow keys move between stars. Each star is a 44 px target, and each reads "4 stars, Good".
+- A `rating` colour token, in `tokens.css` and the design system doc, for filled stars: gold in light and dark mode. The warning colour read brown on white.
+
+**Mock**
+
+- Seeded ratings: farmers' ratings of shipped orders (one of 2 stars), a product, a dealer's own rating, and a 1-star service on a closed complaint.
+- Every rule above, including the score-only view for dealers.
+- The dealer rating is worked out from the mock's orders and payments with the settings' bands.
+
+Walked as Admin on a desktop in light mode and a 390 px phone in dark mode: rating an installation, the order and complaint cards, the page with its low filter and summary, and the dealer card. Axe found nothing, with no console errors and no sideways scroll.
+
+#### Discussion
+
+- **The Ratings page is staff-only and gated on orders view.** Ratings are read through the order's or complaint's own permission, and there is no ratings module. A dealer reads its ratings on its own orders and complaints.
+- **The dealer card shows for every partner.** The backend works it out for any partner id, so the frontend doesn't decide which partner types have one.
+- **A rating is never edited.** The contract has no edit or delete, so the form says so before saving.
+- **This is part 34a.** The consumer portal (farmers signing in) follows in 34b.
+
+#### Files changed
+
+- `src/features/ratings/`: new.
+  - `api/ratings.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: the contract, the four calls, the list, summary and dealer queries, and the create mutation.
+  - `lib/rating-labels.ts`: labels, words for each score, and the refusals.
+  - `components/rating-form.tsx`: the form.
+  - `components/record-ratings.tsx`: the card on an order or complaint, and `RatingRow`.
+  - `components/ratings-page.tsx`, `hooks/use-ratings-params.ts`: the page and its URL state.
+  - `components/dealer-rating.tsx`: the dealer card.
+- `src/components/patterns/star-rating.tsx`, `.stories.tsx`: new, `StarRating` and `StarRatingInput`.
+- `src/styles/tokens.css`, `Docs/Design-System.md`: the `rating` colour.
+- `src/app/(app)/ratings/page.tsx`: new route; `src/components/layout/navigation.ts`: the Ratings item.
+- `src/features/orders/components/order-detail.tsx`, `src/features/complaints/components/complaint-detail.tsx`: the Ratings card.
+- `src/features/partners/components/partner-detail.tsx`, `src/features/payments/components/my-ledger.tsx`: the dealer card.
+- Mock: `src/mocks/data/ratings.ts`, `src/mocks/handlers/ratings.ts` (new), `src/mocks/db.ts`, `src/mocks/handlers/index.ts`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: the `RATE` domain and RATE-001…004.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/ratings/`.
+
+#### Tests
+
+`src/features/ratings/components/ratings.test.tsx`, 9 tests:
+
+- `[RATE-002] Ratings list (contract)`: newest first, the low ones, and a dealer's score-only view.
+- `[RATE-001] Recording a rating (contract)`:
+  - once per kind, then `rating_exists`, `not_rateable` (unshipped, open complaint) and `product_not_shipped`;
+  - orders edit for staff, and `not_your_order` for a dealer.
+- `[RATE-003] Ratings summary (contract)`: by kind and by dealer, lowest first.
+- `[RATE-004] Dealer rating (contract)`: Admin and the dealer itself read it; a QA manager gets `rating_not_permitted`.
+- `[RATE-001] RecordRatingsCard`:
+  - stars required, then the installation rated and its button gone;
+  - a closed complaint's service rating.
+- `[RATE-002] RatingsPage`: 1 or 2 stars narrows the list, and the summary by kind.
+- `[RATE-004] DealerRatingCard`: shown to Admin, hidden from a QA manager.
+
+To check by hand in the mock as Admin:
+
+1. Open a dispatched order → Ratings → **Rate installation**, then rate a product.
+2. Open Service → **Ratings**, choose **1 or 2 stars**, then **Summary**.
+3. Open a channel partner with orders and read its **Dealer rating**.
+
+### Warranty on orders and complaints, and warranty periods in Masters
+
+`feature` · `SO-009` `CMPL-011` `MSTR-017` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--SO-009--warranty.md)
+
+#### Before
+
+Nothing. Nobody could see whether goods sent on an order were still in warranty, a complaint said nothing about warranty, and there was nowhere to set how long a warranty lasts.
+
+#### Now
+
+- **The order's Warranty card (SO-009).** On a shipped order, for those who see orders and dispatches, after the Payments card. Each line shows its status from its latest-ending dispatch: "In warranty until …", "Expired …", "No warranty", "No period on record" or "Not sent yet". Under it, each dispatch's period (from its DC date, or the day it left, for the months in force then) and the complaints raised on the product, in or out of warranty. A replacement order links the complaint it replaces. Skeleton while loading, `ErrorState` with retry on failure; hidden on a draft, from roles without dispatch view, and on a 403.
+- **Warranty on complaint lines (CMPL-011).** Each product on a complaint shows In warranty or Out of warranty, until or ended when, and whether the period ran from the dispatch or from the supply date. Out of warranty blocks nothing.
+- **Masters → Warranty periods (MSTR-017).** Everyone who sees Masters reads the default and each category's periods: in force, upcoming or ended, with their dates. Those who edit masters use **Set a period** to set one for the default or a listed category: 0 to 120 whole months, from tomorrow or later. The period in force ends the day before the new one starts. Today or earlier, and a second period on the same day (409 `term_exists`), are refused on the start-day field. Other field errors from the backend land on their fields, anything else in a toast.
+- The mock answers all three endpoints. Its sample periods are 12 months by default and 24 for drip components, from 1 Apr 2026.
+
+Walked in light and dark, on a desktop and a 390 px phone: axe found nothing, no console errors, no sideways scroll.
+
+#### Discussion
+
+- A period never restates goods already sent, so a new one starts tomorrow at the earliest (`warranty.md`). The form starts on tomorrow and says why.
+- The category picker offers the default and only the categories that already have a period. The backend has no category list yet (BE-024). `TODO(MSTR-017)` in `warranty-terms-panel.tsx` marks where every category goes once it does.
+- The card is gated on `sales_orders.view` and `dispatch.view` together, as the endpoint is. Accounts (no dispatch view) doesn't see it.
+- Quantities use the order line's unit and decimals ("7 NOS sent").
+
+#### Files changed
+
+- `src/features/warranty/components/order-warranty.tsx`: new, the order's Warranty card.
+- `src/features/warranty/components/warranty-chip.tsx`: new, the complaint line's warranty.
+- `src/features/warranty/components/warranty-terms-panel.tsx`: new, the periods list, the Set a period form, and its rules (`termPhase`, `termProblems`, `requestOfTerm`).
+- `src/features/warranty/api/*`, `src/features/warranty/lib/warranty-labels.ts`: the contract, calls, queries, mutation and labels.
+- `src/features/orders/components/order-detail.tsx`: the card after Payments.
+- `src/features/complaints/components/complaint-detail.tsx`: the chip under each product.
+- `src/features/complaints/api/complaints.schemas.ts`: `warranty` on complaint lines.
+- `src/features/masters/components/masters.tsx`: the Warranty periods tab.
+- `src/mocks/data/warranty.ts`, `src/mocks/handlers/warranty.ts`, `src/mocks/db.ts`, `src/mocks/handlers/index.ts`, `src/mocks/handlers/complaints.ts`: the mock.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-009, CMPL-011, MSTR-017.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/warranty/`: records.
+
+#### Tests
+
+- `src/features/warranty/components/warranty.test.tsx`, 15 tests:
+  - `[SO-009] Order warranty (contract)`: periods from dispatches; 403 without dispatch view.
+  - `[SO-009] OrderWarrantyCard`: shown on a shipped order; hidden from Accounts and on a 403.
+  - `[CMPL-011] ComplaintWarranty`: in warranty from the dispatch, out of warranty from the supply date, nothing without an answer.
+  - `[MSTR-017] Warranty periods (rules)` and `(contract)`: phases, months and start-day checks, closing the period in force, `validation_failed`, `term_exists` and `forbidden`.
+  - `[MSTR-017] WarrantyTermsPanel`: lists and sets a period, a clash on the start day, read-only.
+- By hand, in the mock:
+  1. As Admin, open SO/GJ/2026-27/00001 and find the Warranty card.
+  2. Open complaint Poly/Comp./2026-27/GJ/02 and find the chip on each product.
+  3. Open Masters → Warranty periods and Set a period.
+
+### Export and sample orders
+
+`feature` · `SO-010` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--SO-010--export-sample-orders.md)
+
+#### Before
+
+The order form offered Export and Sample only as "waiting on the client's rules", and quotations could not be exports. Nothing showed an order's tax treatment, the buyer's country or the LUT.
+
+#### Now
+
+Built to `export-sample-orders-contract.md` (FS-042). Staff only; a dealer is offered neither, and the backend answers 403 `type_staff_only`.
+
+**Order form**
+
+- **Export** asks for the buyer's **Country** in place of the GSTIN. The hint names the tax from the `export_tax_treatment` setting: "Export under a LUT, no IGST" or "Export with IGST". The tax is fixed once the draft is saved.
+- The preview sends `tax_treatment`, so the figures are the ones the order will store. Under a LUT every line is at 0 % IGST. Under IGST each line pays IGST at its slab.
+- The builder line reads "IGST 0%" or "IGST 18%" instead of an empty CGST + SGST split.
+- **Sample** says what the `sample_pricing` setting makes of it, and gives the `sample_max_value` limit at list price:
+  - free: every line 100 % off, a total of ₹0, and the approval runs on the list value;
+  - charged: priced like a commercial order.
+- An export draft can change its country. Its type stays fixed.
+
+**Quotation form**
+
+- **Export** on a new quotation takes the country and hides the GSTIN, priced the same way.
+- An export draft stays an export, and a domestic one can't become one.
+
+**Pages**
+
+- The order and quotation pages show:
+  - the **Country**;
+  - the **Tax** with its LUT ARN, or "The LUT is taken when the order is submitted";
+  - "An export: never within the state" under the place of supply;
+  - on a sample, Free or Charged.
+- A free sample marks each line **Free sample**, on desktop and phone.
+
+**Place order**
+
+- An export quotation makes an export order, its type fixed and explained.
+- A domestic quotation offers commercial or industrial.
+
+**Refusals**, shown in words:
+
+- `export_country_required`, on the Country field;
+- `export_party_gstin`;
+- `export_country_not_export`;
+- `lut_missing`: ask an admin to record this year's LUT in Seller GSTINs;
+- `sample_over_limit`, naming the limit;
+- `sample_from_quotation`;
+- `type_mismatch`.
+
+**Mock**
+
+- Exports are taxed by the setting.
+- The LUT is taken from the default registration at submit, or 422 `lut_missing`.
+- Free samples are priced at 100 % off, and the limit is checked at create, edit and submit.
+- A free sample's total of 0 still submits, its approval chain on the gross.
+- The pricing preview honours `tax_treatment`.
+- Totals now carry IGST.
+
+Walked on a desktop in light mode and a 390 px phone in dark mode: axe found nothing, with no console errors and no sideways scroll.
+
+#### Discussion
+
+- **The preview prices a sample domestically.** The contract makes a free sample 100 % off when it is saved. It doesn't say the preview does the same, so the builder says so in words instead of guessing.
+- **The settings are staff only.** If they can't be read, the builder falls back to the backend's documented defaults (LUT, free).
+- **Built on PR #165** (merged): the LUT comes from the seller GSTINs and their LUTs.
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`: `tax_treatment`, `export_country`, `lut_arn`, `sample_pricing`; `StaffOrderType`; `export_country` on the create and patch requests.
+- `src/features/quotations/api/quotations.schemas.ts`:
+  - `TAX_TREATMENTS`, and the same fields on quotations;
+  - `export_country` on its requests and `tax_treatment` on the preview;
+  - Export now priced;
+  - `exportCountry` on the header form.
+- `src/features/quotations/lib/builder-lines.ts`: `taxTreatment` in the pricing context; `export_country` errors routed to the field.
+- `src/features/quotations/lib/quotation-labels.ts`: `TAX_TREATMENT_LABELS`.
+- `src/features/settings/hooks/use-export-sample-settings.ts`: new, the export and sample settings with their defaults.
+- Forms:
+  - `src/features/orders/components/order-builder.tsx`: Export and Sample, the Country field, the refusals, `sampleHint`.
+  - `src/features/quotations/components/quotation-builder.tsx`: Export and its Country field.
+  - `src/features/orders/components/place-order.tsx`: export quotations make export orders.
+- Pages:
+  - `src/features/orders/components/order-detail.tsx`: Country, Tax, Sample and the Free sample badge.
+  - `src/features/quotations/components/quotation-detail.tsx`: Country and Tax.
+- `src/features/quotations/components/quotation-line-row.tsx`: an all-IGST line reads as IGST.
+- Mock:
+  - `src/mocks/handlers/export-sample.ts`: new.
+  - `src/mocks/handlers/orders.ts`, `src/mocks/handlers/quotations.ts`, `src/mocks/handlers/settings.ts` (`mockSettings` exported) and `src/mocks/data/quotations.ts` (IGST in totals).
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-010.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/orders/export-*` and `sample-*`.
+
+#### Tests
+
+- `src/features/orders/api/orders-export-sample.test.ts`, 9 tests:
+  - export under a LUT (0 % IGST, not intra-state, the LUT at submit);
+  - IGST by the setting;
+  - the country, the GSTIN, other types and dealers;
+  - `lut_missing`;
+  - the preview's treatment;
+  - an export quotation;
+  - a free sample submitted at ₹0;
+  - a charged sample;
+  - `sample_over_limit`.
+- `src/features/orders/components/export-sample.test.tsx`, 5 tests:
+  - `sampleHint`;
+  - the builder's Country in place of the GSTIN and the sample hint;
+  - a dealer offered neither type;
+  - the order page's country, tax and Free sample badges;
+  - the quotation page's country and LUT.
+- To check by hand in the mock as Admin:
+  1. Open a qualified lead → New order → Export, enter a country and an item, save, then submit. The LUT appears.
+  2. Make a new order as a Sample and check its lines.
+  3. Make a new quotation as an Export.
+
+### A consolidated order from several quotations of one dealer
+
+`feature` · `SO-011` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--SO-011--consolidated-order.md)
+
+#### Before
+
+**Place order** made a draft from one accepted quotation. The backend already took several (`POST /orders` with several `quotation_ids`), but nothing on screen sent more than one. A dealer with several farmers' quotations needed several orders.
+
+#### Now
+
+Built to `orders-api-contract.md` §3 ("From quotations") and the generated `orders.md`.
+
+**In Place order** (on a dealer's accepted, current quotation)
+
+- A section lists the dealer's other accepted, current quotations (`GET /quotations?status=accepted&partner_id=`). Each shows its number, total, party and lead, with a box to tick.
+- As they are ticked, it shows how many quotations and their total together. When they span several leads, it says the order is consolidated: the dealer is the party and it has no single lead.
+- **Make draft order** sends this quotation and those ticked. The dialog's description counts them too.
+- **Not offered** on a direct quotation (no dealer) or a subsidised one, which is ordered alone. An export quotation offers only exports, and a domestic one never offers an export.
+- Loading, an empty list ("No other accepted quotation of this dealer is waiting"), and an error that still lets this quotation be ordered alone.
+
+**Refusals**
+
+- `409 quotation_on_order` naming a ticked quotation unticks it and marks it "already on an order". It says so and lets the user carry on without it.
+- `422 quotations_disagree` now says which field differs (the place of supply, the price date, the seller registration…). An unknown field reads from its key.
+
+**Mock**
+
+- The quotation list takes `partner_id`.
+- One dealer starts with a second accepted quotation, on another lead, to the same place, so the consolidated order can be tried.
+
+**Backend ask**
+
+- **BE-029:** an `orderable` filter on `GET /quotations`. The list can't tell which quotations are already on an order, so one can show as a choice until `POST /orders` refuses it.
+
+Walked as Admin on a desktop in light mode and a touch phone in dark mode:
+
+- the dealer's other quotations;
+- one already on an order, refused, unticked and marked;
+- two ticked;
+- the new draft "For Babra Farm Supplies".
+
+Axe found nothing, with no sideways scroll. The only console error is the deliberate 409.
+
+#### Discussion
+
+- **The walk found the case BE-029 asks about.** The seeded dealer's QT/…/00002 is on an order, yet listed. The first message, "Open that order instead", didn't fit an added quotation, so the refusal now says it was unticked.
+- **"Deliver to" starts from this quotation's party.** For a consolidated order the dealer's address may be the right one. The user changes it, as before.
+- **The backend decides what may join.** The list shows the dealer's quotations; agreement on place, seller, price date, office and territory is checked by `POST /orders`, which names the field.
+- **This is item 37.** Item 38 (the dealer portal walk) follows.
+
+#### Files changed
+
+- `src/features/orders/components/consolidate-quotations.tsx`: new, the dealer's other quotations to tick.
+- `src/features/orders/components/place-order.tsx`: the section, the ids sent, a quotation on an order unticked and marked.
+- `src/features/orders/lib/order-lifecycle.ts`: `quotations_disagree` names the field.
+- `src/features/quotations/api/quotations.schemas.ts`, `.api.ts`: an optional `partnerId` on the list.
+- Mock: `src/mocks/handlers/quotations.ts` (`partner_id`), `src/mocks/db.ts` (a dealer with two waiting quotations).
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-011.
+- `docs/Backend-Tasks.md`: BE-029.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/orders/consolidate*`.
+
+#### Tests
+
+`src/features/orders/components/consolidate.test.tsx`, 4 tests in `[SO-011] A consolidated order from several quotations of one dealer`:
+
+- the dealer's other quotation ticked, the consolidated note, and one order of both;
+- a quotation on an order already, unticked and marked, with the message;
+- the place of supply named when the quotations don't match;
+- nothing to add on a direct quotation.
+
+The other 98 order tests still pass.
+
+To check by hand in the mock, as Admin:
+
+1. Open quotation QT/GJ/2026-27/00025 and select **Place order**.
+2. Tick QT/GJ/2026-27/00028 and select **Make draft order**.
+3. Try QT/GJ/2026-27/00002 too, which is already on an order.
+
+### Tasks for dealers
+
+`feature` · `TASK-009` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--TASK-009--dealer-tasks.md)
+
+#### Before
+
+Staff could give tasks only to staff, and dealer users had no tasks screen.
+
+#### Now
+
+Built to `dealer-tasks-contract.md` (FS-037). The admin switches it on with the `tasks_for_dealers` setting; until then nothing changes for dealers.
+
+**Giving a dealer a task**
+
+- New task's **For** asks for `include_partners`. While the setting is on, it lists the users of the dealers the manager can see under a **Dealers** heading, below **Our team**, each with the dealer's name ("Bhavesh Shah · Shah Agro Traders").
+- A task about a lead or order the dealer can't open is refused on the For field (`link_not_visible_to_assignee`), with a message that says so.
+- Team filters, reports, minutes and reassigning keep to staff, through `staffAssigneesQueryOptions`. Dealers appear only when giving a new task.
+
+**A dealer's Tasks page** (`/my-tasks`)
+
+- **To do** and **Done** views. Each task shows when it is due, what it is about, and who gave it.
+- **Done** opens the existing done dialog to say what happened. It is the only action: no edit, cancel, reopen or minutes link.
+- The page has loading, empty and error states, plus **Show more**.
+
+**When the setting is off**
+
+- A dealer can't read the setting, and the backend refuses every tasks route while it is off. So the dealer's menu asks once for their open tasks (the page reuses the answer) and shows the **Tasks** item only when that works.
+- Opened directly, the page says tasks aren't switched on.
+- This uses a new `NavItem.gate`, with `useNavGates` in the sidebar and the command menu.
+
+**Mock**
+
+- Portal roles hold `tasks` view and edit on their own tasks, honoured only while the setting is on.
+- Assignees take `include_partners`.
+- A dealer completes their tasks; editing, cancelling, reopening and creating answer 403.
+- A task for a dealer about someone else's lead or order is refused.
+
+Walked as Admin, then switched to Dealer on a desktop in light mode and a phone in dark mode. Axe found nothing on the dealer's page, with no console errors and no sideways scroll. With the setting off, the dealer has no Tasks item.
+
+#### Discussion
+
+- **Why the menu probes the backend.** Showing the item from permissions alone would show it while the setting is off, because portal roles hold `tasks` either way. Reading `/settings` isn't possible for a dealer. Asking for the open tasks costs one request, which the page then reuses.
+- **The route guard doesn't use the gate.** The page itself says when tasks are off.
+- **`mockSettings` is now exported from the settings mock,** the same change as in PR #166, so the two merge cleanly.
+
+#### Files changed
+
+- `src/features/tasks/api/tasks.schemas.ts`: assignees carry `kind` and `partner`.
+- `src/features/tasks/api/tasks.api.ts`: `include_partners=true`.
+- `src/features/tasks/api/tasks.queries.ts`: `staffAssigneesQueryOptions`.
+- `src/features/tasks/components/new-task-dialog.tsx`: the Our team and Dealers groups.
+- `src/features/tasks/components/{all-tasks,tasks-view,minutes-dialog,edit-task-dialog}.tsx` and `src/features/reports/components/report-view.tsx`: staff only.
+- `src/features/tasks/lib/task-labels.ts`: the refusal covers dealers.
+- `src/features/tasks/components/task-row.tsx`: a `completeOnly` mode.
+- `src/features/tasks/components/dealer-tasks.tsx` and `src/app/(app)/my-tasks/page.tsx`: new, the dealer's page.
+- `src/features/tasks/hooks/use-dealer-tasks.ts`: new, `dealerTaskParams` and `useDealerTasksOn`.
+- `src/components/layout/navigation.ts`: the gated "dealer-tasks" item, `NavGate`, and `gates` in `canSeeNavItem` and `visibleNavSections`.
+- `src/components/layout/use-nav-gates.ts`: new.
+- `src/components/layout/app-sidebar.tsx`, `src/components/layout/command-menu.tsx`: pass the gates.
+- `src/mocks/handlers/tasks.ts`, `src/mocks/data/permissions.ts`, `src/mocks/handlers/settings.ts`: the mock.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: TASK-009.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, and the `dealer-*` and `assignee-dealers-*` screenshots in `Docs/screenshots/tasks/`.
+
+#### Tests
+
+- `src/features/masters/components/territories-ui.test.tsx`: `findAllByText("In Gujarat")` instead of `findByText`. Every district row says it, so the test failed on `integration` (run 39074675410, issue #167) whenever several rows were already drawn.
+
+- `src/features/tasks/components/dealer-tasks.test.tsx`, 7 tests:
+  - off means 403 for a dealer;
+  - assignees with dealers once the setting is on, the dealer's list, PATCH refused, and complete;
+  - `link_not_visible_to_assignee`;
+  - the nav item waits on its gate and the staff Tasks item stays hidden;
+  - the page says it's off;
+  - the page lists and completes a task with Done only;
+  - New task's Dealers group.
+- `src/features/tasks/api/tasks.test.ts`: the assignee shape now includes `kind` and `partner`.
+- By hand, in the mock:
+  1. As Admin, switch `tasks_for_dealers` on in Company settings.
+  2. Give Bhavesh Shah a task.
+  3. Preview as Dealer, open Tasks, and mark it done.
+
+### The team map and a day's route
+
+`feature` · `TRK-001` `TRK-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--TRK-001--team-map.md)
+
+#### Before
+
+A manager couldn't see where the field team was, or where anyone had been on a given day.
+
+#### Now
+
+Built to `field-tracking-contract.md` and the generated `tracking.md` (migration 030). This is the first web part of field tracking; the Android app that sends the locations is separate. Field tracking gets a new Data ID domain, `TRK`, and the `tracking` permission module.
+
+**Team map** (`/team-map`, TRK-001)
+
+- A **Team map** item under Sales for staff who hold `tracking.view`.
+- Each person the user may track is listed in words beside the map:
+  - **On duty**, **Not heard from** (silent for 15 minutes), or **Off duty**;
+  - their role, when they were last seen, and their battery, with "Battery low: tracking stops if the phone dies" under 20 %;
+  - an open visit ("On a visit to POL/… since 26 minutes ago");
+  - **Fake location** when the phone reported one.
+- On the map, people on duty are green dots, silent ones grey, and a faked location is a red ring. A key explains this, and colour is never the only signal.
+- It refreshes every minute, the most the contract allows, and says so.
+- A person, or their marker, opens their route.
+- A field officer sees only themselves. A role without tracking is told so.
+
+**Route of a day** (`/team-map/{person}?date=`, TRK-002)
+
+- The day is in the URL, today by default. **The day before**, a date field and **The day after** move between days; the day after stops at today.
+- It shows the distance, the time on duty, and the number of stops and visits.
+- It counts the points recorded and says how many were left out for poor accuracy or impossible jumps. A day with faked points says so in red.
+- The map draws the path, with stops (small grey), visits (large green), the start and the last point.
+- **Duty** lists each span and why it ended.
+- **Visits and stops** gives each stop's times and length. A visit names its lead (linked), the outcome, the time spent, its photos, its note, and whether it closed by itself after 12 hours.
+- A day with nothing tracked says so. Someone outside the team opens the not-found page.
+
+**A new pattern**
+
+- `MapView` draws on Leaflet 1.9.4 (BSD-2) over OpenStreetMap tiles, credited on the map. It needs no API key and no marker images: markers are SVG circles coloured with token classes, and a path is a stroke only.
+- It fits itself to what it shows and opens on Gujarat when empty.
+- In dark mode the tiles are toned down.
+- If Leaflet fails to load, it says everything is listed beside it.
+- It has a story.
+
+**Mock**
+
+- Six people around Saurashtra: on duty, silent, off duty, one faked location, one on a visit.
+- A repeatable day for each person: a drive through three villages and back, with stops, two visits on real mock leads, and seven points left out.
+- `tracking.view` by scope: a field officer sees themselves, managers and Admin the team, other roles 403.
+
+Walked as Admin on a desktop in light mode and a 390 px phone in dark mode. Axe found nothing and there was no sideways scroll. The sandbox's network blocks OpenStreetMap, so the screenshots show the markers and path on a blank map, and the console lists the failed tile requests. The tiles need a look on staging.
+
+#### Discussion
+
+- **Leaflet with OpenStreetMap, as the contract asks.** Leaflet is about 40 KB, with no key and no lock-in. MapLibre needs a vector style server, and OpenLayers is heavier. React-leaflet isn't needed: one small effect drives the map.
+- **The tiles in production.** OpenStreetMap's own tile servers suit light use only. Heavy use needs a provider or our own tile server; only `TILE_URL` in `map-view.tsx` changes (`TODO(TRK-001)`).
+- **The lockfile.** The repo asks for Node 24 and npm 11; this sandbox has Node 22. The lockfile change is exactly the three new packages (`leaflet`, `@types/leaflet`, `@types/geojson`), checked with npm 11's `npm ci`.
+- **This is part 35a.** Visit check-in and check-out on the web (35b), and the tracking settings and view log (35c), follow.
+
+#### Files changed
+
+- `package.json`, `package-lock.json`: `leaflet` 1.9.4 and `@types/leaflet` 1.9.22, exact.
+- `src/components/patterns/map-view.tsx`, `.stories.tsx`: new.
+- `src/features/tracking/`: new.
+  - `api/tracking.schemas.ts`, `.api.ts`, `.queries.ts`: the team, the route and the visit shape.
+  - `lib/tracking-labels.ts`.
+  - `components/team-map.tsx`, `components/route-day.tsx`.
+- `src/app/(app)/team-map/page.tsx`, `src/app/(app)/team-map/[userId]/page.tsx`: new routes; `src/components/layout/navigation.ts`: the Team map item.
+- `src/lib/auth/permissions.ts`: the `tracking` module; `src/mocks/data/permissions.ts`: its grants.
+- Mock: `src/mocks/data/tracking.ts`, `src/mocks/handlers/tracking.ts` (new), `src/mocks/handlers/index.ts`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: the `TRK` domain, TRK-001 and TRK-002.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/tracking/`.
+
+#### Tests
+
+`src/features/tracking/components/tracking.test.tsx`, 7 tests:
+
+- `[TRK-001] Team map (contract)`: a manager sees the team, a field officer themselves, a QA manager gets 403.
+- `[TRK-002] Route of a day (contract)`:
+  - a past day with points in order, stops, visits, distance and points left out, and nothing for a day ahead;
+  - 404 outside the team.
+- `[TRK-001] TeamMap`:
+  - every state, the battery warning, an open visit and a fake location in words, and the route link;
+  - no tracking for the role.
+- `[TRK-002] RouteDay`:
+  - figures, visits with lead links, and the day before;
+  - no duty, and no day after today.
+
+To check by hand in the mock as Admin:
+
+1. Open Sales → **Team map**.
+2. Open Ravi Patel, then **The day before**.
+
+### Visits on the web
+
+`feature` · `TRK-003` `TRK-004` `TRK-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--TRK-003--web-visits.md)
+
+#### Before
+
+Visits could only be recorded from the Android app, which isn't built yet. On the web, a manager could see visits on a route, but nobody could check in. The app's own security header also stopped every page from reading the location.
+
+#### Now
+
+Built to `field-tracking-contract.md` §3 (Visits) and the generated `tracking.md`. Checking in and out is the contract's "app and web" part.
+
+**My visits** (`/visits`, TRK-005)
+
+- A **Visits** item under Sales for staff who track (`tracking`).
+- The day is in the URL, with the day before, a date field and the day after (never past today).
+- Each visit shows its time, what it was to (a lead, linked), its outcome, the time spent, photos, a note, and whether it closed by itself after 12 hours.
+- Loading, empty ("No visits yet today", or "No visits this day"), error with a retry, and **Show more**.
+- A role that doesn't track is told so.
+
+**Checking in** (TRK-003)
+
+- **Check in** asks what is being visited: **A lead** (search by farmer, mobile or inquiry number), **A dealer**, or **Another place** by name.
+- **Locate me** asks the browser for the location, on the user's tap, as browsers prefer. It shows how accurate the fix is and warns above 100 m. A blocked location, a browser without it, or a failure each say what to do.
+- The first time, the consent text from `/me/tracking-config` is shown, with **I agree** or **Not now**. **I agree** records it (`POST /tracking/consent`) and continues to the check-in.
+- The visit id is made in the browser. Every new try gets a new id and key, as the contract asks after a 4xx.
+- **Refusals:**
+  - `visit_open`: says another visit is still open and offers **Open that visit** (`?visit=`);
+  - `consent_required`: asks for consent;
+  - a lead or dealer the user can't see: asks for another;
+  - field errors land on the form.
+
+**The open visit** (TRK-004)
+
+- A card at the top: what it is, since when, its photos ("1 of 3"), and **Check out**.
+- **Add photo** opens the camera on a phone (`capture`), or the file picker on a computer. The type and the 10 MB limit are checked first, then `photo_limit`, `photo_window_closed` and 413 are explained. **Photo 1** and so on open a ten-minute link.
+- **Check out** asks how it went (**Met**, **Not available**, **Follow up**, **Other**), takes an optional note and the location again, then closes the visit.
+  - When the policy requires a photo and there is none, the form says so before sending.
+  - `photo_required` and `visit_closed` are explained.
+
+**Security header**
+
+- `Permissions-Policy` now allows `geolocation=(self)` instead of `geolocation=()`, so this app's own pages can ask for the location; embedded frames still can't.
+- Camera and microphone stay off: the photo picker doesn't need them.
+- The CSP TODO now notes that the map's tile host will need `img-src`.
+
+**Mock**
+
+- The consent version each person accepted is kept.
+- One open visit at a time, a lead and a dealer never together, and a place name when neither is given.
+- The same id answers with the same visit.
+- Up to three photos within 24 hours, opened as the file itself.
+- Check-out once; the day's list for "me".
+
+Walked as a field officer on a desktop in light mode and a 390 px phone in dark mode, with the browser's location granted: consent, check in at a place, a photo, check out as Met. Axe found nothing, with no console errors and no sideways scroll.
+
+#### Discussion
+
+- **The walk found two bugs, both fixed here.**
+  - The `geolocation=()` header blocked the location everywhere, in production too.
+  - The first photo upload ran before the chosen file was stored. The file is now passed straight to the upload. The UI test adds a photo, so this stays caught.
+- **CI runs Node 24; this sandbox runs Node 22.** Node 24's form parser won't build a `File` while jsdom owns the global one, so the mock's photo upload answered 500 in CI's component tests. It now reads the multipart body by hand when that happens, and the tests pass on both versions.
+- **Locate me is a tap, not automatic.** Browsers show the permission prompt more willingly after a tap, and the user sees why it's asked.
+- **Photos of earlier visits can't be listed.** The contract returns a photo's id only when it's uploaded, so the card opens the photos added in this session. A visit's count is always shown.
+- **This is part 35b.** The tracking settings and the view log (35c) follow.
+
+#### Files changed
+
+- `src/features/tracking/api/visits.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: new, the config, consent, check-in, check-out, photos and list.
+- `src/features/tracking/hooks/use-browser-fix.ts`: new, the browser's location with every outcome.
+- `src/features/tracking/hooks/use-day-param.ts`: new, the day in the URL, shared with the route page.
+- `src/features/tracking/components/check-in-form.tsx`, `open-visit.tsx`, `my-visits.tsx`, `fix-panel.tsx`, `visit-lead-picker.tsx`: new.
+- `src/features/tracking/components/route-day.tsx`: uses the shared day hook.
+- `src/app/(app)/visits/page.tsx`: new route; `src/components/layout/navigation.ts`: the Visits item.
+- `next.config.ts`: `geolocation=(self)`.
+- Mock: `src/mocks/handlers/visits.ts` (new), `src/mocks/db.ts`, `src/mocks/handlers/index.ts`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: TRK-003…005.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/tracking/visit*`.
+
+#### Tests
+
+`src/features/tracking/components/visits.test.tsx`, 7 tests:
+
+- `[TRK-003] Checking in (contract)`:
+  - consent asked, check-in, the same id replayed, `visit_open` naming the open visit, a blank place refused;
+  - a role that doesn't track.
+- `[TRK-004] Photos and check-out (contract)`:
+  - three photos, then `photo_limit`, a link, check-out once, then `visit_closed`, and the day's list;
+  - a photo's type and size checked first.
+- `[TRK-005] MyVisits`:
+  - consent, check-in at a place with the location, a photo, check-out as Met;
+  - a blocked location explained, with Check in disabled;
+  - a role without tracking.
+
+To check by hand in the mock, as a field officer (Preview as role → Field officer):
+
+1. Open Sales → **Visits** → **Check in**, agree, choose **Another place**, and select **Locate me**.
+2. Check in, add a photo, then **Check out** as **Met**.
+
+### Tracking settings and who looked
+
+`feature` · `TRK-006` `TRK-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--feature--TRK-006--tracking-settings.md)
+
+#### Before
+
+The tracking policy (how often a location is taken, working hours, how long history is kept, the photo rule, the consent text) could only be changed in the database. Nobody could see who had looked at whose location.
+
+#### Now
+
+Built to `field-tracking-contract.md` §3 Admin and the generated `tracking.md`. This completes the web screens of item 35.
+
+**Tracking settings** (`/tracking-settings`, Admin, `masters.view`)
+
+- **Policy** tab: the policy in force and since when, in words.
+  - "A location every 2 min, or every 50 m moved"
+  - "09:00 to 19:00, monday to saturday"
+  - "Location history kept: 90 days"
+  - "Photo at check-out: Optional"
+  - The consent version and its full text.
+- **Save a new version** (for those with `masters.edit`):
+  - It opens on a copy of the version in force, taking over at the start of tomorrow, India time. A version is never edited, and the form says so.
+  - Fields: when it takes over, seconds between locations, the distance filter, the days kept, the working hours and days, the photo rule, and the consent version and text.
+  - Each field is checked against the backend's bounds before sending: 15 to 3,600 seconds, 0 to 5,000 m and 7 to 3,650 days. The day must end after it starts, at least one day must be chosen, the version must be letters, digits, dots, dashes or underscores, and nothing may start in the past.
+  - When the consent version changes, the form says everyone will be asked to agree again.
+  - `policy_exists` lands on **Takes over**; other field refusals land on their fields.
+- **Who looked** tab: "Hetal Shah looked at the route of Ravi Patel for Friday 16 October", "… the visits of …", "… the team map", newest first, with **Show more**.
+  - **Whose location** narrows it to one person.
+  - The backend shows it to Admin and the MD only. For anyone else the list is empty, and the empty state says so.
+- The tab is in the URL.
+
+**The mock**
+
+- Policy versions are kept. The one in force is the latest that has started, and the check-in config, the consent asked and the photo rule all follow it.
+- Saving refuses the same start, the past, out-of-range values and anyone without `masters.edit`.
+- Reading the team map, someone else's route or someone else's visits adds a row to the view log. It starts with a few rows by the District Manager.
+
+**Polish on screens from the last three PRs**
+
+- A card without a header now has room above its content: the ratings list and summary, the portal's consent card, My visits and the view log.
+- The policy cards use level-2 headings, which axe asked for.
+
+Walked as Admin on a desktop in light mode and a 390 px phone in dark mode: the policy, a new version with a new consent version, and who looked. Axe found nothing once the headings were fixed, with no console errors and no sideways scroll.
+
+#### Discussion
+
+- **Admin, under masters.** Saving needs `masters.edit` (the policy table's own row rule), so the page sits beside Company settings and is gated the same way.
+- **A copy of the version in force.** Most saves change one or two figures, so the form starts from what is in force rather than from blanks.
+- **The people filter comes from the log itself.** A list of the team would itself be a look at the team map and add a row to the log, so the filter uses the people already named in it.
+
+#### Files changed
+
+- `src/features/tracking/api/policy.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: new, the policy and the view log.
+- `src/features/tracking/lib/policy-form.ts`: new, the draft, its checks, the request and the working days in words.
+- `src/features/tracking/components/tracking-settings.tsx`: new, both tabs and the form.
+- `src/app/(app)/tracking-settings/page.tsx`: new route; `src/components/layout/navigation.ts`: the Tracking settings item.
+- Mock: `src/mocks/handlers/policy.ts` (new); `src/mocks/handlers/visits.ts` (the config, consent and photo rule from the policy in force), `src/mocks/handlers/tracking.ts` (logging), `src/mocks/db.ts`, `src/mocks/handlers/index.ts`.
+- `src/features/ratings/components/ratings-page.tsx`, `src/features/portal/components/portal-home.tsx`, `src/features/tracking/components/my-visits.tsx`: room above headerless card content.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: TRK-006 and TRK-007.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/tracking/tracking-*`.
+
+#### Tests
+
+`src/features/tracking/components/policy.test.tsx`, 7 tests:
+
+- `[TRK-006] The new-version form's rules`:
+  - it starts tomorrow from the version in force, and every field is checked;
+  - the working days in words.
+- `[TRK-006] Tracking policy (contract)`:
+  - a version added, then `policy_exists`, the past and no `masters.edit` refused;
+  - a new consent version asks again, with its text.
+- `[TRK-007] View log (contract)`: the team map and a route logged, the filter by person, and empty for a District Manager.
+- `[TRK-006] TrackingSettings`:
+  - the policy in words, then a version saved after fixing a field;
+  - who looked, filtered by person.
+
+To check by hand in the mock as Admin:
+
+1. Open Admin → **Tracking settings**.
+2. Choose **Save a new version**, change the consent version, and save.
+3. Open **Team map** and a route, then come back to **Who looked**.
+
+### The dealer portal walk
+
+`fix` · `APP-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-18--fix--APP-008--partner-portal-walk.md)
+
+#### Before
+
+Nobody had walked the app as a dealer, a distributor or a sub-dealer since the portal screens were built. In the mock, a partner user saw:
+
+- every lead in the company (132), with the whole company's pipeline on the dashboard;
+- every order;
+- every complaint.
+
+The backend scopes these to the user's dealership (`partner_subtree`), so the mock was showing far more than a dealer will ever see.
+
+#### Now
+
+Item 38 of `plan-13oct-2026.md`: each partner role walked every screen in its menu, and every staff screen by its address.
+
+**What the walk found and what changed**
+
+- **The mock scopes a partner user to their own,** as the backend does:
+  - leads (the list, the count in the menu, and one lead, which is a 404 outside it);
+  - the dashboard's figures;
+  - orders (the list and one order);
+  - complaints (the list and one complaint).
+  - `src/mocks/data/partner-scope.ts` holds the rule.
+- **Each demo partner user starts with eight new or contacted leads.** None of them has a quotation, order or customer yet, so no other seeded figure moves.
+- **Headings** (axe `heading-order` and `page-has-heading-one`):
+  - My ledger's "Your rating" is now a level-2 heading;
+  - the empty Customers page's title is level 2;
+  - the 404 page for an unknown address has its title as the page's level-1 heading.
+  - `EmptyState` and `EmptyTitle` take `level={1}` for a state that is the whole page.
+
+**What held**
+
+- A partner's menu has ten items: Dashboard, Help, Leads, Customers, Sales orders, My ledger, Complaints, Marketing material, Schemes and Rewards.
+- Each of 22 staff screens, opened by its address, says "You don't have access to this page". Among them are Quotations, Approvals, Users, Settings, Team map, Dispatch, Receipts and Products.
+- No sideways scroll on a desktop or a 390 px touch phone. After the fixes, axe found nothing on any screen.
+
+**Backend ask**
+
+- **BE-030:** say on `GET /auth/me` whether tasks are on for dealers. While `tasks_for_dealers` is off, every page a partner user opens makes one refused `GET /tasks`, which the browser logs as an error.
+
+#### Discussion
+
+- **The leak was the mock's, not the screens'.** Every screen shows what its endpoint returns. A dealer on staging will see their own rows, because the backend scopes them. The mock now behaves the same, so the next walk or demo shows what a dealer really sees.
+- **Only new or contacted leads were handed over.** A first try that handed over leads with quotations and orders moved figures that ten other tests rely on: payments, schemes and the farmers' portal.
+- **Tests that opened another dealership's record as a dealer** now hand that record to the dealer first. These were the dealer's view of a lead, the amend check, the reopen reason and points on a draft.
+- **This is item 38, the last of the plan's numbered items.** The optional polish and the items waiting on others remain.
+
+#### Files changed
+
+- `src/mocks/data/partner-scope.ts`: new, the partner scope and the demo partners' leads.
+- `src/mocks/db.ts`: hands the leads over at reset.
+- `src/mocks/handlers/leads.ts`, `dashboard.ts`, `orders.ts`, `complaints.ts`: scoped to the partner's own.
+- `src/features/ratings/components/dealer-rating.tsx`, `src/features/payments/components/my-ledger.tsx`: the rating card's heading level.
+- `src/features/customers/components/customers-search.tsx`: the empty state's level.
+- `src/components/ui/empty.tsx`, `src/components/patterns/empty-state.tsx`, `src/app/not-found.tsx`: level 1.
+- Tests given their own dealership's record: `lead-activity.test.tsx`, `orders-ui.test.tsx`, `complaints-reopen.test.tsx`, `rewards.test.tsx`, `payments.test.tsx`, `consolidate.test.tsx`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: APP-008.
+- `docs/Backend-Tasks.md`: BE-030.
+- Records: `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/partner-portal/*`.
+
+#### Tests
+
+`src/mocks/handlers/partner-scope.test.ts`, 3 tests in `[APP-008] What a partner user reads in the mock`:
+
+- each partner role reads only their dealership's leads, and the count agrees;
+- another dealership's lead is a 404, and the dashboard sums the dealer's own;
+- another dealership's order or complaint is a 404.
+
+To check by hand in the mock, choose Preview as role → Dealer, then:
+
+1. Open **Leads**: eight leads, all the dealership's.
+2. Open `/users` by its address: "You don't have access to this page".
+
+## 17 October 2026
+
+### Payments: on the order, record a payment, receipts for Accounts, and the dealer ledger and credit standing
+
+`feature` · `ACCT-002` `ACCT-003` `ACCT-004` `ACCT-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--ACCT-002--payments.md)
+
+#### Before
+
+The backend records money received against sales orders (handover `payments-contract.md`, 8 endpoints): receipts, how each is spread over a dealer's orders, up to five planned instalments per order, the dealer ledger and the dealer's credit standing. Nothing is collected online; it is a record.
+
+None of it had a screen. The Accounts queue (ACCT-001) only sent orders on to Approvals.
+
+#### Now
+
+- **Payments on the order (ACCT-002, ACCT-004).** A submitted order gets a Payments card (hidden on a draft, and when the order carries no `payments` block):
+  - **To pay, Received, Balance,** and a status badge: Nothing to pay, Unpaid, Part paid, Paid or Overpaid;
+  - **instalments** with their due dates, and an overdue notice when one is past due and unpaid;
+  - **receipts** that went on this order, with mode, reference and date;
+  - **Record payment** (`payments.create`): opens on this order. A direct (farmer) order's payment goes on it in full;
+  - **Plan instalments** (`payments.edit`): up to five rows, which must add up to what is left to pay.
+- **Record a payment (ACCT-002):** dealer, mode, reference (required for NEFT, UPI and cheque), date received, amount, short-payment flag, remark, and an amount per open order of that dealer, with each order's balance and what stays on account shown live. The backend's refusals land on their fields: a reference already recorded for the dealer, more spread than received, a no-dealer payment not fully spread, an order that can't take a payment, an order of another dealer.
+- **Operations → Receipts (ACCT-003, `/receipts`),** for staff who may view payments:
+  - newest first, with a dealer filter and **Show voided**;
+  - each receipt: who, mode and reference, when received and who entered it, the orders it went on (links), and what is still on account;
+  - **Put the rest on orders:** spreads what is left of a dealer's receipt, never more;
+  - **Void,** with a reason. It comes off every order it went on; it is entered again if it was wrong, never edited;
+  - recording and voiding are hidden from readers (managers).
+- **The dealer ledger (ACCT-005):** approved orders as debits, applied scheme and reward benefits and receipts as credits, with a running balance in words ("owed", "in credit", "Settled"), a date range with the balance brought forward, and what is on account but not on an order.
+  - **Staff:** on a partner's page, under Credit standing.
+  - **Partner users:** **My ledger** (`/ledger`) in their menu, for their own ledger.
+- **Credit standing (ACCT-005),** staff only, on a partner's page: the credit limit (or "Not set: never checked"), the exposure (owed on open orders less payments), and what is available, with "Over the limit" when it goes negative. A 403 hides it.
+- Every list and card has its loading skeleton, empty state and error with retry. Walked through in the mock: Accounts on a desktop in light mode (receipts, record, allocate, void, an order's payments), Admin on a partner's page (credit and ledger), a dealer on a phone in dark mode (My ledger). axe found nothing.
+
+#### Discussion
+
+- **A new menu audience, `partner`.** "My ledger" is for partner users only; staff read a dealer's ledger from the partner page. The nav item's `audience` now takes `"partner"` beside `"staff"`.
+- **Amounts in paise for sums.** What stays on account and the instalment totals are worked out in whole paise, so ₹0.10 + ₹0.20 never drifts.
+- **The allocation editor offers at most ten payable orders,** newest first, each with its balance read from the order. A dealer with more open orders spreads the rest later from Receipts.
+- **Not done here:** the payment status in the approvals inbox (`document.payment_status`) is left for a follow-up; the Accounts queue still sends orders to Approvals as before.
+- Built to the backend's contract and checked against the mock only; not yet checked on staging.
+
+#### Files changed
+
+- `src/features/payments/api/` — schemas, API calls, queries and mutations for receipts, allocation, void, instalments, ledger and credit.
+- `src/features/payments/lib/payment-labels.ts` — mode and status labels, rupee checks, paise helpers.
+- `src/features/payments/components/order-payments.tsx` — the order's Payments card and the instalment plan.
+- `src/features/payments/components/record-payment-form.tsx`, `allocation-editor.tsx` — recording a payment and spreading it.
+- `src/features/payments/components/receipts-list.tsx` — the Receipts page with void and allocate.
+- `src/features/payments/components/partner-ledger.tsx`, `partner-credit.tsx`, `my-ledger.tsx` — the ledger and credit cards.
+- `src/app/(app)/receipts/page.tsx`, `src/app/(app)/ledger/page.tsx` — the routes.
+- `src/components/layout/navigation.ts` — Receipts (Operations) and My ledger (partners), and the `partner` audience.
+- `src/features/orders/` — `payments` on the order, the `partner_id` list filter, the card on the order page.
+- `src/features/partners/components/partner-detail.tsx` — credit standing and the ledger for staff.
+- `src/mocks/` — seeded receipts and an instalment plan, and all eight endpoints.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — ACCT-002…005.
+
+#### Tests
+
+- `src/features/payments/components/payments.test.tsx` — `[ACCT-002] Record a payment (contract)`, `[ACCT-003] Receipts: void and allocate (contract)`, `[ACCT-005] Ledger and credit (contract)`, `[ACCT-003] ReceiptsList`, `[ACCT-002] OrderPaymentsCard on the order`, `[ACCT-005] Ledger and credit cards`: 15 tests.
+- By hand: switch the mock to Accounts, open Operations → Receipts, record, spread and void a payment; open the order from a receipt; open a dealer under Channel partners; switch to a dealer and open My ledger.
+
+### Stock on orders: Order to, availability per line, and where a dispatch left from
+
+`feature` · `DISP-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--DISP-003--stock-on-orders.md)
+
+#### Before
+
+Stock had its own screens (#162), but an order didn't say which warehouse served it or whether the warehouse had enough. A dispatch didn't say where the goods left from, and took no stock out.
+
+#### Now
+
+- **Order to (DISP-003).** Staff with stock access pick the warehouse on a new or draft order; the default is shown as chosen.
+  - It is sent as `warehouse_id` only when it differs from the default; a changed draft sends it with the header.
+  - A dealer never sees it: its order comes from the default, and the backend refuses a choice (422).
+- **Availability on the order form:** under the summary, each line's product reads "850 available", or "Short by 50" in amber when the line wants more. It is read again when the warehouse or the lines change.
+  - It warns and never blocks the order.
+- **On the order page:**
+  - "Order to" names the warehouse.
+  - Each open line reads its available stock, amber with "Warehouse short" when the warehouse is over-committed.
+  - Nothing shows for a shipped line or for someone without stock access.
+- **Recording a dispatch:** **Left from** picks the warehouse, defaulting to the order's. The dispatch names it, and the stock comes out of it.
+  - Voiding a dispatch puts the stock back.
+  - The ledger lists both movements, with the dispatch and the order.
+- Walked through in the mock, with axe finding nothing: Admin on the order form, and Dispatch on an approved order and its dispatch form, both on a desktop in light mode.
+
+#### Discussion
+
+- **Stacked on #162,** the stock screens. Merge #162 first, then retarget this one to `integration`.
+- **The default warehouse is "no choice".** Picking the default sends nothing, so an order follows the default if Admin moves it.
+- **Committed counts the order itself,** so "short" on the order page means the warehouse is over-committed, as the contract says, not that this line alone is short.
+- Built to the backend's contract and checked against the mock only; not yet checked on staging.
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts` — `warehouse` on an order and a dispatch, `stock` on a line, and `warehouse_id` on create, patch and dispatch.
+- `src/features/orders/components/order-builder.tsx` — Order to and the availability panel, staff with stock access only.
+- `src/features/orders/components/order-detail.tsx` — Order to, and each open line's stock.
+- `src/features/orders/components/record-dispatch-form.tsx`, `order-dispatches.tsx` — Left from, and the warehouse on each dispatch.
+- `src/features/stock/components/order-stock.tsx` — the Order to field, the Left from field and the availability panel.
+- `src/mocks/handlers/stock.ts`, `orders.ts` — the warehouse choice, line stock on every read, and dispatch movements.
+
+#### Tests
+
+- `src/features/stock/components/order-stock.test.tsx` — 6 tests:
+  - contract: `[DISP-003] Stock on orders`;
+  - screens: `[DISP-003] Stock on order screens`.
+- The order suites still pass.
+- By hand:
+  1. As Admin, start a new order, add a large quantity and watch the stock panel.
+  2. As Dispatch, open an approved order, read each line's stock, and record a dispatch from Rajkot.
+  3. See it in Operations → Stock → Ledger.
+
+### Marketing material: order from the catalogue with both shares, approve and send, and keep the catalogue
+
+`feature` · `MKT-002` `MKT-003` `MKT-004` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--MKT-002--marketing-material.md)
+
+#### Before
+
+The backend runs marketing material ordering (FS-034; handover `marketing-material-contract.md`, 11 endpoints): a 17-item catalogue with today's price and the company's share, orders split between the company and the dealer, District Manager approval, and dispatch by the marketing team.
+
+Channel → Marketing was a "Soon" item with no screen.
+
+#### Now
+
+- **Channel → Marketing material** (`/marketing`), for everyone holding `marketing_material`. The tab, the list's view and the open order are in the URL.
+- **Order material (MKT-003):**
+  - the catalogue as cards: price per unit, "Indicative" on a stand-in price, and what the company pays;
+  - **Add**, then a quantity stepper; the basket lists what is in it, with **Value**, **Company pays** and **Dealer pays** worked out live as the backend does;
+  - **staff** pick the dealer it is for, or leave it empty for their office's own use, which the company pays in full; a **dealer** orders for itself;
+  - **Place order** sends it straight to the District Manager (there is no draft) and opens it. An item taken off the catalogue meanwhile is refused with a message.
+- **Orders (MKT-003):**
+  - views by who you are: **Mine**; **To approve** (District Managers); **To send** (the marketing team); **All** (staff);
+  - each row with its status, who it is for, the office, who asked, and both shares;
+  - **Download Excel** with the same view.
+- **An order (MKT-003, MKT-004)** opens in a dialog:
+  - its lines with value and both shares, the totals, the remark, the decision and the dispatch;
+  - the buttons come from the order's `can`: **Approve**, **Refuse** (a reason is required), **Cancel order** (a reason once approved), **Record dispatch** (a date not in the future, and a reference);
+  - nobody approves their own order; someone acting first, or an order that isn't yours, says so;
+  - a dealer never sees who decided or dispatched.
+- **Catalogue (MKT-002, `marketing_material.edit`):**
+  - every item, switched-off ones marked;
+  - **Add an item** (code, name, unit, price, company share);
+  - **Change** (a new price or share starts today; `price_changed_today` lands on the price);
+  - **Switch off** or **Offer again**;
+  - a taken code is refused on its field.
+- Tables that scroll sideways on a phone take keyboard focus. The dealer ledger's table gets the same fix.
+- Every list has its loading skeleton, empty state per view, and error with retry. Walked through in the mock, with axe finding nothing:
+  - a dealer on a phone in dark mode: the catalogue, the basket, a placed order;
+  - a District Manager on a desktop in light mode: to approve, the order, a refusal without a reason;
+  - Admin: a dispatch, the catalogue, a change.
+
+#### Discussion
+
+- **A new permission module, `marketing_material`,** as the backend checks it. Migration 038 seeds no role grants, so **BE-028** asks who gets what. Until then the mock follows the handover:
+  - field staff and dealers order;
+  - District and State Managers also approve;
+  - Admin keeps the catalogue and dispatches.
+- **The old "Marketing" item** (MKT-001, marketing offers, "Soon") is now Marketing material. MKT-001 stays planned in the registry.
+- **The preview is only a preview.** The basket's shares are worked out in whole paise the way the backend does. The saved order's figures are the ones shown afterwards.
+- Built to the backend's contract and checked against the mock only; not yet checked on staging.
+
+#### Files changed
+
+- `src/features/marketing/api/` — schemas, API calls, queries and mutations for the catalogue and orders.
+- `src/features/marketing/lib/marketing-labels.ts` — status labels and badges, view names, the share preview.
+- `src/features/marketing/components/` — the page and its tabs, ordering, the orders list, the order dialog with its actions, the catalogue admin, and tests.
+- `src/app/(app)/marketing/page.tsx` — the route.
+- `src/components/layout/navigation.ts` — Marketing material in Channel.
+- `src/lib/auth/permissions.ts` — the `marketing_material` module.
+- `src/mocks/` — the catalogue, four seeded orders, all eleven endpoints, and the grants.
+- `src/features/payments/components/partner-ledger.tsx` — the ledger table takes keyboard focus when it scrolls.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — MKT-002…004.
+- `../docs/Backend-Tasks.md` — BE-028.
+
+#### Tests
+
+- `src/features/marketing/components/marketing.test.tsx`: 12 tests.
+  - contract: `[MKT-003] Marketing orders`, `[MKT-004] Deciding and sending`, `[MKT-002] The catalogue`;
+  - screens: `[MKT-003] MarketingPage` (a dealer's order, approving, a refusal's reason, a dispatch and the catalogue).
+- By hand:
+  1. As a dealer, open Channel → Marketing material, add items and place the order.
+  2. As a District Manager, approve or refuse it under To approve.
+  3. As Admin, record the dispatch under To send, and change an item under Catalogue.
+
+### Campaigns: the list and a campaign's summary for Marketing, and a campaign on leads and QR codes
+
+`feature` · `MKT-005` `MKT-006` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--MKT-005--campaigns.md)
+
+#### Before
+
+The backend tracks campaigns (FS-040; handover `campaigns.md`): the fairs, farmer meetings and drives that bring leads in, with their cost.
+
+- Leads and QR codes can name one.
+- The campaign performance report counts their leads and sales; that report was already on screen.
+
+Nothing else had a screen. A QR code carried only a free-text "Campaign".
+
+#### Now
+
+- **Channel → Campaigns** (`/campaigns`, MKT-005), for staff holding `campaigns`:
+  - each campaign shows its kind, place, dates, how many leads it brought, and its planned or actual cost;
+  - newest start first; search, the kind, and **Showing** (running, switched off, all) live in the URL.
+- **A campaign** opens in a dialog:
+  - leads, won, lost and open, sales on its leads, and cost per lead and per win;
+  - the planned and actual cost, and **See its leads**, which opens the lead list filtered to it;
+  - **Change**; **Switch off** or **Switch on**; **Delete**;
+  - a campaign that leads or QR codes name can't be deleted (`campaign_in_use`). The dialog says so and offers **Switch off instead**.
+- **New campaign** and **Change** take a name, kind, place, start and end dates, planned and actual cost, and a description.
+  - A taken name (case ignored) and an end before the start are refused on their fields.
+  - Someone who can't see cost doesn't see or send the cost fields.
+- **A campaign on a lead (MKT-006):**
+  - New lead and Edit lead have a **Campaign** picker of the running campaigns. Staff only: a dealer's leads carry none.
+  - A campaign switched off since stays named on the lead, and stays on the picker while it is the lead's value.
+  - The lead shows "Campaign: …" beside its source.
+  - The lead list has a **Campaign** filter: any campaign, or **No campaign**.
+- **A campaign on a QR code (MKT-006):**
+  - The QR code form links a running campaign. Leads from the code get it.
+  - The old free text stays as **Campaign note**.
+  - The code's card names the linked campaign first.
+- Every list and dialog has its loading skeleton, empty state, and error with retry.
+- Walked through in the mock, with axe finding nothing:
+  - Admin on a desktop in light mode: the list, a summary, a new campaign's checks, the filtered lead list, a QR code's campaign;
+  - a lead and its Edit on a phone in dark mode.
+
+#### Discussion
+
+- **A new permission module, `campaigns`.**
+  - Any staff user lists campaigns for the pickers.
+  - Cost shows only with `campaigns.view`.
+  - Writes need `campaigns` create, edit or delete.
+  - The backend seeds view for Admin Sales and the MD, and Marketing's full access through its permission table. The mock gives Admin everything.
+- **Data IDs in the MKT domain** (MKT-005, MKT-006), next to marketing material.
+- **The report already existed:** Campaign performance (RPT) was built earlier, so this PR doesn't touch it.
+- Built to the backend's contract and checked against the mock only; not yet checked on staging.
+
+#### Files changed
+
+- `src/features/campaigns/` — the contract, API, queries, mutations, labels, the page, the summary dialog, the form, the picker, and tests.
+- `src/app/(app)/campaigns/page.tsx` — the route.
+- `src/components/layout/navigation.ts` — Campaigns in Channel.
+- `src/lib/auth/permissions.ts` — the `campaigns` module.
+- `src/features/leads/` — `campaign` on a lead, the form field, the Edit patch, the list filter in the URL and the API, and the name on the lead page.
+- `src/features/lead-capture/` — the linked campaign on a QR code and its form.
+- `src/features/orders/` — the lead lists they open pass `campaign: null`.
+- `src/mocks/` — four campaigns, some leads tagged, the five endpoints, the campaign on leads and QR codes, and leads from a linked code.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — MKT-005, MKT-006.
+
+#### Tests
+
+- `src/features/campaigns/components/campaigns.test.tsx` — 11 tests:
+  - contract: `[MKT-005] Campaigns`, `[MKT-006] A campaign on a lead`;
+  - screens: `[MKT-005] CampaignsPage`, `[MKT-006] The campaign on a lead`.
+- The lead, QR code and order suites still pass with the new fields.
+- By hand:
+  1. As Admin, open Channel → Campaigns, add one, open the fair and try to delete it.
+  2. Open a lead from See its leads and change its campaign under Edit.
+  3. Link a campaign on a QR code.
+
+### Import polish: the template, upload errors on their fields, and Import from Excel beside New price list
+
+`feature` · `MSTR-013` `MSTR-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--MSTR-013--import-polish.md)
+
+#### Before
+
+- **No template.** The backend serves a blank file for each import (`GET /imports/template`), but the import dialog had no link to it. Someone without a sheet in the right layout had nothing to start from.
+- **Upload errors as one line.** A wrong sheet, a column-names row past the end, or a file with a header and no rows came back as a message at the top of the dialog, not on the control to fix.
+- **Price-list import only inside a draft.** To import a price list, Admin-Sales had to start a blank draft, open it, then find **Import from Excel** there. On staging this read as "the import is missing" from the price lists.
+
+#### Now
+
+- **Download the template** in every import's first step (rates, partners, order and quotation lines). It saves as `price-list-template.xlsx`, `partner-import-template.xlsx` or `order-lines-template.xlsx`, since the browser can't read the server's file name. It shows working, then done or failed.
+- **Upload errors on their fields** (`fields.file`, `fields.sheet`, `fields.header_row`):
+  - an unreadable file, one with too many rows, or a header with no rows under it: under the file picker;
+  - an unknown sheet: under **Sheet**;
+  - a column-names row past the end: under **Column names on row**, marked invalid and described by its error.
+- **Import from Excel beside New price list**, for `pricing.edit`:
+  - it opens the new-list form titled "Import a price list from Excel", with **Next: choose the file**;
+  - the new draft opens with its import already open (`?import=rates` in the URL, cleared when the import closes);
+  - closing without importing keeps the draft, and a note says so: "The draft is kept, with no rates yet."
+- Walked through in the mock as Admin on a desktop in light mode and a phone in dark mode. axe found nothing, apart from the Download button's hidden "Downloaded" label caught mid-fade on one run.
+
+#### Discussion
+
+- **A draft first, then the file.** The backend imports rates into an existing draft (`target_id`), so the shortcut creates the draft and then opens its import, rather than a new upload-first flow. Cancelling the import leaves an empty draft rather than deleting it: nothing here deletes a price list, and the note tells the user it is there.
+- **The URL opens the import**, so a reload on the draft reopens it, and the in-page **Import from Excel** keeps working as before.
+- **No backend change.** `backend/docs/api/imports.md` already documents the template and the upload's field errors.
+
+#### Files changed
+
+- `src/features/imports/api/imports.api.ts` — `downloadImportTemplate` and the template file names.
+- `src/features/imports/lib/import-refusals.ts` — `upload` (file, sheet, header row) on the refusal.
+- `src/features/imports/components/import-dialog.tsx` — the template button, the file error under the picker, and the sheet and header-row errors on their controls.
+- `src/features/products/components/price-lists-panel.tsx` — **Import from Excel** beside **New price list**; the form's import mode.
+- `src/features/products/components/price-list-sheet.tsx` — opens the import from `?import=rates`; the "kept" note.
+- `src/mocks/handlers/imports.ts` — the template endpoint, and upload refusals on their fields.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — MSTR-013.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/imports/` — records and screens.
+
+#### Tests
+
+- `src/features/imports/api/imports.test.ts`, `[MSTR-013]`: the template under its own name, and refused without permission; an unknown sheet, a far header row and a header-only file each refused on their own field.
+- `src/features/products/components/products-ui.test.tsx`, `[MSTR-013]`: **Import from Excel** beside **New price list** lands on the draft with `?import=rates`; the import opens on arrival, the template downloads, a header-only file is named under the picker, and closing says the draft is kept.
+
+### Stock: what each warehouse holds, the ledger, recording stock, and the warehouses
+
+`feature` · `MSTR-014` `MSTR-015` `MSTR-016` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--MSTR-014--stock.md)
+
+#### Before
+
+The backend keeps stock by warehouse (handover `stock-contract.md`):
+
+- receipts and corrections;
+- dispatches taking stock out;
+- what open orders have committed;
+- the default warehouse.
+
+None of it had a screen.
+
+#### Now
+
+- **Operations → Stock** (`/stock`), for every staff role (`stock.view`); dealers get none. The tab is in the URL.
+- **Stock (MSTR-014):** each product in each warehouse, with on hand, committed and available.
+  - Committed is what submitted, approved and partly dispatched orders still owe.
+  - A negative available reads "Short by …" in red.
+  - Filters: warehouse, product, and **Short only**.
+  - On a phone the table scrolls sideways and takes keyboard focus.
+- **Ledger (MSTR-014):** every movement, newest first: received, correction, dispatched or dispatch undone. Each shows its product, warehouse, reference, dispatch and order, who recorded it, and a signed quantity, with minus in red.
+- **Record stock (MSTR-015, `stock.create`: Dispatch and Admin):**
+  - the warehouse (the default first), **Stock received** or **A correction**, a reference ("Opening" for an opening balance), a note, and a quantity per product;
+  - received must be more than 0, and a correction is not 0 (a minus takes stock off);
+  - the backend's refusals are in words: below zero (`negative_stock`), a switched-off warehouse or product, and a quantity with decimals on a whole-unit product, which is marked on its line.
+- **Warehouses (MSTR-016, `stock.edit`: Admin):** add a warehouse, change its code or name, **Make default**, and switch it off or on.
+  - A taken code is refused on its field.
+  - The default can't be switched off until another is the default (`default_warehouse`).
+  - The first warehouse added is the default.
+- Every list has its loading skeleton, empty state and error with retry.
+- Walked through in the mock, with axe finding nothing:
+  - Dispatch on a desktop in light mode;
+  - Admin on Warehouses;
+  - a field officer on a phone in dark mode.
+
+#### Discussion
+
+- **A new permission module, `stock`,** as the backend checks it:
+  - every staff role views;
+  - Dispatch and Admin create;
+  - Admin edits.
+- **The order side is item 28b,** in its own pull request: "Order to", availability per line, the order's warehouse and the dispatch's. The order contract gains `warehouse` now, so the mock can count what each warehouse has committed.
+- Built to the backend's contract and checked against the mock only; not yet checked on staging.
+
+#### Files changed
+
+- `src/features/stock/` — the contract, API, queries, mutations, labels, the page, the stock list, the ledger, the record form, warehouses, the warehouse select, and tests.
+- `src/app/(app)/stock/page.tsx` — the route.
+- `src/components/layout/navigation.ts` — Stock in Operations.
+- `src/lib/auth/permissions.ts` — the `stock` module.
+- `src/features/orders/api/orders.schemas.ts` — `warehouse` on an order (DISP-003).
+- `src/mocks/` — three warehouses, opening balances and two movements, all seven stock endpoints, and the grants.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — MSTR-014…016 and DISP-003.
+
+#### Tests
+
+- `src/features/stock/components/stock.test.tsx` — 9 tests:
+  - contract: `[MSTR-014] Stock`, `[MSTR-015] Recording stock`, `[MSTR-016] Warehouses`;
+  - labels: `[MSTR-014] Stock labels`;
+  - screens: `[MSTR-014] StockPage`.
+- By hand:
+  1. As Dispatch, open Operations → Stock, tick Short only, and record stock received.
+  2. As Admin, open Warehouses and make Rajkot the default.
+
+### Reward points: balances, gifts and the gift desk, earning rules and point value, and points on a dealer's order
+
+`feature` · `RWD-001` `RWD-002` `RWD-003` `RWD-004` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--RWD-001--reward-points.md)
+
+#### Before
+
+The backend runs reward points (FS-032; handover `rewards-contract.md`, 19 endpoints):
+
+- dealers and staff earn points by rules the admin sets;
+- dealers spend them on a gift, or on an order.
+
+None of it had a screen.
+
+#### Now
+
+- **Channel → Rewards** (`/rewards`), for everyone holding `rewards`. The tab is in the URL.
+- **Points (RWD-001):**
+  - the balance, and what it is worth on an order at today's point value;
+  - the history, newest first, each entry marked earned, taken back, spent or held, given back, expired or adjusted, with when points expire.
+  - **Whose points:** a manager or Admin can look up a dealer's balance. A field officer sees only their own (`rewards` V:own).
+- **Gifts (RWD-001):**
+  - **The catalogue,** cheapest first.
+  - **Ask for it:** a dealer asks for a gift its points cover, and the points are held at once. A gift it can't afford says how many more points are needed.
+  - **Your requests:** with their state. A waiting request can be withdrawn, which gives the points back.
+  - **Staff can't redeem yet (GAP-336).** The screen says so.
+- **Gift desk (RWD-002, `rewards.approve`):**
+  - the requests waiting, or all of them;
+  - **Mark sent,** with an optional note;
+  - **Refuse,** with a reason; the points go back.
+- **Admin (RWD-003, `rewards.edit`):**
+  - **Earning rules:** each in words, with its dates and how long its points last. Add a rule. A rule that has awarded points changes only its end date and the active switch (`rule_in_use`), and a taken code is refused on its field.
+  - **Point value:** what a point is worth and the most of an order points may pay, from today, once a day (`settings_changed_today`).
+  - **Gifts:** add, change, or switch one off.
+  - **Adjust points:** a dealer's or your own balance, with a reason. It shows the new balance before saving.
+- **Points on an order (RWD-004).** A dealer's draft order gets a Reward points card:
+  - **The limit:** up to the order limit (10% of the total, GST included), with "Use N points" as a shortcut.
+  - **Held at once:** the points are held as soon as they are put on, and can be taken off again.
+  - **At submit:** the backend takes them off "To pay" as a benefit, which the order's Schemes card lists as "Reward points redeemed". Points not needed go back.
+- Walked through in the mock:
+  - a dealer on a phone in dark mode: points, gifts, asking, an order's points;
+  - Admin on a desktop in light mode: the desk, a refusal, rules, a new rule, the point value, an adjustment.
+  - axe found nothing.
+
+#### Discussion
+
+- **A new permission module, `rewards`.** RBAC.md §6 gives:
+  - field officers V:own;
+  - managers V:org;
+  - Admin everything;
+  - partner users view and redeem (GAP-043).
+- **A duplicate `targets` entry** in the module list is removed.
+- **Who may redeem.** The screen offers Ask for it and Use points only to partner users holding `rewards.create`. The backend refuses staff below Admin (GAP-336), and Admin redeeming its own points has no use yet.
+- **Points held on a draft** are read from `GET /rewards/gift-redemptions?kind=order&status=pending`. The order itself carries them only after submit.
+- **Mock caveats:**
+  - The demo dealer user's partner, Shah Agro Traders, isn't among the seeded channel partners. Staff therefore look up Ambika Krishi Kendra, which has a seeded history.
+  - Every mock staff role shares one user, so "your own" points are the same for all staff.
+
+#### Files changed
+
+- `src/features/rewards/` (new):
+  - the contract, calls, queries, mutations and labels;
+  - `rewards-page.tsx`, `points-panel.tsx`, `gifts-panel.tsx`, `gift-desk.tsx`, `rules-panel.tsx`, `reward-settings-panel.tsx`, `reward-dialogs.tsx` and `order-points.tsx`;
+  - the tests.
+- `src/app/(app)/rewards/page.tsx` (new), and `src/components/layout/navigation.ts`: the page and its menu item.
+- `src/features/orders/components/order-detail.tsx`: the Reward points card on a dealer's draft.
+- `src/lib/auth/permissions.ts`: the `rewards` module.
+- `src/mocks/data/rewards.ts` (new), `src/mocks/handlers/rewards.ts` (new), `src/mocks/db.ts`, `src/mocks/data/permissions.ts`, `src/mocks/handlers/index.ts` and `src/mocks/handlers/orders.ts`:
+  - the 19 endpoints with the backend's rules;
+  - the `rewards` grants;
+  - points applied at submit and released on cancel, return and amend.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: the RWD domain, RWD-001 to RWD-004.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md` and `Docs/screenshots/rewards/`: records and screens.
+
+#### Tests
+
+- `src/features/rewards/components/rewards.test.tsx`:
+  - **Points and gifts:**
+    - balances by role, with a field officer's scope;
+    - a gift held, refused when not covered, and withdrawn.
+  - **The desk:** `remark_required`, a refusal giving the points back, and `redemption_closed`.
+  - **Admin:** `rule_in_use`, an end date, `code_taken`, settings once a day, an adjustment, and a dealer refused.
+  - **Points on an order:**
+    - held, `points_on_order`, taken off, `over_redeem_limit`, `insufficient_points`, and staff refused;
+    - taken off "To pay" at submit as a benefit.
+  - **The screens:**
+    - a dealer's points and asking for a gift;
+    - a manager looking up a dealer;
+    - refusing at the desk;
+    - adding a rule;
+    - changing the point value;
+    - adjusting a balance;
+    - using points on a draft and taking them off.
+
+### Scheme benefits on an order: the preview on a draft, the benefits and To pay after submit
+
+`feature` · `SCHM-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--SCHM-005--order-scheme-benefits.md)
+
+#### Before
+
+The backend works out scheme benefits on an order (`schemes-contract.md`, FS-031), in two ways:
+
+- `GET /orders/{id}/schemes` previews a draft: the discounts and credits that submit would apply, and what delivery would earn.
+- After submit, the order carries `benefits` and `payable`.
+
+The order page showed neither, so a dealer or sales officer couldn't see a scheme discount, and couldn't see that the amount to pay was lower than the invoice.
+
+#### Now
+
+- **A Schemes card on the order**, under Items.
+- **On a draft:**
+  - **Taken off at submit:** each scheme discount (the scheme, the value it was worked on, and the amount off), and each earlier credit it would use.
+  - **Earned on delivery:** points, or a credit for the next order, counted on what is dispatched.
+  - **The figures:** order total, less scheme benefits, gives "To pay, once submitted".
+  - **Kept current:** the card reads the preview again whenever the lines or the total change.
+  - **No scheme applies:** a draft through a partner says "No scheme applies to this order as it stands". A direct sale shows no card unless a scheme applies.
+- **After submit:**
+  - **Applied benefits:** each one, with its scheme. A benefit reversed because the order went back to draft or was cancelled is struck through, with a "Reversed" badge.
+  - **To pay:** order total, less scheme benefits. On a subsidised order the starting figure is the farmer's share.
+  - **No benefits:** the card is hidden.
+- **Scheme names** link to the scheme for those who may view schemes.
+- **Errors:**
+  - a draft submitted elsewhere (`409 order_not_draft`) re-reads the order;
+  - a refused read (403) hides the card;
+  - any other error shows with Try again.
+- Walked through in the mock as Admin, on a desktop in light mode and a 390 px phone in dark mode: a draft with no scheme, the preview, submit, and the applied benefits. axe found nothing.
+
+#### Discussion
+
+- **The invoice never changes.** The card says so, and the order's Totals stay as they are. "To pay" sits in the Schemes card, where the benefits that explain it are.
+- **No new client-side rules.** The screen shows what the backend works out. The mock's rules are a sketch and are documented in `src/mocks/data/order-schemes.ts`:
+  - only partner orders get benefits;
+  - the largest discount that doesn't stack counts, and the stackable ones add to it;
+  - credits are used up to what is left to pay.
+- **The query key** sits under the order's own key and carries the total and the line count, so a change to the lines reads the preview again.
+- **Payments** (`OrderPayments`, item 26) are separate. This only shows `payable`.
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`: `benefits` on the order, and the preview's contract.
+- `src/features/orders/api/orders.api.ts`, `orders.queries.ts`: `getOrderSchemes` and `orderSchemesQueryOptions`.
+- `src/features/orders/components/order-schemes.tsx` (new), `order-detail.tsx`: the Schemes card.
+- `src/mocks/data/order-schemes.ts` (new), `src/mocks/handlers/orders.ts`, `src/mocks/data/reference.ts`:
+  - the preview endpoint;
+  - benefits applied at submit;
+  - benefits reversed on cancel, return and amend.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SCHM-005.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/schemes/`: records and screens.
+
+#### Tests
+
+- `src/features/orders/components/order-schemes.test.tsx`:
+  - `[SCHM-005]` through the API:
+    - a draft's discount, credit, points and payable;
+    - submit stores the benefits and uses the credit;
+    - the preview is refused after submit;
+    - cancel reverses the benefits and frees the credit.
+  - The screen:
+    - the preview with To pay;
+    - "No scheme applies";
+    - a submitted order's benefits, with a reversed one struck through;
+    - no card when there are none.
+
+### Dealer commission and TOD: stage 18 on the application, Accounts' approvals and payments, and the rates
+
+`feature` · `SUBS-016` `SUBS-017` `SUBS-018` · Nakul Srivastava · [entry](changelog/entries/2026-10-17--feature--SUBS-016--dealer-commission.md)
+
+#### Before
+
+The backend runs subsidy stage 18 (FS-033; handover `dealer-commission-contract.md`):
+
+- once every payment is in, the co-ordinator records the dealer's commission and TOD;
+- Accounts then approves it, returns it or cancels it, and pays it;
+- the admin keeps the rates.
+
+None of these 11 endpoints had a screen, so the dealer's commission could only be worked out by hand.
+
+#### Now
+
+- **On a fully paid subsidy application: a Dealer commission card (SUBS-016).**
+  - **Not recorded yet:** a co-ordinator (`subsidy.edit`) enters the GI fittings and the PVC and HDPE fittings. The installation comes from the calculation unless typed, and the TOD base is the commission base unless typed.
+  - **Worked out as you type:**
+    - cost before GST, less the fittings and installation, gives the commission base;
+    - the commission and TOD at the rate in force on the full-FP date;
+    - the total to the dealer.
+  - **Checks before sending:** amounts that aren't rupees, and fittings and installation above the cost. Each is named on its field.
+  - **Recorded:**
+    - the server's figures, with To approve, To pay, Returned or Paid;
+    - who recorded it, approved it and paid it, with the reference;
+    - a return's remark.
+    - **Record it again** while it waits or after a return.
+  - **No rate in force:** the card says so. An admin gets a link to add one; anyone else is told who to ask.
+  - **No dealer on the application:** the card says no commission is due.
+- **Operations → Dealer commissions (SUBS-017),** for Accounts (`payments`):
+  - To approve, To pay, Returned, Paid and All, in the URL, with Download Excel;
+  - **Approve:** not on one you recorded (`own_decision`);
+  - **Return** and **Cancel it:** each with a remark;
+  - **Record payment:** the date (not in the future) and the UTR or cheque number.
+  - The same actions sit on the application's card.
+- **Subsidy masters → Commission rates (SUBS-018):**
+  - a scheme's rates, newest first, each In force, Scheduled or Superseded;
+  - **Add a rate** (`masters.edit`): system, partner type or one partner, commission %, TOD % and the start date;
+  - a 0% rate retires its scope, and a clash on the same scope and day is refused.
+- Walked through in the mock:
+  - Admin on a desktop in light mode: recording, an error, the rates;
+  - the Account Manager on a phone in dark mode and on a desktop: approving and paying.
+  - axe found nothing.
+
+#### Discussion
+
+- **The working mirrors the backend's own check** (migration 037: base = cost − fittings − installation; each amount to the paisa; total = both). It's shown while typing, but the server's figures are the ones kept and shown after.
+- **Who sees which action** follows the router:
+  - `payments.approve` approves and returns;
+  - `payments.edit` pays;
+  - `subsidy.view` cancels before approval, and Accounts cancels after;
+  - `subsidy.edit` records.
+- **Dealers don't see commissions yet (GAP-330),** so this is staff only.
+- **The menu item** uses `payments`, the Accounts module. Co-ordinators work from the application.
+- **Mock caveat:** every mock staff role signs in as the same user. The commission mock therefore puts the role into the recorder's id, so Accounts isn't taken for the recorder of what Admin recorded. The seeded commission is recorded by a co-ordinator, so Admin and Accounts can both approve it.
+
+#### Files changed
+
+- `src/features/commission/` (new):
+  - the contract, calls, queries, mutations and labels;
+  - `application-commission.tsx`, `commissions-list.tsx`, `commission-decisions.tsx`, `commission-rates-panel.tsx` and `commission-parts.tsx`;
+  - the tests.
+- `src/app/(app)/dealer-commissions/page.tsx` (new), and `src/components/layout/navigation.ts`: the page and its menu item.
+- `src/features/subsidy/components/application-detail.tsx`: the card on the application.
+- `src/features/subsidy/components/subsidy-masters.tsx`: the Commission rates tab.
+- `src/mocks/data/commission.ts` (new), `src/mocks/handlers/commission.ts` (new), `src/mocks/db.ts` and `src/mocks/handlers/index.ts`: the 11 endpoints with the backend's rules, and seeded rates and one commission.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SUBS-016, SUBS-017 and SUBS-018.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md` and `Docs/screenshots/commission/`: records and screens.
+
+#### Tests
+
+- `src/features/commission/components/commission.test.tsx`:
+  - **The contract:**
+    - the preview and the scheme-wide rate for a sub-dealer, and `not_closed`;
+    - recording again, with the server's figures;
+    - fittings above the cost, refused on the field;
+    - a retired rate (`no_rate`);
+    - approve, then pay;
+    - `own_decision`, `remark_required`, a future payment date and `commission_exists`;
+    - a field officer refused;
+    - rates newest first, an added rate, `rate_exists`, and Accounts refused.
+  - **The screens:**
+    - recording again with the working, and a fitting problem on its field;
+    - no rate in force, and nothing on an open application;
+    - approving and paying, returning with a remark, and the empty queue;
+    - the rates with the one in force, and adding one.
+
+## 16 October 2026
+
+### Company settings
+
+`feature` · `ADMN-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-16--feature--ADMN-007--company-settings.md)
+
+#### Before
+
+The backend keeps company-wide rules as settings an administrator changes (FS-036, handover `settings-amend-reopen-contract.md`). Eighteen are seeded today. They decide how an amended order is re-approved, when an order counts as a sale, how a dealer's credit limit is checked, who approves a replacement, how exports and samples are priced, how complaints reopen and escalate, how dealers are rated, and whether farmers have a portal. The frontend had no screen for them, so changing one meant asking the backend team.
+
+#### Now
+
+- **Admin → Company settings** (`/settings`), for staff who see masters.
+- **Every setting the backend lists, drawn from its kind**, as the backend asks ("render the list generically"):
+  - A choice is a set of radio buttons.
+  - A whole number has a box, with its range below it ("1 to 1,00,00,000.").
+  - Role codes are checkboxes of the staff roles.
+  - Bands are four boxes.
+  - Each setting says what it does (the backend's description) and when it last changed.
+- **In sections:**
+  - **Orders:** re-approving an amended order; when an order counts as a sale; a dealer's credit limit; who approves a replacement order; tax on an export; pricing a sample order; the largest sample order.
+  - **Complaints:** the days, roles, clock and count for reopening; a complaint that misses its target.
+  - **Dealers:** tasks for dealers; the rating's window, payment-days bands and order-value bands.
+  - **Customers:** the farmers' portal; sign-in codes to customers in an hour.
+  - A key the page doesn't know goes under **Other**, titled from its own name.
+- **Choices in words**, per setting: "Only when its value rises", "When its last line ships", "Warn the approvers", "Zero-rated under a LUT", "Ring the bell"…
+- **When an order counts as a sale** carries the handover's note: "Changing this recalculates reports and targets for every month."
+- **Who approves a replacement order is a chain.** The roles keep the order they're ticked in, and the card says so: "In this order: State Manager, then Regional Manager, then MD / CEO." To move one to the end, untick it and tick it again. Read-only, it reads the same way.
+- **Save changes** sends only what changed, all together. Until then the form shows how many changes there are, and **Undo changes**. The toast says "Setting saved" or "Settings saved".
+- **Checks before sending:** an empty or broken number, a number out of range, and bands that aren't four rising whole numbers are each named on their setting. A backend refusal comes back on the setting it names.
+- **Without `masters.edit`** the values are shown as text, with a line saying only administrators of masters change them.
+- Checked on a phone in dark mode and a desktop in light mode. axe found nothing.
+
+#### Discussion
+
+- **The backend's code, not the handover's example.**
+  - The handover shows five keys and only `key`, `value`, `allowed`, `description` and `updated_at`.
+  - The backend's `Setting` (`api/schemas/settings.py`) also sends `kind` (`choice`, `int`, `roles`, `bands`), `min` and `max`, and the page is drawn from those.
+  - The migrations (041 to 060) seed 18 keys. The mock seeds the same keys, values and descriptions.
+  - A 422 names the bad setting by its bare key (`api/services/settings.py`). The form also takes `values.<key>`, in case the request's own validation answers that way.
+- **Titles, sections and choice words are the frontend's.** The backend sends only codes and a description. A new key of a known kind needs no change here to work; it only needs a title and section to read well.
+- **A kind the frontend doesn't know** breaks the contract and shows the error state, rather than guessing an editor.
+- **The replacement chain's order** comes from its description ("in order, before the Dispatch Manager"). The backend's `kind` is plain `roles`, so the page knows which key is ordered by name. Moving one by unticking is simple but blunt; drag or up and down buttons can follow if the client asks.
+- **Who may be ticked.** Both roles settings offer the staff roles from `GET /lookups/roles`; partner roles are left out, because settings are for staff. The backend checks that each replacement approver approves orders, and its refusal shows on the card.
+- **Who sees the page.** It sits in Admin under the `masters` module, because changing a setting needs `masters.edit`. The backend lets any staff member read the settings, but in the mock only Admin has `masters`. So other roles meet the access-denied page, and the read-only view is covered by a unit test.
+- **`sale_counted_at` on the reports** (`data.filters.sale_counted_at`) arrives with the reports, item 22.
+
+#### Files changed
+
+- `src/features/settings/` — new: the contract, calls, query and mutation; the `CompanySettings` page with its editors and checks; tests.
+- `src/app/(app)/settings/page.tsx` — new: the route.
+- `src/components/layout/navigation.ts` — Company settings in the Admin menu.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — ADMN-007.
+- `src/mocks/handlers/settings.ts` — new: the backend's 18 seeded settings and `GET`/`PATCH /settings` with the backend's checks. Also `db.ts` and `handlers/index.ts`.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/settings/` — records and screens.
+
+#### Tests
+
+- `src/features/settings/components/company-settings.test.tsx`:
+  - The API: read and patch; a value out of range refused on its key; an employee refused.
+  - A number, a choice and roles saved together, sending only what changed.
+  - The replacement chain: its order shown, a role moved to the end, saved in that order; the Orders section and the sale-counting note.
+  - Read-only without `masters.edit`, the chain read in order.
+  - An unknown key under Other, with bands drawn from their kind.
+- Walked through in the mock as Admin, at desktop light and phone dark: the page, then two settings changed and saved together.
+
+### Reports, and a lead's 360° view
+
+`feature` · `RPT-002` `RPT-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-16--feature--RPT-002--reports-and-the-leads-360-view.md)
+
+#### Before
+
+The backend serves eight reports for managers and HQ, and a 360° view of a lead (handover `reports-contract.md`, FS-024; `when-a-sale-counts.md`, FS-026). "Reports" sat in the menu marked Soon, and a lead's page had no summary across its quotations, orders, money, complaints, visits and tasks.
+
+#### Now
+
+- **Admin → Reports** (`/reports`): a card for each report the user may open, with its figure over the last 30 days.
+  - The reports: lead conversion, salesperson performance, lost leads, follow-ups, dealer performance, campaign performance, territory performance and complaints.
+  - Each card is the report's link. A report that answers 403 is left out, as the handover asks. With none left, the page says there are no reports for your role.
+- **Each report** (`/reports/{name}`):
+  - **Filters**, each only where the report takes it, and all in the URL so a report can be bookmarked or shared:
+    - From and to (empty means the backend's last 30 days);
+    - Area (the leads list's area picker, up to 20);
+    - Person (you and the staff below you);
+    - By: source, person or territory; reason or person; type, status or severity; district or taluka.
+  - **What the figures used:** the window, or "As of" for follow-ups, and "Sales counted at: approval" on the reports that count sales (`data.filters.sale_counted_at`).
+  - **A table with a Total line** where the backend sends totals. On a phone the secondary columns step aside, so nothing scrolls sideways.
+  - **A figure the user may not see** comes as null, never 0. It shows as a dash, read out as "Not available to you", with a line under the table saying so.
+  - **Before asking:** a window over a year, or one that ends before it starts, is named instead of sent.
+  - **Past 1,000 rows** a notice says only the first are shown, and that the totals count them all.
+  - **A 403** says the role can't run the report.
+  - **Download Excel** asks for the same report with `format=xlsx`.
+- **At a glance on a lead** (RPT-003), for staff who see reports:
+  - Seven tiles: quotations, orders (with their value), received, complaints, visits, open tasks and the subsidy stage.
+  - Then the other leads on the same mobile, each linked with its stage. The handover asks for "same mobile", never "same customer", because farmers share phones.
+  - The timeline below stays the lead's own.
+- Admin's menu item now opens Reports, with a description.
+- Checked on a phone in dark mode and a desktop in light mode, as Admin and as a State Manager. axe found nothing.
+
+#### Discussion
+
+- **Eight reports, not seven.** The handover's table lists seven. The backend also serves campaign performance (FS-040), so it's here too. Campaigns themselves come with item 27.
+- **Shapes from the backend's code.** Each report's rows and totals follow `api/services/reports.py`, including where it differs from the handover's example:
+  - follow-ups' filters are `{as_of, owner_id}`;
+  - territory performance takes `level`, not `group_by`;
+  - an "Above this level" row has a null territory;
+  - complaints' totals carry the refunds.
+- **Subsidy stage null has two meanings.** On the 360° view it means either "not yours to see" or "no application". The tile shows a dash without the subsidy permission, and "None" with it.
+- **A status or severity row** comes with its code as its label. The complaints report shows the complaint screens' words for it.
+- **The mock counts from its own data**, so the filters change the figures. Where it has nothing to count, it says so in `src/mocks/handlers/reports.ts`:
+  - Payments, visits and campaign costs belong to modules the mock grants only Admin, so other roles see dashes.
+  - Leads carry no stage dates, so a lead is won or lost on its last activity.
+  - Complaints carry no submitted date, so the complaints report ignores the window.
+  - Three seeded campaigns stand in.
+  - The sale setting reads as "approval".
+- **Not done here:** clicking a figure through to the list behind it. The backend has no drill-down links yet.
+
+#### Files changed
+
+- `src/features/reports/` — new:
+  - `api/`: the contract for the eight reports and the 360° view, the calls (one typed fetcher per report) and the query options.
+  - `lib/report-catalogue.ts`: each report's title, description and filters.
+  - `components/`: `reports-home.tsx`, `report-view.tsx` (filters), `report-bodies.tsx` (the eight tables), `report-table.tsx` and `lead-360.tsx`, with tests.
+- `src/app/(app)/reports/page.tsx`, `src/app/(app)/reports/[report]/page.tsx` — new: the routes. An unknown report is a 404.
+- `src/features/leads/components/lead-detail.tsx` — At a glance, above Details.
+- `src/components/layout/navigation.ts` — Reports opens `/reports`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — RPT-002 filled in; RPT-003 for the 360° view.
+- `src/mocks/handlers/reports.ts` — new: the eight reports and the 360° view, with the backend's 403s and 422s. Also `handlers/index.ts`.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/reports/` — records and screens.
+
+#### Tests
+
+- `src/features/reports/components/reports.test.tsx`:
+  - `[RPT-002]` through the API:
+    - conversion by source and by person, with the same total;
+    - a bad grouping and a backwards window refused;
+    - a withheld figure null for a State Manager and a number for Admin;
+    - an Employee and a QC Manager refused;
+    - the Excel file named as the backend names it.
+  - `[RPT-003]` through the API: the leads on the same mobile, and an Employee refused.
+  - Home: cards with figures for a District Manager; "No reports for your role" for an Employee.
+  - A report:
+    - the table, its Total line, and regrouping by person;
+    - dashes, their line, and the sale setting;
+    - a window over a year stopped before asking;
+    - a refused report.
+  - At a glance: tiles, a withheld figure, the same-mobile lead linked; nothing for an Employee.
+- Walked through in the mock:
+  - every report;
+  - the home page on a desktop and on a phone in dark mode;
+  - a lead's 360° view on both.
+
+### Schemes for Admin and dealers
+
+`feature` · `SCHM-001` `SCHM-002` `SCHM-003` `SCHM-004` · Nakul Srivastava · [entry](changelog/entries/2026-10-16--feature--SCHM-001--schemes-for-admin-and-dealers.md)
+
+#### Before
+
+The backend runs promotional schemes for dealers (handover `schemes-contract.md`, FS-031). There are four types: an order discount, points on an order, a credit for the next order, and a monthly or quarterly target. Admin defines them, and dealers see theirs, their standing and their credits. "Schemes" sat in the menu marked Soon.
+
+#### Now
+
+- **Channel → Schemes** (`/schemes`), with a **Credits** tab.
+- **The list** (SCHM-001) is newest first. Each scheme shows:
+  - what it gives and who qualifies, in words ("5% off, up to ₹50,000 · Orders of ₹2,00,000 or more");
+  - its dates;
+  - whether it's running, scheduled, ended or switched off.
+- **Filters:** staff filter by status, type and a search. A dealer sees only the running schemes aimed at it.
+- **A scheme's page** shows its terms. Staff also see who it's for: a line per kind of target, where any one name on a line will do and every line must match. A dealer never sees who else a scheme is for.
+- **New scheme and Edit** (SCHM-002, for administrators):
+  - **The type decides what's asked.** It sets the benefits offered (a points scheme gives points, and points have no cap), whether a credit's life is asked (next-order credits, and a period's credit), and whether the period is a month or a quarter.
+  - **Who it's for** adds territories (the territory picker), partner types, partners and products. Nothing added means everyone.
+  - **Checks before sending** mirror the backend's rules, each named on its field: a percentage over 100, points that aren't whole, a maximum under the minimum, a period scheme without an end date.
+  - **The backend's refusals** land on their fields. A taken code says so.
+  - **Edit** sends only what changed.
+- **A scheme that has given benefits** keeps its terms. The page and the form say why, and only an earlier end date can be set.
+- **Switch off and Switch on** sit on the scheme's page. Switching off stops new benefits, and credits already earned stay usable.
+- **Standing** (SCHM-003), on a period scheme, shows what has been delivered so far this month or quarter against the target, with a bar and what's left to go. A dealer sees its own; staff pick a partner.
+- **Credits** (SCHM-004) show each credit with:
+  - its value, its scheme and its status;
+  - when it was earned, and on which order or for which period;
+  - when it must be used by, and the order it was used on.
+    A dealer sees its available credits first. Staff see every partner's and may narrow the list to one.
+- Checked on a phone in dark mode and a desktop in light mode, as Admin and as a dealer. axe found nothing.
+
+#### Discussion
+
+- **Target names (BE-027).** The backend answers a scheme's targets as `{ type, id }`. Until it sends names, each one is read from its own record (`/territories/{id}`, `/partners/{id}`, `/products/{id}`), and the frontend reads `name` as soon as it comes. A reader who can't open the record sees the kind and a short id.
+- **Product categories can't be added yet.** A category target takes an id, and nothing lists category ids (BE-024 lists codes). BE-027 asks for both.
+- **Contract details from the backend's code:**
+  - `used` and `is_current` on a scheme;
+  - which benefit kinds each type takes;
+  - the 90-day default for a credit's life;
+  - `targets[i].id` field errors;
+  - `scheme_in_use` for anything but an earlier end date on a used scheme.
+- **Benefits on an order are a second pull request (item 24b).** That covers the preview on a draft and the benefits and "To pay" after submit. It touches `payable` on the order, which PRs #142 and #144 add, so it stacks on them.
+- **The mock** seeds six schemes and four credits. A dealer sees the schemes aimed at its type or itself; every mock partner is in Gujarat, so a territory target always matches. Standing is drawn from the partner's id, because the mock keeps no deliveries. The mock also serves `GET /territories/{id}` to name territory targets.
+
+#### Files changed
+
+- `src/features/schemes/` — new:
+  - the contract, calls, queries and mutations;
+  - the scheme labels;
+  - the list, a scheme, the form with its targets editor and record pickers, the credits list and the tabs, with tests.
+- `src/app/(app)/schemes/` — new: the layout, the list, `new`, `[schemeId]`, `[schemeId]/edit` and `credits`.
+- `src/components/layout/navigation.ts` — Schemes opens `/schemes`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — SCHM-001 filled in; SCHM-002 to SCHM-004.
+- `src/mocks/data/schemes.ts` (new), `src/mocks/handlers/schemes.ts` (new), `src/mocks/db.ts`, `handlers/index.ts` — the seeds and the endpoints with the backend's rules.
+- `../docs/Backend-Tasks.md` — BE-027.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/schemes/` — records and screens.
+
+#### Tests
+
+- `src/features/schemes/components/schemes.test.tsx`:
+  - `[SCHM-001]` through the API: every scheme for staff; a dealer's running schemes without partner targets.
+  - `[SCHM-002]` through the API:
+    - create;
+    - a taken code;
+    - a period scheme with no period or end date;
+    - a State Manager refused;
+    - a used scheme refusing a new name, but taking an earlier end and the switch.
+  - `[SCHM-003]` a dealer's standing; another type refused; staff without a partner refused.
+  - `[SCHM-004]` a dealer's own credits; staff see all.
+  - The list for Admin and for a dealer.
+  - The form:
+    - what's missing named;
+    - only the benefits a type takes;
+    - creating;
+    - a used scheme's end date.
+  - A scheme: its terms, its targets named, Switch off.
+  - A dealer's standing on a period scheme, and a dealer's credits.
+- Walked through in the mock:
+  - as Admin, on a desktop: the list, a new scheme (first empty, then filled and created), a used scheme and its form, a period scheme's standing for a partner, and the credits;
+  - as a dealer, on a phone in dark mode: the list, the standing and the credits.
+
+### Targets and achievement
+
+`feature` · `TGT-001` `TGT-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-16--feature--TGT-001--targets-and-achievement.md)
+
+#### Before
+
+The backend keeps monthly targets per person on four measures: order value, orders, leads won and visits. It also works out achievement live (handover `targets-contract.md`, FS-025). The frontend had no screen for either. Nobody could see their month against a target, and managers couldn't set one.
+
+#### Now
+
+- **Sales → Targets** (`/targets`), for staff who hold `targets`.
+- **The month** is in the URL. It moves a month at a time, with **This month** to come back. A line says when the figures were taken and when a sale counts ("Sales counted at: approval").
+- **Your month:** four cards, one per measure. Each shows what you've achieved so far against its target, with the share and a bar, or "No target set". A measure your role may not see is a dash, read out as "Not available to you".
+- **Your team:** a card for each person below you, with or without a target, then **All together**.
+  - A field officer sees only their own month.
+  - An administrator carries no targets, so they see everyone and have no month of their own.
+- **Set targets**, for those who may set them (TGT-002), opens a dialog:
+  - **The fields:** the four measures as they stand, then the changes to them this month, newest first, each with who made it.
+  - **Saving** sends only what changed. Emptying a measure sends 0, which clears it, and the field says so before saving.
+  - **Checks before sending:** a count that isn't a whole number, or rupees with more than two decimal places, is named on its field.
+  - **Refusals in words:** `not_your_team`, `month_closed`, `user_inactive` and `no_targets`. Field errors show on their measure.
+  - **A past month** warns first that only an administrator changes it.
+  - **After saving**, achievement refreshes.
+- Checked on a phone in dark mode and a desktop in light mode, as a State Manager and as a Field Officer. axe found nothing.
+
+#### Discussion
+
+- **A new module code, `targets`.** The backend gates these endpoints with it (`require("targets", …)`), so it joins the frontend's module list. The mock grants it as follows:
+  - field officers: view, own;
+  - managers: view and create, over their team;
+  - administrators: everything.
+- **The backend's code, where the handover is silent:**
+  - `achievement` also answers `filters.sale_counted_at`;
+  - order value is a decimal string and the other measures are whole numbers;
+  - a past month is closed except at global scope (GAP-233), and twelve months ahead is the limit;
+  - a setter's name can be blank for someone without `users.view`, so the history then leaves out "by".
+- **A target of 0 reads as "No target set".** The backend keeps 0 as the value that clears a target, and sends no share for it.
+- **Cards, not a table.** Each person shows four measures with a bar each. A table of sixteen figures doesn't fit a phone, and cards keep every measure in view at 360 px.
+- **`formatMonth` and `shiftMonth`** join `src/lib/format`, since dates are formatted only there.
+- **The mock** counts orders approved in the month and leads won in it, by owner. Leads carry no won date in the mock, so a lead counts in the month of its last activity. Visits are visible only to Admin. Most of the team has targets seeded for this month and the last.
+
+#### Files changed
+
+- `src/features/targets/` — new:
+  - the contract, calls, queries and mutation;
+  - the measure labels;
+  - the `TargetsView` page and the `SetTargetsDialog`, with tests.
+- `src/app/(app)/targets/page.tsx` — new: the route.
+- `src/components/layout/navigation.ts` — Targets in the Sales menu.
+- `src/lib/auth/permissions.ts` — the `targets` module.
+- `src/lib/format/date.ts`, `index.ts`, `format.test.ts` — `formatMonth` and `shiftMonth`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — the TGT domain; TGT-001 and TGT-002.
+- `src/mocks/data/permissions.ts`, `src/mocks/data/targets.ts` (new), `src/mocks/db.ts`, `src/mocks/handlers/targets.ts` (new), `handlers/index.ts` — the grants, seeded targets, and the three endpoints with the backend's rules.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/targets/` — records and screens.
+
+#### Tests
+
+- `src/features/targets/components/targets.test.tsx`:
+  - `[TGT-001]` through the API: a field officer's single row with visits withheld; a manager with the team below; a dealer refused.
+  - `[TGT-002]` through the API:
+    - a teammate's targets set, with their history;
+    - your own refused (`not_your_team`);
+    - a past month refused for a manager (`month_closed`) but taken from Admin;
+    - a fractional count refused on its field;
+    - a field officer refused.
+  - The page:
+    - a field officer's month, with nothing to set;
+    - moving a month and back.
+  - The dialog:
+    - a bad count named;
+    - only the changes saved, with an emptied target cleared;
+    - a past month's warning and its refusal.
+- `src/lib/format/format.test.ts`: `shiftMonth` across a year, and `formatMonth`.
+- Walked through in the mock:
+  - the team on a desktop and on a phone;
+  - a field officer's month;
+  - setting targets and saving;
+  - a past month on a phone in dark mode.
+
+## 15 October 2026
+
+### Dealer applications: start one, fill it in, and decide
+
+`feature` · `CHNL-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--CHNL-007--dealer-applications.md)
+
+#### Before
+
+The backend recruits dealers (FS-053, `dealer-recruitment-and-small-changes.md`, `docs/api/dealer-applications.md`):
+
+- staff start an application and send the applicant a link (`apply_url`, shown once);
+- the applicant fills in the firm's tax, address and bank details and uploads documents;
+- a State Manager or above, never whoever started it, approves it, which makes the dealer and its login.
+
+The frontend only had what PR #132 added: winning a dealership lead showed the link it started. Nothing listed applications, filled them in or decided them. The mock's link went nowhere.
+
+#### Now
+
+- **Channel partners → Dealer applications** (`/partners/applications`), with tabs on the partners pages:
+  - for staff who see partners;
+  - newest first, filtered by status and a search on firm, contact or mobile, both kept in the URL.
+- **Start an application:**
+  - asks for the firm, the contact, the mobile (it becomes the dealer's login) and the area;
+  - then shows the link once, with Copy, Share on WhatsApp and "Open the application";
+  - a mobile that already signs someone in (`mobile_in_use`), or one with an open application (`application_open`), is refused on the mobile field.
+- **An application's page** shows:
+  - its status, and what is still needed to submit (`missing`): fields, and the GST certificate, PAN card and cancelled cheque, in words;
+  - when the link expires, the manager's remark on a returned one, the reason on a rejected or withdrawn one, and a link to the dealer once approved;
+  - the GST record's name, and a warning when the GSTIN's state isn't the area's;
+  - the firm, tax, address and bank fields (the account number masked unless the reader may see it), and who started and decided it.
+- **What staff can do there** (from `can`):
+  - **Edit details** fills or corrects every field. Only the changes are sent. The PAN is checked against the GSTIN. Under a GSTIN, the GST record offers its names (#132's check);
+  - **Documents** attach, open and are removed as on any record (`record_type: dealer_application`);
+  - **Submit for them**, which is disabled while something is missing;
+  - **New link**: the old link stops, and the new one shows once;
+  - **Withdraw**, with a reason.
+- **Decide**, for a State Manager or above who didn't start it:
+  - approve, under a distributor (optional) and with a partner code (optional; empty means the next one);
+  - return, saying what to fix;
+  - or reject, saying why.
+
+  Approving refreshes the partners, and the page links the new dealer.
+
+- **Shared code:**
+  - the link panel (`ApplyLink`) is shared with the lead-win dialog;
+  - the fields editor is written to serve the applicant's own page next (plan item 19b);
+  - the Documents card takes an `emptyHint`, so an application asks for its own documents.
+- **The mock** follows `dealer_applications.py`:
+  - `missing` from the fields and documents;
+  - `can`, and who may decide;
+  - the mobile, PAN, GSTIN, IFSC and pincode checks;
+  - approval adds the dealer with the next `DLR-GJ-` code.
+
+  Winning a dealership lead now starts a real mock application, so its link and page work.
+
+- Checked on a desktop in light mode and a phone in dark mode: the list, starting one, a draft and its edit dialog, deciding and approved. axe found nothing after the approved notice's link was underlined.
+
+#### Discussion
+
+- **Stacked on #132** (dealership enquiries and the GSTIN check), whose pieces this reuses. Merge #132 first, then retarget this to `integration`.
+- **The applicant's own page** (`/dealer-apply/<token>`: verify by WhatsApp code, fill in, upload, submit) is plan item 19b, next.
+- **A dealer application isn't reachable from its lead yet.** The lead keeps `lead_id` on the application, not the other way round, and the list has no `lead_id` filter.
+- **The document types offered** come from `GET /documents/types` for every record. BE-025 asks for them by record type.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/dealer-applications/api/*`: new; the schemas, the eight calls, queries and mutations.
+- `src/features/dealer-applications/components/*`: new; the list, start, detail, actions (submit, new link, withdraw, decide), the edit form and fields, the link panel, and refusals in words.
+- `src/features/dealer-applications/lib/dealer-application-labels.ts`: new; statuses, firm types, decisions and what `missing` names.
+- `src/app/(app)/partners/applications/page.tsx`, `[applicationId]/page.tsx`: new routes.
+- `src/app/(app)/partners/page.tsx`, `src/features/partners/components/partners-tabs.tsx`: the tabs.
+- `src/features/leads/components/dealer-application-started.tsx`: uses the shared link panel.
+- `src/features/documents/components/record-documents.tsx`: `emptyHint`.
+- `src/mocks/handlers/dealer-applications.ts`, `src/mocks/data/dealer-applications.ts`, `src/mocks/db.ts`, `src/mocks/data/reference.ts`, `src/mocks/handlers/index.ts`: the mock.
+- `src/mocks/handlers/documents.ts`, `partners.ts`, `leads.ts`: documents on an application, the GSTIN check shared, and a real application on a dealership win.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: CHNL-007.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/partners/dealer-app*`: records and screens.
+
+#### Tests
+
+- `src/features/dealer-applications/components/dealer-applications.test.tsx`:
+  - through the API: starting one with its link, then the link gone on a read, and the mobile refusals; nothing submitted while something is missing, and the PAN checked against the GSTIN; an employee can't decide, a State Manager must give a reason to return, and approving adds the dealer; the status filter;
+  - the list, and starting one with the link to send;
+  - a draft's missing fields and documents, and staff filling them in (a wrong pincode said in words);
+  - a State Manager rejecting without a reason, then approving, and the dealer linked;
+  - a returned one's remark, and withdrawing it.
+- `src/features/leads/components/lead-stage.test.tsx`: the dealership win's link is now a real mock application.
+- Walked through in the mock: desktop light and phone dark.
+
+### The dealer applicant's own page: verify, fill in, upload, submit
+
+`feature` · `CHNL-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--CHNL-008--dealer-apply-page.md)
+
+#### Before
+
+A dealer application's link (`apply_url`) points at `/dealer-apply/<token>` on this app. The backend serves the applicant through the `/public/dealer-apply/{token}` calls, and they need no account:
+
+- the outline without a session;
+- a WhatsApp code, which answers a two-hour session sent as `X-Apply-Session`;
+- the fields, a GSTIN check, documents and submit.
+
+The frontend had no such page, so the link the staff send (PR #145) opened nothing.
+
+#### Now
+
+- **`/dealer-apply/<token>`**, public and phone first, in the same layout as the customer's quotation link. Open to visitors who aren't signed in, like `/q/`.
+- **Verify your mobile:**
+  - the firm and the masked mobile, then "Send the code on WhatsApp";
+  - the 6-digit code, with "Send a new code";
+  - a wrong code, or a code asked for within a minute, is said in words.
+- **The form**, once verified:
+  - the same fields as staff's Edit details (`DealerFieldsEditor`, shared), saved as the applicant goes;
+  - **Check GSTIN** says whether it is valid, its PAN, and the GST record's name when there is one;
+  - a returned application shows Polysil's remark.
+- **Documents:**
+  - upload the GST certificate, PAN card, cancelled cheque, shop photo, shop licence, or "Other" with a name (JPEG, PNG, WebP, HEIC or PDF, up to 10 MB);
+  - the applicant's own uploads can be removed; staff uploads show without Remove.
+- **Submit the application** once nothing is missing. Otherwise it says what's still needed, or "Save your changes first".
+- **Other states:**
+  - a submitted application: "Submitted, we will be in touch";
+  - an expired, replaced or closed link: "This link doesn't work any more";
+  - a session that ends (`403 no_session`): verify again, keeping what was saved.
+- **The API client** takes `applicantSession`, sent as `X-Apply-Session`. It is a narrow option, not a general header.
+- **The mock:**
+  - the public calls, with the mock sign-in's code;
+  - a code at most once a minute, and the session;
+  - the outline and the full view;
+  - field checks shared with staff, documents, and submit;
+  - fixed links for the seeds (`apply-demo-1` to `-3`), so a demo survives a reload.
+- Checked on a phone in light and dark mode: verify, the form with a GSTIN checked, a document uploaded, and a submitted one. axe found nothing after the empty states' headings were made level 2.
+
+#### Discussion
+
+- **Stacked on #145** (dealer applications for staff), which is stacked on #132. Merge in that order and retarget each to `integration` first.
+- **The session is kept in the page only, not in storage.** Reopening the link asks for a code again. What was saved stays on the backend.
+- **The GSTIN check reads the GSTIN itself** until the backend has a GST data provider (GAP-292). The applicant types the firm's name.
+- **Not yet checked on staging,** nor with a real WhatsApp code.
+
+#### Files changed
+
+- `src/app/(public)/dealer-apply/[token]/page.tsx`: new route.
+- `src/features/dealer-applications/api/dealer-apply.schemas.ts`, `dealer-apply.api.ts`: new; the applicant's calls.
+- `src/features/dealer-applications/api/dealer-applications.queries.ts`: the applicant's view and GSTIN check.
+- `src/features/dealer-applications/components/dealer-apply-page.tsx`, `dealer-apply-form.tsx`: new; verify, the form, documents and submit.
+- `src/features/dealer-applications/lib/dealer-application-labels.ts`: the document labels.
+- `src/lib/api/client.ts`: `applicantSession`.
+- `src/lib/auth/redirects.ts`: `/dealer-apply/` is open.
+- `src/mocks/handlers/dealer-applications.ts`, `src/mocks/data/dealer-applications.ts`: the public mock.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: CHNL-008.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/public/dealer-apply-*`: records and screens.
+
+#### Tests
+
+- `src/features/dealer-applications/components/dealer-apply.test.tsx`:
+  - the outline until verified, a wrong code refused, then every field;
+  - a write refused without a session; submit refused while something is missing, then accepted;
+  - the page: a wrong code said in words, verify, save, upload;
+  - a returned one's remark; a dead link; a submitted one.
+- `src/lib/api/client.test.ts`: `X-Apply-Session` is sent only when given.
+- `src/lib/auth/redirects.test.ts`: `/dealer-apply/` opens without a session.
+- Walked through in the mock on a phone, light and dark.
+
+### Reopen a closed complaint
+
+`feature` · `CMPL-010` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--CMPL-010--reopen-a-closed-complaint.md)
+
+#### Before
+
+The backend reopens a closed or QC-rejected complaint (`POST /complaints/{id}/reopen`, FS-036, `settings-amend-reopen-contract.md`), and its detail says when that applies (`can.reopen`) and how often it happened (`reopen_count`, `reopened_at`, `reopen_reason`). The frontend had no button for it. When the same emitters failed again after a complaint closed, someone had to raise a new complaint and lose its history.
+
+#### Now
+
+- **Reopen** shows on a closed or QC-rejected complaint while the backend's `can.reopen` allows it. The backend decides who and until when:
+  - whoever raised a closed complaint;
+  - the roles in the `complaint_reopen_roles` setting (QC and Support by default), for a closed or a rejected one;
+  - within `complaint_reopen_days` (30) of closing or rejection, and at most `complaint_reopen_max` (2) times.
+- **The dialog** asks why. It says what follows: the manager's check, QC and a remedy again, and how often it was reopened before. Staff see the reason; a dealer doesn't.
+- **After reopening**, the complaint is "Waiting for a check" again. A note says "Reopened once" (twice, N times), with the reason and when.
+- **The history** shows the backend's `complaint.submitted` event with `reopened: true` as "Reopened", or "Reopened after QC rejected it", and says whether the targets start again or run on.
+- **Refusals:**
+  - no reason: on the field;
+  - the window closed meanwhile (`422 reopen_window_closed`) or someone acted first (`409`): the dialog closes, a toast says why, and the complaint refreshes;
+  - a role not allowed (`403`): "Not yours to reopen";
+  - nobody to check it (`422 no_checker`): the existing message.
+- **The mock** follows `complaint_reopen_refusal()` (migration 041) with the default settings. It seeds one closed complaint, with no remedy due, raised by the signed-in staff user. A reopen keeps the history so far, and the seeded history now includes the remedy and the close.
+- Checked on a desktop in light mode and a phone in dark mode. axe found nothing on the closed complaint, the dialog, or the reopened complaint.
+
+#### Discussion
+
+- **The mock's QC role is `qa_manager`;** the backend's is `qc_manager`. The mock lets `qa_manager` stand for the setting's roles.
+- **The QC verdict and the last remedy stay on the page** after a reopen, as the detail sends them ("the live or the last remedy"); the new round adds its own.
+- **Company settings** (the window, the cap, the roles and whether targets restart) are item 21 of the plan; until then they keep the backend's defaults.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/complaints/api/complaints.schemas.ts`: `can.reopen`, `reopenCount`, `reopenedAt`, `reopenReason`, and the reopen request.
+- `src/features/complaints/api/complaints.api.ts`, `complaints.mutations.ts`: `reopenComplaint` and `useReopenComplaint`.
+- `src/features/complaints/components/complaint-actions.tsx`: the Reopen button and dialog.
+- `src/features/complaints/components/complaint-detail.tsx`: the "Reopened N times" note.
+- `src/features/complaints/lib/complaint-labels.ts`: `reopen_window_closed`, `timesText`, and the history line.
+- `src/mocks/handlers/complaints.ts`, `src/mocks/data/complaints.ts`: the reopen route and rule, and a closed complaint.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: CMPL-010.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/complaints/reopen-*`: records and screens.
+
+#### Tests
+
+- `src/features/complaints/components/complaints-reopen.test.tsx`:
+  - the raiser reopens a closed one: a new round, counted, with the reason;
+  - a reason is needed;
+  - a rejected one only for the allowed roles;
+  - refused once reopened as often as allowed;
+  - a complaint not closed or rejected is refused as moved on;
+  - the reason hidden from a dealer;
+  - on the page: the empty reason, the reopen, the note and the history;
+  - no Reopen on a rejected one outside the roles;
+  - the window closing meanwhile closes the dialog;
+  - the words: "once", "twice", "3 times", and a reopen told apart from a submit.
+- Walked through in the mock: desktop light and phone dark.
+
+### Dormant leads: the banner, reopen and lost
+
+`feature` · `LEAD-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--LEAD-007--dormant-leads.md)
+
+#### Before
+
+The backend moves a lead with no activity for a while to `dormant` overnight (FS-035, `lead-small-gaps-contract.md`). It sends `dormant_from_stage`, the stage Reopen returns it to. It lets a dormant lead be reopened (`POST /leads/{id}/reopen`) or closed as lost (`POST /leads/{id}/transition`).
+
+The frontend showed a "Dormant" badge with no menu and no explanation. Nobody could bring the lead back or close it.
+
+#### Now
+
+- **A dormant lead's page** says "Dormant: no activity for a long time".
+  - It shows where the lead was ("It was Qualified").
+  - It explains that the lead can still be edited, assigned and given tasks, while a quotation waits until it is reopened.
+- **Update stage** offers:
+  - **Reopen lead…**, back to the stage it stood at. The dialog names that stage. The reopen count stays as it was, as the backend keeps it for conversion reports.
+  - **Mark as lost…**, with the usual reason.
+- **The reopen description** now reads "Back to the stage it was at before", which holds for both a lost lead and a dormant one.
+- **The stage help** for Dormant says it can be reopened or marked lost.
+- **The mock** follows the backend:
+  - seeded dormant leads came from Qualified;
+  - reopening returns there;
+  - a dormant lead can move to lost, and if reopened later it goes back to where it went dormant.
+- Checked on a desktop in light mode and a phone in dark mode: the lead, the menu, the reopen dialog and the reopened lead. axe found nothing.
+
+#### Discussion
+
+- **The banner says "a long time", not "60 days".** The period is the `dormant_after_days` setting, which the lead page doesn't read. The backend records the move to Dormant in the lead's history.
+- **No buttons in the banner:** reopen and lost stay in Update stage, beside the other stage moves. The banner points there.
+- **Conflict to expect with #132:** #132 (dealership enquiries) changes `stageMenuFor` and `stageActionDescription` too. Whichever merges second keeps both changes: the dormant case here, and the dealership arguments there.
+- **The backend's API doc** still says only a lost lead can be reopened. Its code (`services/leads.py`, `REOPENABLE`) reopens dormant ones too, and this follows the code.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/leads/api/leads.schemas.ts`: `dormant_from_stage` → `dormantFromStage`.
+- `src/features/leads/lib/lead-lifecycle.ts`: a dormant lead's menu, and the reopen description.
+- `src/features/leads/lib/lead-labels.ts`: the Dormant stage help.
+- `src/features/leads/components/lead-detail.tsx`: the dormant banner.
+- `src/features/leads/components/lead-stage-dialog.tsx`: the reopen dialog for a dormant lead.
+- `src/mocks/handlers/leads.ts`, `src/mocks/data/leads.ts`: dormant reopen and lost, and `dormant_from_stage` on the seed.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/leads/dormant-*`: records and screens.
+
+#### Tests
+
+- `src/features/leads/lib/lead-lifecycle.test.ts`: a dormant lead offers reopen or lost.
+- `src/features/leads/components/lead-dormant.test.tsx`:
+  - `dormant_from_stage` read;
+  - reopened to Qualified without counting a reopen;
+  - lost from dormant, then reopened, back to where it went dormant;
+  - the banner and the menu;
+  - reopening from the page.
+- Walked through in the mock: desktop light and phone dark.
+
+### Dealership enquiries, and a partner's names from the GST record
+
+`feature` · `LEAD-015` `CHNL-006` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--LEAD-015--dealership-enquiries-and-gstin-details.md)
+
+#### Before
+
+The backend added two things with FS-053 (`subsidised-orders-and-small-changes.md`):
+
+- **A dealership enquiry type:** `inquiry_type: "dealership"`, for someone asking to become a dealer. Such a lead can be won straight from qualified, without a quotation. The answer that wins it carries `dealer_application`: the application it started and the link to send, or why none was started.
+- **GSTIN details:** `GET /gstin/{gstin}` answers the GST record's legal name, trade name, address and status (`lookup: found`) once the server has a provider key, and `unavailable` until then.
+
+The frontend knew three enquiry types, so a dealership lead from the backend would have broken the lead's contract. The channel-partner form asked for every name by hand.
+
+#### Now
+
+- **Dealership** is a fourth enquiry type: in the type picker, the lead list's filter and on the lead.
+- **A qualified dealership lead offers Mark as won.** The menu says "They're to become a dealer. Closes the lead and starts their dealer application." The dialog says no quotation is needed.
+- **Winning it shows Dealer application started,** with the link to send, once:
+  - **Copy link**;
+  - **Share on WhatsApp**, which opens WhatsApp to the lead's number with a message and the link (nothing is sent by itself).
+  - The dialog stays open until Done, even though a won lead has no stage menu.
+- **When no application was started,** it says why: the mobile already belongs to a partner (`mobile_in_use`), an application is already open for it (`application_open`), or the number can't take one (`mobile_invalid`).
+- **GSTIN details on the partner form,** staff only. Once the GSTIN is complete:
+  - **Found:** the legal name, trade name and status, and **Use these details**, which fills the business name (trade name, else legal name), PAN and address and ticks GST-registered. Every field stays editable.
+  - **Not found, or no GST provider yet:** says to type the names, as before.
+  - **A GSTIN that doesn't check out** says why. Nothing is looked up until the GSTIN is complete, and the answer (it holds a PAN and address) stays out of the logs.
+- **The mock:** two qualified dealership leads and a new one; winning one starts an application, or refuses one for a partner's mobile. Two GST records are found; any other GSTIN is `unavailable`, as on the backend today.
+- Checked on a desktop in light mode and a phone in dark mode. axe found nothing on the dialogs or the form. It still flags the open stage menu as outside a landmark (moderate); it does the same on any lead, so that predates this change.
+
+#### Discussion
+
+- **Use these details, not an automatic fill.** The contract says to prefill the names. One click does that, and doesn't overwrite a name the officer has already typed until they ask. The fields stay editable either way.
+- **The public enquiry form keeps three types.** `/public/leads` takes only commercial, subsidised and industrial (`public.md`).
+- **The dealer application screens,** and the applicant's own `GET /public/dealer-apply/{token}/gstin/{gstin}`, are part of dealer recruitment, a later plan item. This change only shows the link the win answers with.
+- **Not yet checked on staging.** `GET /gstin/{gstin}` answers `unavailable` there until the backend has a provider key (GAP-292).
+
+#### Files changed
+
+- `src/features/leads/api/leads.schemas.ts`: `dealership` in `LEAD_INQUIRY_TYPES`; `dealer_application` on a lead, read as `dealerApplication`.
+- `src/features/leads/lib/lead-labels.ts`: "Dealership".
+- `src/features/leads/lib/lead-lifecycle.ts`: `stageMenuFor` and `stageActionDescription` take the lead's type.
+- `src/features/leads/components/lead-stage-menu.tsx`: passes the type; keeps the dialog mounted after the win.
+- `src/features/leads/components/lead-stage-dialog.tsx`: Mark as won shows the dealer application.
+- `src/features/leads/components/dealer-application-started.tsx`: new, the link with Copy and Share on WhatsApp, or why none was started.
+- `src/features/partners/api/partners.schemas.ts`, `partners.api.ts`, `partners.queries.ts`: `gstinLookupSchema`, `lookupGstin`, `gstinLookupQueryOptions`.
+- `src/features/partners/components/gstin-details.tsx`: new, the GST record under the GSTIN.
+- `src/features/partners/components/partner-form.tsx`: shows it, staff only.
+- `src/mocks/data/leads.ts`, `src/mocks/handlers/leads.ts`, `src/mocks/handlers/partners.ts`: dealership leads and their win; `GET /gstin/:gstin`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: LEAD-015 and CHNL-006.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/dealership/`: records and screens.
+
+#### Tests
+
+- `src/features/leads/lib/lead-lifecycle.test.ts`, `[LEAD-007] stageMenuFor`: a dealership lead is won from qualified; others are not; the won line for each.
+- `src/features/leads/components/lead-stage.test.tsx`, `[LEAD-007] LeadStageMenu`:
+  - a qualified dealership lead won, its link shown with Copy and a WhatsApp link to the lead's number, then Done;
+  - the reason when no application was started.
+- `src/features/partners/api/partners.test.ts`, `[CHNL-006] lookupGstin`: a found record read, blank names as null; `unavailable` from the mock; refused to partner users.
+- `src/features/partners/components/partners-ui.test.tsx`, `[CHNL-006]`:
+  - a found GSTIN shown, then used to fill the name, PAN and address, which stay editable;
+  - unavailable and not found ask for the names;
+  - no lookup until the GSTIN is complete, and an error says to type the names.
+- Walked through in the mock: desktop light and phone dark, as a State Manager (the win) and as Admin (the partner form).
+
+### Group chats
+
+`feature` · `MSG-006` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--MSG-006--group-chats.md)
+
+#### Before
+
+The backend added named groups with FS-048 (`group-chat.md`).
+
+- Every conversation now carries `kind` and `group`, and `participant` is null for a group.
+- New endpoints: `POST /conversations/groups`, `PATCH /conversations/{id}`, and the members list, add and remove.
+
+The frontend read only one-to-one conversations. Its contract required a participant, so one group in the list would have broken the whole Messages screen.
+
+#### Now
+
+- **The contract:** a conversation is either one to one, with its colleague, or a group, with its name, member count, manager and whether the user manages it. An older answer without `kind` reads as one to one. A group without its group, or a pair without its colleague, is a contract violation.
+- **New group:** the people icon beside New message.
+  - It takes a name (up to 80 characters) and colleagues ticked from the staff directory, up to 49.
+  - The form names a missing name or empty list before sending.
+  - The user manages the new group, and it opens at once, already listed.
+- **The list mixes groups and pairs.** A group row has a group icon, its name, and its size before the last message ("4 members · Dispatch says…"). It is listed from the moment it is made.
+- **A group thread** names each sender above their run of messages, from the member list, which is loaded once per thread. The header shows the name and size. The box reads "Message Saurashtra sales".
+- **Group info:**
+  - the members, current first, with "(you)" and "Manages this group" (from `is_manager`, so it follows a hand-over);
+  - who has left;
+  - **Add people**, which doesn't offer anyone already in and stops at 50 (`group_full`);
+  - **Leave the group**, after a confirm.
+  - The manager also renames the group and removes people.
+- **Out of a group:** leaving, or a 404 while the group is open (the user was removed), says so and goes back to Messages. The group drops out of the list.
+- **The mock:**
+  - two groups: one the user manages with messages from three colleagues, and one someone else manages, still empty;
+  - the five endpoints;
+  - the rules: who may rename or remove, the hand-over to the longest-standing member, re-adding someone who left, and the 50 limit.
+- Checked on a desktop in light mode and a phone in dark mode: the list, a group thread, Group info, and making a group. axe found nothing with the pointer at rest.
+
+#### Discussion
+
+- **Stacked on #131,** which reads one conversation on its own. Merge #131 first, then retarget this PR to `integration`.
+- **No Idempotency-Key handled by hand.** Like the other message calls, these writes take the key `apiRequest` adds to every mutation.
+- **New group is an icon button,** named "New group" for screen readers and in its tooltip. The list's header is too narrow beside the thread for two labelled buttons.
+- **Found in the walk, not changed here:** in dark mode, a hovered row with an avatar fails colour contrast. The avatar's 5% white background sits on the hover colour, and the initials fall below 4.5:1. The existing New message dialog does the same. The fix is a token change that reaches every screen, so it is noted in the plan rather than made here.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/messages/api/messages.schemas.ts`:
+  - `kind` and `group` on a conversation, with `DirectConversation`, `GroupConversation` and `conversationName`;
+  - `Member`;
+  - the group request and member-list schemas.
+- `src/features/messages/api/messages.api.ts`: `createGroup`, `renameGroup`, `listMembers`, `addMembers`, `removeMember`.
+- `src/features/messages/api/messages.queries.ts`: `groupMembersQueryOptions`, under the conversation list's key.
+- `src/features/messages/api/messages.mutations.ts`: `useCreateGroup`, `useRenameGroup`, `useAddMembers`, `useRemoveMember`.
+- `src/features/messages/components/people-picker.tsx`: new, the multi-select over the directory.
+- `src/features/messages/components/new-group-dialog.tsx`: new.
+- `src/features/messages/components/group-info-dialog.tsx`: new.
+- `src/features/messages/components/conversation-list.tsx`: group rows; New group.
+- `src/features/messages/components/conversation-thread.tsx`: the group header, sender names, Group info, leaving the screen.
+- `src/features/messages/components/message-bubble.tsx`: `showSender`.
+- `src/mocks/data/messages.ts`, `src/mocks/db.ts`, `src/mocks/handlers/messages.ts`: groups, members and the five endpoints.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: MSG-006.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/messages-notifications/`: records and screens.
+
+#### Tests
+
+- `src/features/messages/api/messages.api.test.ts`, `[MSG-006] group chats`:
+  - a group listed from the start, with no participant;
+  - one with nobody else refused;
+  - members current first, and someone who left taken back;
+  - `group_full` adds nobody;
+  - only the manager renames or removes, and a pair has no name (`not_a_group`);
+  - leaving drops the group and hands it to the longest-standing member;
+  - an older answer without `kind`, and a group without its group refused.
+- `src/features/messages/components/group-chats.test.tsx`:
+  - the list's group rows;
+  - New group's missing fields, then made and opened;
+  - a thread naming each sender;
+  - Group info as manager (remove, rename) and as a member (add people, leave);
+  - removed while open, back to Messages.
+- `conversation-thread.test.tsx`, `messages-lib.test.ts`: brought up to the new shape.
+- Walked through in the mock: desktop light and phone dark.
+
+### Masters: the lists and lead scoring
+
+`feature` · `MSTR-009` `MSTR-010` `MSTR-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--MSTR-009--masters-the-lists-and-lead-scoring.md)
+
+#### Before
+
+Admin → Masters sat in the menu marked "Soon". The backend serves the writes for every list behind the pickers (`backend/docs/api/lookups.md`):
+
+- lead sources, irrigation systems, lost reasons, crops, meeting types and complaint types: add a row (`POST /lookups/{list}`), switch one on or off (`PATCH /lookups/{list}/{id}`);
+- the lead score's weights, caps and bands: `GET`/`PATCH /lookups/scoring`.
+
+Nothing in the frontend wrote them, so a new lead source or lost reason needed the backend developer.
+
+#### Now
+
+- **Masters** opens at `/masters`, for staff who see masters. It has one tab per list, then Lead scoring, and the open tab is kept in the URL. Those with `masters.edit` change things; everyone else reads them.
+- **Each list** shows every row's name, code and status ("In use" or "Switched off"), with how many are in use.
+  - **Add a lead source** (and the same for every list) asks for a name and a code. The code follows the name ("Krishi Mela" → `krishi_mela`) until it is typed.
+  - Sources and reasons also take a sort order. Sources take a quality from 0 to 1. Reasons take Lost or Won.
+  - A missing name, a misshapen code, a code already in use, or a quality outside 0 to 1 is named on its field before sending. The backend's refusals land on the same fields.
+  - **Switch off** keeps the row: records that use it keep it, and new ones can't pick it. **Switch on** brings it back. Rows are never renamed or deleted, as the backend allows (ADR-033).
+  - Every picker that reads the list refreshes.
+- **Lead scoring** lists the four weights (with what they add up to), the value cap, the fast and slow contact hours, the engagement cap, and the hot and warm bands. Each setting says what it does, from the backend's formula.
+  - **Save the settings** sends only what changed.
+  - A cap or an hour band of 0 is refused on its field, as the backend refuses it.
+  - Any setting the backend adds later shows under "Other".
+- **The menu item** is live and staff only.
+- **The mock:**
+  - the lists live in the mock database;
+  - the writes are refused without `masters.edit`;
+  - the score settings start from the backend's seed (migration 006).
+- Checked on a desktop in light mode and a phone in dark mode, as Admin: a list, adding a source, and lead scoring. axe found nothing.
+
+#### Discussion
+
+- **BE-026, new:** the lists answer only `id`, `code`, `name` and `is_active`. So a source's quality and a row's sort order can be set when it is added, but not shown or changed afterwards. Masters asks for them only on add until the list returns them.
+- **Offices** (`/org-units`) are the rest of plan item 8, in the next PR, as another Masters tab.
+- **The mock's other screens** still read the seeded lists. A row added here shows in Masters and in the pickers that read `GET /lookups/{list}`, but the mock's lead and complaint handlers don't know it.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/masters/api/masters.schemas.ts`, `masters.api.ts`, `masters.queries.ts`, `masters.mutations.ts`: new. The writes, the score settings, and which list takes which field.
+- `src/features/masters/components/masters.tsx`: new, the page and its tabs.
+- `src/features/masters/components/lookup-list-panel.tsx`: new, one list with Add and Switch off/on.
+- `src/features/masters/components/scoring-panel.tsx`: new, the score settings.
+- `src/app/(app)/masters/page.tsx`: new, the route.
+- `src/components/layout/navigation.ts`: Masters is live, staff only.
+- `src/mocks/data/lookups.ts`, `src/mocks/db.ts`, `src/mocks/handlers/lookups.ts`: editable lists, the writes and the score settings.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: MSTR-001 retitled; MSTR-009 and MSTR-010.
+- `../docs/Backend-Tasks.md`: BE-026.
+- `Docs/Plan.md` (§9.1, §9.3), `Docs/Tested-Features.md`, `Docs/screenshots/masters/`: records and screens.
+
+#### Tests
+
+- `src/features/masters/api/masters.test.ts`:
+  - `[MSTR-009]`: a row added and listed; a used code refused on its field; switched off and on, kept in the list; refused without `masters.edit`.
+  - `[MSTR-010]`: settings read, and only those sent changed; a zero cap and an unknown key refused by name.
+- `src/features/masters/components/masters-ui.test.tsx`:
+  - `[MSTR-009]`: read-only without `masters.edit`; adding a source with its code following the name; switching a complaint type off from its tab; the form's rules and the request it sends.
+  - `[MSTR-010]`: only the changed setting saved; a zero cap refused on its field; read-only without `masters.edit`; the setting text helpers.
+- Walked through in the mock: desktop light and phone dark.
+
+### Masters: the offices
+
+`feature` · `MSTR-011` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--MSTR-011--masters-the-offices.md)
+
+#### Before
+
+The backend serves the office tree (`backend/docs/api/org-units.md`):
+
+- add an office: `POST /org-units`;
+- rename, move or re-cover one: `PATCH /org-units/{id}`;
+- close or reopen one: `POST /org-units/{id}/close`, `/reopen`.
+
+The frontend only read open offices, for the office picker on the people forms. A new branch, or a district office closed after a reorganisation, needed the backend developer.
+
+#### Now
+
+- **Offices** is the last tab of Masters.
+  - It shows open offices by default, or Closed or All, searched by name, a page at a time.
+  - Each office says where it sits ("Under Gujarat State" or "Top level"), the territory it covers (or "HQ unit"), its level named by the role that runs it ("District Manager"), and how many people work from it.
+- **New office** asks for:
+  - a name;
+  - the level, from the roles ("2 · District Manager"); it can't change later;
+  - the office it sits under, or "A top-level office, under none";
+  - the territory it covers, or "An HQ unit, covering no territory".
+
+  What's missing is named before sending. The backend refuses three things on their fields: a name already used beside it, a closed parent, and a move under one of its own offices.
+
+- **Edit** renames, moves or re-covers an open office. It sends only what changed, and says "Nothing changed yet" until something does.
+- **Close** is refused while people work from the office (`422 fields.id`). The row says so: "2 people still work from Rajkot District. Move them to another office, or deactivate them in Users & roles, then close it." **Reopen** brings a closed office back, from All.
+- Every change refreshes the office pickers on the people forms too.
+- Read-only without `masters.edit`.
+- **The mock** adds `GET /org-units/{id}`, add, edit, close and reopen, with the backend's rules: a unique name among siblings, an open parent, no loops, and no closing while people are anchored. The list also filters by `parent_id`.
+- Checked on a desktop in light mode and a phone in dark mode: the list with a refused close, editing, and a new office. axe found nothing.
+
+#### Discussion
+
+- **Stacked on #134,** which adds the Masters page. Merge #134 first, then retarget this PR to `integration`.
+- **Levels come from the roles list** (`GET /lookups/roles`), so the form doesn't hard-code what level 2 or 5 means.
+- **Territories** (`/territories`) stay seeded; their admin is still listed as not built.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/masters/api/masters.schemas.ts`, `masters.api.ts`, `masters.queries.ts`, `masters.mutations.ts`: the office schema, list, add, edit, close and reopen.
+- `src/features/masters/components/offices-panel.tsx`: new, the list.
+- `src/features/masters/components/office-dialog.tsx`: new, the add and edit form.
+- `src/features/masters/components/masters.tsx`: the Offices tab.
+- `src/components/layout/navigation.ts`: the page's description.
+- `src/mocks/handlers/users.ts`: the office routes and rules.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: MSTR-011.
+- `Docs/Plan.md` (§9.1, §9.3), `Docs/Tested-Features.md`, `Docs/screenshots/masters/`: records and screens.
+
+#### Tests
+
+- `src/features/masters/api/masters.test.ts`, `[MSTR-011] Offices`:
+  - open by default, closed when asked, with people counted;
+  - added under an open office, and a name used beside it refused;
+  - a move under its own office refused;
+  - a busy office not closed, and an empty one closed and reopened;
+  - refused without `masters.edit`.
+- `src/features/masters/components/offices-ui.test.tsx`:
+  - the list's place, territory, level and people;
+  - why a busy office can't be closed;
+  - reopening from All;
+  - a new HQ unit at the top level, after its missing fields;
+  - read-only without `masters.edit`;
+  - the form's rules, and only what changed sent.
+- Walked through in the mock: desktop light and phone dark.
+
+### Masters: the territories
+
+`feature` · `MSTR-012` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--MSTR-012--territories.md)
+
+#### Before
+
+The backend administers the territory tree (`backend/docs/api/territories.md`):
+
+- `GET /territories`, filtered by level, parent and a search;
+- `POST /territories`: a state at the root, or one level down under its parent;
+- `PATCH /territories/{id}`: rename, or set the code.
+
+Writes need `masters.edit`. Names are unique among siblings and codes unique per level. A state's code numbers its leads (`POL/<code>/…`) and locks once a lead is numbered with it (`code_locked`).
+
+The frontend only searched territories in the pickers (`/lookups/territories`). A new state, district, taluka or village needed the backend developer.
+
+#### Now
+
+- **Masters → Territories**, after Offices (`/masters?tab=territories`).
+- **The list:**
+  - states first, or all, districts, talukas or villages, searched by name or code;
+  - each row shows its code, level and where it sits;
+  - **Districts** (or Talukas, Villages) opens the level below inside it, shown as "In Gujarat" and cleared with its ×;
+  - a locked state says its code can't change, and a state without a code says its leads can't be numbered.
+- **New territory**, for `masters.edit`:
+  - the level, then for anything but a state, the territory one level up, picked by name;
+  - the name, and the code (optional except as the state's lead prefix, which the hint explains). The code is stored in capitals.
+- **Edit**, for `masters.edit`:
+  - rename, or set the code. A locked state's code field is disabled and says why;
+  - a name taken among its siblings, a code taken at its level, or a locked code are refused in words.
+- **After a change**, the territory lists refresh, and so do the territory pickers.
+- **The top bar's description** for Masters mentions the territories.
+- **The mock** follows `masters.py`: levels and parents, unique names and codes, the lock from the leads' numbers, and `masters.edit` for writes.
+- Checked on a desktop in light mode and a phone in dark mode: the states, Gujarat's districts, a new taluka, and a locked state's edit. axe found nothing.
+
+#### Discussion
+
+- **Stacked on #135** (offices), which is stacked on #134. Merge in order and retarget each to `integration` first.
+- **In the mock, the admin list keeps its own copy of the tree.** A territory added there doesn't show in the pickers until a reload brings back the seed. On the backend both read the same table.
+- **There is no delete or merge.** The backend offers neither.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/masters/api/masters.schemas.ts`, `masters.api.ts`, `masters.queries.ts`, `masters.mutations.ts`: territories.
+- `src/features/masters/components/territories-panel.tsx`, `territory-dialog.tsx`: new.
+- `src/features/masters/components/masters.tsx`: the tab.
+- `src/components/layout/navigation.ts`: the description.
+- `src/mocks/handlers/territories.ts`: new; `src/mocks/handlers/index.ts`, `src/mocks/db.ts`, `src/mocks/data/territories.ts`: the mock.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: MSTR-012.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/masters/territories-*`: records and screens.
+
+#### Tests
+
+- `src/features/masters/components/territories-ui.test.tsx`:
+  - through the API: Gujarat's code locked and Uttar Pradesh's open; a locked code refused, a rename kept; a district without a parent refused, one under its state added with its code in capitals, a duplicate name refused; an employee may not add;
+  - the tab: the states with the locked note, Gujarat's districts opened;
+  - a new state with its code added; a locked state's code disabled;
+  - an employee reads without New territory or Edit.
+- Walked through in the mock: desktop light and phone dark.
+
+### Subsidised quotations: the subsidy step and card
+
+`feature` · `QUOT-014` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--QUOT-014--subsidised-quotations.md)
+
+#### Before
+
+The backend takes `sales_type: "subsidised"` on a quotation (FS-057, `subsidised-quotations.md`). The quotation carries the subsidy calculator's answer for one farmer category, through:
+
+- `PUT /quotations/{id}/subsidy`, a draft only;
+- `GET /quotations/{id}/subsidy/calculation`, the full answer stored with it.
+
+Sending needs the subsidy (`422 subsidy_missing`).
+
+The frontend offered only Commercial and Industrial, and said subsidised quotations waited on the client's rules.
+
+#### Now
+
+- **The builder** offers **Subsidised** for a subsidised lead, or a quotation that already is one, and starts there for a subsidised lead. It says: "Save the draft, then calculate its subsidy on the quotation."
+- **The quotation's Subsidy card**, on a subsidised quotation:
+  - a draft without one says so, with **Calculate the subsidy**;
+  - once saved, it shows the scheme, system and masters' date; the category; what the scheme pays; what the farmer pays; the total cost (with CG's inspection outside the cap, and AP's GST paid by the state where they apply);
+  - **Recalculate** on a draft, and **Show the full calculation** (the stored answer, as on an application);
+  - `calculation_total_differs` reads "The calculation's total differs from the quotation's lines. Recalculate if the lines changed." It is no longer repeated in the general warnings.
+- **The subsidy step** (`/quotations/{id}/subsidy`, a draft only):
+  - the calculator for the lead's scheme (`GET /subsidy-schemes/for-lead`) and irrigation system, with the scheme's own inputs;
+  - then the farmer's category, only one that applies on every crop block, with the subsidy and the farmer's share beside each;
+  - saving sends the calculation without the scheme, as the backend asks, and returns to the quotation;
+  - it says why it can't run: not subsidised, not a draft, the lead hidden, the lead's state without a scheme, or the system without a calculation.
+- **Refusals:**
+  - sending without a subsidy: "Calculate the subsidy first";
+  - the lead's scheme or system changed: calculate again;
+  - on save: `not_subsidised`, `quotation_not_draft` and `masters_not_in_force` in words, and field refusals listed.
+- **Shared code:** "applies on every crop block" moved into the calculator's library, shared with starting an application.
+- **The mock:**
+  - it accepts subsidised drafts;
+  - it calculates and stores the subsidy on the lead's scheme;
+  - it compares the calculation's total with the lines (1 %);
+  - it serves the stored calculation, and refuses to send a subsidised draft without its subsidy.
+- Checked on a desktop in light mode and a phone in dark mode: from a subsidised lead to a draft, the step, and the saved subsidy. axe found nothing.
+
+#### Discussion
+
+- **Not part of go-live** (the user, 13 Oct); built in the plan's order.
+- **Stacked on #140,** whose calculator takes each scheme's inputs (AP, CG, RJ, UP). Merge #140 first, then retarget this to `integration`.
+- **Making an order from an accepted subsidised quotation** is plan item 17.
+- **Recalculating starts the calculator empty.** The stored calculation is the answer, not the request that produced it, so the inputs can't be refilled from it.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/quotations/api/quotations.schemas.ts`, `quotations.api.ts`, `quotations.queries.ts`, `quotations.mutations.ts`: the subsidy block, Subsidised as priced, `setQuotationSubsidy`, `getQuotationSubsidyCalculation`.
+- `src/features/quotations/components/quotation-subsidy.tsx`: new, the card and the step.
+- `src/app/(app)/(sales)/quotations/[quotationId]/subsidy/page.tsx`: new, the route.
+- `src/features/quotations/components/quotation-detail.tsx`: the card, and the warning it says.
+- `src/features/quotations/components/quotation-builder.tsx`: Subsidised for a subsidised lead.
+- `src/features/quotations/lib/quotation-lifecycle.ts`: the send refusals.
+- `src/features/subsidy/lib/calculator-draft.ts`, `src/features/subsidy/components/start-application.tsx`: `applicableEverywhere` shared.
+- `src/mocks/handlers/quotations.ts`, `src/mocks/db.ts`, `src/mocks/handlers/subsidy-applications.ts`: the subsidy routes, the send check, and `schemeForLead` exported.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: QUOT-014.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/quotations/quote-subsidy-*`: records and screens.
+
+#### Tests
+
+- `src/features/quotations/components/quotation-subsidy.test.tsx`:
+  - a subsidised draft isn't sent without its subsidy;
+  - one category's figures stored, and the full calculation with them;
+  - a category that doesn't apply, and a quotation that isn't subsidised, refused;
+  - the card: none yet with its link; then the scheme, the farmer, Recalculate, the total differing, and the full calculation;
+  - the step: calculated on the lead's scheme and system, a category chosen and saved;
+  - a sent quotation's subsidy can't change.
+- Walked through in the mock: desktop light and phone dark.
+
+### Subsidised orders typed in, with their leads
+
+`feature` · `SO-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--SO-008--subsidised-orders-typed-in.md)
+
+#### Before
+
+A subsidised order could only be made from a subsidised quotation (PR #142). The backend also takes one typed in, staff only (FS-054, `subsidised-orders-and-small-changes.md`):
+
+- `POST /orders` with `order_type: "subsidised"`, the usual direct-order fields, and `subsidy`;
+- `subsidy` holds `lead_ids` (1 to 50, qualified or later, the first being the order's lead), the material, the subsidy and the farmer payable;
+- no `lead_id` (`422 lead_from_subsidy`).
+
+The new-order screen offered Commercial and Industrial only. The order's Edit the subsidy changed the amounts but kept the leads as they were. The mock refused a subsidised order typed in.
+
+#### Now
+
+- **New order** offers **Subsidised** to staff. A dealer doesn't see it.
+- **The Subsidy card** on the new order, once Subsidised is chosen:
+  - **Leads:** searched by farmer, mobile or inquiry number among the qualified leads and later, up to 50. They are listed in order, and each can be removed. The first is marked "the order's lead"; the screen says it can't change later. The lead the order started from comes first.
+  - the **material** (empty: the order total, shown in the placeholder);
+  - the **subsidy**;
+  - the **farmer payable** (empty: material less subsidy, worked out as a hint from the priced total).
+- **Saving:**
+  - it waits for a lead ("Add the farmer's lead for the subsidy.") and asks for the subsidy;
+  - the request sends `subsidy` and no `lead_id`;
+  - the backend's refusals are said in words: a subsidy or payable above the material, a lead you can't see or that can't take an order (on the Leads field), staff only.
+- **Edit the subsidy** on a draft now edits the leads too, with the same picker. The first lead has no Remove: it routes the order (`first_lead_fixed`).
+- **Shared code:** the money fields, the draft's checks and the request body move to `order-subsidy-fields.tsx`, used by both screens.
+- **The mock:**
+  - it makes a subsidised order typed in: the first named lead is its lead, and the leads and amounts are checked as the backend checks them;
+  - it refuses `lead_id` beside `subsidy` (`lead_from_subsidy`), and a missing subsidy (`subsidy_missing`);
+  - one set of lead and amount checks serves both the create and `PUT /orders/{id}/subsidy`.
+- Checked on a desktop in light mode and a phone in dark mode: a new subsidised order from a qualified lead with a second lead added, its card, and Edit the subsidy with the leads. axe found nothing.
+
+#### Discussion
+
+- **Not part of go-live** (the user, 13 Oct); plan item 17b.
+- **Stacked on #142,** which is stacked on #141 and #140. Merge in that order; retarget each to `integration` first.
+- **A lead's name shows in the picker while choosing, not in the edit dialog.** The order's `subsidy.leads` carries the inquiry number only.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`: `CreateDirectOrder` takes Subsidised and `subsidy`.
+- `src/features/orders/components/subsidy-leads-picker.tsx`: new, the leads in order, with search.
+- `src/features/orders/components/order-subsidy-fields.tsx`: new, the leads and the three amounts, their checks and the request.
+- `src/features/orders/components/order-builder.tsx`: Subsidised for staff, the Subsidy card, the request and its refusals.
+- `src/features/orders/components/order-subsidy.tsx`: Edit the subsidy with the leads.
+- `src/mocks/handlers/orders.ts`: subsidised orders typed in; the lead and amount checks shared.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/orders/order-subsidy-{new,direct-card,edit-leads}-*`: records and screens.
+
+#### Tests
+
+- `src/features/orders/components/order-builder.test.tsx`:
+  - names two leads (the first the order's) and the subsidy, then saves a subsidised draft with the material as the total and the payable derived;
+  - asks for the subsidy before saving;
+  - a dealer isn't offered Subsidised.
+- `src/features/orders/components/order-subsidy.test.tsx`:
+  - through the API: the lead is the first named; a subsidy above the material, and a lead that can't take an order (named under `subsidy.lead_ids`), are refused;
+  - the edit dialog keeps the first lead and adds another.
+- Walked through in the mock: desktop light and phone dark.
+
+### Subsidised orders: placed from a subsidised quotation, and the subsidy card
+
+`feature` · `SO-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--SO-008--subsidised-orders.md)
+
+#### Before
+
+The backend takes `order_type: "subsidised"` (FS-054). A subsidised order made from one accepted subsidised quotation takes its subsidy from it (FS-057 rule 8). It is staff only (`403 type_staff_only`).
+
+The order carries `subsidy`:
+
+- the material amount;
+- what the scheme pays;
+- what the farmer pays;
+- the leads it covers, the first being the order's lead.
+
+A draft's subsidy is changed through `PUT /orders/{id}/subsidy`. The order collects the farmer's share, at most its total, less scheme benefits (FS-055 rule 4, in the backend code).
+
+The frontend offered only commercial and industrial orders. Placing an order from a subsidised quotation was refused with `type_mismatch`, and the order page had no subsidy.
+
+#### Now
+
+- **Place order** on an accepted subsidised quotation:
+  - fixes the type to Subsidised;
+  - says where the subsidy comes from: "The subsidy comes from the quotation: ₹700.00 from the scheme, ₹300.00 from the farmer."
+- **The order's Subsidy card**, on a subsidised order:
+  - the material, what the scheme pays and what the farmer pays;
+  - it says when the material is the order total, and when the farmer's share is material less subsidy;
+  - the leads it covers, the first marked as the order's lead, and a hidden one as "a lead you cannot see".
+- **Edit the subsidy**, on a draft, for staff with `sales_orders.edit`:
+  - the material (empty for the order total), the subsidy, and the farmer payable (empty for material less subsidy, shown as a hint);
+  - the leads stay as they are;
+  - field refusals land on their fields (`subsidy.subsidy_amount`, `subsidy.farmer_payable`).
+- **The draft's warnings, in words on the card:**
+  - `subsidy_above_material`: the lines changed;
+  - `farmer_payable_not_material_less_subsidy`: allowed, check it's what was agreed.
+
+  These are no longer repeated in the order's notices.
+
+- **Edit items on a subsidised draft keeps its type.** The builder used to read any type but Industrial as Commercial, and sent it whenever the header changed: the backend refuses that (`422 order_type_fixed`). A draft from quotations, or of a type the builder doesn't offer, now shows its type as fixed, and the type is sent only when it changes.
+- **Refusals:**
+  - `subsidy_above_material`, `payable_above_material`, `first_lead_fixed` and `lead_not_visible`;
+  - `order_type_not_subsidised`, `subsidy_missing` and `quotation_subsidy_missing`;
+  - `subsidised_quotation_count`, `type_mismatch` and `type_staff_only`;
+  - `subsidy_scheme_changed` and `subsidy_system_changed`: revise the quotation.
+- **The mock:**
+  - it makes a subsidised order from one accepted subsidised quotation. Material is the calculation's cost; the subsidy includes AP's state GST, as the backend's `quotation_subsidy.for_order` does;
+  - it serves and replaces a draft's subsidy, with the backend's checks;
+  - it works out the defaults and warnings again when the lines change;
+  - it refuses a type change on an order from quotations or a subsidised one (`order_type_fixed`).
+- Checked on a desktop in light mode and a phone in dark mode: from a subsidised lead, the quotation and its subsidy, sent without a message and accepted, then the order placed, its card, and the subsidy edited. axe found nothing.
+
+#### Discussion
+
+- **Not part of go-live** (the user, 13 Oct); built in the plan's order.
+- **Stacked on #141** (subsidised quotations), which is stacked on #140. Merge #140, then #141, then this; retarget each to `integration` before merging.
+- **A subsidised order typed in** is plan item 17b: the order builder with several leads (1 to 50), the material, the subsidy and the farmer payable, and no `lead_id` (`lead_from_subsidy`). The mock still answers it with `order_type_unsupported` (a `TODO(SO-008)` marks it).
+- **The leads on a draft can't be changed here yet.** The edit keeps `lead_ids` as they are. Adding or removing leads comes with item 17b's lead picker.
+- **The handover says a subsidised order is never made from a quotation; the backend code allows it** (`_check_subsidy_shape`, `quotation_subsidy.for_order`). The frontend follows the code.
+- **The handover also says a subsidised order's `payable` is not the farmer's share; the code bases it on the farmer's share** (at most the total, less scheme benefits: `get_order`, FS-055 rule 4). The card says what the code does. The frontend doesn't show `payable` yet.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`, `orders.api.ts`, `orders.mutations.ts`: the subsidy block, Subsidised from a quotation, `setOrderSubsidy` and `useSetOrderSubsidy`.
+- `src/features/orders/components/order-subsidy.tsx`: new, the card and the edit dialog.
+- `src/features/orders/components/order-detail.tsx`: the card, and its warnings left out of the notices.
+- `src/features/orders/components/place-order.tsx`: Subsidised for a subsidised quotation.
+- `src/features/orders/lib/order-lifecycle.ts`: the refusals.
+- `src/features/orders/components/order-builder.tsx`: a fixed type shown as fixed, and sent only when changed.
+- `src/mocks/handlers/orders.ts`, `src/mocks/db.ts`: subsidised orders from quotations, `PUT /orders/{id}/subsidy`, and the block worked out again on a lines change.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-008.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/orders/order-subsidy-*`: records and screens.
+
+#### Tests
+
+- `src/features/orders/components/order-subsidy.test.tsx`:
+  - the order takes its subsidy from the accepted subsidised quotation;
+  - a quotation of the wrong type, one without its subsidy, and a dealer are refused;
+  - a draft's amounts are changed: material left out is the order total, and the payable is derived;
+  - a new first lead, a subsidy above the material, and an order that isn't subsidised are refused;
+  - placing it: the type is fixed to Subsidised, the subsidy is named, and the draft opens;
+  - the card: the amounts and the lead, and new amounts saved;
+  - a payable that isn't material less subsidy is shown, and one above the material is refused.
+- `src/features/orders/components/order-builder.test.tsx`: a subsidised draft keeps its type when its header changes (the mock now refuses a type change with `order_type_fixed`, as the backend does).
+- Walked through in the mock: desktop light and phone dark.
+
+### The calculator asks for each scheme's own inputs (CG, RJ, UP, AP)
+
+`feature` · `SUBS-002` `SUBS-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--SUBS-002--each-schemes-own-inputs.md)
+
+#### Before
+
+Each system in `GET /subsidy/config` lists the extra request fields it needs, in `inputs`. The handover says to build the form from them, never from the state (`state-subsidy-formulas.md`, `andhra-pradesh-subsidy.md`). The calculator read none of them, so:
+
+- CG, RJ and UP couldn't calculate. Sprinklers had no set size; CG and RJ drip had no spacing label; RJ had no filters or existing equipment.
+- **An AP drip result failed outright:** the backend sends `regular_matrix_id: null` for it, and the response schema took only a string, so the whole calculation became a contract error.
+- **New result rows were dropped:** CG's `fittings` and `flat_inspection`, AP's `gst_paid_by_state`, and RJ's unit-cost `add_ons` and `deductions` disappeared silently.
+- **The scheme picker** sent no scheme for whichever active scheme came first in code order. "AP" sorts before "GGRC", so choosing AP calculated under Gujarat.
+
+#### Now
+
+- **"The scheme's inputs"** shows, under the head unit, what the system's config lists:
+  - a sprinkler set size, 63, 75, 90 or 110 mm (`pipe_size_mm`);
+  - a spacing from the scheme's own list (`spacing_label`, from `spacing_labels`);
+  - RJ's hydrocyclone and gravel filter (none or a size), and "Farmer already has a head unit" and "… the PVC main line";
+  - AP drip's "Guided cost (from the AP MIP portal)" and "Fittings and accessories (from the portal)", with "Copy these, and the lines above, from the portal's bill of quantities."
+- A scheme that asks for none, Gujarat today, shows no card and sends exactly what it sent before. An input code the screen doesn't know yet is named in a note rather than ignored.
+- **Before sending:** the figures wait for a required input ("Fill in the scheme's inputs to see the subsidy"). A spacing not in the scheme's list, or a money amount that isn't a number, is marked on its field. A backend refusal of any of these lands on its field too.
+- **The results:**
+  - an AP drip result reads with null matrix ids, and its figure is labelled "Guided cost (the portal's total)";
+  - the summary adds "Fittings add-on", "Inspection charge (outside the cap)" and "GST paid by the state" wherever a column isn't zero;
+  - RJ's unit cost says what the filters added and what the existing equipment took off.
+- **New warnings have titles:** no rate for the set size, a subsidy above the cost, deductions above the unit cost, the pipe size ignored, the guided cost above the cost, the fittings amount above the lines, and an area between table steps.
+- **The scheme picker** treats the backend's default, GGRC, as "none", and sends any other scheme by code, wherever it sorts.
+- **The mock** lists each state's `inputs` by scheme code (CG, RJ, UP, AP), with invented spacing labels. It refuses a listed input that's missing, and AP's fields on another scheme. It calculates AP drip without a unit cost table, adding the state's half of the GST. Its AP figures are illustrative, not AP's formula.
+- Checked on a desktop in light mode and a phone in dark mode: an AP scheme set up in Subsidy masters, then an AP drip quotation before and after the portal's figures. axe found nothing.
+
+#### Discussion
+
+- **Please confirm with the backend:** the AP handover asks whether the frontend is fine with `regular_matrix_id` and `seven_year_matrix_id` becoming nullable (breaking under ADR-028). This PR reads them as nullable and doesn't otherwise use them, so yes.
+- **One crop and free-text crop names outside Gujarat:** the config's `crop_count_max` already limits the blocks to one. The crop is still chosen from `GET /subsidy/crops`, which serves each scheme's own list.
+- **The quotation PDF and the farmer's link** still print without the state's GST for AP; that is the backend's GAP-482.
+- **In the mock,** a scheme set up in Subsidy masters has no categories until its masters are entered, so the category preview answers 404 there. That is the mock's existing behaviour for an unfinished scheme.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/subsidy/api/subsidy.schemas.ts`:
+  - config `inputs`, `spacing_labels`, `pipeline` and `cap_mode`;
+  - the new request fields;
+  - the extra blocks, the jantri add-ons and deductions, and nullable matrix ids;
+  - `guidedCost` and `DEFAULT_SUBSIDY_SCHEME`.
+- `src/features/subsidy/lib/calculator-draft.ts`: the scheme inputs in the draft, checked, and sent only when listed.
+- `src/features/subsidy/components/calculator-inputs.tsx`: `SchemeInputsCard`.
+- `src/features/subsidy/components/subsidy-calculator.tsx`: the card, its fields placed for refusals, the waiting message, and the scheme picker's default.
+- `src/features/subsidy/components/calculator-results.tsx`, `src/features/subsidy/lib/subsidy-labels.ts`: the guided cost label, the add-ons and deductions, the extra summary rows, and the warning titles.
+- `src/mocks/handlers/subsidy.ts`: inputs by scheme, their refusals, and AP drip.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/subsidy/ap-*`: records and screens.
+
+#### Tests
+
+- `src/features/subsidy/components/subsidy-scheme-inputs.test.tsx`:
+  - a scheme asking for none sends none;
+  - AP drip waits for its guided cost and fittings amount, then sends them, and a typo is marked;
+  - RJ sends its spacing, filters and existing equipment, and a spacing not in the list is a mistake;
+  - a sprinkler asks for its set size;
+  - an AP result with null matrix ids and the state's GST reads;
+  - the screen, end to end: an AP scheme picked (it sorts before GGRC), the portal's figures entered, the guided cost and "GST paid by the state" shown.
+- `src/features/subsidy/lib/calculator-draft.test.ts`: fixtures updated for the new config fields.
+- Walked through in the mock: desktop light and phone dark.
+
+### Subsidy completion: the farmer's share, the dispatch date, the bells, Sprinkler steps
+
+`feature` · `SUBS-006` `SUBS-002` `NOTIF-001` `SO-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--SUBS-006--subsidy-completion.md)
+
+#### Before
+
+The backend added these, all additive (`subsidy-completion.md`):
+
+1. A subsidised order's `payable` is the farmer's share: at most the total, less scheme benefits.
+2. `dispatched_on` on a subsidy file: the first dispatch of a subsidised order naming its lead. Stage 7 takes it as the supply date when `supply` isn't sent.
+3. Six bell kinds about a subsidy file (`resource.type: subsidy_application`).
+4. Reopening a closed file.
+5. Sprinkler areas between two table steps: the next step's quantities, a pro-rata unit cost, and an `area_between_steps` warning.
+
+The frontend had none of these, except reopening (4), which PR #137 builds. The Sprinkler area was a list of the table's steps. The bell showed subsidy notices with the plain icon and no link.
+
+#### Now
+
+- **The farmer's share (§1):**
+  - the order schema reads `payable`;
+  - a subsidised order's Subsidy card says "Payable ₹…: the farmer's share";
+  - the mock works it out as the backend does: never below 0 or above the total.
+- **The dispatch date (§2):**
+  - a subsidy file shows **Dispatched on** beside the Reg. No., or "Not yet";
+  - recording stage 7 says under the supply date "Dispatched on 12 Oct 2026. Left empty, the supply date is taken from it.";
+  - the form already sent only changed fields, so an untouched supply date isn't sent and the backend fills it.
+- **The bells (§3):** `subsidy_returned`, `subsidy_query`, `subsidy_tr_failed`, `subsidy_closed`, `subsidy_cancelled` and `subsidy_reopened` each have an icon. `subsidy_application` records open `/subsidy/{id}` and are named "Subsidy file".
+- **Sprinkler steps (§5):**
+  - the area is typed, like the other systems, and checked against the table's range ("Between 0.4 and 5 Ha.");
+  - an area between two steps is calculated, with the warning in the handover's words: "The area is between table steps. Quantities use the next step; the unit cost is in between.";
+  - a scheme needing an exact step still answers `exact_area_match_required` on the area.
+- **The mock:**
+  - `dispatched_on` comes from the first un-voided dispatch of a subsidised order naming the lead, and one seeded file short of stage 7 has one;
+  - stage 7 fills `supply` from it when the key isn't sent;
+  - Sprinkler takes 0.4 to 5 Ha, with the warning between steps.
+- Checked on a desktop in light mode and a phone in dark mode: the file's Dispatched on, stage 7's hint, and a 1.3 Ha Sprinkler. axe found nothing. The bell and the payable line are checked by tests.
+
+#### Discussion
+
+- **Not part of go-live** (the user, 13 Oct); plan item 18.
+- **Stacked on #143** (#142, #141, #140 under it). Merge in order and retarget each to `integration` first.
+- **Reopening a closed file (§4) is PR #137,** on its own branch.
+- **The payable shows only on the Subsidy card.** The order page shows no payable or payments elsewhere yet: that is plan item 26 (payments).
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`, `src/features/orders/components/order-subsidy.tsx`, `src/mocks/handlers/orders.ts`: `payable`, and the farmer's share on the card.
+- `src/features/subsidy/api/subsidy-applications.schemas.ts`, `src/features/subsidy/components/application-detail.tsx`, `application-actions.tsx`, `src/mocks/handlers/subsidy-applications.ts`: `dispatched_on`, and the stage 7 hint and fill.
+- `src/features/notifications/api/notifications.schemas.ts`, `src/features/notifications/components/notification-bell.tsx`, `src/lib/navigation/resource-href.ts`: the six kinds, and the file's link.
+- `src/features/subsidy/components/calculator-inputs.tsx`, `src/features/subsidy/lib/calculator-draft.ts`, `src/features/subsidy/lib/subsidy-labels.ts`, `src/features/subsidy/components/calculator-results.tsx`, `src/mocks/handlers/subsidy.ts`: Sprinkler between steps.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/subsidy/{application-dispatched,stage7-supply-hint,sprinkler-between-steps}-*`: records and screens.
+
+#### Tests
+
+- `src/features/subsidy/api/subsidy-applications.test.ts`: stage 7 takes the dispatch date as the supply date when none is sent.
+- `src/features/subsidy/components/applications-ui.test.tsx`: the file shows Dispatched on, and stage 7 offers it.
+- `src/features/notifications/components/notification-bell.test.tsx`: a subsidy bell opens its file.
+- `src/features/orders/components/order-subsidy.test.tsx`: the payable is the farmer's share, at most the total, and the card says so.
+- `src/features/subsidy/api/subsidy.test.ts`, `src/features/subsidy/lib/calculator-draft.test.ts`, `src/features/subsidy/components/subsidy-calculator.test.tsx`: Sprinkler takes an area between steps (with the warning in words) and refuses one outside the range. These three replace the tests that wanted a tabulated area.
+- Walked through in the mock: desktop light and phone dark.
+
+### Reopen a closed subsidy file, and the document checklist
+
+`feature` · `SUBS-015` `SUBS-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--SUBS-015--reopen-a-closed-subsidy-file.md)
+
+#### Before
+
+A subsidy application closes by itself once every stage-16 amount has its stage-17 date. After that it takes no more entries. When a date or an amount had been entered wrong, nobody could correct it from the screen.
+
+The backend added `POST /subsidy-applications/{id}/reopen` (`subsidy-completion.md` §4) and `GET /subsidy-document-types`, the checklist every application is given. The frontend used neither.
+
+#### Now
+
+- **Reopen** shows on a closed ("Fully paid") file, only for those with `subsidy.approve`: Admin Sales and the MD.
+  - The closed file's note tells them they can reopen it to correct an entry, and that it closes again when the payment entries are complete.
+  - The dialog asks why (1 to 500 characters) and says that the file's owner and the lead's owner are told.
+  - Afterwards the file is open, with its stages and figures as they were, and **Record stage** and **Cancel** are back.
+- **It closes again** only when an entry writes a stage-16 amount or a stage-17 date, as the backend checks.
+- **Refusals:**
+  - no reason: on the field;
+  - `409 commission_settled`: "The dealer's commission is settled". The file stays closed;
+  - `409 application_not_closed`: the dialog closes, a toast says why, and the file refreshes;
+  - `403`: "Not yours to reopen".
+- **Subsidy masters → Documents** lists the checklist from `GET /subsidy-document-types`.
+  - Each item is numbered, with its code; an item no longer asked for is marked.
+  - It is read only and the same for every scheme.
+- **The mock:**
+  - It seeds one closed file through every stage.
+  - Reopen needs `subsidy.approve`.
+  - A file closes again only on an entry that writes a payment field, so reopening and then opening the file no longer closes it.
+  - It serves the checklist, and records `subsidy.reopened` on the lead's history.
+- Checked on a desktop in light mode and a phone in dark mode: the closed file, the dialog, the reopened file and the checklist. axe found nothing.
+
+#### Discussion
+
+- **Why a Documents tab:** each application's checklist already names its items, so `GET /subsidy-document-types` adds nothing there. The tab lets an administrator read the list without opening an application. If the client wants the list editable, that needs a backend endpoint.
+- **The commission rule can't be shown in the mock,** which has no dealer commissions; a test stands in for it.
+- **Not yet checked on staging.**
+
+#### Files changed
+
+- `src/features/subsidy/api/subsidy-applications.schemas.ts`, `.api.ts`, `.queries.ts`, `.mutations.ts`: `reopenApplication`, `listDocumentTypes` and their query and mutation.
+- `src/features/subsidy/components/application-actions.tsx`: the Reopen button and dialog.
+- `src/features/subsidy/components/application-detail.tsx`: `subsidy.approve`, and the closed note's hint.
+- `src/features/subsidy/components/document-checklist-panel.tsx`: new, the checklist.
+- `src/features/subsidy/components/subsidy-masters.tsx`: the Documents tab.
+- `src/mocks/handlers/subsidy-applications.ts`: the reopen and checklist routes, a closed seeded file, and closing only on a payment entry.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SUBS-015, and `GET /subsidy-document-types` under SUBS-007.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/subsidy/`: records and screens.
+
+#### Tests
+
+- `src/features/subsidy/components/subsidy-reopen.test.tsx`:
+  - a closed file reopened stays open until a payment entry closes it again;
+  - a missing reason, an open file and someone without `subsidy.approve` refused;
+  - the checklist read;
+  - on the page: the hint, the empty reason, the reopen and the buttons back;
+  - no Reopen for a District Manager;
+  - a settled commission explained in the dialog;
+  - a file no longer closed closes the dialog;
+  - the masters checklist, with an item no longer asked for.
+- Walked through in the mock: desktop light and phone dark.
+
+### One set of meeting minutes on its own page
+
+`feature` · `TASK-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-15--feature--TASK-007--one-set-of-minutes-on-its-own-page.md)
+
+#### Before
+
+A task created from meeting minutes said "From meeting minutes" as plain text. The minutes themselves showed only on the lead's page, in a list. From My day, Team or All tasks there was no way to read the meeting a task came from without finding the lead first. The backend's `GET /minutes/{id}` (`tasks-and-planner-contract.md`) was registered under TASK-007 but unused.
+
+#### Now
+
+- **"From meeting minutes"** on an action item's task is a link, wherever the task shows: My day, Team, All tasks and a lead's tasks.
+- **It opens `/tasks/minutes/{id}`**, which shows:
+  - the meeting's date;
+  - the lead it was about, as a link, or the partner;
+  - who was there and the notes;
+  - each action item as its task stands now ("1 of 2 done", overdue in red);
+  - who recorded the minutes.
+- **The page sits under Tasks,** so the Tasks menu rule decides who opens it (APP-006), and Tasks stays highlighted. Minutes out of scope (`404`) show "Page not found"; other failures show the error with a retry.
+- **Shared view:** the lead's minutes card and the page show the same view (`MinutesContent`). The minutes now carry their lead and partner.
+- **The mock** serves `GET /minutes/{id}`.
+- Checked on a desktop in light mode and a phone in dark mode: the link on a task, the page, and minutes not found. axe found nothing.
+
+#### Discussion
+
+- **Under `/tasks`, not `/minutes`:** a page outside the menu map is open to anyone signed in, and minutes are staff only.
+- **No new Data ID:** `GET /minutes/{id}` was already listed under TASK-007.
+
+#### Files changed
+
+- `src/features/tasks/api/tasks.schemas.ts`, `tasks.api.ts`, `tasks.queries.ts`: the minutes' lead and partner, `getMinutes`, `minutesQueryOptions`.
+- `src/features/tasks/components/minutes-detail.tsx`: new, the page.
+- `src/app/(app)/tasks/minutes/[minutesId]/page.tsx`: new, the route.
+- `src/features/tasks/components/lead-minutes.tsx`: `MinutesContent`, shared with the page.
+- `src/features/tasks/components/task-row.tsx`: the link.
+- `src/mocks/handlers/tasks.ts`: `GET /minutes/{id}`.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/tasks/minutes-*`: records and screens.
+
+#### Tests
+
+- `src/features/tasks/components/minutes-detail.test.tsx`:
+  - `getMinutes` reads the minutes with each action item as it stands, and a 404 for unknown ones;
+  - the page shows the meeting, the linked lead, "1 of 2 done", the action items and the notes;
+  - minutes out of scope are not found;
+  - a lead's action-item task links to the page.
+- Walked through in the mock: desktop light and phone dark.
+
+## 14 October 2026
+
+### The Accounts queue, and the order counts behind its badge
+
+`feature` · `ACCT-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-14--feature--ACCT-001--the-accounts-queue-and-the-order-counts-behind-its-badge.md)
+
+#### Before
+
+"Accounts queue" sat in the menu marked "Soon". The backend finished it in BE-022 (`accounts-queue-order-names.md`):
+
+- `waiting_on` on `GET /orders`, `/orders/stats` and `/orders/export`;
+- `GET /orders/stats` itself.
+
+Accounts found their orders only through the Approvals inbox.
+
+The menu item also asked for an `accounts` permission. The backend has no such module: the Accounts role holds `payments` (RBAC.md §6.2). So on the real backend the item could never have appeared.
+
+#### Now
+
+- **The Accounts queue,** at `/accounts`.
+  - **The list:** every submitted order whose next approval step is Accounts' payment check. Each row shows its number (linked to the order), the party and dealer, type, owner, when it was submitted, and its value.
+  - **Deciding:** **Decide in Approvals** for those who decide.
+  - **Above the list:** "1 order waits on Accounts' payment check", and **Download Excel** for the queue.
+  - **States:** skeleton, "Nothing waits on Accounts" (saying when an order arrives), an error with a reference, a later page failing while the rows stay.
+- **The sidebar badge** on Accounts queue: the waiting orders, from `GET /orders/stats`'s `waiting_on.account_manager`.
+  - It is checked again each minute.
+  - It refreshes whenever an order or an approval changes.
+- **Who sees it:** whoever may view payments, which is Accounts and Admin. A field officer has no menu item, and the page refuses them (APP-006).
+- **The permission module** is `payments`, as the backend names it.
+  - The mock's Accounts role holds payments view, create, edit and approve, as RBAC.md says.
+  - A payment's documents follow `payments.edit`, as the backend's do.
+- Checked on a desktop in light mode and a phone in dark mode. axe found nothing.
+
+#### Discussion
+
+- **Built like the Dispatch queue,** as rows rather than a table. "Show more" and the list skeleton now live in `queue-parts.tsx`, shared by both queues.
+- **Deciding stays in Approvals.** The queue sends each order there rather than repeating the decision dialog.
+- **Recording a payment** ("What Accounts records" in the handover) needs the payments screens, plan item 26. The queue has no such button yet.
+- **The badge reads the stats without `waiting_on`,** as the handover says. Its key sits under the order lists, so every write and approval decision that refreshes the lists refreshes it too.
+- **Stacked on #125,** which reworked the same order list parameters and mock filter. Merge #125 first, then retarget this PR to `integration`.
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`: `waitingOn` on the list parameters; `orderStatsSchema`; `ACCOUNTS_ROLE`.
+- `src/features/orders/api/orders.api.ts`: `getOrderStats`; `waiting_on` on the list and export.
+- `src/features/orders/api/orders.queries.ts`: `orderStatsQueryOptions`, `accountsQueueQueryOptions`, `ACCOUNTS_QUEUE`.
+- `src/features/orders/components/accounts-queue.tsx`: new, the queue.
+- `src/features/orders/components/queue-parts.tsx`: new, "Show more" and the skeleton, moved from `dispatch-queue.tsx`.
+- `src/app/(app)/accounts/page.tsx`: new, the route.
+- `src/components/layout/navigation.ts`, `app-sidebar.tsx`: the live menu item and its badge.
+- `src/lib/auth/permissions.ts`, `src/mocks/data/permissions.ts`, `src/mocks/handlers/documents.ts`: `payments` replaces `accounts`.
+- `src/mocks/handlers/orders.ts`: `waiting_on` in the shared filter; `GET /orders/stats`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: ACCT-001 in progress, with its endpoints.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/accounts/`: records and screens.
+
+#### Tests
+
+- `src/features/orders/api/orders.test.ts`, `[ACCT-001] Order stats and the Accounts queue`:
+  - every status counted, and the one order waiting on Accounts;
+  - the list filtered with `waiting_on=account_manager`.
+- `src/features/orders/components/accounts-queue.test.tsx`, `[ACCT-001] AccountsQueue`:
+  - the row, its link and "Decide in Approvals";
+  - the count line and Download Excel;
+  - the empty queue.
+- `src/components/layout/navigation.test.ts`, `[APP-006]`: `/accounts` opens to Accounts and Admin, not to a field officer or a dealer.
+- `src/mocks/data/permissions.test.ts`: Accounts approves on `payments`.
+- Walked through in the mock:
+  - as Accounts: desktop light and phone dark, with the sidebar badge reading "Waiting on Accounts: 1";
+  - as a field officer: refused, with no menu item.
+
+### An empty conversation names its colleague after a reload
+
+`feature` · `MSG-004` `MSG-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-14--feature--MSG-004--an-empty-conversation-names-its-colleague-after-a-reload.md)
+
+#### Before
+
+The backend lists a conversation only once someone writes in it, and had no way to read one on its own. So the thread named the colleague of a just-started conversation from the answer to "start", kept in the page's memory.
+
+After a reload, or from a link a colleague shared, an empty conversation's header read "Conversation". The empty state said "No messages yet" rather than whom to write to, and the box had no name. The backend has since added `GET /conversations/{id}` (BE-021).
+
+#### Now
+
+- **The thread reads a conversation it can't find in the list** from `GET /conversations/{id}`. That covers a conversation just started, opened after a reload, or opened from a link.
+  - The header names the colleague and their role.
+  - The empty state reads "Say hello to Imran Sheikh".
+  - The box is labelled "Message Imran Sheikh".
+- **A listed conversation is not read again;** the list, which is polled, stays the source.
+- **Starting a conversation** seeds that read with the backend's answer, so the header doesn't wait for it.
+- **If the read fails,** the header says "Conversation", as before, and the thread still loads and sends. A conversation that isn't the user's is a 404, and the page shows not-found, as it already did from the messages call.
+- The mock answers `GET /conversations/{id}`, including the 404.
+- Checked on a desktop in light mode and a phone in dark mode: a new conversation with Imran Sheikh, one read of the conversation each time. axe found nothing.
+
+#### Discussion
+
+- **Under the list's key.** The read's query key sits under the conversation list's, so a refresh of the list (after a send, a start, or a colleague found to have left) refreshes it too.
+- **Groups are not handled here.** The backend's `Conversation` now carries `kind` and `group`, with `participant` null for a group (FS-048). The frontend still expects one colleague, so a group in the list or behind a link would be a contract error. Groups are plan item 7, which widens the schema.
+- **A reload can't be shown in the mock walk:** the mock's data resets on a reload, so a new conversation is gone. A unit test covers it: the conversation is started outside the page and the thread names it from the backend.
+
+#### Files changed
+
+- `src/features/messages/api/messages.api.ts`: `getConversation`.
+- `src/features/messages/api/messages.queries.ts`: `conversationQueryOptions` and `messageKeys.conversation`. They replace the in-memory `startedConversationQueryOptions`.
+- `src/features/messages/api/messages.mutations.ts`: starting a conversation seeds the read.
+- `src/features/messages/components/conversation-thread.tsx`: reads an unlisted conversation.
+- `src/mocks/handlers/messages.ts`: `GET /conversations/:conversationId`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: MSG-004 reads one conversation.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/messages-notifications/`: records and screens.
+
+#### Tests
+
+- `src/features/messages/api/messages.api.test.ts`, `[MSG-004]`:
+  - one conversation read before anyone writes in it, and a listed one;
+  - a 404 for one that isn't the user's.
+- `src/features/messages/components/conversation-thread.test.tsx`, `[MSG-002] ConversationThread`:
+  - the colleague named after a reload, from the backend, with the box labelled;
+  - "Conversation" when the read fails, with the thread still there;
+  - the existing test for a just-started conversation now seeds the read.
+- Walked through in the mock: desktop light and phone dark.
+
+### Dashboard: area by irrigation system, and orders against target
+
+`feature` · `RPT-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-14--feature--RPT-001--dashboard-area-by-irrigation-system-and-orders-against-target.md)
+
+#### Before
+
+The backend's `GET /dashboard/overview` gained two fields with FS-052 (`dashboard.md`, "Five small changes" in `dealer-recruitment-and-small-changes.md`):
+
+- `area_by_system`: open and won leads now, by irrigation system, with their land in hectares;
+- `targets_by_month`: this month and the five before it, the order value target against what was sold, or `null` without a targets permission.
+
+The dashboard read neither. The mock sent neither, and the frontend knew no `targets` permission.
+
+#### Now
+
+- **Area by irrigation system,** a new dashboard card.
+  - One row per system, most land first: its name, "38.5 hectares" and "14 leads", over a bar of the land.
+  - "No open or won leads yet." when there are none. "None of these leads has its land recorded yet." when every system's land is zero.
+- **Orders against target,** a new dashboard card.
+  - One row per month, oldest first; the current month is marked "so far".
+  - Each row: a bar of what was sold, a line across it at the target, and "₹9.84 L of ₹12 L 82%" beside it.
+  - A key names the bar (Sold) and the line (Target), so neither rests on colour.
+  - A month without a target says "no target". A role that can't see sales orders (`achieved: null`) sees "Target ₹12 L" and a description to match.
+  - "No targets set for the last six months." when there is nothing to draw.
+- **Left out without a targets permission.** The backend sends `null` to Accounts, Dispatch, QA and partner users, and the card is not drawn. The area card then takes the row, its rows spread over columns.
+- **An older backend** without either field reads as no areas and no targets card, not as a broken contract. A month that isn't `YYYY-MM` is a contract violation.
+- **`ProportionBar` takes a `marker`:** a line at a value on the bar's own scale, with a ring in the card's colour where it crosses the fill. It has stories now.
+- **`formatMonth`:** "2026-10" reads "Oct 2026", in India's time.
+- **The `targets` permission module,** and the mock's grants as migration 035 seeds them: officers view their own, managers view and set their team's, Admin everything.
+- Checked on a desktop in light mode and a phone in dark mode as a State Manager, as Accounts (no targets) and as a field officer in dark mode. axe found nothing.
+
+#### Discussion
+
+- **Rows, not a column chart.** Both cards follow the dashboard's existing pipeline and sources cards: a label, the figures in text, and a thin bar. Every value is printed beside its bar, so there is no hover tooltip to find and nothing is lost on a phone.
+- **One hue.** The bars are the primary colour; the target line is the text colour with a ring. No status colour marks a month over or under target: the percentage says it.
+- **One scale per card.** The targets bars share the largest of every target and sale, so months compare with each other, and a month over target runs past its line.
+- **Sorted by land** rather than the backend's name order, so the comparison reads at a glance.
+- **Not yet checked on staging.** PR #128.
+
+#### Files changed
+
+- `src/features/dashboard/api/dashboard.schemas.ts`: `area_by_system` and `targets_by_month`, read as `areaBySystem` (default `[]`) and `targetsByMonth` (default `null`); `amount`.
+- `src/features/dashboard/components/dashboard-charts.tsx`: new, `AreaBySystemCard`, `TargetsCard` and their skeleton.
+- `src/features/dashboard/components/dashboard-overview.tsx`: the new row, and its skeleton.
+- `src/components/patterns/proportion-bar.tsx`, `proportion-bar.stories.tsx`: the `marker`; stories.
+- `src/lib/format/date.ts`, `index.ts`: `formatMonth`.
+- `src/lib/auth/permissions.ts`, `src/mocks/data/permissions.ts`: the `targets` module and its grants.
+- `src/mocks/handlers/dashboard.ts`: both fields, with `null` targets for a role without them.
+- `src/lib/data-ids/registry.ts`: RPT-001's title and note.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/dashboard/`: records and screens.
+
+#### Tests
+
+- `src/features/dashboard/api/dashboard.test.ts`, `[RPT-001] getDashboardOverview`:
+  - both fields read from the backend's shape;
+  - an older backend without them: no areas, no targets;
+  - a month that isn't `YYYY-MM` refused;
+  - the mock sends six months to a manager and `null` to Accounts.
+- `src/features/dashboard/components/dashboard-charts.test.tsx`:
+  - `[RPT-001] AreaBySystemCard`: most land first, hectares and leads; the empty and no-land notes;
+  - `[RPT-001] TargetsCard`: sold of target with its share, "so far", the key; targets alone; no targets;
+  - `[RPT-001] DashboardOverview charts`: both cards for a manager; no targets card for Accounts.
+- `src/lib/format/format.test.ts`: `formatMonth`.
+- Walked through in the mock: desktop light and phone dark as a State Manager, desktop as Accounts, desktop dark as a field officer.
+
+### Order list filters by area and office
+
+`feature` · `SO-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-14--feature--SO-001--order-list-filters-by-area-and-office.md)
+
+#### Before
+
+The orders list filtered by status, type, "Only my orders" and a search. The backend had added `territory_id` (up to 20, a state selecting its districts and talukas) and `owner_org_unit_id` (an office and the offices under it) to `GET /orders`, `/orders/stats` and `/orders/export` ("Five small changes" in `dealer-recruitment-and-small-changes.md`). The lead list already had an Area filter, but the orders list had neither.
+
+#### Now
+
+- **Area** on the orders list.
+  - **Picking:** states, districts or talukas, drilling down from the top, up to 20. Each area covers everything under it.
+  - **The list:** the whole territory tree (`GET /lookups/territories?parent_id=`), with no counts. Orders have no "areas with orders" endpoint, and the lead list's counts would be of leads.
+  - **The empty state** names the place: "Amreli has no talukas. Go back and choose Amreli itself."
+- **Office**, for staff only (a dealer never sees it): one open office, by name.
+  - A district office reads "Under Gujarat State".
+  - Choosing an office covers the offices under it.
+  - While the list loads, or if it fails, the pill says so.
+- **Both filters:**
+  - are kept in the URL (`area=`, `office=`), so a link to a filtered list works;
+  - count in "Reset filters", which clears them;
+  - go to **Download Excel** with the rest.
+- The lead list's Area filter works as before, with its counts.
+- Checked on a desktop in light mode and a phone in dark mode. axe found nothing with either popover open or with the list filtered.
+
+#### Discussion
+
+- **One Area pill, two sources.** `LeadAreaFilter` takes `source: "leads" | "territories"`.
+  - Both read one query, `areaRowsQueryOptions`, which gives the same rows either way.
+  - The territories rows have their own cache key, so they never mix with the territory picker's search results.
+  - `searchTerritories` gained an optional `parentId`.
+- **Office is a single choice,** because the backend takes one `owner_org_unit_id`. The open offices fit in one list of 50 (`GET /org-units?is_open=true`, readable by anyone signed in).
+- **`GET /orders/stats` isn't used yet.** It comes with the Accounts queue, plan item 3, and will take the same filters.
+- **Plan §9's paragraph** gets its sentence once #124, which merges the duplicated paragraph, is in. This PR updates only the §9.1 row, to stay clear of that merge.
+- **The mock:**
+  - the list and the export share one filter;
+  - an order is in an area when its territory, or any above it, is chosen;
+  - an office covers the offices under it;
+  - the mock export now honours the filters too, as the backend does.
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`, `orders.api.ts`: `areas` and `officeId` on the list parameters, sent as `territory_id` and `owner_org_unit_id` on the list and the export.
+- `src/features/orders/hooks/use-order-list-params.ts`: `area` and `office` in the URL, the filter count and reset.
+- `src/features/orders/components/orders-toolbar.tsx`: the Area pill and the staff Office pill.
+- `src/features/orders/api/orders.queries.ts`, `components/place-order.tsx`: no area or office on their fixed lists.
+- `src/features/leads/components/lead-area-filter.tsx`, `src/features/leads/api/leads.queries.ts`: the `source` prop and `areaRowsQueryOptions`.
+- `src/features/lookups/api/lookups.api.ts`, `lookups.schemas.ts`: `parent_id` on the territory search.
+- `src/mocks/handlers/orders.ts`: area and office filtering, shared by the list and the export.
+- `Docs/Plan.md` (§9.1), `Docs/Tested-Features.md`, `Docs/screenshots/orders/`: records and screens.
+
+#### Tests
+
+- `src/features/orders/api/orders.test.ts`, `[SO-001] listOrders`:
+  - Amreli's orders only;
+  - two districts sent comma-joined;
+  - the Amreli office gives the same orders;
+  - the state office covers every district office.
+- `src/features/orders/components/orders-ui.test.tsx`, `[SO-001] Sales orders list`:
+  - states first, then Gujarat's districts;
+  - picking Amreli narrows the table and the pill names it;
+  - clearing it restores the list;
+  - the Office pill narrows it, with "Reset filters" shown;
+  - a dealer has no Office pill.
+- The lead list's Area tests (`leads-ui.test.tsx`) pass unchanged.
+- Walked through in the mock as a State Manager:
+  - desktop light: the Area picker with Amreli chosen, and the filtered list;
+  - phone dark: the Office picker, and the filtered list.
+
+### No dialog close timer once the dialog has gone
+
+`fix` · `APP-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-14--fix--APP-003--no-dialog-close-timer-once-the-dialog-has-gone.md)
+
+#### Before
+
+After a save, eleven dialogs show "Saved" and close themselves 600 ms later:
+
+- leads: assign, stage, new lead;
+- orders: every action;
+- quotations;
+- complaints;
+- tasks: new, edit, action, minutes;
+- approval limits.
+
+Each cleared its timer when it went away, but none checked whether it had gone before starting one. `useAsyncAction` runs a success handler even after its component has unmounted, on purpose, so that the toast still shows. So a save that finished after the dialog was closed, or after the user left the page, started a timer that nothing would ever clear. It then closed a dialog that no longer existed.
+
+In the browser this did nothing visible. In the unit tests, a timer could outlive its test file. On 13 October, CI on PR #124 failed after all 1010 tests had passed, with "ReferenceError: window is not defined" from the lead assign dialog's timer, firing after jsdom was torn down (`lead-assign.test.tsx`).
+
+#### Now
+
+- **One hook,** `useCloseAfterSuccess` in `src/hooks/`, closes a dialog a moment after a save:
+  - its timer is cleared when the dialog goes;
+  - it is never started once the dialog has gone.
+- **Nine dialogs use it.** Their own copies are gone: three local hooks, the complaints' `useCloseLater`, and five inline timers.
+- **The new-lead and new-task dialogs** also reset their form when they close. They keep their own timer, with the same never-after-it-has-gone guard.
+- Nothing changes on screen.
+
+#### Discussion
+
+- **Why the timers and not `useAsyncAction`.** Not calling `onSuccess` after unmount would also stop the leak. But it would lose the toast, and the page change after a delete, when the user had closed the dialog mid-save. The timer is the only part that must not outlive the dialog.
+- **Ported into PR #124,** whose CI it failed. The change is identical there, so it merges cleanly whichever lands first. Any other open PR picks it up from `integration`.
+
+#### Files changed
+
+- `src/hooks/use-close-after-success.ts`: new, the hook and `CLOSE_AFTER_SUCCESS_MS`.
+- **Using the hook:**
+  - `src/features/orders/components/order-dialog-shared.tsx`, `order-action-dialog.tsx`, `record-dispatch-form.tsx`;
+  - `src/features/leads/components/lead-assign-dialog.tsx`, `lead-stage-dialog.tsx`;
+  - `src/features/quotations/components/quotation-action-dialog.tsx`;
+  - `src/features/complaints/components/complaint-dialog-parts.tsx`, `complaint-actions.tsx`, `complaint-targets.tsx`, `remedy-card.tsx`;
+  - `src/features/tasks/components/edit-task-dialog.tsx`, `minutes-dialog.tsx`, `task-action-dialog.tsx`;
+  - `src/features/approvals/components/approval-limit-dialog.tsx`.
+- **Guarded in place:** `src/features/leads/components/new-lead-dialog.tsx`, `src/features/tasks/components/new-task-dialog.tsx`.
+
+#### Tests
+
+- `src/hooks/use-close-after-success.test.ts`, `[APP-003] useCloseAfterSuccess`:
+  - closes after the moment;
+  - forgets the close when the dialog goes first;
+  - starts no timer when a save finishes after the dialog has gone (the case CI hit).
+- The dialogs' own tests pass unchanged: leads, orders, quotations, complaints, tasks and approvals, 272 tests.
+
 ## 13 October 2026
+
+### A working plan from 13 October, and the handover's gap measured again
+
+`docs` · `REPO-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--docs--REPO-001--a-working-plan-from-13-october-and-the-handover-s-gap.md)
+
+#### Before
+
+The handover (`Docs/Frontend-Handover.md`, 11 October) listed what was left to build in §10. Its numbers were two days old: 194 of 372 backend endpoints without a frontend.
+
+Since then, #109, #111, #112, #113 and #118 have merged, and the backend has added FS-061 to FS-064. Nothing said which item to take next once the go-live fixes were in, and there was no single place to tick work off across sessions.
+
+#### Now
+
+- **`Docs/plan-13oct-2026.md`, a working plan.**
+  - It lists every item left, in four tiers:
+    1. gaps inside the go-live screens;
+    2. small missing pieces of built modules;
+    3. subsidised quotations and orders;
+    4. modules with no screens yet.
+  - It also lists what waits on the backend or the client, and optional polish.
+  - Each item names its endpoints, its contract in `backend/docs/`, and its Data ID.
+  - Its first section says how a session picks an item, marks it in progress, and ticks it in its PR, so work can carry on across sessions.
+- **The handover, updated to 13 October (`b8632ed`):**
+  - §9 lists #109, #111, #112, #113 (via #114) and #118. Only #7 is open.
+  - §10's measured gap is redone: **183 of 379 endpoints** have no frontend. Documents, imports and partners are now fully built. The portal grew from 6 to 8 endpoints with ratings.
+  - P1 marks land in hectares and the whole-number score as done in #109. P2 marks channel partners (#112) and documents (#113) as done.
+  - §0, §10 and §11 point to the plan.
+  - The §12 list is regenerated: 183 endpoints.
+- **Pointers:** `AGENTS.md` §1 has a "Pick the next task" row, and `Plan.md` §9.3 gives the new count and links the plan.
+
+#### Discussion
+
+- **The order came from the user, on 13 October:**
+  - the go-live screens' gaps first (orders, dashboard, messages, the dealership enquiry and GSTIN, group chats, masters);
+  - subsidised quotations and orders after them, because they are not part of go-live.
+- **The plan is a separate file, not more of §10.** A session ticks one line in it per PR. §10 keeps the background, and the handover stays a guide rather than a log.
+- **Measured the handover's way (§12.2):**
+  - an endpoint counts as built when the frontend's mock serves it;
+  - a mock without a screen would overcount, but no endpoint used by the frontend can be missing from the list;
+  - the field-level gaps (new filters and fields on built endpoints) are listed by hand in the plan, from the handovers.
+- **Not checked yet:** whether the subsidy calculator already renders Andhra Pradesh's drip inputs from the config (plan item 14).
+
+#### Files changed
+
+- `Docs/plan-13oct-2026.md`: new, the working plan.
+- `Docs/Frontend-Handover.md`: the 13 October update to §0, §9, §10, §11 and §12.
+- `Docs/Plan.md`: §9.3 gives the new count and links the plan.
+- `AGENTS.md`: §1 links the plan.
+
+#### Tests
+
+Documentation only. `npm run verify` and `prettier --check` pass. The counts come from the handover's §12.2 script, run on `b8632ed`: 197 mocked endpoints against 379 documented, so 183 are missing.
 
 ### The release's menu: only the screens a deployment releases
 
@@ -315,6 +3949,79 @@ The backend's Excel import (FS-062, `backend/docs/api/imports.md`) and price lis
 - `src/features/quotations/lib/builder-lines.test.ts` — the sale type in previews; `draftLinesFromImport`.
 - `src/lib/format/format.test.ts` — `formatFileSize`.
 - Walked through in the mock: new list with a sale type, filter, a rate import at desktop light and phone dark, items into a quotation. axe found nothing on the dialog's four steps.
+
+### Amend an approved order
+
+`feature` · `SO-007` · Nakul Srivastava · [entry](changelog/entries/2026-10-13--feature--SO-007--amend-an-approved-order.md)
+
+#### Before
+
+Once an order was approved, nothing on it could change. The only way out was to cancel it and type a new one, which lost its number and its history. The backend has served `POST /orders/{id}/amend` since FS-036 (`settings-amend-reopen-contract.md`, migration 041), with "Amend after a voided dispatch" added in migration 064. The frontend had no screen for it.
+
+#### Now
+
+- **Amend order…** sits in an approved order's More menu, next to Cancel.
+  - **Who sees it:** staff who edit orders, or who own the order.
+  - **When:** while nothing has shipped.
+  - **Never offered:** to partner users, on a replacement order, or once something has shipped.
+- **The dialog.** It asks what needs to change, and why. The reason is required, and is kept on the order and its history. It explains what follows:
+  - the order goes back to draft under the same number;
+  - it needs approval again;
+  - its PDF is withdrawn until then;
+  - any payment instalments are cleared for Accounts to set again.
+- **The amended draft** shows a banner: "Amended after approval · it was approved at ₹…".
+  - It counts the amends when there were several.
+  - It shows the reason, for staff; a partner user reads none.
+  - It says what to do next; while the order waits again, it says that too.
+- **The old approval chain** stays visible as "Approval before the amend", saying it starts again from the first step on submit.
+- **The history** reads "Amended: back to draft" with the approved total. The lead's history reads "Sales order amended, back to draft".
+- **The edit screen** fixes the order type of an amended order, and says why. A refused change (`422 order_type_fixed`) has its own sentence.
+- **Refusals, each in words:**
+  - `409 voided_dispatch_holds_lines`: "This order had a dispatch voided. Cancel it and create a new one.", as the backend's handover asks;
+  - `409 order_has_payments`;
+  - `422 order_type_fixed`;
+  - `409 order_dispatched`;
+  - `409 status_changed`, which closes the dialog and shows the latest.
+- Checked on a desktop in light mode and a phone in dark mode. axe found nothing on the dialog, the amended order or the edit screen.
+
+#### Discussion
+
+- **In the More menu, beside Cancel,** as the contract's "Screens" section puts it. It is rare, and it undoes an approval, so it doesn't sit with the everyday buttons.
+- **What the screen checks first:** staff only (the backend refuses portal roles, GAP-352), the order approved, nothing shipped, not a replacement.
+- **What only the backend knows:** whether money is allocated, or a voided dispatch still names the lines. The order carries neither, so the backend's refusal says it in words.
+- **The old chain on a draft.** `GET /orders/{id}` returns the order's latest approval request. After an amend that is the chain that approved it before, so a draft showed four green steps. Retitling it keeps the record without suggesting the draft is approved.
+- **The setting `order_amend_reapproval`** (`always` or `value_rises`) decides whether a total that didn't rise goes straight to Accounts on resubmit. The screen doesn't read it. The wording says "needs approval again", which holds either way. The settings screen is plan item 21.
+- **Plan records:** `Docs/Plan.md` had two copies of the §9 paragraph after #114. They are merged into one, so partners and documents both appear once.
+
+#### Files changed
+
+- `src/features/orders/api/orders.schemas.ts`: `amend_count`, `amended_from_total`, `amend_reason` on the order (defaulted, so older responses still parse).
+- `src/features/orders/api/orders.api.ts`, `orders.mutations.ts`: `amendOrder`, `useAmendOrder`.
+- `src/features/orders/lib/order-lifecycle.ts`: the `amend` action, `isStaff` in the permissions, four refusals, the `order.amended` history line.
+- `src/features/orders/hooks/use-order-actions.ts`: passes `isStaff`.
+- `src/features/orders/components/order-actions.tsx`, `order-action-dialog.tsx`: the menu item and the dialog.
+- `src/features/orders/components/order-detail.tsx`: the amended banner.
+- `src/features/orders/components/order-approval.tsx`: "Approval before the amend".
+- `src/features/orders/components/order-builder.tsx`: the order type fixed after an amend; `order_type_fixed`.
+- `src/features/leads/lib/timeline-entries.ts`: the lead's history line.
+- `src/mocks/handlers/orders.ts`: `POST /orders/:id/amend` with the backend's rules, in its order.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-007.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/orders/`: records and screens.
+
+#### Tests
+
+- `src/features/orders/lib/order-lifecycle.test.ts`, `[SO-007] Amend an approved order`:
+  - who is offered it, and who isn't (partner, Dispatch, shipped, replacement, not approved);
+  - the refusals in words;
+  - the history line.
+- `src/features/orders/api/orders.test.ts`, `[SO-007] amendOrder`:
+  - back to draft under its number, with the approved total, the reason and the history event;
+  - 409 `order_dispatched`, 409 `status_changed`, 403 for a dealer.
+- `src/features/orders/components/orders-ui.test.tsx`, `[SO-007] Amend an approved order`:
+  - the whole flow, with the empty reason refused, the banner and the retitled chain;
+  - the voided-dispatch refusal in the dialog;
+  - nothing offered to a dealer.
+- Walked through in the mock as admin: desktop light (menu, dialog with the empty reason, the amended draft, the edit screen) and phone dark (dialog, amended draft).
 
 ### CI green again: CHANGELOG.md regenerated, and two tests that depended on timing
 

@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { exportTasks } from "@/features/tasks/api/tasks.api";
 import {
-  taskAssigneesQueryOptions,
+  staffAssigneesQueryOptions,
   taskListQueryOptions,
 } from "@/features/tasks/api/tasks.queries";
 import { TASK_STATUSES, TASK_TYPES, type TaskListParams } from "@/features/tasks/api/tasks.schemas";
@@ -60,7 +60,7 @@ export function AllTasks({
 }: AllTasksProps): React.JSX.Element {
   const params: TaskListParams = taskListParamsOf(filters);
   const query = useInfiniteQuery(taskListQueryOptions(params));
-  const people = useQuery({ ...taskAssigneesQueryOptions(), enabled: hasTeam });
+  const people = useQuery({ ...staffAssigneesQueryOptions(), enabled: hasTeam });
   const total = query.data?.pages[0]?.total ?? null;
   const capped = query.data?.pages[0]?.totalCapped ?? false;
   const filtered =

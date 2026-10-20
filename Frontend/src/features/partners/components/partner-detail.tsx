@@ -39,6 +39,9 @@ import {
   PARTNER_TYPE_LABELS,
   PARTNER_TYPE_PLURALS,
 } from "@/features/partners/lib/partner-labels";
+import { PartnerCreditCard } from "@/features/payments/components/partner-credit";
+import { PartnerLedgerCard } from "@/features/payments/components/partner-ledger";
+import { DealerRatingCard } from "@/features/ratings/components/dealer-rating";
 import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
 import { refusalOf } from "@/features/users/components/person-dialogs";
 import { mobileText } from "@/features/users/lib/user-labels";
@@ -293,7 +296,11 @@ function PartnerView({ partner }: { partner: Partner }): React.JSX.Element {
             </CardContent>
           </Card>
         ) : null}
+        {staff ? <PartnerCreditCard partnerId={partner.id} /> : null}
+        {staff ? <DealerRatingCard partnerId={partner.id} /> : null}
       </div>
+
+      {staff ? <PartnerLedgerCard partnerId={partner.id} /> : null}
 
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent size="sm">

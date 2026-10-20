@@ -6,16 +6,19 @@ import { isApiError } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import { writeMockRole } from "@/lib/dev/mock-settings";
+import { MOCK_TERRITORIES, mockTerritoryLineage } from "@/mocks/data/territories";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 
 import {
+  amendOrder,
   cancelOrder,
   closeOrderShort,
   createDispatch,
   createOrder,
   deleteOrder,
   getOrder,
+  getOrderStats,
   getOrderTimeline,
   listDispatches,
   listOrders,
@@ -53,6 +56,8 @@ const ALL: OrderListParams = {
   mine: false,
   leadId: null,
   quotationId: null,
+  areas: [],
+  officeId: null,
 };
 
 function seeded(status: Order["status"]): string {
@@ -134,6 +139,54 @@ describe("[SO-001] listOrders", () => {
     expect(free.items).toEqual([]);
   });
 
+  it("filters by areas, each with everything under it, and by an office with its sub-offices", async () => {
+    const district = (name: string): string => {
+      const found = MOCK_TERRITORIES.find(
+        (item) => item.level === "district" && item.name === name,
+      );
+      if (found === undefined) throw new Error(`No ${name} district in the mock`);
+      return found.id;
+    };
+    const office = (name: string): string => {
+      const found = mockDb.offices.find((item) => item.name === name);
+      if (found === undefined) throw new Error(`No ${name} office in the mock`);
+      return found.id;
+    };
+    let sent: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/orders"), ({ request }) => {
+        sent = new URL(request.url);
+      }),
+    );
+
+    const amreli = await listOrders({ ...ALL, areas: [district("Amreli")] });
+    expect(amreli.items.length).toBeGreaterThan(0);
+    expect(amreli.items.length).toBeLessThan((await listOrders(ALL)).items.length);
+    expect(
+      amreli.items.every((row) => {
+        const order = mockDb.orders.find((item) => item.id === row.id);
+        return mockTerritoryLineage(order?.territory.id ?? "").some(
+          (item) => item.name === "Amreli",
+        );
+      }),
+    ).toBe(true);
+
+    const two = await listOrders({ ...ALL, areas: [district("Amreli"), district("Jamnagar")] });
+    expect(sent?.searchParams.get("territory_id")).toBe(
+      `${district("Amreli")},${district("Jamnagar")}`,
+    );
+    expect(two.items.length).toBeGreaterThan(amreli.items.length);
+
+    const officeOrders = await listOrders({ ...ALL, officeId: office("Amreli District") });
+    expect(sent?.searchParams.get("owner_org_unit_id")).toBe(office("Amreli District"));
+    expect(officeOrders.items.map((order) => order.id).sort()).toEqual(
+      amreli.items.map((order) => order.id).sort(),
+    );
+    // The state office covers the district offices under it.
+    const state = await listOrders({ ...ALL, officeId: office("Gujarat State") });
+    expect(state.items.length).toBe((await listOrders(ALL)).items.length);
+  });
+
   it("shows how much has shipped", async () => {
     const page = await listOrders({ ...ALL, status: ["dispatched", "partially_dispatched"] });
     const shares = page.items.map((order) => [order.status, order.dispatchedPct] as const);
@@ -141,6 +194,33 @@ describe("[SO-001] listOrders", () => {
     expect(
       shares.some(([status, pct]) => status === "partially_dispatched" && pct > 0 && pct < 100),
     ).toBe(true);
+  });
+});
+
+describe("[ACCT-001] Order stats and the Accounts queue", () => {
+  afterEach(reset);
+
+  it("counts every status, and submitted orders by whose step is next", async () => {
+    const stats = await getOrderStats();
+    expect(stats.total).toBe(mockDb.orders.length);
+    expect(Object.keys(stats.byStatus).sort()).toEqual([...ORDER_STATUSES].sort());
+    expect(stats.byStatus.submitted).toBe(
+      mockDb.orders.filter((order) => order.status === "submitted").length,
+    );
+    expect(stats.waitingOn.account_manager).toBe(1);
+  });
+
+  it("lists only the orders whose next step is Accounts'", async () => {
+    let sent: URL | undefined;
+    server.use(
+      http.get(buildApiUrl("/orders"), ({ request }) => {
+        sent = new URL(request.url);
+      }),
+    );
+    const queue = await listOrders({ ...ALL, status: ["submitted"], waitingOn: "account_manager" });
+    expect(sent?.searchParams.get("waiting_on")).toBe("account_manager");
+    expect(queue.items).toHaveLength(1);
+    expect(queue.items[0]?.waitingOn).toBe("account_manager");
   });
 });
 
@@ -349,6 +429,72 @@ describe("[SO-004] submitOrder and the approval chain", () => {
         }),
       ),
     ).resolves.toEqual({ status: 409, code: "order_dispatched" });
+  });
+});
+
+describe("[SO-007] amendOrder", () => {
+  afterEach(reset);
+
+  function approvedUnshipped(): string {
+    const order = mockDb.orders.find(
+      (item) =>
+        item.status === "approved" &&
+        item.dispatches.length === 0 &&
+        item.order_type !== "replacement",
+    );
+    if (order === undefined) throw new Error("No approved, unshipped order in the mock");
+    return order.id;
+  }
+
+  it("takes an approved order back to draft under its number, keeping what it was approved at", async () => {
+    as("admin");
+    const id = approvedUnshipped();
+    const before = await getOrder(id);
+    const amended = await amendOrder(id, {
+      body: { remark: "Farmer wants 20 more laterals", expected_status: "approved" },
+      idempotencyKey: key(),
+    });
+    expect(amended).toMatchObject({
+      status: "draft",
+      orderNo: before.orderNo,
+      approvedAt: null,
+      pdfState: "none",
+      amendCount: 1,
+      amendedFromTotal: before.totals.total,
+      amendReason: "Farmer wants 20 more laterals",
+    });
+    const history = await getOrderTimeline({ orderId: id, cursor: null });
+    expect(history.items.map((event) => event.kind)).toContain("order.amended");
+  });
+
+  it("refuses once something has shipped, a stale status, and a partner user", async () => {
+    as("admin");
+    await expect(
+      refusal(
+        amendOrder(seeded("partially_dispatched"), {
+          body: { remark: "More", expected_status: "partially_dispatched" },
+          idempotencyKey: key(),
+        }),
+      ),
+    ).resolves.toEqual({ status: 409, code: "order_dispatched" });
+    const id = approvedUnshipped();
+    await expect(
+      refusal(
+        amendOrder(id, {
+          body: { remark: "More", expected_status: "draft" },
+          idempotencyKey: key(),
+        }),
+      ),
+    ).resolves.toEqual({ status: 409, code: "status_changed" });
+    as("dealer");
+    await expect(
+      refusal(
+        amendOrder(id, {
+          body: { remark: "More", expected_status: "approved" },
+          idempotencyKey: key(),
+        }),
+      ),
+    ).resolves.toEqual({ status: 403, code: "forbidden" });
   });
 });
 

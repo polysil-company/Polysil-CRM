@@ -16,6 +16,7 @@ import { MOCK_ID_SPACE, MOCK_PARTNERS, mockUuid } from "@/mocks/data/reference";
 import { findMockTerritory, MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { mockDb } from "@/mocks/db";
 
+import { campaignRefFor } from "./campaigns";
 import { createLeadFrom } from "./leads";
 import { applyScenario } from "./scenario";
 import { errorResponse } from "./shared";
@@ -35,6 +36,7 @@ function may(action: "view" | "create" | "edit"): boolean {
 const qrBodySchema = z.object({
   label: z.string().trim().min(1).max(120),
   campaign: z.string().trim().max(120).nullish(),
+  campaign_id: z.string().min(1).nullish(),
   partner_id: z.string().min(1).nullish(),
   territory_id: z.string().min(1).nullish(),
 });
@@ -110,6 +112,12 @@ export const leadCaptureHandlers = [
         territory_id: "not found",
       });
     }
+    const linked = campaignRefFor(body.campaign_id);
+    if (linked === "bad") {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        campaign_id: "Not a running campaign.",
+      });
+    }
     const serial = mockDb.qrCodes.length + 1;
     const code = mockQrCode(serial);
     const row: QrCodeWire = {
@@ -118,6 +126,8 @@ export const leadCaptureHandlers = [
       url: mockEnquiryUrl(code),
       label: body.label,
       campaign: body.campaign ?? null,
+      campaign_id: linked?.id ?? null,
+      campaign_name: linked?.name ?? null,
       partner,
       territory,
       is_active: true,
@@ -145,6 +155,16 @@ export const leadCaptureHandlers = [
     const body = parsed.data;
     if (body.label !== undefined) row.label = body.label;
     if (body.campaign !== undefined) row.campaign = body.campaign ?? null;
+    if (body.campaign_id !== undefined && body.campaign_id !== row.campaign_id) {
+      const linked = campaignRefFor(body.campaign_id);
+      if (linked === "bad") {
+        return errorResponse(422, "validation_error", "Some fields need correcting.", {
+          campaign_id: "Not a running campaign.",
+        });
+      }
+      row.campaign_id = linked?.id ?? null;
+      row.campaign_name = linked?.name ?? null;
+    }
     if (body.partner_id !== undefined) {
       const partner = body.partner_id === null ? null : partnerRef(body.partner_id);
       if (partner === undefined) {
@@ -295,6 +315,9 @@ export const leadCaptureHandlers = [
     if (lead instanceof Response) return lead;
     if (row?.partner != null) {
       lead.assigned_partner = row.partner;
+      // A lead from a linked code gets its campaign (migration 049's trigger).
+      lead.campaign_id = row.campaign_id ?? null;
+      lead.campaign_name = row.campaign_name ?? null;
     }
     if (row !== undefined) row.lead_count += 1;
     mockDb.leads = [lead, ...mockDb.leads];

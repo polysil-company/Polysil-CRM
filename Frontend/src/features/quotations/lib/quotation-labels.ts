@@ -4,6 +4,7 @@ import type {
   PdfState,
   QuotationStatus,
   SalesType,
+  TaxTreatment,
 } from "@/features/quotations/api/quotations.schemas";
 import { EMPTY_VALUE, formatNumber } from "@/lib/format";
 
@@ -35,6 +36,13 @@ export const SALES_TYPE_LABELS: Readonly<Record<SalesType, string>> = {
   subsidised: "Subsidised",
   marketing: "Marketing",
   sample: "Sample",
+};
+
+/** SO-010 · How a document is taxed, in words. */
+export const TAX_TREATMENT_LABELS: Readonly<Record<TaxTreatment, string>> = {
+  domestic: "Domestic GST",
+  export_lut: "Export under a LUT, no IGST",
+  export_igst: "Export with IGST",
 };
 
 export const PDF_STATE_LABELS: Readonly<Record<PdfState, string>> = {

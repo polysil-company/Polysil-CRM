@@ -121,6 +121,8 @@ describe("[SO-006] [LEAD-009] [QUOT-013] Excel exports", () => {
       mine: false,
       leadId: null,
       quotationId: null,
+      areas: [],
+      officeId: null,
     });
     expect(orders.filename).toMatch(/^orders-\d{4}-\d{2}-\d{2}\.xlsx$/);
 
@@ -134,6 +136,7 @@ describe("[SO-006] [LEAD-009] [QUOT-013] Excel exports", () => {
       sort: "createdAt",
       order: "desc",
       areas: [],
+      campaign: null,
     });
     expect(leads.filename).toMatch(/^leads-/);
 

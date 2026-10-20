@@ -7,6 +7,7 @@ import { leadKeys } from "@/features/leads/api/leads.queries";
 import { quotationKeys } from "@/features/quotations/api/quotations.queries";
 
 import {
+  amendOrder,
   cancelOrder,
   closeOrderShort,
   createDispatch,
@@ -14,6 +15,7 @@ import {
   deleteOrder,
   patchOrder,
   replaceOrderLines,
+  setOrderSubsidy,
   submitOrder,
   voidDispatch,
   type WriteInput,
@@ -28,6 +30,7 @@ import type {
   Order,
   PatchOrderRequest,
   RemarkRequest,
+  OrderSubsidyRequest,
   ReplaceOrderLinesRequest,
 } from "./orders.schemas";
 
@@ -69,6 +72,21 @@ export function useCreateOrder(): UseMutationResult<
     mutationKey: [...orderKeys.all, "create"],
     mutationFn: createOrder,
     meta: { dataId: "SO-003" },
+    onSuccess: apply,
+  });
+}
+
+/** SO-008 · A subsidised draft's leads and amounts. */
+export function useSetOrderSubsidy(): UseMutationResult<
+  Order,
+  Error,
+  OrderActionInput<OrderSubsidyRequest>
+> {
+  const apply = useApplyOrder();
+  return useMutation({
+    mutationKey: [...orderKeys.all, "subsidy"],
+    mutationFn: ({ id, input }) => setOrderSubsidy(id, input),
+    meta: { dataId: "SO-008" },
     onSuccess: apply,
   });
 }
@@ -153,6 +171,17 @@ export function useCancelOrder(): UseMutationResult<Order, Error, OrderActionInp
     mutationKey: [...orderKeys.all, "cancel"],
     mutationFn: ({ id, input }) => cancelOrder(id, input),
     meta: { dataId: "SO-004" },
+    onSuccess: apply,
+  });
+}
+
+/** SO-007 · Take an approved order back to draft; the page shows the draft at once. */
+export function useAmendOrder(): UseMutationResult<Order, Error, OrderActionInput<RemarkRequest>> {
+  const apply = useApplyOrder();
+  return useMutation({
+    mutationKey: [...orderKeys.all, "amend"],
+    mutationFn: ({ id, input }) => amendOrder(id, input),
+    meta: { dataId: "SO-007" },
     onSuccess: apply,
   });
 }

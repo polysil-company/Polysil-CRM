@@ -27,6 +27,8 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectGroupLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -40,6 +42,7 @@ import {
   TASK_TYPES,
   taskFormSchema,
   type CreateTaskRequest,
+  type TaskAssignee,
   type TaskFormValues,
   type TaskSubject,
 } from "@/features/tasks/api/tasks.schemas";
@@ -99,6 +102,7 @@ export function NewTaskDialog({
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<unknown>(null);
   const timer = useRef<number | undefined>(undefined);
+  const mounted = useRef(false);
   const idempotency = useIdempotencyKey();
   const createTask = useCreateTask();
 
@@ -119,8 +123,12 @@ export function NewTaskDialog({
   const { errors } = useFormState({ control: form.control });
   const type = useWatch({ control: form.control, name: "type" });
 
+  // The close timer never outlives the dialog, and never starts once it has gone: a save can
+  // finish after the page was left.
   useEffect(() => {
+    mounted.current = true;
     return () => {
+      mounted.current = false;
       window.clearTimeout(timer.current);
     };
   }, []);
@@ -136,6 +144,7 @@ export function NewTaskDialog({
       toast.success("Task added", {
         description: `${task.title} · ${formatFullDate(task.dueAt)}`,
       });
+      if (!mounted.current) return;
       timer.current = window.setTimeout(() => {
         setOpen(false);
         form.reset(blank());
@@ -349,7 +358,10 @@ export function NewTaskDialog({
   );
 }
 
-/** Who does it: the user first, then the people below them. One choice reads as plain text. */
+/**
+ * Who does it: the user first, then the people below them, then (TASK-009) the users of the
+ * dealers they can see, in their own group, while `tasks_for_dealers` is on.
+ */
 function AssigneeField({
   value,
   onChange,
@@ -362,10 +374,19 @@ function AssigneeField({
   error: string | undefined;
 }): React.JSX.Element {
   const query = useQuery(taskAssigneesQueryOptions());
-  const items = (query.data ?? []).map((person) => ({
+  const people = query.data ?? [];
+  const toItem = (person: TaskAssignee): { value: string; label: string } => ({
     value: person.id,
-    label: person.id === meId ? `${person.name} (you)` : person.name,
-  }));
+    label:
+      person.id === meId
+        ? `${person.name} (you)`
+        : person.partner === null
+          ? person.name
+          : `${person.name} · ${person.partner.name}`,
+  });
+  const staff = people.filter((person) => person.kind === "staff").map(toItem);
+  const dealers = people.filter((person) => person.kind === "partner").map(toItem);
+  const items = [...staff, ...dealers];
 
   return (
     <Field data-invalid={error ? true : undefined}>
@@ -390,11 +411,32 @@ function AssigneeField({
           />
         </SelectTrigger>
         <SelectContent>
-          {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
+          {dealers.length === 0 ? (
+            staff.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))
+          ) : (
+            <>
+              <SelectGroup>
+                <SelectGroupLabel>Our team</SelectGroupLabel>
+                {staff.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+              <SelectGroup>
+                <SelectGroupLabel>Dealers</SelectGroupLabel>
+                {dealers.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </>
+          )}
         </SelectContent>
       </Select>
       <FieldError id="task-assignee-error">{error}</FieldError>

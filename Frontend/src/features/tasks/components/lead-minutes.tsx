@@ -92,14 +92,26 @@ export function LeadMinutes({ leadId, leadName, merged }: LeadMinutesProps): Rea
 }
 
 function MinutesEntry({ minutes }: { minutes: Minutes }): React.JSX.Element {
-  const done = minutes.actionItems.filter((task) => task.status === "done").length;
-  const total = minutes.actionItems.length;
-
   return (
     <li
       aria-label={`Meeting on ${formatDateTime(minutes.heldAt)}`}
       className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:p-4"
     >
+      <MinutesContent minutes={minutes} />
+    </li>
+  );
+}
+
+/**
+ * What one set of minutes says: when, "2 of 3 done", who was there, the notes, each action
+ * item as its task stands now, and who recorded them. On a lead's card and on its own page.
+ */
+export function MinutesContent({ minutes }: { minutes: Minutes }): React.JSX.Element {
+  const done = minutes.actionItems.filter((task) => task.status === "done").length;
+  const total = minutes.actionItems.length;
+
+  return (
+    <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-foreground">
           <time dateTime={minutes.heldAt}>{formatDateTime(minutes.heldAt)}</time>
@@ -159,7 +171,7 @@ function MinutesEntry({ minutes }: { minutes: Minutes }): React.JSX.Element {
       {minutes.createdBy === null ? null : (
         <p className="text-xs text-subtle-foreground">Recorded by {minutes.createdBy.name}</p>
       )}
-    </li>
+    </>
   );
 }
 

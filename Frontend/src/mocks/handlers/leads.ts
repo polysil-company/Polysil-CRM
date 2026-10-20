@@ -27,6 +27,7 @@ import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { mockLand } from "@/mocks/data/leads";
 import { mockLookupRows } from "@/mocks/data/lookups";
+import { leadInPartnerScope } from "@/mocks/data/partner-scope";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
 import {
@@ -39,6 +40,8 @@ import {
 import { newestFirst } from "@/mocks/data/timeline";
 import { mockDb } from "@/mocks/db";
 
+import { campaignRefFor } from "./campaigns";
+import { dealerApplicationWire, startMockDealerApplicationFor } from "./dealer-applications";
 import { MOCK_CREATOR, leadEventsOf, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
@@ -132,6 +135,7 @@ function filterLeads(params: URLSearchParams): LeadWire[] {
     .map((stage) => stage.trim())
     .filter(isStage);
   const source = params.get("source");
+  const campaign = params.get("campaign_id");
   const inquiryType = params.get("inquiry_type");
   const q = params.get("q") ?? "";
   const areas = new Set(
@@ -142,10 +146,20 @@ function filterLeads(params: URLSearchParams): LeadWire[] {
   );
 
   return mockDb.leads.filter((lead) => {
+    if (!leadInPartnerScope(lead)) return false;
     if (stages.length > 0 ? !stages.includes(lead.stage) : lead.stage === "merged") {
       return false;
     }
     if (source !== null && source !== "" && lead.source !== source) return false;
+    if (campaign === "none" && lead.campaign_id != null) return false;
+    if (
+      campaign !== null &&
+      campaign !== "" &&
+      campaign !== "none" &&
+      lead.campaign_id !== campaign
+    ) {
+      return false;
+    }
     if (inquiryType !== null && inquiryType !== "" && lead.inquiry_type !== inquiryType) {
       return false;
     }
@@ -231,6 +245,14 @@ export function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
     );
   }
 
+  // MKT-006 · A dealer's leads carry no campaign; staff name a running one.
+  const linked = isPartnerRole(readMockRole()) ? null : campaignRefFor(body.campaign_id);
+  if (linked === "bad") {
+    return errorResponse(422, "validation_error", "Some fields need correcting.", {
+      campaign_id: "Not a running campaign.",
+    });
+  }
+
   const activeCrops = mockLookupRows("crops").filter((crop) => crop.is_active !== false);
   const unknownCrop = body.crops.findIndex(
     (code) => !activeCrops.some((crop) => crop.code === code),
@@ -272,9 +294,12 @@ export function createLeadFrom(body: CreateLeadRequest): LeadWire | Response {
       is_active: true,
     })),
     ...mockLand(body.land_hectares),
+    campaign_id: linked?.id ?? null,
+    campaign_name: linked?.name ?? null,
     lost_reason: null,
     lost_note: null,
     reopen_count: 0,
+    dormant_from_stage: null,
     merged_into: null,
     first_contacted_at: null,
     last_activity_at: now,
@@ -315,6 +340,8 @@ const MOCK_TRANSITIONS: Readonly<Partial<Record<LeadStage, readonly LeadStage[]>
   qualified: ["quoted", "lost"],
   quoted: ["negotiation", "won", "lost"],
   negotiation: ["won", "lost"],
+  // a dormant lead can be closed as lost, or reopened (FS-035)
+  dormant: ["lost"],
 };
 const TERMINAL_STAGES: readonly LeadStage[] = ["won", "lost", "merged"];
 
@@ -325,6 +352,30 @@ const TERMINAL_STAGES: readonly LeadStage[] = ["won", "lost", "merged"];
  */
 function hasAcceptedQuotation(lead: LeadWire): boolean {
   return lead.stage === "negotiation";
+}
+
+/**
+ * LEAD-015 · What winning a dealership lead starts (FS-053): an application and its link, or
+ * why none was started when a partner already has the mobile number.
+ */
+function startMockDealerApplication(lead: LeadWire): NonNullable<LeadWire["dealer_application"]> {
+  const mobile = lead.mobile.replace(/^\+/, "");
+  if (!/^91\d{10}$/.test(mobile)) {
+    return { id: null, apply_url: null, not_started: "mobile_invalid" };
+  }
+  // CHNL-007 · a real application, so its link and its page work in the mock
+  const started = startMockDealerApplicationFor({
+    firm: lead.farmer_name,
+    contact: lead.farmer_name,
+    mobile,
+    territory: { id: lead.territory.id, name: lead.territory.name },
+    leadId: lead.id,
+  });
+  if ("refused" in started) {
+    return { id: null, apply_url: null, not_started: started.refused };
+  }
+  const wire = dealerApplicationWire(started.application, true);
+  return { id: wire.id, apply_url: wire.apply_url ?? null, not_started: null };
 }
 
 /** Idempotency-Key handling shared by the stage endpoints: 400, replay or 409. */
@@ -591,7 +642,7 @@ export const leadHandlers = [
     if (failure) return failure;
 
     const lead = mockDb.leads.find((item) => item.id === params.leadId);
-    if (!lead) {
+    if (!lead || !leadInPartnerScope(lead)) {
       return errorResponse(404, "not_found", "No such lead.");
     }
     const body: LeadResponseWire = { data: forReader(lead) };
@@ -717,7 +768,12 @@ export const leadHandlers = [
         stage: current,
       });
     }
-    if (!(MOCK_TRANSITIONS[current] ?? []).includes(body.to_stage)) {
+    // FS-053: a dealership lead is also won straight from qualified, with no quotation.
+    const dealershipWin = lead.inquiry_type === "dealership" && body.to_stage === "won";
+    const allowed =
+      (MOCK_TRANSITIONS[current] ?? []).includes(body.to_stage) ||
+      (dealershipWin && current === "qualified");
+    if (!allowed) {
       return errorResponse(
         422,
         "invalid_transition",
@@ -737,7 +793,7 @@ export const leadHandlers = [
         },
       );
     }
-    if (body.to_stage === "won" && !hasAcceptedQuotation(lead)) {
+    if (body.to_stage === "won" && !dealershipWin && !hasAcceptedQuotation(lead)) {
       return errorResponse(
         422,
         "quotation_required",
@@ -764,7 +820,9 @@ export const leadHandlers = [
       payload.lost_note = body.lost_note;
       lead.lost_reason = { id: reason.id, code: reason.code, name: reason.name };
       lead.lost_note = body.lost_note;
-      mockDb.lostFrom.set(lead.id, current);
+      // lost from dormant returns, when reopened, to where it went dormant from
+      mockDb.lostFrom.set(lead.id, lead.dormant_from_stage ?? current);
+      lead.dormant_from_stage = null;
     }
 
     recordLeadEvent(lead, "lead.stage_changed", payload);
@@ -773,6 +831,13 @@ export const leadHandlers = [
       lead.first_contacted_at = lead.last_activity_at;
     }
     mockDb.stageChanges.set(idempotency.key, { body: idempotency.serialized, leadId: lead.id });
+    if (dealershipWin) {
+      // Only this answer carries the application, and its link, as on the backend.
+      const body: LeadResponseWire = {
+        data: { ...lead, dealer_application: startMockDealerApplication(lead) },
+      };
+      return HttpResponse.json(body);
+    }
     return HttpResponse.json({ data: lead } satisfies LeadResponseWire);
   }),
 
@@ -796,8 +861,21 @@ export const leadHandlers = [
       );
       return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
     }
+    if (lead.stage === "dormant") {
+      // back to where it was swept from; the reopen count is the conversion report's, so it stays
+      const target = lead.dormant_from_stage ?? "new";
+      recordLeadEvent(lead, "lead.reopened", {
+        from: "dormant",
+        to: target,
+        note: parsed.data.note,
+      });
+      lead.stage = target;
+      lead.dormant_from_stage = null;
+      mockDb.stageChanges.set(idempotency.key, { body: idempotency.serialized, leadId: lead.id });
+      return HttpResponse.json({ data: lead } satisfies LeadResponseWire);
+    }
     if (lead.stage !== "lost") {
-      return errorResponse(422, "stage_terminal", "Only a lost lead can be reopened.", {
+      return errorResponse(422, "stage_terminal", "Only a lost or dormant lead can be reopened.", {
         stage: lead.stage,
       });
     }
@@ -927,6 +1005,13 @@ export const leadHandlers = [
       }
       lead.territory = toTerritoryRef(territory);
       changed.territory_id = body.territory_id;
+    }
+    if (body.campaign_id !== undefined && body.campaign_id !== lead.campaign_id) {
+      const linked = isPartnerRole(readMockRole()) ? null : campaignRefFor(body.campaign_id);
+      if (linked === "bad") return validationError({ campaign_id: "Not a running campaign." });
+      lead.campaign_id = linked?.id ?? null;
+      lead.campaign_name = linked?.name ?? null;
+      changed.campaign_id = body.campaign_id;
     }
     if (body.crops !== undefined) {
       const crops = mockLookupRows("crops");

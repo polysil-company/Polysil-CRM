@@ -14,6 +14,7 @@ export default function NotFound(): React.JSX.Element {
       <EmptyState
         icon={Location01Icon}
         title="Page not found"
+        level={1}
         description="The link may be broken, or the page may have moved."
         action={
           <Link href="/dashboard" className={buttonVariants()}>

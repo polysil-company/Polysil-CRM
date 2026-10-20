@@ -25,18 +25,25 @@ import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
 import { useCreateOrder, useSaveOrderDraft } from "@/features/orders/api/orders.mutations";
 import {
+  ORDER_TYPES,
   ORDERABLE_TYPES,
   PAYMENT_TERMS,
   type Order,
   type OrderLine,
   type OrderPartyRequest,
+  type StaffOrderType,
 } from "@/features/orders/api/orders.schemas";
 import {
   ORDER_TYPE_LABELS,
   PAYMENT_TERMS_LABELS,
   orderNumber,
 } from "@/features/orders/lib/order-labels";
+import { orderRefusal } from "@/features/orders/lib/order-lifecycle";
 import { quotationKeys } from "@/features/quotations/api/quotations.queries";
+import {
+  EXPORT_COUNTRY_MAX_LENGTH,
+  type TaxTreatment,
+} from "@/features/quotations/api/quotations.schemas";
 import {
   PricedItemsCard,
   PricedSummary,
@@ -52,14 +59,27 @@ import {
   type DraftLine,
   type PricingContext,
 } from "@/features/quotations/lib/builder-lines";
+import { TAX_TREATMENT_LABELS } from "@/features/quotations/lib/quotation-labels";
+import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
+import { useExportSampleSettings } from "@/features/settings/hooks/use-export-sample-settings";
+import { LineAvailability, OrderToField } from "@/features/stock/components/order-stock";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
 import { createRequestId } from "@/lib/api/request-id";
-import { normalizeIndianMobile } from "@/lib/format";
+import { formatInr, normalizeIndianMobile } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
+
+import {
+  SubsidyFields,
+  subsidyDraftProblems,
+  subsidyFieldErrors,
+  subsidyRequest,
+  type SubsidyDraft,
+  type SubsidyProblems,
+} from "./order-subsidy-fields";
 
 const log = createLogger({
   file: "features/orders/components/order-builder.tsx",
@@ -71,10 +91,34 @@ export type OrderBuilderSource =
   | { readonly mode: "create"; readonly lead: Lead | null }
   | { readonly mode: "edit"; readonly order: Order };
 
-const OrderTypeSchema = z.enum(ORDERABLE_TYPES);
+const OrderTypeSchema = z.enum(ORDER_TYPES);
+
+type OrderableType = (typeof ORDERABLE_TYPES)[number];
+
+function orderableType(value: string): value is OrderableType {
+  return ORDERABLE_TYPES.some((type) => type === value);
+}
+
+/** SO-008, SO-010 · What the builder may make: Subsidised, Export and Sample too, for staff. */
+type BuildableType = StaffOrderType;
+
+const STAFF_ONLY_TYPES = [
+  "subsidised",
+  "export",
+  "sample",
+] as const satisfies readonly StaffOrderType[];
+
+function buildableType(value: string): value is BuildableType {
+  return orderableType(value) || STAFF_ONLY_TYPES.some((type) => type === value);
+}
 
 const orderHeaderSchema = z.object({
   orderType: OrderTypeSchema,
+  /** SO-010 · Checked against the type when saving: an export needs it. */
+  exportCountry: z
+    .string()
+    .trim()
+    .max(EXPORT_COUNTRY_MAX_LENGTH, "Keep the country under 100 characters"),
   partyName: z.string().trim().min(1, "Enter who the order is for").max(200),
   partyMobile: z
     .string()
@@ -102,6 +146,7 @@ type OrderHeaderForm = z.infer<typeof orderHeaderSchema>;
 
 const HEADER_FIELD_NAMES: readonly (keyof OrderHeaderForm)[] = [
   "orderType",
+  "exportCountry",
   "partyName",
   "partyMobile",
   "partyAddress",
@@ -116,6 +161,7 @@ function headerDefaults(source: OrderBuilderSource): OrderHeaderForm {
     const { lead } = source;
     return {
       orderType: lead?.type === "industrial" ? "industrial" : "commercial",
+      exportCountry: "",
       partyName: lead?.customerName ?? "",
       partyMobile: lead?.phone ?? "",
       partyAddress:
@@ -129,7 +175,9 @@ function headerDefaults(source: OrderBuilderSource): OrderHeaderForm {
   }
   const { order } = source;
   return {
-    orderType: order.orderType === "industrial" ? "industrial" : "commercial",
+    // SO-008 · A subsidised draft (and any type the builder doesn't offer) keeps its type
+    orderType: order.orderType,
+    exportCountry: order.exportCountry ?? "",
     partyName: order.party.name,
     partyMobile: order.party.mobile ?? "",
     partyAddress: order.party.address ?? "",
@@ -147,7 +195,11 @@ function partyFrom(values: OrderHeaderForm): OrderPartyRequest {
     name: values.partyName.trim(),
     mobile: mobile === "" ? null : (normalizeIndianMobile(mobile) ?? mobile),
     address: values.partyAddress.trim() === "" ? null : values.partyAddress.trim(),
-    gstin: values.partyGstin.trim() === "" ? null : values.partyGstin.trim().toUpperCase(),
+    // SO-010 · An export buyer has no GSTIN (422 export_party_gstin).
+    gstin:
+      values.orderType === "export" || values.partyGstin.trim() === ""
+        ? null
+        : values.partyGstin.trim().toUpperCase(),
   };
 }
 
@@ -183,6 +235,15 @@ function draftLinesFromOrder(lines: readonly OrderLine[]): DraftLine[] {
   }));
 }
 
+/** SO-010 · What the sample setting makes of a sample order, in words. */
+export function sampleHint(pricing: "free" | "charged", maxValue: number | null): string {
+  const limit =
+    maxValue === null ? "" : ` It may be worth up to ${formatInr(String(maxValue))} at list price.`;
+  return pricing === "free"
+    ? `Staff only. A free sample: every line is 100 % off and the total is ₹0; the approval runs on the list value.${limit}`
+    : `Staff only. Priced like a commercial order.${limit}`;
+}
+
 /**
  * SO-005 · An order typed in line by line, without a quotation: from a qualified lead, or
  * afresh with the party and where the goods go; or a draft's items and header edited. Every
@@ -202,8 +263,34 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   const { errors } = useFormState({ control: form.control });
   const place = useWatch({ control: form.control, name: "place" });
   const fromQuotations = source.mode === "edit" && source.order.quotations.length > 0;
+  // SO-007: an amended order keeps its type (422 order_type_fixed). FS-042 rule 18: so does a
+  // draft from quotations, or one the builder can't make.
+  const amended = source.mode === "edit" && source.order.amendCount > 0;
+  const typeFixed =
+    source.mode === "edit" && (amended || fromQuotations || !orderableType(source.order.orderType));
   // The place is fixed by the lead, or by the draft once saved.
   const placeFixed = source.mode === "edit" || source.lead !== null;
+  const staff = useIsStaff();
+  const canSeeStock = useCan("stock", "view");
+  // DISP-003 · Staff pick "Order to" and see stock; a dealer's order comes from the default.
+  const showsStock = staff && canSeeStock;
+  const initialWarehouse = source.mode === "edit" ? (source.order.warehouse?.id ?? null) : null;
+  const [warehouseId, setWarehouseId] = useState<string | null>(initialWarehouse);
+  const typeChoices: readonly BuildableType[] =
+    source.mode === "create" && staff ? [...ORDERABLE_TYPES, ...STAFF_ONLY_TYPES] : ORDERABLE_TYPES;
+  // SO-008 · A subsidised order typed in names its leads and subsidy; the lead it starts from
+  // is the first (FS-054 rule 6)
+  const [subsidyDraft, setSubsidyDraft] = useState<SubsidyDraft>(() => ({
+    leads:
+      source.mode === "create" && source.lead !== null
+        ? [{ id: source.lead.id, code: source.lead.code, name: source.lead.customerName }]
+        : [],
+    material: "",
+    amount: "",
+    payable: "",
+  }));
+  const [subsidyShown, setSubsidyShown] = useState(false);
+  const [subsidyServer, setSubsidyServer] = useState<SubsidyProblems>({});
 
   const partnerId =
     source.mode === "create"
@@ -213,9 +300,25 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   const placeId = place?.id ?? "";
   // MSTR-008 · The order's type picks its sale type's price list first, as the save will.
   const orderType = useWatch({ control: form.control, name: "orderType" });
+  // SO-010 · An export is priced with the tax it will store: its own once made, else the
+  // setting. A sample shows what the setting makes of it.
+  const exportOrSample = orderType === "export" || orderType === "sample";
+  const exportSample = useExportSampleSettings(source.mode === "create" && exportOrSample);
+  const taxTreatment: TaxTreatment =
+    orderType !== "export"
+      ? "domestic"
+      : source.mode === "edit"
+        ? source.order.taxTreatment
+        : exportSample.exportTreatment;
   const context = useMemo<PricingContext>(
-    () => ({ placeOfSupplyTerritoryId: placeId, partnerId, asOf, salesType: orderType }),
-    [placeId, partnerId, asOf, orderType],
+    () => ({
+      placeOfSupplyTerritoryId: placeId,
+      partnerId,
+      asOf,
+      salesType: orderType,
+      taxTreatment,
+    }),
+    [placeId, partnerId, asOf, orderType, taxTreatment],
   );
   const priced = usePricedLines(context, () =>
     source.mode === "edit" && source.order.lines.length > 0
@@ -230,6 +333,12 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   const idempotency = useIdempotencyKey();
   const create = useCreateOrder();
   const saveDraft = useSaveOrderDraft();
+  const subsidised = source.mode === "create" && orderType === "subsidised";
+  const subsidyLocal = subsidised ? subsidyDraftProblems(subsidyDraft) : {};
+  const subsidyProblems: SubsidyProblems = {
+    ...(subsidyShown ? subsidyLocal : {}),
+    ...subsidyServer,
+  };
 
   const save = useAsyncAction({
     action: async (values: OrderHeaderForm) => {
@@ -243,22 +352,43 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         remarks: orNull(values.remarks),
       };
       if (source.mode === "create") {
+        const type = buildableType(values.orderType) ? values.orderType : "commercial";
         const body = {
-          order_type: values.orderType,
-          ...(source.lead === null ? {} : { lead_id: source.lead.id }),
+          order_type: type,
+          ...(type === "export" ? { export_country: values.exportCountry.trim() } : {}),
+          // a subsidised order takes its leads from the subsidy (422 lead_from_subsidy)
+          ...(type === "subsidised"
+            ? { subsidy: subsidyRequest(subsidyDraft) }
+            : source.lead === null
+              ? {}
+              : { lead_id: source.lead.id }),
           ...(partnerId === null ? {} : { partner_id: partnerId }),
           party: partyFrom(values),
           place_of_supply_territory_id: values.place?.id ?? "",
           ...common,
           lines,
+          ...(showsStock && warehouseId !== null ? { warehouse_id: warehouseId } : {}),
         };
         return create.mutateAsync({ body, idempotencyKey: idempotency.keyFor(body) });
       }
-      const headerChanged = JSON.stringify(values) !== JSON.stringify(initialHeader);
+      const warehouseChanged = showsStock && warehouseId !== initialWarehouse;
+      const headerChanged =
+        warehouseChanged || JSON.stringify(values) !== JSON.stringify(initialHeader);
+      // Only a changed type is sent: an order from quotations, or a subsidised one, keeps its
+      // own (422 order_type_fixed)
+      const newType =
+        values.orderType !== initialHeader.orderType && orderableType(values.orderType)
+          ? { order_type: values.orderType }
+          : {};
+      const countryChanged =
+        values.orderType === "export" &&
+        values.exportCountry.trim() !== initialHeader.exportCountry;
       const headerBody = {
-        order_type: values.orderType,
+        ...newType,
+        ...(countryChanged ? { export_country: values.exportCountry.trim() } : {}),
         ...(fromQuotations ? {} : { party: partyFrom(values) }),
         ...common,
+        ...(warehouseChanged ? { warehouse_id: warehouseId } : {}),
         expected_status: "draft" as const,
       };
       const linesBody = { lines, expected_status: "draft" as const };
@@ -290,6 +420,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
 
   function handleSaveError(error: unknown): void {
     const fields = isApiError(error) && error.details !== undefined ? readAnyFields(error) : {};
+    setSubsidyServer(subsidised ? subsidyFieldErrors(error) : {});
     const routed = routeSaveErrors(fields, priced.plan.keys);
     priced.setLineErrors(routed.lines);
     for (const [field, message] of Object.entries(routed.header)) {
@@ -322,6 +453,55 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       case "order_type_unsupported":
         setFormError({ title: "That order type isn't built yet", description: error.message });
         return;
+      case "order_type_fixed":
+        setFormError({
+          title: "The order type can't change now",
+          description: "This order was amended after approval, so it keeps its type.",
+        });
+        return;
+      // SO-010 · the export's and the sample's refusals
+      case "export_country_required":
+        form.setError("exportCountry", { type: "server", message: "Enter the buyer's country." });
+        setFormError(null);
+        return;
+      case "export_party_gstin":
+        setFormError({
+          title: "An export buyer has no GSTIN",
+          description: "Leave the GSTIN empty for an export.",
+        });
+        return;
+      case "lut_missing":
+        setFormError({
+          title: "No LUT covers this date",
+          description:
+            "Ask an admin to record this year's LUT in Products & prices → Seller GSTINs.",
+        });
+        return;
+      case "sample_over_limit":
+        setFormError({
+          title: "This sample is worth too much",
+          description:
+            exportSample.sampleMaxValue === null
+              ? error.message
+              : `A sample may be worth up to ${formatInr(String(exportSample.sampleMaxValue))} at list price. Take some items off.`,
+        });
+        return;
+      case "sample_from_quotation":
+      case "type_mismatch":
+      case "export_country_not_export":
+        setFormError({ title: "That order type doesn't fit", description: error.message });
+        return;
+      // SO-008 · the subsidised order's refusals, in the order's words
+      case "subsidy_above_material":
+      case "payable_above_material":
+      case "lead_not_visible":
+      case "subsidy_missing":
+      case "lead_from_subsidy":
+      case "type_staff_only": {
+        const refusal = orderRefusal(error);
+        setFormError({ title: refusal.title, description: refusal.message });
+        return;
+      }
       case "status_changed":
       case "order_not_draft":
         setFormError({
@@ -351,7 +531,9 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       ? "Choose where the goods go first."
       : priced.rowsReady === 0
         ? "Add at least one item."
-        : saveBlocker(priced);
+        : subsidised && subsidyDraft.leads.length === 0
+          ? "Add the farmer's lead for the subsidy."
+          : saveBlocker(priced);
   const canSave = blocker === null && priced.upToDate && !save.isBusy;
 
   const title = source.mode === "create" ? "New order" : `Edit ${orderNumber(source.order)}`;
@@ -371,7 +553,17 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       className="flex flex-col gap-5"
       onSubmit={(event) => {
         setFormError(null);
+        setSubsidyShown(true);
+        setSubsidyServer({});
         void form.handleSubmit((values) => {
+          if (subsidised && Object.keys(subsidyLocal).length > 0) return;
+          if (values.orderType === "export" && values.exportCountry.trim() === "") {
+            form.setError("exportCountry", {
+              type: "required",
+              message: "Enter the buyer's country.",
+            });
+            return;
+          }
           void save.run(values);
         })(event);
       }}
@@ -437,34 +629,59 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
             </CardHeader>
             <CardContent>
               <FieldGroup className="grid gap-4 sm:grid-cols-2">
-                <Controller
-                  control={form.control}
-                  name="orderType"
-                  render={({ field }) => (
-                    <Field className="sm:col-span-2">
-                      <FieldLabel id="order-type-label">Order type</FieldLabel>
-                      <RadioGroup<(typeof ORDERABLE_TYPES)[number]>
-                        aria-labelledby="order-type-label"
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        className="flex-row flex-wrap gap-5"
-                      >
-                        {ORDERABLE_TYPES.map((type) => (
-                          <label
-                            key={type}
-                            className="flex items-center gap-2 text-sm text-foreground"
-                          >
-                            <RadioGroupItem value={type} />
-                            {ORDER_TYPE_LABELS[type]}
-                          </label>
-                        ))}
-                      </RadioGroup>
-                      <FieldDescription>
-                        Export, sample, subsidised and the others wait on the client&apos;s rules.
-                      </FieldDescription>
-                    </Field>
-                  )}
-                />
+                {typeFixed ? (
+                  <Field className="sm:col-span-2">
+                    <FieldLabel>Order type</FieldLabel>
+                    <p className="text-sm text-foreground">{ORDER_TYPE_LABELS[orderType]}</p>
+                    <FieldDescription>
+                      {amended
+                        ? "Fixed: the order was amended after approval, so it keeps its type."
+                        : fromQuotations
+                          ? "An order made from quotations keeps its type."
+                          : "This order keeps its type."}
+                    </FieldDescription>
+                  </Field>
+                ) : (
+                  <Controller
+                    control={form.control}
+                    name="orderType"
+                    render={({ field }) => (
+                      <Field className="sm:col-span-2">
+                        <FieldLabel id="order-type-label">Order type</FieldLabel>
+                        <RadioGroup<BuildableType>
+                          aria-labelledby="order-type-label"
+                          value={buildableType(field.value) ? field.value : "commercial"}
+                          onValueChange={field.onChange}
+                          className="flex-row flex-wrap gap-5"
+                        >
+                          {typeChoices.map((type) => (
+                            <label
+                              key={type}
+                              className="flex items-center gap-2 text-sm text-foreground"
+                            >
+                              <RadioGroupItem value={type} />
+                              {ORDER_TYPE_LABELS[type]}
+                            </label>
+                          ))}
+                        </RadioGroup>
+                        <FieldDescription>
+                          {field.value === "subsidised"
+                            ? "Staff only. Name the farmers' leads and the subsidy below."
+                            : field.value === "export"
+                              ? `Staff only. ${TAX_TREATMENT_LABELS[taxTreatment]}, fixed when the draft is saved.`
+                              : field.value === "sample"
+                                ? sampleHint(
+                                    exportSample.samplePricing,
+                                    exportSample.sampleMaxValue,
+                                  )
+                                : typeChoices.includes("subsidised")
+                                  ? "Marketing material and replacements are made elsewhere."
+                                  : "Export, sample and subsidised orders are made by staff."}
+                        </FieldDescription>
+                      </Field>
+                    )}
+                  />
+                )}
                 <TextField
                   id="order-party-name"
                   label="Party"
@@ -498,22 +715,40 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
                     />
                   )}
                 </TextField>
-                <TextField
-                  id="order-party-gstin"
-                  label="GSTIN"
-                  optional
-                  error={errors.partyGstin?.message}
-                >
-                  {(aria) => (
-                    <Input
-                      autoComplete="off"
-                      className="uppercase"
-                      disabled={fromQuotations}
-                      {...aria}
-                      {...form.register("partyGstin")}
-                    />
-                  )}
-                </TextField>
+                {orderType === "export" ? (
+                  <TextField
+                    id="order-export-country"
+                    label="Country"
+                    error={errors.exportCountry?.message}
+                    description="Where the buyer is. An export buyer has no GSTIN."
+                  >
+                    {(aria) => (
+                      <Input
+                        autoComplete="country-name"
+                        maxLength={EXPORT_COUNTRY_MAX_LENGTH}
+                        {...aria}
+                        {...form.register("exportCountry")}
+                      />
+                    )}
+                  </TextField>
+                ) : (
+                  <TextField
+                    id="order-party-gstin"
+                    label="GSTIN"
+                    optional
+                    error={errors.partyGstin?.message}
+                  >
+                    {(aria) => (
+                      <Input
+                        autoComplete="off"
+                        className="uppercase"
+                        disabled={fromQuotations}
+                        {...aria}
+                        {...form.register("partyGstin")}
+                      />
+                    )}
+                  </TextField>
+                )}
                 <TextField
                   id="order-party-address"
                   label="Party's address"
@@ -571,6 +806,13 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
                 >
                   {(aria) => <Textarea rows={2} {...aria} {...form.register("deliveryAddress")} />}
                 </TextField>
+                {showsStock ? (
+                  <OrderToField
+                    value={warehouseId}
+                    onValueChange={setWarehouseId}
+                    className="sm:col-span-2"
+                  />
+                ) : null}
                 <Controller
                   control={form.control}
                   name="paymentTerms"
@@ -611,6 +853,31 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
               </FieldGroup>
             </CardContent>
           </Card>
+
+          {subsidised ? (
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-0.5">
+                  <CardTitle level={3}>Subsidy</CardTitle>
+                  <CardDescription>
+                    The leads it covers, what the scheme pays, and what the farmer pays.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <SubsidyFields
+                  idPrefix="new-order-subsidy"
+                  draft={subsidyDraft}
+                  onDraftChange={(next) => {
+                    setSubsidyDraft(next);
+                    setSubsidyServer({});
+                  }}
+                  problems={subsidyProblems}
+                  total={priced.totals?.total ?? null}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
 
         <Card className="lg:sticky lg:top-4">
@@ -626,6 +893,24 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <PricedSummary priced={priced} />
+            {showsStock ? (
+              <LineAvailability
+                warehouseId={warehouseId}
+                lines={priced.lines.flatMap((line) =>
+                  line.product === null || line.qty.trim() === ""
+                    ? []
+                    : [
+                        {
+                          key: line.key,
+                          productId: line.product.id,
+                          name: line.product.description,
+                          qty: line.qty.trim(),
+                          uom: line.product.uom,
+                        },
+                      ],
+                )}
+              />
+            ) : null}
             <div className="flex flex-col gap-2 border-t border-border pt-4">
               <Button
                 type="submit"

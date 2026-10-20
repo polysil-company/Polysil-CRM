@@ -26,8 +26,10 @@ ID tells you *which functionality*, and the request ID tells you *which request*
 | `DOC` | Documents on records — purchase orders, payment slips, invoices, photos |
 | `TASK` | Tasks and daily work |
 | `CHNL` | Channel partners — distributor, dealer, sub-dealer |
+| `TGT` | Sales targets and achievement |
 | `MKT` | Marketing and promotional offers |
 | `SCHM` | Schemes |
+| `RWD` | Reward points — balances, gifts, rules and points on an order |
 | `MSTR` | Masters — products, stock, price lists, territories |
 | `RPT` | Reports and dashboards |
 | `SUBS` | Subsidy forms and case status |
@@ -37,6 +39,9 @@ ID tells you *which functionality*, and the request ID tells you *which request*
 | `NOTIF` | Notifications — in-app bell, WhatsApp and email |
 | `MSG` | Messages — direct conversations between staff |
 | `BOT` | AI assistant |
+| `FARM` | The farmers' portal — a customer's own record, consent and ratings |
+| `TRK` | Field tracking — duty, locations, visits, the team map and routes |
+| `RATE` | Ratings — customers' and dealers' feedback, and the dealer rating |
 | `SITE` | Public website |
 | `REPO` | Repository tooling — changelog, lint rules, git hooks, CI |
 
@@ -125,6 +130,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | APP-005 | Collapsible desktop sidebar and page titles in the top bar | frontend | in-progress |
 | APP-006 | Route guards — a page the user may not open shows access denied, not the page | frontend | in-progress |
 | APP-007 | Release menu — a deployment shows and opens only the screens it releases | frontend | in-progress |
+| APP-008 | Partner portal — what a dealer, distributor or sub-dealer sees: their own leads and dashboard, and no staff screens | frontend | in-progress |
 | OBS-001 | Logger utility with runtime log level | frontend | in-progress |
 | OBS-002 | API client — request IDs, error normalisation, response contract validation | shared | in-progress |
 | DS-001 | Design tokens and component library | frontend | in-progress |
@@ -135,6 +141,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | AUTH-005 | Sign out (`POST /auth/logout`) | shared | mocked |
 | AUTH-006 | Signed-in routing — sign-in redirects, return path and session end | frontend | in-progress |
 | AUTH-007 | Change your own password — forced while a temporary password is in force (`POST /auth/password`) | shared | in-progress |
+| FARM-001 | The farmers' portal: their details, enquiries, quotations, orders and complaints (`GET /portal/me` and the four lists) | shared | in-progress |
+| FARM-002 | A farmer records or withdraws their own consent (`PATCH /portal/me`) | shared | in-progress |
+| FARM-003 | A farmer rates an installation or a service (`GET /portal/ratings`, `POST /portal/ratings`) | shared | in-progress |
 | LEAD-001 | List leads with filters, sorting and pagination (`GET /leads`, `GET /leads/areas`) | shared | in-progress |
 | LEAD-002 | Create lead (`POST /leads`) | shared | in-progress |
 | LEAD-003 | Lead detail (`GET /leads/{leadId}`) | shared | in-progress |
@@ -149,8 +158,26 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-012 | Duplicate review — dismiss a pair, or merge one lead into the other (`GET /leads/duplicates`, `POST /leads/duplicates/{linkId}/dismiss`, `POST /leads/{leadId}/merge`) | shared | in-progress |
 | LEAD-013 | Lead QR codes — make, print, rename or switch off (`GET /lead-qr-codes`, `POST /lead-qr-codes`, `PATCH /lead-qr-codes/{qrId}`) | shared | in-progress |
 | LEAD-014 | The public enquiry page — /enquiry, with or without a QR code (`GET /public/lead-form`, `GET /public/territories`, `POST /public/leads/verify`, `POST /public/leads`) | shared | in-progress |
+| LEAD-015 | Dealership enquiries — won from qualified, starting a dealer application (`POST /leads/{id}/transition`) | shared | in-progress |
+| LEAD-016 | Customers: find one by name or mobile, with an area filter (`GET /customers`) | shared | in-progress |
+| LEAD-017 | A customer's page: details, its leads, quotations and orders, and the timeline across them (`GET /customers/{id}`, `/timeline`) | shared | in-progress |
+| LEAD-018 | Edit a customer and record or withdraw consent: staff with leads edit (`PATCH /customers/{id}`) | shared | in-progress |
+| RATE-001 | Rate an installation, a shipped product or a closed complaint's service (`POST /ratings`) | shared | in-progress |
+| RATE-002 | Ratings on an order or complaint, and the list with the low ones (`GET /ratings`) | shared | in-progress |
+| RATE-003 | Ratings by dealer, product or kind (`GET /ratings/summary`) | shared | in-progress |
+| RATE-004 | A dealer's rating from days to payment and order value (`GET /partners/{id}/dealer-rating`) | shared | in-progress |
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
-| RPT-002 | Reports | shared | planned |
+| RPT-002 | Reports — conversion, people, lost leads, follow-ups, dealers, campaigns, areas, complaints (`GET /reports/*`) | shared | in-progress |
+| RPT-003 | A lead's 360° view (`GET /leads/{id}/360`) | shared | in-progress |
+| TGT-001 | Targets — the month's achievement, yours and your team's (`GET /targets/achievement`) | shared | in-progress |
+| TGT-002 | Set a person's monthly targets, with their history (`GET /targets`, `PUT /targets`) | shared | in-progress |
+| TRK-001 | The team map: where each person on duty was last seen (`GET /tracking/team/latest`) | shared | in-progress |
+| TRK-002 | One person's day: path, stops, visits, duty and distance (`GET /tracking/users/{id}/route`) | shared | in-progress |
+| TRK-003 | Check in at a lead, a dealer or a place, with consent first (`POST /visits`, `GET /me/tracking-config`, `POST /tracking/consent`) | shared | in-progress |
+| TRK-004 | An open visit: photos and check-out (`POST /visits/{id}/check-out`, `/photos`, `GET /visits/{id}/photos/{photo_id}`) | shared | in-progress |
+| TRK-005 | My visits of a day, and one visit (`GET /visits`, `GET /visits/{id}`) | shared | in-progress |
+| TRK-006 | Tracking settings: the policy in force, and a new version from a date (`GET /tracking/policy`, `PUT /tracking/policy`) | shared | in-progress |
+| TRK-007 | Who looked at whose route, visits or the team map (`GET /tracking/view-log`) | shared | in-progress |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
@@ -164,12 +191,18 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-011 | Delete a draft quotation (`DELETE /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-012 | The customer's quotation page — /q/{token} (`GET /public/q/{token}`, `GET /public/q/{token}/pdf`) | shared | in-progress |
 | QUOT-013 | Export the quotation list to Excel (`GET /quotations/export`) | shared | in-progress |
+| QUOT-014 | A subsidised quotation's subsidy, for one farmer category (`PUT /quotations/{id}/subsidy`, `GET /quotations/{id}/subsidy/calculation`) | shared | in-progress |
 | SO-001 | Sales orders list (`GET /orders`) | shared | in-progress |
 | SO-002 | A sales order — the document, its approval chain, PDF and history (`GET /orders/{orderId}`, `GET /orders/{orderId}/pdf`, `GET /orders/{orderId}/timeline`) | shared | in-progress |
 | SO-003 | New order from accepted quotations, and a draft's header (`POST /orders`, `PATCH /orders/{orderId}`, `DELETE /orders/{orderId}`) | shared | in-progress |
 | SO-004 | Submit an order for approval, and cancel it (`POST /orders/{orderId}/submit`, `POST /orders/{orderId}/cancel`) | shared | in-progress |
 | SO-005 | A direct order typed in line by line, and a draft's lines (`POST /orders`, `PUT /orders/{orderId}/lines`, `POST /pricing/quote-lines`) | shared | in-progress |
 | SO-006 | Export the order list to Excel (`GET /orders/export`) | shared | in-progress |
+| SO-007 | Amend an approved order (`POST /orders/{orderId}/amend`) | shared | in-progress |
+| SO-008 | A subsidised order: from a subsidised quotation, its subsidy block, and editing it on a draft (`POST /orders`, `PUT /orders/{id}/subsidy`) | shared | in-progress |
+| SO-009 | Warranty on an order: each line's dispatches with start, end and status, and the claims raised (`GET /orders/{id}/warranty`) | shared | in-progress |
+| SO-010 | Export and sample orders: the buyer's country, the tax treatment and LUT, and free or charged samples, on orders and quotations (FS-042) | shared | in-progress |
+| SO-011 | A consolidated order: one draft from several accepted quotations of one dealer (`POST /orders` with several `quotation_ids`) | shared | in-progress |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
 | CMPL-001 | Complaints list — filters, waiting on me, counts (`GET /complaints`, `GET /complaints/stats`) | shared | in-progress |
@@ -181,6 +214,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | CMPL-007 | Complaint remedy — refund, replacement or none; withdraw (`POST /complaints/{id}/remedy`, `POST /complaints/{id}/remedy/withdraw`) | shared | in-progress |
 | CMPL-008 | Complaint targets (SLA policies) and complaint types (`GET /complaint-sla-policies`, `POST /complaint-sla-policies`, `GET /lookups/complaint-types`, `POST /lookups/complaint-types`) | shared | in-progress |
 | CMPL-009 | Export complaints to Excel (`GET /complaints/export`) | shared | in-progress |
+| CMPL-010 | Reopen a closed or QC-rejected complaint, with a reason (`POST /complaints/{id}/reopen`) | shared | in-progress |
+| CMPL-011 | Warranty on a complaint line: in warranty, out, none or unknown, from the dispatch or the supply date (`warranty` on `GET /complaints/{id}`) | shared | in-progress |
+| CMPL-012 | Complaint escalation: a missed response or resolution target rings the bell; the complaint shows the miss (FS-028) | shared | in-progress |
 | TASK-001 | My day — one person's tasks due that day and overdue (`GET /planner`) | shared | in-progress |
 | TASK-002 | Team day — due, done and overdue per person below a manager (`GET /planner/team`) | shared | in-progress |
 | TASK-003 | List tasks — a lead's tasks, and every task with filters (`GET /tasks`, `GET /tasks/{id}`) | shared | in-progress |
@@ -189,14 +225,31 @@ The registry file is the source of truth; this snapshot helps reading.
 | TASK-006 | Edit or reassign an open task (`PATCH /tasks/{id}`) | shared | in-progress |
 | TASK-007 | Meeting minutes with action items (`POST /minutes`, `GET /minutes`, `GET /minutes/{id}`) | shared | in-progress |
 | TASK-008 | Export the task list to Excel (`GET /tasks/export`) | shared | in-progress |
+| TASK-009 | Tasks for dealers: dealer users in the assignee picker, and a dealer's own tasks with Done only, while `tasks_for_dealers` is on (FS-037) | shared | in-progress |
 | CHNL-001 | Channel partners list and detail, with the Excel export (`GET /partners`, `/partners/{id}`, `/partners/export`) | shared | in-progress |
 | CHNL-002 | Add a channel partner — a distributor, or a dealer or sub-dealer under one (`POST /partners`) | shared | in-progress |
 | CHNL-003 | Correct a channel partner's details and credit terms (`PATCH /partners/{id}`) | shared | in-progress |
 | CHNL-004 | Close or reopen a channel partner (`POST /partners/{id}/close`, `/reopen`) | shared | in-progress |
 | CHNL-005 | Import channel partners from Excel (`/imports` with `kind=partners`) | shared | in-progress |
+| CHNL-006 | GSTIN details — fill a partner's names from the GST record (`GET /gstin/{gstin}`) | shared | in-progress |
+| CHNL-007 | Dealer applications — start one, fill it for the applicant, and decide (`/dealer-applications`, `…/submit`, `…/withdraw`, `…/link`, `…/decision`) | shared | in-progress |
+| CHNL-008 | The dealer applicant's own page — verify the mobile, fill in, upload, submit (`/public/dealer-apply/{token}`, `…/verify`, `…/documents`, `…/submit`) | shared | in-progress |
 | MKT-001 | Marketing offers — set by Admin, visible to channel partners only | shared | planned |
-| SCHM-001 | Schemes — set by Admin, visible to everyone | shared | planned |
-| MSTR-001 | Masters — products, stock, price lists, territories | shared | planned |
+| MKT-002 | Marketing material catalogue: today's price and company share; Admin adds, changes and switches off items (`/marketing-materials`) | shared | in-progress |
+| MKT-003 | Marketing material orders: order with company and dealer shares, the lists and their Excel (`/marketing-orders`) | shared | in-progress |
+| MKT-004 | Marketing material order decisions: approve, reject, cancel, dispatch (`/marketing-orders/{id}/approve`, `/reject`, `/cancel`, `/dispatch`) | shared | in-progress |
+| MKT-005 | Campaigns: the list with lead counts and cost, a campaign's summary; Marketing adds, changes, switches off and deletes (`/campaigns`) | shared | in-progress |
+| MKT-006 | A campaign on a lead and a QR code: the picker, the name on the lead, the lead list's campaign filter (`campaign_id`) | shared | in-progress |
+| SCHM-001 | Schemes — the list and a scheme (`GET /schemes`, `GET /schemes/{id}`) | shared | in-progress |
+| SCHM-002 | Create and change a scheme (`POST /schemes`, `PATCH /schemes/{id}`) | shared | in-progress |
+| SCHM-003 | A period scheme's standing (`GET /schemes/{id}/standing`) | shared | in-progress |
+| SCHM-004 | Scheme credits (`GET /scheme-entitlements`) | shared | in-progress |
+| SCHM-005 | Scheme benefits on an order: the preview on a draft, the benefits and To pay after submit (`GET /orders/{id}/schemes`, `benefits` and `payable` on `GET /orders/{id}`) | shared | in-progress |
+| RWD-001 | Reward points: a balance, its history, the gifts, and asking for one (`/rewards/balance`, `/rewards/ledger`, `/gifts`, `/rewards/gift-redemptions`) | shared | in-progress |
+| RWD-002 | The gift desk: fulfil or reject (`/rewards/gift-redemptions/{id}/fulfil`, `/reject`) | shared | in-progress |
+| RWD-003 | Reward admin: rules, settings, gifts, adjustments (`/reward-rules`, `/reward-settings`, `/gifts`, `/rewards/adjustments`) | shared | in-progress |
+| RWD-004 | Reward points on a dealer's draft order (`POST`/`DELETE /orders/{id}/reward-redemption`) | shared | in-progress |
+| MSTR-001 | Masters — the Admin → Masters area: lists, lead scoring and offices (`/masters`) | shared | in-progress |
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
 | MSTR-004 | Product catalogue — browse, add and correct products (`GET`/`POST /products`, `GET`/`PATCH /products/{id}`) | shared | in-progress |
@@ -204,6 +257,17 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-006 | Price lists — draft, fill the rate sheet, publish, close (`/price-lists*`) | shared | in-progress |
 | MSTR-007 | Excel import with column matching — price list rates, partners, order and quotation lines (`/imports*`) | shared | in-progress |
 | MSTR-008 | Price lists by sale type — commercial, industrial or subsidised (`sales_type` on `/price-lists`, `/pricing/quote-lines`) | shared | in-progress |
+| MSTR-009 | Masters lists — add a row, switch it on or off (`POST /lookups/{list}`, `PATCH /lookups/{list}/{id}`) | shared | in-progress |
+| MSTR-010 | Lead scoring — the weights, caps and thresholds behind a lead's score (`GET`/`PATCH /lookups/scoring`) | shared | in-progress |
+| MSTR-011 | Offices — the office tree: add, rename, move, close and reopen (`/org-units*`) | shared | in-progress |
+| MSTR-012 | Territories — the state, district, taluka and village tree: add, rename, set codes (`GET /territories`, `POST /territories`, `PATCH /territories/{id}`) | shared | in-progress |
+| MSTR-013 | Import polish — the blank template, upload errors on their fields, and a price list started from Excel (`GET /imports/template`, `POST /imports`, `POST /price-lists`) | frontend | in-progress |
+| MSTR-014 | Stock: on hand, committed and available by warehouse and product, and the stock ledger (`GET /stock`, `GET /stock/movements`) | shared | in-progress |
+| MSTR-015 | Record stock: a receipt or a correction, by warehouse (`POST /stock/movements`) | shared | in-progress |
+| MSTR-016 | Warehouses: add, change, switch off, and the default (`/warehouses`) | shared | in-progress |
+| MSTR-017 | Warranty periods: the default and each category's months, from a date (`GET`/`POST /warranty-terms`) | shared | in-progress |
+| MSTR-018 | Seller GSTINs and LUTs: our registrations, and each one's LUT by financial year (`/seller-gstins`) | shared | in-progress |
+| MSTR-019 | Holidays: the days complaint targets skip, by year; add one ahead, remove a future one (`/holidays`) | shared | in-progress |
 | DOC-001 | Documents on a lead, quotation, order or dispatch — the list, the types and opening one (`GET /documents`, `/leads/{id}/documents`, `/documents/types`, `/documents/{id}/link`) | shared | in-progress |
 | DOC-002 | Attach a document to a record (`POST /documents`) | shared | in-progress |
 | DOC-003 | Remove a document (`DELETE /documents/{id}`) | shared | in-progress |
@@ -213,7 +277,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SUBS-004 | Start a subsidy application from a lead — the calculation and the farmer's category (`POST /subsidy-applications`, `GET /subsidy-schemes/for-lead/{leadId}`) | shared | in-progress |
 | SUBS-005 | Subsidy applications worklist, with its Excel export (`GET /subsidy-applications`, `GET /subsidy-applications/export`) | shared | in-progress |
 | SUBS-006 | A subsidy application — its figures, stored calculation, stages and cancel (`GET /subsidy-applications/{id}`, `GET /subsidy-applications/{id}/calculation`, `GET /subsidy-applications/{id}/stages`, `POST /subsidy-applications/{id}/stages`, `POST /subsidy-applications/{id}/cancel`, `GET /subsidy-stages`) | shared | in-progress |
-| SUBS-007 | A subsidy application's document checklist and uploads (`GET /subsidy-applications/{id}/documents`, `POST /subsidy-applications/{id}/documents`, `GET /subsidy-applications/{id}/documents/{docId}`) | shared | in-progress |
+| SUBS-007 | A subsidy application's document checklist and uploads (`GET /subsidy-applications/{id}/documents`, `POST /subsidy-applications/{id}/documents`, `GET /subsidy-applications/{id}/documents/{docId}`, `GET /subsidy-document-types`) | shared | in-progress |
 | SUBS-008 | Download a subsidy application's PIMS sheet (`GET /subsidy-applications/{id}/pims.xlsx`) | shared | in-progress |
 | SUBS-009 | Subsidy ageing — the client's six ageing figures per application, with its export (`GET /subsidy-reports/ageing`, `GET /subsidy-reports/ageing/export`) | shared | in-progress |
 | SUBS-010 | Subsidy stage report — applications and money in each stage, with its export (`GET /subsidy-reports/stages`, `GET /subsidy-reports/stages/export`) | shared | in-progress |
@@ -221,22 +285,35 @@ The registry file is the source of truth; this snapshot helps reading.
 | SUBS-012 | Subsidy masters — categories, parameters, component rates and crop spacings, revised from a date (`GET /subsidy-masters/{kind}`, `POST /subsidy-masters/{kind}/revisions`) | shared | in-progress |
 | SUBS-013 | Subsidy matrices — the unit-cost and quantity matrices in force, and a new one from a date (`GET /subsidy-masters/{kind}/matrices`, `POST /subsidy-masters/{kind}/matrices`) | shared | in-progress |
 | SUBS-014 | Subsidy schemes — a state's scheme set up, its readiness, stage names and switching off (`GET /subsidy-schemes`, `POST /subsidy-schemes`, `GET /subsidy-schemes/{code}`, `PATCH /subsidy-schemes/{code}`, `PATCH /subsidy-schemes/{code}/stages/{stageCode}`) | shared | in-progress |
-| ACCT-001 | Accounts work queue | shared | planned |
+| ACCT-001 | Accounts work queue (`GET /orders?waiting_on=account_manager`, `GET /orders/stats`, `GET /orders/export`) | shared | in-progress |
+| ACCT-002 | Record a payment, spread over a dealer's orders (`POST /payments`) | shared | in-progress |
+| ACCT-003 | Receipts for Accounts: allocate the rest, void (`GET /payments`, `/payments/{id}/allocations`, `/void`) | shared | in-progress |
+| ACCT-004 | An order's payments and instalments (`payments` on `GET /orders/{id}`, `PUT /orders/{id}/payment-schedule`) | shared | in-progress |
+| ACCT-005 | A dealer's ledger and credit (`GET /partners/{id}/ledger`, `/credit`) | shared | in-progress |
+| SUBS-015 | Reopen a closed subsidy application, with a reason (`POST /subsidy-applications/{id}/reopen`) | shared | in-progress |
+| SUBS-016 | Dealer commission and TOD on an application, stage 18 (`GET`/`POST /subsidy-applications/{id}/commission`, `/commission/preview`) | shared | in-progress |
+| SUBS-017 | Dealer commissions for Accounts: approve, return, cancel, pay, Excel (`/dealer-commissions*`) | shared | in-progress |
+| SUBS-018 | Commission rates by scheme, from a date (`GET`/`POST /commission-rates`) | shared | in-progress |
 | DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |
 | DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |
+| DISP-003 | Stock on orders: Order to, availability per line, the order's warehouse and the dispatch's (`GET /stock/availability`, `warehouse_id`) | shared | in-progress |
 | ADMN-001 | People — the list of staff and partner users, with filters and an Excel export (`GET /users`, `GET /users/export`) | shared | in-progress |
 | ADMN-002 | A person — identity, role, office or partner, territories, sign-in state (`GET /users/{id}`) | shared | in-progress |
 | ADMN-003 | Add a person — a staff member with a temporary password, or a partner user (`POST /users`, `GET /lookups/roles`, `GET /org-units`) | shared | in-progress |
 | ADMN-004 | Correct a person — details, role, office, territories; deactivate or reactivate (`PATCH /users/{id}`) | shared | in-progress |
 | ADMN-005 | Account actions — a new temporary password, sign out everywhere, unlock (`POST /users/{id}/password`, `/sessions/revoke`, `/unlock`) | shared | in-progress |
 | ADMN-006 | A leaver — hand over their open leads and tasks, then deactivate or delete (`POST /users/{id}/handover`, `DELETE /users/{id}`) | shared | in-progress |
+| ADMN-007 | Company settings — how amended orders are re-approved, and complaint reopening (`GET /settings`, `PATCH /settings`) | shared | in-progress |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |
 | NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | in-progress |
 | NOTIF-002 | Mark notifications as read — one or all | shared | in-progress |
 | MSG-001 | Conversation list with unread counts | shared | in-progress |
 | MSG-002 | Messages in a conversation | shared | in-progress |
 | MSG-003 | Send a message, optionally linking a CRM record | shared | in-progress |
-| MSG-004 | Start a conversation — staff directory search | shared | in-progress |
+| MSG-004 | Start or read one conversation — staff directory search | shared | in-progress |
 | MSG-005 | Mark a conversation as read | shared | in-progress |
+| MSG-006 | Group chats — start a group, rename it, add, remove and leave (`POST /conversations/groups`, `PATCH /conversations/{id}`, `/conversations/{id}/members`) | shared | in-progress |
+| BOT-001 | Find an action or a record from the command menu (`GET /assistant?q=`) | shared | in-progress |
+| BOT-002 | Help: everything the user may do here (`GET /assistant/actions`) | shared | in-progress |
 | REPO-001 | Changelog system — one entry per change, generated CHANGELOG.md | frontend | in-progress |
 | REPO-002 | Quality gates — lint rules, git hooks, CI pipeline | frontend | in-progress |

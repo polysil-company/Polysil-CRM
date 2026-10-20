@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { LEAD_STAGES } from "@/features/leads/api/leads.schemas";
+import type { CalculateRequest } from "@/features/subsidy/api/subsidy.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 import { EMPTY_VALUE, normalizeIndianMobile } from "@/lib/format";
 
@@ -34,6 +35,16 @@ export const SALES_TYPES = [
   "sample",
 ] as const;
 export type SalesType = (typeof SALES_TYPES)[number];
+
+/**
+ * SO-010 · How a document is taxed, fixed when it is created (FS-042): domestic GST, an export
+ * zero-rated under a LUT (every line at 0 % IGST), or an export charged IGST at each slab.
+ */
+export const TAX_TREATMENTS = ["domestic", "export_lut", "export_igst"] as const;
+export type TaxTreatment = (typeof TAX_TREATMENTS)[number];
+
+/** The buyer's country on an export: free text, as the backend stores it. */
+export const EXPORT_COUNTRY_MAX_LENGTH = 100;
 
 export const PDF_STATES = ["pending", "ready", "failed"] as const;
 export type PdfState = (typeof PDF_STATES)[number];
@@ -158,6 +169,8 @@ export interface QuotationListParams {
   readonly currentOnly: boolean;
   /** Quotations on one lead, and on leads merged into it. */
   readonly leadId: string | null;
+  /** SO-011 · Quotations of one channel partner; left out, every partner's. */
+  readonly partnerId?: string | null;
   /** Ask for the matching total ("1–25 of 49"). It costs the backend a count; off where unused. */
   readonly countTotal?: boolean;
 }
@@ -303,12 +316,36 @@ const approvalWireSchema = z.object({
   request_remark: z.string().nullish(),
 });
 
+/** QUOT-014 · What a subsidised quotation's calculation came to, for its category (FS-057). */
+const quotationSubsidyWireSchema = z.object({
+  /** The lead's scheme it ran on. */
+  scheme: z.string().min(1),
+  system_type: z.string().min(1),
+  category: z.object({ code: z.string().min(1), name: z.string(), pct: z.string() }),
+  /** The calculation's total with GST, with any flat charge. */
+  total_cost: z.string(),
+  /** CG's inspection charge outside the cap; "0.00" elsewhere. */
+  flat_charge: z.string(),
+  subsidy: z.string(),
+  farmer_share: z.string(),
+  /** AP: the state's half of the GST; subsidy + farmer share + this = the total. */
+  gst_paid_by_state: z.string().default("0.00"),
+  as_of: z.string(),
+  formula_version: z.string(),
+});
+
 export const quotationWireSchema = z.object({
   id: z.string().min(1),
   quote_no: z.string().min(1).nullable(),
   version: z.number().int().positive(),
   status: z.enum(QUOTATION_STATUSES),
   sales_type: z.enum(SALES_TYPES),
+  /** SO-010 · Fixed at create; a revision keeps it. */
+  tax_treatment: z.enum(TAX_TREATMENTS).default("domestic"),
+  /** SO-010 · The buyer's country; null unless an export. */
+  export_country: z.string().nullish(),
+  /** SO-010 · The LUT an export_lut quotation is zero-rated under, as of its price date. */
+  lut_arn: z.string().nullish(),
   source: z.enum(["internal", "external"]),
   lead: leadRef.nullable(),
   party: z.object({
@@ -339,6 +376,8 @@ export const quotationWireSchema = z.object({
   is_provisional: z.boolean(),
   /** Each is "code: sentence". */
   warnings: z.array(z.string()),
+  /** QUOT-014 · A subsidised quotation's calculation for one category; null until calculated. */
+  subsidy: quotationSubsidyWireSchema.nullish(),
   terms: z.string().nullable(),
   valid_until: isoDate.nullable(),
   sent_at: isoDateTime.nullable(),
@@ -375,6 +414,9 @@ export const quotationSchema = quotationWireSchema.transform((wire) => ({
   version: wire.version,
   status: wire.status,
   salesType: wire.sales_type,
+  taxTreatment: wire.tax_treatment,
+  exportCountry: wire.export_country ?? null,
+  lutArn: wire.lut_arn ?? null,
   source: wire.source,
   lead:
     wire.lead === null
@@ -404,6 +446,21 @@ export const quotationSchema = quotationWireSchema.transform((wire) => ({
   totals: wire.totals,
   isProvisional: wire.is_provisional,
   warnings: wire.warnings,
+  subsidy:
+    wire.subsidy == null
+      ? null
+      : {
+          scheme: wire.subsidy.scheme,
+          systemType: wire.subsidy.system_type,
+          category: wire.subsidy.category,
+          totalCost: wire.subsidy.total_cost,
+          flatCharge: wire.subsidy.flat_charge,
+          subsidy: wire.subsidy.subsidy,
+          farmerShare: wire.subsidy.farmer_share,
+          gstPaidByState: wire.subsidy.gst_paid_by_state,
+          asOf: wire.subsidy.as_of,
+          formulaVersion: wire.subsidy.formula_version,
+        },
   terms: wire.terms,
   validUntil: wire.valid_until,
   sentAt: wire.sent_at,
@@ -528,6 +585,8 @@ export interface QuoteLinesRequest {
   readonly partner_id?: string;
   /** MSTR-008 · The document's sale type; commercial, industrial and subsidised have lists. */
   readonly sales_type?: string;
+  /** SO-010 · An export's treatment, so the preview shows the tax it will store. */
+  readonly tax_treatment?: TaxTreatment;
 }
 
 const previewLineWireSchema = quotationLineWireSchema.omit({ line_no: true });
@@ -578,6 +637,8 @@ export interface PartyRequest {
 export interface CreateQuotationRequest {
   readonly lead_id: string;
   readonly sales_type: SalesType;
+  /** SO-010 · Required on an export, refused on any other type. */
+  readonly export_country?: string;
   readonly party: PartyRequest;
   readonly terms: string | null;
   readonly lines: readonly QuotationLineRequest[];
@@ -586,6 +647,8 @@ export interface CreateQuotationRequest {
 /** PATCH /quotations/{id} — a draft's header; the response re-prices the lines. */
 export interface PatchQuotationRequest {
   readonly sales_type?: SalesType;
+  /** SO-010 · Omit to keep. Required on an export. */
+  readonly export_country?: string | null;
   readonly party?: PartyRequest;
   readonly terms?: string | null;
   readonly expected_status: "draft";
@@ -601,11 +664,24 @@ export interface ReplaceLinesRequest {
 export const PRICED_SALES_TYPES = [
   "commercial",
   "industrial",
+  "export",
+  "subsidised",
 ] as const satisfies readonly SalesType[];
+
+/** QUOT-014 · PUT /quotations/{id}/subsidy: the calculator's request, without the scheme. */
+export interface QuotationSubsidyRequest {
+  readonly category_code: string;
+  readonly calculation: Omit<CalculateRequest, "scheme">;
+}
 
 /** The builder's header form. */
 export const quotationHeaderFormSchema = z.object({
   salesType: z.enum(PRICED_SALES_TYPES),
+  /** SO-010 · Checked against the sale type when saving: an export needs it. */
+  exportCountry: z
+    .string()
+    .trim()
+    .max(EXPORT_COUNTRY_MAX_LENGTH, { message: "Keep the country under 100 characters" }),
   partyName: z.string().trim().min(1, { message: "Enter who the quotation is for" }).max(200),
   partyMobile: z
     .string()

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
@@ -133,4 +133,27 @@ export async function discardImport({
     idempotencyKey,
     schema: z.undefined(),
   });
+}
+
+/** The names the backend asks the blank templates to be saved under (handover `excel-import.md`). */
+export const TEMPLATE_FILE_NAMES: Readonly<Record<ImportKind, string>> = {
+  partners: "partner-import-template.xlsx",
+  price_list_items: "price-list-template.xlsx",
+  lines: "order-lines-template.xlsx",
+};
+
+/**
+ * MSTR-013 · GET /imports/template — a blank file for this import: our column names on row 1,
+ * and a "How to fill" sheet. Filled in, it uploads with every column matched by name. The same
+ * permission as the upload. Saved under our own name: `Content-Disposition` isn't readable.
+ */
+export async function downloadImportTemplate(kind: ImportKind): Promise<DownloadedFile> {
+  const file = await apiDownload({
+    dataId: "MSTR-013",
+    logger: log,
+    fn: "downloadImportTemplate",
+    path: "/imports/template",
+    query: { kind },
+  });
+  return { blob: file.blob, filename: TEMPLATE_FILE_NAMES[kind] };
 }

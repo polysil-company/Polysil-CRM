@@ -195,10 +195,28 @@ export const teamPageSchema = cursorPageSchema(teamRowSchema);
 export type TeamPage = CursorPage<TeamRow>;
 export type TeamPageWire = { data: TeamRowWire[]; meta: PageMetaWire };
 
-/** GET /tasks/assignees — the user first, then the active staff below them. */
+/**
+ * GET /tasks/assignees — the user first, then the active staff below them; with
+ * `include_partners`, also the users of dealers they can see, while `tasks_for_dealers` is on
+ * (TASK-009, FS-037).
+ */
+const assigneeWireSchema = z.object({
+  id,
+  full_name: z.string(),
+  kind: z.enum(["staff", "partner"]).default("staff"),
+  partner: z.object({ id, name: z.string(), partner_type: z.string().nullish() }).nullish(),
+});
+
 export const taskAssigneesSchema = z
-  .object({ data: z.array(userRefSchema) })
-  .transform(({ data }) => data);
+  .object({ data: z.array(assigneeWireSchema) })
+  .transform(({ data }) =>
+    data.map((person) => ({
+      id: person.id,
+      name: person.full_name.trim() || "Unnamed",
+      kind: person.kind,
+      partner: person.partner == null ? null : { id: person.partner.id, name: person.partner.name },
+    })),
+  );
 
 export type TaskAssignee = z.output<typeof taskAssigneesSchema>[number];
 
@@ -277,6 +295,8 @@ export type MinutesWire = z.input<typeof minutesWireSchema>;
 
 const minutesSchema = minutesWireSchema.transform((wire) => ({
   id: wire.id,
+  lead: wire.lead,
+  partner: wire.partner,
   taskId: wire.task_id,
   heldAt: wire.held_at,
   attendees: wire.attendees.map((name) => name.trim()).filter((name) => name !== ""),

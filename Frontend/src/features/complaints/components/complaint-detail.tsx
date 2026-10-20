@@ -25,8 +25,11 @@ import {
   complaintHistoryEntry,
   SEVERITY_BADGE,
   SEVERITY_LABELS,
+  timesText,
 } from "@/features/complaints/lib/complaint-labels";
 import { formatQuantity } from "@/features/quotations/lib/quotation-labels";
+import { RecordRatingsCard } from "@/features/ratings/components/record-ratings";
+import { ComplaintWarranty } from "@/features/warranty/components/warranty-chip";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
 import { formatDate, formatDateTime, formatIndianPhone } from "@/lib/format";
@@ -142,7 +145,18 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
             <Badge variant={SEVERITY_BADGE[complaint.severity]}>
               {SEVERITY_LABELS[complaint.severity]}
             </Badge>
-            {late ? <Badge variant="danger">Late</Badge> : null}
+            {/* CMPL-012 · an escalation names the target it missed, in place of "Late" */}
+            {late &&
+            complaint.responseEscalatedAt === null &&
+            complaint.resolutionEscalatedAt === null ? (
+              <Badge variant="danger">Late</Badge>
+            ) : null}
+            {complaint.responseEscalatedAt === null ? null : (
+              <Badge variant="danger">Response target missed</Badge>
+            )}
+            {complaint.resolutionEscalatedAt === null ? null : (
+              <Badge variant="danger">Resolution target missed</Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {complaint.type.name} · {complaint.contactName} · {complaint.territory.name}
@@ -157,6 +171,17 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
           title={`Returned to fix${complaint.check.by === null ? "" : ` by ${complaint.check.by.name}`}`}
         >
           {complaint.check.remark} Edit the draft, then submit it again.
+        </Notice>
+      ) : null}
+      {complaint.reopenCount > 0 ? (
+        <Notice tone="neutral" title={`Reopened ${timesText(complaint.reopenCount)}`}>
+          {complaint.reopenReason ?? "It went through the check, QC and a remedy again."}
+          {complaint.reopenedAt === null ? null : (
+            <span className="text-muted-foreground">
+              {" "}
+              · last <RelativeDate value={complaint.reopenedAt} />
+            </span>
+          )}
         </Notice>
       ) : null}
       {complaint.status === "cancelled" && complaint.cancellation !== null ? (
@@ -290,6 +315,7 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
                             .join(" · ")}
                         </p>
                       )}
+                      <ComplaintWarranty warranty={line.warranty} />
                     </div>
                     <p className="shrink-0 text-sm text-muted-foreground tabular-nums">
                       <span
@@ -324,6 +350,7 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
         <div className="flex min-w-0 flex-col gap-4">
           <RemedyCard complaint={complaint} />
           <TargetsCard complaint={complaint} />
+          <RecordRatingsCard kind="complaint" complaint={complaint} />
           {complaint.check === null || returned ? null : (
             <DecisionCard
               title="Manager's check"
@@ -389,12 +416,14 @@ function TargetsCard({ complaint }: { complaint: Complaint }): React.JSX.Element
               due={sla.responseDueAt}
               met={sla.respondedAt}
               breached={sla.responseBreached}
+              escalatedAt={complaint.responseEscalatedAt}
             />
             <Target
               label="Resolution"
               due={sla.resolutionDueAt}
               met={sla.resolvedAt}
               breached={sla.resolutionBreached}
+              escalatedAt={complaint.resolutionEscalatedAt}
             />
           </dl>
         )}
@@ -408,11 +437,14 @@ function Target({
   due,
   met,
   breached,
+  escalatedAt,
 }: {
   label: string;
   due: string | null;
   met: string | null;
   breached: boolean;
+  /** CMPL-012 · When the miss rang the bell for the owner and managers; null if it didn't. */
+  escalatedAt: string | null;
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-0.5">
@@ -437,6 +469,11 @@ function Target({
         {met !== null && due !== null ? (
           <span className="text-muted-foreground"> · due {formatDateTime(due)}</span>
         ) : null}
+        {escalatedAt === null ? null : (
+          <span className="block text-xs text-danger">
+            Escalated to its owner and managers {formatDateTime(escalatedAt)}
+          </span>
+        )}
       </dd>
     </div>
   );

@@ -8,6 +8,7 @@ import {
   applicationResponseSchema,
   checklistSchema,
   documentLinkSchema,
+  documentTypeListSchema,
   leadSchemeSchema,
   stageDefsSchema,
   stageEntriesSchema,
@@ -20,8 +21,10 @@ import {
   type ChecklistItem,
   type CreateApplicationRequest,
   type DocumentLink,
+  type DocumentType,
   type LeadScheme,
   type RecordStageRequest,
+  type ReopenApplicationRequest,
   type StageDef,
   type StageEntry,
 } from "./subsidy-applications.schemas";
@@ -203,6 +206,35 @@ export function cancelApplication(
     body,
     idempotencyKey,
     schema: applicationResponseSchema,
+  });
+}
+
+/** SUBS-015 · POST /subsidy-applications/{id}/reopen — a closed file opens again; stages stay. */
+export function reopenApplication(
+  applicationId: string,
+  { body, idempotencyKey }: WriteInput<ReopenApplicationRequest>,
+): Promise<Application> {
+  return apiRequest({
+    dataId: "SUBS-015",
+    logger: log,
+    fn: "reopenApplication",
+    method: "POST",
+    path: applicationPath(applicationId, "/reopen"),
+    body,
+    idempotencyKey,
+    schema: applicationResponseSchema,
+  });
+}
+
+/** SUBS-007 · GET /subsidy-document-types — the checklist's items, for every application. */
+export function listDocumentTypes(signal?: AbortSignal): Promise<DocumentType[]> {
+  return apiRequest({
+    dataId: "SUBS-007",
+    logger: log,
+    fn: "listDocumentTypes",
+    path: "/subsidy-document-types",
+    schema: documentTypeListSchema,
+    signal,
   });
 }
 

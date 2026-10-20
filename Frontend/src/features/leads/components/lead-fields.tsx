@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CampaignSelect } from "@/features/campaigns/components/campaign-select";
 import {
   LEAD_INQUIRY_TYPES,
   LEAD_TERRITORY_LEVELS,
@@ -25,6 +26,7 @@ import { LEAD_INQUIRY_TYPE_LABELS } from "@/features/leads/lib/lead-labels";
 import { CropPicker } from "@/features/lookups/components/crop-picker";
 import { LookupSelect } from "@/features/lookups/components/lookup-select";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
+import { useIsStaff } from "@/features/session/hooks/use-session";
 
 const TYPE_ITEMS = LEAD_INQUIRY_TYPES.map((value) => ({
   value,
@@ -81,12 +83,17 @@ export function LeadFields({
   form,
   idPrefix,
   withNote = false,
+  currentCampaign = null,
 }: {
   form: UseFormReturn<CreateLeadFormValues, unknown, CreateLeadRequest>;
   idPrefix: string;
   withNote?: boolean;
+  /** MKT-006 · The campaign the lead already names, kept on the picker if switched off since. */
+  currentCampaign?: { readonly id: string; readonly name: string } | null;
 }): React.JSX.Element {
   const { errors } = useFormState({ control: form.control });
+  // A dealer's leads carry no campaign (FS-040): the picker is for staff.
+  const staff = useIsStaff();
   return (
     <FieldGroup className="grid gap-4 sm:grid-cols-2">
       <FormField
@@ -256,6 +263,33 @@ export function LeadFields({
           </FormField>
         )}
       />
+
+      {staff ? (
+        <Controller
+          control={form.control}
+          name="campaign"
+          render={({ field, fieldState }) => (
+            <FormField
+              id={`${idPrefix}-campaign`}
+              label="Campaign"
+              optional
+              description="The fair, meeting or drive that brought the farmer in."
+              error={fieldState.error?.message}
+              className="sm:col-span-2"
+            >
+              {(aria) => (
+                <CampaignSelect
+                  {...aria}
+                  value={field.value ?? null}
+                  current={currentCampaign}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
+            </FormField>
+          )}
+        />
+      ) : null}
 
       <Controller
         control={form.control}

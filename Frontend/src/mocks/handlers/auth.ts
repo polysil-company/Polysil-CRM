@@ -14,10 +14,13 @@ import {
   readMockRole,
   writeMockChangedPassword,
   writeMockMustChangePassword,
+  writeMockConsumerMobile,
   writeMockRole,
 } from "@/lib/dev/mock-settings";
 import { mockMeFor } from "@/mocks/data/sessions";
+import { mockDb } from "@/mocks/db";
 
+import { mockConsumerMe } from "./portal";
 import { applyScenario } from "./scenario";
 
 /**
@@ -208,6 +211,7 @@ export const authHandlers = [
 
     delete failures[email];
     writeStored(FAILURES_KEY, failures);
+    writeMockConsumerMobile(null);
     if (isPartnerRole(readMockRole())) {
       writeMockRole(DEFAULT_MOCK_ROLE);
     }
@@ -268,6 +272,15 @@ export const authHandlers = [
     }
 
     writeStored(OTP_KEY, null);
+    // FARM-001 · A customer's number signs in as that farmer; any other as a partner user.
+    const customer = mockDb.customers.find(
+      (item) => toE164WithoutPlus(item.mobile) === challenge.mobile,
+    );
+    if (customer !== undefined) {
+      writeMockConsumerMobile(customer.mobile);
+      return issueTokens();
+    }
+    writeMockConsumerMobile(null);
     if (!isPartnerRole(readMockRole())) {
       writeMockRole(DEFAULT_MOCK_PARTNER_ROLE);
     }
@@ -285,6 +298,7 @@ export const authHandlers = [
   http.post(buildApiUrl("/auth/logout"), async () => {
     await applyScenario({ allowFailure: false });
     writeStored(REFRESH_KEY, null);
+    writeMockConsumerMobile(null);
     return new HttpResponse(null, { status: 204 });
   }),
 
@@ -294,6 +308,8 @@ export const authHandlers = [
     if (!hasLiveAccessToken(request)) {
       return errorResponse(401, "unauthenticated", "Not signed in.");
     }
+    const consumer = mockConsumerMe();
+    if (consumer !== null) return HttpResponse.json(consumer);
     const me = mockMeFor(readMockRole());
     return HttpResponse.json({
       data: {

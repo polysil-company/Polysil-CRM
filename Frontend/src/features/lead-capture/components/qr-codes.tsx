@@ -37,6 +37,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CampaignSelect } from "@/features/campaigns/components/campaign-select";
 import { DealerPicker, type DealerChoice } from "@/features/complaints/components/dealer-picker";
 import {
   useCreateQrCode,
@@ -248,7 +249,7 @@ function QrCodeCard({
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
         <dt className="text-muted-foreground">Campaign</dt>
-        <dd className="text-foreground">{code.campaign ?? "None"}</dd>
+        <dd className="text-foreground">{code.linkedCampaign?.name ?? code.campaign ?? "None"}</dd>
         <dt className="text-muted-foreground">Dealer</dt>
         <dd className="text-foreground">
           {code.partner?.name ?? "None: leads go to the area's officer"}
@@ -324,6 +325,7 @@ function QrCodeCard({
 interface QrForm {
   label: string;
   campaign: string;
+  linkedCampaign: string | null;
   dealer: DealerChoice | null;
   territory: TerritoryChoice | null;
 }
@@ -335,6 +337,7 @@ const qrFormSchema: z.ZodType<QrForm, QrForm> = z.object({
     .min(1, "Name it so staff recognise it: the dealer, the stall, the leaflet.")
     .max(120, "Keep it under 120 characters."),
   campaign: z.string().trim().max(120, "Keep it under 120 characters."),
+  linkedCampaign: z.string().nullable(),
   dealer: z.custom<DealerChoice | null>(() => true),
   territory: z.custom<TerritoryChoice | null>(() => true),
 });
@@ -342,6 +345,7 @@ const qrFormSchema: z.ZodType<QrForm, QrForm> = z.object({
 const SERVER_FIELDS = {
   label: "label",
   campaign: "campaign",
+  campaign_id: "linkedCampaign",
   partner_id: "dealer",
   territory_id: "territory",
 } as const satisfies Readonly<Record<string, keyof QrForm>>;
@@ -363,6 +367,7 @@ function QrCodeForm({
     defaultValues: {
       label: existing?.label ?? "",
       campaign: existing?.campaign ?? "",
+      linkedCampaign: existing?.linkedCampaign?.id ?? null,
       dealer:
         existing?.partner == null ? null : { id: existing.partner.id, name: existing.partner.name },
       territory: existing?.territory ?? null,
@@ -376,6 +381,7 @@ function QrCodeForm({
       const body = {
         label: values.label.trim(),
         campaign: values.campaign.trim() === "" ? null : values.campaign.trim(),
+        campaign_id: values.linkedCampaign,
         partner_id: values.dealer?.id ?? null,
         territory_id: values.territory?.id ?? null,
       };
@@ -447,9 +453,34 @@ function QrCodeForm({
             />
             <FieldError id="qr-label-error">{errors.label?.message}</FieldError>
           </Field>
+          <Controller
+            control={form.control}
+            name="linkedCampaign"
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.error ? true : undefined}>
+                <FieldLabel htmlFor="qr-linked-campaign">
+                  Campaign
+                  <span className="font-normal text-subtle-foreground">(optional)</span>
+                </FieldLabel>
+                <CampaignSelect
+                  id="qr-linked-campaign"
+                  value={field.value}
+                  current={existing?.linkedCampaign ?? null}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  aria-invalid={fieldState.error ? true : undefined}
+                  aria-describedby="qr-linked-campaign-help"
+                />
+                <FieldDescription id="qr-linked-campaign-help">
+                  Leads from this code are counted under it.
+                </FieldDescription>
+                <FieldError>{fieldState.error?.message}</FieldError>
+              </Field>
+            )}
+          />
           <Field data-invalid={errors.campaign ? true : undefined}>
             <FieldLabel htmlFor="qr-campaign">
-              Campaign
+              Campaign note
               <span className="font-normal text-subtle-foreground">(optional)</span>
             </FieldLabel>
             <Input

@@ -66,6 +66,7 @@ in the same shape. Never renumber or reuse a number.
 
 - [x] **BE-019** · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders` · SO-003 · low
 - [x] **BE-020** · Name the order on its events in the lead's timeline · SO-002, LEAD-005 · normal
+- [ ] **BE-029** · List only the quotations still free to order: an `orderable` filter on `GET /quotations` · SO-011 · low
 
 **Messages** — added as the message screens are connected (MSG-001…).
 
@@ -86,6 +87,22 @@ in the same shape. Never renumber or reuse a number.
 **Documents** — added as the documents on records are built (DOC-001…003).
 
 - [ ] **BE-025** · Offer only the document types a record takes: `record_type` on `GET /documents/types` · DOC-002 · low
+
+**Masters** — added as Admin → Masters is built (MSTR-009, MSTR-010).
+
+- [ ] **BE-026** · Show a list row's sort order, quality and kind: return them on `LookupItem` · MSTR-009 · low
+
+**Schemes** — added as the schemes are built (SCHM-001…004).
+
+- [ ] **BE-027** · Name a scheme's targets, and list product categories with their ids · SCHM-001, SCHM-002 · normal
+
+**Marketing material** — added as it is built (MKT-002…004).
+
+- [ ] **BE-028** · Say which roles may order, approve and send marketing material: default grants for `marketing_material` · MKT-002, MKT-003, MKT-004 · normal
+
+**Partner portal** — added from the dealer portal walk (item 38).
+
+- [ ] **BE-030** · Say on `GET /auth/me` whether tasks are on for dealers (`tasks_for_dealers`) · TASK-009, AUTH-002 · low
 
 ---
 
@@ -503,3 +520,86 @@ in the same shape. Never renumber or reuse a number.
   picker from this list as the handover says, and won't hard-code which types to hide.
 - **Done when:** the filter answers the record's types only. The frontend will send the record's
   type and drop nothing itself.
+
+### BE-026 · Show a list row's sort order, quality and kind: return them on `LookupItem`
+
+- **Status:** ⬜ Open
+- **Asked:** 15 Oct 2026 · MSTR-009
+- **What:** `GET /lookups/{list}` (and the `POST`/`PATCH` answers) carry each row's `sort_order`
+  for sources and reasons, `quality` for sources, and `kind` for reasons, as `LookupCreate` takes
+  them. Null where a list has none.
+- **Why:** Masters sets them when a row is added, and `PATCH` can change `sort_order` and
+  `quality`, but the list answers only `id`, `code`, `name` and `is_active`. So the screen can't
+  show a source's quality or a row's place, and changing one would be blind. For now Masters asks
+  for them only when adding a row.
+- **Done when:** the three fields come back on every list row. The frontend will show them and
+  offer to change sort order and quality in place.
+### BE-027 · Name a scheme's targets, and list product categories with their ids
+
+- **Status:** ⬜ Open
+- **Asked:** 16 Oct 2026 · SCHM-001, SCHM-002
+- **What:**
+  - Each entry of a scheme's `targets` gains `name`: the territory's, partner's, product's or
+    category's name (for `partner_type`, the type itself is enough).
+  - `GET /lookups/product-categories` (BE-024) answers each category's `id` beside its code,
+    since a `product_category` target takes the id.
+- **Why:** a scheme answers its targets as `{ type, id }` only. The frontend reads each name from
+  its own record (`GET /territories/{id}`, `/partners/{id}`, `/products/{id}`): one call per target,
+  and each needs access to that record. Someone who may view schemes but not masters sees "Territory
+  1a2b…" instead of "Rajkot". No endpoint lists category ids, so the scheme form can't offer a
+  product category at all.
+- **Done when:** targets come with their names, and the categories come with their ids. The
+  frontend then drops the per-target calls and offers categories in the form.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-028 · Say which roles may order, approve and send marketing material: default grants for `marketing_material`
+
+- **Status:** ⬜ Open
+- **Asked:** 17 Oct 2026 · MKT-002, MKT-003, MKT-004
+- **What:**
+  - Migration 038 checks `marketing_material` (view, create, approve, edit, delete) but seeds no
+    role grants, so on a fresh database nobody but a role edited by hand can open the screens.
+  - Seed the defaults the handover describes, or say who gets what: dealers and field staff order
+    (view, create); the District Manager over the office approves (approve); the marketing team
+    keeps the catalogue and records dispatch (edit); Admin everything.
+  - Add the `marketing` role's grants, since it is a functional role in `/roles`.
+- **Why:** the frontend gates the menu item and every button on these permissions. The mock grants
+  them as above for now; without seeded grants the page is hidden for everyone on staging.
+- **Done when:** `GET /auth/me` returns `marketing_material` for those roles on a fresh database.
+  The frontend then checks the mock against the seeded grants.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-029 · List only the quotations still free to order: an `orderable` filter on `GET /quotations`
+
+- **Status:** ⬜ Open
+- **Asked:** 18 Oct 2026 · SO-011
+- **What:**
+  - Place order now offers the dealer's other accepted quotations, to make one consolidated
+    order (`POST /orders` with several `quotation_ids`). The list comes from
+    `GET /quotations?status=accepted&partner_id=…`.
+  - That list can't tell which of them are already on a live order. Add `orderable=true`
+    (accepted, current, and not on a live order), or an `order` reference on each row.
+- **Why:** today a quotation already on an order shows as a choice. The frontend learns it only
+  when `POST /orders` answers `409 quotation_on_order`; it then unticks and marks that quotation.
+- **Done when:** the filter (or the field) is in `quotations.md`. The frontend then lists only the
+  free ones.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-030 · Say on `GET /auth/me` whether tasks are on for dealers (`tasks_for_dealers`)
+
+- **Status:** ⬜ Open
+- **Asked:** 18 Oct 2026 · TASK-009, AUTH-002
+- **What:**
+  - A partner user can't read `GET /settings`. To learn whether `tasks_for_dealers` is on, the
+    frontend asks for the user's open tasks and reads a `403` as "off".
+  - Return the switch with the session instead, for example `features: { tasks_for_dealers: true }`
+    on `GET /auth/me`, or leave the `tasks` grant out of a partner user's permissions while it is off.
+- **Why:** while the switch is off, every page a dealer, distributor or sub-dealer opens makes one
+  refused `GET /tasks` call. The browser logs that as an error, which hides real ones in a walk.
+- **Done when:** `GET /auth/me` says whether tasks are on, or the grant follows the switch. The
+  frontend then drops the probe.
+- **Done in:** —
+- **Backend notes:** —

@@ -106,9 +106,157 @@ const requestSchema = z.object({
   group_total_area: decimal(3).optional(),
   installation_rate_per_ha: decimal(2).optional(),
   nozzle: z.enum(["plastic", "brass"]).optional(),
+  pipe_size_mm: z.union([z.literal(63), z.literal(75), z.literal(90), z.literal(110)]).optional(),
+  spacing_label: z.string().optional(),
+  hydrocyclone_m3: z.number().nonnegative().optional(),
+  gravel_filter_m3: z.number().nonnegative().optional(),
+  head_unit_existing: z.boolean().optional(),
+  pvc_existing: z.boolean().optional(),
+  guided_cost: decimal(2).optional(),
+  fittings_amount: decimal(2).optional(),
 });
 
 export type CalculateBody = z.infer<typeof requestSchema>;
+
+/**
+ * The extra inputs each state's scheme asks for, by system, as the backend's config lists
+ * them (`state-subsidy-formulas.md`, `andhra-pradesh-subsidy.md`). Gujarat asks for none. A
+ * scheme set up in the mock under one of these codes gets them.
+ */
+const SCHEME_INPUTS_BY_CODE: Readonly<Record<string, Partial<Record<string, readonly string[]>>>> =
+  {
+    CG: { drip: ["spacing_label"], sprinkler: ["pipe_size_mm"] },
+    RJ: {
+      drip: [
+        "spacing_label",
+        "hydrocyclone_m3",
+        "gravel_filter_m3",
+        "head_unit_existing",
+        "pvc_existing",
+      ],
+      mini_sprinkler: [
+        "spacing_label",
+        "hydrocyclone_m3",
+        "gravel_filter_m3",
+        "head_unit_existing",
+        "pvc_existing",
+      ],
+      sprinkler: ["pipe_size_mm"],
+    },
+    UP: { sprinkler: ["pipe_size_mm"] },
+    AP: { drip: ["guided_cost", "fittings_amount"], sprinkler: ["pipe_size_mm"] },
+  };
+
+/** Invented spacing labels for the mock's CG and RJ schemes; the backend's come from masters. */
+const MOCK_SPACING_LABELS = ["1.2 x 0.6 m", "1.5 x 0.6 m", "2.0 x 0.75 m"] as const;
+
+function inputsFor(scheme: string, system: string): readonly string[] {
+  return SCHEME_INPUTS_BY_CODE[scheme]?.[system] ?? [];
+}
+
+/** The backend's refusals of the extra inputs: a listed one missing, or one the system doesn't take. */
+function schemeInputRefusals(body: CalculateBody, scheme: string): Record<string, string> {
+  const asks = new Set(inputsFor(scheme, body.system_type));
+  const fields: Record<string, string> = {};
+  const sent: Readonly<Record<string, unknown>> = {
+    guided_cost: body.guided_cost,
+    fittings_amount: body.fittings_amount,
+    pipe_size_mm: body.pipe_size_mm,
+    spacing_label: body.spacing_label,
+  };
+  for (const [field, value] of Object.entries(sent)) {
+    if (asks.has(field) && value === undefined) fields[field] = "required";
+    if (
+      !asks.has(field) &&
+      value !== undefined &&
+      (field === "guided_cost" || field === "fittings_amount")
+    ) {
+      fields[field] = "not taken by this scheme";
+    }
+  }
+  if (
+    body.spacing_label !== undefined &&
+    !MOCK_SPACING_LABELS.some((label) => label === body.spacing_label)
+  ) {
+    fields.spacing_label = "not one of the scheme's spacings";
+  }
+  return fields;
+}
+
+/**
+ * AP drip, roughly: the designer copies the portal's lines, fittings amount and guided cost.
+ * The figures here are illustrative: Gujarat's sums for the lines, the guided cost as the cap,
+ * and half the GST paid by the state, so subsidy + farmer's share + that half = the total.
+ */
+function calculateApDrip(body: CalculateBody): CalculateResponseWire["data"] {
+  const base = calculate({ ...body, scheme: undefined });
+  const guided = Number(body.guided_cost ?? "0");
+  const fittings = Number(body.fittings_amount ?? "0");
+  const linesTotal =
+    sumLines(body.head_lines ?? []) +
+    body.crops.reduce((sum, crop) => sum + sumLines(crop.lines), 0);
+  const warnings = [...base.warnings];
+  const withState = (blocks: BlocksWire): BlocksWire => ({
+    ...blocks,
+    gst_paid_by_state: money(Number(blocks.total_gst) / 2),
+  });
+  const total = withState(base.total.blocks);
+  if (guided > Number(total.cost_excl_gst)) {
+    warnings.push(
+      "guided_cost_above_cost: The guided cost is more than the cost; the subsidy is on the cost.",
+    );
+  }
+  if (fittings > linesTotal) {
+    warnings.push(
+      "fittings_above_material: The fittings amount is more than the lines. Likely a typing slip.",
+    );
+  }
+  return {
+    ...base,
+    scheme: "AP",
+    masters: { ...base.masters, regular_matrix_id: null, seven_year_matrix_id: null },
+    crops: base.crops.map((crop) => {
+      const blocks = withState(crop.blocks);
+      const totalInclGst = Number(blocks.total_incl_gst);
+      const stateGst = Number(blocks.gst_paid_by_state ?? "0");
+      const cap = Math.min(guided, Number(blocks.cost_excl_gst));
+      return {
+        ...crop,
+        blocks,
+        jantri: {
+          regular: guided.toFixed(4),
+          regular_with_sump: guided.toFixed(4),
+          regular_for_cap: guided.toFixed(4),
+          seven_year: null,
+        },
+        warnings: crop.warnings.filter((warning) => !warning.startsWith("seven_year_")),
+        categories: crop.categories.map((category) => {
+          if (category.variant !== "regular") {
+            return {
+              ...category,
+              applicable: false,
+              reason: "AP has no seven-year rows.",
+              subsidy: "0.00",
+              farmer_share: "0.00",
+              subsidy_pct: "0.00",
+              gsdma_farmer_share: null,
+            };
+          }
+          const subsidy = (cap * Number(category.pct)) / 100;
+          return {
+            ...category,
+            subsidy: money(subsidy),
+            farmer_share: money(Math.max(0, totalInclGst - subsidy - stateGst)),
+            subsidy_pct: money(totalInclGst > 0 ? (subsidy / totalInclGst) * 100 : 0),
+            gsdma_farmer_share: null,
+          };
+        }),
+      };
+    }),
+    total: { blocks: total },
+    warnings,
+  };
+}
 
 const money = (value: number): string => value.toFixed(2);
 const sumLines = (lines: readonly { rate: string; qty: string }[]): number =>
@@ -140,9 +288,9 @@ function refusals(body: CalculateBody): Record<string, string> {
     if (Number(crop.area) <= 0) fields[`${at}.area`] = "must be more than 0";
     if (Number(crop.lateral_spacing) <= 0) fields[`${at}.lateral_spacing`] = "must be more than 0";
     if (body.system_type === "sprinkler") {
-      if (!MOCK_SPRINKLER_AREAS.some((area) => Number(area) === Number(crop.area))) {
-        fields[`${at}.area`] =
-          "Sprinkler areas are the scheme's steps: 0.4 to 5.0 Ha in steps of 0.2, or 2.01 Ha";
+      // SUBS-002 · between two steps is allowed (`subsidy-completion.md` §5); outside isn't
+      if (Number(crop.area) < 0.4 || Number(crop.area) > 5) {
+        fields[`${at}.area`] = "Sprinkler areas run from 0.4 to 5 Ha";
       }
       if (crop.lines.length > 0) fields[`${at}.lines`] = "Sprinkler derives its own lines";
     }
@@ -321,6 +469,11 @@ export function calculate(body: CalculateBody): CalculateResponseWire["data"] {
     if (area > 5) {
       warnings.push("area_above_table: The area is above 5 Ha; the unit cost is scaled.");
     }
+    if (system === "sprinkler" && !MOCK_SPRINKLER_AREAS.some((step) => Number(step) === area)) {
+      warnings.push(
+        `area_between_steps: ${crop.area} Ha is between table steps; quantities use the next step up and the unit cost is pro rata between the two`,
+      );
+    }
     const sevenYearApplies =
       area >= SEVEN_YEAR_MIN && area <= SEVEN_YEAR_MAX && forSubsidy >= SEVEN_YEAR_SPACING_FLOOR;
     if (!sevenYearApplies) {
@@ -459,6 +612,10 @@ export const subsidyHandlers = [
           quantity_source: system.systemType === "sprinkler" ? "matrix" : "design",
           formula_version: MOCK_FORMULA_VERSION,
           sprinkler_areas: system.systemType === "sprinkler" ? [...MOCK_SPRINKLER_AREAS] : null,
+          inputs: [...inputsFor(scheme.code, system.systemType)],
+          spacing_labels: inputsFor(scheme.code, system.systemType).includes("spacing_label")
+            ? [...MOCK_SPACING_LABELS]
+            : [],
         }),
       ),
       parameters: own
@@ -547,6 +704,15 @@ export const subsidyHandlers = [
     }
     const scheme = readActiveScheme(checked.body.scheme);
     if (scheme instanceof Response) return scheme;
+    const inputProblems = schemeInputRefusals(checked.body, scheme.code);
+    if (Object.keys(inputProblems).length > 0) {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", inputProblems);
+    }
+    // AP drip has no unit cost table: the portal's guided cost stands in for it (FS-063).
+    if (scheme.code === "AP" && checked.body.system_type === "drip") {
+      if (scheme.systems.includes("drip"))
+        return HttpResponse.json({ data: calculateApDrip(checked.body) });
+    }
     const missing = missingFor(scheme.code, checked.body.system_type, todayInIndia());
     if (!scheme.systems.includes(checked.body.system_type) || missing.length > 0) {
       return errorResponse(

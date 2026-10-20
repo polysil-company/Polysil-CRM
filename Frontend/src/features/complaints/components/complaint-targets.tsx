@@ -48,13 +48,14 @@ import { SEVERITY_BADGE, SEVERITY_LABELS } from "@/features/complaints/lib/compl
 import { lookupListQueryOptions } from "@/features/lookups/api/lookups.queries";
 import { useCan } from "@/features/session/hooks/use-session";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError, readFieldErrors } from "@/lib/api/errors";
 import { formatCalendarDay, todayInIndia } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
-import { Refusal, useCloseLater } from "./complaint-dialog-parts";
+import { Refusal } from "./complaint-dialog-parts";
 
 const log = createLogger({
   file: "features/complaints/components/complaint-targets.tsx",
@@ -351,7 +352,7 @@ function TargetForm({
   const today = todayInIndia();
   const create = useCreateSlaPolicy();
   const idempotency = useIdempotencyKey();
-  const closeLater = useCloseLater(onClose);
+  const closeLater = useCloseAfterSuccess(onClose);
   const [refusal, setRefusal] = useState<{ title: string; message: string } | null>(null);
   const form = useForm<TargetForm>({
     resolver: zodResolver(targetSchema(today)),

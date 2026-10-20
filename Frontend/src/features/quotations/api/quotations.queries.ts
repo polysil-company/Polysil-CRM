@@ -3,6 +3,7 @@ import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/
 import {
   getPublicQuotation,
   getQuotation,
+  getQuotationSubsidyCalculation,
   getQuotationTimeline,
   listQuotationVersions,
   listQuotations,
@@ -37,7 +38,18 @@ export const quotationKeys = {
   products: (q: string) => [...quotationKeys.all, "products", q] as const,
   previews: () => [...quotationKeys.all, "preview"] as const,
   preview: (request: QuoteLinesRequest) => [...quotationKeys.previews(), request] as const,
+  subsidyCalculation: (quotationId: string) =>
+    [...quotationKeys.detail(quotationId), "subsidy-calculation"] as const,
 };
+
+/** QUOT-014 · The full calculation stored with a subsidised quotation, read when asked for. */
+export function quotationSubsidyCalculationQueryOptions(quotationId: string) {
+  return queryOptions({
+    queryKey: quotationKeys.subsidyCalculation(quotationId),
+    queryFn: ({ signal }) => getQuotationSubsidyCalculation(quotationId, signal),
+    meta: { dataId: "QUOT-014" },
+  });
+}
 
 /** QUOT-001 · Keeps the previous page on screen while the next one loads. */
 export function quotationListQueryOptions(params: QuotationListParams) {

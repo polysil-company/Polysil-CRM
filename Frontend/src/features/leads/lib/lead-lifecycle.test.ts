@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { LEAD_STAGES } from "@/features/leads/api/leads.schemas";
 import { ApiError } from "@/lib/api/errors";
 
-import { stageActionLabel, stageChangeError, stageMenuFor } from "./lead-lifecycle";
+import {
+  stageActionDescription,
+  stageActionLabel,
+  stageChangeError,
+  stageMenuFor,
+} from "./lead-lifecycle";
 
 function refusal(status: number, code: string, fields: Record<string, string> = {}): ApiError {
   return new ApiError({
@@ -35,10 +40,35 @@ describe("[LEAD-007] stageMenuFor", () => {
     expect(stageMenuFor("lost").actions).toEqual([{ kind: "reopen" }]);
   });
 
-  it("offers nothing on a closed or dormant lead", () => {
-    for (const stage of ["won", "merged", "dormant"] as const) {
+  it("lets a dealership lead be won straight from qualified (LEAD-015)", () => {
+    expect(stageMenuFor("qualified", "dealership").actions).toEqual([
+      { kind: "won" },
+      { kind: "lost" },
+    ]);
+    expect(stageMenuFor("qualified", "commercial").actions).toEqual([{ kind: "lost" }]);
+    expect(stageMenuFor("contacted", "dealership").actions).toEqual([
+      { kind: "move", to: "qualified" },
+      { kind: "lost" },
+    ]);
+    expect(stageActionDescription({ kind: "won" }, "dealership")).toBe(
+      "They're to become a dealer. Closes the lead and starts their dealer application.",
+    );
+    expect(stageActionDescription({ kind: "won" })).toBe(
+      "The farmer accepted a quotation. Closes the lead.",
+    );
+  });
+
+  it("offers nothing on a closed lead", () => {
+    for (const stage of ["won", "merged"] as const) {
       expect(stageMenuFor(stage)).toEqual({ actions: [], hint: null });
     }
+  });
+
+  it("offers reopen or lost on a dormant lead (FS-035)", () => {
+    expect(stageMenuFor("dormant")).toEqual({
+      actions: [{ kind: "reopen" }, { kind: "lost" }],
+      hint: null,
+    });
   });
 
   it("says where the quotation-driven steps happen", () => {

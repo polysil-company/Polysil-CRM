@@ -3,11 +3,12 @@ import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import {
   getPlannerDay,
   getTeamDay,
+  getMinutes,
   listLeadMinutes,
   listTaskAssignees,
   listTasks,
 } from "./tasks.api";
-import type { PlannerParams, TaskListParams } from "./tasks.schemas";
+import type { PlannerParams, TaskAssignee, TaskListParams } from "./tasks.schemas";
 
 /**
  * Query keys for tasks. A change to one task can move it between a day, a team's counts and
@@ -20,6 +21,7 @@ export const taskKeys = {
   list: (params: TaskListParams) => [...taskKeys.all, "list", params] as const,
   assignees: () => [...taskKeys.all, "assignees"] as const,
   minutes: (leadId: string) => [...taskKeys.all, "minutes", leadId] as const,
+  minutesOne: (minutesId: string) => [...taskKeys.all, "minutes-one", minutesId] as const,
 };
 
 const FIRST_PAGE: string | null = null;
@@ -62,6 +64,26 @@ export function taskAssigneesQueryOptions() {
     queryFn: ({ signal }) => listTaskAssignees(signal),
     staleTime: 5 * 60_000,
     meta: { dataId: "TASK-004" },
+  });
+}
+
+/**
+ * TASK-004 · The same people without the dealers' users (TASK-009): for filters, reports,
+ * minutes and reassigning, which are about the team.
+ */
+export function staffAssigneesQueryOptions() {
+  return queryOptions({
+    ...taskAssigneesQueryOptions(),
+    select: (people: TaskAssignee[]) => people.filter((person) => person.kind === "staff"),
+  });
+}
+
+/** TASK-007 · One set of minutes, each action item as it stands now. */
+export function minutesQueryOptions(minutesId: string) {
+  return queryOptions({
+    queryKey: taskKeys.minutesOne(minutesId),
+    queryFn: ({ signal }) => getMinutes(minutesId, signal),
+    meta: { dataId: "TASK-007" },
   });
 }
 

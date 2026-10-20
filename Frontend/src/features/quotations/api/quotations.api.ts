@@ -3,6 +3,10 @@ import {
   timelinePageSchema,
   type TimelinePage,
 } from "@/features/leads/api/leads.schemas";
+import {
+  calculateResponseSchema,
+  type SubsidyCalculation,
+} from "@/features/subsidy/api/subsidy.schemas";
 import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
@@ -32,6 +36,7 @@ import {
   type Quotation,
   type QuotationListParams,
   type QuotationPage,
+  type QuotationSubsidyRequest,
 } from "./quotations.schemas";
 
 const log = createLogger({ file: "features/quotations/api/quotations.api.ts", dataId: "QUOT-001" });
@@ -57,6 +62,7 @@ export async function listQuotations(
       status: params.status.join(","),
       sales_type: params.salesType,
       lead_id: params.leadId,
+      partner_id: params.partnerId ?? undefined,
       current_only: params.currentOnly ? undefined : false,
     },
     schema: quotationPageSchema,
@@ -226,6 +232,38 @@ export function sendQuotation(
     body,
     idempotencyKey,
     schema: quotationResponseSchema,
+  });
+}
+
+/** QUOT-014 · PUT /quotations/{id}/subsidy — calculates and stores the draft's subsidy. */
+export function setQuotationSubsidy(
+  quotationId: string,
+  { body, idempotencyKey }: SaveInput<QuotationSubsidyRequest>,
+): Promise<Quotation> {
+  return apiRequest({
+    dataId: "QUOT-014",
+    logger: log,
+    fn: "setQuotationSubsidy",
+    method: "PUT",
+    path: `/quotations/${encodeURIComponent(quotationId)}/subsidy`,
+    body,
+    idempotencyKey,
+    schema: quotationResponseSchema,
+  });
+}
+
+/** QUOT-014 · GET /quotations/{id}/subsidy/calculation — the full calculation stored with it. */
+export function getQuotationSubsidyCalculation(
+  quotationId: string,
+  signal?: AbortSignal,
+): Promise<SubsidyCalculation> {
+  return apiRequest({
+    dataId: "QUOT-014",
+    logger: log,
+    fn: "getQuotationSubsidyCalculation",
+    path: `/quotations/${encodeURIComponent(quotationId)}/subsidy/calculation`,
+    schema: calculateResponseSchema,
+    signal,
   });
 }
 

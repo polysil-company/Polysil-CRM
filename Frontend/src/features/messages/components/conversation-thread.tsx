@@ -1,15 +1,22 @@
 "use client";
 
-import { ArrowLeft01Icon, BubbleChatIcon } from "@hugeicons/core-free-icons";
+import {
+  ArrowLeft01Icon,
+  BubbleChatIcon,
+  InformationCircleIcon,
+  UserGroupIcon,
+} from "@hugeicons/core-free-icons";
 import { useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { notFound, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import type * as React from "react";
+import { toast } from "sonner";
 
 import { EmptyState } from "@/components/patterns/empty-state";
 import { QueryView } from "@/components/patterns/query-view";
 import { Avatar, AvatarFallback, getInitials } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,12 +24,15 @@ import { useMarkConversationRead } from "@/features/messages/api/messages.mutati
 import {
   conversationListQueryOptions,
   conversationMessagesQueryOptions,
+  conversationQueryOptions,
+  groupMembersQueryOptions,
   messageKeys,
-  startedConversationQueryOptions,
 } from "@/features/messages/api/messages.queries";
 import {
+  conversationName,
   sendMessageRequestSchema,
   type Conversation,
+  type GroupConversation,
   type Message,
 } from "@/features/messages/api/messages.schemas";
 import {
@@ -36,13 +46,15 @@ import { isApiError } from "@/lib/api/errors";
 import { isSameDay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { GroupInfoDialog, memberCountLabel } from "./group-info-dialog";
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
 
 /**
  * MSG-002 · One conversation: who it is with, the messages grouped by day, and the
  * composer. Unread messages are marked as read while the conversation is open.
- * An unknown conversation renders the not-found page.
+ * An unknown conversation renders the not-found page. In a group (MSG-006) each sender is
+ * named from the member list, and a 404 means the user is out of it: it leaves the screen.
  */
 export function ConversationThread({
   conversationId,
@@ -50,18 +62,44 @@ export function ConversationThread({
   conversationId: string;
 }): React.JSX.Element {
   const { data: session } = useSession();
+  const myId = session?.user.id ?? null;
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const [infoOpen, setInfoOpen] = useState(false);
   const thread = useQuery(conversationMessagesQueryOptions(conversationId));
   const conversations = useQuery(conversationListQueryOptions());
-  const started = useQuery(startedConversationQueryOptions(conversationId));
+  const listed = conversations.data?.items.find((item) => item.id === conversationId);
+  // A conversation nobody has written in yet is not listed: it is read on its own (BE-021).
+  const unlisted = useQuery({
+    ...conversationQueryOptions(conversationId),
+    enabled: conversations.status !== "pending" && listed === undefined,
+  });
   const { mutate: markConversationRead } = useMarkConversationRead();
 
-  // A conversation nobody has written in yet is not listed: the "start" answer names it.
-  const conversation =
-    conversations.data?.items.find((item) => item.id === conversationId) ?? started.data ?? null;
+  const conversation = listed ?? unlisted.data ?? null;
+  const group = conversation?.kind === "group" ? conversation : null;
+  // Loaded once per group thread, to name each sender (a message carries only `sender_id`).
+  const members = useQuery({
+    ...groupMembersQueryOptions(conversationId),
+    enabled: group !== null,
+  });
   const unreadCount = conversation?.unreadCount ?? 0;
   const newestShown = thread.data?.items.at(-1)?.id ?? null;
-  const participantLeft = conversation?.participant.isActive === false;
+  const participantLeft = conversation?.kind === "direct" && !conversation.participant.isActive;
+  const removedFromGroup =
+    group !== null &&
+    thread.status === "error" &&
+    isApiError(thread.error) &&
+    thread.error.status === 404;
+
+  const senderNameOf = (senderId: string): string =>
+    members.data?.find((member) => member.person.id === senderId)?.person.name ?? "A colleague";
+
+  const leaveScreen = (): void => {
+    setInfoOpen(false);
+    void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+    router.replace("/messages");
+  };
 
   const pendingBodies = useMutationState({
     filters: { mutationKey: [...messageKeys.all, "send", conversationId], status: "pending" },
@@ -79,15 +117,46 @@ export function ConversationThread({
     }
   }, [conversationId, unreadCount, newestShown, markConversationRead]);
 
-  if (thread.status === "error" && isApiError(thread.error) && thread.error.status === 404) {
+  // A 404 while polling a group means the user was removed: say so and leave it (MSG-006).
+  useEffect(() => {
+    if (removedFromGroup) {
+      toast.info("You're no longer in this group", {
+        description: group.group.name,
+      });
+      void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+      router.replace("/messages");
+    }
+  }, [removedFromGroup, group, queryClient, router]);
+
+  if (
+    !removedFromGroup &&
+    thread.status === "error" &&
+    isApiError(thread.error) &&
+    thread.error.status === 404
+  ) {
     notFound();
   }
 
-  const participantName = conversation?.participant.name ?? null;
+  const participantName = conversation === null ? null : conversationName(conversation);
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      <ThreadHeader conversation={conversation} loading={conversations.status === "pending"} />
+      <ThreadHeader
+        conversation={conversation}
+        loading={conversations.status === "pending" || unlisted.isLoading}
+        onOpenInfo={() => {
+          setInfoOpen(true);
+        }}
+      />
+      {group === null ? null : (
+        <GroupInfoDialog
+          conversation={group}
+          myId={myId}
+          open={infoOpen}
+          onOpenChange={setInfoOpen}
+          onLeft={leaveScreen}
+        />
+      )}
       <div className="flex min-h-0 flex-1 flex-col">
         <QueryView
           query={thread}
@@ -98,7 +167,11 @@ export function ConversationThread({
               <EmptyState
                 icon={BubbleChatIcon}
                 title={
-                  participantName === null ? "No messages yet" : `Say hello to ${participantName}`
+                  participantName === null
+                    ? "No messages yet"
+                    : group === null
+                      ? `Say hello to ${participantName}`
+                      : `Start the conversation in ${participantName}`
                 }
                 description="Write below. You can share a lead from its page to talk about it here."
               />
@@ -109,8 +182,9 @@ export function ConversationThread({
             <MessageLog
               messages={page.items}
               pendingBodies={pendingBodies}
-              myId={session?.user.id ?? null}
-              participantName={participantName ?? "Colleague"}
+              myId={myId}
+              senderNameOf={group === null ? () => participantName ?? "Colleague" : senderNameOf}
+              namesSenders={group !== null}
             />
           )}
         </QueryView>
@@ -135,9 +209,11 @@ export function ConversationThread({
 function ThreadHeader({
   conversation,
   loading,
+  onOpenInfo,
 }: {
   conversation: Conversation | null;
   loading: boolean;
+  onOpenInfo: () => void;
 }): React.JSX.Element {
   return (
     <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-2 sm:px-4">
@@ -160,6 +236,8 @@ function ThreadHeader({
         ) : (
           <h2 className="text-sm font-semibold text-foreground">Conversation</h2>
         )
+      ) : conversation.kind === "group" ? (
+        <GroupHeading conversation={conversation} onOpenInfo={onOpenInfo} />
       ) : (
         <>
           <Avatar size="lg">
@@ -179,16 +257,51 @@ function ThreadHeader({
   );
 }
 
+/** A group's name and size, with Group info (MSG-006). */
+function GroupHeading({
+  conversation,
+  onOpenInfo,
+}: {
+  conversation: GroupConversation;
+  onOpenInfo: () => void;
+}): React.JSX.Element {
+  return (
+    <>
+      <Avatar size="lg">
+        <AvatarFallback>
+          <Icon icon={UserGroupIcon} />
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h2 className="truncate text-sm font-semibold text-foreground">
+          {conversation.group.name}
+        </h2>
+        <p className="truncate text-xs text-muted-foreground">
+          {memberCountLabel(conversation.group.memberCount)}
+        </p>
+      </div>
+      <Button variant="ghost" size="sm" onClick={onOpenInfo}>
+        <Icon icon={InformationCircleIcon} />
+        Group info
+      </Button>
+    </>
+  );
+}
+
 function MessageLog({
   messages,
   pendingBodies,
   myId,
-  participantName,
+  senderNameOf,
+  namesSenders,
 }: {
   messages: readonly Message[];
   pendingBodies: readonly string[];
   myId: string | null;
-  participantName: string;
+  /** Who sent a message, by `sender_id`. */
+  senderNameOf: (senderId: string) => string;
+  /** A group shows each sender's name above their messages. */
+  namesSenders: boolean;
 }): React.JSX.Element {
   const now = new Date(useNow());
   const endRef = useRef<HTMLDivElement>(null);
@@ -212,6 +325,7 @@ function MessageLog({
           const newDay =
             previous === undefined || !isSameDay(previous.createdAt, message.createdAt);
           const mine = message.senderId === myId;
+          const startsRun = !continuesGroup(previous, message);
           return (
             <li key={message.id} className="flex flex-col">
               {newDay ? (
@@ -228,8 +342,9 @@ function MessageLog({
                 resource={message.resource}
                 createdAt={message.createdAt}
                 mine={mine}
-                senderName={participantName}
-                grouped={continuesGroup(previous, message)}
+                senderName={senderNameOf(message.senderId)}
+                showSender={namesSenders ? !mine && startsRun : false}
+                grouped={!startsRun}
                 showTime={!continuesGroup(message, messages[index + 1])}
               />
             </li>

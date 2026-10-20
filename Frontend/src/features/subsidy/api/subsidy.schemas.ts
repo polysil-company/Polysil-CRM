@@ -13,6 +13,9 @@ import { z } from "zod";
 /** A plain decimal string: "199818.16", "0.400", "-0.01". */
 const decimal = z.string().regex(/^-?\d+(\.\d+)?$/);
 
+/** The scheme the backend calculates under when a request names none. */
+export const DEFAULT_SUBSIDY_SCHEME = "GGRC";
+
 export const SYSTEM_TYPES = ["drip", "mini_sprinkler", "sprinkler"] as const;
 export const systemTypeSchema = z.enum(SYSTEM_TYPES);
 export type SystemType = z.infer<typeof systemTypeSchema>;
@@ -21,6 +24,29 @@ export const NOZZLES = ["plastic", "brass"] as const;
 export type Nozzle = (typeof NOZZLES)[number];
 
 const variantSchema = z.enum(["regular", "seven_year"]);
+
+/**
+ * The extra request fields a scheme's system may ask for (`inputs` in its config): CG, RJ and UP
+ * (`state-subsidy-formulas.md`), and AP drip (`andhra-pradesh-subsidy.md`). The form shows
+ * each one the config lists; it never decides by state.
+ */
+export const SCHEME_INPUTS = [
+  "pipe_size_mm",
+  "spacing_label",
+  "hydrocyclone_m3",
+  "gravel_filter_m3",
+  "head_unit_existing",
+  "pvc_existing",
+  "guided_cost",
+  "fittings_amount",
+] as const;
+export type SchemeInput = (typeof SCHEME_INPUTS)[number];
+
+/** The sprinkler set sizes the backend takes (`pipe_size_mm`). */
+export const PIPE_SIZES = [63, 75, 90, 110] as const;
+/** RJ's filter sizes in m³; 0 is none. */
+export const HYDROCYCLONE_SIZES = [0, 20, 25, 30] as const;
+export const GRAVEL_FILTER_SIZES = [0, 10, 20, 25, 30] as const;
 
 // ── the lookups (SUBS-003) ───────────────────────────────────────────────────────
 
@@ -35,6 +61,13 @@ const systemConfigWireSchema = z.object({
   formula_version: z.string(),
   /** The tabulated areas a Sprinkler quotation may use; null for the other two systems. */
   sprinkler_areas: z.array(decimal).nullable(),
+  /** The calculation model and cap (FS-056): for display or debugging only. */
+  pipeline: z.string().optional(),
+  cap_mode: z.string().optional(),
+  /** The optional request fields this system needs. */
+  inputs: z.array(z.string()).optional(),
+  /** The spacing choices, when `inputs` has `spacing_label`. */
+  spacing_labels: z.array(z.string()).optional(),
 });
 
 const systemConfigSchema = systemConfigWireSchema.transform((wire) => ({
@@ -44,6 +77,15 @@ const systemConfigSchema = systemConfigWireSchema.transform((wire) => ({
   cropCountMax: wire.crop_count_max,
   formulaVersion: wire.formula_version,
   sprinklerAreas: wire.sprinkler_areas,
+  /** The inputs this screen can show; a code it doesn't know yet is left out. */
+  inputs: (wire.inputs ?? []).filter((code): code is SchemeInput =>
+    SCHEME_INPUTS.some((known) => known === code),
+  ),
+  /** What the config lists that the screen can't show yet, so the designer is told. */
+  unknownInputs: (wire.inputs ?? []).filter(
+    (code) => !SCHEME_INPUTS.some((known) => known === code),
+  ),
+  spacingLabels: wire.spacing_labels ?? [],
 }));
 
 export type SystemConfig = z.output<typeof systemConfigSchema>;
@@ -137,6 +179,15 @@ export interface CalculateRequest {
   readonly group_total_area?: string;
   readonly installation_rate_per_ha?: string;
   readonly nozzle?: Nozzle;
+  /** The scheme's extra inputs, sent only when the system's config lists them. */
+  readonly pipe_size_mm?: number;
+  readonly spacing_label?: string;
+  readonly hydrocyclone_m3?: number;
+  readonly gravel_filter_m3?: number;
+  readonly head_unit_existing?: boolean;
+  readonly pvc_existing?: boolean;
+  readonly guided_cost?: string;
+  readonly fittings_amount?: string;
 }
 
 /** The 22 rows of the quotation summary, top to bottom. Every key is always present. */
@@ -190,7 +241,17 @@ const blocksSchema = z.object({
   total_sgst: decimal,
   total_gst: decimal,
   total_incl_gst: decimal,
+  /** CG drip: the fittings add-on on the subtotal (FS-056). */
+  fittings: decimal.default("0.00"),
+  /** CG: the inspection charge outside the cap, added to the farmer's share (FS-056). */
+  flat_inspection: decimal.default("0.00"),
+  /** AP: the half of the GST the state pays; subsidy + farmer's share + this = the total. */
+  gst_paid_by_state: decimal.default("0.00"),
 }) satisfies z.ZodType<Record<BlockKey, string>>;
+
+/** Rows some schemes add to the summary, shown only where a figure isn't zero. */
+export const EXTRA_BLOCK_KEYS = ["fittings", "flat_inspection", "gst_paid_by_state"] as const;
+export type ExtraBlockKey = (typeof EXTRA_BLOCK_KEYS)[number];
 
 export type Blocks = z.infer<typeof blocksSchema>;
 
@@ -238,6 +299,10 @@ const cropResultWireSchema = z.object({
     /** What the subsidy is actually capped on — the figure the scheme's own sheet prints. */
     regular_for_cap: decimal,
     seven_year: decimal.nullable(),
+    /** RJ: the filter add-ons on the unit cost. */
+    add_ons: decimal.default("0.00"),
+    /** RJ: the existing head unit and PVC taken off. */
+    deductions: decimal.default("0.00"),
   }),
   categories: z.array(categoryResultSchema),
   warnings: z.array(z.string()),
@@ -255,6 +320,8 @@ const cropResultSchema = cropResultWireSchema.transform((wire) => ({
   blocks: wire.blocks,
   unitCostForCap: wire.jantri.regular_for_cap,
   unitCostSevenYear: wire.jantri.seven_year,
+  unitCostAddOns: wire.jantri.add_ons,
+  unitCostDeductions: wire.jantri.deductions,
   categories: wire.categories,
   warnings: wire.warnings,
 }));
@@ -295,8 +362,9 @@ export const calculateResponseSchema = z
       masters: z.object({
         as_of: z.string(),
         formula_version: z.string(),
-        regular_matrix_id: z.string(),
-        seven_year_matrix_id: z.string(),
+        /** Null for AP drip, which has no unit cost table (FS-063). */
+        regular_matrix_id: z.string().nullable(),
+        seven_year_matrix_id: z.string().nullable(),
         quantity_matrix_id: z.string().nullable(),
       }),
       crops: z.array(cropResultSchema).min(1),
@@ -310,6 +378,8 @@ export const calculateResponseSchema = z
     scheme: data.scheme,
     asOf: data.masters.as_of,
     formulaVersion: data.masters.formula_version,
+    /** AP drip has no unit cost table: its "unit cost" is the portal's guided cost, a total. */
+    guidedCost: data.masters.regular_matrix_id === null,
     crops: data.crops,
     total: data.total.blocks,
     sprinkler: data.sprinkler,

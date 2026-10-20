@@ -7,7 +7,7 @@ import { NavTabs, type NavTab } from "@/components/patterns/nav-tabs";
 import { leadStatsQueryOptions } from "@/features/leads/api/leads.queries";
 import { useCan } from "@/features/session/hooks/use-session";
 
-/** Leads · Quotations · Sales orders. Tabs the user cannot view are not shown. */
+/** Leads · Customers · Quotations · Sales orders. Tabs the user cannot view are not shown. */
 export function SalesTabs(): React.JSX.Element {
   const canSeeLeads = useCan("leads");
   const canSeeQuotations = useCan("quotations");
@@ -22,6 +22,8 @@ export function SalesTabs(): React.JSX.Element {
             label: "Leads",
             count: stats?.total,
           } satisfies NavTab,
+          // LEAD-016 · customers are seen through their leads
+          { href: "/customers", label: "Customers" } satisfies NavTab,
         ]
       : []),
     ...(canSeeQuotations ? [{ href: "/quotations", label: "Quotations" } satisfies NavTab] : []),

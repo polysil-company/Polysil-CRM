@@ -19,10 +19,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CommissionRatesPanel } from "@/features/commission/components/commission-rates-panel";
 import { useCan } from "@/features/session/hooks/use-session";
 import { schemeListQueryOptions } from "@/features/subsidy/api/subsidy-schemes.queries";
 import { todayInIndia } from "@/lib/format";
 
+import { DocumentChecklistPanel } from "./document-checklist-panel";
 import {
   CATEGORY_CONFIG,
   COMPONENT_RATE_CONFIG,
@@ -41,6 +43,8 @@ const TABLES = [
   "crop-spacings",
   "unit-costs",
   "quantities",
+  "documents",
+  "commission",
 ] as const;
 type Table = (typeof TABLES)[number];
 
@@ -52,6 +56,8 @@ const TABLE_LABELS: Readonly<Record<Table, string>> = {
   "crop-spacings": "Crop spacings",
   "unit-costs": "Unit costs",
   quantities: "Quantities",
+  documents: "Documents",
+  commission: "Commission rates",
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -64,7 +70,8 @@ const DEFAULT_SCHEME = "GGRC";
  * scheme at a time, as in force on a date (today by default, or any other to see what applied
  * then). Whoever may edit masters revises a table's rows, or starts a new matrix, from today or
  * a later date; nothing is overwritten. The overview says what a scheme still lacks, and a new
- * state's scheme is set up from it.
+ * state's scheme is set up from it. SUBS-007 · The Documents tab reads the checklist every
+ * application is given, the same for every scheme.
  */
 export function SubsidyMasters(): React.JSX.Element {
   const canEdit = useCan("masters", "edit");
@@ -212,6 +219,13 @@ export function SubsidyMasters(): React.JSX.Element {
         </TabsContent>
         <TabsContent value="quantities">
           <MatrixPanel kind="quantity" scheme={scheme} on={on} canEdit={canEdit} />
+        </TabsContent>
+        <TabsContent value="documents">
+          <DocumentChecklistPanel />
+        </TabsContent>
+        {/* SUBS-018 · The dealer's commission and TOD at stage 18. */}
+        <TabsContent value="commission">
+          <CommissionRatesPanel scheme={scheme} canEdit={canEdit} />
         </TabsContent>
       </Tabs>
 

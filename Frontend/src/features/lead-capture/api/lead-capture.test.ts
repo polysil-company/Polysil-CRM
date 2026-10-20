@@ -30,6 +30,7 @@ describe("[LEAD-013] QR codes", () => {
       body: {
         label: "Stall at the fair",
         campaign: null,
+        campaign_id: null,
         partner_id: MOCK_PARTNERS[0]?.id ?? null,
         territory_id: null,
       },
@@ -51,7 +52,13 @@ describe("[LEAD-013] QR codes", () => {
     writeMockRole("state_manager");
     await expect(
       createQrCode({
-        body: { label: "X", campaign: null, partner_id: "nope", territory_id: null },
+        body: {
+          label: "X",
+          campaign: null,
+          campaign_id: null,
+          partner_id: "nope",
+          territory_id: null,
+        },
         idempotencyKey: "q-3",
       }),
     ).rejects.toMatchObject({ status: 422, details: { fields: { partner_id: "not found" } } });

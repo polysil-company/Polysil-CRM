@@ -3,10 +3,12 @@ import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
 import {
+  gstinLookupSchema,
   partnerPageSchema,
   partnerSchema,
   partnerStateSchema,
   type CreatePartnerRequest,
+  type GstinLookup,
   type Partner,
   type PartnerListParams,
   type PartnerPage,
@@ -115,6 +117,19 @@ export function getPartner(partnerId: string, signal?: AbortSignal): Promise<Par
     fn: "getPartner",
     path: partnerPath(partnerId),
     schema: partnerSchema,
+    signal,
+  });
+}
+
+/** CHNL-006 · GET /gstin/{gstin}: the GST record's names. Its PAN and address stay out of logs. */
+export function lookupGstin(gstin: string, signal?: AbortSignal): Promise<GstinLookup> {
+  return apiRequest({
+    dataId: "CHNL-006",
+    logger: log,
+    fn: "lookupGstin",
+    path: `/gstin/${encodeURIComponent(gstin)}`,
+    schema: gstinLookupSchema,
+    sensitive: true,
     signal,
   });
 }

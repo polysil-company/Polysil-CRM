@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { apiRequest } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
@@ -5,17 +7,22 @@ import { createLogger } from "@/lib/logger";
 import {
   conversationListResponseSchema,
   conversationResponseSchema,
+  memberListResponseSchema,
   markConversationReadResponseSchema,
   messageListResponseSchema,
   messageResponseSchema,
   staffDirectoryResponseSchema,
+  type AddMembersRequest,
   type Conversation,
   type ConversationList,
+  type CreateGroupRequest,
   type MarkConversationReadRequest,
   type MarkConversationReadResult,
+  type Member,
   type Message,
   type MessagePage,
   type Person,
+  type RenameGroupRequest,
   type SendMessageRequest,
   type StartConversationRequest,
 } from "./messages.schemas";
@@ -87,6 +94,24 @@ export function searchStaffDirectory(q: string, signal?: AbortSignal): Promise<r
   });
 }
 
+/**
+ * MSG-004 · GET /conversations/{conversationId}: one of the user's conversations, whether or
+ * not anyone has written in it yet (BE-021). 404 when it is not theirs.
+ */
+export function getConversation(
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<Conversation> {
+  return apiRequest({
+    dataId: "MSG-004",
+    logger: log,
+    fn: "getConversation",
+    path: conversationPath(conversationId),
+    schema: conversationResponseSchema,
+    signal,
+  });
+}
+
 /** MSG-004 · POST /conversations */
 export function startConversation(participantId: string): Promise<Conversation> {
   const body: StartConversationRequest = { participant_id: participantId };
@@ -118,5 +143,80 @@ export function markConversationRead(
     path: `${conversationPath(conversationId)}/read`,
     body,
     schema: markConversationReadResponseSchema,
+  });
+}
+
+/** MSG-006 · POST /conversations/groups: the user is added and manages it. */
+export function createGroup(body: CreateGroupRequest): Promise<Conversation> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "createGroup",
+    method: "POST",
+    path: "/conversations/groups",
+    body,
+    schema: conversationResponseSchema,
+  });
+}
+
+/** MSG-006 · PATCH /conversations/{conversationId}: the manager renames the group. */
+export function renameGroup(
+  conversationId: string,
+  body: RenameGroupRequest,
+): Promise<Conversation> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "renameGroup",
+    method: "PATCH",
+    path: conversationPath(conversationId),
+    body,
+    schema: conversationResponseSchema,
+  });
+}
+
+/** MSG-006 · GET /conversations/{conversationId}/members: everyone who has been in it. */
+export function listMembers(
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<readonly Member[]> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "listMembers",
+    path: `${conversationPath(conversationId)}/members`,
+    schema: memberListResponseSchema,
+    signal,
+  });
+}
+
+/** MSG-006 · POST /conversations/{conversationId}/members: any member adds colleagues. */
+export function addMembers(
+  conversationId: string,
+  body: AddMembersRequest,
+): Promise<readonly Member[]> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "addMembers",
+    method: "POST",
+    path: `${conversationPath(conversationId)}/members`,
+    body,
+    schema: memberListResponseSchema,
+  });
+}
+
+/**
+ * MSG-006 · DELETE /conversations/{conversationId}/members/{userId}: the user's own id leaves the
+ * group; another's is the manager removing them.
+ */
+export function removeMember(conversationId: string, userId: string): Promise<undefined> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "removeMember",
+    method: "DELETE",
+    path: `${conversationPath(conversationId)}/members/${encodeURIComponent(userId)}`,
+    schema: z.undefined(),
   });
 }

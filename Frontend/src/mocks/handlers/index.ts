@@ -1,27 +1,49 @@
 import type { HttpHandler } from "msw";
 
 import { approvalHandlers } from "./approvals";
+import { assistantHandlers } from "./assistant";
 import { authHandlers } from "./auth";
+import { campaignHandlers } from "./campaigns";
+import { commissionHandlers } from "./commission";
 import { complaintHandlers } from "./complaints";
+import { customerHandlers } from "./customers";
 import { dashboardHandlers } from "./dashboard";
+import { dealerApplicationHandlers } from "./dealer-applications";
 import { documentHandlers } from "./documents";
+import { holidayHandlers } from "./holidays";
 import { importHandlers } from "./imports";
 import { leadCaptureHandlers } from "./lead-capture";
 import { leadHandlers } from "./leads";
 import { lookupHandlers } from "./lookups";
+import { marketingHandlers } from "./marketing";
 import { messageHandlers } from "./messages";
 import { notificationHandlers } from "./notifications";
 import { orderHandlers } from "./orders";
 import { partnerHandlers } from "./partners";
+import { paymentHandlers } from "./payments";
+import { policyHandlers } from "./policy";
+import { consumerFenceHandlers, portalHandlers } from "./portal";
 import { productHandlers } from "./products";
 import { quotationHandlers } from "./quotations";
+import { ratingHandlers } from "./ratings";
+import { reportHandlers } from "./reports";
+import { orderPointsHandlers, rewardHandlers } from "./rewards";
+import { schemeHandlers } from "./schemes";
+import { sellerGstinHandlers } from "./seller-gstins";
+import { settingsHandlers } from "./settings";
+import { stockHandlers } from "./stock";
 import { subsidyHandlers } from "./subsidy";
 import { subsidyApplicationHandlers } from "./subsidy-applications";
 import { subsidyMasterHandlers } from "./subsidy-masters";
 import { subsidyReportHandlers } from "./subsidy-reports";
 import { subsidySchemeHandlers } from "./subsidy-schemes";
+import { targetHandlers } from "./targets";
 import { taskHandlers } from "./tasks";
+import { territoryHandlers } from "./territories";
+import { trackingHandlers } from "./tracking";
 import { userHandlers } from "./users";
+import { visitHandlers } from "./visits";
+import { warrantyHandlers } from "./warranty";
 
 /**
  * What the backend does not serve yet, so it stays mocked even against a real API
@@ -37,7 +59,9 @@ export const unbuiltHandlers: readonly HttpHandler[] = [];
  * by the backend, so in partial mode it goes to the real API.
  */
 export const handlers: readonly HttpHandler[] = [
+  ...consumerFenceHandlers,
   ...authHandlers,
+  ...portalHandlers,
   ...approvalHandlers,
   ...leadHandlers,
   ...leadCaptureHandlers,
@@ -48,12 +72,34 @@ export const handlers: readonly HttpHandler[] = [
   ...documentHandlers,
   ...orderHandlers,
   ...dashboardHandlers,
+  ...reportHandlers,
   ...notificationHandlers,
   ...messageHandlers,
   ...taskHandlers,
+  ...targetHandlers,
   ...complaintHandlers,
   ...userHandlers,
   ...partnerHandlers,
+  ...dealerApplicationHandlers,
+  ...territoryHandlers,
+  ...settingsHandlers,
+  ...paymentHandlers,
+  ...commissionHandlers,
+  ...rewardHandlers,
+  ...orderPointsHandlers,
+  ...marketingHandlers,
+  ...campaignHandlers,
+  ...stockHandlers,
+  ...customerHandlers,
+  ...ratingHandlers,
+  ...trackingHandlers,
+  ...visitHandlers,
+  ...policyHandlers,
+  ...warrantyHandlers,
+  ...holidayHandlers,
+  ...assistantHandlers,
+  ...sellerGstinHandlers,
+  ...schemeHandlers,
   ...subsidyHandlers,
   ...subsidyApplicationHandlers,
   ...subsidyReportHandlers,

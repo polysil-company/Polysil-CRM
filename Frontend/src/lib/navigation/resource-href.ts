@@ -16,6 +16,7 @@ const RESOURCE_TYPE_LABELS = new Map<string, string>([
   ["approval", "Approval"],
   ["task", "Task"],
   ["complaint", "Complaint"],
+  ["subsidy_application", "Subsidy file"],
 ]);
 
 /** "Lead", "Sales order" — or "Record" for a type the app does not know yet. */
@@ -31,7 +32,8 @@ export type ResourceHref =
   | `/leads/${string}`
   | `/quotations/${string}`
   | `/sales-orders/${string}`
-  | `/complaints/${string}`;
+  | `/complaints/${string}`
+  | `/subsidy/${string}`;
 
 /** Where a record opens, or null while its module has no screen yet. */
 export function resourceHref(resource: Pick<ResourceRef, "type" | "id">): ResourceHref | null {
@@ -45,6 +47,9 @@ export function resourceHref(resource: Pick<ResourceRef, "type" | "id">): Resour
       return `/sales-orders/${id}`;
     case "complaint":
       return `/complaints/${id}`;
+    // SUBS-006 · the subsidy bells (`subsidy-completion.md` §3)
+    case "subsidy_application":
+      return `/subsidy/${id}`;
     default:
       // TODO(TASK-003): link a task once it has its own page; My day shows one day only, so
       // it may not hold the task.

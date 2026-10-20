@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  useAmendOrder,
   useCancelOrder,
   useCloseOrderShort,
   useDeleteOrder,
@@ -44,12 +45,13 @@ import {
   stepRoleLabel,
 } from "@/features/orders/lib/order-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCloseAfterSuccess } from "@/hooks/use-close-after-success";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { readFieldErrors } from "@/lib/api/errors";
 import { formatInr } from "@/lib/format";
 import { createLogger } from "@/lib/logger";
 
-import { RefusalAlert, useCloseAfterSuccess, useOrderRefusal } from "./order-dialog-shared";
+import { RefusalAlert, useOrderRefusal } from "./order-dialog-shared";
 import { RecordDispatchForm } from "./record-dispatch-form";
 
 const log = createLogger({
@@ -65,6 +67,7 @@ export type OrderDialog =
   | { readonly kind: "cancel" }
   | { readonly kind: "dispatch" }
   | { readonly kind: "close-short" }
+  | { readonly kind: "amend" }
   | { readonly kind: "void"; readonly dispatch: Dispatch };
 
 export interface OrderActionDialogProps {
@@ -75,10 +78,10 @@ export interface OrderActionDialogProps {
 }
 
 /**
- * SO-003, SO-004, DISP-002 · Confirms an action on an order: submit, edit the header, delete a
- * never-submitted draft, cancel, record a dispatch, close short, void a dispatch. A refusal
- * because someone else moved the order closes the dialog, says so, and shows the latest; any
- * other refusal stays in the dialog with what to do next.
+ * SO-003, SO-004, SO-007, DISP-002 · Confirms an action on an order: submit, edit the header,
+ * delete a never-submitted draft, cancel, amend, record a dispatch, close short, void a
+ * dispatch. A refusal because someone else moved the order closes the dialog, says so, and shows
+ * the latest; any other refusal stays in the dialog with what to do next.
  */
 export function OrderActionDialog({
   order,
@@ -103,6 +106,9 @@ export function OrderActionDialog({
         ) : null}
         {dialog?.kind === "close-short" ? (
           <RemarkForm order={order} action="close-short" onClose={onClose} />
+        ) : null}
+        {dialog?.kind === "amend" ? (
+          <RemarkForm order={order} action="amend" onClose={onClose} />
         ) : null}
         {dialog?.kind === "void" ? (
           <RemarkForm order={order} action="void" dispatch={dialog.dispatch} onClose={onClose} />
@@ -414,9 +420,9 @@ function DeleteForm({ order, onClose }: FormProps): React.JSX.Element {
   );
 }
 
-// ── cancel, close short, void: a reason is required (SO-004, DISP-002) ─────────
+// ── cancel, amend, close short, void: a reason is required (SO-004, SO-007, DISP-002) ──
 
-type RemarkAction = "cancel" | "close-short" | "void";
+type RemarkAction = "cancel" | "amend" | "close-short" | "void";
 
 const REMARK_COPY: Readonly<
   Record<RemarkAction, { title: string; label: string; submit: string; busy: string; done: string }>
@@ -427,6 +433,13 @@ const REMARK_COPY: Readonly<
     submit: "Cancel order",
     busy: "Cancelling…",
     done: "Cancelled",
+  },
+  amend: {
+    title: "Amend this approved order?",
+    label: "What needs to change, and why?",
+    submit: "Amend order",
+    busy: "Amending…",
+    done: "Amended",
   },
   "close-short": {
     title: "Close the order short?",
@@ -444,6 +457,13 @@ const REMARK_COPY: Readonly<
   },
 };
 
+const REMARK_HANDLERS: Readonly<Record<RemarkAction, string>> = {
+  cancel: "handleCancelOrder",
+  amend: "handleAmendOrder",
+  "close-short": "handleCloseShort",
+  void: "handleVoidDispatch",
+};
+
 function RemarkForm({
   order,
   action,
@@ -451,6 +471,7 @@ function RemarkForm({
   onClose,
 }: FormProps & { action: RemarkAction; dispatch?: Dispatch }): React.JSX.Element {
   const cancel = useCancelOrder();
+  const amend = useAmendOrder();
   const closeShort = useCloseOrderShort();
   const voidDispatch = useVoidDispatch();
   const idempotency = useIdempotencyKey();
@@ -472,6 +493,8 @@ function RemarkForm({
       switch (action) {
         case "cancel":
           return cancel.mutateAsync({ id, input });
+        case "amend":
+          return amend.mutateAsync({ id, input });
         case "close-short":
           return closeShort.mutateAsync({ id, input });
         case "void":
@@ -479,21 +502,21 @@ function RemarkForm({
       }
     },
     logger: log,
-    fn:
-      action === "void"
-        ? "handleVoidDispatch"
-        : action === "cancel"
-          ? "handleCancelOrder"
-          : "handleCloseShort",
-    dataId: action === "cancel" ? "SO-004" : "DISP-002",
+    fn: REMARK_HANDLERS[action],
+    dataId: action === "cancel" ? "SO-004" : action === "amend" ? "SO-007" : "DISP-002",
     onSuccess: () => {
       idempotency.reset();
-      toast.success(
-        action === "void"
-          ? `${dispatch?.dispatchNo ?? "Dispatch"} voided`
-          : `${orderNumber(order)} ${copy.done.toLowerCase()}`,
-        action === "void" ? { description: "Its quantities are open again." } : undefined,
-      );
+      if (action === "void") {
+        toast.success(`${dispatch?.dispatchNo ?? "Dispatch"} voided`, {
+          description: "Its quantities are open again.",
+        });
+      } else if (action === "amend") {
+        toast.success(`${orderNumber(order)} is a draft again`, {
+          description: "Make the changes, then submit it for approval again.",
+        });
+      } else {
+        toast.success(`${orderNumber(order)} ${copy.done.toLowerCase()}`);
+      }
       closeSoon();
     },
     onError: (error) => {
@@ -506,13 +529,15 @@ function RemarkForm({
   });
 
   const explain =
-    action === "cancel"
-      ? order.quotations.length > 0
-        ? "The order stays on record, marked cancelled, and its quotations can be ordered again. The reason is kept on its history."
-        : "The order stays on record, marked cancelled. The reason is kept on its history."
-      : action === "close-short"
-        ? "Every quantity still open becomes short, and nothing more ships against this order. What has left stays as it is."
-        : `${dispatch?.dispatchNo ?? "The dispatch"} stays on record, marked void, and its quantities are open again.`;
+    action === "amend"
+      ? "It goes back to draft under the same number, so its items and terms can change. It then needs approval again. Its PDF is withdrawn until then, and any payment instalments are cleared for Accounts to set again."
+      : action === "cancel"
+        ? order.quotations.length > 0
+          ? "The order stays on record, marked cancelled, and its quotations can be ordered again. The reason is kept on its history."
+          : "The order stays on record, marked cancelled. The reason is kept on its history."
+        : action === "close-short"
+          ? "Every quantity still open becomes short, and nothing more ships against this order. What has left stays as it is."
+          : `${dispatch?.dispatchNo ?? "The dispatch"} stays on record, marked void, and its quantities are open again.`;
 
   return (
     <form
@@ -556,7 +581,7 @@ function RemarkForm({
         </DialogClose>
         <Button
           type="submit"
-          variant="destructive"
+          variant={action === "amend" ? "primary" : "destructive"}
           state={submit.state}
           loadingLabel={copy.busy}
           successLabel={copy.done}

@@ -25,22 +25,24 @@ function visibleIds(
 }
 
 describe("[APP-001] navigation", () => {
-  it("shows the modules the user may view, and the dashboard to everyone", () => {
+  it("shows the modules the user may view, and the dashboard and help to everyone", () => {
     expect(
       visibleIds([{ module: "leads", actions: ["view", "create"], scope: "org_subtree" }]),
-    ).toEqual(["dashboard", "leads"]);
-    expect(visibleIds([])).toEqual(["dashboard"]);
+    ).toEqual(["dashboard", "help", "leads", "customers"]);
+    expect(visibleIds([])).toEqual(["dashboard", "help"]);
   });
 
   it("needs the view action, not just any grant", () => {
     expect(visibleIds([{ module: "leads", actions: ["create"], scope: null }])).toEqual([
       "dashboard",
+      "help",
     ]);
   });
 
   it("ignores modules the app does not know yet", () => {
     expect(visibleIds([{ module: "warehouse", actions: ["view"], scope: "global" }])).toEqual([
       "dashboard",
+      "help",
     ]);
   });
 
@@ -142,6 +144,13 @@ describe("[APP-006] route guards", () => {
     expect(canOpenPath("/partners/new", admin, "staff")).toBe(true);
     expect(canOpenPath("/partners/p-1/edit", dealer, "partner_user")).toBe(false);
     expect(canOpenPath("/partners", mockPermissionsFor("qa_manager"), "staff")).toBe(false);
+  });
+
+  it("opens the Accounts queue to whoever may view payments, as the backend names it (ACCT-001)", () => {
+    expect(canOpenPath("/accounts", mockPermissionsFor("account_manager"), "staff")).toBe(true);
+    expect(canOpenPath("/accounts", admin, "staff")).toBe(true);
+    expect(canOpenPath("/accounts", mockPermissionsFor("employee"), "staff")).toBe(false);
+    expect(canOpenPath("/accounts", dealer, "partner_user")).toBe(false);
   });
 
   it("leaves pages outside the nav map open", () => {

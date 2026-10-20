@@ -96,6 +96,8 @@ export interface RecordDocumentsProps {
    * an order): it names the list and the button, "Documents on D/SO/…", "Attach a file to D/SO/…".
    */
   recordName?: string;
+  /** CHNL-007 · What to attach, when the record has none yet and the reader may add. */
+  emptyHint?: string;
 }
 
 /** A browser that can't name HEIC still sends it: judge by the extension then. */
@@ -128,6 +130,7 @@ export function RecordDocuments({
   variant = "card",
   description,
   recordName,
+  emptyHint = "No documents yet. Attach the purchase order, a payment slip or a photo.",
 }: RecordDocumentsProps): React.JSX.Element {
   const label = recordName === undefined ? "Documents" : `Documents on ${recordName}`;
   const query = useQuery(documentsQueryOptions(scope));
@@ -173,11 +176,7 @@ export function RecordDocuments({
       pending={<DocumentsSkeleton />}
       isEmpty={(documents) => documents.length === 0}
       empty={
-        <p className="text-sm text-muted-foreground">
-          {mayAdd
-            ? "No documents yet. Attach the purchase order, a payment slip or a photo."
-            : "No documents."}
-        </p>
+        <p className="text-sm text-muted-foreground">{mayAdd ? emptyHint : "No documents."}</p>
       }
     >
       {(documents) => (

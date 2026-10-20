@@ -58,6 +58,7 @@ const PATCH_KEYS = [
   "estimated_value",
   "crops",
   "land_hectares",
+  "campaign_id",
 ] as const satisfies readonly (keyof PatchLeadRequest)[];
 
 function formValuesOf(lead: Lead): CreateLeadFormValues {
@@ -74,6 +75,7 @@ function formValuesOf(lead: Lead): CreateLeadFormValues {
     crops: lead.crops.map((crop) => crop.code),
     landHectares: lead.landHectares === null ? "" : String(Number(lead.landHectares)),
     note: "",
+    campaign: lead.campaign?.id ?? null,
   };
 }
 
@@ -177,7 +179,7 @@ export function LeadEditDialog({ lead }: { lead: Lead }): React.JSX.Element {
             </DialogDescription>
           </DialogHeader>
           <DialogBody>
-            <LeadFields form={form} idPrefix="edit-lead" />
+            <LeadFields form={form} idPrefix="edit-lead" currentCampaign={lead.campaign} />
             {formErrorView ? (
               <div
                 role="alert"

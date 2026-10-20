@@ -21,6 +21,7 @@ import {
 import { PARTNER_TYPE_LABELS, parentTypeOf } from "@/features/partners/lib/partner-labels";
 import { normalizeIndianMobile } from "@/lib/format";
 
+import { GstinDetails } from "./gstin-details";
 import { ParentPicker, type ParentChoice } from "./parent-picker";
 
 /** The backend's shapes (migration 004), checked here first so the form names the field. */
@@ -407,6 +408,20 @@ export function PartnerFields({
               }}
             />
             <FieldError id="partner-gstin-error">{errors.gstin}</FieldError>
+            {/* CHNL-006 · Staff only: the backend answers 403 to partner users. */}
+            {staff && GSTIN_PATTERN.test(upper(draft.gstin)) ? (
+              <GstinDetails
+                gstin={upper(draft.gstin)}
+                onUse={(fill) => {
+                  set({
+                    name: fill.name,
+                    pan: fill.pan ?? draft.pan,
+                    address: fill.address ?? draft.address,
+                    gstRegistered: true,
+                  });
+                }}
+              />
+            ) : null}
           </Field>
 
           <Field data-invalid={invalid("pan")}>

@@ -17,6 +17,7 @@ import {
 } from "@/features/tasks/api/tasks.schemas";
 import { summarizeSchemaIssues } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
+import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { todayInIndia } from "@/lib/format";
 import { mockLookupRows } from "@/mocks/data/lookups";
@@ -27,6 +28,7 @@ import { MOCK_TEAM, type MockMinutes, type MockTask, type MockUser } from "@/moc
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
+import { mockSettings } from "./settings";
 import { decodeCursor, encodeCursor, errorResponse } from "./shared";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -43,11 +45,49 @@ function currentUser(): MockUser {
   return { id: me.id, full_name: me.full_name };
 }
 
-/** How far the user's `tasks` grant reaches, or null without one (dealers get no tasks). */
+/** TASK-009 · Whether the admin has switched on tasks for dealers (`tasks_for_dealers`). */
+function dealerTasksOn(): boolean {
+  return mockSettings().find((setting) => setting.key === "tasks_for_dealers")?.value === "on";
+}
+
+/**
+ * How far the user's `tasks` grant reaches, or null without one. A dealer's own-scope grant
+ * counts only while `tasks_for_dealers` is on (FS-037): off, every tasks route answers 403.
+ */
 function taskScope(): string | null {
-  return (
-    mockPermissionsFor(readMockRole()).find((grant) => grant.module === "tasks")?.scope ?? null
-  );
+  const role = readMockRole();
+  if (isPartnerRole(role) && !dealerTasksOn()) return null;
+  return mockPermissionsFor(role).find((grant) => grant.module === "tasks")?.scope ?? null;
+}
+
+/** A dealer user completes; edit, cancel, reopen and new tasks answer 403. */
+function dealerRefusal(): Response | null {
+  return isPartnerRole(readMockRole())
+    ? errorResponse(403, "forbidden", "A dealer completes its tasks; Polysil staff change them.")
+    : null;
+}
+
+/** TASK-009 · The users of the dealers in the mock, as the assignee list names them. */
+const DEALER_ROLES = ["distributor", "dealer", "sub_dealer"] as const;
+
+function dealerUsers(): {
+  user: MockUser;
+  partner: { id: string; name: string; partner_type: string };
+}[] {
+  return DEALER_ROLES.map((role) => {
+    const me = mockMeFor(role).data;
+    return {
+      user: { id: me.id, full_name: me.full_name },
+      partner: { id: me.partner?.id ?? "", name: me.partner?.name ?? "", partner_type: role },
+    };
+  });
+}
+
+/** Staff who may give dealers tasks see their users, while the setting is on. */
+function assignableDealers(scope: string | null): ReturnType<typeof dealerUsers> {
+  return scope === null || scope === "own" || !dealerTasksOn() || isPartnerRole(readMockRole())
+    ? []
+    : dealerUsers();
 }
 
 /** The people below the user: none for an officer. */
@@ -261,12 +301,22 @@ export const taskHandlers = [
   }),
 
   /** TASK-004 · The user first, then the active staff below them. */
-  http.get(buildApiUrl("/tasks/assignees"), async () => {
+  http.get(buildApiUrl("/tasks/assignees"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     const scope = taskScope();
     if (scope === null) return noTasksModule();
-    return HttpResponse.json({ data: [currentUser(), ...teamOf(scope)] });
+    const withPartners = new URL(request.url).searchParams.get("include_partners") === "true";
+    return HttpResponse.json({
+      data: [
+        ...[currentUser(), ...teamOf(scope)].map((person) => ({ ...person, kind: "staff" })),
+        ...(withPartners ? assignableDealers(scope) : []).map(({ user, partner }) => ({
+          ...user,
+          kind: "partner",
+          partner,
+        })),
+      ],
+    });
   }),
 
   /** TASK-003 · Tasks in the user's scope, earliest due first, filtered by lead or status. */
@@ -308,6 +358,8 @@ export const taskHandlers = [
     if (failure) return failure;
     const scope = taskScope();
     if (scope === null) return noTasksModule();
+    const refused = dealerRefusal();
+    if (refused !== null) return refused;
     const key = idempotencyKeyOf(request);
     if (key instanceof Response) return key;
 
@@ -327,9 +379,10 @@ export const taskHandlers = [
     }
     const body = parsed.data;
     const me = currentUser();
-    const assignee = [me, ...teamOf(scope)].find(
-      (person) => person.id === (body.assigned_to ?? me.id),
-    );
+    const dealer = assignableDealers(scope).find((item) => item.user.id === body.assigned_to);
+    const assignee =
+      dealer?.user ??
+      [me, ...teamOf(scope)].find((person) => person.id === (body.assigned_to ?? me.id));
     if (assignee === undefined) {
       return errorResponse(422, "not_assignable", "That person is not yours to assign to.", {
         assigned_to: "not assignable by you",
@@ -354,6 +407,23 @@ export const taskHandlers = [
       return errorResponse(422, "lead_merged", "That lead was merged into another.", {
         lead_id: "merged",
       });
+    }
+    // TASK-009 · a dealer sees only its own leads and orders
+    const linkedOrder =
+      body.sales_order_id == null
+        ? null
+        : mockDb.orders.find((item) => item.id === body.sales_order_id);
+    if (
+      dealer !== undefined &&
+      ((lead != null && lead.assigned_partner?.id !== dealer.partner.id) ||
+        (linkedOrder != null && linkedOrder.partner?.id !== dealer.partner.id))
+    ) {
+      return errorResponse(
+        422,
+        "link_not_visible_to_assignee",
+        "The dealer can't open what this task is about.",
+        { assigned_to: "can't open the lead this task is about" },
+      );
     }
     const wantsType = body.task_type === "meeting" && lead !== null;
     const meetingType = mockLookupRows("meeting-types").find(
@@ -461,6 +531,8 @@ export const taskHandlers = [
   http.patch(buildApiUrl("/tasks/:taskId"), async ({ request, params }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
+    const refused = dealerRefusal();
+    if (refused !== null) return refused;
     const key = idempotencyKeyOf(request);
     if (key instanceof Response) return key;
     const raw: unknown = await request.json();
@@ -535,6 +607,16 @@ export const taskHandlers = [
             )
             .sort((a, b) => b.held_at.localeCompare(a.held_at));
     return HttpResponse.json({ data: rows.map(minutesWire) });
+  }),
+
+  /** TASK-007 · One set of minutes; a partner user has no minutes (staff only). */
+  http.get(buildApiUrl("/minutes/:minutesId"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (taskScope() === null) return noTasksModule();
+    const minutes = mockDb.minutes.find((item) => item.id === params.minutesId);
+    if (minutes === undefined) return errorResponse(404, "not_found", "No such minutes.");
+    return HttpResponse.json({ data: minutesWire(minutes) });
   }),
 
   /**
@@ -743,6 +825,8 @@ export const taskHandlers = [
   http.post(buildApiUrl("/tasks/:taskId/cancel"), async ({ request, params }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
+    const refused = dealerRefusal();
+    if (refused !== null) return refused;
     const key = idempotencyKeyOf(request);
     if (key instanceof Response) return key;
     const raw: unknown = await request.json();
@@ -778,6 +862,8 @@ export const taskHandlers = [
   http.post(buildApiUrl("/tasks/:taskId/reopen"), async ({ request, params }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
+    const refused = dealerRefusal();
+    if (refused !== null) return refused;
     const key = idempotencyKeyOf(request);
     if (key instanceof Response) return key;
     const serialized = JSON.stringify({ task: params.taskId });

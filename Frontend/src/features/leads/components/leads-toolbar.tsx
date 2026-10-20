@@ -10,6 +10,7 @@ import { SearchField } from "@/components/patterns/search-field";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Skeleton } from "@/components/ui/skeleton";
+import { activeCampaignsQueryOptions } from "@/features/campaigns/api/campaigns.queries";
 import { exportLeads } from "@/features/leads/api/leads.api";
 import { LEAD_INQUIRY_TYPES, LEAD_STAGES } from "@/features/leads/api/leads.schemas";
 import { useLeadListParams } from "@/features/leads/hooks/use-lead-list-params";
@@ -63,6 +64,12 @@ export function LeadsToolbar(): React.JSX.Element {
   const canReviewDuplicates = canEdit && staff;
   const sources = useQuery(lookupListQueryOptions("lead-sources"));
   const canCreate = useCan("leads", "create");
+  // MKT-006 · Staff filter by campaign; a dealer's leads carry none, and dealers can't list them.
+  const campaigns = useQuery({ ...activeCampaignsQueryOptions(), enabled: staff });
+  const campaignOptions = [
+    { value: "none", label: "No campaign" },
+    ...(campaigns.data ?? []).map((campaign) => ({ value: campaign.id, label: campaign.name })),
+  ];
 
   // Inactive sources stay listed: old leads still carry them, so they are still worth filtering by.
   const sourceOptions = (sources.data ?? []).map((source) => ({
@@ -113,6 +120,17 @@ export function LeadsToolbar(): React.JSX.Element {
               setFilters({ type });
             }}
           />
+          {staff ? (
+            <SingleFilterPill
+              label="Campaign"
+              options={campaignOptions}
+              selected={params.campaign}
+              emptyMessage="Campaigns couldn't be loaded."
+              onChange={(campaign) => {
+                setFilters({ campaign });
+              }}
+            />
+          ) : null}
           {activeFilterCount > 0 ? (
             <Button variant="ghost" size="sm" onClick={resetFilters}>
               Reset filters

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  createParser,
   parseAsArrayOf,
   parseAsBoolean,
   parseAsInteger,
@@ -9,6 +10,7 @@ import {
   useQueryStates,
 } from "nuqs";
 
+import { MAX_LEAD_AREAS } from "@/features/leads/api/leads.schemas";
 import {
   DEFAULT_ORDER_PAGE_SIZE,
   ORDER_PAGE_SIZE_OPTIONS,
@@ -19,10 +21,17 @@ import {
   type OrderType,
 } from "@/features/orders/api/orders.schemas";
 
+/** A territory or office id: a UUID or similar, never a comma. */
+const ID_PATTERN = /^[\w-]{1,64}$/;
+const parseAsId = createParser({
+  parse: (value: string) => (ID_PATTERN.test(value) ? value : null),
+  serialize: (value: string) => value,
+});
+
 /**
  * URL ⇄ state for the Sales orders page, as the quotation list does it: filters and the page
  * live in the URL, and `cursors` keeps the cursor of every page moved forward through.
- * `mine=true` shows only the signed-in user's own orders.
+ * `mine=true` shows only the signed-in user's own orders; `area` and `office` narrow by place.
  */
 export const orderListSearchParams = {
   cursors: parseAsArrayOf(parseAsString).withDefault([]),
@@ -31,6 +40,9 @@ export const orderListSearchParams = {
   status: parseAsArrayOf(parseAsStringLiteral(ORDER_STATUSES)).withDefault([]),
   type: parseAsStringLiteral(ORDER_TYPES),
   mine: parseAsBoolean.withDefault(false),
+  /** SO-001: territories (with everything under them) and an office (with its sub-offices). */
+  area: parseAsArrayOf(parseAsId).withDefault([]),
+  office: parseAsId,
 };
 
 export interface OrderFilterPatch {
@@ -38,6 +50,8 @@ export interface OrderFilterPatch {
   readonly status?: readonly OrderStatus[];
   readonly type?: OrderType | null;
   readonly mine?: boolean;
+  readonly areas?: readonly string[];
+  readonly officeId?: string | null;
 }
 
 export interface OrderListParamsControls {
@@ -75,6 +89,8 @@ export function useOrderListParams(): OrderListParamsControls {
     mine: values.mine,
     leadId: null,
     quotationId: null,
+    areas: [...new Set(values.area)].slice(0, MAX_LEAD_AREAS),
+    officeId: values.office,
   };
 
   const activeFilterCount = [
@@ -82,6 +98,8 @@ export function useOrderListParams(): OrderListParamsControls {
     params.status.length > 0,
     params.orderType !== null,
     params.mine,
+    params.areas.length > 0,
+    params.officeId !== null,
   ].filter(Boolean).length;
 
   return {
@@ -95,6 +113,8 @@ export function useOrderListParams(): OrderListParamsControls {
         ...(patch.status === undefined ? {} : { status: [...patch.status] }),
         ...(patch.type === undefined ? {} : { type: patch.type }),
         ...(patch.mine === undefined ? {} : { mine: patch.mine }),
+        ...(patch.areas === undefined ? {} : { area: [...patch.areas] }),
+        ...(patch.officeId === undefined ? {} : { office: patch.officeId }),
       });
     },
     nextPage: (cursor) => {
@@ -110,7 +130,15 @@ export function useOrderListParams(): OrderListParamsControls {
       void setValues({ pageSize: normalizePageSize(pageSize), cursors: null });
     },
     resetFilters: () => {
-      void setValues({ q: null, status: null, type: null, mine: null, cursors: null });
+      void setValues({
+        q: null,
+        status: null,
+        type: null,
+        mine: null,
+        area: null,
+        office: null,
+        cursors: null,
+      });
     },
   };
 }

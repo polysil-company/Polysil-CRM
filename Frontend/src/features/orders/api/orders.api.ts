@@ -14,6 +14,8 @@ import {
   noContentSchema,
   orderPageSchema,
   orderResponseSchema,
+  orderSchemePreviewSchema,
+  orderStatsSchema,
   type CreateDispatchRequest,
   type CreateDirectOrder,
   type CreateOrderFromQuotations,
@@ -22,8 +24,11 @@ import {
   type Order,
   type OrderListParams,
   type OrderPage,
+  type OrderSchemePreview,
+  type OrderStats,
   type PatchOrderRequest,
   type RemarkRequest,
+  type OrderSubsidyRequest,
   type ReplaceOrderLinesRequest,
   type DispatchListParams,
   type DispatchPage,
@@ -55,8 +60,12 @@ export async function listOrders(
       status: params.status.join(","),
       order_type: params.orderType,
       owner: params.mine ? "me" : undefined,
+      waiting_on: params.waitingOn ?? undefined,
       lead_id: params.leadId,
       quotation_id: params.quotationId,
+      territory_id: params.areas.join(","),
+      owner_org_unit_id: params.officeId,
+      partner_id: params.partnerId ?? undefined,
     },
     schema: orderPageSchema,
     signal,
@@ -83,6 +92,24 @@ export function getOrder(orderId: string, signal?: AbortSignal): Promise<Order> 
     fn: "getOrder",
     path: `/orders/${encodeURIComponent(orderId)}`,
     schema: orderResponseSchema,
+    signal,
+  });
+}
+
+/**
+ * SCHM-005 · GET /orders/{id}/schemes — the scheme panel on a draft: what submit would take off
+ * and what delivery would earn. `409 order_not_draft` once submitted: read `benefits` instead.
+ */
+export function getOrderSchemes(
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<OrderSchemePreview> {
+  return apiRequest({
+    dataId: "SCHM-005",
+    logger: log,
+    fn: "getOrderSchemes",
+    path: `/orders/${encodeURIComponent(orderId)}/schemes`,
+    schema: orderSchemePreviewSchema,
     signal,
   });
 }
@@ -175,6 +202,23 @@ export function replaceOrderLines(
   });
 }
 
+/** SO-008 · PUT /orders/{id}/subsidy — a subsidised draft's leads and amounts. */
+export function setOrderSubsidy(
+  orderId: string,
+  { body, idempotencyKey }: WriteInput<OrderSubsidyRequest>,
+): Promise<Order> {
+  return apiRequest({
+    dataId: "SO-008",
+    logger: log,
+    fn: "setOrderSubsidy",
+    method: "PUT",
+    path: `/orders/${encodeURIComponent(orderId)}/subsidy`,
+    body,
+    idempotencyKey,
+    schema: orderResponseSchema,
+  });
+}
+
 /** SO-006 · GET /orders/export — the list as an Excel file, with the list's filters. */
 export function exportOrders(params: OrderListParams): Promise<DownloadedFile> {
   return apiDownload({
@@ -187,8 +231,11 @@ export function exportOrders(params: OrderListParams): Promise<DownloadedFile> {
       status: params.status.join(","),
       order_type: params.orderType,
       owner: params.mine ? "me" : undefined,
+      waiting_on: params.waitingOn ?? undefined,
       lead_id: params.leadId,
       quotation_id: params.quotationId,
+      territory_id: params.areas.join(","),
+      owner_org_unit_id: params.officeId,
     },
   });
 }
@@ -223,6 +270,21 @@ export function submitOrder(
   });
 }
 
+/**
+ * ACCT-001 · GET /orders/stats — every status's count, and submitted orders by the role whose
+ * step is next. Called without `waiting_on`, `waitingOn.account_manager` is the Accounts badge.
+ */
+export function getOrderStats(signal?: AbortSignal): Promise<OrderStats> {
+  return apiRequest({
+    dataId: "ACCT-001",
+    logger: log,
+    fn: "getOrderStats",
+    path: "/orders/stats",
+    schema: orderStatsSchema,
+    signal,
+  });
+}
+
 /** SO-004 · POST /orders/{id}/cancel — with a reason. */
 export function cancelOrder(
   orderId: string,
@@ -234,6 +296,26 @@ export function cancelOrder(
     fn: "cancelOrder",
     method: "POST",
     path: `/orders/${encodeURIComponent(orderId)}/cancel`,
+    body,
+    idempotencyKey,
+    schema: orderResponseSchema,
+  });
+}
+
+/**
+ * SO-007 · POST /orders/{id}/amend — an approved order back to draft under its number, with a
+ * reason. Refused once anything ships or is paid (409), and for a replacement order (422).
+ */
+export function amendOrder(
+  orderId: string,
+  { body, idempotencyKey }: WriteInput<RemarkRequest>,
+): Promise<Order> {
+  return apiRequest({
+    dataId: "SO-007",
+    logger: log,
+    fn: "amendOrder",
+    method: "POST",
+    path: `/orders/${encodeURIComponent(orderId)}/amend`,
     body,
     idempotencyKey,
     schema: orderResponseSchema,

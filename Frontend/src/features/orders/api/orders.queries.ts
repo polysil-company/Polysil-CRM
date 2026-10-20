@@ -1,7 +1,15 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 
-import { getOrder, getOrderTimeline, listDispatches, listOrders } from "./orders.api";
 import {
+  getOrder,
+  getOrderSchemes,
+  getOrderStats,
+  getOrderTimeline,
+  listDispatches,
+  listOrders,
+} from "./orders.api";
+import {
+  ACCOUNTS_ROLE,
   DEFAULT_ORDER_PAGE_SIZE,
   type DispatchListParams,
   type OrderListParams,
@@ -27,6 +35,9 @@ export const orderKeys = {
   timeline: (orderId: string) => [...orderKeys.timelines(), orderId] as const,
   // Under lists(), so recording or voiding a dispatch refreshes the queue as well.
   toShip: () => [...orderKeys.lists(), "to-ship"] as const,
+  /** Under `lists()`, so every write and decision that refreshes lists refreshes these. */
+  accountsQueue: () => [...orderKeys.lists(), "accounts-queue"] as const,
+  stats: () => [...orderKeys.lists(), "stats"] as const,
   dispatches: (params: DispatchListParams) => [...orderKeys.lists(), "dispatches", params] as const,
 };
 
@@ -42,6 +53,8 @@ const TO_SHIP: OrderListParams = {
   mine: false,
   leadId: null,
   quotationId: null,
+  areas: [],
+  officeId: null,
 };
 
 /** DISP-001 · The orders waiting to ship, a page at a time. */
@@ -52,6 +65,38 @@ export function ordersToShipQueryOptions() {
     initialPageParam: FIRST_PAGE,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     meta: { dataId: "DISP-001" },
+  });
+}
+
+/** How often the Accounts badge is checked again (a minute, like the approvals badge). */
+const ORDER_STATS_POLL_MS = 60_000;
+
+/** ACCT-001 · The counts, for the Accounts badge: orders whose next step is Accounts'. */
+export function orderStatsQueryOptions() {
+  return queryOptions({
+    queryKey: orderKeys.stats(),
+    queryFn: ({ signal }) => getOrderStats(signal),
+    refetchInterval: ORDER_STATS_POLL_MS,
+    meta: { dataId: "ACCT-001" },
+  });
+}
+
+/** ACCT-001 · Submitted orders waiting on Accounts' payment check (BE-022). */
+export const ACCOUNTS_QUEUE: OrderListParams = {
+  ...TO_SHIP,
+  status: ["submitted"],
+  waitingOn: ACCOUNTS_ROLE,
+};
+
+/** ACCT-001 · The Accounts queue, newest first as the order list is, a page at a time. */
+export function accountsQueueQueryOptions() {
+  return infiniteQueryOptions({
+    queryKey: orderKeys.accountsQueue(),
+    queryFn: ({ pageParam, signal }) =>
+      listOrders({ ...ACCOUNTS_QUEUE, cursor: pageParam }, signal),
+    initialPageParam: FIRST_PAGE,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    meta: { dataId: "ACCT-001" },
   });
 }
 
@@ -93,6 +138,18 @@ export function orderDetailQueryOptions(orderId: string) {
     // The PDF is ready when the user comes back from another tab or app (walk F-14).
     refetchIntervalInBackground: true,
     meta: { dataId: "SO-002" },
+  });
+}
+
+/**
+ * SCHM-005 · A draft's scheme preview. Under the order's own key, so whatever refreshes the order
+ * refreshes it; `revision` (the total and line count) refetches it as soon as the lines change.
+ */
+export function orderSchemesQueryOptions(orderId: string, revision: string) {
+  return queryOptions({
+    queryKey: [...orderKeys.detail(orderId), "schemes", revision] as const,
+    queryFn: ({ signal }) => getOrderSchemes(orderId, signal),
+    meta: { dataId: "SCHM-005" },
   });
 }
 

@@ -18,6 +18,7 @@ const NONE: OrderPermissions = {
   recordDispatch: false,
   editDispatch: false,
   isOwner: false,
+  isStaff: true,
 };
 const FIELD: OrderPermissions = { ...NONE, editOrders: true, isOwner: true };
 const DISPATCH: OrderPermissions = { ...NONE, recordDispatch: true, editDispatch: true };
@@ -27,6 +28,7 @@ const ADMIN: OrderPermissions = {
   recordDispatch: true,
   editDispatch: true,
   isOwner: false,
+  isStaff: true,
 };
 
 function refused(status: number, code: string, fields: Record<string, string> = {}): ApiError {
@@ -103,6 +105,7 @@ describe("[SO-004] orderActions", () => {
       recordDispatch: false,
       closeShort: false,
       voidDispatch: false,
+      amend: false,
     });
   });
 });
@@ -166,5 +169,63 @@ describe("[SO-001] order labels", () => {
     expect(stepRoleLabel("dispatch_manager")).toBe("Dispatch");
     expect(waitingOnLabel("state_manager")).toBe("Waiting on State Manager");
     expect(waitingOnLabel(null)).toBeNull();
+  });
+});
+
+describe("[SO-007] Amend an approved order", () => {
+  const approved = {
+    status: "approved" as const,
+    orderNo: "SO/GJ/2026-27/00001",
+    lines: lines("0.000"),
+    orderType: "commercial" as const,
+  };
+
+  it("is offered to staff who edit orders or own it, while nothing has shipped", () => {
+    expect(orderActions(approved, FIELD).amend).toBe(true);
+    expect(orderActions(approved, ADMIN).amend).toBe(true);
+    expect(orderActions(approved, { ...NONE, isOwner: true }).amend).toBe(true);
+    expect(orderActions(approved, DISPATCH).amend).toBe(false);
+  });
+
+  it("isn't offered to a partner, after a dispatch, on a replacement, or before approval", () => {
+    expect(orderActions(approved, { ...FIELD, isStaff: false }).amend).toBe(false);
+    expect(orderActions({ ...approved, lines: lines("1.000") }, ADMIN).amend).toBe(false);
+    expect(orderActions({ ...approved, orderType: "replacement" }, ADMIN).amend).toBe(false);
+    expect(orderActions({ ...approved, status: "submitted" }, ADMIN).amend).toBe(false);
+    expect(orderActions({ ...approved, status: "partially_dispatched" }, ADMIN).amend).toBe(false);
+  });
+
+  it("says why the backend refused, in the user's words", () => {
+    expect(orderRefusal(refused(409, "voided_dispatch_holds_lines"))).toMatchObject({
+      title: "This order had a dispatch voided",
+      message: "Its items can't change now. Cancel it and create a new one.",
+      stale: false,
+    });
+    expect(orderRefusal(refused(409, "order_has_payments")).title).toBe(
+      "Money is allocated to this order",
+    );
+    expect(orderRefusal(refused(422, "order_type_fixed")).title).toBe(
+      "A replacement order can't be amended",
+    );
+    expect(orderRefusal(refused(409, "order_dispatched")).stale).toBe(true);
+  });
+
+  it("writes the amend in the order's history with the total it was approved at", () => {
+    const event = (kind: string, payload: Record<string, unknown>): TimelineEvent => ({
+      id: kind,
+      kind,
+      occurredAt: "2026-10-13T10:00:00.000Z",
+      actor: null,
+      payload,
+    });
+    expect(
+      orderHistoryEntry(
+        event("order.amended", { from: "approved", to: "draft", from_total: "105000.00" }),
+      ),
+    ).toEqual({
+      title: "Amended: back to draft",
+      detail: "It was approved at ₹1,05,000.00",
+      tone: "warning",
+    });
   });
 });

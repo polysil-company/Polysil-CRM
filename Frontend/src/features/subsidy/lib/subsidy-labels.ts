@@ -1,4 +1,4 @@
-import type { BlockKey, SystemType } from "@/features/subsidy/api/subsidy.schemas";
+import type { BlockKey, ExtraBlockKey, SystemType } from "@/features/subsidy/api/subsidy.schemas";
 import { formatNumber } from "@/lib/format";
 
 /** SUBS-002 · Words for the calculator's codes. */
@@ -13,7 +13,7 @@ export const SYSTEM_LABELS: Readonly<Record<SystemType, string>> = {
 export type BlockTone = "block" | "tax" | "subtotal" | "total";
 
 export interface BlockRow {
-  readonly key: BlockKey;
+  readonly key: BlockKey | ExtraBlockKey;
   readonly label: string;
   readonly tone: BlockTone;
   /** The `GET /subsidy/config` parameter whose rate the label prints, e.g. insurance. */
@@ -52,6 +52,22 @@ export const BLOCK_ROWS: readonly BlockRow[] = [
 ];
 
 /**
+ * Rows only some schemes fill, each placed after the row named, and shown only where a column
+ * isn't zero: CG's fittings add-on and its inspection charge outside the cap, and AP's half of
+ * the GST that the state pays (subsidy + farmer's share + it = the total).
+ */
+export const EXTRA_BLOCK_ROWS: readonly (BlockRow & { readonly after: BlockKey })[] = [
+  { key: "fittings", label: "Fittings add-on", tone: "block", after: "sump" },
+  {
+    key: "flat_inspection",
+    label: "Inspection charge (outside the cap)",
+    tone: "block",
+    after: "sump",
+  },
+  { key: "gst_paid_by_state", label: "GST paid by the state", tone: "tax", after: "total_gst" },
+];
+
+/**
  * A ratio from the masters as a percentage to print: "0.0028" → "0.28%". Display only — the
  * figures beside it come from the backend. Null when the parameter is missing or unreadable.
  */
@@ -71,7 +87,24 @@ const WARNING_TITLES: Readonly<Record<string, string>> = {
   seven_year_not_applicable: "Seven-year rows don't apply",
   rounding_residual: "A paisa of rounding",
   sump_ignored_by_workbook: "Sump counted here, not in the scheme's sheet",
+  no_unit_cost_for_size: "No subsidy rate for this set size at this area",
+  subsidy_above_cost: "The scheme's sheet gives a subsidy above the cost",
+  unit_cost_below_zero: "The deductions are more than the unit cost",
+  pipe_size_ignored: "This scheme sets the pipe size by area",
+  guided_cost_above_cost: "The guided cost is more than the cost",
+  fittings_above_material: "The fittings amount is more than the lines",
+  area_between_steps: "The area is between table steps",
 };
+
+/** Warnings said in plain words in place of the backend's sentence. */
+const WARNING_SENTENCES: Readonly<Record<string, string>> = {
+  // SUBS-002 · `subsidy-completion.md` §5
+  area_between_steps: "Quantities use the next step; the unit cost is in between.",
+};
+
+export function warningSentence(code: string, sentence: string): string {
+  return WARNING_SENTENCES[code] ?? sentence;
+}
 
 /**
  * "seven_year_area_below_table" is the seven-year table's clamp, a different figure from the
