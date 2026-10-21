@@ -392,7 +392,9 @@ LEAD-005…008, QUOT-001…012, APPR-001…002, TASK-001…008, SO-001…004, DI
 
 ### 9.2 Still mocked — the backend serves them now, the frontend connects next
 
-Nothing. Notifications and messages were the last (BE-009, BE-010); `unbuiltHandlers` in `src/mocks/handlers/index.ts` is empty, so `partial` mocking sends every request to the real API. A module built before its endpoints exist goes back on that list until it is connected.
+- **A complaint's PDF** (CMPL-013, 21 Oct): **Download PDF** on a complaint, built to the shape asked in BE-031 (`pdf_state`, `GET /complaints/{id}/pdf`). The backend doesn't serve it yet; the button stays hidden until `pdf_state` arrives.
+
+Nothing else. Notifications and messages were the last (BE-009, BE-010); `unbuiltHandlers` in `src/mocks/handlers/index.ts` is empty, so `partial` mocking sends every request to the real API. A module built before its endpoints exist goes back on that list until it is connected.
 
 Picked up from the backend's finished asks: crops and land on a lead (BE-003: the new-lead form, the lead page and the list), win probability and weekly activity removed (BE-004), quotation numbers with links in a lead's history (BE-017), sorting on `GET /leads` (BE-001), the territory levels filter (BE-005), names on assignment events (BE-006), `awaiting_approval` on quotation list rows, and the `quotation_id` filter on `GET /orders` (BE-019); from #49, `request_remark` on approval rows and partner search by contact person; from #50, `GET /leads/areas` and the `territory_id` list filter. Nothing the backend marked done is left to pick up. Order events in a lead's history need the order's id and number from the backend (BE-020).
 

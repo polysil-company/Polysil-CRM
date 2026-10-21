@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-101 changes, newest first. Each title opens its entry.
+102 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-21 | [Download a complaint as PDF](changelog/entries/2026-10-21--feature--CMPL-013--complaint-pdf.md) | `feature` | `CMPL-013` |
 | 2026-10-18 | [Search and help](changelog/entries/2026-10-18--feature--BOT-001--assistant.md) | `feature` | `BOT-001` `BOT-002` |
 | 2026-10-18 | [Holidays, and complaint escalation](changelog/entries/2026-10-18--feature--CMPL-012--holidays-escalation.md) | `feature` | `CMPL-012` `MSTR-019` |
 | 2026-10-18 | [The farmers' portal](changelog/entries/2026-10-18--feature--FARM-001--consumer-portal.md) | `feature` | `FARM-001` `FARM-002` `FARM-003` |
@@ -112,6 +113,67 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 21 October 2026
+
+### Download a complaint as PDF
+
+`feature` · `CMPL-013` · Nakul Srivastava · [entry](changelog/entries/2026-10-21--feature--CMPL-013--complaint-pdf.md)
+
+#### Before
+
+After the QC verdict a complaint's files are locked, and the 18 Oct walk asked whether that was meant (F-12). A complaint also had no printable copy to send or file, unlike a quotation or a sales order.
+
+#### Now
+
+The user decided on 20 Oct: files stay locked after the QC verdict, and a complaint gets a **Download PDF** like a quotation or an order.
+
+- **Download PDF** sits by the complaint's actions once it is submitted.
+  - It asks for a ten-minute link on each click and opens it in a new tab, with the same button as quotations and orders (`PdfLinkButton`).
+  - While the PDF renders it says "Preparing PDF…"; a refusal says why.
+- **The backend doesn't serve it yet.** BE-031 asks for it in the order's shape:
+  - `pdf_state` on the complaint (`none`, `pending`, `ready`, `failed`);
+  - `GET /complaints/{id}/pdf` returning the link.
+- **Nothing changes on staging until then.** The button shows only when `pdf_state` arrives.
+
+**Mock**
+
+- `pdf_state` is `none` for a draft and `ready` once submitted.
+- The link names the file after the complaint number; a draft's link is a 404.
+
+Walked as Admin on a desktop in light mode and a touch phone in dark mode, on a closed complaint. Axe found nothing, with no sideways scroll.
+
+#### Discussion
+
+- **Built ahead of the backend, on purpose.** The contract mirrors the order's PDF, which the backend already serves, so the shape is unlikely to move. Plan.md §9.2 lists it as mocked until BE-031 is done.
+- **What the PDF contains is the backend's call.** BE-031 suggests:
+  - the number, status and severity;
+  - the parties;
+  - the lines;
+  - the check, the QC verdict and the remedy;
+  - the history.
+
+#### Files changed
+
+- `src/features/complaints/api/complaints.schemas.ts`: `pdf_state` on the complaint, `pdfState` on the screen.
+- `src/features/complaints/api/complaints.api.ts`: `getComplaintPdf`.
+- `src/features/complaints/components/complaint-detail.tsx`: **Download PDF**.
+- Mock: `src/mocks/handlers/complaints.ts`, the state and the link.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: CMPL-013.
+- `docs/Backend-Tasks.md`: BE-031.
+- Records: `Docs/Plan.md` (§9.2), `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`, `Docs/screenshots/complaints/complaint-pdf-*`.
+
+#### Tests
+
+`src/features/complaints/components/complaint-pdf.test.tsx`, 4 tests:
+
+- `[CMPL-013] A complaint's PDF (contract)`: none for a draft and a 404; a link once submitted.
+- `[CMPL-013] Download PDF on the complaint`:
+  - a closed complaint's PDF opens in a new tab, with no opener;
+  - no button on a draft;
+  - no button while the backend doesn't send `pdf_state`.
+
+To check by hand in the mock, open any closed complaint and select **Download PDF**.
 
 ## 18 October 2026
 

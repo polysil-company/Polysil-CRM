@@ -339,6 +339,7 @@ Complaint types are set with the other lookups, in the admin masters.
 
 ---
 - **CMPL-012 · Escalation** (screens: [the complaint](screenshots/complaints/complaint-escalated-desktop-light.jpg), [on a phone](screenshots/complaints/complaint-escalated-mobile-dark.jpg), [the bell](screenshots/complaints/bell-escalated-desktop-light.jpg)). While **Complaint escalation** rings the bell (Company settings), a complaint that misses a target says "Response target missed" or "Resolution target missed" by its status (in place of "Late"), and its Targets card says when it was escalated to its owner and managers. Its history shows "… target missed: escalated" by no one; the bell has a `complaint_escalated` kind with its own icon, opening the complaint. Dealers never get the fields or the bell. 🧪 👀
+- **CMPL-013 · Download PDF** (screens: [a closed complaint](screenshots/complaints/complaint-pdf-desktop-light.jpg), [phone, dark](screenshots/complaints/complaint-pdf-phone-dark.jpg)). A submitted complaint offers **Download PDF** by its actions, like a quotation or an order: a ten-minute link opened in a new tab. Files stay locked after the QC verdict (the user's decision on F-12). Built to the shape asked in BE-031 and **mocked**: the button shows only once the backend sends `pdf_state`, so staging shows none until then. 🧪 👀
 
 ## Subsidy
 

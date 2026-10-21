@@ -702,6 +702,14 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
   },
+  "CMPL-013": {
+    domain: "CMPL",
+    title:
+      "Download a complaint as PDF, like a quotation or an order (`GET /complaints/{id}/pdf`, `pdf_state`)",
+    owner: "shared",
+    status: "in-progress",
+    notes: "Asked as BE-031 (21 Oct). The button shows only once the backend sends `pdf_state`.",
+  },
 
   "TASK-001": {
     domain: "TASK",

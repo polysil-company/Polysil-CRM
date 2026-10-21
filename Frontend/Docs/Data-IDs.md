@@ -217,6 +217,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | CMPL-010 | Reopen a closed or QC-rejected complaint, with a reason (`POST /complaints/{id}/reopen`) | shared | in-progress |
 | CMPL-011 | Warranty on a complaint line: in warranty, out, none or unknown, from the dispatch or the supply date (`warranty` on `GET /complaints/{id}`) | shared | in-progress |
 | CMPL-012 | Complaint escalation: a missed response or resolution target rings the bell; the complaint shows the miss (FS-028) | shared | in-progress |
+| CMPL-013 | Download a complaint as PDF, like a quotation or an order (`GET /complaints/{id}/pdf`, `pdf_state`) | shared | in-progress |
 | TASK-001 | My day — one person's tasks due that day and overdue (`GET /planner`) | shared | in-progress |
 | TASK-002 | Team day — due, done and overdue per person below a manager (`GET /planner/team`) | shared | in-progress |
 | TASK-003 | List tasks — a lead's tasks, and every task with filters (`GET /tasks`, `GET /tasks/{id}`) | shared | in-progress |
