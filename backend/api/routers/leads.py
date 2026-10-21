@@ -44,7 +44,8 @@ from api.schemas.leads import (
     TimelineEvent,
     TimelinePage,
 )
-from api.services import exports
+from api.schemas.products import ProductCategoryItem, UomItem
+from api.services import exports, pricing
 from api.services import leads as service
 
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -710,6 +711,25 @@ async def edit_complaint_type(item_id: ItemId, body: LookupUpdate, db: DbSession
                               idem: IdemKey) -> JSONResponse:
     """Switch a complaint type on or off, or reorder it."""
     return await _update(db, claims, idem, "complaint-types", "complaint_type", item_id, body)
+
+
+@lookups.get("/product-categories", response_model=Envelope[list[ProductCategoryItem]],
+             responses=_ERRORS, dependencies=[Depends(require("products", "view"))])
+async def product_categories(db: DbSession) -> Envelope[list[ProductCategoryItem]]:
+    """The product categories, for the product form's category picker and a scheme's
+    `product_category` target (FS-070). Switched-off categories are included with
+    `is_active` false: offer one only when the product already has it. `POST /products`
+    does not refuse an inactive code, so hiding it is the form's job."""
+    return Envelope(data=await pricing.product_categories(db))
+
+
+@lookups.get("/uoms", response_model=Envelope[list[UomItem]], responses=_ERRORS,
+             dependencies=[Depends(require("products", "view"))])
+async def uoms(db: DbSession) -> Envelope[list[UomItem]]:
+    """The units of measure, for the product form's unit picker (FS-070). Each says how
+    many decimals a quantity in it takes. Switched-off units are included with
+    `is_active` false."""
+    return Envelope(data=await pricing.uoms(db))
 
 
 @lookups.get("/scoring", response_model=Envelope[list[ScoringItem]], responses=_ERRORS)

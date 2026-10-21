@@ -120,11 +120,19 @@ async def list_applications(
         stage: Annotated[str | None, Query(max_length=60, description="A stage code.")] = None,
         q: Annotated[str | None, Query(max_length=100, description="Application number, "
                                        "registration number or farmer's name.")] = None,
+        lead_id: Annotated[str | None, Query(
+            pattern=UUID_RE, description="Only this lead's applications (FS-070). Empty means "
+            "none you can see, not none exists. Leads merged into it are not followed.")] = None,
         cursor: Annotated[str | None, Query()] = None,
         limit: Annotated[int, Query(ge=1, le=100)] = 50) -> ApplicationPage:
-    """The worklist, newest first, in your scope."""
-    return await service.list_applications(db, status=status, stage=stage, q=q, cursor=cursor,
-                                           limit=limit)
+    """The worklist, newest first, in your scope.
+
+    The lead page passes `lead_id` to find the lead's application. An application keeps
+    the owner it was forwarded with, so a lead's later owner may get an empty list while
+    Forward still answers 422 `already_forwarded`.
+    """
+    return await service.list_applications(db, status=status, stage=stage, q=q, lead_id=lead_id,
+                                           cursor=cursor, limit=limit)
 
 
 @router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},

@@ -60,6 +60,7 @@ if TARGET == "production" or (TARGET == "local" and not ALLOW_LOCAL):
 
 PDF_WAIT_SECONDS = 120
 PRODUCT_TRIES = 25
+FREIGHT = "500.00"   # FS-069: the journey's freight charge, in rupees before tax
 # Demo users from scripts/seed_demo.py: a district manager and a field officer.
 DISTRICT_MANAGER = "asha@polysil.in"
 FIELD_OFFICER = "ravi@polysil.in"
@@ -327,6 +328,36 @@ def test_create_quotation(writer: LiveClient, run: Run) -> None:
         "the party mobile is not LIVE_TEST_MOBILE"
 
 
+def test_gst_choice_and_freight(writer: LiveClient, run: Run) -> None:
+    """FS-069: a slab picked on the first line and a freight charge, in one save.
+    Freight joins taxable, tax and total, never gross or discount."""
+    quotation_id, lines = run.need("quotation_id", "lines")
+    before = data(writer.get(f"{API}/quotations/{quotation_id}"), 200)
+    offered = data(writer.get(f"{API}/pricing/gst-slabs"), 200)["choices"]
+    own = Decimal(before["lines"][0]["hsn_slab"])
+    picks = [c for c in offered if Decimal(c) != own]
+    if not picks:
+        run.stop("the slab list offers nothing but the first line's own slab")
+    body = {"lines": [dict(lines[0], gst_slab=picks[0]), *lines[1:]],
+            "freight": {"amount": FREIGHT}}
+    quotation = data(writer.put(f"{API}/quotations/{quotation_id}/lines", json=body), 200)
+    first, totals = quotation["lines"][0], quotation["totals"]
+    assert first["gst_slab_chosen"] and Decimal(first["gst_slab"]) == Decimal(picks[0]), \
+        f"line 1 is at {first['gst_slab']}, chosen {first['gst_slab_chosen']}"
+    assert quotation["gst_changed_lines"] == 1, \
+        f"gst_changed_lines is {quotation['gst_changed_lines']}"
+    freight = quotation["freight"]
+    assert freight and Decimal(freight["amount"]) == Decimal(FREIGHT), f"freight is {freight}"
+    assert Decimal(freight["total"]) == Decimal(freight["amount"]) + sum(
+        Decimal(freight[k]) for k in ("cgst", "sgst", "igst")), "freight's total is not its parts"
+    assert Decimal(totals["freight"]) == Decimal(FREIGHT), f"totals.freight is {totals['freight']}"
+    assert Decimal(totals["gross"]) == Decimal(before["totals"]["gross"]), "freight moved gross"
+    assert Decimal(totals["taxable"]) == (Decimal(totals["gross"]) - Decimal(totals["discount"])
+                                          + Decimal(FREIGHT)), \
+        "taxable is not gross - discount + freight"
+    run.values["freight"] = freight
+
+
 def test_send_without_a_message(writer: LiveClient, run: Run) -> None:
     lead_id, quotation_id = run.need("lead_id", "quotation_id")
     quotation = data(writer.post(f"{API}/quotations/{quotation_id}/send",
@@ -381,6 +412,8 @@ def test_pdf_contents(writer: LiveClient, run: Run) -> None:
     assert inr(quotation["totals"]["total"]) in page_one, "the total is not on page 1"
     if quotation["is_provisional"]:
         assert "INDICATIVE PRICING" in page_one.upper(), "stand-in prices carry no banner"
+    if quotation.get("freight"):
+        assert "freight" in page_one.lower(), "FS-069: no freight row on page 1"
 
 
 def test_accept(writer: LiveClient, run: Run) -> None:
@@ -403,6 +436,11 @@ def test_order_from_quotation(writer: LiveClient, run: Run) -> None:
     assert order["lead"]["id"] == lead_id, f"order {order['id']} carries another lead"
     assert quotation_id in [q["id"] for q in order["quotations"]], \
         f"order {order['id']} does not carry quotation {quotation_id}"
+    freight = run.values.get("freight")
+    if freight:
+        took = order["freight"]
+        assert took and Decimal(took["amount"]) == Decimal(freight["amount"]), \
+            f"FS-069: the order took freight {took}, the quotation had {freight['amount']}"
 
 
 def test_upload_document(writer: LiveClient, run: Run) -> None:

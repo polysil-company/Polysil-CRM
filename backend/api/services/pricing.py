@@ -534,6 +534,24 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
                          intra_state=intra_state, tier=tier, partner_id=target)
 
 
+async def product_categories(db: AsyncSession) -> list[sch.ProductCategoryItem]:
+    """FS-070 (BE-024). Switched-off rows are listed; soft-deleted ones are not."""
+    rows = (await db.execute(text(
+        "SELECT id, code, name, sort_order, is_active FROM product_category "
+        "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
+    return [sch.ProductCategoryItem(id=str(r.id), code=r.code, name=r.name,
+                                    sort_order=r.sort_order, is_active=r.is_active) for r in rows]
+
+
+async def uoms(db: AsyncSession) -> list[sch.UomItem]:
+    """FS-070 (BE-024). Switched-off rows are listed; soft-deleted ones are not."""
+    rows = (await db.execute(text(
+        "SELECT id, code, name, decimals, is_active FROM uom "
+        "WHERE deleted_at IS NULL ORDER BY code"))).all()
+    return [sch.UomItem(id=str(r.id), code=r.code, name=r.name, decimals=r.decimals,
+                        is_active=r.is_active) for r in rows]
+
+
 async def slab_choices(db: AsyncSession) -> tuple[Decimal, ...]:
     """FS-069 rule 3: the slabs the dropdown offers, the admin setting
     `gst_slab_choices`. Read on input only."""

@@ -667,11 +667,17 @@ async def _cancel_approval(db: AsyncSession, quotation_id: str) -> None:
                      {"q": quotation_id})
 
 
+# FS-070: the link an order holds a quotation by; released_at is set on cancel and delete
+_order_quotation_t = sa.table("order_quotation", sa.column("quotation_id", sa.Uuid),
+                              sa.column("released_at", sa.DateTime(timezone=True)))
+
+
 async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | None = None,
                           status: str | None = None, sales_type: str | None = None,
                           owner: str | None = None, partner_id: str | None = None,
                           q: str | None = None, created_from: str | None = None,
                           created_to: str | None = None, current_only: bool = True,
+                          orderable: bool = False,
                           limit: int = 25, cursor: str | None = None,
                           include_total: bool = False) -> sch.QuotationPage:
     """The list, keyset-paged by (created_at desc, id). A lead_id filter also
@@ -705,6 +711,18 @@ async def list_quotations(db: AsyncSession, caller: Caller, *, lead_id: str | No
                      + dt.timedelta(days=1))
     if q:
         where.append(_search_clause(q))
+    if orderable:
+        # FS-070 rule 6, as 013 order_quotations_claim: accepted, current, not deleted
+        # (a delete-holder's scope shows deleted rows), and held by no live order.
+        # order_quotation reads under the caller's RLS, so a holder order out of scope
+        # leaves the row listed; POST /orders still answers 409 quotation_on_order.
+        where.extend([
+            sa.cast(quotation_t.c.status, sa.Text) == "accepted",
+            quotation_t.c.superseded_by_id.is_(None),
+            quotation_t.c.deleted_at.is_(None),
+            ~sa.exists().where(_order_quotation_t.c.quotation_id == quotation_t.c.id,
+                               _order_quotation_t.c.released_at.is_(None)),
+        ])
     filters = list(where)
     if cursor:
         c_ts, c_id = _decode_cursor(cursor)

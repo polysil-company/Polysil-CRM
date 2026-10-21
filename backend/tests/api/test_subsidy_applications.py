@@ -886,3 +886,27 @@ def test_the_violated_constraint_is_read_from_the_driver_error_or_its_cause() ->
     psycopg_like.diag = SimpleNamespace(constraint_name="uq_subsidy_document_file")  # type: ignore[attr-defined]
     assert service._constraint(DBAPIError("x", {}, psycopg_like)) == "uq_subsidy_document_file"
     assert service._constraint(DBAPIError("x", {}, Exception("other"))) is None
+
+
+async def test_the_list_and_its_export_filter_by_lead(
+        client: httpx.AsyncClient, office: Office, fake_engine: list[CalculateRequest]) -> None:
+    """FS-070 (BE-023): `lead_id` answers that lead's application only; a lead with none
+    answers an empty list; leaving the filter out changes nothing."""
+    fo = await _as(client, office, "field_officer")
+    app = await _app(client, office, fo)
+    other = await _app(client, office, fo)
+    r = await client.get(APPS, headers=fo, params={"lead_id": app["lead"]["id"]})
+    assert r.status_code == 200, r.text
+    assert [a["id"] for a in r.json()["data"]] == [app["id"]]
+    bare = await _lead(client, office, fo)
+    r = await client.get(APPS, headers=fo, params={"lead_id": bare["id"]})
+    assert r.status_code == 200 and r.json()["data"] == [], r.text
+    r = await client.get(APPS, headers=fo, params={"lead_id": "not-a-uuid"})
+    assert r.status_code == 422, r.text
+    every = {a["id"] for a in (await client.get(APPS, headers=fo)).json()["data"]}
+    assert {app["id"], other["id"]} <= every
+    r = await client.get(f"{APPS}/export", headers=fo, params={"lead_id": app["lead"]["id"]})
+    assert r.status_code == 200, r.text
+    from openpyxl import load_workbook
+    rows = list(load_workbook(io.BytesIO(r.content)).active.iter_rows(values_only=True))
+    assert len(rows) == 2 and app["application_no"] in rows[1], "the export holds that lead's row only"

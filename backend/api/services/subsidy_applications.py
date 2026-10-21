@@ -226,8 +226,8 @@ async def get(db: AsyncSession, app_id: str) -> sch.Application:
 
 
 async def list_applications(db: AsyncSession, *, status: str | None = None, stage: str | None = None,
-                            q: str | None = None, cursor: str | None = None,
-                            limit: int = 50) -> sch.ApplicationPage:
+                            q: str | None = None, lead_id: str | None = None,
+                            cursor: str | None = None, limit: int = 50) -> sch.ApplicationPage:
     limit = max(1, min(limit, _LIMIT))
     where: list[str] = ["true"]
     params: dict[str, Any] = {"lim": limit + 1}
@@ -241,6 +241,9 @@ async def list_applications(db: AsyncSession, *, status: str | None = None, stag
         like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         where.append("(a.application_no ILIKE :q OR a.reg_no ILIKE :q OR a.farmer_name ILIKE :q)")
         params["q"] = like
+    if lead_id:
+        where.append("a.lead_id = CAST(:lead AS uuid)")
+        params["lead"] = lead_id
     if cursor:
         at, aid = _decode_cursor(cursor)
         where.append("(a.created_at, a.id) < (:at, CAST(:aid AS uuid))")

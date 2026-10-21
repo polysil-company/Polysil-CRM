@@ -2549,7 +2549,7 @@ def f_live_checks() -> None:
         [("j1", "staging only: the journey. Lead, two stages,\nquotation, send (channel none), PDF", YELLOW),
          ("j2", "accept, order (never submitted), document,\neach record's timeline", YELLOW),
          ("j3", "negatives: another office reads no lead;\na role without view gets 403", GREEN),
-         ("j4", "live/inventory.json: 120 paths, each checked\nor skipped with a reason; 47 forbidden on prod", GREY)],
+         ("j4", "live/inventory.json: 122 paths, each checked\nor skipped with a reason; 47 forbidden on prod", GREY)],
         [("n1", "TWO GETS WRITE\n\n/tracking/team/latest and /visits insert view-log\nrows. Never called on production. The normal suite\ncalls every checked GET in a READ ONLY transaction.", RED),
          ("n2", "STAGING SENDS REAL WHATSAPP\n\nEvery record carries LIVE_TEST_MOBILE: one message\nper run, the lead acknowledgement.", RED),
          ("n3", "THE GUARD READS THE SAME URL THE WRITES USE\n\nA wrong address fails the guard instead of passing it.", GREEN),

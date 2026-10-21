@@ -35,6 +35,17 @@ DOC_TYPE_LABELS: Final[dict[str, str]] = {
     "shop_licence": "Shop licence",
 }
 
+# FS-070 (BE-025): the types each record takes. A dealer application takes the set its
+# applicant upload accepts (routers/dealer_applications.py); every other record the
+# general ones. `other` belongs everywhere. The upload does not enforce this (GAP-516).
+_DEALER_DOCS: Final = ("gst_certificate", "pan_card", "cancelled_cheque", "shop_photo",
+                       "shop_licence", "other")
+_GENERAL_DOCS: Final = (*(k for k in DOC_TYPE_LABELS if k not in _DEALER_DOCS), "other")
+DOC_TYPES_BY_RECORD: Final[dict[str, tuple[str, ...]]] = {
+    "lead": _GENERAL_DOCS, "quotation": _GENERAL_DOCS, "sales_order": _GENERAL_DOCS,
+    "dispatch": _GENERAL_DOCS, "payment": _GENERAL_DOCS, "dealer_application": _DEALER_DOCS,
+}
+
 
 class RecordDocumentType(BaseModel):
     code: str

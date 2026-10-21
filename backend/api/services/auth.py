@@ -50,7 +50,14 @@ from api.errors import (
     ValidationFailed,
 )
 from api.integrations import cache
-from api.schemas.auth import MeResponse, ModulePermission, OrgUnitRef, PartnerRef, RoleRef
+from api.schemas.auth import (
+    Features,
+    MeResponse,
+    ModulePermission,
+    OrgUnitRef,
+    PartnerRef,
+    RoleRef,
+)
 
 _hasher = PasswordHasher()
 
@@ -588,6 +595,11 @@ async def me(db: AsyncSession, *, user_id: str) -> MeResponse:
     """
     row = (await db.execute(_ME_QUERY, {"uid": user_id})).one()
     perms = (await db.execute(_PERMISSIONS_QUERY, {"uid": user_id})).all()
+    # FS-070 rule 7: read the row itself; app_setting_text raises when it is missing,
+    # and /auth/me must not fail every sign-in for that
+    tasks_on = bool((await db.execute(text(
+        "SELECT coalesce((SELECT value #>> '{}' FROM app_setting "
+        "WHERE key = 'tasks_for_dealers') = 'on', false)"))).scalar_one())
 
     return MeResponse(
         id=str(row.id),
@@ -602,6 +614,7 @@ async def me(db: AsyncSession, *, user_id: str) -> MeResponse:
             ModulePermission(module=p.module, actions=list(p.actions), scope=p.scope)
             for p in perms
         ],
+        features=Features(tasks_for_dealers=tasks_on),
     )
 
 
