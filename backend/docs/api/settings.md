@@ -102,7 +102,7 @@ the old and new value. Returns the full list.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `key` | string | yes |  |
-| `kind` | `choice` \| `int` \| `roles` \| `bands` | yes | choice: one of `allowed`; int: a whole number in `min`..`max`; roles: a list of role codes; bands: four whole numbers, zero or more, strictly rising (FS-043). |
+| `kind` | `choice` \| `int` \| `roles` \| `bands` \| `slabs` | yes | choice: one of `allowed`; int: a whole number in `min`..`max`; roles: a list of role codes; bands: four whole numbers, zero or more, strictly rising (FS-043); slabs: GST slabs as strings such as "18", each a slab in force, none twice (FS-069). |
 | `value` | string \| integer \| string[] \| integer[] | yes |  |
 | `allowed` | string[] \| null | yes | The choices, for a choice setting. |
 | `min` | integer \| null | yes |  |

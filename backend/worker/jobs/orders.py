@@ -19,6 +19,7 @@ from sqlalchemy import text
 from api.config import Settings, get_settings
 from api.db.session import async_session_factory
 from api.domain import orders as domain
+from api.domain import quotations as quotation_domain
 from api.services.clock import today_ist
 from api.storage import Storage, get_storage
 from worker.jobs.outbox import enter_as_principal
@@ -41,6 +42,8 @@ def render_html(doc: dict[str, Any]) -> str:
     tiers = discount_tiers(doc["lines"])
     return _env.get_template("order.html").render(
         o=o, lines=doc["lines"], tiers=tiers, discount_cols=discount_columns(tiers),
+        # FS-069 rule 16: freight is a row of its own, so the rows add up to the total
+        freight=quotation_domain.freight_rates(o),
         is_provisional=bool(o.get("is_provisional")),
         intra_state=bool(o.get("intra_state")), rendered_on=today_ist().strftime("%d %b %Y"))
 

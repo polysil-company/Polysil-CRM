@@ -155,17 +155,44 @@ class PricedLine:
     money: LineTax
     # the cascade as requested, tier one first; `discount_pct` is its first entry
     discounts: tuple[Decimal, ...] = ()
+    # FS-069: the slab the user chose, when it differs from the HSN's. None means
+    # the line follows `tax.slab`.
+    chosen_slab: Decimal | None = None
+
+    @property
+    def slab(self) -> Decimal:
+        """The line's slab: the chosen one, else the HSN's. Under a LUT the rates
+        charged are 0 and this still holds the line's own slab."""
+        return self.chosen_slab if self.chosen_slab is not None else self.tax.slab
+
+    @property
+    def chosen(self) -> bool:
+        return self.chosen_slab is not None
 
     @property
     def provisional_fields(self) -> tuple[str, ...]:
         """What on this line is still a stand-in of ours rather than the client's.
-        `rate` comes from the list, the tax fields from the product."""
+        `rate` comes from the list, the tax fields from the product. A chosen slab
+        is the user's, so it is never a stand-in (FS-069 rule 17)."""
         out = {f for f in self.product.provisional_fields if f in ("hsn_code", "gst_slab")}
         if self.rate.price_list.is_provisional:
             out.add("rate")
         if self.tax.is_provisional:
             out.add("gst_slab")
+        if self.chosen:
+            out.discard("gst_slab")
         return tuple(sorted(out))
+
+
+@dataclass(frozen=True)
+class FreightTax:
+    """FS-069: the document's freight, taxed like a line of quantity one. No
+    discount and no price list (rule 6)."""
+
+    amount: Decimal
+    slab: Decimal
+    chosen: bool
+    money: LineTax
 
 
 @dataclass(frozen=True)
@@ -185,3 +212,4 @@ class PricedDocument:
     totals: DocumentTotals
     intra_state: bool
     warnings: tuple[str, ...]
+    freight: FreightTax | None = None

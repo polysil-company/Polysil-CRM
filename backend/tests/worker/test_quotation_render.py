@@ -588,3 +588,42 @@ def test_a_render_tick_stops_at_its_budget_and_never_overlaps(
     assert overlapped == 0, "a tick that finds one running does nothing"
     assert 1 <= handled <= 4, handled
     assert asyncio.run(job.quotation_render_due({"storage": object()})) >= 1, "the guard resets"
+
+
+# ── FS-069: freight ──────────────────────────────────────────────────────────
+
+def _with_freight(slab: str) -> dict:
+    """The sample (every line at 5 %, intra-state) with 500.00 of freight added the
+    way the engine adds it: taxable, the taxes and the total grow; gross and
+    discount do not."""
+    doc = _doc()
+    tax = {"5": "12.50", "18": "45.00"}[slab]
+    q = doc["quotation"]
+    q.update(freight_amount="500.00", freight_slab=slab, freight_slab_chosen=slab != "5",
+             freight_cgst=tax, freight_sgst=tax, freight_igst="0.00",
+             freight_total=str(Decimal("500.00") + 2 * Decimal(tax)),
+             taxable=str(Decimal(q["taxable"]) + Decimal("500.00")),
+             cgst=str(Decimal(q["cgst"]) + Decimal(tax)),
+             sgst=str(Decimal(q["sgst"]) + Decimal(tax)),
+             total=str(Decimal(q["total"]) + Decimal("500.00") + 2 * Decimal(tax)))
+    return doc
+
+
+def test_freight_prints_below_a_goods_sub_total() -> None:
+    flat = _flat(_with_freight("18"))
+    assert "Sub Total ₹1,768.10 Freight ₹500.00" in flat
+    assert "Total ₹2,446.50" in flat
+
+
+def test_no_single_rate_label_when_freight_carries_another_slab() -> None:
+    flat = _flat(_with_freight("18"))
+    assert "CGST @" not in flat and "SGST @" not in flat
+    assert "CGST ₹89.20" in flat
+
+
+def test_the_rate_label_stays_when_freight_shares_the_lines_slab() -> None:
+    assert "CGST @ 2.5%" in _flat(_with_freight("5"))
+
+
+def test_no_freight_row_without_freight() -> None:
+    assert "Freight" not in _flat(_doc())

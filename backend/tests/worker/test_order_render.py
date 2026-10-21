@@ -129,3 +129,20 @@ def test_an_order_pdf_carries_no_company_profile(monkeypatch: pytest.MonkeyPatch
     data, content_type = job.render_document(_doc(), settings)
     assert content_type == "application/pdf"
     assert len(pypdf.PdfReader(io.BytesIO(data)).pages) == 1
+
+
+def test_freight_is_a_row_of_its_own_so_the_rows_add_up() -> None:
+    """FS-069 rule 16: the order's tax and total include freight, so a Freight row
+    with its own taxable, tax and total makes the rows reconcile."""
+    doc = _doc()
+    o = doc["order"]
+    o.update(freight_amount="500.00", freight_slab="18", freight_slab_chosen=False,
+             freight_cgst="45.00", freight_sgst="45.00", freight_igst="0.00",
+             freight_total="590.00")
+    page = _text(job.render_html(doc))
+    assert "Freight" in page
+    assert "₹500.00 45.00 (9%) 45.00 (9%) ₹590.00" in page
+
+
+def test_no_freight_row_without_freight() -> None:
+    assert "Freight" not in _text(job.render_html(_doc()))

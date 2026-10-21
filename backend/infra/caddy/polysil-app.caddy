@@ -1,22 +1,23 @@
-# The frontend on the staging box, at polysil.pranayx.tech. Prepared; applied by
-# hand, in this order:
+# The frontend on the staging box, at polysil-test.pranayx.tech (polysil.pranayx.tech
+# until 16 Oct 2026; that record is gone). Applied by `deploy_staging.py frontend-caddy`,
+# after:
 #
-#   1. An A record for polysil.pranayx.tech at Cloudflare, pointing at this box,
+#   1. An A record for polysil-test.pranayx.tech at Cloudflare, pointing at this box,
 #      DNS only (grey cloud): Let's Encrypt must reach the box for HTTP-01.
 #   2. `python scripts/deploy_staging.py frontend-provision`, so polysil-frontend
 #      and polysil-deploy-hook exist on distributed-file-system_default.
-#   3. Append the block below to /home/opc/Distributed-File-System/Caddyfile, then:
-#        docker exec distributed-file-system-web-1 caddy validate --config /etc/caddy/Caddyfile
-#        docker exec distributed-file-system-web-1 caddy reload --config /etc/caddy/Caddyfile
+#   3. `python scripts/deploy_staging.py frontend-caddy`: replaces the block below,
+#      and removes any old polysil.pranayx.tech block,
+#      in /home/opc/Distributed-File-System/Caddyfile, validates, reloads.
 #
-# Undo: remove the block and reload.
+# Undo: remove the blocks and reload.
 #
 # One origin for the browser: the pages, the API and the webhook. The API goes
 # straight to its container, so an upload does not pass through Next's rewrite,
 # and the refresh cookie (path /api/v1/auth) is set on this host. Tabs, like the
 # file on the box.
 
-polysil.pranayx.tech {
+polysil-test.pranayx.tech {
 	encode zstd gzip
 
 	# FS-015 rule 10: the outer belt on complaint uploads

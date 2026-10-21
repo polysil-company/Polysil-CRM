@@ -24,7 +24,15 @@ from api.schemas.leads import (
     TerritoryRef,
     UserRef,
 )
-from api.schemas.products import MAX_LINES, TaxTreatment, _places
+from api.schemas.products import (
+    GST_SLAB_DOC,
+    MAX_LINES,
+    FreightIn,
+    FreightOut,
+    TaxTreatment,
+    _places,
+    _slab_places,
+)
 from api.schemas.subsidy import CalculateRequest
 
 SalesType = Literal["commercial", "industrial", "export", "subsidised", "marketing", "sample"]
@@ -77,6 +85,8 @@ class QuotationLineIn(BaseModel):
     gst_rate_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE,
         description="From the preview. Refused with rate_changed if it no longer resolves.")]
+    gst_slab: Annotated[Decimal | None, Field(default=None, ge=0, le=100,
+                                              description=GST_SLAB_DOC)]
 
     @field_validator("qty")
     @classmethod
@@ -88,9 +98,18 @@ class QuotationLineIn(BaseModel):
     def _discount_places(cls, v: Decimal, info: ValidationInfo) -> Decimal:
         return _places(v, 3, str(info.field_name))
 
+    @field_validator("gst_slab")
+    @classmethod
+    def _gst_places(cls, v: Decimal | None) -> Decimal | None:
+        return _slab_places(v)
+
     @property
     def discounts(self) -> tuple[Decimal, Decimal, Decimal]:
         return (self.discount_pct, self.discount2_pct, self.discount3_pct)
+
+
+_FREIGHT_IN = ("FS-069: one freight or transport charge, before tax. Commercial and "
+               "industrial only, and only with at least one line.")
 
 
 class QuotationCreate(BaseModel):
@@ -129,6 +148,7 @@ class QuotationCreate(BaseModel):
     lines: Annotated[list[QuotationLineIn], Field(
         default_factory=list, max_length=MAX_LINES,
         description="Zero to 200. A draft may be saved empty; sending needs at least one.")]
+    freight: FreightIn | None = Field(default=None, description=_FREIGHT_IN)
 
     @property
     def partner_given(self) -> bool:
@@ -152,6 +172,12 @@ class QuotationPatch(BaseModel):
         description="The buyer's country. Omit to keep. Required on an export.")]
     party: Party | None = None
     terms: Annotated[str | None, Field(default=None, max_length=2000)]
+    freight: FreightIn | None = Field(
+        default=None, description=_FREIGHT_IN + " Omit to keep; null to remove. A change to "
+                                                "a type other than commercial or industrial "
+                                                "clears the freight and every GST choice "
+                                                "(warning gst_choice_cleared); sending freight "
+                                                "with such a change is 422 freight_not_allowed.")
     expected_status: Annotated[Status | None, Field(
         default=None, description="Act only if the quotation is still in this status; "
                                   "otherwise 409 status_changed.")]
@@ -166,6 +192,8 @@ class LinesReplace(BaseModel):
 
     lines: Annotated[list[QuotationLineIn], Field(max_length=MAX_LINES,
                                                    description="The whole basket, in order.")]
+    freight: FreightIn | None = Field(
+        default=None, description=_FREIGHT_IN + " Omit to keep; null to remove.")
     expected_status: Status | None = None
 
 
@@ -254,7 +282,10 @@ class QuotationLine(BaseModel):
     discount3_amt: str
     discount: str = Field(description="The three amounts summed. Not gross x discount_pct.")
     taxable: str
-    gst_slab: str
+    gst_slab: str = Field(description="The line's slab: the one picked, else the HSN's.")
+    hsn_slab: str = Field(description="The product's HSN slab when the line was priced.")
+    gst_slab_chosen: bool = Field(description="The slab was picked. Re-send `gst_slab` for "
+                                              "this line when saving the basket.")
     cgst_rate: str
     sgst_rate: str
     igst_rate: str
@@ -269,8 +300,13 @@ class QuotationLine(BaseModel):
 
 
 class Totals(BaseModel):
+    """`gross` and `discount` are the goods only; `taxable`, the taxes and `total`
+    include freight (FS-069), so `taxable = gross - discount + freight`."""
+
     gross: str
     discount: str
+    freight: str = Field(default="0.00", description="FS-069: the freight before tax; 0.00 "
+                                                     "without freight.")
     taxable: str
     cgst: str
     sgst: str
@@ -383,6 +419,9 @@ class Quotation(BaseModel):
                                                         "than one list.")
     price_list_ids: list[str]
     lines: list[QuotationLine]
+    freight: FreightOut | None = Field(default=None, description="FS-069: the freight, or null.")
+    gst_changed_lines: int = Field(default=0, description="FS-069: lines whose GST slab was "
+                                                          "picked. Show it to an approver.")
     totals: Totals
     is_provisional: bool = Field(description="Any line carries a stand-in rate or slab. The "
                                              "PDF carries a banner; show the same.")
