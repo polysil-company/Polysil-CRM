@@ -256,3 +256,76 @@ describe("[SO-008] A subsidised order typed in", () => {
     expect(screen.queryByRole("radio", { name: "Subsidised" })).not.toBeInTheDocument();
   });
 });
+
+describe("[QUOT-015] An order's GST slab per item, and freight", () => {
+  afterEach(() => {
+    push.mockReset();
+    resetMockDb();
+    writeMockRole("admin");
+  });
+
+  it("saves a picked slab and the freight on a direct order", PRICING_TEST, async () => {
+    signInAs("admin");
+    const user = show(<NewDirectOrder leadId={leadAt("qualified")} />);
+    await screen.findByRole("form", { name: "New order" });
+    await addPipe(user, "10");
+    const item = screen.getByRole("listitem", { name: "Item 1" });
+    await within(item).findByText("Rate", {}, PRICED);
+
+    await user.click(within(item).getByRole("combobox", { name: "GST for item 1" }));
+    await user.click(await screen.findByRole("option", { name: "40%" }));
+    await user.type(screen.getByLabelText("Freight before tax (optional)"), "800");
+    await user.click(screen.getByRole("combobox", { name: "GST on freight" }));
+    await user.click(await screen.findByRole("option", { name: "5%" }));
+    expect(await screen.findByText(/^GST 5%:/, {}, PRICED)).toBeInTheDocument();
+
+    const save = screen.getByRole("button", { name: "Save draft order" });
+    await waitFor(() => {
+      expect(save).toBeEnabled();
+    }, PRICED);
+    await user.click(save);
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledTimes(1);
+    });
+    const [saved] = mockDb.orders;
+    expect(saved?.lines[0]).toMatchObject({ gst_slab: "40.000", gst_slab_chosen: true });
+    expect(saved?.freight).toMatchObject({
+      amount: "800.00",
+      gst_slab: "5.000",
+      gst_slab_chosen: true,
+      total: "840.00",
+    });
+    expect(saved?.gst_changed_lines).toBe(1);
+  });
+
+  it("puts a refused freight on the freight field", PRICING_TEST, async () => {
+    signInAs("admin");
+    server.use(
+      http.post(buildApiUrl("/orders"), () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: "freight_not_allowed",
+              message: "Freight is for commercial and industrial documents only.",
+              fields: { freight: "Not allowed." },
+            },
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = show(<NewDirectOrder leadId={leadAt("qualified")} />);
+    await screen.findByRole("form", { name: "New order" });
+    await addPipe(user, "10");
+    await within(screen.getByRole("listitem", { name: "Item 1" })).findByText("Rate", {}, PRICED);
+    await user.type(screen.getByLabelText("Freight before tax (optional)"), "800");
+    const save = screen.getByRole("button", { name: "Save draft order" });
+    await waitFor(() => {
+      expect(save).toBeEnabled();
+    }, PRICED);
+    await user.click(save);
+
+    expect(await screen.findByText("Not allowed.")).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+});

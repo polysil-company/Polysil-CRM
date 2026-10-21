@@ -27,6 +27,7 @@ import type { QueueRow } from "@/features/approvals/api/approvals.schemas";
 import {
   DOC_TYPE_LABELS,
   documentTitle,
+  gstChangedText,
   stepOwnerLabel,
 } from "@/features/approvals/lib/approval-labels";
 import { formatRate } from "@/features/quotations/lib/quotation-labels";
@@ -218,6 +219,11 @@ function ApprovalRow({
           {document.discountPct === null ? null : (
             <span className="text-sm font-medium text-warning">
               {formatRate(document.discountPct)} discount asked
+            </span>
+          )}
+          {gstChangedText(document.gstChangedLines) === null ? null : (
+            <span className="text-sm font-medium text-warning">
+              {gstChangedText(document.gstChangedLines)}
             </span>
           )}
           {document.isProvisional ? (

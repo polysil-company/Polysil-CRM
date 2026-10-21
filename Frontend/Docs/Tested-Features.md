@@ -691,6 +691,16 @@ Export and sample orders and export quotations (handover `export-sample-orders-c
 - **SO-010 · An export quotation** (screen: [the quotation](screenshots/orders/export-quotation-desktop-light.jpg)). **Export** on a new quotation takes the country, prices without GST under a LUT, and shows the tax and the LUT covering its price date. A draft keeps its treatment: an export stays an export. 🧪 👀
 - **SO-010 · An order from an export quotation.** Place order makes an export order, its type fixed and its tax taken from the quotation; a domestic quotation can't make one (`type_mismatch`). 🧪
 
+## A GST slab per item, and freight
+
+FS-069 (`backend/docs/api/pricing.md`), commercial and industrial quotations and orders only. Walked through in the mock as Admin on a desktop in light mode, and on a phone in dark mode; axe found nothing, and the phone page doesn't scroll sideways. Not yet checked on the dev API.
+
+- **QUOT-015 · The GST dropdown on each item** (screens: [the builder](screenshots/quotations/gst-quotation-builder-desktop-light.jpg), [the dropdown](screenshots/quotations/gst-builder-dropdown-desktop-light.jpg), [an order on a phone](screenshots/quotations/gst-order-builder-mobile-dark.jpg)). Each item starts on its HSN slab, marked "(HSN)". The dropdown offers the admin's slabs plus that HSN slab. Picking another slab says "Changed from 18%", and only that item sends a slab. Subsidised, export and sample documents show no dropdown. 🧪 👀
+- **QUOT-015 · Freight** (screen: [a bad amount](screenshots/quotations/gst-freight-error-desktop-light.jpg)). An amount before tax, and a slab that defaults to the highest among the items, with the line under it saying which. Freight shows on its own row in the totals. It counts in the taxable value and the total, but not in gross or discount. A wrong amount, or freight with no item, is named on the field and holds the save. The backend's refusals land on the item or on the freight. 🧪 👀
+- **QUOT-015 · On the document** (screen: [the quotation](screenshots/quotations/gst-quotation-detail-desktop-light.jpg)). A picked item says "Changed from HSN 18%", and the totals show "Freight (GST 5%)". An edited draft brings back its slabs and freight and sends them again. 🧪 👀
+- **QUOT-015 · Approvals** (screen: [the inbox](screenshots/quotations/gst-approvals-desktop-light.jpg)). "GST changed on 1 line" beside the discount asked, and again in the decision dialog. 🧪 👀
+- **QUOT-015 · The slabs on offer** (screen: [Company settings](screenshots/quotations/gst-settings-slabs-desktop-light.jpg)). A tick box per slab in force, 40 % included, at least one. 🧪 👀
+
 ## Masters
 
 Admin → **Masters** (`/masters`), for staff who see masters (`backend/docs/api/lookups.md`). Those with `masters.edit` change things; everyone else who sees the page reads them. One tab per list, then Lead scoring; the open tab is in the URL. Walked through in the mock at desktop light and phone dark; axe found nothing. Not yet checked on staging. PR #134.

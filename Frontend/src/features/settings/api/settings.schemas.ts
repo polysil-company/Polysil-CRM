@@ -6,13 +6,14 @@ import { z } from "zod";
  * screen renders each from its `kind`, never from a list of known keys.
  */
 
-export const SETTING_KINDS = ["choice", "int", "roles", "bands"] as const;
+export const SETTING_KINDS = ["choice", "int", "roles", "bands", "slabs"] as const;
 
 const settingWireSchema = z.object({
   key: z.string().min(1),
   /**
    * choice: one of `allowed`; int: a whole number in `min`..`max`; roles: role codes;
-   * bands: four whole numbers, zero or more, strictly rising (FS-043).
+   * bands: four whole numbers, zero or more, strictly rising (FS-043); slabs: GST slabs as
+   * strings such as "18", at least one, each a slab in force, none twice (FS-069).
    */
   kind: z.enum(SETTING_KINDS),
   value: z.union([z.string(), z.number(), z.array(z.string()), z.array(z.number())]),
@@ -57,6 +58,13 @@ export type Setting =
       readonly value: readonly number[];
       readonly description: string;
       readonly updatedAt: string;
+    }
+  | {
+      readonly key: string;
+      readonly kind: "slabs";
+      readonly value: readonly string[];
+      readonly description: string;
+      readonly updatedAt: string;
     };
 
 function toSetting(wire: z.output<typeof settingWireSchema>): Setting {
@@ -89,6 +97,12 @@ function toSetting(wire: z.output<typeof settingWireSchema>): Setting {
         ...base,
         kind: "bands",
         value: Array.isArray(value) ? value.map(Number) : [],
+      };
+    case "slabs":
+      return {
+        ...base,
+        kind: "slabs",
+        value: Array.isArray(value) ? value.map((slab) => String(Number(slab))) : [],
       };
   }
 }

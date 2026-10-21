@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Toaster } from "@/components/ui/sonner";
 import { buildApiUrl } from "@/lib/api/url";
 import { formatInr } from "@/lib/format";
-import { mockDb } from "@/mocks/db";
+import { mockFreight, totalsOf } from "@/mocks/data/quotations";
+import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 import { renderWithProviders } from "@/test/render";
 
@@ -199,5 +200,34 @@ describe("[QUOT-001] LeadQuotations", () => {
     );
 
     expect(await screen.findByText("No quotations yet")).toBeInTheDocument();
+  });
+});
+
+describe("[QUOT-015] A changed GST slab and freight on the document", () => {
+  afterEach(() => {
+    resetMockDb();
+  });
+
+  it("marks an item whose slab was picked, and adds the freight to the totals", async () => {
+    const wire = mockQuotation(
+      (quotation) => quotation.status === "accepted" && quotation.lines.length > 1,
+    );
+    const [first, ...rest] = wire.lines;
+    if (first === undefined) throw new Error("No line");
+    // Picked at 40 % over the HSN's slab; ₹1,000 freight at the default, 40 %.
+    wire.lines = [
+      { ...first, hsn_slab: first.gst_slab, gst_slab: "40.000", gst_slab_chosen: true },
+      ...rest,
+    ];
+    wire.freight = mockFreight(100_000, 40, false);
+    wire.totals = totalsOf(wire.lines, wire.freight);
+    renderWithProviders(<QuotationDetail quotationId={wire.id} />);
+
+    const table = await screen.findByRole("table", { name: /Quotation items/ });
+    const hsn = `${String(Number(first.gst_slab))}%`;
+    expect(within(table).getByText(`Changed from HSN ${hsn}`)).toBeInTheDocument();
+    const totals = screen.getByLabelText("Totals");
+    expect(within(totals).getByText("Freight (GST 40%)")).toBeInTheDocument();
+    expect(within(totals).getByText(formatInr("1000.00", { paise: true }))).toBeInTheDocument();
   });
 });

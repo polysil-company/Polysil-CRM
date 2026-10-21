@@ -485,6 +485,15 @@ export const DATA_IDS = {
     notes:
       "FS-057, subsidised-quotations.md. A draft only; sending needs it (422 subsidy_missing). Not part of go-live (13 Oct).",
   },
+  "QUOT-015": {
+    domain: "QUOT",
+    title: "A GST slab per line, and freight, on a quotation or an order",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /pricing/gst-slabs"],
+    notes:
+      "FS-069. Commercial and industrial only. Each line presets to its hsn_slab; gst_slab is sent only when picked. Freight without a slab takes the highest line slab; taxable and total include it, gross and discount don't.",
+  },
   "SO-001": {
     domain: "SO",
     title: "Sales orders list",

@@ -6,9 +6,10 @@ import type * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { QuotationLine } from "@/features/quotations/api/quotations.schemas";
-import { lineIssue, type DraftLine } from "@/features/quotations/lib/builder-lines";
+import { lineIssue, sameSlab, type DraftLine } from "@/features/quotations/lib/builder-lines";
 import { formatRate } from "@/features/quotations/lib/quotation-labels";
 import { formatInr } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,8 @@ export interface QuotationLineRowProps {
   /** A refusal from the backend for this row. */
   error: string | undefined;
   canRemove: boolean;
+  /** QUOT-015 · The slabs a commercial or industrial line may take; null hides the dropdown. */
+  slabChoices: readonly string[] | null;
   onChange: (next: DraftLine) => void;
   onRemove: () => void;
 }
@@ -43,10 +46,13 @@ export function QuotationLineRow({
   pricing,
   error,
   canRemove,
+  slabChoices,
   onChange,
   onRemove,
 }: QuotationLineRowProps): React.JSX.Element {
   const id = `line-${line.key}`;
+  // The HSN's slab: the product's, or the preview's for a line that came without one.
+  const hsnSlab = line.product?.gstSlab ?? priced?.hsnSlab ?? null;
   const number = index + 1;
   const issue = lineIssue(line);
   const message = error ?? issue;
@@ -76,7 +82,12 @@ export function QuotationLineRow({
       </div>
 
       <div className="grid grid-cols-12 gap-3">
-        <div className="col-span-12 flex min-w-0 flex-col gap-1.5 md:col-span-6">
+        <div
+          className={cn(
+            "col-span-12 flex min-w-0 flex-col gap-1.5",
+            slabChoices === null ? "md:col-span-6" : "md:col-span-4",
+          )}
+        >
           <label htmlFor={`${id}-product`} className="text-xs text-muted-foreground">
             Product
           </label>
@@ -139,6 +150,18 @@ export function QuotationLineRow({
             </div>
           ))}
         </fieldset>
+        {slabChoices === null ? null : (
+          <GstSlabSelect
+            id={`${id}-gst`}
+            number={number}
+            hsnSlab={hsnSlab}
+            picked={line.gstSlab}
+            choices={slabChoices}
+            onPick={(gstSlab) => {
+              onChange({ ...line, gstSlab });
+            }}
+          />
+        )}
       </div>
 
       <PricedStrip
@@ -156,6 +179,84 @@ export function QuotationLineRow({
         </p>
       )}
     </li>
+  );
+}
+
+/** "18.000" → "18", "0.250" → "0.25": one key per rate. */
+export function slabKey(slab: string): string {
+  return String(Number(slab));
+}
+
+/**
+ * QUOT-015 · The slabs a dropdown offers: the admin's choices, the HSN's own slab even when it
+ * isn't one of them, and a slab picked before the list changed. Lowest first.
+ */
+export function slabOptions(
+  choices: readonly string[],
+  ...also: readonly (string | null)[]
+): string[] {
+  const keys = new Set([...choices, ...also.filter((slab) => slab !== null)].map(slabKey));
+  return [...keys].sort((a, b) => Number(a) - Number(b));
+}
+
+/** QUOT-015 · The line's GST: preset to its HSN slab; picking that slab again is no choice. */
+function GstSlabSelect({
+  id,
+  number,
+  hsnSlab,
+  picked,
+  choices,
+  onPick,
+}: {
+  id: string;
+  number: number;
+  hsnSlab: string | null;
+  picked: string | null;
+  choices: readonly string[];
+  onPick: (gstSlab: string | null) => void;
+}): React.JSX.Element {
+  const items = slabOptions(choices, hsnSlab, picked).map((slab) => ({
+    value: slab,
+    label:
+      hsnSlab !== null && sameSlab(slab, hsnSlab) ? `${formatRate(slab)} (HSN)` : formatRate(slab),
+  }));
+  const value = picked ?? hsnSlab;
+  const changed = picked !== null && hsnSlab !== null && !sameSlab(picked, hsnSlab);
+  return (
+    <div className="col-span-12 flex flex-col gap-1.5 sm:col-span-4 md:col-span-2">
+      <label htmlFor={id} className="text-xs text-muted-foreground">
+        GST
+      </label>
+      <Select
+        items={items}
+        value={value === null ? null : slabKey(value)}
+        disabled={hsnSlab === null}
+        onValueChange={(next) => {
+          if (next === null) return;
+          onPick(hsnSlab !== null && sameSlab(next, hsnSlab) ? null : next);
+        }}
+      >
+        <SelectTrigger
+          id={id}
+          aria-label={`GST for item ${String(number)}`}
+          aria-describedby={changed ? `${id}-changed` : undefined}
+        >
+          <SelectValue placeholder="—" />
+        </SelectTrigger>
+        <SelectContent>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {changed ? (
+        <p id={`${id}-changed`} className="text-xs text-warning">
+          Changed from {formatRate(hsnSlab)}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

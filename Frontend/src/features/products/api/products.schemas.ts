@@ -19,7 +19,7 @@ export const PROVISIONAL_FIELDS = ["hsn_code", "gst_slab", "mrp", "pack_multiple
 export type ProvisionalField = (typeof PROVISIONAL_FIELDS)[number];
 
 /** The slabs the backend accepts; a new one arrives as a migration, never as data entry. */
-export const GST_SLABS = ["0", "0.25", "3", "5", "12", "18", "28"] as const;
+export const GST_SLABS = ["0", "0.25", "3", "5", "12", "18", "28", "40"] as const;
 
 export const CHANNEL_TIERS = ["distributor", "dealer", "sub_dealer", "farmer"] as const;
 export type ChannelTier = (typeof CHANNEL_TIERS)[number];

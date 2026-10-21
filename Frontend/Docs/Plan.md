@@ -381,6 +381,7 @@ LEAD-005…008, QUOT-001…012, APPR-001…002, TASK-001…008, SO-001…004, DI
 | Excel import with column matching — rates into a draft price list (replace or merge), items into a quotation or order; upload, match, check, import good rows only or all | MSTR-007 | `POST /imports`, `POST /imports/{id}/check`, `POST /imports/{id}/commit`, `DELETE /imports/{id}` |
 | Import polish — **Download the template** in every import, upload refusals on the file, sheet and column-names row, and **Import from Excel** beside **New price list** (a draft, then its import, opened by `?import=rates`) | MSTR-013 | `GET /imports/template`, `POST /imports`, `POST /price-lists` |
 | Price lists by sale type — the field, the filter and the label; the quotation's sale type and the order's type on price previews | MSTR-008 | `sales_type` on `GET/POST /price-lists` and `POST /pricing/quote-lines` |
+| A GST slab per item and freight on commercial and industrial quotations and orders — the dropdown, the freight, the totals, the "Changed from" mark, "GST changed on n lines" on approvals, and the slabs setting | QUOT-015 | `GET /pricing/gst-slabs`; `gst_slab` and `freight` on `POST /pricing/quote-lines`, `POST /quotations`, `PUT /quotations/{id}/lines`, `POST /orders`, `PUT /orders/{id}/lines`; `gst_changed_lines` on `/approvals/pending`; the `slabs` kind on `/settings` |
 
 | Old `/leads/summary` (guessed) | `GET /leads/stats` (real) |
 |---|---|
