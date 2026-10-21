@@ -80,6 +80,15 @@ def grants(modules: set[str]) -> dict[str, dict[str, tuple[str, list[str]]]]:
     return out
 
 
+def managed(role_ids: dict[str, object]) -> dict[str, object]:
+    """The roles whose permissions this seed sets: the ones it declares. Built-in
+    roles (`intake` from 015, `system`) get their grants from their migration, and
+    resetting them to the matrix deletes those grants. That stopped the public
+    enquiry form creating leads on production (ISS-214)."""
+    owned = {code for code, *_ in ROLES}
+    return {code: rid for code, rid in role_ids.items() if code in owned}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--modules", default=",".join(RELEASED),
@@ -112,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
         matrix = grants(modules)
         cur.execute("SELECT id, code FROM role")
         role_ids = {code: rid for rid, code in cur.fetchall()}
-        for code, rid in role_ids.items():
+        for code, rid in managed(role_ids).items():
             declared: list[str] = []
             for module, (scope, actions) in matrix.get(code, {}).items():
                 for action in actions:
