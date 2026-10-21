@@ -75,14 +75,19 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
         "o.over_credit_limit, "
         # the queue row is an approver's, so the asker's reason is theirs to read
         "(SELECT r.remark FROM approval_request r WHERE r.doc_type = 'sales_order' "
-        "AND r.entity_id = o.id ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS ask_remark "
+        "AND r.entity_id = o.id ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS ask_remark, "
+        # FS-069 rule 4: the approver sees that a GST slab was picked
+        "(SELECT count(*) FROM order_line ol WHERE ol.sales_order_id = o.id "
+        "AND ol.gst_slab_chosen) AS gst_changed "
         "FROM sales_order o "
         "LEFT JOIN app_user u ON u.id = o.created_by WHERE o.id = ANY(CAST(:ids AS uuid[])) "
         "UNION ALL "
         # a draft quotation has no number (FS-013 4); the raise time is the request's
         "SELECT q.id, NULL, q.party_name, q.total, q.is_provisional, ar.requested_by, "
         "u.full_name, ar.created_at, q.created_at, quotation_effective_pct(q.gross, q.discount), "
-        "NULL::boolean, ar.remark "
+        "NULL::boolean, ar.remark, "
+        "(SELECT count(*) FROM quotation_line ql WHERE ql.quotation_id = q.id "
+        "AND ql.gst_slab_chosen) "
         "FROM quotation q "
         # who asked, not who drafted: anyone who edits the draft may ask (OCR review)
         "LEFT JOIN LATERAL (SELECT r.requested_by, r.created_at, r.remark "
@@ -94,7 +99,8 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
         "UNION ALL "
         # FS-015b: a refund; the party is the complaint's contact, the total the amount
         "SELECT c.id, c.complaint_no::text, c.contact_name, ar.amount, false, ar.requested_by, "
-        "u.full_name, ar.created_at, c.created_at, NULL::numeric, NULL::boolean, ar.remark "
+        "u.full_name, ar.created_at, c.created_at, NULL::numeric, NULL::boolean, ar.remark, "
+        "0::bigint "
         "FROM complaint c "
         "JOIN LATERAL (SELECT r.amount, r.requested_by, r.created_at, r.remark "
         "FROM approval_request r "
@@ -122,7 +128,7 @@ async def queue(db: AsyncSession, caller: Caller, *, include_below: bool = False
                 discount_pct=None if d.pct is None else f"{d.pct:.2f}",
                 payment_status=paid.get(str(d.id)),
                 over_credit_limit=d.over_credit_limit,      # an approver's queue (FS-027 rule 8)
-                request_remark=d.ask_remark),
+                request_remark=d.ask_remark, gst_changed_lines=int(d.gst_changed)),
             waiting_since=r.waiting_since.isoformat()))
     return sch.QueuePage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor,
                                                   total=total, total_capped=capped))

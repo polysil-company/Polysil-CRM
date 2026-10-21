@@ -11,10 +11,11 @@ SettingValue = str | int | list[str] | list[int]
 
 class Setting(BaseModel):
     key: str
-    kind: Literal["choice", "int", "roles", "bands"] = Field(
+    kind: Literal["choice", "int", "roles", "bands", "slabs"] = Field(
         description="choice: one of `allowed`; int: a whole number in `min`..`max`; "
                     "roles: a list of role codes; bands: four whole numbers, zero or more, "
-                    "strictly rising (FS-043).")
+                    "strictly rising (FS-043); slabs: GST slabs as strings such as \"18\", "
+                    "each a slab in force, none twice (FS-069).")
     value: SettingValue
     allowed: list[str] | None = Field(description="The choices, for a choice setting.")
     min: int | None

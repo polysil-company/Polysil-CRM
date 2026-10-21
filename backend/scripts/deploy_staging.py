@@ -8,7 +8,7 @@
     python scripts/deploy_staging.py status      # containers, health, resource use
     python scripts/deploy_staging.py frontend-provision   # the deploy key and the webhook receiver
     python scripts/deploy_staging.py frontend    # pull integration and rebuild the frontend now
-    python scripts/deploy_staging.py frontend-caddy   # add polysil.pranayx.tech to the box's Caddy
+    python scripts/deploy_staging.py frontend-caddy   # polysil-test.pranayx.tech on the box's Caddy
     python scripts/deploy_staging.py logs [svc]
     python scripts/deploy_staging.py down
 
@@ -50,8 +50,8 @@ TARGET = "staging"
 FRONTEND_SRC = ROOT / "scripts" / "local" / "reviewstaging" / "Frontend"
 # the go-live menu (nav item ids in the frontend's navigation.ts); scripts/seed_prod.py
 # RELEASED is the matching backend scope
-RELEASED_NAV = ("dashboard", "messages", "leads", "quotations", "sales-orders", "approvals",
-                "tasks", "dispatch", "approval-limits", "products", "users",
+RELEASED_NAV = ("dashboard", "messages", "leads", "qr-codes", "quotations", "sales-orders",
+                "approvals", "tasks", "dispatch", "approval-limits", "products", "users",
                 "channel-partners")
 # --source: the code comes from a checkout of the shared repo (its backend/ and
 # Frontend/), the release branch; the client's data files always come from here
@@ -577,17 +577,21 @@ CADDY_CONTAINER = "distributed-file-system-web-1"
 
 
 def frontend_caddy(env: dict[str, str]) -> None:
-    """Put polysil.pranayx.tech in the Caddyfile the box's proxy serves, replacing
-    the block if it is there already, so a change to the block reaches the box.
+    """Put polysil-test.pranayx.tech in the Caddyfile the box's proxy serves,
+    replacing our block if it is there already, so a change to it reaches the box.
+    A block for the old name, polysil.pranayx.tech, is removed.
     The file belongs to another project: it is backed up first, and restored if
     Caddy refuses the result, so their site is never left on a broken config."""
     text = (INFRA / "caddy" / "polysil-app.caddy").read_text(encoding="utf-8")
-    block = text[text.index("polysil.pranayx.tech {"):].rstrip() + "\n"
+    block = text[text.index("polysil-test.pranayx.tech {"):].rstrip() + "\n"
     f = shlex.quote(CADDYFILE)
     backup = shlex.quote(CADDYFILE + ".bak-polysil-app")
     c = CADDY_CONTAINER
-    # drop the old block: from its opening line to the first closing brace at column 0
-    strip = ("awk 'index($0, \"polysil.pranayx.tech {\") == 1 {skip=1} "
+    # drop our blocks: from an opening line to the first closing brace at column 0.
+    # The comment between them in our file is dropped too; only the blocks go up.
+    block = "\n".join(line for line in block.splitlines() if not line.startswith("#")) + "\n"
+    strip = ("awk 'index($0, \"polysil.pranayx.tech {\") == 1 || "
+             "index($0, \"polysil-test.pranayx.tech {\") == 1 {skip=1} "
              "skip && /^}/ {skip=0; next} !skip'")
     # `cat > file` keeps the inode: the Caddyfile is bind-mounted into the proxy
     script = (

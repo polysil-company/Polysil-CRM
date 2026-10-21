@@ -387,6 +387,21 @@ One approval chain.
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
+**`FreightOut`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes |  |
+| `gst_slab` | string | yes |  |
+| `gst_slab_chosen` | boolean | yes | False when the slab is the default, which follows the goods lines on every save. |
+| `cgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `sgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `igst_rate` | string | yes | The slab when inter-state, else 0. |
+| `cgst` | string | yes | Freight's CGST, rounded on its own. |
+| `sgst` | string | yes | Freight's SGST, always equal to its CGST. |
+| `igst` | string | yes | Freight's IGST. |
+| `total` | string | yes | The amount plus its tax. |
+
 **`InstalmentOut`**
 
 | Field | Type | Required | Notes |
@@ -482,6 +497,8 @@ One approval chain.
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
+| `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
 | `last_rejection` | LastRejection \| null | yes | Set while a rejected order is back in draft. |
@@ -559,7 +576,9 @@ One approval chain.
 | `discount3_amt` | string | yes |  |
 | `discount` | string | yes |  |
 | `taxable` | string | yes |  |
-| `gst_slab` | string | yes |  |
+| `gst_slab` | string | yes | The line's slab: the one picked, else the HSN's. |
+| `hsn_slab` | string | yes | The product's HSN slab when the line was priced. |
+| `gst_slab_chosen` | boolean | yes | The slab was picked (FS-069). |
 | `cgst_rate` | string | yes |  |
 | `sgst_rate` | string | yes |  |
 | `igst_rate` | string | yes |  |
@@ -694,6 +713,7 @@ One approval chain.
 | `payment_status` | string \| null |  | An order row: not_applicable, unpaid, part_paid, paid or overpaid (FS-022), for the Accounts step. Null otherwise. |
 | `over_credit_limit` | boolean \| null |  | An order row: over the dealer's credit limit at submit (FS-027); null when unchecked or not an order. |
 | `request_remark` | string \| null |  | Why the approval was asked, as the person asking wrote it. Show it beside the figures. Null when none was given. |
+| `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked rather than taken from the HSN. Show "GST changed on n lines" when above 0. Default `0`. |
 
 **`QueuePage`**
 
@@ -741,6 +761,8 @@ One approval chain.
 | `price_list` | PriceListRef \| null | yes | Null when the lines drew from more than one list. |
 | `price_list_ids` | string[] | yes |  |
 | `lines` | QuotationLine[] | yes |  |
+| `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
 | `warnings` | string[] | yes | Each is `code: sentence`. |
@@ -787,7 +809,9 @@ One approval chain.
 | `discount3_amt` | string | yes |  |
 | `discount` | string | yes | The three amounts summed. Not gross x discount_pct. |
 | `taxable` | string | yes |  |
-| `gst_slab` | string | yes |  |
+| `gst_slab` | string | yes | The line's slab: the one picked, else the HSN's. |
+| `hsn_slab` | string | yes | The product's HSN slab when the line was priced. |
+| `gst_slab_chosen` | boolean | yes | The slab was picked. Re-send `gst_slab` for this line when saving the basket. |
 | `cgst_rate` | string | yes |  |
 | `sgst_rate` | string | yes |  |
 | `igst_rate` | string | yes |  |
@@ -821,6 +845,7 @@ One approval chain.
 | `farmer_share` | string | yes | What the farmer pays. |
 | `as_of` | string | yes | The masters' date. |
 | `formula_version` | string | yes |  |
+| `gst_paid_by_state` | string |  | AP: the state's half of the GST. subsidy + farmer_share + this = total_cost (FS-063). Default `0.00`. |
 
 **`ReceiptOut`**
 
@@ -967,6 +992,7 @@ One approval chain.
 |---|---|---|---|
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
+| `freight` | string |  | FS-069: the freight before tax; 0.00 without freight. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |

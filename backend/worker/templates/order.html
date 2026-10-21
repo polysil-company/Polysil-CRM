@@ -96,6 +96,22 @@
         <td class="n">{{ l.total | rupees }}</td>
       </tr>
       {% endfor %}
+      {% if freight %}
+      <tr>
+        <td></td><td>Freight</td><td></td><td></td><td></td><td></td>
+        {# Value stays the goods' gross, as the Totals row prints it #}
+        <td></td>
+        {% if discount_cols %}<td colspan="{{ discount_cols }}"></td>{% endif %}
+        <td class="n">{{ o.freight_amount | rupees }}</td>
+        {% if intra_state %}
+        <td class="n">{{ o.freight_cgst | money }} <span class="muted">({{ freight.cgst_rate | pct }}%)</span></td>
+        <td class="n">{{ o.freight_sgst | money }} <span class="muted">({{ freight.sgst_rate | pct }}%)</span></td>
+        {% else %}
+        <td class="n">{{ o.freight_igst | money }} <span class="muted">({{ freight.igst_rate | pct }}%)</span></td>
+        {% endif %}
+        <td class="n">{{ o.freight_total | rupees }}</td>
+      </tr>
+      {% endif %}
     </tbody>
     <tfoot>
       <tr>

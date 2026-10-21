@@ -43,13 +43,20 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
-from api.domain.money import HUNDRED, ZERO, round2
+from api.domain.money import CENT, HUNDRED, ZERO, round2
 from api.domain.pricing.types import (
     DiscountStep,
     DocumentTotals,
+    FreightTax,
     LineTax,
     PricingError,
 )
+
+# The Council's slabs. 40 % is in force from 22 Sep 2025 (FS-069); 12 and 28 stay
+# legal for documents dated before it. Migration 010's `ck_gst_rate_slab`, widened
+# by 077, holds the same list.
+GST_SLABS: tuple[Decimal, ...] = tuple(Decimal(s) for s in
+                                       ("0", "0.25", "3", "5", "12", "18", "28", "40"))
 
 # Rule 11. The quantity bound alone does not bound the line total, because a rate
 # is `numeric(14,2)` and admits twelve digits before the point: executed, a
@@ -129,17 +136,50 @@ def compute_line(*, rate: Decimal, qty: Decimal, discount_pct: Decimal = ZERO,
                    total=taxable + igst, steps=tuple(steps))
 
 
-def document_totals(lines: tuple[LineTax, ...]) -> DocumentTotals:
+def default_freight_slab(slabs: Sequence[Decimal]) -> Decimal:
+    """FS-069 rule 7: the highest slab among the goods lines, each line's own slab,
+    chosen or not, a zero-taxable line included. The owner's rule; the legal rule
+    for a composite supply is the principal supply's rate (GAP-510)."""
+    if not slabs:
+        raise PricingError("freight_without_lines",
+                           "Freight needs at least one goods line.", "freight")
+    return max(slabs)
+
+
+def compute_freight(*, amount: Decimal, slab: Decimal, chosen: bool,
+                    intra_state: bool) -> FreightTax:
+    """FS-069 rules 5, 6 and 8: freight is taxed as a line of quantity one, with no
+    discount, so it rounds and splits CGST and SGST exactly as a line does."""
+    if amount <= 0 or amount != amount.quantize(CENT) or amount > MAX_LINE_TOTAL:
+        raise PricingError(
+            "freight_amount_invalid",
+            f"Freight must be above zero, at most {MAX_LINE_TOTAL:f}, in rupees and paise.",
+            "freight.amount")
+    if slab not in GST_SLABS:
+        raise PricingError("gst_slab_not_offered", f"{slab:f} % is not a GST slab.",
+                           "freight.gst_slab")
+    money = compute_line(rate=amount, qty=Decimal("1"), slab=slab, intra_state=intra_state)
+    return FreightTax(amount=amount, slab=slab, chosen=chosen, money=money)
+
+
+def document_totals(lines: tuple[LineTax, ...],
+                    freight: FreightTax | None = None) -> DocumentTotals:
     """The sum of rounded lines. Not a recomputation on the summed taxable value:
-    those differ by paise, and a hundred-line document diverges by rupees."""
+    those differ by paise, and a hundred-line document diverges by rupees.
+
+    Freight (FS-069 rule 8) joins taxable, the taxes and the total, never gross or
+    discount: the discount approval reads `discount / gross` (017), and freight in
+    `gross` would dilute a discount past its limit. So on the header
+    `taxable = gross - discount + freight`."""
+    extra = freight.money if freight is not None else None
     totals = DocumentTotals(
         gross=sum((ln.gross for ln in lines), ZERO),
         discount=sum((ln.discount for ln in lines), ZERO),
-        taxable=sum((ln.taxable for ln in lines), ZERO),
-        cgst=sum((ln.cgst for ln in lines), ZERO),
-        sgst=sum((ln.sgst for ln in lines), ZERO),
-        igst=sum((ln.igst for ln in lines), ZERO),
-        total=sum((ln.total for ln in lines), ZERO),
+        taxable=sum((ln.taxable for ln in lines), ZERO) + (extra.taxable if extra else ZERO),
+        cgst=sum((ln.cgst for ln in lines), ZERO) + (extra.cgst if extra else ZERO),
+        sgst=sum((ln.sgst for ln in lines), ZERO) + (extra.sgst if extra else ZERO),
+        igst=sum((ln.igst for ln in lines), ZERO) + (extra.igst if extra else ZERO),
+        total=sum((ln.total for ln in lines), ZERO) + (extra.total if extra else ZERO),
     )
     if totals.total > MAX_DOCUMENT_TOTAL:
         raise PricingError("document_total_too_large",

@@ -295,6 +295,25 @@ mean, which is the normal case for a state list that corrects a few rates.
 
 ---
 
+## `GET /api/v1/pricing/gst-slabs`
+
+**Gst Slabs**
+
+The GST slabs a line's dropdown and the freight dropdown offer (FS-069).
+
+The admin keeps the list in the setting `gst_slab_choices`. Read it once per
+screen. Preset each line to its `hsn_slab`, even when that slab is not in the
+list: a product taxed at 12 % shows 12 %, and leaving it there is not a choice.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_GstSlabChoices_` | Successful Response |
+| `403` | `ErrorResponse` | No pricing.view. |
+
+---
+
 ## `POST /api/v1/pricing/quote-lines`
 
 **Quote Lines**
@@ -328,6 +347,16 @@ figures are still our stand-ins and the quotation must not go to a farmer;
 right if a state list is a discount layer and a mispricing if it replaces the
 base, and nobody has told us which.
 
+**GST choice and freight (FS-069), commercial and industrial only.** A line may
+carry `gst_slab`, picked from `GET /pricing/gst-slabs`; send it only for a slab
+the user picked. Each line returns `gst_slab` (the slab used), `hsn_slab` and
+`gst_slab_chosen`, so the screen can mark a changed rate. `freight` adds one
+charge before tax; with no `gst_slab` it takes the highest slab among the lines.
+It returns priced under `freight`, and `totals.taxable`, the taxes and
+`totals.total` include it, while `totals.gross` and `totals.discount` are the
+goods only. Errors: 422 `gst_choice_not_allowed`, `gst_slab_not_offered`,
+`freight_not_allowed`, `freight_without_lines`, `freight_amount_invalid`.
+
 **Request body**
 
 **`QuoteLinesRequest`**
@@ -340,7 +369,8 @@ base, and nobody has told us which.
 | `partner_id` | string \| null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
 | `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
 | `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
-| `sales_type` | `commercial` \| `industrial` \| `subsidised` \| `export` \| `sample` \| `marketing` \| `marketing_material` \| `replacement` \| null |  | The quotation's sale type or the order's type, so the preview prices from the same lists the save will. commercial, industrial and subsidised use their own lists first; every other value, and null, use general lists only (FS-061). |
+| `sales_type` | `commercial` \| `industrial` \| `subsidised` \| `export` \| `sample` \| `marketing` \| `marketing_material` \| `replacement` \| null |  | The quotation's sale type or the order's type, so the preview prices from the same lists the save will. commercial, industrial and subsidised use their own lists first; every other value, and null, use general lists only (FS-061). A GST choice and freight need commercial or industrial. |
+| `freight` | FreightIn \| null |  | FS-069: optional freight. |
 
 **Responses**
 
@@ -354,6 +384,12 @@ base, and nobody has told us which.
 ---
 
 ## Models
+
+**`Envelope_GstSlabChoices_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | GstSlabChoices | yes |  |
 
 **`Envelope_PriceList_`**
 
@@ -386,6 +422,34 @@ base, and nobody has told us which.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
+
+**`FreightIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | number \| string | yes | Rupees before tax: above 0, at most two decimals, at most 99,999,999.99. Anything else is 422 freight_amount_invalid. |
+| `gst_slab` | number \| string \| null |  | A slab from `GET /pricing/gst-slabs`. Omit for the default: the highest slab among the goods lines. |
+
+**`FreightOut`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes |  |
+| `gst_slab` | string | yes |  |
+| `gst_slab_chosen` | boolean | yes | False when the slab is the default, which follows the goods lines on every save. |
+| `cgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `sgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `igst_rate` | string | yes | The slab when inter-state, else 0. |
+| `cgst` | string | yes | Freight's CGST, rounded on its own. |
+| `sgst` | string | yes | Freight's SGST, always equal to its CGST. |
+| `igst` | string | yes | Freight's IGST. |
+| `total` | string | yes | The amount plus its tax. |
+
+**`GstSlabChoices`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `choices` | string[] | yes | The slabs the dropdown offers, from the admin setting `gst_slab_choices`. |
 
 **`HTTPValidationError`**
 
@@ -512,7 +576,9 @@ base, and nobody has told us which.
 | `discount` | string | yes | The three amounts summed. Not gross x discount_pct: that is only the first tier. |
 | `taxable` | string | yes | The balance after the third tier. |
 | `hsn_code` | string | yes |  |
-| `gst_slab` | string | yes |  |
+| `gst_slab` | string | yes | The line's slab: the one picked, else the HSN's. |
+| `hsn_slab` | string | yes | The product's HSN slab, whatever was picked. |
+| `gst_slab_chosen` | boolean | yes | True when the slab was picked and differs from the HSN's. Show it as changed. |
 | `gst_rate_id` | string | yes |  |
 | `cgst_rate` | string | yes |  |
 | `sgst_rate` | string | yes |  |
@@ -532,6 +598,7 @@ base, and nobody has told us which.
 | `discount_pct` | number \| string |  | The first discount tier: per cent off the gross, at most three decimals. Default `0`. |
 | `discount2_pct` | number \| string |  | The second tier, per cent off the balance after the first. Each tier's amount is rounded to the paisa before the next applies. Default `0`. |
 | `discount3_pct` | number \| string |  | The third tier, per cent off the balance after the second. Default `0`. |
+| `gst_slab` | number \| string \| null |  | FS-069: the GST slab the user picked from `GET /pricing/gst-slabs`, a percentage such as 18. Commercial and industrial only. Omit, null, or the line's own HSN slab: the line follows the HSN rate. Send it only for a slab picked in the dropdown, and re-send it for every line whose `gst_slab_chosen` is true when saving the whole basket. |
 
 **`QuoteLinesRequest`**
 
@@ -543,7 +610,8 @@ base, and nobody has told us which.
 | `partner_id` | string \| null |  | Staff only, to price for a partner. A partner caller's tier comes from their own account and this field is refused. |
 | `seller_gstin_id` | string \| null |  | Which of our registrations supplies. Defaults to the one in force. |
 | `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
-| `sales_type` | `commercial` \| `industrial` \| `subsidised` \| `export` \| `sample` \| `marketing` \| `marketing_material` \| `replacement` \| null |  | The quotation's sale type or the order's type, so the preview prices from the same lists the save will. commercial, industrial and subsidised use their own lists first; every other value, and null, use general lists only (FS-061). |
+| `sales_type` | `commercial` \| `industrial` \| `subsidised` \| `export` \| `sample` \| `marketing` \| `marketing_material` \| `replacement` \| null |  | The quotation's sale type or the order's type, so the preview prices from the same lists the save will. commercial, industrial and subsidised use their own lists first; every other value, and null, use general lists only (FS-061). A GST choice and freight need commercial or industrial. |
+| `freight` | FreightIn \| null |  | FS-069: optional freight. |
 
 **`QuoteLinesResponse`**
 
@@ -556,6 +624,7 @@ base, and nobody has told us which.
 | `intra_state` | boolean | yes | True when both states match, so the tax splits into CGST and SGST. Returned so the document never re-derives it. |
 | `price_list_ids` | string[] | yes | Every list the lines resolved from. More than one raises the `mixed_price_lists` warning. |
 | `lines` | QuoteLine[] | yes |  |
+| `freight` | FreightOut \| null |  |  |
 | `totals` | QuoteTotals | yes |  |
 | `warnings` | string[] | yes | Each is `code: sentence`. Split on the first colon, switch on the code, show the sentence. |
 

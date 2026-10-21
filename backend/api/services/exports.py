@@ -220,7 +220,8 @@ LEADS: Final = (
 
 _TOTALS: Final = (
     Column("Subtotal", "totals.gross", "money"), Column("Discount", "totals.discount", "money"),
-    Column("Taxable", "totals.taxable", "money"), Column("CGST", "totals.cgst", "money"),
+    Column("Freight", "totals.freight", "money"), Column("Taxable", "totals.taxable", "money"),
+    Column("CGST", "totals.cgst", "money"),
     Column("SGST", "totals.sgst", "money"), Column("IGST", "totals.igst", "money"),
     Column("Total", "totals.total", "money"),
 )

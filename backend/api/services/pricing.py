@@ -30,6 +30,7 @@ trigger carries it.
 from __future__ import annotations
 
 import datetime as dt
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -42,14 +43,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.domain.money import round2
 from api.domain.pricing.resolve import applicable, mixed_list_warning, pick
 from api.domain.pricing.tax import (
+    GST_SLABS,
     MAX_DOCUMENT_TOTAL,
     MAX_QTY,
+    compute_freight,
     compute_line,
+    default_freight_slab,
     document_totals,
 )
 from api.domain.pricing.types import (
     ZERO,
     DiscountStep,
+    FreightTax,
     PricedDocument,
     PricedLine,
     PriceList,
@@ -70,8 +75,9 @@ TAX_TREATMENTS = ("domestic", "export_lut", "export_igst")
 
 MAX_LINES = 200
 MAX_FUTURE = dt.timedelta(days=365)
-GST_SLABS = (Decimal("0"), Decimal("0.25"), Decimal("3"), Decimal("5"),
-             Decimal("12"), Decimal("18"), Decimal("28"))
+# FS-069 rule 2: the document types on which a line's slab may be chosen and
+# freight added. Every other type keeps its own tax rules.
+CHOICE_TYPES = ("commercial", "industrial")
 
 
 def _dec(v: Any) -> Decimal:
@@ -280,11 +286,34 @@ def _check_quantity(product: Product, qty: Decimal, index: int) -> None:
 @dataclass(frozen=True)
 class LineSpec:
     """One line to price: what the preview posts and what a saved line re-resolves.
-    `discounts` is the cascade, tier one first."""
+    `discounts` is the cascade, tier one first. `gst_slab` is the slab the user
+    chose (FS-069); None, or the HSN's own slab, means the line follows the HSN."""
 
     product_id: str
     qty: Decimal
     discounts: tuple[Decimal, ...] = ()
+    gst_slab: Decimal | None = None
+    # True for a slab the request sent, False for one a document holds: only input
+    # is checked against the admin's list (FS-069 rule 3, code review F-2)
+    typed: bool = False
+
+
+@dataclass(frozen=True)
+class FreightSpec:
+    """FS-069: the document's freight as typed or as stored. `gst_slab` None means
+    the default, re-resolved on every pricing (rule 7)."""
+
+    amount: Decimal
+    gst_slab: Decimal | None = None
+    typed: bool = False
+
+
+def _chosen(ln: LineSpec, hsn_slab: Decimal) -> Decimal | None:
+    """FS-069 rule 1: a value equal to the HSN's slab is not a choice, so a builder
+    echoing the preview's slab back changes nothing. Compared as numbers."""
+    if ln.gst_slab is None or ln.gst_slab == hsn_slab:
+        return None
+    return ln.gst_slab
 
 
 @dataclass(frozen=True)
@@ -311,7 +340,9 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
                          sales_type: str | None,
                          existing: bool = False,
                          tax_as_of: dt.date | None = None,
-                         tax_treatment: str = "domestic") -> PricedContext:
+                         tax_treatment: str = "domestic",
+                         freight: FreightSpec | None = None,
+                         offered: Sequence[Decimal] | None = None) -> PricedContext:
     """Resolve and price a set of lines against the masters in force on a date.
     Stores nothing and locks nothing (rule 14).
 
@@ -341,6 +372,15 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
     required, with no default, so no caller prices from general lists by
     forgetting it (FS-061). Export, sample, replacement and `None` map to general
     lists only.
+
+    `freight` and each `LineSpec.gst_slab` are FS-069's. Every caller passes what
+    the document holds, so a re-price keeps them (rule 9). The rules that make them
+    legal live here, not in the callers: only commercial and industrial take them
+    (rule 2), freight needs a goods line (rule 5), and the ceiling counts freight
+    (rule 8). Whether a choice is in the admin's list (`offered`, from
+    `slab_choices`) is checked on input only: a caller re-pricing what a document
+    already holds passes None, so a stored choice survives a change to the list
+    (rule 3).
     """
     if tax_treatment not in TAX_TREATMENTS:
         raise ValidationFailed(fields={"tax_treatment": f"One of {', '.join(TAX_TREATMENTS)}."})
@@ -350,6 +390,15 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
         raise ValidationFailed(fields={"as_of": "A price date may not be more than a year ahead."})
     if len(lines) > MAX_LINES:
         raise ValidationFailed(fields={"lines": f"At most {MAX_LINES} lines."})
+    allows_choice = sales_type in CHOICE_TYPES and tax_treatment == "domestic"
+    if freight is not None:
+        if not allows_choice:
+            raise ValidationFailed("Freight is for commercial and industrial documents only.",
+                                   code="freight_not_allowed", fields={"freight": "Not allowed."})
+        if not lines:
+            raise ValidationFailed("Freight needs at least one goods line.",
+                                   code="freight_without_lines",
+                                   fields={"freight": "Add a line first."})
 
     target, tier, pos_state = await resolve_scope(
         db, partner_id=partner_id, place_of_supply_territory_id=place_of_supply_territory_id)
@@ -403,6 +452,25 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
     if unpriced:
         raise ValidationFailed(code="product_not_priced", fields=unpriced)
 
+    picked = {i: _chosen(ln, products[ln.product_id][1].slab) for i, ln in enumerate(lines)}
+    refused = {f"lines[{i}].gst_slab": "Not allowed on this document type."
+               for i, s in picked.items() if s is not None and not allows_choice}
+    def _menu(typed: bool) -> tuple[Decimal, ...]:
+        return tuple(offered) if offered is not None and typed else GST_SLABS
+
+    refused.update({f"lines[{i}].gst_slab": f"{s:f} % is not one of the GST slabs offered."
+                    for i, s in picked.items()
+                    if s is not None and s not in _menu(lines[i].typed)})
+    if freight is not None and freight.gst_slab is not None \
+            and freight.gst_slab not in _menu(freight.typed):
+        refused["freight.gst_slab"] = (f"{freight.gst_slab:f} % is not one of the GST "
+                                       f"slabs offered.")
+    if refused:
+        code = ("gst_choice_not_allowed" if not allows_choice else "gst_slab_not_offered")
+        raise ValidationFailed("A GST slab may be chosen on commercial and industrial "
+                               "documents only, from the slabs in force.", code=code,
+                               fields=refused)
+
     priced: list[PricedLine] = []
     for i, ln in enumerate(lines):
         product, tax = products[ln.product_id]
@@ -410,19 +478,34 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
             _check_quantity(product, ln.qty, i)
         rate = chosen[str(i)]
         tiers = tuple(ln.discounts) or (ZERO,)
+        own = picked[i]
+        slab = own if own is not None else tax.slab
         try:
             money = compute_line(rate=rate.rate, qty=ln.qty, discounts=tiers,
-                                 slab=ZERO if tax_treatment == "export_lut" else tax.slab,
+                                 slab=ZERO if tax_treatment == "export_lut" else slab,
                                  intra_state=intra_state)
         except PricingError as exc:
             raise ValidationFailed(
                 exc.message, code=exc.code,
                 fields={f"lines[{i}].{exc.field_path or 'qty'}": exc.message}) from exc
         priced.append(PricedLine(product=product, qty=ln.qty, discount_pct=tiers[0],
-                                 rate=rate, tax=tax, money=money, discounts=tiers))
+                                 rate=rate, tax=tax, money=money, discounts=tiers,
+                                 chosen_slab=own))
+
+    freight_tax: FreightTax | None = None
+    if freight is not None:
+        try:
+            freight_tax = compute_freight(
+                amount=freight.amount,
+                slab=(freight.gst_slab if freight.gst_slab is not None
+                      else default_freight_slab([p.slab for p in priced])),
+                chosen=freight.gst_slab is not None, intra_state=intra_state)
+        except PricingError as exc:
+            raise ValidationFailed(exc.message, code=exc.code,
+                                   fields={exc.field_path or "freight": exc.message}) from exc
 
     try:
-        totals = document_totals(tuple(p.money for p in priced))
+        totals = document_totals(tuple(p.money for p in priced), freight_tax)
     except PricingError as exc:
         raise ValidationFailed(exc.message, code=exc.code, fields={"lines": exc.message}) from exc
 
@@ -444,11 +527,49 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
                         f"cannot be added to a new one.")
 
     document = PricedDocument(lines=tuple(priced), totals=totals, intra_state=intra_state,
-                              warnings=tuple(warnings))
+                              warnings=tuple(warnings), freight=freight_tax)
     return PricedContext(document=document, as_of=day, seller_gstin_id=gstin_id,
                          seller_state_id=seller, seller_code=seller_code,
                          place_of_supply_state_id=pos_state, place_of_supply_code=pos_code,
                          intra_state=intra_state, tier=tier, partner_id=target)
+
+
+async def slab_choices(db: AsyncSession) -> tuple[Decimal, ...]:
+    """FS-069 rule 3: the slabs the dropdown offers, the admin setting
+    `gst_slab_choices`. Read on input only."""
+    raw: str = (await db.execute(text(
+        "SELECT app_setting_json('gst_slab_choices')::text"))).scalar_one()
+    return tuple(Decimal(str(v)) for v in json.loads(raw))
+
+
+async def gst_slabs(db: AsyncSession) -> sch.GstSlabChoices:
+    return sch.GstSlabChoices(choices=[f"{v.normalize():f}" for v in await slab_choices(db)])
+
+
+def freight_spec(body: Any) -> FreightSpec | None:
+    """A request's `freight` (FS-069) as the pipeline takes it."""
+    return (None if body is None
+            else FreightSpec(amount=body.amount, gst_slab=body.gst_slab, typed=True))
+
+
+def stored_freight(row: Any) -> FreightSpec | None:
+    """What a document holds, re-priced as it stands: a default slab re-resolves,
+    a chosen one is kept (rule 7)."""
+    if row.freight_amount is None:
+        return None
+    return FreightSpec(amount=_dec(row.freight_amount),
+                       gst_slab=_dec(row.freight_slab) if row.freight_slab_chosen else None)
+
+
+def line_spec(product_id: str, qty: Decimal, discounts: tuple[Decimal, ...],
+              gst_slab: Any = None, *, typed: bool = False) -> LineSpec:
+    return LineSpec(product_id=product_id, qty=qty, discounts=discounts,
+                    gst_slab=None if gst_slab is None else _dec(gst_slab), typed=typed)
+
+
+def stored_slab(row: Any) -> Decimal | None:
+    """A stored line's choice, carried into a re-price (rule 9)."""
+    return _dec(row.gst_slab) if row.gst_slab_chosen else None
 
 
 async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.QuoteLinesResponse:
@@ -457,11 +578,76 @@ async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.Quot
         db, partner_id=body.partner_id,
         place_of_supply_territory_id=body.place_of_supply_territory_id,
         seller_gstin_id=body.seller_gstin_id, as_of=body.as_of,
-        lines=[LineSpec(product_id=ln.product_id, qty=ln.qty, discounts=ln.discounts)
+        lines=[line_spec(ln.product_id, ln.qty, ln.discounts, ln.gst_slab, typed=True)
                for ln in body.lines],
-        sales_type=body.sales_type, tax_treatment=body.tax_treatment)
+        sales_type=body.sales_type, tax_treatment=body.tax_treatment,
+        freight=freight_spec(body.freight), offered=await slab_choices(db))
     return _quote_response(ctx.document, as_of=ctx.as_of, gstin_id=ctx.seller_gstin_id,
                            seller_code=ctx.seller_code, pos_code=ctx.place_of_supply_code)
+
+
+_FREIGHT_COLS = ("fa", "fs", "fc", "fcg", "fsg", "fig", "ft")
+
+
+def freight_params(f: FreightTax | None) -> dict[str, Any]:
+    """The seven header columns (077), all null without freight."""
+    if f is None:
+        return dict.fromkeys(_FREIGHT_COLS)
+    m = f.money
+    return {"fa": f.amount, "fs": f.slab, "fc": f.chosen, "fcg": m.cgst, "fsg": m.sgst,
+            "fig": m.igst, "ft": m.total}
+
+
+def freight_from_row(row: Any) -> sch.FreightOut | None:
+    """A stored document's freight. The rates are not stored: they follow from the
+    slab and the document's `intra_state`, as a line's do."""
+    if row.freight_amount is None:
+        return None
+    slab = _dec(row.freight_slab)
+    half = slab / 2
+    intra = bool(row.intra_state)
+    return sch.FreightOut(
+        amount=_s(_dec(row.freight_amount)), gst_slab=_rate(slab),
+        gst_slab_chosen=bool(row.freight_slab_chosen),
+        cgst_rate=_rate(half if intra else ZERO), sgst_rate=_rate(half if intra else ZERO),
+        igst_rate=_rate(ZERO if intra else slab), cgst=_s(_dec(row.freight_cgst)),
+        sgst=_s(_dec(row.freight_sgst)), igst=_s(_dec(row.freight_igst)),
+        total=_s(_dec(row.freight_total)))
+
+
+def freight_drift(row: Any, f: FreightTax | None) -> str | None:
+    """What moved between a stored document's freight and a fresh pricing of it
+    (FS-069 rule 9), as the `rate_changed` field text; None when nothing did."""
+    if row.freight_amount is None and f is None:
+        return None
+    if row.freight_amount is None or f is None:
+        return "added" if row.freight_amount is None else "removed"
+    pairs = {"gst_slab": (_dec(row.freight_slab), f.slab),
+             "cgst": (_dec(row.freight_cgst), f.money.cgst),
+             "sgst": (_dec(row.freight_sgst), f.money.sgst),
+             "igst": (_dec(row.freight_igst), f.money.igst),
+             "total": (_dec(row.freight_total), f.money.total)}
+    moved = [f"{k} {_s(a) if k != 'gst_slab' else _rate(a)} -> "
+             f"{_s(b) if k != 'gst_slab' else _rate(b)}"
+             for k, (a, b) in pairs.items() if a != b]
+    return ", ".join(moved) or None
+
+
+def cleared_warning(lines: int, freight: bool) -> str:
+    what = [f"{lines} GST choices"] if lines else []
+    what += ["the freight"] if freight else []
+    return (f"gst_choice_cleared: {' and '.join(what)} removed; this document type takes "
+            f"neither.")
+
+
+def freight_out(f: FreightTax | None) -> sch.FreightOut | None:
+    if f is None:
+        return None
+    m = f.money
+    return sch.FreightOut(amount=_s(f.amount), gst_slab=_rate(f.slab), gst_slab_chosen=f.chosen,
+                          cgst_rate=_rate(m.cgst_rate), sgst_rate=_rate(m.sgst_rate),
+                          igst_rate=_rate(m.igst_rate), cgst=_s(m.cgst), sgst=_s(m.sgst),
+                          igst=_s(m.igst), total=_s(m.total))
 
 
 def _cascade(steps: tuple[DiscountStep, ...]) -> dict[str, str]:
@@ -488,7 +674,8 @@ def _quote_response(doc: PricedDocument, *, as_of: dt.date, gstin_id: str, selle
             price_list_id=p.rate.price_list.id, price_list_item_id=p.rate.price_list_item_id,
             gross=_s(p.money.gross), **_cascade(p.money.steps),
             discount=_s(p.money.discount), taxable=_s(p.money.taxable),
-            hsn_code=p.tax.hsn_code, gst_slab=_rate(p.tax.slab), gst_rate_id=p.tax.gst_rate_id,
+            hsn_code=p.tax.hsn_code, gst_slab=_rate(p.slab), hsn_slab=_rate(p.tax.slab),
+            gst_slab_chosen=p.chosen, gst_rate_id=p.tax.gst_rate_id,
             cgst_rate=_rate(p.money.cgst_rate), sgst_rate=_rate(p.money.sgst_rate),
             igst_rate=_rate(p.money.igst_rate),
             cgst=_s(p.money.cgst), sgst=_s(p.money.sgst), igst=_s(p.money.igst),
@@ -500,7 +687,7 @@ def _quote_response(doc: PricedDocument, *, as_of: dt.date, gstin_id: str, selle
         as_of=as_of, seller_gstin_id=gstin_id, seller_state=seller_code,
         place_of_supply_state=pos_code, intra_state=doc.intra_state,
         price_list_ids=sorted({p.rate.price_list.id for p in doc.lines}),
-        lines=lines,
+        lines=lines, freight=freight_out(doc.freight),
         totals=sch.QuoteTotals(gross=_s(t.gross), discount=_s(t.discount), taxable=_s(t.taxable),
                                cgst=_s(t.cgst), sgst=_s(t.sgst), igst=_s(t.igst),
                                total=_s(t.total)),

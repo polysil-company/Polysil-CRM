@@ -298,6 +298,59 @@ class PublishResult(BaseModel):
 
 # ── the pricing preview ──────────────────────────────────────────────────────
 
+GST_SLAB_DOC = ("FS-069: the GST slab the user picked from `GET /pricing/gst-slabs`, a "
+                "percentage such as 18. Commercial and industrial only. Omit, null, or the "
+                "line's own HSN slab: the line follows the HSN rate. Send it only for a slab "
+                "picked in the dropdown, and re-send it for every line whose "
+                "`gst_slab_chosen` is true when saving the whole basket.")
+
+
+def _slab_places(v: Decimal | None) -> Decimal | None:
+    return None if v is None else _places(v, 3, "gst_slab")
+
+
+class FreightIn(BaseModel):
+    """FS-069: one freight or transport charge per document, before tax."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount: Annotated[Decimal, Field(
+        allow_inf_nan=False,
+        description="Rupees before tax: above 0, at most two decimals, at most "
+                    "99,999,999.99. Anything else is 422 freight_amount_invalid.")]
+    gst_slab: Annotated[Decimal | None, Field(
+        default=None, ge=0, le=100,
+        description="A slab from `GET /pricing/gst-slabs`. Omit for the default: the "
+                    "highest slab among the goods lines.")]
+
+    @field_validator("gst_slab")
+    @classmethod
+    def _gst_places(cls, v: Decimal | None) -> Decimal | None:
+        return _slab_places(v)
+
+
+class FreightOut(BaseModel):
+    """The freight as priced. Its tax is part of the document's taxable, tax and
+    total figures, never its gross or discount."""
+
+    amount: str
+    gst_slab: str
+    gst_slab_chosen: bool = Field(description="False when the slab is the default, which "
+                                              "follows the goods lines on every save.")
+    cgst_rate: str = Field(description="Half the slab when intra-state, else 0.")
+    sgst_rate: str = Field(description="Half the slab when intra-state, else 0.")
+    igst_rate: str = Field(description="The slab when inter-state, else 0.")
+    cgst: str = Field(description="Freight's CGST, rounded on its own.")
+    sgst: str = Field(description="Freight's SGST, always equal to its CGST.")
+    igst: str = Field(description="Freight's IGST.")
+    total: str = Field(description="The amount plus its tax.")
+
+
+class GstSlabChoices(BaseModel):
+    choices: list[str] = Field(description="The slabs the dropdown offers, from the admin "
+                                           "setting `gst_slab_choices`.")
+
+
 class QuoteLineIn(BaseModel):
     product_id: Annotated[str, Field(pattern=UUID_RE)]
     qty: Annotated[Decimal, Field(
@@ -314,6 +367,8 @@ class QuoteLineIn(BaseModel):
     discount3_pct: Annotated[Decimal, Field(
         default=Decimal("0"), ge=0, le=100,
         description="The third tier, per cent off the balance after the second.")]
+    gst_slab: Annotated[Decimal | None, Field(default=None, ge=0, le=100,
+                                              description=GST_SLAB_DOC)]
 
     @field_validator("qty")
     @classmethod
@@ -324,6 +379,11 @@ class QuoteLineIn(BaseModel):
     @classmethod
     def _discount_places(cls, v: Decimal, info: ValidationInfo) -> Decimal:
         return _places(v, 3, str(info.field_name))
+
+    @field_validator("gst_slab")
+    @classmethod
+    def _gst_places(cls, v: Decimal | None) -> Decimal | None:
+        return _slab_places(v)
 
     @property
     def discounts(self) -> tuple[Decimal, Decimal, Decimal]:
@@ -358,7 +418,9 @@ class QuoteLinesRequest(BaseModel):
         description="The quotation's sale type or the order's type, so the preview prices "
                     "from the same lists the save will. commercial, industrial and subsidised "
                     "use their own lists first; every other value, and null, use general "
-                    "lists only (FS-061).")
+                    "lists only (FS-061). A GST choice and freight need commercial or "
+                    "industrial.")
+    freight: FreightIn | None = Field(default=None, description="FS-069: optional freight.")
 
 
 class QuoteLine(BaseModel):
@@ -389,7 +451,10 @@ class QuoteLine(BaseModel):
                                       "that is only the first tier.")
     taxable: str = Field(description="The balance after the third tier.")
     hsn_code: str
-    gst_slab: str
+    gst_slab: str = Field(description="The line's slab: the one picked, else the HSN's.")
+    hsn_slab: str = Field(description="The product's HSN slab, whatever was picked.")
+    gst_slab_chosen: bool = Field(description="True when the slab was picked and differs "
+                                              "from the HSN's. Show it as changed.")
     gst_rate_id: str
     cgst_rate: str
     sgst_rate: str
@@ -404,7 +469,9 @@ class QuoteLine(BaseModel):
 
 class QuoteTotals(BaseModel):
     """The sum of the rounded lines, never a recomputation on the summed values.
-    The two differ by paise, and a hundred-line document by rupees."""
+    The two differ by paise, and a hundred-line document by rupees. `gross` and
+    `discount` are the goods only; `taxable`, the taxes and `total` include freight,
+    so `taxable = gross - discount + freight.amount` (FS-069)."""
 
     gross: str
     discount: str
@@ -427,6 +494,7 @@ class QuoteLinesResponse(BaseModel):
         description="Every list the lines resolved from. More than one raises the "
                     "`mixed_price_lists` warning.")
     lines: list[QuoteLine]
+    freight: FreightOut | None = None
     totals: QuoteTotals
     warnings: list[str] = Field(
         description="Each is `code: sentence`. Split on the first colon, switch on the "

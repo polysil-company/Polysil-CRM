@@ -977,6 +977,30 @@ def f_pricing() -> None:
               "than the supplying warehouse's, because warehouses\n"
               "do not exist yet (GAP-088).", w=460, colour=YELLOW)
 
+    e += note("nGreen3", 0, 1550,
+              "FS-069: A PICKED SLAB AND FREIGHT\n\n"
+              "Commercial and industrial only. A line may carry\n"
+              "gst_slab from the admin's list (0, 5, 18, 40); one\n"
+              "equal to the HSN's is not a choice. Freight is a\n"
+              "line of quantity one, slab picked or the highest\n"
+              "line's. Every re-price carries both.", w=460, colour=GREEN)
+
+    e += note("nRed4", 480, 1550,
+              "FREIGHT IS NEVER IN GROSS OR DISCOUNT\n\n"
+              "It joins taxable, tax and total only, so\n"
+              "taxable = gross - discount + freight, a CHECK on\n"
+              "both headers. In gross it would turn a 20 %\n"
+              "discount into 14 % and slip it past approval,\n"
+              "which reads discount / gross (017).", w=460, colour=RED)
+
+    e += note("nYellow3", 960, 1550,
+              "ASSUMED, NOT CONFIRMED\n\n"
+              "No approval for a picked slab; the approver sees\n"
+              "gst_changed_lines (GAP-508). Freight counts in\n"
+              "sales and targets (GAP-509). The default is the\n"
+              "highest slab, not the principal supply's (GAP-510).",
+              w=460, colour=YELLOW)
+
     write("11-pricing", e)
 
 
@@ -2525,7 +2549,7 @@ def f_live_checks() -> None:
         [("j1", "staging only: the journey. Lead, two stages,\nquotation, send (channel none), PDF", YELLOW),
          ("j2", "accept, order (never submitted), document,\neach record's timeline", YELLOW),
          ("j3", "negatives: another office reads no lead;\na role without view gets 403", GREEN),
-         ("j4", "live/inventory.json: 119 paths, each checked\nor skipped with a reason; 47 forbidden on prod", GREY)],
+         ("j4", "live/inventory.json: 120 paths, each checked\nor skipped with a reason; 47 forbidden on prod", GREY)],
         [("n1", "TWO GETS WRITE\n\n/tracking/team/latest and /visits insert view-log\nrows. Never called on production. The normal suite\ncalls every checked GET in a READ ONLY transaction.", RED),
          ("n2", "STAGING SENDS REAL WHATSAPP\n\nEvery record carries LIVE_TEST_MOBILE: one message\nper run, the lead acknowledgement.", RED),
          ("n3", "THE GUARD READS THE SAME URL THE WRITES USE\n\nA wrong address fails the guard instead of passing it.", GREEN),
