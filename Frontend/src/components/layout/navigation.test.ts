@@ -139,10 +139,13 @@ describe("[APP-006] route guards", () => {
     expect(canOpenPath("/approvals", mockPermissionsFor("employee"), "staff")).toBe(false);
   });
 
-  it("opens Channel partners and the pages under it to staff who read partners only (CHNL-001)", () => {
+  it("opens Channel partners to whoever reads partners, and dealer applications to staff only (CHNL-001, CHNL-002)", () => {
     expect(canOpenPath("/partners", mockPermissionsFor("employee"), "staff")).toBe(true);
     expect(canOpenPath("/partners/new", admin, "staff")).toBe(true);
-    expect(canOpenPath("/partners/p-1/edit", dealer, "partner_user")).toBe(false);
+    // A distributor or dealer adds and corrects the partners under it (client, 20 Oct).
+    expect(canOpenPath("/partners/p-1/edit", dealer, "partner_user")).toBe(true);
+    expect(canOpenPath("/partners/applications", dealer, "partner_user")).toBe(false);
+    expect(canOpenPath("/partners", mockPermissionsFor("sub_dealer"), "partner_user")).toBe(false);
     expect(canOpenPath("/partners", mockPermissionsFor("qa_manager"), "staff")).toBe(false);
   });
 

@@ -84,7 +84,8 @@ describe("[CHNL-001] Channel partners — list and detail", () => {
 
   it("lists every partner newest first with the total, and filters by type, parent and status", async () => {
     const page = await listPartners(ALL);
-    expect(page.total).toBe(9);
+    // Nine seeded, and the three demo partner users' own dealerships (CHNL-002).
+    expect(page.total).toBe(12);
     expect(page.items[0]?.name).toBe("Babra Farm Supplies");
 
     const dealers = await listPartners({ ...ALL, type: "dealer" });
@@ -124,6 +125,7 @@ describe("[CHNL-001] Channel partners — list and detail", () => {
   it("offers only open partners of the type one up as a parent", async () => {
     const distributors = await searchParents("distributor", "");
     expect(distributors.map((partner) => partner.name).sort()).toEqual([
+      "Gujarat Agro Distributors",
       "Saurashtra Agro Distributors",
       "Sorath Agri Distributors",
     ]);
