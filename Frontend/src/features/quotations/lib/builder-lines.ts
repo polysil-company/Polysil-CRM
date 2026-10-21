@@ -133,7 +133,9 @@ export interface PricingContext {
  * QUOT-015 · A GST slab per line and freight: commercial and industrial sales, taxed at home.
  * Every other document follows the HSN and takes no freight.
  */
-export function allowsGstChoice(context: Pick<PricingContext, "salesType" | "taxTreatment">): boolean {
+export function allowsGstChoice(
+  context: Pick<PricingContext, "salesType" | "taxTreatment">,
+): boolean {
   return (
     takesGstChoice(context.salesType) &&
     (context.taxTreatment === undefined || context.taxTreatment === "domestic")

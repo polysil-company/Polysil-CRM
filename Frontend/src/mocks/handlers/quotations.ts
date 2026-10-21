@@ -162,7 +162,10 @@ export function storedLineIn(
 export function storedFreightIn(freight: FreightWire | null): FreightIn | null {
   return freight === null
     ? null
-    : { amount: freight.amount, gst_slab: freight.gst_slab_chosen ? Number(freight.gst_slab) : null };
+    : {
+        amount: freight.amount,
+        gst_slab: freight.gst_slab_chosen ? Number(freight.gst_slab) : null,
+      };
 }
 
 /**

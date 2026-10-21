@@ -193,7 +193,6 @@ export function usePricedLines(
     freightError: freightBlock ?? freightSaveError,
     freightBlocks: freightBlock !== null,
     setFreightSaveError,
-    pricedFreight:
-      plan.request?.freight === undefined ? null : (snapshot?.preview.freight ?? null),
+    pricedFreight: plan.request?.freight === undefined ? null : (snapshot?.preview.freight ?? null),
   };
 }
