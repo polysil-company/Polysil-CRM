@@ -40,6 +40,8 @@ async def test_the_category_and_unit_lookups_list_every_live_code(
     await s.execute(text("INSERT INTO product_category (code, name, is_active) VALUES (:c, 'Gone', true), (:o, 'Off', false)"),
                     {"c": f"GONE{tag}", "o": f"OFF{tag}"})
     await s.execute(text("UPDATE product_category SET deleted_at = now() WHERE code = :c"), {"c": f"GONE{tag}"})
+    await s.execute(text("INSERT INTO uom (code, name, decimals, deleted_at) VALUES (:u, 'Gone', 0, now())"),
+                    {"u": f"GU{tag}"})
     await s.commit()
     try:
         r = await client.get(f"{V1}/lookups/product-categories", headers=h)
@@ -51,7 +53,9 @@ async def test_the_category_and_unit_lookups_list_every_live_code(
         r = await client.get(f"{V1}/lookups/uoms", headers=h)
         assert r.status_code == 200, r.text
         assert r.json()["data"] and all(0 <= u["decimals"] <= 3 for u in r.json()["data"])
+        assert f"GU{tag}" not in {u["code"] for u in r.json()["data"]}, "a soft-deleted unit is listed"
     finally:
+        await s.execute(text("DELETE FROM uom WHERE code = :u"), {"u": f"GU{tag}"})
         await s.execute(text("DELETE FROM product_category WHERE code IN (:c, :o)"),
                         {"c": f"GONE{tag}", "o": f"OFF{tag}"})
         await s.commit()
@@ -132,6 +136,15 @@ async def test_scheme_targets_carry_names_and_an_echo_changes_nothing(
     await s.close()
     assert names == {"territory": want.t, "partner_type": "dealer", "partner": want.p, "product": want.x}
 
+    s = sessions()
+    cat = (await s.execute(text(
+        "SELECT c.id, c.name FROM product_category c JOIN product p ON p.product_category_id = c.id "
+        "WHERE p.id = CAST(:x AS uuid)"), {"x": shop.product})).one()
+    await s.close()
+    by_cat = await schemes._scheme(client, shop, made, targets=[
+        {"type": "territory", "id": shop.district}, {"type": "product_category", "id": str(cat.id)}])
+    assert {t["type"]: t["name"] for t in by_cat["targets"]}["product_category"] == cat.name
+
     h = await endpoints._as(client, shop, "admin_sales")
     r = await client.patch(f"{V1}/schemes/{sch['id']}", json={"is_active": False}, headers={**h, **_key()})
     assert r.status_code == 200, r.text
@@ -194,14 +207,57 @@ async def test_orderable_lists_only_accepted_quotations_on_no_live_order(
         await s.close()
 
 
-async def test_orderable_leaves_a_draft_quotation_out(client: httpx.AsyncClient, shop: Shop) -> None:
+async def test_orderable_leaves_out_a_quotation_not_yet_accepted(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    """Code review F-1: the status rule on its own, with no `status` param."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    lead = (await client.post(f"{V1}/leads", headers={**ho, **_key()}, json={
+        "farmer_name": "Kiritbhai Shah", "mobile": "97" + f"{uuid.uuid4().int % 10**8:08d}",
+        "territory_id": shop.district, "inquiry_type": "commercial", "mis_system": "drip",
+        "village": "Vadod"})).json()["data"]
+    for stage in ("contacted", "qualified"):
+        r = await client.post(f"{V1}/leads/{lead['id']}/transition", json={"to_stage": stage},
+                              headers={**ho, **_key()})
+        assert r.status_code == 200, r.text
+    r = await client.post(f"{V1}/quotations", headers={**ho, **_key()}, json={
+        "lead_id": lead["id"], "sales_type": "commercial",
+        "place_of_supply_territory_id": shop.district, "seller_gstin_id": shop.seller,
+        "price_effective_date": endpoints.AS_OF,
+        "lines": [{"product_id": shop.product, "qty": "20", "discount_pct": "5"}]})
+    assert r.status_code == 201, r.text
+    q = r.json()["data"]
+    every = await client.get(f"{V1}/quotations", headers=ho, params={"lead_id": lead["id"]})
+    assert {x["id"] for x in every.json()["data"]} == {q["id"]}, "without the filter nothing changes"
+    assert await _orderable(client, ho, lead["id"]) == set(), "a draft is not orderable"
+    r = await client.post(f"{V1}/quotations/{q['id']}/send", json={"channel": "none"},
+                          headers={**ho, **_key()})
+    assert r.status_code == 200, r.text
+    assert await _orderable(client, ho, lead["id"]) == set(), "a sent quotation is not orderable"
+
+
+async def test_a_returned_order_holds_its_quotation_and_a_deleted_draft_frees_it(
+        client: httpx.AsyncClient, shop: Shop) -> None:
+    """Edge case EC-9: an approver's rejection returns the order to draft and keeps the
+    hold; deleting a never-submitted draft releases it."""
     ho = await endpoints._as(client, shop, "field_officer")
     q = await endpoints._accepted_quotation(client, shop, ho)
-    every = await client.get(f"{V1}/quotations", headers=ho, params={"lead_id": q["lead"]["id"]})
-    assert {x["id"] for x in every.json()["data"]} == {q["id"]}, "without the filter nothing changes"
-    r = await client.get(f"{V1}/quotations", headers=ho,
-                         params={"lead_id": q["lead"]["id"], "orderable": "true", "status": "draft"})
-    assert r.json()["data"] == []
+    lead = q["lead"]["id"]
+    order = await endpoints._submit(client, ho, (await endpoints._create(
+        client, ho, {"quotation_ids": [q["id"]]}))["id"])
+    hm = await endpoints._as(client, shop, "district_manager")
+    r = await endpoints._decide(client, hm, order["approval"]["steps"][0]["id"], "reject", "Rate too low")
+    assert r.status_code == 200, r.text
+    assert await _orderable(client, ho, lead) == set(), "a returned order still holds it"
+    r = await client.post(f"{V1}/orders/{order['id']}/cancel", json={"remark": "Start again"},
+                          headers={**ho, **_key()})
+    assert r.status_code == 200, r.text
+
+    draft = await endpoints._create(client, ho, {"quotation_ids": [q["id"]]})
+    assert await _orderable(client, ho, lead) == set()
+    admin = await endpoints._as(client, shop, "md_ceo")
+    r = await client.delete(f"{V1}/orders/{draft['id']}", headers={**admin, **_key()})
+    assert r.status_code == 204, r.text
+    assert await _orderable(client, ho, lead) == {q["id"]}, "deleting the draft releases it"
 
 
 # ── BE-030: features on /auth/me ─────────────────────────────────────────────
