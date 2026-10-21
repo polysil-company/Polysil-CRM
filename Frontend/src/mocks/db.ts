@@ -52,7 +52,7 @@ import { seedMarketingOrders, seedMaterials, type MockMarketingOrder } from "./d
 import { generateConversations, generateGroups, type MockGroupMember } from "./data/messages";
 import { generateNotifications } from "./data/notifications";
 import { generateOrders } from "./data/orders";
-import { handLeadsToSessionPartners } from "./data/partner-scope";
+import { handLeadsToSessionPartners, sessionPartnerRecords } from "./data/partner-scope";
 import { seedPartners, type MockPartnerRecord } from "./data/partners";
 import { seedPayments, seedSchedules, type MockInstalment } from "./data/payments";
 import {
@@ -292,7 +292,9 @@ function createMockDb(): MockDb {
   const complaints = generateComplaints(leads, orders);
   const gifts = seedGifts();
   const materials = seedMaterials();
-  const partners = seedPartners();
+  const seeded = seedPartners();
+  // CHNL-002 · the demo partner users' own dealerships, newest last so the staff list is unchanged
+  const partners = [...seeded, ...sessionPartnerRecords(seeded.at(-1)?.territory ?? null)];
   const firstDealer = partners.find((partner) => partner.partner_type === "dealer");
   const approvalSteps = seedApprovals(quotations, orders, thresholds);
   const { tasks, minutes } = seedMinutes(generateTasks(leads));

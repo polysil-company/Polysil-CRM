@@ -94,9 +94,16 @@ function FormSkeleton({ label }: { label: string }): React.JSX.Element {
  * CHNL-002 · Add a partner. From a partner's page, `parentId` starts the form as the next
  * type down under it ("Add a dealer"); otherwise as a distributor.
  */
-export function NewPartner({ parentId }: { parentId: string | null }): React.JSX.Element {
+export function NewPartner({
+  parentId: askedParentId,
+}: {
+  parentId: string | null;
+}): React.JSX.Element {
   const canCreate = useCan("partners", "create");
   const session = useSession();
+  const staff = useIsStaff();
+  // CHNL-002 · A distributor or dealer adds the next type down under itself, whatever the URL says.
+  const parentId = staff ? askedParentId : (session.data?.partner?.id ?? null);
   const parent = useQuery({
     ...partnerDetailQueryOptions(parentId ?? ""),
     enabled: parentId !== null,
@@ -112,7 +119,14 @@ export function NewPartner({ parentId }: { parentId: string | null }): React.JSX
       />
     );
   }
-  if (parentId === null) return <NewPartnerForm initial={emptyPartnerDraft()} />;
+  if (parentId === null) {
+    // A partner user always has its own partner; without one there is nothing to add under.
+    return staff ? (
+      <NewPartnerForm initial={emptyPartnerDraft()} />
+    ) : (
+      <FormSkeleton label="Loading your account" />
+    );
+  }
   if (parent.status === "pending") return <FormSkeleton label="Loading the partner above" />;
   if (parent.status === "error") {
     if (isApiError(parent.error) && parent.error.status === 404) notFound();
@@ -137,7 +151,7 @@ export function NewPartner({ parentId }: { parentId: string | null }): React.JSX
               territory: parent.data.territory,
             }
       }
-      backTo={parent.data}
+      backTo={staff ? parent.data : undefined}
     />
   );
 }
@@ -147,7 +161,7 @@ function NewPartnerForm({
   backTo,
 }: {
   initial: PartnerDraft;
-  backTo?: Partner;
+  backTo?: Partner | undefined;
 }): React.JSX.Element {
   const router = useRouter();
   const staff = useIsStaff();
