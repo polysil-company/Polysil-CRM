@@ -1426,6 +1426,20 @@ _LOOKUP_COLS: dict[str, frozenset[str]] = {
 }
 
 
+def _lookup_returning(table: str) -> str:
+    """FS-070: the columns a lookup row answers. A table without one gives NULL."""
+    extra = _LOOKUP_COLS[table]
+    so = "sort_order" if "sort_order" in extra else "NULL::int"
+    qu = "quality" if "quality" in extra else "NULL::numeric"
+    ki = "kind::text" if "kind" in extra else "NULL::text"
+    return f"id, code, name, is_active, {so} AS sort_order, {qu} AS quality, {ki} AS kind"
+
+
+def _lookup_item(r: Any) -> LookupItem:
+    return LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active,
+                      sort_order=r.sort_order, quality=r.quality, kind=r.kind)
+
+
 async def create_lookup(db: AsyncSession, table: str, body: LookupCreate) -> LookupItem:
     extra = _LOOKUP_COLS[table]
     # created_by from the claim, as on every business row. The seed leaves it null.
@@ -1447,12 +1461,12 @@ async def create_lookup(db: AsyncSession, table: str, body: LookupCreate) -> Loo
     try:
         r = (await db.execute(text(
             f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(vals)}) "
-            "RETURNING id, code, name, is_active"), params)).one()
+            f"RETURNING {_lookup_returning(table)}"), params)).one()
     except DBAPIError as exc:
         if (getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)) == "23505":
             raise ValidationFailed(fields={"code": "already exists"}) from exc
         raise
-    return LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
+    return _lookup_item(r)
 
 
 async def update_lookup(db: AsyncSession, table: str, item_id: str,
@@ -1475,10 +1489,10 @@ async def update_lookup(db: AsyncSession, table: str, item_id: str,
     sets.append("updated_by = app_current_user_id()")
     r = (await db.execute(text(
         f"UPDATE {table} SET {', '.join(sets)} WHERE id = CAST(:id AS uuid) "
-        "RETURNING id, code, name, is_active"), params)).one_or_none()
+        f"RETURNING {_lookup_returning(table)}"), params)).one_or_none()
     if r is None:
         raise NotFoundError("No such row.")
-    return LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
+    return _lookup_item(r)
 
 
 # Caps and hour bands must stay positive or the score divides by zero (rule 7).
@@ -1948,53 +1962,55 @@ def _decode_cursor(cursor: str) -> tuple[datetime, str]:
 
 async def list_lead_sources(db: AsyncSession) -> list[LookupItem]:
     rows = (await db.execute(text(
-        "SELECT id, code, name, is_active FROM lead_source "
+        "SELECT id, code, name, is_active, sort_order, "
+        # a scoring weight: Masters editors only (FS-070, GAP-514)
+        "CASE WHEN (SELECT app_has_permission('masters', 'edit')) THEN quality END AS quality, "
+        "NULL::text AS kind FROM lead_source "
         "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
-    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
-            for r in rows]
+    return [_lookup_item(r) for r in rows]
 
 
 async def list_crops(db: AsyncSession) -> list[LookupItem]:
     """Switched-off crops included, so a lead that has one still names it."""
     rows = (await db.execute(text(
-        "SELECT id, code, name, is_active FROM crop "
+        "SELECT id, code, name, is_active, sort_order, NULL::numeric AS quality, "
+        "NULL::text AS kind FROM crop "
         "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
-    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
-            for r in rows]
+    return [_lookup_item(r) for r in rows]
 
 
 async def list_mis_systems(db: AsyncSession) -> list[LookupItem]:
     rows = (await db.execute(text(
-        "SELECT id, code, name, is_active FROM mis_system "
+        "SELECT id, code, name, is_active, NULL::int AS sort_order, "
+        "NULL::numeric AS quality, NULL::text AS kind FROM mis_system "
         "WHERE deleted_at IS NULL ORDER BY name"))).all()
-    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
-            for r in rows]
+    return [_lookup_item(r) for r in rows]
 
 
 async def list_meeting_types(db: AsyncSession) -> list[LookupItem]:
     """FS-014: switched-off types included with `is_active` false, as for lost reasons."""
     rows = (await db.execute(text(
-        "SELECT id, code, name, is_active FROM meeting_type "
+        "SELECT id, code, name, is_active, sort_order, NULL::numeric AS quality, "
+        "NULL::text AS kind FROM meeting_type "
         "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
-    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
-            for r in rows]
+    return [_lookup_item(r) for r in rows]
 
 
 async def list_complaint_types(db: AsyncSession) -> list[LookupItem]:
     """FS-015: switched-off types included with `is_active` false."""
     rows = (await db.execute(text(
-        "SELECT id, code, name, is_active FROM complaint_type "
+        "SELECT id, code, name, is_active, sort_order, NULL::numeric AS quality, "
+        "NULL::text AS kind FROM complaint_type "
         "WHERE deleted_at IS NULL ORDER BY sort_order, name"))).all()
-    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
-            for r in rows]
+    return [_lookup_item(r) for r in rows]
 
 
 async def list_lost_reasons(db: AsyncSession) -> list[LookupItem]:
     rows = (await db.execute(text(
-        "SELECT id, code, name, is_active FROM won_lost_reason "
+        "SELECT id, code, name, is_active, sort_order, NULL::numeric AS quality, "
+        "kind::text AS kind FROM won_lost_reason "
         "WHERE kind = 'lost' AND deleted_at IS NULL ORDER BY sort_order, name"))).all()
-    return [LookupItem(id=str(r.id), code=r.code, name=r.name, is_active=r.is_active)
-            for r in rows]
+    return [_lookup_item(r) for r in rows]
 
 
 async def list_partners(db: AsyncSession, *, q: str | None = None,

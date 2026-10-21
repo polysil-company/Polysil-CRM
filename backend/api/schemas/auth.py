@@ -210,6 +210,17 @@ class ModulePermission(BaseModel):
     )
 
 
+class Features(BaseModel):
+    """Switches the admin sets that change what the screens offer (FS-070)."""
+
+    tasks_for_dealers: bool = Field(
+        default=False,
+        description="True when the admin setting `tasks_for_dealers` is `on`. Partner users "
+        "get the Tasks screens only while it is true; `permissions` still lists `tasks` for "
+        "portal roles, so check both. Read once per session: after the switch flips, a "
+        "`/tasks` call can still answer 403.")
+
+
 class MeResponse(BaseModel):
     """What the frontend needs to render navigation and hide controls.
 
@@ -237,6 +248,8 @@ class MeResponse(BaseModel):
         "POST /auth/password answers 403 `password_change_required`; show the "
         "change-password screen.")
     permissions: list[ModulePermission] = Field(default_factory=list)
+    features: Features = Field(default_factory=Features,
+                               description="Admin switches that change the screens (FS-070).")
 
 
 class OwnPasswordChange(BaseModel):

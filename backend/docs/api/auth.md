@@ -326,6 +326,12 @@ response on a slow connection does not sign the user out of everything.
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
+**`Features`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `tasks_for_dealers` | boolean |  | True when the admin setting `tasks_for_dealers` is `on`. Partner users get the Tasks screens only while it is true; `permissions` still lists `tasks` for portal roles, so check both. Read once per session: after the switch flips, a `/tasks` call can still answer 403. Default `False`. |
+
 **`HTTPValidationError`**
 
 | Field | Type | Required | Notes |
@@ -351,6 +357,7 @@ response on a slow connection does not sign the user out of everything.
 | `partner` | api__schemas__auth__PartnerRef \| null |  | Portal users only. Never set together with `org_unit`. |
 | `must_change_password` | boolean |  | True while a temporary password set by an administrator is in force. Until the person changes it, every route except this one and POST /auth/password answers 403 `password_change_required`; show the change-password screen. Default `False`. |
 | `permissions` | ModulePermission[] |  |  |
+| `features` | Features |  | Admin switches that change the screens (FS-070). |
 
 **`ModulePermission`**
 

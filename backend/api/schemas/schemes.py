@@ -57,6 +57,11 @@ class Target(BaseModel):
                              "sub_dealer), partner (and its subtree), product, product_category.")
     id: str = Field(min_length=1, max_length=64,
                     description="The id, or for partner_type the type's name.")
+    name: str | None = Field(
+        default=None, max_length=2000,
+        description="Output only (FS-070): the territory's, partner's, product's or category's "
+        "name; for partner_type the type. Null outside your scope. Ignored on input, so "
+        "sending back what you read is fine.")
 
 
 class SchemeCreate(BaseModel):

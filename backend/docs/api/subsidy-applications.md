@@ -31,6 +31,10 @@ Conventions for every endpoint in this file:
 
 The worklist, newest first, in your scope.
 
+The lead page passes `lead_id` to find the lead's application. An application keeps
+the owner it was forwarded with, so a lead's later owner may get an empty list while
+Forward still answers 422 `already_forwarded`.
+
 **Parameters**
 
 | Name | In | Type | Required | Notes |
@@ -38,6 +42,7 @@ The worklist, newest first, in your scope.
 | `status` | query | `open` \| `full_fp_received` \| `cancelled` \| null |  |  |
 | `stage` | query | string \| null |  | A stage code. |
 | `q` | query | string \| null |  | Application number, registration number or farmer's name. |
+| `lead_id` | query | string \| null |  | Only this lead's applications (FS-070). Empty means none you can see, not none exists. Leads merged into it are not followed. |
 | `cursor` | query | string \| null |  |  |
 | `limit` | query | integer |  |  |
 
@@ -114,6 +119,7 @@ narrow the filters. An empty list gives a file with the header row only.
 | `status` | query | `open` \| `full_fp_received` \| `cancelled` \| null |  |  |
 | `stage` | query | string \| null |  | A stage code. |
 | `q` | query | string \| null |  | Application number, registration number or farmer's name. |
+| `lead_id` | query | string \| null |  | Only this lead's applications (FS-070). Empty means none you can see, not none exists. Leads merged into it are not followed. |
 
 **Responses**
 
