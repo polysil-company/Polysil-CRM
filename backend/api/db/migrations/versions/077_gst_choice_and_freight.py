@@ -139,6 +139,8 @@ def upgrade() -> None:
         op.execute(f"ALTER TABLE {table} ALTER COLUMN hsn_slab SET NOT NULL, "
                    f"ADD CONSTRAINT ck_{table}_gst_chosen CHECK (gst_slab_chosen = (gst_slab <> hsn_slab))")
     op.execute(HSN_SLAB_FILL)
+    # a new function is EXECUTE to PUBLIC; a trigger function needs no caller grant
+    op.execute("REVOKE EXECUTE ON FUNCTION line_hsn_slab_fill() FROM PUBLIC")
     for table in _LINE_TRIGGERS:
         # named to sort before the refuse trigger, which reads nothing of these columns
         op.execute(f"CREATE TRIGGER trg_{table}_a_hsn_slab BEFORE INSERT ON {table} "

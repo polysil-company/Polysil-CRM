@@ -63,13 +63,13 @@ async def test_the_line_columns_and_their_checks(db: AsyncSession) -> None:
             "WHERE conname = :c"), {"c": f"ck_{table}_gst_chosen"})).scalar_one()
         assert "gst_slab_chosen" in checks and "hsn_slab" in checks
         trg = (await db.execute(text(
-            "SELECT tgenabled FROM pg_trigger WHERE tgname = :n"),
+            "SELECT tgenabled::text FROM pg_trigger WHERE tgname = :n"),
             {"n": f"trg_{table}_a_hsn_slab"})).scalar_one()
         assert trg == "O", "enabled"
     # the backfill left the freeze triggers on
     for trg in ("trg_quotation_line_refuse_sent_edit", "trg_order_line_refuse_edit",
                 "trg_quotation_line_audit", "trg_order_line_audit"):
-        assert (await db.execute(text("SELECT tgenabled FROM pg_trigger WHERE tgname = :n"),
+        assert (await db.execute(text("SELECT tgenabled::text FROM pg_trigger WHERE tgname = :n"),
                                  {"n": trg})).scalar_one() == "O", trg
 
 
