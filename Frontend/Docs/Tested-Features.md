@@ -596,6 +596,10 @@ Screens:
   - Then the territory, code, business name, optional GSTIN, PAN and GST registration, contact details and credit terms.
   - Missing or misshapen fields are named before sending. A used code comes back on its field.
   - **Add a dealer** on a distributor's page starts the form under it, in its territory. 🧪 👀
+  - **On the portal** (CHNL-002, the client's decision of 20 Oct; screens: [a dealer's Channel partners](screenshots/partners/portal-partners-desktop-light.jpg), [Add a sub-dealer](screenshots/partners/portal-new-sub-dealer-desktop-light.jpg), [phone, dark](screenshots/partners/portal-new-sub-dealer-phone-dark.jpg), [added](screenshots/partners/portal-sub-dealer-added-desktop-light.jpg)).
+    - A dealer sees its own business and the sub-dealers under it, with **Add a sub-dealer**; a distributor gets **Add a dealer**.
+    - The type and "Under which" are fixed to its own business, and there are no credit terms.
+    - A sub-dealer has no Channel partners, and Dealer applications stays with staff. 🧪 👀
 - **CHNL-003 · Correct a partner.** Only what changed is sent, and the form says "Nothing changed yet" until something does. The code, type and parent are fixed; payment terms take 0 to 365 days. 🧪 👀
 - **CHNL-004 · Close or reopen.** Close says how many users will be signed out and deactivated. Reopen says they stay deactivated until reactivated in Users & roles. A closed partner can't be edited until reopened. 🧪 👀
 - **CHNL-005 · Import partners from Excel.**

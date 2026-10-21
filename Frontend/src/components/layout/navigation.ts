@@ -293,10 +293,9 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Channel partners",
         description: "Distributors, their dealers and the dealers' sub-dealers.",
         icon: Store01Icon,
+        // CHNL-002 · Staff, and a distributor or dealer for the partners under it (decided by
+        // the client on 20 Oct). A sub-dealer has no partners grant, so it never shows there.
         module: "partners",
-        // TODO(CHNL-002): a distributor or dealer may add the next type down from the portal
-        // (partners.md); the screens are staff only until that is agreed with the client.
-        audience: "staff",
         dataId: "CHNL-001",
         href: "/partners",
       },
@@ -556,7 +555,7 @@ export function visibleNavSections(
  * Pages below a nav item that are for staff even when the item is not: a partner user sees
  * no possible duplicates (the backend sends none and refuses to dismiss one, walk F-1).
  */
-const STAFF_ONLY_PATHS: readonly string[] = ["/leads/duplicates"];
+const STAFF_ONLY_PATHS: readonly string[] = ["/leads/duplicates", "/partners/applications"];
 
 /**
  * APP-006 · Whether the user may open a page, by the same rule that shows its nav item, so a

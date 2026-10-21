@@ -33,8 +33,8 @@ import {
   PARTNER_STATUSES,
   usePartnerListParams,
 } from "@/features/partners/hooks/use-partner-list-params";
-import { PARTNER_TYPE_LABELS } from "@/features/partners/lib/partner-labels";
-import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
+import { childTypeOf, PARTNER_TYPE_LABELS } from "@/features/partners/lib/partner-labels";
+import { useCan, useIsStaff, useSession } from "@/features/session/hooks/use-session";
 import { mobileText } from "@/features/users/lib/user-labels";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { formatCount } from "@/lib/format";
@@ -100,12 +100,13 @@ export function PartnersList(): React.JSX.Element {
               Import from Excel
             </Button>
           ) : null}
-          {canCreate ? (
+          {canCreate && staff ? (
             <Link href="/partners/new" className={buttonVariants()}>
               <Icon icon={Add01Icon} />
               New partner
             </Link>
           ) : null}
+          {canCreate && !staff ? <AddUnderMine /> : null}
         </div>
       </div>
 
@@ -330,5 +331,22 @@ export function PartnersListSkeleton(): React.JSX.Element {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * CHNL-002 · On the portal: "Add a sub-dealer" for a dealer, "Add a dealer" for a distributor,
+ * under the user's own partner. Nothing while its own record loads, or for a type with none below.
+ */
+function AddUnderMine(): React.JSX.Element | null {
+  const ownId = useSession().data?.partner?.id ?? null;
+  const own = useQuery({ ...partnerDetailQueryOptions(ownId ?? ""), enabled: ownId !== null });
+  const child = own.data === undefined ? null : childTypeOf(own.data.type);
+  if (child === null) return null;
+  return (
+    <Link href="/partners/new" className={buttonVariants()}>
+      <Icon icon={Add01Icon} />
+      Add a {PARTNER_TYPE_LABELS[child].toLowerCase()}
+    </Link>
   );
 }

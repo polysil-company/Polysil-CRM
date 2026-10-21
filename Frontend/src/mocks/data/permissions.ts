@@ -96,8 +96,13 @@ function manager(scope: Scope): MockModulePermission[] {
 }
 
 /** No `subsidy`: the backend answers portal users 403 there (handover `subsidy-calculation.md`). */
-function channelPartner(): MockModulePermission[] {
+function channelPartner(role: "distributor" | "dealer" | "sub_dealer"): MockModulePermission[] {
   return [
+    // RBAC.md §6.3: a distributor or dealer views, adds and corrects the next type down
+    // under itself (CHNL-002, decided by the client on 20 Oct); a sub-dealer has none.
+    ...(role === "sub_dealer"
+      ? []
+      : [grant("partners", ["view", "create", "edit"], "partner_subtree")]),
     grant("leads", ["view", "edit"], "partner_subtree"),
     grant("sales_orders", ["view", "create", "edit"], "partner_subtree"),
     grant("complaints", ["view", "create"], "partner_subtree"),
@@ -166,6 +171,6 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
     case "distributor":
     case "dealer":
     case "sub_dealer":
-      return channelPartner();
+      return channelPartner(role);
   }
 }

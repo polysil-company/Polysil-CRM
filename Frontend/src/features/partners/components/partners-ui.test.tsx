@@ -4,6 +4,8 @@ import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
+import { listPartners } from "@/features/partners/api/partners.api";
+import { isApiError } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
 import type { Role } from "@/lib/auth/roles";
 import { writeMockRole } from "@/lib/dev/mock-settings";
@@ -64,7 +66,7 @@ describe("[CHNL-001] PartnersList", () => {
     expect(dealer).toHaveTextContent("1 user");
     // Open partners by default: the closed one waits behind the Status filter.
     expect(within(list).queryByRole("link", { name: /Balagam/ })).not.toBeInTheDocument();
-    expect(screen.getByText("8 partners, newest first.")).toBeInTheDocument();
+    expect(screen.getByText("11 partners, newest first.")).toBeInTheDocument();
   });
 
   it("finds the closed ones, and the partners under one, from the URL", async () => {
@@ -175,6 +177,84 @@ describe("[CHNL-002] NewPartner", () => {
     signInAs("employee");
     show(<NewPartner parentId={null} />);
     expect(await screen.findByText("You can't add partners")).toBeInTheDocument();
+  });
+});
+
+describe("[CHNL-002] On the portal: a dealer adds its own sub-dealers", () => {
+  beforeEach(reset);
+  afterEach(reset);
+
+  it("lists the dealer's own business and what is under it, with Add a sub-dealer", async () => {
+    signInAs("dealer");
+    show(<PartnersList />);
+    const list = await screen.findByRole("list", { name: "Partners" });
+    expect(within(list).getByRole("link", { name: /Shah Agro Traders/ })).toBeInTheDocument();
+    expect(within(list).getByRole("link", { name: /Kisan Seva Kendra/ })).toBeInTheDocument();
+    expect(within(list).queryByRole("link", { name: /Saurashtra Agro/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Add a sub-dealer" })).toHaveAttribute(
+      "href",
+      "/partners/new",
+    );
+    expect(screen.queryByRole("link", { name: "New partner" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Import from Excel" })).not.toBeInTheDocument();
+  });
+
+  it("adds a sub-dealer under the dealer itself, with the type and the dealer fixed", async () => {
+    signInAs("dealer");
+    const mine = mockMeFor("dealer").data.partner?.id ?? "";
+    // Whatever the address says, a dealer adds under itself.
+    const user = show(<NewPartner parentId={idOf("Sorath Agri Distributors")} />);
+    const form = await screen.findByRole("form", { name: "New partner" });
+    expect(within(form).getByRole("textbox", { name: "Type" })).toHaveValue("Sub-dealer");
+    expect(within(form).getByRole("textbox", { name: "Under which dealer" })).toHaveValue(
+      "Shah Agro Traders",
+    );
+    expect(within(form).queryByRole("button", { name: "Distributor" })).not.toBeInTheDocument();
+    expect(within(form).queryByLabelText(/Credit limit/)).not.toBeInTheDocument();
+
+    await user.type(within(form).getByRole("textbox", { name: "Code" }), "SD-RJK-1");
+    await user.type(within(form).getByRole("textbox", { name: "Business name" }), "Gondal Agro");
+    await user.click(within(form).getByRole("button", { name: "Add the partner" }));
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith(`/partners/${idOf("Gondal Agro")}`);
+    });
+    expect(mockDb.partners.find((item) => item.name === "Gondal Agro")).toMatchObject({
+      partner_type: "sub_dealer",
+      parent_id: mine,
+      credit_limit: null,
+    });
+  });
+
+  it("offers a distributor Add a dealer, and a sub-dealer no Channel partners at all", async () => {
+    signInAs("distributor");
+    show(<PartnersList />);
+    expect(await screen.findByRole("link", { name: "Add a dealer" })).toBeInTheDocument();
+
+    signInAs("sub_dealer");
+    expect(
+      await listPartners({
+        cursor: null,
+        q: "",
+        type: null,
+        active: true,
+        parentId: null,
+      }).then(
+        () => "listed",
+        (error: unknown) => (isApiError(error) ? error.status : null),
+      ),
+    ).toBe(403);
+  });
+
+  it("offers Add a sub-dealer on the dealer's own page only", async () => {
+    signInAs("dealer");
+    const view = renderWithProviders(<PartnerDetail partnerId={idOf("Shah Agro Traders")} />);
+    expect(await screen.findByRole("link", { name: "Add a sub-dealer" })).toBeInTheDocument();
+    view.unmount();
+
+    renderWithProviders(<PartnerDetail partnerId={idOf("Kisan Seva Kendra")} />);
+    await screen.findByRole("heading", { name: "Kisan Seva Kendra" });
+    expect(screen.queryByRole("link", { name: /^Add a/ })).not.toBeInTheDocument();
   });
 });
 
