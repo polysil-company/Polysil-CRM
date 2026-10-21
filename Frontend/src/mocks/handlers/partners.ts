@@ -13,6 +13,7 @@ import { can, type PermissionAction } from "@/lib/auth/permissions";
 import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { normalizeIndianMobile } from "@/lib/format";
+import { mockSessionPartnerId, partnerRecordInScope } from "@/mocks/data/partner-scope";
 import type { MockPartnerRecord } from "@/mocks/data/partners";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
@@ -62,8 +63,12 @@ function needsKey(request: Request): Response | null {
     : null;
 }
 
+/** A partner in the caller's scope: staff any, a partner user its own subtree (else a 404). */
 function find(partnerId: unknown): MockPartnerRecord | undefined {
-  return mockDb.partners.find((partner) => partner.id === String(partnerId));
+  const partner = mockDb.partners.find((item) => item.id === String(partnerId));
+  return partner !== undefined && partnerRecordInScope(partner, mockDb.partners)
+    ? partner
+    : undefined;
 }
 
 function anchored(partnerId: string): { active: number; inactive: number } {
@@ -94,6 +99,7 @@ function filtered(url: URL): MockPartnerRecord[] {
   const active = params.get("is_active");
   return mockDb.partners.filter(
     (partner) =>
+      partnerRecordInScope(partner, mockDb.partners) &&
       (q === "" ||
         partner.name.toLowerCase().includes(q) ||
         partner.code.toLowerCase().includes(q) ||
@@ -358,6 +364,11 @@ export const partnerHandlers = [
         "set by staff only";
     }
     Object.assign(fields, parentProblem(body.partner_type, body.parent_id));
+    // CHNL-002 · a distributor or dealer on the portal adds the next type down under itself.
+    const mine = mockSessionPartnerId();
+    if (mine !== null && body.parent_id !== mine) {
+      fields.parent_id = "a partner adds partners under itself only";
+    }
     const territory = territoryRef(body.territory_id);
     if (territory === undefined) fields.territory_id = "not found";
     const shaped = contactFields(body, fields);

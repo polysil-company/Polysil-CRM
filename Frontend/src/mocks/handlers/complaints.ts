@@ -25,6 +25,7 @@ import {
   type PatchComplaintRequest,
 } from "@/features/complaints/api/complaints.schemas";
 import type { TimelineEventWire, TimelinePageWire } from "@/features/leads/api/leads.schemas";
+import type { PdfLinkWire } from "@/features/quotations/api/quotations.schemas";
 import { summarizeSchemaIssues } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
@@ -156,6 +157,8 @@ function toWire(complaint: MockComplaint, who: Caller = caller()): ComplaintWire
     response_escalated_at: portal ? null : escalations(complaint).response,
     resolution_escalated_at: portal ? null : escalations(complaint).resolution,
     can: canFor(complaint, who),
+    // CMPL-013 · the PDF, as proposed in BE-031: none for a draft, ready once submitted
+    pdf_state: complaint.status === "draft" ? "none" : "ready",
   };
 }
 
@@ -743,6 +746,27 @@ export const complaintHandlers = [
     return complaint instanceof Response
       ? complaint
       : HttpResponse.json({ data: toWire(complaint) });
+  }),
+
+  // CMPL-013 · the complaint's PDF link, as proposed in BE-031 (the order's shape)
+  http.get(complaintPath("/pdf"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const found = findComplaint(params.complaintId);
+    if (found instanceof Response) return found;
+    if (found.status === "draft" || found.complaint_no === null) {
+      return errorResponse(404, "not_found", "A complaint has a PDF once it is submitted.");
+    }
+    const filename = `${found.complaint_no.replace(/[/.]+/g, "-")}.pdf`;
+    const body: PdfLinkWire = {
+      data: {
+        // TODO(CMPL-013): the mock has no PDFs; the real link is a signed storage URL.
+        url: `https://files.polysil.example/complaints/${filename}`,
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        filename,
+      },
+    };
+    return HttpResponse.json(body);
   }),
 
   http.get(complaintPath("/timeline"), async ({ params, request }) => {

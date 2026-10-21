@@ -23,6 +23,7 @@ from api.idempotency import payload_digest, run_idempotent
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE
 from api.schemas.products import (
+    GstSlabChoices,
     PriceList,
     PriceListCreate,
     PriceListItemsPage,
@@ -261,5 +262,26 @@ async def quote_lines(body: QuoteLinesRequest, db: DbSession) -> Envelope[QuoteL
     `mixed_price_lists` means the lines drew from more than one list, which is
     right if a state list is a discount layer and a mispricing if it replaces the
     base, and nobody has told us which.
+
+    **GST choice and freight (FS-069), commercial and industrial only.** A line may
+    carry `gst_slab`, picked from `GET /pricing/gst-slabs`; send it only for a slab
+    the user picked. Each line returns `gst_slab` (the slab used), `hsn_slab` and
+    `gst_slab_chosen`, so the screen can mark a changed rate. `freight` adds one
+    charge before tax; with no `gst_slab` it takes the highest slab among the lines.
+    It returns priced under `freight`, and `totals.taxable`, the taxes and
+    `totals.total` include it, while `totals.gross` and `totals.discount` are the
+    goods only. Errors: 422 `gst_choice_not_allowed`, `gst_slab_not_offered`,
+    `freight_not_allowed`, `freight_without_lines`, `freight_amount_invalid`.
     """
     return Envelope(data=await service.quote_lines(db, body))
+
+
+@router.get("/gst-slabs", response_model=Envelope[GstSlabChoices])
+async def gst_slabs(db: DbSession) -> Envelope[GstSlabChoices]:
+    """The GST slabs a line's dropdown and the freight dropdown offer (FS-069).
+
+    The admin keeps the list in the setting `gst_slab_choices`. Read it once per
+    screen. Preset each line to its `hsn_slab`, even when that slab is not in the
+    list: a product taxed at 12 % shows 12 %, and leaving it there is not a choice.
+    """
+    return Envelope(data=await service.gst_slabs(db))

@@ -42,7 +42,7 @@ import {
 import { PartnerCreditCard } from "@/features/payments/components/partner-credit";
 import { PartnerLedgerCard } from "@/features/payments/components/partner-ledger";
 import { DealerRatingCard } from "@/features/ratings/components/dealer-rating";
-import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
+import { useCan, useIsStaff, useSession } from "@/features/session/hooks/use-session";
 import { refusalOf } from "@/features/users/components/person-dialogs";
 import { mobileText } from "@/features/users/lib/user-labels";
 import { useAsyncAction } from "@/hooks/use-async-action";
@@ -106,6 +106,9 @@ function PartnerView({ partner }: { partner: Partner }): React.JSX.Element {
   const canEdit = useCan("partners", "edit");
   const canCreate = useCan("partners", "create");
   const staff = useIsStaff();
+  // CHNL-002 · a distributor or dealer adds the next type down under itself only.
+  const ownPartnerId = useSession().data?.partner?.id ?? null;
+  const mayAddUnder = staff || partner.id === ownPartnerId;
   const [confirming, setConfirming] = useState(false);
   const type = PARTNER_TYPE_LABELS[partner.type];
   const childType = childTypeOf(partner.type);
@@ -162,7 +165,7 @@ function PartnerView({ partner }: { partner: Partner }): React.JSX.Element {
               {partner.active ? "Close" : "Reopen"}
             </Button>
           ) : null}
-          {canCreate && childType !== null && partner.active ? (
+          {canCreate && mayAddUnder && childType !== null && partner.active ? (
             <Link
               href={`/partners/new?parent=${encodeURIComponent(partner.id)}`}
               className={buttonVariants()}

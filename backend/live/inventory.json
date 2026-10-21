@@ -61,6 +61,7 @@
   "/api/v1/portal/quotations": {"query": {}, "public": false, "skip": {"all": "a consumer signs in by OTP to a phone; a staff account answers 403 not_a_consumer"}, "forbidden": []},
   "/api/v1/portal/ratings": {"query": {}, "public": false, "skip": {"all": "a consumer signs in by OTP to a phone; a staff account answers 403 not_a_consumer"}, "forbidden": []},
   "/api/v1/price-lists": {"query": {}, "public": false, "skip": {}, "forbidden": []},
+  "/api/v1/pricing/gst-slabs": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/products": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/public/lead-form": {"query": {}, "public": true, "skip": {}, "forbidden": []},
   "/api/v1/public/territories": {"query": {"parent_id": "@state_id"}, "public": true, "skip": {}, "forbidden": []},

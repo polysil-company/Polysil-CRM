@@ -8,12 +8,14 @@ import type * as React from "react";
 
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
+import { PdfLinkButton } from "@/components/patterns/pdf-link-button";
 import { RelativeDate } from "@/components/patterns/relative-date";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getComplaintPdf } from "@/features/complaints/api/complaints.api";
 import {
   complaintDetailQueryOptions,
   complaintTimelineQueryOptions,
@@ -33,11 +35,17 @@ import { ComplaintWarranty } from "@/features/warranty/components/warranty-chip"
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { isApiError } from "@/lib/api/errors";
 import { formatDate, formatDateTime, formatIndianPhone } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 
 import { AttachmentsCard } from "./attachments-card";
 import { ComplaintActions } from "./complaint-actions";
 import { RemedyCard } from "./remedy-card";
+
+const log = createLogger({
+  file: "features/complaints/components/complaint-detail.tsx",
+  dataId: "CMPL-013",
+});
 
 const DOT: Readonly<Record<string, string>> = {
   neutral: "bg-subtle-foreground",
@@ -162,7 +170,19 @@ function ComplaintView({ complaint }: { complaint: Complaint }): React.JSX.Eleme
             {complaint.type.name} · {complaint.contactName} · {complaint.territory.name}
           </p>
         </div>
-        <ComplaintActions complaint={complaint} />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* CMPL-013 · its PDF, like a quotation's or an order's, once the backend makes one */}
+          {complaint.pdfState === null || complaint.pdfState === "none" ? null : (
+            <PdfLinkButton
+              getLink={() => getComplaintPdf(complaint.id)}
+              pdfState={complaint.pdfState}
+              logger={log}
+              dataId="CMPL-013"
+              label="Download PDF"
+            />
+          )}
+          <ComplaintActions complaint={complaint} />
+        </div>
       </div>
 
       {returned && complaint.check !== null ? (

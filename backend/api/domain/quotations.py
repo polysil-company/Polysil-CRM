@@ -196,6 +196,25 @@ def shared_rate(lines: Sequence[Mapping[str, object]], key: str) -> Decimal | No
     return rates.pop() if len(rates) == 1 else None
 
 
+def freight_rates(doc: Mapping[str, object]) -> dict[str, object] | None:
+    """A document's freight as a rate-bearing row (FS-069 rule 16), so `shared_rate`
+    counts it: goods at 18 % with freight at 5 % name no single rate. None without
+    freight. `doc` is the claim's quotation or order, whose rates are not stored."""
+    if doc.get("freight_amount") is None:
+        return None
+    slab = _dec(doc["freight_slab"])
+    if doc.get("intra_state"):
+        return {"cgst_rate": slab / 2, "sgst_rate": slab / 2, "igst_rate": Decimal(0)}
+    return {"cgst_rate": Decimal(0), "sgst_rate": Decimal(0), "igst_rate": slab}
+
+
+def goods_subtotal(doc: Mapping[str, object]) -> Decimal:
+    """The goods' taxable value: the document's taxable less its freight, which
+    `taxable` includes (FS-069 rule 8)."""
+    freight = doc.get("freight_amount")
+    return _dec(doc["taxable"]) - (_dec(freight) if freight is not None else Decimal(0))
+
+
 def validity_days(sent_on: dt.date, until: dt.date) -> int:
     """Days the quotation stays open, both dates on the IST calendar (FS-064 rule
     15). Never negative."""

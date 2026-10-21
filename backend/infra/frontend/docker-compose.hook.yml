@@ -13,7 +13,7 @@ services:
       context: .
       dockerfile: hook.Dockerfile
     image: polysil-deploy-hook:staging
-    # Caddy routes /hooks/github on polysil.pranayx.tech to this name.
+    # Caddy routes /hooks/github on polysil-test.pranayx.tech to this name.
     container_name: polysil-deploy-hook
     restart: unless-stopped
     environment:

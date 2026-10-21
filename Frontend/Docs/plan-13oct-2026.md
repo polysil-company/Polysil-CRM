@@ -163,8 +163,8 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [-] **BE-023:** a `lead_id` filter on `GET /subsidy-applications`, for the subsidy card on a lead. Open on the backend.
 - [-] **BE-024:** `GET /lookups/product-categories` and `/lookups/uoms` for the product form. Open on the backend.
 - [-] **BE-025:** `record_type` on `GET /documents/types`, so a lead isn't offered the dealer-application types. Open on the backend.
-- [-] **CHNL-002, the client:** should a distributor or dealer add the next type down from the portal ("My dealers")? The screens are staff only today.
-- [-] **F-12, the user:** files on a complaint can't be added after the QC verdict. Is that meant?
+- [x] **CHNL-002, the client:** yes (20 Oct), dealers add their own sub-dealers. Built: Channel partners opens to a distributor or dealer, which adds the next type down under itself. PR #186, 21 Oct (`feature/CHNL-002-portal-sub-dealers`).
+- [x] **F-12, the user:** yes (20 Oct), files stay locked after the QC verdict, with a **Download PDF** on the complaint like a quotation or an order. Built against the shape asked in BE-031 (CMPL-013), shown once the backend sends `pdf_state`. PR #187, 21 Oct (`feature/CMPL-013-complaint-pdf`).
 
 ## Optional polish
 

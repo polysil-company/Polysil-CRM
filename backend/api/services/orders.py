@@ -67,7 +67,7 @@ from api.services.leads import (
     _route,
     _under,
 )
-from api.services.pricing import LineSpec, PricedContext, _rate, _s
+from api.services.pricing import FreightSpec, LineSpec, PricedContext, _rate, _s
 from api.services.quotations import _STORAGE_DOWN
 from api.storage import Storage
 
@@ -205,7 +205,8 @@ async def _lock(db: AsyncSession, order_id: str) -> Any:
         "SELECT id, status::text AS status, lead_id, partner_id, place_of_supply_territory_id, "
         "seller_gstin_id, price_effective_date, territory_id, owner_org_unit_id, total, order_no, "
         "order_type::text AS order_type, tax_treatment, export_country, sample_pricing, "
-        "amend_count, party_gstin::text AS party_gstin "
+        "amend_count, party_gstin::text AS party_gstin, freight_amount, freight_slab, "
+        "freight_slab_chosen, freight_cgst, freight_sgst, freight_igst, freight_total "
         "FROM sales_order WHERE id = CAST(:o AS uuid) AND deleted_at IS NULL FOR UPDATE"),
         {"o": order_id})).one_or_none()
     if row is None:
@@ -332,14 +333,17 @@ async def _linked_quotations(db: AsyncSession, order_id: str) -> list[str]:
 async def _price(db: AsyncSession, *, partner_id: str | None, pos: str, seller: str | None,
                  as_of: dt.date | None, specs: list[LineSpec], existing: bool,
                  order_type: str, submitting: bool = False,
-                 treatment: str = "domestic") -> PricedContext:
+                 treatment: str = "domestic", freight: FreightSpec | None,
+                 offered: Sequence[Decimal] | None = None) -> PricedContext:
     """Rates at the price date, tax at today (rule 3), under the order's stored
-    treatment (FS-042 rule 5), from the lists for the order's type (FS-061)."""
+    treatment (FS-042 rule 5), from the lists for the order's type (FS-061).
+    `freight` has no default: every caller passes what the order holds or what the
+    request says (FS-069 rule 9); `offered` only on input (rule 3)."""
     try:
         return await pricing.price_document(
             db, partner_id=partner_id, place_of_supply_territory_id=pos, seller_gstin_id=seller,
             as_of=as_of, lines=specs, existing=existing, tax_as_of=today_ist(),
-            sales_type=order_type, tax_treatment=treatment)
+            sales_type=order_type, tax_treatment=treatment, freight=freight, offered=offered)
     except ValidationFailed as exc:
         if exc.fields and "as_of" in exc.fields:
             exc.fields = {("price_effective_date" if k == "as_of" else k): v
@@ -359,7 +363,8 @@ def _compare_preview(lines: list[QuotationLineIn], ctx: PricedContext) -> None:
     for i, (ln, p) in enumerate(zip(lines, ctx.document.lines, strict=True)):
         if ln.price_list_item_id and ln.price_list_item_id != p.rate.price_list_item_id:
             fields[f"lines[{i}].rate"] = f"now {_s(p.rate.rate)}"
-        if ln.gst_rate_id and ln.gst_rate_id != p.tax.gst_rate_id:
+        # FS-069 rule 9: the HSN master moving under a chosen slab changes nothing
+        if ln.gst_rate_id and ln.gst_rate_id != p.tax.gst_rate_id and not p.chosen:
             fields[f"lines[{i}].gst_slab"] = f"now {_rate(p.tax.slab)}"
     if fields:
         raise ConflictError("Prices or tax changed since the preview. Review the new figures "
@@ -369,14 +374,19 @@ def _compare_preview(lines: list[QuotationLineIn], ctx: PricedContext) -> None:
 _MONEY = ("gross", "discount", "taxable", "cgst", "sgst", "igst", "total")
 
 
-def _compare_stored(stored: list[Any], ctx: PricedContext) -> None:
+def _compare_stored(stored: list[Any], ctx: PricedContext, head: Any) -> None:
     """At submit: the stored lines against a fresh resolution, ids and every
-    printed figure (FS-005 9.7 A-1)."""
+    printed figure (FS-005 9.7 A-1), freight's included (FS-069 rule 9)."""
     fields: dict[str, str] = {}
+    drift = pricing.freight_drift(head, ctx.document.freight)
+    if drift:
+        fields["freight"] = drift
     for i, (row, p) in enumerate(zip(stored, ctx.document.lines, strict=True)):
         if str(row.price_list_item_id) != p.rate.price_list_item_id:
             fields[f"lines[{i}].rate"] = f"{_s(row.rate)} -> {_s(p.rate.rate)}"
-        if str(row.gst_rate_id) != p.tax.gst_rate_id:
+        # F-6: a line chosen when saved keeps its slab whatever the master did
+        if str(row.gst_rate_id) != p.tax.gst_rate_id and not p.chosen \
+                and not row.gst_slab_chosen:
             fields[f"lines[{i}].gst_slab"] = f"{_rate(row.gst_slab)} -> {_rate(p.tax.slab)}"
         moved = [f for f in _MONEY if Decimal(getattr(row, f)) != getattr(p.money, f)]
         if moved:
@@ -405,7 +415,8 @@ def _line_row(order_id: str, n: int, p: PricedLine, snap: Any | None,
         "d2p": s2.pct if s2 else zero, "d2a": s2.amount if s2 else zero,
         "a2": s2.after if s2 else (s1.after if s1 else p.money.gross),
         "d3p": s3.pct if s3 else zero, "d3a": s3.amount if s3 else zero,
-        "disc": p.money.discount, "taxable": p.money.taxable, "slab": p.tax.slab,
+        "disc": p.money.discount, "taxable": p.money.taxable, "slab": p.slab,
+        "hslab": p.tax.slab, "chosen": p.chosen,
         "cr": p.money.cgst_rate, "sr": p.money.sgst_rate, "ir": p.money.igst_rate,
         "cgst": p.money.cgst, "sgst": p.money.sgst, "igst": p.money.igst, "total": p.money.total,
         "prov": list(p.provisional_fields), "src": source,
@@ -417,11 +428,12 @@ _LINE_INSERT = text("""
         uom_decimals, qty, rate, price_list_id, price_list_item_id, gst_rate_id, gross,
         discount_pct, discount1_amt, after_discount1, discount2_pct, discount2_amt,
         after_discount2, discount3_pct, discount3_amt, discount, taxable, gst_slab,
+        hsn_slab, gst_slab_chosen,
         cgst_rate, sgst_rate, igst_rate, cgst, sgst, igst, total, provisional_fields,
         source_quotation_line_id)
     VALUES (CAST(:o AS uuid), :n, CAST(:product AS uuid), :desc, :hsn, :uom, :dec, :qty, :rate,
         CAST(:pl AS uuid), CAST(:pli AS uuid), CAST(:gr AS uuid), :gross,
-        :d1p, :d1a, :a1, :d2p, :d2a, :a2, :d3p, :d3a, :disc, :taxable, :slab,
+        :d1p, :d1a, :a1, :d2p, :d2a, :a2, :d3p, :d3a, :disc, :taxable, :slab, :hslab, :chosen,
         :cr, :sr, :ir, :cgst, :sgst, :igst, :total, CAST(:prov AS text[]),
         CAST(:src AS uuid))
 """)
@@ -451,7 +463,10 @@ async def _write_figures(db: AsyncSession, order_id: str, ctx: PricedContext,
                 place_of_supply_state_id = CAST(:ps AS uuid), intra_state = :intra,
                 price_effective_date = :day, price_list_id = CAST(:pl AS uuid),
                 gross = :gross, discount = :disc, taxable = :taxable, cgst = :cgst, sgst = :sgst,
-                igst = :igst, total = :total, is_provisional = :prov, updated_by = CAST(:me AS uuid)
+                igst = :igst, total = :total, is_provisional = :prov,
+                updated_by = CAST(:me AS uuid), freight_amount = :fa, freight_slab = :fs,
+                freight_slab_chosen = :fc,
+                freight_cgst = :fcg, freight_sgst = :fsg, freight_igst = :fig, freight_total = :ft
             WHERE id = CAST(:o AS uuid)"""),
             {"sg": ctx.seller_gstin_id, "ps": ctx.place_of_supply_state_id,
              "intra": ctx.intra_state, "day": ctx.as_of,
@@ -459,15 +474,35 @@ async def _write_figures(db: AsyncSession, order_id: str, ctx: PricedContext,
              "gross": t.gross, "disc": t.discount, "taxable": t.taxable, "cgst": t.cgst,
              "sgst": t.sgst, "igst": t.igst, "total": t.total,
              "prov": any(p.provisional_fields for p in ctx.document.lines),
-             "me": caller.user_id, "o": order_id})
+             "me": caller.user_id, "o": order_id, **pricing.freight_params(ctx.document.freight)})
     except DBAPIError as exc:
         raise map_db_error(exc) from exc
 
 
-def _specs(rows: list[Any]) -> list[LineSpec]:
-    return [LineSpec(product_id=str(r.product_id), qty=Decimal(r.qty),
-                     discounts=(Decimal(r.discount_pct), Decimal(r.discount2_pct),
-                                Decimal(r.discount3_pct))) for r in rows]
+def _specs(rows: list[Any], *, keep_choice: bool = True) -> list[LineSpec]:
+    """A stored basket re-priced, its GST choices kept unless the order's type takes
+    none (FS-069 rules 2 and 9). Quotation lines read the same way."""
+    return [pricing.line_spec(str(r.product_id), Decimal(r.qty),
+                              (Decimal(r.discount_pct), Decimal(r.discount2_pct),
+                               Decimal(r.discount3_pct)),
+                              pricing.stored_slab(r) if keep_choice else None) for r in rows]
+
+
+def _body_specs(lines: list[QuotationLineIn]) -> list[LineSpec]:
+    return [pricing.line_spec(ln.product_id, ln.qty, ln.discounts, ln.gst_slab, typed=True)
+            for ln in lines]
+
+
+def _quotations_freight(rows: list[Any]) -> FreightSpec | None:
+    """FS-069 rule 11: the quotations' freight summed; its slab chosen only when every
+    quotation with freight chose the same one."""
+    carrying = [r for r in rows if r.freight_amount is not None]
+    if not carrying:
+        return None
+    slabs = {Decimal(r.freight_slab) if r.freight_slab_chosen else None for r in carrying}
+    only = next(iter(slabs)) if len(slabs) == 1 else None
+    return FreightSpec(amount=sum((Decimal(r.freight_amount) for r in carrying), Decimal(0)),
+                       gst_slab=only)
 
 
 async def _stored(db: AsyncSession, order_id: str) -> list[Any]:
@@ -550,7 +585,8 @@ def _line_out(r: Any) -> sch.OrderLine:
         discount2_pct=_qty(r.discount2_pct), discount2_amt=_money(r.discount2_amt),
         after_discount2=_money(r.after_discount2), discount3_pct=_qty(r.discount3_pct),
         discount3_amt=_money(r.discount3_amt), discount=_money(r.discount),
-        taxable=_money(r.taxable), gst_slab=_qty(r.gst_slab), cgst_rate=_qty(r.cgst_rate),
+        taxable=_money(r.taxable), gst_slab=_qty(r.gst_slab), hsn_slab=_qty(r.hsn_slab),
+        gst_slab_chosen=bool(r.gst_slab_chosen), cgst_rate=_qty(r.cgst_rate),
         sgst_rate=_qty(r.sgst_rate), igst_rate=_qty(r.igst_rate), cgst=_money(r.cgst),
         sgst=_money(r.sgst), igst=_money(r.igst), total=_money(r.total),
         provisional_fields=list(r.provisional_fields or []), qty_dispatched=_qty(sent),
@@ -559,9 +595,11 @@ def _line_out(r: Any) -> sch.OrderLine:
 
 
 def _totals(r: Any) -> Totals:
-    return Totals(gross=_money(r.gross), discount=_money(r.discount), taxable=_money(r.taxable),
-                  cgst=_money(r.cgst), sgst=_money(r.sgst), igst=_money(r.igst),
-                  total=_money(r.total))
+    # the header identity (077's CHECK) gives the freight without another column
+    freight = Decimal(r.taxable) - Decimal(r.gross) + Decimal(r.discount)
+    return Totals(gross=_money(r.gross), discount=_money(r.discount), freight=_money(freight),
+                  taxable=_money(r.taxable), cgst=_money(r.cgst), sgst=_money(r.sgst),
+                  igst=_money(r.igst), total=_money(r.total))
 
 
 def _warnings(r: Any, lines: list[sch.OrderLine]) -> list[str]:
@@ -651,6 +689,8 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         export_country=r.export_country, lut_arn=r.lut_arn, sample_pricing=r.sample_pricing,
         price_effective_date=r.price_effective_date.isoformat(),
         tax_date=_iso(r.tax_date), is_provisional=r.is_provisional, lines=lines,
+        freight=pricing.freight_from_row(r),
+        gst_changed_lines=sum(1 for ln in lines if ln.gst_slab_chosen),
         totals=totals, approval=approval, last_rejection=last_rejection,
         dispatches=await _dispatches(db, order_id, portal),
         warnings=_warnings(r, lines) + subsidy_warnings,
@@ -937,7 +977,8 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
         "q.place_of_supply_territory_id, q.seller_gstin_id, q.price_effective_date, "
         "q.owner_user_id, q.owner_org_unit_id, q.territory_id, q.party_name, q.party_mobile, "
         "q.party_address, q.party_gstin::text AS party_gstin, q.quote_no::text AS quote_no, "
-        "q.sales_type::text AS sales_type, q.tax_treatment, q.export_country "
+        "q.sales_type::text AS sales_type, q.tax_treatment, q.export_country, "
+        "q.freight_amount, q.freight_slab, q.freight_slab_chosen "
         "FROM quotation q WHERE q.id = ANY(CAST(:ids AS uuid[])) AND q.deleted_at IS NULL"),
         {"ids": ids})).all()
     if len(rows) != len(ids):
@@ -1032,13 +1073,14 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
             "pos": str(first.place_of_supply_territory_id),
             "seller": str(first.seller_gstin_id), "day": first.price_effective_date,
             "lines": list(lines), "mode": _Mode(first.tax_treatment, None),
-            "country": first.export_country}
+            "country": first.export_country, "freight": _quotations_freight(list(rows))}
 
 
 def _repriced(source: list[Any], ctx: PricedContext) -> list[str]:
     out = []
     for i, (row, p) in enumerate(zip(source, ctx.document.lines, strict=True)):
-        if Decimal(row.rate) != p.rate.rate or Decimal(row.gst_slab) != p.tax.slab \
+        # FS-069: the slab charged, so a chosen line copied as chosen is not repriced
+        if Decimal(row.rate) != p.rate.rate or Decimal(row.gst_slab) != p.slab \
                 or Decimal(row.total) != p.money.total:
             out.append(f"repriced: line {i + 1} changed from its quotation "
                        f"(total {_s(row.total)} -> {_s(p.money.total)}).")
@@ -1197,9 +1239,14 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
             raise ValidationFailed("An order from quotations takes the country from them.",
                                    code="quotations_disagree",
                                    fields={"export_country": "fixed by the quotations"})
+        keeps = body.order_type in pricing.CHOICE_TYPES and mode.treatment == "domestic"
+        given = "freight" in body.model_fields_set
         ctx = await _price(db, partner_id=src["partner"], pos=src["pos"], seller=src["seller"],
-                           as_of=src["day"], specs=_specs(src["lines"]), existing=True,
-                           order_type=body.order_type, treatment=mode.treatment)
+                           as_of=src["day"], specs=_specs(src["lines"], keep_choice=keeps),
+                           existing=True, order_type=body.order_type, treatment=mode.treatment,
+                           freight=(pricing.freight_spec(body.freight) if given
+                                    else src["freight"] if keeps else None),
+                           offered=await pricing.slab_choices(db) if given else None)
         warnings += _repriced(src["lines"], ctx)
         if body.order_type == domain.SUBSIDISED:
             from_quote = await quotation_subsidy.for_order(db, body.quotation_ids[0], src["lead"])
@@ -1245,10 +1292,10 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
         party = _party_values(body.party)
         ctx = await _price(db, partner_id=partner, pos=pos, seller=body.seller_gstin_id,
                            as_of=body.price_effective_date,
-                           specs=_moded([LineSpec(product_id=ln.product_id, qty=ln.qty,
-                                                  discounts=ln.discounts) for ln in body.lines],
-                                        mode),
-                           existing=False, order_type=body.order_type, treatment=mode.treatment)
+                           specs=_moded(_body_specs(body.lines), mode),
+                           existing=False, order_type=body.order_type, treatment=mode.treatment,
+                           freight=pricing.freight_spec(body.freight),
+                           offered=await pricing.slab_choices(db))
         _compare_preview(body.lines, ctx)
     await _check_sample(db, body.order_type, ctx)
     await _check_lut(db, mode.treatment, ctx.seller_gstin_id)
@@ -1353,10 +1400,21 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
                                fields={"partner_id": "required"})
     await stock_service.check_order_warehouse(db, caller, body.warehouse_id)
     stored = await _stored(db, order_id)
+    # FS-069 rule 2: a type that takes no choice and no freight clears both
+    keeps = new_type in pricing.CHOICE_TYPES and mode.treatment == "domestic"
+    given = "freight" in body.model_fields_set
+    if given and body.freight is not None and not keeps:
+        raise ValidationFailed("Freight is for commercial and industrial orders only.",
+                               code="freight_not_allowed", fields={"freight": "Not allowed."})
+    freight = pricing.freight_spec(body.freight) if given else pricing.stored_freight(row)
+    cleared_lines = sum(1 for r in stored if r.gst_slab_chosen) if not keeps else 0
+    cleared_freight = row.freight_amount is not None and not keeps
     ctx = await _price(db, partner_id=partner, pos=pos, seller=seller, as_of=day,
-                       specs=_moded(_specs(stored), mode,
+                       specs=_moded(_specs(stored, keep_choice=keeps), mode,
                                     was_free=row.sample_pricing == "free"),
-                       existing=True, order_type=new_type, treatment=mode.treatment)
+                       existing=True, order_type=new_type, treatment=mode.treatment,
+                       freight=freight if keeps else None,
+                       offered=await pricing.slab_choices(db) if given else None)
     await _check_sample(db, new_type, ctx)
     await _check_lut(db, mode.treatment, ctx.seller_gstin_id)
     sets: dict[str, Any] = {"tt": mode.treatment, "ec": country.strip() if country else None,
@@ -1387,6 +1445,11 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
     if not row.lead_id and mode.treatment == "domestic" \
             and pos != str(row.place_of_supply_territory_id):
         assignments.append("territory_id = CAST(:pos AS uuid)")
+    # 077 checks freight against the type on every statement: going to a type that
+    # takes none, the figures (freight cleared) are written before the type moves
+    # (code review F-1)
+    if not keeps:
+        await _write_figures(db, order_id, ctx, caller)
     try:
         await db.execute(text(f"UPDATE sales_order SET {', '.join(assignments)} "
                               f"WHERE id = CAST(:o AS uuid)"),
@@ -1396,11 +1459,17 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
     await _write_lines(db, order_id, ctx, stored,
                        [str(r.source_quotation_line_id) if r.source_quotation_line_id else None
                         for r in stored])
-    await _write_figures(db, order_id, ctx, caller)
+    if keeps:
+        await _write_figures(db, order_id, ctx, caller)
+    extra = ({"cleared": {"lines": cleared_lines, "freight": cleared_freight}}
+             if cleared_lines or cleared_freight else {})
     await _emit(db, order_id=order_id, lead_id=row.lead_id, kind="order.updated",
-                actor_id=caller.user_id, fields=sorted(body.model_fields_set - {"expected_status"}))
+                actor_id=caller.user_id, fields=sorted(body.model_fields_set - {"expected_status"}),
+                **extra)
     out = await get_order(db, caller, order_id)
     out.warnings += [w for w in ctx.document.warnings if w not in out.warnings]
+    if extra:
+        out.warnings.append(pricing.cleared_warning(cleared_lines, cleared_freight))
     return out
 
 
@@ -1413,9 +1482,12 @@ async def replace_lines(db: AsyncSession, caller: Caller, order_id: str,
     ctx = await _price(db, partner_id=str(row.partner_id) if row.partner_id else None,
                        pos=str(row.place_of_supply_territory_id), seller=str(row.seller_gstin_id),
                        as_of=row.price_effective_date,
-                       specs=_moded([LineSpec(product_id=ln.product_id, qty=ln.qty,
-                                              discounts=ln.discounts) for ln in body.lines], mode),
-                       existing=False, order_type=row.order_type, treatment=mode.treatment)
+                       specs=_moded(_body_specs(body.lines), mode),
+                       existing=False, order_type=row.order_type, treatment=mode.treatment,
+                       freight=(pricing.freight_spec(body.freight)
+                                if "freight" in body.model_fields_set
+                                else pricing.stored_freight(row)),
+                       offered=await pricing.slab_choices(db))
     _compare_preview(body.lines, ctx)
     await _check_sample(db, row.order_type, ctx)
     await _write_lines(db, order_id, ctx)
@@ -1441,8 +1513,9 @@ async def submit_order(db: AsyncSession, caller: Caller, order_id: str,
     ctx = await _price(db, partner_id=str(row.partner_id) if row.partner_id else None,
                        pos=str(row.place_of_supply_territory_id), seller=str(row.seller_gstin_id),
                        as_of=row.price_effective_date, specs=_specs(stored), existing=True,
-                       order_type=row.order_type, submitting=True, treatment=row.tax_treatment)
-    _compare_stored(stored, ctx)
+                       order_type=row.order_type, submitting=True, treatment=row.tax_treatment,
+                       freight=pricing.stored_freight(row))
+    _compare_stored(stored, ctx, row)
     _check_staff(caller, row.order_type)
     await _check_sample(db, row.order_type, ctx)
     await _check_lut(db, row.tax_treatment, str(row.seller_gstin_id))

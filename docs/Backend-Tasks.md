@@ -104,6 +104,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-030** · Say on `GET /auth/me` whether tasks are on for dealers (`tasks_for_dealers`) · TASK-009, AUTH-002 · low
 
+**Complaints** — added as the complaint screens grow (CMPL-013).
+
+- [ ] **BE-031** · A complaint's PDF, like a quotation's or an order's: `pdf_state` and `GET /complaints/{id}/pdf` · CMPL-013 · normal
+
 ---
 
 ## Details
@@ -601,5 +605,26 @@ in the same shape. Never renumber or reuse a number.
   refused `GET /tasks` call. The browser logs that as an error, which hides real ones in a walk.
 - **Done when:** `GET /auth/me` says whether tasks are on, or the grant follows the switch. The
   frontend then drops the probe.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-031 · A complaint's PDF, like a quotation's or an order's: `pdf_state` and `GET /complaints/{id}/pdf`
+
+- **Status:** ⬜ Open
+- **Asked:** 21 Oct 2026 · CMPL-013 · the user's decision on F-12 (20 Oct)
+- **What:**
+  - Once the QC verdict is in, files on a complaint stay locked, as today. The user wants a
+    **Download PDF** on the complaint instead, like the quotation and the sales order.
+  - Proposed, in the order's shape so the same button works:
+    - `pdf_state` on the complaint: `none` for a draft, then `pending`, `ready` or `failed`. Render
+      again when the complaint changes (a verdict, a remedy, closing, reopening).
+    - `GET /complaints/{id}/pdf` returning `PdfLink` (`url`, `expires_at`, `filename`), a link that
+      lasts ten minutes. `404` for a draft, `409 pdf_pending` and `409 pdf_failed` as on orders.
+  - What the PDF holds is the backend's call. A suggestion: the number, status and severity; the
+    contact, place, partner, lead and order; the lines with quantities; the check, the QC verdict
+    and the remedy; and the history.
+- **Why:** the complaint page has no printable copy to send or file. Quotations and orders have one.
+- **Done when:** both are in `complaints.md`. The frontend already shows the button when
+  `pdf_state` arrives, and the mock follows the shape above.
 - **Done in:** —
 - **Backend notes:** —

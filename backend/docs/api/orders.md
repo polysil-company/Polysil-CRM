@@ -116,6 +116,7 @@ The draft has no number until it is submitted.
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 | `subsidy` | SubsidyBlockIn \| null |  | Required on a subsidised order (FS-054), refused on any other. Its lead_ids replace lead_id, which is refused here. |
+| `freight` | FreightIn \| null |  | FS-069: one freight charge before tax, commercial and industrial only. From quotations, omit it to take their freight summed; send it to replace that. |
 
 **Responses**
 
@@ -291,6 +292,7 @@ On an order from quotations the fields they fix are fixed.
 | `payment_terms` | `full_payment` \| `credit` \| null |  |  |
 | `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
 | `remarks` | string \| null |  |  |
+| `freight` | FreightIn \| null |  | FS-069: omit to keep, null to remove. A change to a type other than commercial or industrial clears the freight and every GST choice (warning gst_choice_cleared); sending freight with such a change is 422 freight_not_allowed. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
 **Responses**
@@ -517,7 +519,8 @@ Replace a draft's lines wholesale, priced as new lines.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `lines` | QuotationLineIn[] | yes | Every line; the draft's lines are replaced. |
+| `lines` | QuotationLineIn[] | yes | Every line; the draft's lines are replaced. Re-send gst_slab on every line whose gst_slab_chosen is true. |
+| `freight` | FreightIn \| null |  | FS-069: omit to keep, null to remove. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
 **Responses**
@@ -828,6 +831,28 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
+**`FreightIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | number \| string | yes | Rupees before tax: above 0, at most two decimals, at most 99,999,999.99. Anything else is 422 freight_amount_invalid. |
+| `gst_slab` | number \| string \| null |  | A slab from `GET /pricing/gst-slabs`. Omit for the default: the highest slab among the goods lines. |
+
+**`FreightOut`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes |  |
+| `gst_slab` | string | yes |  |
+| `gst_slab_chosen` | boolean | yes | False when the slab is the default, which follows the goods lines on every save. |
+| `cgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `sgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `igst_rate` | string | yes | The slab when inter-state, else 0. |
+| `cgst` | string | yes | Freight's CGST, rounded on its own. |
+| `sgst` | string | yes | Freight's SGST, always equal to its CGST. |
+| `igst` | string | yes | Freight's IGST. |
+| `total` | string | yes | The amount plus its tax. |
+
 **`InstalmentOut`**
 
 | Field | Type | Required | Notes |
@@ -883,6 +908,8 @@ and only the outcome to a dealer.
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
+| `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
 | `last_rejection` | LastRejection \| null | yes | Set while a rejected order is back in draft. |
@@ -947,6 +974,7 @@ and only the outcome to a dealer.
 | `remarks` | string \| null |  |  |
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 | `subsidy` | SubsidyBlockIn \| null |  | Required on a subsidised order (FS-054), refused on any other. Its lead_ids replace lead_id, which is refused here. |
+| `freight` | FreightIn \| null |  | FS-069: one freight charge before tax, commercial and industrial only. From quotations, omit it to take their freight summed; send it to replace that. |
 
 **`OrderLeadRef`**
 
@@ -980,7 +1008,9 @@ and only the outcome to a dealer.
 | `discount3_amt` | string | yes |  |
 | `discount` | string | yes |  |
 | `taxable` | string | yes |  |
-| `gst_slab` | string | yes |  |
+| `gst_slab` | string | yes | The line's slab: the one picked, else the HSN's. |
+| `hsn_slab` | string | yes | The product's HSN slab when the line was priced. |
+| `gst_slab_chosen` | boolean | yes | The slab was picked (FS-069). |
 | `cgst_rate` | string | yes |  |
 | `sgst_rate` | string | yes |  |
 | `igst_rate` | string | yes |  |
@@ -997,7 +1027,8 @@ and only the outcome to a dealer.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `lines` | QuotationLineIn[] | yes | Every line; the draft's lines are replaced. |
+| `lines` | QuotationLineIn[] | yes | Every line; the draft's lines are replaced. Re-send gst_slab on every line whose gst_slab_chosen is true. |
+| `freight` | FreightIn \| null |  | FS-069: omit to keep, null to remove. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
 **`OrderPage`**
@@ -1031,6 +1062,7 @@ and only the outcome to a dealer.
 | `payment_terms` | `full_payment` \| `credit` \| null |  |  |
 | `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
 | `remarks` | string \| null |  |  |
+| `freight` | FreightIn \| null |  | FS-069: omit to keep, null to remove. A change to a type other than commercial or industrial clears the freight and every GST choice (warning gst_choice_cleared); sending freight with such a change is 422 freight_not_allowed. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
 **`OrderPayments`**
@@ -1153,6 +1185,7 @@ and only the outcome to a dealer.
 | `discount3_pct` | number \| string |  | The third tier, per cent off the balance after the second. Default `0`. |
 | `price_list_item_id` | string \| null |  | From the preview. Refused with rate_changed if it no longer resolves. |
 | `gst_rate_id` | string \| null |  | From the preview. Refused with rate_changed if it no longer resolves. |
+| `gst_slab` | number \| string \| null |  | FS-069: the GST slab the user picked from `GET /pricing/gst-slabs`, a percentage such as 18. Commercial and industrial only. Omit, null, or the line's own HSN slab: the line follows the HSN rate. Send it only for a slab picked in the dropdown, and re-send it for every line whose `gst_slab_chosen` is true when saving the whole basket. |
 
 **`QuotationRef`**
 
@@ -1252,6 +1285,7 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
+| `freight` | string |  | FS-069: the freight before tax; 0.00 without freight. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |

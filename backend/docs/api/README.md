@@ -30,7 +30,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Partners | 7 | [`partners.md`](partners.md) |
 | Payments | 8 | [`payments.md`](payments.md) |
 | Portal | 8 | [`portal.md`](portal.md) |
-| Pricing | 8 | [`pricing.md`](pricing.md) |
+| Pricing | 9 | [`pricing.md`](pricing.md) |
 | Products | 8 | [`products.md`](products.md) |
 | Public | 6 | [`public.md`](public.md) |
 | Quotations | 16 | [`quotations.md`](quotations.md) |

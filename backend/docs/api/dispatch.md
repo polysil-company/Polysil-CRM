@@ -181,6 +181,21 @@ order.
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
+**`FreightOut`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes |  |
+| `gst_slab` | string | yes |  |
+| `gst_slab_chosen` | boolean | yes | False when the slab is the default, which follows the goods lines on every save. |
+| `cgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `sgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `igst_rate` | string | yes | The slab when inter-state, else 0. |
+| `cgst` | string | yes | Freight's CGST, rounded on its own. |
+| `sgst` | string | yes | Freight's SGST, always equal to its CGST. |
+| `igst` | string | yes | Freight's IGST. |
+| `total` | string | yes | The amount plus its tax. |
+
 **`InstalmentOut`**
 
 | Field | Type | Required | Notes |
@@ -236,6 +251,8 @@ order.
 | `tax_date` | string \| null | yes | The date GST was taken at: today on a draft, the submit date after. |
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
+| `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
 | `last_rejection` | LastRejection \| null | yes | Set while a rejected order is back in draft. |
@@ -313,7 +330,9 @@ order.
 | `discount3_amt` | string | yes |  |
 | `discount` | string | yes |  |
 | `taxable` | string | yes |  |
-| `gst_slab` | string | yes |  |
+| `gst_slab` | string | yes | The line's slab: the one picked, else the HSN's. |
+| `hsn_slab` | string | yes | The product's HSN slab when the line was priced. |
+| `gst_slab_chosen` | boolean | yes | The slab was picked (FS-069). |
 | `cgst_rate` | string | yes |  |
 | `sgst_rate` | string | yes |  |
 | `igst_rate` | string | yes |  |
@@ -439,6 +458,7 @@ order.
 |---|---|---|---|
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
+| `freight` | string |  | FS-069: the freight before tax; 0.00 without freight. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |

@@ -105,6 +105,7 @@ that blocks them.
 | `party` | Party \| null |  | Defaults from the lead. |
 | `terms` | string \| null |  | Free text printed at the foot. |
 | `lines` | QuotationLineIn[] |  | Zero to 200. A draft may be saved empty; sending needs at least one. |
+| `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. |
 
 **Responses**
 
@@ -251,6 +252,7 @@ anything but a draft with `409 quotation_not_draft`.
 | `export_country` | string \| null |  | The buyer's country. Omit to keep. Required on an export. |
 | `party` | Party \| null |  |  |
 | `terms` | string \| null |  |  |
+| `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. A change to a type other than commercial or industrial clears the freight and every GST choice (warning gst_choice_cleared); sending freight with such a change is 422 freight_not_allowed. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
 
 **Responses**
@@ -289,6 +291,7 @@ allowed on a draft; sending needs at least one.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `lines` | QuotationLineIn[] | yes | The whole basket, in order. |
+| `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **Responses**
@@ -754,6 +757,28 @@ Every version of the number, oldest first. Any version's id works.
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
+**`FreightIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | number \| string | yes | Rupees before tax: above 0, at most two decimals, at most 99,999,999.99. Anything else is 422 freight_amount_invalid. |
+| `gst_slab` | number \| string \| null |  | A slab from `GET /pricing/gst-slabs`. Omit for the default: the highest slab among the goods lines. |
+
+**`FreightOut`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes |  |
+| `gst_slab` | string | yes |  |
+| `gst_slab_chosen` | boolean | yes | False when the slab is the default, which follows the goods lines on every save. |
+| `cgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `sgst_rate` | string | yes | Half the slab when intra-state, else 0. |
+| `igst_rate` | string | yes | The slab when inter-state, else 0. |
+| `cgst` | string | yes | Freight's CGST, rounded on its own. |
+| `sgst` | string | yes | Freight's SGST, always equal to its CGST. |
+| `igst` | string | yes | Freight's IGST. |
+| `total` | string | yes | The amount plus its tax. |
+
 **`LeadRef`**
 
 | Field | Type | Required | Notes |
@@ -846,6 +871,8 @@ Every version of the number, oldest first. Any version's id works.
 | `price_list` | PriceListRef \| null | yes | Null when the lines drew from more than one list. |
 | `price_list_ids` | string[] | yes |  |
 | `lines` | QuotationLine[] | yes |  |
+| `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
 | `warnings` | string[] | yes | Each is `code: sentence`. |
@@ -884,6 +911,7 @@ Every version of the number, oldest first. Any version's id works.
 | `party` | Party \| null |  | Defaults from the lead. |
 | `terms` | string \| null |  | Free text printed at the foot. |
 | `lines` | QuotationLineIn[] |  | Zero to 200. A draft may be saved empty; sending needs at least one. |
+| `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. |
 
 **`QuotationLine`**
 
@@ -907,7 +935,9 @@ Every version of the number, oldest first. Any version's id works.
 | `discount3_amt` | string | yes |  |
 | `discount` | string | yes | The three amounts summed. Not gross x discount_pct. |
 | `taxable` | string | yes |  |
-| `gst_slab` | string | yes |  |
+| `gst_slab` | string | yes | The line's slab: the one picked, else the HSN's. |
+| `hsn_slab` | string | yes | The product's HSN slab when the line was priced. |
+| `gst_slab_chosen` | boolean | yes | The slab was picked. Re-send `gst_slab` for this line when saving the basket. |
 | `cgst_rate` | string | yes |  |
 | `sgst_rate` | string | yes |  |
 | `igst_rate` | string | yes |  |
@@ -931,6 +961,7 @@ Every version of the number, oldest first. Any version's id works.
 | `discount3_pct` | number \| string |  | The third tier, per cent off the balance after the second. Default `0`. |
 | `price_list_item_id` | string \| null |  | From the preview. Refused with rate_changed if it no longer resolves. |
 | `gst_rate_id` | string \| null |  | From the preview. Refused with rate_changed if it no longer resolves. |
+| `gst_slab` | number \| string \| null |  | FS-069: the GST slab the user picked from `GET /pricing/gst-slabs`, a percentage such as 18. Commercial and industrial only. Omit, null, or the line's own HSN slab: the line follows the HSN rate. Send it only for a slab picked in the dropdown, and re-send it for every line whose `gst_slab_chosen` is true when saving the whole basket. |
 
 **`QuotationPage`**
 
@@ -951,6 +982,7 @@ Every version of the number, oldest first. Any version's id works.
 | `export_country` | string \| null |  | The buyer's country. Omit to keep. Required on an export. |
 | `party` | Party \| null |  |  |
 | `terms` | string \| null |  |  |
+| `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. A change to a type other than commercial or industrial clears the freight and every GST choice (warning gst_choice_cleared); sending freight with such a change is 422 freight_not_allowed. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
 
 **`QuotationSubsidy`**
@@ -966,6 +998,7 @@ Every version of the number, oldest first. Any version's id works.
 | `farmer_share` | string | yes | What the farmer pays. |
 | `as_of` | string | yes | The masters' date. |
 | `formula_version` | string | yes |  |
+| `gst_paid_by_state` | string |  | AP: the state's half of the GST. subsidy + farmer_share + this = total_cost (FS-063). Default `0.00`. |
 
 **`QuotationSubsidyIn`**
 
@@ -1067,6 +1100,7 @@ Every version of the number, oldest first. Any version's id works.
 |---|---|---|---|
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
+| `freight` | string |  | FS-069: the freight before tax; 0.00 without freight. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |
@@ -1108,4 +1142,5 @@ Every version of the number, oldest first. Any version's id works.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `lines` | QuotationLineIn[] | yes | The whole basket, in order. |
+| `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |

@@ -270,7 +270,22 @@ export function PartnerFields({
           <CardTitle level={2}>Where it sits</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
-          {mode === "create" ? (
+          {mode === "create" && !staff ? (
+            <Field className="sm:col-span-2">
+              <FieldLabel htmlFor="partner-type-fixed">Type</FieldLabel>
+              <Input
+                id="partner-type-fixed"
+                value={PARTNER_TYPE_LABELS[draft.type]}
+                disabled
+                readOnly
+              />
+              <FieldDescription>
+                You add the next type down, under your own business. Its prices come from the{" "}
+                {PARTNER_TYPE_LABELS[draft.type].toLowerCase()} tier.
+              </FieldDescription>
+            </Field>
+          ) : null}
+          {mode === "create" && staff ? (
             <Field className="sm:col-span-2" data-invalid={invalid("type")}>
               <FieldLabel id="partner-type-label">Type</FieldLabel>
               <ToggleGroup
@@ -303,7 +318,7 @@ export function PartnerFields({
               <FieldLabel htmlFor="partner-parent">
                 Under which {PARTNER_TYPE_LABELS[parentType].toLowerCase()}
               </FieldLabel>
-              {mode === "create" ? (
+              {mode === "create" && staff ? (
                 <ParentPicker
                   id="partner-parent"
                   type={parentType}

@@ -339,6 +339,7 @@ Complaint types are set with the other lookups, in the admin masters.
 
 ---
 - **CMPL-012 · Escalation** (screens: [the complaint](screenshots/complaints/complaint-escalated-desktop-light.jpg), [on a phone](screenshots/complaints/complaint-escalated-mobile-dark.jpg), [the bell](screenshots/complaints/bell-escalated-desktop-light.jpg)). While **Complaint escalation** rings the bell (Company settings), a complaint that misses a target says "Response target missed" or "Resolution target missed" by its status (in place of "Late"), and its Targets card says when it was escalated to its owner and managers. Its history shows "… target missed: escalated" by no one; the bell has a `complaint_escalated` kind with its own icon, opening the complaint. Dealers never get the fields or the bell. 🧪 👀
+- **CMPL-013 · Download PDF** (screens: [a closed complaint](screenshots/complaints/complaint-pdf-desktop-light.jpg), [phone, dark](screenshots/complaints/complaint-pdf-phone-dark.jpg)). A submitted complaint offers **Download PDF** by its actions, like a quotation or an order: a ten-minute link opened in a new tab. Files stay locked after the QC verdict (the user's decision on F-12). Built to the shape asked in BE-031 and **mocked**: the button shows only once the backend sends `pdf_state`, so staging shows none until then. 🧪 👀
 
 ## Subsidy
 
@@ -596,6 +597,10 @@ Screens:
   - Then the territory, code, business name, optional GSTIN, PAN and GST registration, contact details and credit terms.
   - Missing or misshapen fields are named before sending. A used code comes back on its field.
   - **Add a dealer** on a distributor's page starts the form under it, in its territory. 🧪 👀
+  - **On the portal** (CHNL-002, the client's decision of 20 Oct; screens: [a dealer's Channel partners](screenshots/partners/portal-partners-desktop-light.jpg), [Add a sub-dealer](screenshots/partners/portal-new-sub-dealer-desktop-light.jpg), [phone, dark](screenshots/partners/portal-new-sub-dealer-phone-dark.jpg), [added](screenshots/partners/portal-sub-dealer-added-desktop-light.jpg)).
+    - A dealer sees its own business and the sub-dealers under it, with **Add a sub-dealer**; a distributor gets **Add a dealer**.
+    - The type and "Under which" are fixed to its own business, and there are no credit terms.
+    - A sub-dealer has no Channel partners, and Dealer applications stays with staff. 🧪 👀
 - **CHNL-003 · Correct a partner.** Only what changed is sent, and the form says "Nothing changed yet" until something does. The code, type and parent are fixed; payment terms take 0 to 365 days. 🧪 👀
 - **CHNL-004 · Close or reopen.** Close says how many users will be signed out and deactivated. Reopen says they stay deactivated until reactivated in Users & roles. A closed partner can't be edited until reopened. 🧪 👀
 - **CHNL-005 · Import partners from Excel.**

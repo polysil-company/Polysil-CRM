@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { approvalBlockSchema } from "@/features/orders/api/orders.schemas";
+import { PDF_STATES } from "@/features/quotations/api/quotations.schemas";
 import { complaintLineWarrantySchema } from "@/features/warranty/api/warranty.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
 
@@ -226,6 +227,11 @@ export const complaintWireSchema = z.object({
   /** Why it was last reopened. Staff only: absent or null for a dealer. */
   reopen_reason: z.string().nullish(),
   can: canWireSchema,
+  /**
+   * CMPL-013 · The complaint's PDF, as on an order (asked as BE-031): none for a draft, pending
+   * while it renders, ready, or failed. Absent until the backend ships it, and then no button.
+   */
+  pdf_state: z.enum(["none", ...PDF_STATES]).nullish(),
   created_at: isoDateTime,
   updated_at: isoDateTime,
   submitted_at: isoDateTime.nullable(),
@@ -236,6 +242,7 @@ export type ComplaintWire = z.input<typeof complaintWireSchema>;
 
 export const complaintSchema = complaintWireSchema.transform((wire) => ({
   id: wire.id,
+  pdfState: wire.pdf_state ?? null,
   number: wire.complaint_no,
   status: wire.status,
   type: wire.complaint_type,
