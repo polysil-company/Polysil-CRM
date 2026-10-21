@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { timelinePageSchema, type TimelinePage } from "@/features/leads/api/leads.schemas";
+import { pdfLinkResponseSchema, type PdfLink } from "@/features/quotations/api/quotations.schemas";
 import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import type { DataId } from "@/lib/data-ids";
 import { createLogger } from "@/lib/logger";
@@ -115,6 +116,20 @@ export function getComplaint(complaintId: string, signal?: AbortSignal): Promise
     path: complaintPath(complaintId),
     schema: complaintResponseSchema,
     signal,
+  });
+}
+
+/**
+ * CMPL-013 · GET /complaints/{id}/pdf — a ten-minute link to the complaint's PDF, asked for on
+ * the click, as for an order (BE-031).
+ */
+export function getComplaintPdf(complaintId: string): Promise<PdfLink> {
+  return apiRequest({
+    dataId: "CMPL-013",
+    logger: log,
+    fn: "getComplaintPdf",
+    path: complaintPath(complaintId, "/pdf"),
+    schema: pdfLinkResponseSchema,
   });
 }
 
