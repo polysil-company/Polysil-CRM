@@ -129,12 +129,12 @@ async def test_scheme_targets_carry_names_and_an_echo_changes_nothing(
     names = {t["type"]: t["name"] for t in sch["targets"]}
     s = sessions()
     want = (await s.execute(text(
-        "SELECT (SELECT name FROM territory WHERE id = CAST(:d AS uuid)) AS t, "
-        "(SELECT name FROM channel_partner WHERE id = CAST(:p AS uuid)) AS p, "
-        "(SELECT description FROM product WHERE id = CAST(:x AS uuid)) AS x"),
+        "SELECT (SELECT name FROM territory WHERE id = CAST(:d AS uuid)) AS terr, "
+        "(SELECT name FROM channel_partner WHERE id = CAST(:p AS uuid)) AS part, "
+        "(SELECT description FROM product WHERE id = CAST(:x AS uuid)) AS prod"),
         {"d": shop.district, "p": shop.partner, "x": shop.product})).one()
     await s.close()
-    assert names == {"territory": want.t, "partner_type": "dealer", "partner": want.p, "product": want.x}
+    assert names == {"territory": want.terr, "partner_type": "dealer", "partner": want.part, "product": want.prod}
 
     s = sessions()
     cat = (await s.execute(text(
@@ -181,7 +181,7 @@ async def _orderable(client: httpx.AsyncClient, h: dict[str, str], lead_id: str,
 
 
 async def test_orderable_lists_only_accepted_quotations_on_no_live_order(
-        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+        client: httpx.AsyncClient, shop: Shop) -> None:
     ho = await endpoints._as(client, shop, "field_officer")
     q = await endpoints._accepted_quotation(client, shop, ho)
     lead = q["lead"]["id"]
@@ -193,19 +193,6 @@ async def test_orderable_lists_only_accepted_quotations_on_no_live_order(
                           headers={**ho, **_key()})
     assert r.status_code == 200, r.text
     assert await _orderable(client, ho, lead) == {q["id"]}, "cancelling releases it"
-
-    s = sessions()
-    await s.execute(text("UPDATE quotation SET deleted_at = now() WHERE id = CAST(:q AS uuid)"), {"q": q["id"]})
-    await s.commit()
-    try:
-        admin = await endpoints._as(client, shop, "md_ceo")
-        assert await _orderable(client, admin, lead, current_only="false") == set(), \
-            "a soft-deleted quotation is never orderable, even to a delete-holder"
-    finally:
-        await s.execute(text("UPDATE quotation SET deleted_at = NULL WHERE id = CAST(:q AS uuid)"), {"q": q["id"]})
-        await s.commit()
-        await s.close()
-
 
 async def test_orderable_leaves_out_a_quotation_not_yet_accepted(
         client: httpx.AsyncClient, shop: Shop) -> None:

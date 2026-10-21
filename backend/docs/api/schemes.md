@@ -440,3 +440,4 @@ bar. `422 not_a_period_scheme` for any other type.
 |---|---|---|---|
 | `type` | `territory` \| `partner_type` \| `partner` \| `product` \| `product_category` | yes | territory (a state, district or taluka; matches anything under it), partner_type (distributor, dealer or sub_dealer), partner (and its subtree), product, product_category. |
 | `id` | string | yes | The id, or for partner_type the type's name. |
+| `name` | string \| null |  | Output only (FS-070): the territory's, partner's, product's or category's name; for partner_type the type. Null outside your scope. Ignored on input, so sending back what you read is fine. |
