@@ -163,7 +163,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [-] **BE-023:** a `lead_id` filter on `GET /subsidy-applications`, for the subsidy card on a lead. Open on the backend.
 - [-] **BE-024:** `GET /lookups/product-categories` and `/lookups/uoms` for the product form. Open on the backend.
 - [-] **BE-025:** `record_type` on `GET /documents/types`, so a lead isn't offered the dealer-application types. Open on the backend.
-- [x] **CHNL-002, the client:** yes (20 Oct), dealers add their own sub-dealers. Built: Channel partners opens to a distributor or dealer, which adds the next type down under itself. PR #185, 21 Oct (`feature/CHNL-002-portal-sub-dealers`).
+- [x] **CHNL-002, the client:** yes (20 Oct), dealers add their own sub-dealers. Built: Channel partners opens to a distributor or dealer, which adds the next type down under itself. PR #186, 21 Oct (`feature/CHNL-002-portal-sub-dealers`).
 - [-] **F-12, the user:** files on a complaint can't be added after the QC verdict. Is that meant?
 
 ## Optional polish
