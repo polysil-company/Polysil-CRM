@@ -193,6 +193,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-012 | The customer's quotation page — /q/{token} (`GET /public/q/{token}`, `GET /public/q/{token}/pdf`) | shared | in-progress |
 | QUOT-013 | Export the quotation list to Excel (`GET /quotations/export`) | shared | in-progress |
 | QUOT-014 | A subsidised quotation's subsidy, for one farmer category (`PUT /quotations/{id}/subsidy`, `GET /quotations/{id}/subsidy/calculation`) | shared | in-progress |
+| QUOT-015 | A GST slab per line, and freight, on a commercial or industrial quotation or order (`GET /pricing/gst-slabs`; `gst_slab` and `freight` on the preview, the saves and the lines) | shared | in-progress |
 | SO-001 | Sales orders list (`GET /orders`) | shared | in-progress |
 | SO-002 | A sales order — the document, its approval chain, PDF and history (`GET /orders/{orderId}`, `GET /orders/{orderId}/pdf`, `GET /orders/{orderId}/timeline`) | shared | in-progress |
 | SO-003 | New order from accepted quotations, and a draft's header (`POST /orders`, `PATCH /orders/{orderId}`, `DELETE /orders/{orderId}`) | shared | in-progress |

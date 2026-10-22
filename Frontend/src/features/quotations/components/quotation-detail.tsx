@@ -25,6 +25,7 @@ import {
   TAX_TREATMENT_LABELS,
   formatQuantity,
   formatRate,
+  freightLabel,
   parseWarnings,
   quotationTitle,
 } from "@/features/quotations/lib/quotation-labels";
@@ -41,6 +42,7 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { GstChangeMark } from "./gst-change-mark";
 import { QuotationActions } from "./quotation-actions";
 import { QuotationHistory } from "./quotation-history";
 import { QuotationStatusBadge } from "./quotation-status-badge";
@@ -525,6 +527,7 @@ function LineTable({
                 <span className="block text-xs text-muted-foreground">
                   {gstAmount(line, intraState)}
                 </span>
+                <GstChangeMark line={line} />
               </td>
               <td className={cn(numCell, "font-medium")}>
                 {formatInr(line.total, { paise: true })}
@@ -569,7 +572,10 @@ function LineCards({
             <dd className="text-right tabular-nums">{formatDiscount(line.discount)}</dd>
             <dt className="text-muted-foreground">Taxable</dt>
             <dd className="text-right tabular-nums">{formatInr(line.taxable, { paise: true })}</dd>
-            <dt className="text-muted-foreground">{gstLabel(line, intraState)}</dt>
+            <dt className="text-muted-foreground">
+              {gstLabel(line, intraState)}
+              <GstChangeMark line={line} />
+            </dt>
             <dd className="text-right tabular-nums">{gstAmount(line, intraState)}</dd>
             <dt className="font-medium">Total</dt>
             <dd className="text-right font-medium tabular-nums">
@@ -587,6 +593,15 @@ function TotalsBlock({ quotation }: { quotation: Quotation }): React.JSX.Element
   const rows: { label: string; value: string; strong?: boolean }[] = [
     { label: "Gross", value: formatInr(totals.gross, { paise: true }) },
     { label: "Discount", value: formatDiscount(totals.discount) },
+    // QUOT-015 · Freight is taxed inside the taxable value, never in gross or discount.
+    ...(quotation.freight === null
+      ? []
+      : [
+          {
+            label: freightLabel(quotation.freight),
+            value: formatInr(quotation.freight.amount, { paise: true }),
+          },
+        ]),
     { label: "Taxable value", value: formatInr(totals.taxable, { paise: true }) },
     ...(quotation.intraState
       ? [

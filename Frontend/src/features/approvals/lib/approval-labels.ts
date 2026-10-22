@@ -21,6 +21,12 @@ export function documentTitle(docType: ApprovalDocType, number: string | null): 
   return docType === "quotation" ? "Draft quotation" : DOC_TYPE_LABELS[docType];
 }
 
+/** QUOT-015 · "GST changed on 2 lines" for an approver; null when no line's slab was picked. */
+export function gstChangedText(lines: number): string | null {
+  if (lines <= 0) return null;
+  return `GST changed on ${String(lines)} ${lines === 1 ? "line" : "lines"}`;
+}
+
 /**
  * The backend asks for a remark to reject, and on every Accounts decision: Accounts checks
  * payment outside the system, and the remark is the record (role `account_manager`,

@@ -134,3 +134,22 @@ export function quotationBlockedReason(stage: LeadStage): string | null {
       return "The lead is dormant";
   }
 }
+
+/**
+ * QUOT-015 · "Changed from HSN 12%" on a line whose GST slab was picked over its HSN's, so a
+ * reader sees the rate isn't the product's own; null otherwise.
+ */
+export function gstChangeNote(line: {
+  readonly gstSlab: string;
+  readonly hsnSlab: string;
+  readonly gstSlabChosen: boolean;
+}): string | null {
+  return line.gstSlabChosen && Number(line.gstSlab) !== Number(line.hsnSlab)
+    ? `Changed from HSN ${formatRate(line.hsnSlab)}`
+    : null;
+}
+
+/** QUOT-015 · The totals row for freight: "Freight (GST 18%)". */
+export function freightLabel(freight: { readonly gstSlab: string }): string {
+  return `Freight (GST ${formatRate(freight.gstSlab)})`;
+}

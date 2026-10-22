@@ -98,6 +98,28 @@ describe("[APPR-001] ApprovalsInbox", () => {
     expect(within(dialog).getByText(reason)).toBeInTheDocument();
   });
 
+  it("[QUOT-015] says on how many lines the GST slab was changed", async () => {
+    signInAs("state_manager");
+    const step = mockDb.approvalSteps.find(
+      (item) => item.docType === "quotation" && item.role === "state_manager",
+    );
+    const quotation = mockDb.quotations.find((item) => item.id === step?.docId);
+    if (quotation === undefined) throw new Error("No quotation waiting on a State Manager");
+    quotation.gst_changed_lines = 2;
+    const user = show();
+
+    const changed = (await rows()).find(
+      (row) => within(row).queryByText("GST changed on 2 lines") !== null,
+    );
+    if (changed === undefined) throw new Error("No row says the GST changed");
+    // Rows whose slabs follow the HSN say nothing.
+    expect(screen.getAllByText(/^GST changed on/)).toHaveLength(1);
+
+    await user.click(within(changed).getByRole("button", { name: /^Approve/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/GST changed on 2 lines/)).toBeInTheDocument();
+  });
+
   it("approves without a remark", async () => {
     signInAs("state_manager");
     const user = show();
