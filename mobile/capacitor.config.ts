@@ -9,12 +9,14 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * purpose (the agreed approach) and keep it narrow: https only, no cleartext, navigation limited
  * to our own host, and a local page when the site can't be reached.
  *
- * Which site: `CAP_SERVER_URL` at build time (`npx cap sync android`). Without it, the staging
- * web app. A production APK must set it.
+ * Which site: `CAP_SERVER_URL` at build time (`npx cap sync android`). Without it, or empty, the
+ * staging web app. A production APK must set it.
  */
 const STAGING_URL = "https://polysil-test.pranayx.tech";
 
-const serverUrl = new URL(process.env.CAP_SERVER_URL ?? STAGING_URL);
+// Unset or empty (a CI input left blank) both mean staging.
+const requested = process.env.CAP_SERVER_URL?.trim() ?? "";
+const serverUrl = new URL(requested === "" ? STAGING_URL : requested);
 if (serverUrl.protocol !== "https:") {
   throw new Error(`CAP_SERVER_URL must be https, not ${serverUrl.protocol}`);
 }
