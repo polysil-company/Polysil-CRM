@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Toaster } from "@/components/ui/sonner";
 import {
   createScheme,
+  getScheme,
   getStanding,
   listEntitlements,
   listSchemes,
@@ -17,6 +18,7 @@ import { buildApiUrl } from "@/lib/api/url";
 import type { Role } from "@/lib/auth/roles";
 import { writeMockRole } from "@/lib/dev/mock-settings";
 import { shiftCalendarDay, todayInIndia } from "@/lib/format";
+import { MOCK_PRODUCT_CATEGORIES } from "@/mocks/data/products";
 import { mockSchemeId } from "@/mocks/data/schemes";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb, resetMockDb } from "@/mocks/db";
@@ -310,5 +312,39 @@ describe("[SCHM-004] CreditsList", () => {
     await waitFor(() => {
       expect(screen.queryByText("Used")).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("[SCHM-002] Named targets and product categories (BE-027)", () => {
+  afterEach(reset);
+
+  it("reads each target's name from the scheme itself", async () => {
+    signInAs("admin");
+    const scheme = await getScheme(mockSchemeId(1));
+    expect(scheme.targets.length).toBeGreaterThan(0);
+    expect(scheme.targets.find((target) => target.type === "territory")?.name).toBe("Gujarat");
+  });
+
+  it("adds a product category as a target, by its id", async () => {
+    signInAs("admin");
+    const user = show(<SchemeForm scheme={null} />);
+
+    await user.click(screen.getByRole("radio", { name: /Points on an order/ }));
+    await user.type(screen.getByLabelText("Code"), "PTS-HDPE");
+    await user.type(screen.getByLabelText("Name"), "Points on HDPE pipes");
+    await user.type(screen.getByLabelText("How many points"), "100");
+    await user.click(screen.getByRole("radio", { name: "Product category" }));
+    const categories = await screen.findByRole("group", { name: "Product categories" });
+    await user.click(within(categories).getByRole("checkbox", { name: "HDPE PIPES" }));
+    expect(
+      within(screen.getByRole("list", { name: "Targets" })).getByText("HDPE PIPES"),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Create scheme" }));
+
+    expect(await screen.findByText("Scheme created")).toBeInTheDocument();
+    const hdpe = MOCK_PRODUCT_CATEGORIES.find((category) => category.code === "HDPE PIPES");
+    expect(mockDb.schemes.find((scheme) => scheme.code === "PTS-HDPE")?.targets).toEqual([
+      { type: "product_category", id: hdpe?.id },
+    ]);
   });
 });

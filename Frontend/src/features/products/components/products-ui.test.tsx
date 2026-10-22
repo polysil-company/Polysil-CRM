@@ -91,7 +91,7 @@ describe("[MSTR-004] ProductMaster catalogue", () => {
     await user.click(within(dialog).getByRole("combobox", { name: "Category" }));
     await user.click(await screen.findByRole("option", { name: "DRIP COMPONENTS" }));
     await user.click(within(dialog).getByRole("combobox", { name: "Unit" }));
-    await user.click(await screen.findByRole("option", { name: /^NOS/ }));
+    await user.click(await screen.findByRole("option", { name: /^Numbers/ }));
     await user.click(within(dialog).getByRole("button", { name: "Add the product" }));
 
     expect(
@@ -107,7 +107,7 @@ describe("[MSTR-004] ProductMaster catalogue", () => {
     await user.click(within(dialog).getByRole("combobox", { name: "Category" }));
     await user.click(await screen.findByRole("option", { name: "DRIP COMPONENTS" }));
     await user.click(within(dialog).getByRole("combobox", { name: "Unit" }));
-    await user.click(await screen.findByRole("option", { name: /^NOS/ }));
+    await user.click(await screen.findByRole("option", { name: /^Numbers/ }));
     await user.click(within(dialog).getByRole("button", { name: "Add the product" }));
 
     expect(await screen.findByText("Product added")).toBeInTheDocument();

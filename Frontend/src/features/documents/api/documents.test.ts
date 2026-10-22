@@ -72,6 +72,21 @@ describe("[DOC-001] Documents on a record", () => {
     expect(types.find((type) => type.code === "other")?.needsName).toBe(true);
   });
 
+  it("[BE-025] offers each record only the types it takes", async () => {
+    const lead = (await listDocumentTypes("lead")).map((type) => type.code);
+    expect(lead).toContain("purchase_order");
+    expect(lead).not.toContain("gst_certificate");
+    const application = (await listDocumentTypes("dealer_application")).map((type) => type.code);
+    expect(application).toEqual([
+      "gst_certificate",
+      "pan_card",
+      "cancelled_cheque",
+      "shop_photo",
+      "shop_licence",
+      "other",
+    ]);
+  });
+
   it("lists one record's documents, and a lead's whole story with each record named", async () => {
     const { leadId, orderId } = story();
     const onOrder = await listDocuments("sales_order", orderId);

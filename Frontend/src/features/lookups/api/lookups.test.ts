@@ -35,8 +35,24 @@ describe("[MSTR-002] listLookup", () => {
     const sources = await listLookup("lead-sources");
 
     expect(sources).toEqual([
-      { id: "1", code: "website", name: "Website", isActive: true },
-      { id: "2", code: "fax", name: "Fax", isActive: false },
+      {
+        id: "1",
+        code: "website",
+        name: "Website",
+        isActive: true,
+        sortOrder: null,
+        quality: null,
+        kind: null,
+      },
+      {
+        id: "2",
+        code: "fax",
+        name: "Fax",
+        isActive: false,
+        sortOrder: null,
+        quality: null,
+        kind: null,
+      },
     ]);
   });
 });

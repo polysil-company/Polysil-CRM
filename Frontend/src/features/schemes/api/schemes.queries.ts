@@ -1,11 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import {
-  getScheme,
-  getStanding,
-  listEntitlements,
-  listSchemes,
-} from "./schemes.api";
+import { getScheme, getStanding, listEntitlements, listSchemes } from "./schemes.api";
 import type { EntitlementListParams, SchemeListParams } from "./schemes.schemas";
 
 export const schemeKeys = {

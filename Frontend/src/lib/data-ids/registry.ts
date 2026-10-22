@@ -1009,7 +1009,14 @@ export const DATA_IDS = {
     title: "Product catalogue — browse, add and correct products",
     owner: "shared",
     status: "in-progress",
-    endpoints: ["GET /products", "POST /products", "GET /products/{id}", "PATCH /products/{id}"],
+    endpoints: [
+      "GET /products",
+      "POST /products",
+      "GET /products/{id}",
+      "PATCH /products/{id}",
+      "GET /lookups/product-categories",
+      "GET /lookups/uoms",
+    ],
   },
   "MSTR-005": {
     domain: "MSTR",

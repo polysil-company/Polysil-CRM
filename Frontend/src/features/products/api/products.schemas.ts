@@ -349,7 +349,12 @@ export const productCategoriesSchema = z
     ),
   })
   .transform(({ data }) =>
-    data.map((item) => ({ id: item.id, code: item.code, name: item.name, isActive: item.is_active })),
+    data.map((item) => ({
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      isActive: item.is_active,
+    })),
   );
 
 export type ProductCategoriesWire = z.input<typeof productCategoriesSchema>;
