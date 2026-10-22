@@ -1,13 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import {
-  getScheme,
-  getStanding,
-  getTargetName,
-  listEntitlements,
-  listSchemes,
-  type NamedTargetType,
-} from "./schemes.api";
+import { getScheme, getStanding, listEntitlements, listSchemes } from "./schemes.api";
 import type { EntitlementListParams, SchemeListParams } from "./schemes.schemas";
 
 export const schemeKeys = {
@@ -17,8 +10,6 @@ export const schemeKeys = {
   standing: (schemeId: string, partnerId: string | null) =>
     [...schemeKeys.all, "standing", schemeId, partnerId] as const,
   credits: (params: EntitlementListParams) => [...schemeKeys.all, "credits", params] as const,
-  targetName: (type: NamedTargetType, targetId: string) =>
-    [...schemeKeys.all, "target-name", type, targetId] as const,
 };
 
 /** The first page has no cursor. */
@@ -61,16 +52,5 @@ export function creditListQueryOptions(params: EntitlementListParams) {
     initialPageParam: FIRST_PAGE,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     meta: { dataId: "SCHM-004" },
-  });
-}
-
-/** SCHM-001 · A target's name from its record; it rarely changes. */
-export function targetNameQueryOptions(type: NamedTargetType, targetId: string) {
-  return queryOptions({
-    queryKey: schemeKeys.targetName(type, targetId),
-    queryFn: ({ signal }) => getTargetName(type, targetId, signal),
-    staleTime: 10 * 60_000,
-    retry: false,
-    meta: { dataId: "SCHM-001" },
   });
 }

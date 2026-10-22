@@ -24,6 +24,7 @@ describe("[AUTH-002] GET /auth/me contract", () => {
       partner: null,
       permissions: [{ module: "leads", actions: ["view", "create"], scope: "org_subtree" }],
       mustChangePassword: false,
+      features: { tasksForDealers: false },
     });
   });
 
@@ -64,5 +65,19 @@ describe("[AUTH-002] GET /auth/me contract", () => {
     expect(
       meResponseSchema.safeParse({ data: { id: "1", full_name: "A", user_type: "guest" } }).success,
     ).toBe(false);
+  });
+});
+
+describe("[AUTH-002] The admin's switches on /auth/me (BE-030)", () => {
+  it("reads tasks for dealers, and takes a missing switch as off", () => {
+    const base = {
+      id: "usr-9",
+      full_name: "Bhavesh Shah",
+      user_type: "partner_user" as const,
+    };
+    expect(
+      meResponseSchema.parse({ data: { ...base, features: { tasks_for_dealers: true } } }).features,
+    ).toEqual({ tasksForDealers: true });
+    expect(meResponseSchema.parse({ data: base }).features).toEqual({ tasksForDealers: false });
   });
 });

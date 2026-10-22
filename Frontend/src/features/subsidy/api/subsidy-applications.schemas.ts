@@ -142,8 +142,8 @@ export interface ApplicationListParams {
   readonly stage: string | null;
   readonly q: string;
   /**
-   * A lead's applications. The backend doesn't filter on it yet (BE-023), so the rows are also
-   * matched on `lead.id` after they arrive.
+   * A lead's applications, in the caller's scope (BE-023). Empty means none the caller can see:
+   * starting one can still answer 422 `already_forwarded`.
    */
   readonly leadId: string | null;
 }

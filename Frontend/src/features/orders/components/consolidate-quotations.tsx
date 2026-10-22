@@ -29,6 +29,8 @@ function candidateParams(partnerId: string): QuotationListParams {
     currentOnly: true,
     leadId: null,
     partnerId,
+    // BE-029 · only the ones on no live order; a 409 still marks one an unseen order holds
+    orderable: true,
     countTotal: false,
   };
 }

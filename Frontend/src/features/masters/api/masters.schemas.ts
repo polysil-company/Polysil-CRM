@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import type { LookupList } from "@/features/lookups/api/lookups.schemas";
+import {
+  lookupItemWireSchema,
+  toLookupItem,
+  type LookupList,
+} from "@/features/lookups/api/lookups.schemas";
 import { cursorPageSchema } from "@/lib/api/pagination";
 
 /**
@@ -13,22 +17,13 @@ const decimal = z.string().regex(/^-?\d+(\.\d+)?$/);
 
 /** One list row, as a write answers it. Reads come from MSTR-002's `lookupListResponseSchema`. */
 export const lookupItemResponseSchema = z
-  .object({
-    data: z.object({
-      id: z.string().min(1),
-      code: z.string().min(1),
-      name: z.string().min(1),
-      is_active: z.boolean().optional(),
-    }),
-  })
-  .transform(({ data }) => ({
-    id: data.id,
-    code: data.code,
-    name: data.name,
-    isActive: data.is_active ?? true,
-  }));
+  .object({ data: lookupItemWireSchema })
+  .transform(({ data }) => toLookupItem(data));
 
 export type LookupItemResponse = z.input<typeof lookupItemResponseSchema>;
+
+/** BE-026 · The backend's bound on a sort order, either way. */
+export const LOOKUP_SORT_ORDER_LIMIT = 1_000_000;
 
 /** A code: lowercase letters, digits and underscores; it never changes once added. */
 export const LOOKUP_CODE_PATTERN = /^[a-z0-9_]+$/;

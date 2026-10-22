@@ -355,6 +355,18 @@ export function rateChanges(lines: readonly LineIn[]): Record<string, string> {
   return fields;
 }
 
+/** BE-029 · Accepted, current, and on no order but a cancelled one. */
+function isOrderable(quotation: QuotationWire): boolean {
+  return (
+    quotation.status === "accepted" &&
+    quotation.superseded_by === null &&
+    !mockDb.orders.some(
+      (order) =>
+        order.status !== "cancelled" && order.quotations.some((item) => item.id === quotation.id),
+    )
+  );
+}
+
 function validation(fields: Record<string, string>): Response {
   return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
 }
@@ -720,6 +732,8 @@ export const quotationHandlers = [
     const partnerId = url.searchParams.get("partner_id");
     const q = url.searchParams.get("q") ?? "";
     const currentOnly = url.searchParams.get("current_only") !== "false";
+    // BE-029 · accepted, current and on no live order
+    const orderable = url.searchParams.get("orderable") === "true";
 
     const matches =
       scenario === "empty"
@@ -731,6 +745,7 @@ export const quotationHandlers = [
               (leadId === null || leadId === "" || onLead(quotation, leadId)) &&
               (partnerId === null || partnerId === "" || quotation.partner?.id === partnerId) &&
               (!currentOnly || quotation.superseded_by === null) &&
+              (!orderable || isOrderable(quotation)) &&
               matchesSearch(quotation, q),
           );
     const counted = url.searchParams.get("include_total") === "true";

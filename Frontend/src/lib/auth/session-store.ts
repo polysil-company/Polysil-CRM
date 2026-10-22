@@ -14,6 +14,7 @@
 import { apiRequest, registerAccessTokenProvider } from "@/lib/api/client";
 import { isApiError, type ApiError } from "@/lib/api/errors";
 import { createLogger } from "@/lib/logger";
+import { isNativeApp, PolysilTracking } from "@/lib/native/tracking-plugin";
 
 import { isSessionEndReason, type SessionEndReason } from "./redirects";
 import { clearSessionHint, hasSessionHint, writeSessionHint } from "./session-hint";
@@ -107,10 +108,27 @@ function scheduleRefresh(): void {
   }, delayMs);
 }
 
+/**
+ * TRK-008 · Inside the Android app, the native tracker uploads points with the web session's
+ * access token until it expires (BE-032 will give it a token of its own). It never refreshes
+ * the token itself: two refreshers would trip `refresh_reused`. This is the one place a token
+ * leaves the API client, as AGENTS.md §6 records. A no-op in a browser.
+ */
+function handTokenToNative(token: string, expiresAtMs: number): void {
+  if (!isNativeApp()) return;
+  void PolysilTracking.setAccessToken({
+    token,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+  }).catch((error: unknown) => {
+    log.warn("handTokenToNative", "The native tracker didn't take the token", { error });
+  });
+}
+
 /** Keeps the tokens from a successful sign-in or refresh. */
 export function acceptSessionTokens(tokens: SessionTokens): void {
   accessToken = tokens.accessToken;
   expiresAt = Date.now() + tokens.expiresInSeconds * 1000;
+  handTokenToNative(accessToken, expiresAt);
   writeSessionHint();
   setSnapshot({ status: "signed-in", endReason: null, error: null });
   scheduleRefresh();
@@ -124,6 +142,7 @@ export function endSession(
   clearTimeout(refreshTimer);
   accessToken = null;
   expiresAt = 0;
+  handTokenToNative("", 0);
   clearSessionHint();
   if (!fromOtherTab) {
     const message: SessionEndedMessage = { type: "session-ended", reason };

@@ -91,7 +91,7 @@ describe("[MSTR-004] ProductMaster catalogue", () => {
     await user.click(within(dialog).getByRole("combobox", { name: "Category" }));
     await user.click(await screen.findByRole("option", { name: "DRIP COMPONENTS" }));
     await user.click(within(dialog).getByRole("combobox", { name: "Unit" }));
-    await user.click(await screen.findByRole("option", { name: /^NOS/ }));
+    await user.click(await screen.findByRole("option", { name: /^Numbers/ }));
     await user.click(within(dialog).getByRole("button", { name: "Add the product" }));
 
     expect(
@@ -107,7 +107,7 @@ describe("[MSTR-004] ProductMaster catalogue", () => {
     await user.click(within(dialog).getByRole("combobox", { name: "Category" }));
     await user.click(await screen.findByRole("option", { name: "DRIP COMPONENTS" }));
     await user.click(within(dialog).getByRole("combobox", { name: "Unit" }));
-    await user.click(await screen.findByRole("option", { name: /^NOS/ }));
+    await user.click(await screen.findByRole("option", { name: /^Numbers/ }));
     await user.click(within(dialog).getByRole("button", { name: "Add the product" }));
 
     expect(await screen.findByText("Product added")).toBeInTheDocument();
@@ -143,6 +143,115 @@ describe("[MSTR-004] ProductMaster catalogue", () => {
     expect(within(dialog).getByLabelText("Description")).toBeDisabled();
     expect(within(dialog).queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Change HSN" })).not.toBeInTheDocument();
+  });
+});
+
+describe("[MSTR-005] A new product's HSN code", () => {
+  beforeEach(() => {
+    signInAs("admin");
+  });
+  afterEach(() => {
+    resetMockDb();
+    writeMockRole("state_manager");
+    push.mockReset();
+  });
+
+  /** Fills in what a new product needs; the HSN is left to each test. */
+  async function fillNewProduct(
+    user: ReturnType<typeof userEvent.setup>,
+    description: string,
+  ): Promise<HTMLElement> {
+    await user.click(await screen.findByRole("button", { name: "New product" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Description"), description);
+    await user.click(within(dialog).getByRole("combobox", { name: "Category" }));
+    await user.click(await screen.findByRole("option", { name: "DRIP COMPONENTS" }));
+    await user.click(within(dialog).getByRole("combobox", { name: "Unit" }));
+    await user.click(await screen.findByRole("option", { name: /^Numbers/ }));
+    return dialog;
+  }
+
+  /** The method and path of every products call the screen makes from now on. */
+  function recordCalls(): string[] {
+    const calls: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      const path = new URL(request.url).pathname;
+      if (request.method !== "GET" && path.includes("/products")) {
+        calls.push(`${request.method} ${path.replace(/\/products\/[^/]+/, "/products/:id")}`);
+      }
+    });
+    return calls;
+  }
+
+  afterEach(() => {
+    server.events.removeAllListeners();
+  });
+
+  it("creates the product, then sets its HSN, and the catalogue drops its No HSN badge", async () => {
+    const calls = recordCalls();
+    const user = show(<ProductMaster />);
+    const dialog = await fillNewProduct(user, "ONLINE DRIPPER 4 LPH");
+    await user.type(within(dialog).getByLabelText("HSN code (optional)"), "84248200");
+    await user.click(within(dialog).getByRole("button", { name: "Add the product" }));
+
+    expect(await screen.findByText("Product added")).toBeInTheDocument();
+    expect(calls).toEqual(["POST /api/v1/products", "PUT /api/v1/products/:id/hsn"]);
+    const row = await screen.findByRole("button", { name: /^ONLINE DRIPPER 4 LPH/ });
+    expect(within(row).queryByText("No HSN")).not.toBeInTheDocument();
+    expect(
+      mockDb.products.find((item) => item.description === "ONLINE DRIPPER 4 LPH")?.hsn_code,
+    ).toBe("84248200");
+  });
+
+  it("makes only the product when no HSN is given, and names a bad code first", async () => {
+    const calls = recordCalls();
+    const user = show(<ProductMaster />);
+    const dialog = await fillNewProduct(user, "ONLINE DRIPPER 2 LPH");
+    await user.type(within(dialog).getByLabelText("HSN code (optional)"), "12");
+    await user.click(within(dialog).getByRole("button", { name: "Add the product" }));
+    expect(
+      await within(dialog).findByText("Four to eight digits, or leave it empty."),
+    ).toBeInTheDocument();
+    expect(calls).toEqual([]);
+
+    await user.clear(within(dialog).getByLabelText("HSN code (optional)"));
+    await user.click(within(dialog).getByRole("button", { name: "Add the product" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(calls).toEqual(["POST /api/v1/products"]);
+  });
+
+  it("keeps the product when its HSN is refused, says why, and stays open on it", async () => {
+    server.use(
+      http.put(buildApiUrl("/products/:productId/hsn"), () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: "validation_error",
+              message: "Bad.",
+              fields: { hsn_code: "not a known heading" },
+            },
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = show(<ProductMaster />);
+    const dialog = await fillNewProduct(user, "ONLINE DRIPPER 6 LPH");
+    await user.type(within(dialog).getByLabelText("HSN code (optional)"), "99999999");
+    await user.click(within(dialog).getByRole("button", { name: "Add the product" }));
+
+    expect(
+      await screen.findByText(/^Product added, HSN not set: Not a known heading/),
+    ).toBeInTheDocument();
+    expect(mockDb.products.some((item) => item.description === "ONLINE DRIPPER 6 LPH")).toBe(true);
+    expect(
+      await within(dialog).findByRole("heading", { name: "ONLINE DRIPPER 6 LPH" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/No HSN code yet/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Set HSN" })).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("HSN code (optional)")).not.toBeInTheDocument();
   });
 });
 

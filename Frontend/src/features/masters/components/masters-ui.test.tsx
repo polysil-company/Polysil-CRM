@@ -13,7 +13,7 @@ import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 import { renderWithProviders } from "@/test/render";
 
-import { codeFromName, createRequestOf, draftProblems } from "./lookup-list-panel";
+import { codeFromName, createRequestOf, draftProblems, updateRequestOf } from "./lookup-list-panel";
 import { Masters } from "./masters";
 import { changedSettings, settingProblem, settingText } from "./scoring-panel";
 
@@ -180,5 +180,60 @@ describe("[MSTR-010] Lead scoring", () => {
         { w_value: "35", w_speed: "25" },
       ),
     ).toEqual({ w_speed: "25" });
+  });
+});
+
+describe("[MSTR-009] A row's order, quality and kind (BE-026)", () => {
+  afterEach(reset);
+
+  it("shows each source's order and quality, and changes only what was edited", async () => {
+    signInAs("admin");
+    const user = show(<Masters />);
+    const table = await screen.findByRole("table", { name: "Lead sources" });
+    const agriFair = within(table).getByRole("row", { name: /Agri Fair/ });
+    expect(within(agriFair).getByText("6")).toBeInTheDocument();
+    expect(within(agriFair).getByText("0.70")).toBeInTheDocument();
+
+    await user.click(within(agriFair).getByRole("button", { name: "Edit Agri Fair" }));
+    const form = await screen.findByRole("form", { name: "Edit Agri Fair" });
+    const quality = within(form).getByRole("textbox", { name: "Quality" });
+    await user.clear(quality);
+    await user.type(quality, "1.5");
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    expect(within(form).getByText("A number from 0 to 1, like 0.6.")).toBeInTheDocument();
+
+    await user.clear(quality);
+    await user.type(quality, "0.9");
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Agri Fair saved")).toBeInTheDocument();
+    const row = mockDb.lookups["lead-sources"].find((item) => item.code === "agri_fair");
+    expect(row).toMatchObject({ quality: "0.90", sort_order: 6 });
+  });
+
+  it("hides quality from those who may not edit masters, and shows a reason's kind", async () => {
+    signInAs("employee");
+    show(<Masters />, "?tab=lost-reasons");
+    const table = await screen.findByRole("table", { name: "Lost reasons" });
+    expect(within(table).getByRole("columnheader", { name: "Kind" })).toBeInTheDocument();
+    expect(within(table).getAllByText("Lost").length).toBeGreaterThan(0);
+    expect(within(table).queryByRole("columnheader", { name: "Quality" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Edit / })).not.toBeInTheDocument();
+  });
+
+  it("sends only a sort order or quality that changed", () => {
+    const row = {
+      id: "1",
+      code: "agri_fair",
+      name: "Agri Fair",
+      isActive: true,
+      sortOrder: 6,
+      quality: "0.70",
+      kind: null,
+    };
+    expect(updateRequestOf("lead-sources", row, { sortOrder: "6", quality: "0.7" })).toEqual({});
+    expect(updateRequestOf("lead-sources", row, { sortOrder: "-2", quality: "0.70" })).toEqual({
+      sort_order: -2,
+    });
+    expect(updateRequestOf("lost-reasons", row, { sortOrder: "6", quality: "0.9" })).toEqual({});
   });
 });

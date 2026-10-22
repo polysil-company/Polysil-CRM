@@ -178,6 +178,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | TRK-005 | My visits of a day, and one visit (`GET /visits`, `GET /visits/{id}`) | shared | in-progress |
 | TRK-006 | Tracking settings: the policy in force, and a new version from a date (`GET /tracking/policy`, `PUT /tracking/policy`) | shared | in-progress |
 | TRK-007 | Who looked at whose route, visits or the team map (`GET /tracking/view-log`) | shared | in-progress |
+| TRK-008 | The Android app's duty: go on and off duty, and the route recorded natively (`POST /tracking/duty/start`, `/tracking/duty/end`, `/locations/batch`) | shared | in-progress |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
@@ -254,7 +255,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-001 | Masters — the Admin → Masters area: lists, lead scoring and offices (`/masters`) | shared | in-progress |
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
-| MSTR-004 | Product catalogue — browse, add and correct products (`GET`/`POST /products`, `GET`/`PATCH /products/{id}`) | shared | in-progress |
+| MSTR-004 | Product catalogue — browse, add and correct products (`GET`/`POST /products`, `GET`/`PATCH /products/{id}`; the pickers from `GET /lookups/product-categories` and `/lookups/uoms`) | shared | in-progress |
 | MSTR-005 | Tax classification — a product's HSN code and each code's GST slab, from a date (`/products/{id}/hsn`, `/tax-rates`) | shared | in-progress |
 | MSTR-006 | Price lists — draft, fill the rate sheet, publish, close (`/price-lists*`) | shared | in-progress |
 | MSTR-007 | Excel import with column matching — price list rates, partners, order and quotation lines (`/imports*`) | shared | in-progress |

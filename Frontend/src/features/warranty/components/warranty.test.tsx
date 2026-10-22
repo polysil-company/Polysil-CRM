@@ -252,7 +252,7 @@ describe("[MSTR-017] WarrantyTermsPanel", () => {
       </>,
     );
     const list = await screen.findByRole("list", { name: "Warranty periods" });
-    expect(within(list).getByText("Drip components")).toBeInTheDocument();
+    expect(within(list).getByText("DRIP COMPONENTS")).toBeInTheDocument();
     expect(within(list).getAllByText("In force").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Set a period" }));

@@ -35,6 +35,8 @@ export const meResponseSchema = z
        * `password_change_required`.
        */
       must_change_password: z.boolean().nullish(),
+      /** AUTH-002 · Admin switches that change the screens (FS-070, BE-030). */
+      features: z.object({ tasks_for_dealers: z.boolean().nullish() }).nullish(),
     }),
   })
   .transform(({ data }) => ({
@@ -49,6 +51,10 @@ export const meResponseSchema = z
       scope: permission.scope ?? null,
     })),
     mustChangePassword: data.must_change_password === true,
+    features: {
+      /** TASK-009 · Partner users get the Tasks screens only while this is on. */
+      tasksForDealers: data.features?.tasks_for_dealers === true,
+    },
   }));
 
 /** The backend's JSON, as the mock backend must produce it. */

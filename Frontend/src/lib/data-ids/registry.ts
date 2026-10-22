@@ -1018,7 +1018,14 @@ export const DATA_IDS = {
     title: "Product catalogue — browse, add and correct products",
     owner: "shared",
     status: "in-progress",
-    endpoints: ["GET /products", "POST /products", "GET /products/{id}", "PATCH /products/{id}"],
+    endpoints: [
+      "GET /products",
+      "POST /products",
+      "GET /products/{id}",
+      "PATCH /products/{id}",
+      "GET /lookups/product-categories",
+      "GET /lookups/uoms",
+    ],
   },
   "MSTR-005": {
     domain: "MSTR",
@@ -1739,6 +1746,15 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     notes: "Admin and MD read it; for anyone else it is empty.",
+  },
+  "TRK-008": {
+    domain: "TRK",
+    title: "The Android app's duty: go on and off duty, and the route recorded natively in between",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /tracking/duty/start", "POST /tracking/duty/end", "POST /locations/batch"],
+    notes:
+      "Capacitor shell (mobile/) plus our own Kotlin plugin: Fused location, a foreground service, Room, OkHttp, WorkManager. Uploads use the web session's token until BE-032 gives a device token.",
   },
   "BOT-001": {
     domain: "BOT",

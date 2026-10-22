@@ -16,7 +16,7 @@ import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PRODUCT_PAGE_SIZE } from "@/features/products/api/products.api";
 import {
-  catalogueFacetsQueryOptions,
+  productCategoriesQueryOptions,
   productListQueryOptions,
 } from "@/features/products/api/products.queries";
 import { QUOTATION_CATEGORIES, type Product } from "@/features/products/api/products.schemas";
@@ -58,9 +58,12 @@ export function ProductCatalogue({ canEdit }: { canEdit: boolean }): React.JSX.E
   const { params, status, page, activeFilterCount, setFilters, setPage, resetFilters } =
     useProductMasterParams();
   const query = useQuery(productListQueryOptions(params, page));
-  const facets = useQuery(catalogueFacetsQueryOptions());
+  const categories = useQuery(productCategoriesQueryOptions());
   const [editing, setEditing] = useState<Editing | null>(null);
-  const categoryOptions = (facets.data?.categories ?? []).map((value) => ({ value, label: value }));
+  const categoryOptions = (categories.data ?? []).map((category) => ({
+    value: category.code,
+    label: category.name,
+  }));
   const filtered = activeFilterCount > 0;
 
   return (
@@ -79,7 +82,7 @@ export function ProductCatalogue({ canEdit }: { canEdit: boolean }): React.JSX.E
             label="Category"
             options={categoryOptions}
             selected={params.category}
-            emptyMessage={facets.isPending ? "Loading categories…" : "No categories yet."}
+            emptyMessage={categories.isPending ? "Loading categories…" : "No categories yet."}
             onChange={(category) => {
               setFilters({ category });
             }}

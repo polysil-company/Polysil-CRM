@@ -1,19 +1,22 @@
 import type { WarrantyTermWire } from "@/features/warranty/api/warranty.schemas";
 
+import { MOCK_PRODUCT_CATEGORIES } from "./products";
 import { mockUuid } from "./reference";
 
 /** The mock's own id space for warranty terms and categories. */
 export const WARRANTY_SPACE = 0x3a12;
 
-/** The mock's product categories, with the ids a warranty term names. */
-export const MOCK_WARRANTY_CATEGORIES: readonly { id: string; code: string; name: string }[] = [
-  { id: mockUuid(WARRANTY_SPACE, 101), code: "PVC PIPES", name: "PVC pipes" },
-  { id: mockUuid(WARRANTY_SPACE, 102), code: "DRIP COMPONENTS", name: "Drip components" },
-];
+/** The product categories a warranty term names: the same rows `GET /lookups/product-categories` lists. */
+export const MOCK_WARRANTY_CATEGORIES: readonly { id: string; code: string; name: string }[] =
+  MOCK_PRODUCT_CATEGORIES.map((category) => ({
+    id: category.id,
+    code: category.code,
+    name: category.name,
+  }));
 
 /** The stand-in until the client answers: 12 months for everything; drip components 24 (a sample). */
 export function seedWarrantyTerms(): WarrantyTermWire[] {
-  const drip = MOCK_WARRANTY_CATEGORIES[1] ?? null;
+  const drip = MOCK_WARRANTY_CATEGORIES.find((item) => item.code === "DRIP COMPONENTS") ?? null;
   return [
     {
       id: mockUuid(WARRANTY_SPACE, 1),

@@ -77,12 +77,30 @@ const LIST_OFFSET: Readonly<Record<LookupList, number>> = {
 };
 
 /** Every row of one list, as GET /lookups/{list} returns it. */
+/** BE-026 · The seeded sources' quality (migration 006), by code. */
+const SOURCE_QUALITY: Readonly<Record<string, string>> = {
+  whatsapp: "0.60",
+  website: "0.60",
+  employee: "0.80",
+  dealer: "0.70",
+  campaign: "0.50",
+  agri_fair: "0.70",
+  farmer_meeting: "0.80",
+  qr_code: "0.50",
+  form_link: "0.50",
+};
+
 export function mockLookupRows(list: LookupList): LookupRow[] {
+  const ordered = list === "lead-sources" || list === "lost-reasons";
   return SEEDS[list].map(([code, name], index) => ({
     id: mockUuid(MOCK_ID_SPACE.lookup, LIST_OFFSET[list] + index + 1),
     code,
     name,
     is_active: true,
+    // BE-026 · each row's place, a source's quality, a reason's kind; null where a list has none
+    sort_order: ordered ? index + 1 : null,
+    quality: list === "lead-sources" ? (SOURCE_QUALITY[code] ?? "0.50") : null,
+    kind: list === "lost-reasons" ? "lost" : null,
   }));
 }
 

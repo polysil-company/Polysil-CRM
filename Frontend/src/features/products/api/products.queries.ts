@@ -3,7 +3,8 @@ import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 import {
   getHsnHistory,
   getPriceList,
-  listCatalogueFacets,
+  listProductCategories,
+  listUoms,
   listPriceListItems,
   listPriceLists,
   listProducts,
@@ -20,7 +21,8 @@ export const productKeys = {
   all: ["product-master"] as const,
   products: (params: ProductListParams, page: number) =>
     [...productKeys.all, "products", params, page] as const,
-  facets: () => [...productKeys.all, "facets"] as const,
+  categories: () => [...productKeys.all, "categories"] as const,
+  uoms: () => [...productKeys.all, "uoms"] as const,
   hsn: (productId: string) => [...productKeys.all, "hsn", productId] as const,
   taxRates: (hsnCode: string | null, inForce: boolean, page: number) =>
     [...productKeys.all, "tax-rates", hsnCode, inForce, page] as const,
@@ -44,12 +46,22 @@ export function productListQueryOptions(params: ProductListParams, page: number)
   });
 }
 
-/** MSTR-004 · The categories and units in use; they change only when a product does. */
-export function catalogueFacetsQueryOptions() {
+/** MSTR-004 · Every product category (BE-024); they change only with a migration. */
+export function productCategoriesQueryOptions() {
   return queryOptions({
-    queryKey: productKeys.facets(),
-    queryFn: ({ signal }) => listCatalogueFacets(signal),
-    staleTime: 10 * 60_000,
+    queryKey: productKeys.categories(),
+    queryFn: ({ signal }) => listProductCategories(signal),
+    staleTime: 30 * 60_000,
+    meta: { dataId: "MSTR-004" },
+  });
+}
+
+/** MSTR-004 · Every unit with its decimals (BE-024). */
+export function uomsQueryOptions() {
+  return queryOptions({
+    queryKey: productKeys.uoms(),
+    queryFn: ({ signal }) => listUoms(signal),
+    staleTime: 30 * 60_000,
     meta: { dataId: "MSTR-004" },
   });
 }
