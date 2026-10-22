@@ -7,12 +7,13 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-103 changes, newest first. Each title opens its entry.
+104 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
 | 2026-10-21 | [Dealers add their own sub-dealers](changelog/entries/2026-10-21--feature--CHNL-002--portal-sub-dealers.md) | `feature` | `CHNL-002` `CHNL-001` |
 | 2026-10-21 | [Download a complaint as PDF](changelog/entries/2026-10-21--feature--CMPL-013--complaint-pdf.md) | `feature` | `CMPL-013` |
+| 2026-10-21 | [An HSN code on the New product form](changelog/entries/2026-10-21--fix--MSTR-005--hsn-on-the-new-product-form.md) | `fix` | `MSTR-005` `MSTR-004` |
 | 2026-10-18 | [Search and help](changelog/entries/2026-10-18--feature--BOT-001--assistant.md) | `feature` | `BOT-001` `BOT-002` |
 | 2026-10-18 | [Holidays, and complaint escalation](changelog/entries/2026-10-18--feature--CMPL-012--holidays-escalation.md) | `feature` | `CMPL-012` `MSTR-019` |
 | 2026-10-18 | [The farmers' portal](changelog/entries/2026-10-18--feature--FARM-001--consumer-portal.md) | `feature` | `FARM-001` `FARM-002` `FARM-003` |
@@ -249,6 +250,43 @@ Walked as Admin on a desktop in light mode and a touch phone in dark mode, on a 
   - no button while the backend doesn't send `pdf_state`.
 
 To check by hand in the mock, open any closed complaint and select **Download PDF**.
+
+### An HSN code on the New product form
+
+`fix` · `MSTR-005` `MSTR-004` · Nakul Srivastava · [entry](changelog/entries/2026-10-21--fix--MSTR-005--hsn-on-the-new-product-form.md)
+
+#### Before
+
+The New product form had no HSN code. The Tax section, where a heading is set, showed only once a product existed, and `POST /products` takes no `hsn_code` (`ProductCreate` in `backend/docs/api/products.md`). So a new product always reached the catalogue with "No HSN". Quotations couldn't tax it until someone opened it again to set one.
+
+#### Now
+
+- **New product** has an optional **HSN code** with a **From** date, which defaults to today. The code is four to eight digits, as on the Tax rates tab; a bad one is named before anything is sent.
+- **Adding the product with an HSN** makes two requests, each with its own idempotency key: first `POST /products`, then `PUT /products/{id}/hsn` for the new product. Without an HSN, only the product is created.
+- **When the heading is refused after the product was made:**
+  - the product stays;
+  - a toast says "Product added, HSN not set: <reason>";
+  - the dialog stays open on the new product, in edit mode, with its Tax section to set the code again.
+- Checked on a phone in dark mode and a desktop in light mode. axe found nothing.
+
+#### Discussion
+
+- **Two requests, not one.** The backend sets a heading only through `PUT /products/{id}/hsn`, which keeps its history with dates. Creating the product first means a refused heading never costs the product: there is nothing to undo, and the person tries the code again where headings are set.
+- **Separate keys.** A retried save after a failure must not replay the product's create under the heading's key, or the other way round.
+
+#### Files changed
+
+- `src/features/products/components/product-dialog.tsx` — the HSN and From fields on a new product, the create-then-heading save, and edit mode on the new product when the heading fails.
+- `src/features/products/components/products-ui.test.tsx` — three tests.
+- `Docs/Tested-Features.md`, `Docs/screenshots/products/` — the story and screens.
+
+#### Tests
+
+- `src/features/products/components/products-ui.test.tsx`, `[MSTR-005] A new product's HSN code`:
+  - with an HSN: `POST` then `PUT …/hsn`, and the new row has no "No HSN" badge;
+  - a bad code named first, with nothing sent; without an HSN, only `POST`;
+  - the heading refused: the product exists, the toast gives the reason, and the dialog is on the product with its Tax section.
+- Walked through in the mock as Admin, on a desktop in light mode and a phone in dark mode: a new product with an HSN, then added.
 
 ## 18 October 2026
 

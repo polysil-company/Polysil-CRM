@@ -78,6 +78,9 @@ interface Draft {
   mrp: string;
   packMultiple: string;
   subsidyEligible: boolean;
+  /** A new product's first HSN code, set right after it is created (MSTR-005). */
+  hsn: string;
+  hsnFrom: string;
 }
 
 function draftOf(product: Product | null): Draft {
@@ -90,12 +93,17 @@ function draftOf(product: Product | null): Draft {
     mrp: product?.mrp ?? "",
     packMultiple: product?.packMultiple ?? "",
     subsidyEligible: product?.subsidyEligible ?? true,
+    hsn: "",
+    hsnFrom: todayInIndia(),
   };
 }
 
 const POSITIVE = /^\d+(\.\d+)?$/;
 
-function problemsOf(draft: Draft): Record<string, string> {
+const HSN = /^\d{4,8}$/;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function problemsOf(draft: Draft, creating: boolean): Record<string, string> {
   const problems: Record<string, string> = {};
   if (draft.description.trim() === "")
     problems.description = "Describe it as it prints on a quotation.";
@@ -109,6 +117,10 @@ function problemsOf(draft: Draft): Record<string, string> {
     if (trimmed !== "" && (!POSITIVE.test(trimmed) || Number(trimmed) <= 0)) {
       problems[key] = "A positive number, or leave it empty.";
     }
+  }
+  if (creating && draft.hsn.trim() !== "") {
+    if (!HSN.test(draft.hsn.trim())) problems.hsn = "Four to eight digits, or leave it empty.";
+    if (!DAY.test(draft.hsnFrom)) problems.hsnFrom = "Choose the day it starts.";
   }
   return problems;
 }
@@ -181,16 +193,21 @@ export function ProductDialog({
   const facets = useQuery(catalogueFacetsQueryOptions());
   const create = useCreateProduct();
   const patch = usePatchProduct();
+  const assign = useAssignHsn();
   const idempotency = useIdempotencyKey();
+  const hsnIdempotency = useIdempotencyKey();
+  // A new product whose HSN didn't take stays open here, as the product it now is.
+  const [created, setCreated] = useState<Product | null>(null);
+  const current = created ?? product;
   const [draft, setDraft] = useState<Draft>(() => draftOf(product));
   const [shown, setShown] = useState(false);
   const [serverFields, setServerFields] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
-  const problems = problemsOf(draft);
+  const problems = problemsOf(draft, current === null);
   const errors: Record<string, string | undefined> = shown
     ? { ...serverFields, ...problems }
     : serverFields;
-  const body = product === null ? null : patchOf(draft, product);
+  const body = current === null ? null : patchOf(draft, current);
   const nothing = body !== null && Object.keys(body).length === 0;
   const set = (patchDraft: Partial<Draft>): void => {
     setDraft((current) => ({ ...current, ...patchDraft }));
@@ -198,24 +215,53 @@ export function ProductDialog({
   };
 
   const submit = useAsyncAction({
-    action: () => {
-      if (product === null) {
+    action: async (): Promise<{ saved: Product; hsnError: unknown }> => {
+      if (current === null) {
         const request = createOf(draft);
-        return create.mutateAsync({ body: request, idempotencyKey: idempotency.keyFor(request) });
+        const saved = await create.mutateAsync({
+          body: request,
+          idempotencyKey: idempotency.keyFor(request),
+        });
+        const hsnCode = draft.hsn.trim();
+        if (hsnCode === "") return { saved, hsnError: null };
+        // A separate request with its own key: the product stays made whatever this answers.
+        const hsnRequest = { productId: saved.id, hsnCode, from: draft.hsnFrom };
+        try {
+          await assign.mutateAsync({
+            ...hsnRequest,
+            idempotencyKey: hsnIdempotency.keyFor(hsnRequest),
+          });
+          return { saved, hsnError: null };
+        } catch (error) {
+          return { saved, hsnError: error };
+        }
       }
       const request = body ?? {};
-      return patch.mutateAsync({
-        productId: product.id,
+      const saved = await patch.mutateAsync({
+        productId: current.id,
         body: request,
         idempotencyKey: idempotency.keyFor(request),
       });
+      return { saved, hsnError: null };
     },
     logger: log,
-    fn: product === null ? "handleCreateProduct" : "handleEditProduct",
+    fn: current === null ? "handleCreateProduct" : "handleEditProduct",
     dataId: "MSTR-004",
-    onSuccess: (saved) => {
+    onSuccess: ({ saved, hsnError }) => {
       idempotency.reset();
-      toast.success(product === null ? "Product added" : "Product saved", {
+      hsnIdempotency.reset();
+      if (hsnError !== null) {
+        const read = readRefusal(hsnError, { hsn_code: "hsn", effective_from: "hsnFrom" });
+        const reason =
+          read.message ?? (Object.values(read.fields).join(" ") || "the code was refused.");
+        toast.error(`Product added, HSN not set: ${reason}`);
+        // Stay open on the new product, so its tax heading can be set below.
+        setCreated(saved);
+        setDraft(draftOf(saved));
+        setShown(false);
+        return;
+      }
+      toast.success(current === null ? "Product added" : "Product saved", {
         description: saved.description,
       });
       onClose();
@@ -244,9 +290,9 @@ export function ProductDialog({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <DialogHeader>
-        <DialogTitle>{product === null ? "New product" : product.description}</DialogTitle>
+        <DialogTitle>{current === null ? "New product" : current.description}</DialogTitle>
         <DialogDescription>
-          {product === null
+          {current === null
             ? "Add it to the catalogue. Prices come from the price lists; tax from its HSN code."
             : readOnly
               ? "The catalogue row, as quotations and orders read it."
@@ -257,7 +303,7 @@ export function ProductDialog({
         <form
           id="product-form"
           noValidate
-          aria-label={product === null ? "New product" : "Product details"}
+          aria-label={current === null ? "New product" : "Product details"}
           className="grid gap-4 sm:grid-cols-2"
           onSubmit={(event) => {
             event.preventDefault();
@@ -406,7 +452,7 @@ export function ProductDialog({
           <Field data-invalid={errors.mrp === undefined ? undefined : true}>
             <FieldLabel htmlFor="product-mrp">
               MRP, ₹ (optional)
-              <StandIn show={product?.provisional.includes("mrp") === true} />
+              <StandIn show={current?.provisional.includes("mrp") === true} />
             </FieldLabel>
             <Input
               id="product-mrp"
@@ -427,7 +473,7 @@ export function ProductDialog({
           <Field data-invalid={errors.packMultiple === undefined ? undefined : true}>
             <FieldLabel htmlFor="product-pack">
               Pack multiple (optional)
-              <StandIn show={product?.provisional.includes("pack_multiple") === true} />
+              <StandIn show={current?.provisional.includes("pack_multiple") === true} />
             </FieldLabel>
             <Input
               id="product-pack"
@@ -452,6 +498,51 @@ export function ProductDialog({
             <FieldError id="product-pack-error">{errors.packMultiple}</FieldError>
           </Field>
 
+          {current === null ? (
+            <>
+              <Field data-invalid={errors.hsn === undefined ? undefined : true}>
+                <FieldLabel htmlFor="product-hsn">HSN code (optional)</FieldLabel>
+                <Input
+                  id="product-hsn"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={8}
+                  className="font-mono"
+                  value={draft.hsn}
+                  aria-invalid={errors.hsn === undefined ? undefined : true}
+                  aria-describedby={
+                    errors.hsn === undefined ? "product-hsn-help" : "product-hsn-error"
+                  }
+                  onChange={(event) => {
+                    set({ hsn: event.target.value });
+                  }}
+                />
+                {errors.hsn === undefined ? (
+                  <FieldDescription id="product-hsn-help">
+                    Its tax heading. Without one, quotations can&apos;t tax it.
+                  </FieldDescription>
+                ) : null}
+                <FieldError id="product-hsn-error">{errors.hsn}</FieldError>
+              </Field>
+              <Field data-invalid={errors.hsnFrom === undefined ? undefined : true}>
+                <FieldLabel htmlFor="product-hsn-from">From</FieldLabel>
+                <Input
+                  id="product-hsn-from"
+                  type="date"
+                  value={draft.hsnFrom}
+                  aria-invalid={errors.hsnFrom === undefined ? undefined : true}
+                  aria-describedby={
+                    errors.hsnFrom === undefined ? undefined : "product-hsn-from-error"
+                  }
+                  onChange={(event) => {
+                    set({ hsnFrom: event.target.value });
+                  }}
+                />
+                <FieldError id="product-hsn-from-error">{errors.hsnFrom}</FieldError>
+              </Field>
+            </>
+          ) : null}
+
           <div className="flex items-center gap-2 sm:col-span-2">
             <Checkbox
               id="product-subsidy"
@@ -473,7 +564,7 @@ export function ProductDialog({
           </p>
         )}
 
-        {product === null ? null : <TaxHeading product={product} canEdit={canEdit} />}
+        {current === null ? null : <TaxHeading product={current} canEdit={canEdit} />}
       </DialogBody>
       <DialogFooter>
         {nothing && canEdit ? (
@@ -481,7 +572,7 @@ export function ProductDialog({
             Nothing changed yet.
           </p>
         ) : null}
-        {product !== null && canEdit ? <ActiveToggle product={product} onDone={onClose} /> : null}
+        {current !== null && canEdit ? <ActiveToggle product={current} onDone={onClose} /> : null}
         <DialogClose render={<Button type="button" variant="outline" disabled={submit.isBusy} />}>
           {readOnly ? "Close" : "Cancel"}
         </DialogClose>
@@ -495,7 +586,7 @@ export function ProductDialog({
             successLabel="Saved"
             errorLabel="Not saved"
           >
-            {product === null ? "Add the product" : "Save changes"}
+            {current === null ? "Add the product" : "Save changes"}
           </Button>
         )}
       </DialogFooter>
