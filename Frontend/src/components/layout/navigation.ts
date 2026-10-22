@@ -68,7 +68,7 @@ export interface NavItem {
 }
 
 /** A condition outside the permissions that an item waits on; see `useNavGates`. */
-export type NavGate = "dealer-tasks";
+export type NavGate = "dealer-tasks" | "native-app";
 
 export interface NavSection {
   readonly id: string;
@@ -224,6 +224,18 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         audience: "staff",
         dataId: "TRK-001",
         href: "/team-map",
+      },
+      {
+        id: "duty",
+        label: "Duty",
+        description: "Go on duty to record your route; go off duty to stop.",
+        icon: Location01Icon,
+        module: "tracking",
+        audience: "staff",
+        dataId: "TRK-008",
+        href: "/duty",
+        // Only inside the Android app: a browser can't record a route in the background.
+        gate: "native-app",
       },
       {
         id: "visits",
