@@ -38,8 +38,22 @@ SELECT s.id, s.code::text AS code, s.name, s.description, s.scheme_type::text AS
        s.benefit_kind::text AS benefit_kind, s.benefit_value, s.benefit_cap, s.entitlement_days,
        s.period::text AS period, s.valid_from, s.valid_to, s.priority, s.stackable, s.is_active,
        s.created_at, scheme_used(s.id) AS used,
-       coalesce((SELECT jsonb_agg(jsonb_build_object('type', t.target_type::text, 'id', t.target_id)
-                                  ORDER BY t.target_type, t.target_id)
+       coalesce((SELECT jsonb_agg(jsonb_build_object(
+                    'type', t.target_type::text, 'id', t.target_id,
+                    -- FS-070 rule 5: each cast sits in its own branch, so a partner_type
+                    -- row never meets one; the subselects read under the caller's RLS
+                    'name', CASE t.target_type::text
+                        WHEN 'partner_type' THEN t.target_id
+                        WHEN 'territory' THEN (SELECT x.name FROM territory x
+                                                WHERE x.id = t.target_id::uuid)
+                        WHEN 'partner' THEN (SELECT x.name FROM channel_partner x
+                                              WHERE x.id = t.target_id::uuid)
+                        WHEN 'product' THEN (SELECT x.description FROM product x
+                                              WHERE x.id = t.target_id::uuid)
+                        WHEN 'product_category' THEN (SELECT x.name FROM product_category x
+                                                       WHERE x.id = t.target_id::uuid)
+                    END)
+                    ORDER BY t.target_type, t.target_id)
                    FROM scheme_target t WHERE t.scheme_id = s.id), '[]'::jsonb) AS targets
   FROM scheme s"""
 
@@ -195,7 +209,9 @@ async def patch_scheme(db: AsyncSession, caller: Caller, scheme_id: str,
                   else (dt.date.fromisoformat(current.valid_to) if current.valid_to else None)),
         priority=body.priority if body.priority is not None else current.priority,
         stackable=body.stackable if body.stackable is not None else current.stackable,
-        targets=body.targets if body.targets is not None else current.targets)
+        # names are output only (FS-070 rule 4): rebuild from type and id
+        targets=(body.targets if body.targets is not None
+                 else [sch.Target(type=t.type, id=t.id) for t in current.targets]))
     terms = _terms(merged)
     problems = domain.problems(terms)
     if problems:

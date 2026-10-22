@@ -16,6 +16,8 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GST_SLABS } from "@/features/products/api/products.schemas";
+import { formatRate } from "@/features/quotations/lib/quotation-labels";
 import { useCan } from "@/features/session/hooks/use-session";
 import { usePatchSettings } from "@/features/settings/api/settings.mutations";
 import { settingsQueryOptions } from "@/features/settings/api/settings.queries";
@@ -96,6 +98,11 @@ const COPY: Readonly<Record<string, SettingCopy>> = {
     choices: { free: "Free", charged: "Priced like a commercial order" },
   },
   sample_max_value: { title: "The largest sample order, in rupees", section: "orders" },
+  gst_slab_choices: {
+    title: "GST slabs an item or freight can be set to",
+    section: "orders",
+    note: "Commercial and industrial quotations and orders. Each item still offers its own HSN slab.",
+  },
   complaint_reopen_days: { title: "Days to reopen a complaint", section: "complaints" },
   complaint_reopen_roles: { title: "Who may reopen a complaint", section: "complaints" },
   complaint_reopen_clock: {
@@ -161,6 +168,8 @@ function draftOf(setting: Setting): string | readonly string[] {
       return setting.value;
     case "bands":
       return setting.value.map(String);
+    case "slabs":
+      return setting.value;
   }
 }
 
@@ -192,6 +201,9 @@ function problemOf(setting: Setting, draft: string | readonly string[]): string 
       return "Each one more than the one before.";
     }
   }
+  if (setting.kind === "slabs" && (!Array.isArray(draft) || draft.length === 0)) {
+    return "Choose at least one slab.";
+  }
   return null;
 }
 
@@ -207,6 +219,8 @@ function requestValueOf(
       return (Array.isArray(draft) ? draft : []).map((item) => Number(String(item).trim()));
     case "roles":
       return Array.isArray(draft) ? draft : [];
+    case "slabs":
+      return [...(Array.isArray(draft) ? draft : [])].sort((a, b) => Number(a) - Number(b));
     case "choice":
       return typeof draft === "string" ? draft : "";
   }
@@ -215,7 +229,7 @@ function requestValueOf(
 /**
  * ADMN-007 · Admin → Company settings (FS-036): rules for orders, complaints, dealers and the
  * farmers' portal, in sections; more arrive with other features. Each setting is drawn from its
- * kind (a choice, a number in a range, roles, or four rising bands). Staff read them; those who
+ * kind (a choice, a number in a range, roles, four rising bands, or GST slabs). Staff read them; those who
  * may edit masters change them and save them together.
  */
 export function CompanySettings(): React.JSX.Element {
@@ -429,6 +443,8 @@ function ReadOnlyValue({ setting }: { setting: Setting }): React.JSX.Element {
       return <>{formatNumber(setting.value)}</>;
     case "bands":
       return <>{setting.value.map((value) => formatNumber(value)).join(", ")}</>;
+    case "slabs":
+      return <>{slabsInOrder(setting.value).map(formatRate).join(", ")}</>;
     case "roles":
       return (
         <>
@@ -518,6 +534,29 @@ function SettingEditor({
       />
     );
   }
+  if (setting.kind === "slabs") {
+    const picked = Array.isArray(value) ? value : [];
+    return (
+      <div
+        role="group"
+        aria-label={title}
+        aria-describedby={error === undefined ? undefined : describedBy}
+        className="flex flex-wrap gap-x-5 gap-y-2"
+      >
+        {slabsInOrder([...GST_SLABS, ...setting.value]).map((slab) => (
+          <label key={slab} className="flex min-h-9 items-center gap-2 text-sm text-foreground">
+            <Checkbox
+              checked={picked.includes(slab)}
+              onCheckedChange={(checked) => {
+                onChange(checked ? [...picked, slab] : picked.filter((item) => item !== slab));
+              }}
+            />
+            {formatRate(slab)}
+          </label>
+        ))}
+      </div>
+    );
+  }
   const bands = Array.isArray(value) ? value : [];
   return (
     <div role="group" aria-label={title} className="flex flex-wrap gap-2">
@@ -605,6 +644,13 @@ function RolesEditor({
         </FieldDescription>
       ) : null}
     </>
+  );
+}
+
+/** QUOT-015 · Slabs once each, lowest first: "0.25" and "0.250" are one slab. */
+function slabsInOrder(slabs: readonly string[]): string[] {
+  return [...new Set(slabs.map((slab) => String(Number(slab))))].sort(
+    (a, b) => Number(a) - Number(b),
   );
 }
 

@@ -53,6 +53,13 @@ export const trackingConfigSchema = z
       accepted: data.consent.accepted_version === data.consent.required_version,
     },
     visitPhotoRequired: data.visit_photo_required,
+    /** TRK-008 · How often the app takes a fix and uploads, and the batch limit. */
+    intervalSeconds: data.interval_seconds,
+    distanceFilterM: data.distance_filter_m,
+    maxBatchPoints: data.max_batch_points,
+    /** TRK-008 · The open duty, if any. */
+    onDuty:
+      data.on_duty === null ? null : { id: data.on_duty.id, startedAt: data.on_duty.started_at },
   }));
 export type TrackingConfig = z.output<typeof trackingConfigSchema>;
 

@@ -30,6 +30,7 @@ import type {
   StageEntryWire,
 } from "@/features/subsidy/api/subsidy-applications.schemas";
 import type { CalculateResponseWire } from "@/features/subsidy/api/subsidy.schemas";
+import type { DutyWire } from "@/features/tracking/api/duty.schemas";
 import type { PolicyWire, ViewLogRowWire } from "@/features/tracking/api/policy.schemas";
 import type { VisitWire } from "@/features/tracking/api/tracking.schemas";
 import type { VisitPhotoWire } from "@/features/tracking/api/visits.schemas";
@@ -46,7 +47,7 @@ import { seedDocuments, type MockDocument } from "./data/documents";
 import { seedHolidays } from "./data/holidays";
 import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
-import { generateLeads } from "./data/leads";
+import { generateLeads, seedDeletedLeads } from "./data/leads";
 import { seedLookups, seedScoring } from "./data/lookups";
 import { seedMarketingOrders, seedMaterials, type MockMarketingOrder } from "./data/marketing";
 import { generateConversations, generateGroups, type MockGroupMember } from "./data/messages";
@@ -87,6 +88,8 @@ import { seedWarrantyTerms } from "./data/warranty";
 export interface MockDb {
   /** Newest first, in the backend's wire format. */
   leads: LeadWire[];
+  /** LEAD-019 · Soft-deleted leads: listed only with `deleted=true`, for `leads.delete` holders. */
+  deletedLeads: LeadWire[];
   /** Newest first, full documents; list rows are derived from them. */
   quotations: QuotationWire[];
   /** Quotation saves: Idempotency-Key → the request and the quotation it made or changed. */
@@ -161,6 +164,10 @@ export interface MockDb {
   trackingConsent: Map<string, string>;
   /** TRK-003 … TRK-005 · Visits checked in on the web, newest first. */
   visits: VisitWire[];
+  /** TRK-008 · Duty sessions, by person; the last one may be open. */
+  duties: Map<string, DutyWire[]>;
+  /** TRK-008 · The ids of points the batch endpoint has counted. */
+  trackPoints: Set<string>;
   /** TRK-006 · Tracking policy versions, oldest first; seeded on first read. */
   trackingPolicies: PolicyWire[];
   /** TRK-007 · Who looked at whose location, newest first; seeded on first read. */
@@ -300,6 +307,7 @@ function createMockDb(): MockDb {
   const { tasks, minutes } = seedMinutes(generateTasks(leads));
   return {
     leads,
+    deletedLeads: seedDeletedLeads(leads),
     customers,
     customerEvents: new Map(),
     quotations,
@@ -344,6 +352,8 @@ function createMockDb(): MockDb {
     ratings: seedRatings(orders, complaints),
     trackingConsent: new Map(),
     visits: [],
+    duties: new Map(),
+    trackPoints: new Set(),
     visitPhotos: new Map(),
     trackingPolicies: [],
     viewLog: null,

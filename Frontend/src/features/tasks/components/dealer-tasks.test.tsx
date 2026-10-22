@@ -13,7 +13,7 @@ import {
   listTasks,
   patchTask,
 } from "@/features/tasks/api/tasks.api";
-import { dealerTaskParams } from "@/features/tasks/hooks/use-dealer-tasks";
+import { dealerTaskParams, useDealerTasksOn } from "@/features/tasks/hooks/use-dealer-tasks";
 import { isApiError } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
 import type { Role } from "@/lib/auth/roles";
@@ -195,5 +195,40 @@ describe("[TASK-009] The new task dialog's Dealers group", () => {
     expect(
       screen.getByRole("option", { name: "Bhavesh Shah · Shah Agro Traders" }),
     ).toBeInTheDocument();
+  });
+});
+
+function GateProbe(): React.JSX.Element {
+  return <p>{useDealerTasksOn() ? "Tasks on" : "Tasks off"}</p>;
+}
+
+describe("[TASK-009] The dealer's Tasks gate (BE-030)", () => {
+  afterEach(() => {
+    resetMockDb();
+  });
+
+  it("follows the switch on /auth/me, and never asks /tasks to find out", async () => {
+    const asked: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      asked.push(new URL(request.url).pathname);
+    });
+    writeMockRole("dealer");
+    server.use(
+      http.get(buildApiUrl("/auth/me"), () =>
+        HttpResponse.json({
+          data: { ...mockMeFor("dealer").data, features: { tasks_for_dealers: true } },
+        }),
+      ),
+    );
+    renderWithProviders(<GateProbe />);
+    expect(await screen.findByText("Tasks on")).toBeInTheDocument();
+    expect(asked.some((path) => path.endsWith("/tasks"))).toBe(false);
+    server.events.removeAllListeners();
+  });
+
+  it("stays off while the switch is off", async () => {
+    signInAs("dealer");
+    renderWithProviders(<GateProbe />);
+    expect(await screen.findByText("Tasks off")).toBeInTheDocument();
   });
 });

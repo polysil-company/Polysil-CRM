@@ -7,12 +7,17 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-103 changes, newest first. Each title opens its entry.
+108 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-22 | [Deleted leads, for those who may delete them](changelog/entries/2026-10-22--feature--LEAD-019--deleted-leads-for-those-who-may-delete-them.md) | `feature` | `LEAD-019` |
+| 2026-10-22 | [The backend's answers to BE-023 to BE-030, wired in](changelog/entries/2026-10-22--feature--MSTR-004--backend-answers-be-023-to-030.md) | `feature` | `MSTR-004` `SUBS-005` `SCHM-002` `DOC-001` `MSTR-009` `SO-011` `TASK-009` `AUTH-002` `MSTR-017` |
+| 2026-10-22 | [The Android app for field staff, with duty tracking](changelog/entries/2026-10-22--feature--TRK-008--android-tracking-app.md) | `feature` | `TRK-008` |
 | 2026-10-21 | [Dealers add their own sub-dealers](changelog/entries/2026-10-21--feature--CHNL-002--portal-sub-dealers.md) | `feature` | `CHNL-002` `CHNL-001` |
 | 2026-10-21 | [Download a complaint as PDF](changelog/entries/2026-10-21--feature--CMPL-013--complaint-pdf.md) | `feature` | `CMPL-013` |
+| 2026-10-21 | [A GST slab per item, and freight](changelog/entries/2026-10-21--feature--QUOT-015--gst-slab-and-freight.md) | `feature` | `QUOT-015` |
+| 2026-10-21 | [An HSN code on the New product form](changelog/entries/2026-10-21--fix--MSTR-005--hsn-on-the-new-product-form.md) | `fix` | `MSTR-005` `MSTR-004` |
 | 2026-10-18 | [Search and help](changelog/entries/2026-10-18--feature--BOT-001--assistant.md) | `feature` | `BOT-001` `BOT-002` |
 | 2026-10-18 | [Holidays, and complaint escalation](changelog/entries/2026-10-18--feature--CMPL-012--holidays-escalation.md) | `feature` | `CMPL-012` `MSTR-019` |
 | 2026-10-18 | [The farmers' portal](changelog/entries/2026-10-18--feature--FARM-001--consumer-portal.md) | `feature` | `FARM-001` `FARM-002` `FARM-003` |
@@ -114,6 +119,265 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 22 October 2026
+
+### Deleted leads, for those who may delete them
+
+`feature` · `LEAD-019` · Nakul Srivastava · [entry](changelog/entries/2026-10-22--feature--LEAD-019--deleted-leads-for-those-who-may-delete-them.md)
+
+#### Before
+
+A deleted lead disappeared from every list. The backend can list deleted leads for a holder of `leads.delete` (`GET /leads?deleted=true`), but no screen asked for them. This was the first item of the plan's optional polish.
+
+#### Now
+
+**Deleted leads** on the leads list, for holders of `leads.delete` (Admin in the mock):
+
+- **Switching views:**
+  - **Deleted leads** switches the list to the leads deleted so far. The address carries `?deleted=true`, so the view survives a refresh and can be shared.
+  - **Back to leads** returns to the live list.
+- **A note above the list** says nobody without the right to delete leads sees these, and that they can't be opened or brought back from here yet.
+- **Rows:** the same columns as the live list, but the names are not links.
+- **What stays and what goes:**
+  - search, filters, sort, paging and **Download Excel** work on the deleted list;
+  - **New lead** and **Possible duplicates** are hidden.
+- **Empty:** "No deleted leads". With filters on, the usual "No leads match these filters".
+- **Without `leads.delete`:** the button is absent. Opening `?deleted=true` by its address shows the live list, and nothing asks for deleted leads.
+
+**Mock:**
+
+- deleting a lead moves it to the deleted list, as the backend's soft delete does;
+- two deleted leads are seeded, as copies of seeded leads, so no other count moves.
+
+**Records brought into `integration`:**
+
+- **BE-032** (the tracking app's device token), which #194 refers to;
+- the two handoff files (`Docs/handoff-21oct-2026.md` and `Docs/handoff-mobile-app.md`).
+
+All three had stayed on a working branch.
+
+#### Discussion
+
+- **Read-only, for now.** The backend says the list exists "to restore one", but has no restore endpoint, and its rows don't say when or by whom a lead was deleted. **BE-033** asks for:
+  - `POST /leads/{id}/restore`;
+  - `deleted_at` and `deleted_by` on the rows;
+  - whether a deleted lead's page opens.
+
+  A **Restore** button follows when it lands.
+
+- **Why the names aren't links:** a lead's page offers edits and stage changes. Doing that on a deleted lead nobody else can see would be confusing, and the backend hasn't said whether the page opens at all.
+- **The flag is optional on `LeadListParams`:** five other callers build the list's parameters (the order and visit lead pickers, three tests). Left out, it means the live list, as the backend's own default does.
+
+#### Files changed
+
+- `src/features/leads/api/leads.schemas.ts`: `deleted` on `LeadListParams`.
+- `src/features/leads/api/leads.api.ts`: list and export send `deleted=true` only when asked.
+- `src/features/leads/hooks/use-lead-list-params.ts`: `deleted` in the URL, honoured only with `leads.delete`; `setDeleted`.
+- `src/features/leads/components/leads-toolbar.tsx`: the switch, the note, and New lead and duplicates hidden in the deleted view.
+- `src/features/leads/components/leads-table.tsx`: the deleted columns and the empty state.
+- `src/features/leads/components/leads-columns.tsx`: `deletedLeadColumns`, names without links.
+- Mock:
+  - `src/mocks/db.ts`: `deletedLeads`;
+  - `src/mocks/data/leads.ts`: `seedDeletedLeads`;
+  - `src/mocks/handlers/leads.ts`: `deleted=true` for a deleter; delete keeps the lead.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: LEAD-019.
+- `docs/Backend-Tasks.md`: BE-033; BE-032 brought in.
+- Records:
+  - `Docs/Tested-Features.md`;
+  - `Docs/plan-13oct-2026.md`;
+  - `Docs/handoff-21oct-2026.md` and `Docs/handoff-mobile-app.md`, brought in.
+
+#### Tests
+
+`src/features/leads/components/leads-deleted.test.tsx`, 4 tests in `[LEAD-019] Deleted leads`:
+
+- a deleter switches to the deleted leads, with `deleted=true` sent and kept in the URL; names aren't links; New lead and duplicates are hidden; Back to leads returns;
+- a lead deleted through `DELETE /leads/{id}` appears in the list;
+- "No deleted leads" when there are none;
+- without `leads.delete`: no button, and the address shows the live list without asking for deleted leads.
+
+To check by hand in the mock, choose Preview as role → Admin, then:
+
+1. Open **Leads** and select **Deleted leads**: two leads, with the note above them.
+2. Select **Back to leads**.
+
+### The backend's answers to BE-023 to BE-030, wired in
+
+`feature` · `MSTR-004` `SUBS-005` `SCHM-002` `DOC-001` `MSTR-009` `SO-011` `TASK-009` `AUTH-002` `MSTR-017` · Nakul Srivastava · [entry](changelog/entries/2026-10-22--feature--MSTR-004--backend-answers-be-023-to-030.md)
+
+#### Before
+
+The backend shipped eight answers to the frontend's asks in #190 (`docs/Backend-Tasks.md`, BE-023 to BE-030). Until then the screens worked around each gap:
+
+- the lead's subsidy card filtered applications itself;
+- the product form read every product to learn the categories and units;
+- schemes read each target's name from its own record, one call per target;
+- the document type picker offered a dealer application's types on every record;
+- Masters couldn't show a row's order or quality;
+- Place order listed quotations already on an order;
+- a dealer's every page asked `/tasks` and got a refused request.
+
+#### Now
+
+- **BE-023 · The lead's subsidy application** comes from `GET /subsidy-applications?lead_id=`. The card no longer filters the rows itself. An empty answer means none the user can see, so Start still handles `already_forwarded`.
+- **BE-024 · The product form's pickers** come from `GET /lookups/product-categories` (by name) and `GET /lookups/uoms` (with each unit's decimals).
+  - Each picker offers the active rows, plus a switched-off one only to a product that already has it.
+  - The catalogue's Category filter lists every category too.
+  - Warranty periods now offer every active category, not only those already used.
+- **BE-027 · A scheme's targets** show the names the backend sends, with no extra calls. A target outside the user's scope shows its kind and a short id.
+  - **Product category** can now be added as a target: tick boxes from the categories, sent by id.
+  - The form still sends `targets` on an edit only when they changed, as the backend asks.
+- **BE-025 · The document type picker** asks for the record's own types (`GET /documents/types?record_type=`). A lead, quotation, order or dispatch no longer offers the GST certificate or the PAN card.
+- **BE-026 · Masters lists:**
+  - sources and lost reasons show their **Order**, and lost reasons their **Kind**;
+  - those who may edit masters also see a source's **Quality**, and get **Edit** for the order and the quality. Only what changed is sent, within ±1,000,000 and 0 to 1.
+- **BE-029 · Place order's other quotations** come from `GET /quotations?orderable=true`: accepted, current and on no live order. A `409 quotation_on_order` is still handled, for an order the user can't see.
+- **BE-030 · A dealer's Tasks item** follows `features.tasks_for_dealers` on `GET /auth/me`, so partner pages no longer make a refused `/tasks` call.
+- **BE-028** needed nothing built.
+
+#### Discussion
+
+- **The mock follows each answer:**
+  - the categories and units are the backend's seeds, with the mock catalogue's own unit codes (NOS, MTR at two decimals, SET);
+  - warranty terms use the same category ids;
+  - sources carry the seeded quality and order, and quality is null for those without `masters.edit`;
+  - scheme targets are named;
+  - `/auth/me` carries the switch.
+- **"Won" reasons:** the backend lists none yet (GAP-513), so every lost reason shows "Lost".
+
+#### Files changed
+
+- `src/features/subsidy/api/` — the `lead_id` filter is the backend's.
+- `src/features/products/` — the two lookups, their queries, the form's pickers and the catalogue filter.
+- `src/features/warranty/components/warranty-terms-panel.tsx` — every category.
+- `src/features/schemes/` — target names from the scheme; product category targets; the per-target calls removed.
+- `src/features/documents/` — types by record.
+- `src/features/lookups/api/lookups.schemas.ts`, `src/features/masters/` — order, quality and kind; the Edit dialog.
+- `src/features/quotations/api/`, `src/features/orders/components/consolidate-quotations.tsx` — `orderable`.
+- `src/features/session/api/session.schemas.ts`, `src/features/tasks/hooks/use-dealer-tasks.ts` — the switch on `/auth/me`.
+- `src/mocks/` — the lookups, record types, row fields, named targets, `orderable` and the switch.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`, `Docs/Plan.md`, `Docs/Tested-Features.md`.
+
+#### Tests
+
+- `products.test.ts`: the categories with ids, and the units with decimals; a code that isn't one refused.
+- `schemes.test.tsx`: a scheme's targets named; a product category added as a target, by id.
+- `documents.test.ts`: a lead's types without a dealer's, and a dealer application's five and Other.
+- `masters-ui.test.tsx`: order and quality shown; Edit refusing a quality over 1, then saving only the quality; quality hidden and Kind shown without `masters.edit`; only a changed field sent.
+- `quotations.test.ts`: `orderable` lists only free accepted quotations, and is sent as `orderable=true`.
+- `session.schemas.test.ts` and `dealer-tasks.test.tsx`: the switch read from `/auth/me`, off when missing, and no `/tasks` call to find out.
+- Existing suites updated for the new fields, the unit labels and the warranty categories.
+
+### The Android app for field staff, with duty tracking
+
+`feature` · `TRK-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-22--feature--TRK-008--android-tracking-app.md)
+
+#### Before
+
+Field staff could check in to visits from a browser, and managers could see the team map and a day's route. But nothing recorded a route: a browser can't track location in the background (`field-tracking-contract.md`). The client wants field staff on their own Android phones to record the start, the end and the route of each duty, so the server can work out the kilometres.
+
+#### Now
+
+- **`mobile/`, a new Capacitor 8.5.3 app** (`com.polysil.crm`):
+  - **The shell** loads the live web app (`server.url`, https only, no cleartext, navigation limited to our host, an offline page). Screen and logic changes reach phones without a new APK.
+  - **Our own Kotlin tracking plugin** uses only free, first-party pieces:
+    - Play Services' Fused location;
+    - a foreground service of type `location`, with a permanent "Tracking on duty" notification;
+    - Room, which keeps every fix until the server counts or names it;
+    - OkHttp for uploads (never the WebView, which Android slows in the background);
+    - WorkManager as the backup when the network returns.
+
+    A boot receiver resumes a duty still open after a restart.
+
+  - **The upload rules** follow the contract and live in plain Kotlin:
+    - oldest first, at most `max_batch_points` per batch;
+    - the `Idempotency-Key` is the sha256 of the sorted point ids;
+    - after `200`, every point sent is deleted;
+    - `batch_too_large` is split into parts, each with a new key;
+    - `bad_clock` is shown to the person;
+    - `401` keeps the points and waits for a token; `403` stops;
+    - a network error or `5xx` resends the same body under the same key;
+    - after any other `4xx` the key is never used again;
+    - `duty.ended_at` stops the duty and tells the screen.
+- **Duty** (`/duty`), a Sales menu item shown only inside the app to staff who track:
+  - **The consent first**, if this version isn't accepted yet.
+  - **One card per missing step:** "Allow all the time", battery optimisation off, notifications on Android 13 and up, and GPS on. Each card has a button to its setting, and **Go on duty** stays off until every step is done.
+  - **Autostart advice** for Xiaomi, Redmi, POCO, Oppo, Realme, Vivo, OnePlus and Samsung phones, linked to dontkillmyapp.com. It's advice, not a blocker.
+  - **Go on duty:** one fresh fix, then `POST /tracking/duty/start`, then the tracker starts with **the id the server answered**.
+  - **Go off duty:** the tracker sends what's waiting, then `POST /tracking/duty/end`, then the tracker stops.
+  - **What it shows:** "On duty since 9:02", the last upload, the points waiting and today's km from the route.
+  - **Every state:** loading; offline, said calmly; a wrong clock; a duty the server ended ("Duty ended after working hours"); an error. In a browser, Duty says it lives in the app.
+- **The token hand-off:** `lib/auth/session-store.ts` passes each new access token to the tracker (`setAccessToken`), and an empty one on sign-out. It's a no-op in a browser. This is the one exception to "never pass tokens", written down in `AGENTS.md` §6.
+- **`.github/workflows/android-apk.yml`:**
+  - on a pull request that touches `mobile/`: lint, unit tests and a debug APK;
+  - on demand: a signed `polysil-tracking-<version>.apk`, with the keystore from GitHub secrets.
+- **`mobile/README.md`:** the install guide for staff (install from this source, Google's unverified-developer step, the permissions, autostart), and the developer notes.
+
+#### Discussion
+
+- **Until BE-032 lands, the team map shows staff as stale while the app is closed.** BE-032 (a device token) is logged on the handoff's branch. Until then the tracker uploads with the web session's token, which lasts 15 minutes. After that, points wait on the phone; nothing is lost, since the server takes points up to its retention period, and they go up when the app is next opened. The native side never refreshes the token itself, because two refreshers would trip `refresh_reused`.
+- **`server.url` in production:** Capacitor documents it as meant for live reload. We use it on purpose, as agreed, and keep it narrow: https only, no cleartext, our host only, an offline page.
+- **Versions:**
+  - Capacitor 8.5.3 (latest), whose template pins the Android Gradle Plugin at 8.13.0 with Gradle 8.14.3 and SDK 36. AGP 9.2 is newer, but Capacitor 8's own Android library is built on AGP 8, so the template's version stays.
+  - Kotlin 2.4.21, KSP 2.3.12, Play Services Location 21.4.0, Room 2.8.4, WorkManager 2.11.2, OkHttp 5.3.2, kotlinx-serialization-json 1.12.0. All free and open source; no paid SDK.
+- **Built, but not yet run as an Android build:** the build sandbox blocks `dl.google.com`, where the Android SDK and Google's Maven libraries are served. So `./gradlew lint test assembleDebug` couldn't run here; it runs in the new workflow. The upload rules' 15 unit tests did run here, as plain JVM tests with Kotlin 2.4.21.
+- **Choices written down:**
+  - The GPS interval is `interval_seconds`, with the distance filter, as the contract says.
+  - A batch whose key a `4xx` used up is halved until the point at fault is alone, and that point is dropped, since the server will never take it.
+  - The plugin adds `openSettings` (the app's settings or the location switch) and a phone maker field to `getDeviceId`, for the permission and autostart cards.
+- **Still to do:**
+  - the field pilot (3 to 4 phones of different brands, a full day each, compared with the real trip);
+  - BE-032;
+  - the production web URL for `CAP_SERVER_URL`;
+  - the release keystore in GitHub secrets.
+
+#### Files changed
+
+- `mobile/` (new):
+  - `package.json`, `capacitor.config.ts`, `www/` (the start and offline pages);
+  - `android/` (Capacitor's template, plus the manifest, the Gradle setup and signing from the environment);
+  - `android/app/src/main/java/com/polysil/crm/tracking/` (the plugin, service, Room store, uploader, worker, boot receiver);
+  - `tracking/core/` with its JVM tests;
+  - `README.md`.
+- `.github/workflows/android-apk.yml` (new).
+- `src/lib/native/tracking-plugin.ts` (new): the plugin, registered once.
+- `src/lib/auth/session-store.ts`: the token hand-off.
+- `src/features/tracking/native/` (new): the Zod-checked bridge and `useIsNativeApp`.
+- `src/features/tracking/api/duty.*` and `native.queries.ts` (new); `visits.schemas.ts` reads the intervals and the open duty.
+- `src/features/tracking/components/duty-screen.tsx`, `lib/duty-labels.ts`, `hooks/use-browser-fix.ts` (one fix as a promise).
+- `src/app/(app)/duty/page.tsx` (new); `src/components/layout/navigation.ts` and `use-nav-gates.ts`: Duty behind the `native-app` gate.
+- `src/mocks/`: duty start and end, `/locations/batch`, and the open duty in the config.
+- `package.json`: `@capacitor/core` 8.5.3.
+- `AGENTS.md` §6: the token exception.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`, `Docs/Plan.md`, `Docs/Tested-Features.md`.
+
+#### Tests
+
+- **Kotlin, as JVM unit tests** (`mobile/android/app/src/test/…/core/`, 15):
+  - the batch key (sha256 of the sorted ids, whatever their order);
+  - splitting at the batch limit, oldest first;
+  - deleting every point sent after `200`, rejected ones too;
+  - keeping points and resending the same body and key after a network error and a `5xx`;
+  - keeping points on `401`, and sending nothing without a token;
+  - stopping on `ended_at` and on `403`;
+  - `batch_too_large` split under new keys;
+  - `bad_clock` reported and its key never used again;
+  - after another `4xx`, no key reused and the point at fault dropped;
+  - the body and the answers read.
+- **Vitest:**
+  - `tracking-bridge.test.ts`: the bridge is a no-op in a browser.
+  - `duty-labels.test.ts`: the blockers in order, upload problems, the server's end reasons, autostart by maker.
+  - `duty.test.tsx`, through the API: consent needed, one open duty answered again, the end, `duty_not_found`.
+  - `duty.test.tsx`, the screen:
+    - in a browser;
+    - the consent first;
+    - Go on duty off until every step is done, one card each, with autostart advice;
+    - on duty: the API first, then the tracker with the server's id;
+    - off duty: flush, end, stop, in that order;
+    - points waiting while offline;
+    - the server ending the duty.
+  - `session-store.test.ts`: each token handed to the tracker inside the app, an empty one on sign-out, never in a browser.
 
 ## 21 October 2026
 
@@ -249,6 +513,97 @@ Walked as Admin on a desktop in light mode and a touch phone in dark mode, on a 
   - no button while the backend doesn't send `pdf_state`.
 
 To check by hand in the mock, open any closed complaint and select **Download PDF**.
+
+### A GST slab per item, and freight
+
+`feature` · `QUOT-015` · Nakul Srivastava · [entry](changelog/entries/2026-10-21--feature--QUOT-015--gst-slab-and-freight.md)
+
+#### Before
+
+Every item on a quotation or an order was taxed at its product's HSN slab, and there was no way to add freight. The backend now lets a commercial or industrial document pick each line's slab and add one freight charge (FS-069, `backend/docs/api/pricing.md`).
+
+#### Now
+
+- **A GST dropdown on each item** in the quotation builder and the order builder, for commercial and industrial sales only.
+  - It offers the slabs the admin chose (`GET /pricing/gst-slabs`, read once per screen), plus the item's own HSN slab even when that slab isn't in the list.
+  - It starts on the HSN slab, marked "(HSN)". Picking another slab says "Changed from 18%" under it. Picking the HSN slab again is no change.
+  - A slab is sent only for an item where one was picked, and re-sent on every save after that.
+- **Freight** sits under the items: an amount before tax and an optional GST slab. Without a slab it takes the highest among the items, and the line under it says so.
+  - Freight goes into the taxable value, the taxes and the total, never into gross or discount. The totals show it on its own row.
+  - The amount is checked as it's typed: rupees above 0, at most two decimals. Freight with no item says "Add an item first". Either one holds the save.
+  - It's sent on a new document, and on every edit of one, where an emptied box removes it.
+- **The backend's refusals land on their fields:** a slab on its item (`gst_choice_not_allowed`, `gst_slab_not_offered`), and the freight's on the freight (`freight_not_allowed`, `freight_without_lines`, `freight_amount_invalid`).
+- **The quotation and order pages** mark an item whose slab was picked ("Changed from HSN 18%"), and show "Freight (GST 18%)" in the totals.
+- **Approvals** say "GST changed on 2 lines" on the row and in the decision dialog.
+- **Company settings** gain "GST slabs an item or freight can be set to": a tick box per slab in force, at least one.
+- The Council's 40 % slab joins the list of GST slabs, so tax rates can be set at 40 % too.
+
+#### Discussion
+
+- **Subsidised, export, sample and the rest** show neither the dropdown nor freight. An export under a LUT doesn't take them either: the backend allows a choice only when the supply is taxed at home.
+- **A type changed away from commercial or industrial** is cleared by the backend (warning `gst_choice_cleared`), so the builder sends neither a slab nor freight for it.
+- **The PDF** is drawn by the backend. The customer's page shows only the total, which already includes freight.
+- **Orders made from quotations** (consolidate) take their quotations' freight on the backend. The mock doesn't add it up, and the screen sends no freight there.
+- **The mock** follows the backend's rules: the admin's list, the five refusals, freight priced like a line of one with no discount, and the default slab re-resolved on every save. It also seeds the `gst_slab_choices` setting (0, 5, 18, 40) and serves `GET /pricing/gst-slabs`.
+
+#### Files changed
+
+- `src/features/quotations/api/` — the freight and slab fields on lines, totals, previews and saves; `GET /pricing/gst-slabs` and its query.
+- `src/features/quotations/lib/builder-lines.ts`, `hooks/use-priced-lines.ts` — a picked slab per row, the freight box, what's sent, and where refusals go.
+- `src/features/quotations/components/` — the GST dropdown, the freight editor, the Freight total, the "Changed from" mark (`gst-change-mark.tsx`, new) and the builder's save.
+- `src/features/orders/` — the same on orders: the schema, the builder's save and the order page.
+- `src/features/approvals/` — `gst_changed_lines` on a row, shown on the inbox and in the dialog.
+- `src/features/settings/` — the `slabs` kind; `src/features/products/api/products.schemas.ts` — 40 %.
+- `src/mocks/` — the slabs endpoint and setting, choices and freight on previews, quotations and orders, and `gst_changed_lines` on approvals.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — QUOT-015.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/quotations/` — records and screens.
+
+#### Tests
+
+- `builder-lines.test.ts`: a slab sent only where picked and only where the sale takes it; freight sent once it reads as rupees; the freight's problems in words; a refused slab and a refused freight routed; a draft's slab and freight read back.
+- `quotations.write.test.ts`, through the API: the slabs on offer; a picked slab and freight priced (freight in taxable and total, not gross); refused on a subsidised quotation; a slab off the list; a freight that isn't rupees.
+- `quotation-builder.test.tsx`: the HSN slab preset and nothing sent for it; 5 % picked and ₹1,500 freight saved; a bad amount on its field; a refused slab on its item, holding the save; none of it on a subsidised quotation; a draft's slab and freight loaded and sent again.
+- `order-builder.test.tsx`: 40 % on an item and freight at 5 % saved on a direct order; a refused freight on its field.
+- `quotations-ui.test.tsx`: the changed item marked and the freight in the totals.
+- `approvals-inbox.test.tsx`: "GST changed on 2 lines" on the row and in the dialog.
+- `company-settings.test.tsx`: the slabs through the API (in force, at least one, none twice), ticked and saved, and at least one needed.
+
+### An HSN code on the New product form
+
+`fix` · `MSTR-005` `MSTR-004` · Nakul Srivastava · [entry](changelog/entries/2026-10-21--fix--MSTR-005--hsn-on-the-new-product-form.md)
+
+#### Before
+
+The New product form had no HSN code. The Tax section, where a heading is set, showed only once a product existed, and `POST /products` takes no `hsn_code` (`ProductCreate` in `backend/docs/api/products.md`). So a new product always reached the catalogue with "No HSN". Quotations couldn't tax it until someone opened it again to set one.
+
+#### Now
+
+- **New product** has an optional **HSN code** with a **From** date, which defaults to today. The code is four to eight digits, as on the Tax rates tab; a bad one is named before anything is sent.
+- **Adding the product with an HSN** makes two requests, each with its own idempotency key: first `POST /products`, then `PUT /products/{id}/hsn` for the new product. Without an HSN, only the product is created.
+- **When the heading is refused after the product was made:**
+  - the product stays;
+  - a toast says "Product added, HSN not set: <reason>";
+  - the dialog stays open on the new product, in edit mode, with its Tax section to set the code again.
+- Checked on a phone in dark mode and a desktop in light mode. axe found nothing.
+
+#### Discussion
+
+- **Two requests, not one.** The backend sets a heading only through `PUT /products/{id}/hsn`, which keeps its history with dates. Creating the product first means a refused heading never costs the product: there is nothing to undo, and the person tries the code again where headings are set.
+- **Separate keys.** A retried save after a failure must not replay the product's create under the heading's key, or the other way round.
+
+#### Files changed
+
+- `src/features/products/components/product-dialog.tsx` — the HSN and From fields on a new product, the create-then-heading save, and edit mode on the new product when the heading fails.
+- `src/features/products/components/products-ui.test.tsx` — three tests.
+- `Docs/Tested-Features.md`, `Docs/screenshots/products/` — the story and screens.
+
+#### Tests
+
+- `src/features/products/components/products-ui.test.tsx`, `[MSTR-005] A new product's HSN code`:
+  - with an HSN: `POST` then `PUT …/hsn`, and the new row has no "No HSN" badge;
+  - a bad code named first, with nothing sent; without an HSN, only `POST`;
+  - the heading refused: the product exists, the toast gives the reason, and the dialog is on the product with its Tax section.
+- Walked through in the mock as Admin, on a desktop in light mode and a phone in dark mode: a new product with an HSN, then added.
 
 ## 18 October 2026
 

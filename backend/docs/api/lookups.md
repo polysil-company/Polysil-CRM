@@ -598,6 +598,26 @@ partners in its territories, an admin all of them.
 
 ---
 
+## `GET /api/v1/lookups/product-categories`
+
+**Product Categories**
+
+The product categories, for the product form's category picker and a scheme's
+`product_category` target (FS-070). Switched-off categories are included with
+`is_active` false: offer one only when the product already has it. `POST /products`
+does not refuse an inactive code, so hiding it is the form's job.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_ProductCategoryItem__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/lookups/roles`
 
 **List Roles**
@@ -699,6 +719,25 @@ for an unknown level, or with `level` as well.
 
 ---
 
+## `GET /api/v1/lookups/uoms`
+
+**Uoms**
+
+The units of measure, for the product form's unit picker (FS-070). Each says how
+many decimals a quantity in it takes. Switched-off units are included with
+`is_active` false.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_list_UomItem__` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## Models
 
 **`Envelope_LookupItem_`**
@@ -719,6 +758,12 @@ for an unknown level, or with `level` as well.
 |---|---|---|---|
 | `data` | PartnerPick[] | yes |  |
 
+**`Envelope_list_ProductCategoryItem__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | ProductCategoryItem[] | yes |  |
+
 **`Envelope_list_RoleItem__`**
 
 | Field | Type | Required | Notes |
@@ -736,6 +781,12 @@ for an unknown level, or with `level` as well.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | TerritoryPick[] | yes |  |
+
+**`Envelope_list_UomItem__`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | UomItem[] | yes |  |
 
 **`ErrorBody`**
 
@@ -769,6 +820,9 @@ for an unknown level, or with `level` as well.
 | `code` | string | yes |  |
 | `name` | string | yes |  |
 | `is_active` | boolean |  | Default `True`. |
+| `sort_order` | integer \| null |  | Lower sorts first. Null for a list without one (MIS systems). FS-070. |
+| `quality` | string \| null |  | Lead sources only: the source-quality factor in the score, 0 to 1. Shown only to a caller with `masters.edit`; null otherwise. FS-070. |
+| `kind` | `won` \| `lost` \| null |  | Reasons only. The lost-reasons list holds lost reasons only. FS-070. |
 
 **`LookupUpdate`**
 
@@ -787,6 +841,16 @@ for an unknown level, or with `level` as well.
 | `name` | string | yes |  |
 | `partner_type` | string | yes | distributor, dealer or sub_dealer. |
 | `territory` | TerritoryParent \| null |  |  |
+
+**`ProductCategoryItem`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes | What a scheme's `product_category` target takes. |
+| `code` | string | yes | What `POST /products` takes as `product_category`. |
+| `name` | string | yes | The category's display name. |
+| `sort_order` | integer | yes | Lower first; the list is already in this order. |
+| `is_active` | boolean | yes | A switched-off category is listed; offer it only when the product already has it. |
 
 **`RoleItem`**
 
@@ -828,3 +892,13 @@ for an unknown level, or with `level` as well.
 | `level` | string | yes | state, district, taluka or village. |
 | `code` | string \| null |  |  |
 | `parent` | TerritoryParent \| null |  |  |
+
+**`UomItem`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes | The unit's id. |
+| `code` | string | yes | What `POST /products` takes as `uom`. |
+| `name` | string | yes | The unit's display name. |
+| `decimals` | integer | yes | How many decimals a quantity in this unit takes, 0 to 3. |
+| `is_active` | boolean | yes | A switched-off unit is listed; offer it only when the product already has it. |

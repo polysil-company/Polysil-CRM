@@ -65,6 +65,11 @@ const scoringPatchSchema = z.object({
   values: z.record(z.string(), z.union([z.string(), z.number()])),
 });
 
+/** Quality is stored at two places: 0.555 comes back "0.56". */
+function qualityText(value: string | number): string {
+  return (Math.round(Number(value) * 100) / 100).toFixed(2);
+}
+
 function mayEditMasters(): boolean {
   return can(mockPermissionsFor(readMockRole()), "masters", "edit");
 }
@@ -84,7 +89,11 @@ export const lookupHandlers = [
       const { failure } = await applyScenario();
       if (failure) return failure;
 
-      const body: LookupListWire = { data: mockDb.lookups[list] };
+      // BE-026 · quality only for those who may edit masters
+      const rows = mockDb.lookups[list].map((row) =>
+        mayEditMasters() ? row : { ...row, quality: row.quality === undefined ? undefined : null },
+      );
+      const body: LookupListWire = { data: rows };
       return HttpResponse.json(body);
     }),
   ),
@@ -108,11 +117,15 @@ export const lookupHandlers = [
           code: "already in use",
         });
       }
+      const ordered = list === "lead-sources" || list === "lost-reasons";
       const row = {
         id: mockUuid(MOCK_ID_SPACE.lookup, 9000 + LIST_SLOT[list] * 100 + rows.length + 1),
         code: parsed.data.code,
         name: parsed.data.name,
         is_active: true,
+        sort_order: ordered ? (parsed.data.sort_order ?? 0) : null,
+        quality: list === "lead-sources" ? qualityText(parsed.data.quality ?? "0.5") : null,
+        kind: list === "lost-reasons" ? (parsed.data.kind ?? "lost") : null,
       };
       mockDb.lookups[list] = [...rows, row];
       const body: LookupItemResponse = { data: row };
@@ -133,7 +146,23 @@ export const lookupHandlers = [
           quality: "0 to 1",
         });
       }
-      const updated = { ...row, is_active: parsed.data.is_active ?? row.is_active ?? true };
+      const { sort_order: sortOrder, quality } = parsed.data;
+      if (sortOrder != null && Math.abs(sortOrder) > 1_000_000) {
+        return errorResponse(422, "validation_error", "Some fields need correcting.", {
+          sort_order: "at most 1,000,000 either way",
+        });
+      }
+      if (quality != null && !(Number(quality) >= 0 && Number(quality) <= 1)) {
+        return errorResponse(422, "validation_error", "Some fields need correcting.", {
+          quality: "0 to 1",
+        });
+      }
+      const updated = {
+        ...row,
+        is_active: parsed.data.is_active ?? row.is_active ?? true,
+        ...(sortOrder == null ? {} : { sort_order: sortOrder }),
+        ...(quality == null ? {} : { quality: qualityText(quality) }),
+      };
       mockDb.lookups[list] = mockDb.lookups[list].map((item) =>
         item.id === row.id ? updated : item,
       );

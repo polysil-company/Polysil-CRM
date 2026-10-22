@@ -48,9 +48,17 @@ _ERRORS: dict[int | str, dict[str, object]] = {
 
 
 @router.get("/types", response_model=Envelope[list[RecordDocumentType]], responses=_ERRORS)
-async def document_types(caller: CallerDep) -> Envelope[list[RecordDocumentType]]:
-    """The document types and their labels, for the type picker. `other` needs a name."""
-    return Envelope(data=service.types())
+async def document_types(
+    caller: CallerDep,
+    record_type: Annotated[RecordType | None, Query(
+        description="FS-070: only the types this kind of record takes. A dealer application "
+        "takes its five shop and tax documents and `other`; every other record the ten "
+        "general types. Omitted: every type.")] = None,
+) -> Envelope[list[RecordDocumentType]]:
+    """The document types and their labels, for the type picker. `other` needs a name.
+
+    Send the record's `record_type` so the picker offers only what belongs on it."""
+    return Envelope(data=service.types(record_type))
 
 
 @router.post("", status_code=201, response_model=Envelope[RecordDocument], responses=_ERRORS)

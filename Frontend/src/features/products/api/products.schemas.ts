@@ -19,7 +19,7 @@ export const PROVISIONAL_FIELDS = ["hsn_code", "gst_slab", "mrp", "pack_multiple
 export type ProvisionalField = (typeof PROVISIONAL_FIELDS)[number];
 
 /** The slabs the backend accepts; a new one arrives as a migration, never as data entry. */
-export const GST_SLABS = ["0", "0.25", "3", "5", "12", "18", "28"] as const;
+export const GST_SLABS = ["0", "0.25", "3", "5", "12", "18", "28", "40"] as const;
 
 export const CHANNEL_TIERS = ["distributor", "dealer", "sub_dealer", "farmer"] as const;
 export type ChannelTier = (typeof CHANNEL_TIERS)[number];
@@ -330,3 +330,59 @@ export const publishResultSchema = z
     data: z.object({ closed_predecessor_id: z.string().nullish() }).loose(),
   })
   .transform(({ data }) => ({ closedPredecessorId: data.closed_predecessor_id ?? null }));
+
+// ── lookups the product form offers (BE-024, BE-027) ────────────────────────────
+
+/** GET /lookups/product-categories — every category, switched-off ones too, in sort order. */
+export const productCategoriesSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        /** What a scheme's `product_category` target takes. */
+        id: z.string().min(1),
+        /** What `POST /products` takes as `product_category`. */
+        code: z.string().min(1),
+        name: z.string().min(1),
+        sort_order: z.number().int(),
+        is_active: z.boolean(),
+      }),
+    ),
+  })
+  .transform(({ data }) =>
+    data.map((item) => ({
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      isActive: item.is_active,
+    })),
+  );
+
+export type ProductCategoriesWire = z.input<typeof productCategoriesSchema>;
+export type ProductCategory = z.output<typeof productCategoriesSchema>[number];
+
+/** GET /lookups/uoms — every unit with the decimals a quantity in it takes. */
+export const uomsSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        id: z.string().min(1),
+        /** What `POST /products` takes as `uom`. */
+        code: z.string().min(1),
+        name: z.string().min(1),
+        decimals: z.number().int().min(0).max(3),
+        is_active: z.boolean(),
+      }),
+    ),
+  })
+  .transform(({ data }) =>
+    data.map((item) => ({
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      decimals: item.decimals,
+      isActive: item.is_active,
+    })),
+  );
+
+export type UomsWire = z.input<typeof uomsSchema>;
+export type Uom = z.output<typeof uomsSchema>[number];

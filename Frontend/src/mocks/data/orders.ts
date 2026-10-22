@@ -6,10 +6,10 @@ import type {
   OrderSummaryWire,
   OrderWire,
 } from "@/features/orders/api/orders.schemas";
-import type { QuotationWire } from "@/features/quotations/api/quotations.schemas";
+import type { FreightWire, QuotationWire } from "@/features/quotations/api/quotations.schemas";
 
 import { orderManagersFor } from "./approvals";
-import { MOCK_PRODUCTS, MOCK_SELLER } from "./quotations";
+import { gstChangedLines, MOCK_PRODUCTS, MOCK_SELLER } from "./quotations";
 import { MOCK_ID_SPACE, MOCK_STAFF, mockUuid } from "./reference";
 
 /**
@@ -102,6 +102,8 @@ function orderLineFrom(line: QuotationWire["lines"][number]): OrderLineWire {
     discount: line.discount,
     taxable: line.taxable,
     gst_slab: line.gst_slab,
+    hsn_slab: line.hsn_slab ?? line.gst_slab,
+    gst_slab_chosen: line.gst_slab_chosen ?? false,
     cgst_rate: line.cgst_rate,
     sgst_rate: line.sgst_rate,
     igst_rate: line.igst_rate,
@@ -246,6 +248,8 @@ export interface MockDirectOrderInput {
   readonly owner: OrderWire["owner"];
   readonly ownerOrgUnit: OrderWire["owner_org_unit"];
   readonly lines: readonly QuotationWire["lines"][number][];
+  /** QUOT-015 · The freight as priced; none when left out. */
+  readonly freight?: FreightWire | null;
   readonly orderType: OrderWire["order_type"];
   readonly deliveryAddress: string | null;
   readonly paymentTerms: OrderWire["payment_terms"];
@@ -282,7 +286,7 @@ export function mockDirectOrder(input: MockDirectOrderInput): OrderWire {
     intra_state: true,
     price_effective_date: input.createdAt.slice(0, 10),
     tax_date: input.createdAt.slice(0, 10),
-    ...withOrderLines(lines),
+    ...withOrderLines(lines, input.freight ?? null),
     approval: null,
     last_rejection: null,
     dispatches: [],
@@ -304,18 +308,25 @@ export function mockDirectOrder(input: MockDirectOrderInput): OrderWire {
 /** SO-005 · A draft's lines replaced: renumbered, with the totals again. */
 export function withOrderLines(
   lines: readonly OrderLineWire[],
-): Pick<OrderWire, "lines" | "totals" | "is_provisional"> {
+  freight: FreightWire | null = null,
+): Pick<OrderWire, "lines" | "totals" | "is_provisional" | "freight" | "gst_changed_lines"> {
+  const add = (sum: string, part: string | undefined): string =>
+    ((Math.round(Number(sum) * 100) + Math.round(Number(part ?? "0") * 100)) / 100).toFixed(2);
   return {
     is_provisional: lines.some((line) => line.provisional_fields.length > 0),
     lines: [...lines],
+    // QUOT-015 · freight joins taxable, the taxes and the total, never gross or discount
+    freight,
+    gst_changed_lines: gstChangedLines(lines),
     totals: {
       gross: sumMoney(lines, "gross"),
       discount: sumMoney(lines, "discount"),
-      taxable: sumMoney(lines, "taxable"),
-      cgst: sumMoney(lines, "cgst"),
-      sgst: sumMoney(lines, "sgst"),
-      igst: sumMoney(lines, "igst"),
-      total: sumMoney(lines, "total"),
+      freight: freight?.amount ?? "0.00",
+      taxable: add(sumMoney(lines, "taxable"), freight?.amount),
+      cgst: add(sumMoney(lines, "cgst"), freight?.cgst),
+      sgst: add(sumMoney(lines, "sgst"), freight?.sgst),
+      igst: add(sumMoney(lines, "igst"), freight?.igst),
+      total: add(sumMoney(lines, "total"), freight?.total),
     },
   };
 }

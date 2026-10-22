@@ -2,7 +2,9 @@ import { z } from "zod";
 
 import { orderPaymentsSchema } from "@/features/payments/api/payments.schemas";
 import {
+  freightWireSchema,
   TAX_TREATMENTS,
+  type FreightRequest,
   type QuotationLineRequest,
 } from "@/features/quotations/api/quotations.schemas";
 import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
@@ -70,6 +72,8 @@ const territoryRef = z.object({ id: z.string().min(1), name: displayText, level:
 const totalsSchema = z.object({
   gross: decimal,
   discount: decimal,
+  /** QUOT-015 · Freight before tax, "0.00" without; inside taxable and total, not gross. */
+  freight: decimal.default("0.00"),
   taxable: decimal,
   cgst: decimal,
   sgst: decimal,
@@ -264,6 +268,10 @@ const orderLineWireSchema = z.object({
   discount: decimal,
   taxable: decimal,
   gst_slab: decimal,
+  /** QUOT-015 · The product's HSN slab when the line was priced. */
+  hsn_slab: decimal.optional(),
+  /** QUOT-015 · The slab was picked (FS-069). */
+  gst_slab_chosen: z.boolean().default(false),
   cgst_rate: decimal,
   sgst_rate: decimal,
   igst_rate: decimal,
@@ -303,6 +311,8 @@ const orderLineSchema = orderLineWireSchema.transform((wire) => ({
   discount: wire.discount,
   taxable: wire.taxable,
   gstSlab: wire.gst_slab,
+  hsnSlab: wire.hsn_slab ?? wire.gst_slab,
+  gstSlabChosen: wire.gst_slab_chosen,
   cgst: { rate: wire.cgst_rate, amount: wire.cgst },
   sgst: { rate: wire.sgst_rate, amount: wire.sgst },
   igst: { rate: wire.igst_rate, amount: wire.igst },
@@ -490,6 +500,10 @@ export const orderWireSchema = z.object({
   tax_date: isoDate.nullable(),
   is_provisional: z.boolean(),
   lines: z.array(orderLineSchema),
+  /** QUOT-015 · The freight, or null. */
+  freight: freightWireSchema.nullish(),
+  /** QUOT-015 · Lines whose GST slab was picked: shown to an approver. */
+  gst_changed_lines: z.number().int().nonnegative().default(0),
   totals: totalsSchema,
   approval: approvalBlockSchema.nullable(),
   last_rejection: z.object({ remark: z.string(), role: z.string(), at: isoDateTime }).nullable(),
@@ -571,6 +585,8 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
   taxDate: wire.tax_date,
   isProvisional: wire.is_provisional,
   lines: wire.lines,
+  freight: wire.freight ?? null,
+  gstChangedLines: wire.gst_changed_lines,
   totals: wire.totals,
   approval: wire.approval,
   lastRejection: wire.last_rejection,
@@ -669,6 +685,8 @@ export interface CreateDirectOrder {
   readonly payment_terms: PaymentTerms;
   readonly remarks: string | null;
   readonly lines: readonly QuotationLineRequest[];
+  /** QUOT-015 · One freight charge before tax; commercial and industrial only. */
+  readonly freight?: FreightRequest;
   /** DISP-003 · "Order to"; null or left out means the default. Staff only (a dealer gets 422). */
   readonly warehouse_id?: string | null;
 }
@@ -676,6 +694,8 @@ export interface CreateDirectOrder {
 /** SO-005 · PUT /orders/{id}/lines — every line of a draft, priced as new. */
 export interface ReplaceOrderLinesRequest {
   readonly lines: readonly QuotationLineRequest[];
+  /** QUOT-015 · Omit to keep; null to remove. */
+  readonly freight?: FreightRequest | null;
   readonly expected_status: "draft";
 }
 

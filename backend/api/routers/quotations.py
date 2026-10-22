@@ -115,6 +115,11 @@ async def list_quotations(
     current_only: Annotated[bool, Query(
         description="Hide superseded versions. On by default; switch it off to see "
                     "every version of every number.")] = True,
+    orderable: Annotated[bool, Query(
+        description="FS-070: only quotations still free to order: accepted, current, and on "
+                    "no live order. Combine with `partner_id` or `lead_id`. It narrows, it "
+                    "does not promise: an order you cannot see may hold one, and "
+                    "`POST /orders` then answers 409 `quotation_on_order`.")] = False,
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     cursor: Annotated[str | None, Query(description="From a previous page's next_cursor.")] = None,
     include_total: Annotated[bool, Query(
@@ -127,7 +132,8 @@ async def list_quotations(
     return await service.list_quotations(
         db, caller, lead_id=lead_id, status=status_, sales_type=sales_type, owner=owner,
         partner_id=partner_id, q=q, created_from=created_from, created_to=created_to,
-        current_only=current_only, limit=limit, cursor=cursor, include_total=include_total)
+        current_only=current_only, orderable=orderable, limit=limit, cursor=cursor,
+        include_total=include_total)
 
 
 @router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},

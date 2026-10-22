@@ -51,9 +51,10 @@ def _raise_for(code: str | None, exc: Exception | None = None) -> None:
                                code="too_many_documents") from exc
 
 
-def types() -> list[sch.RecordDocumentType]:
+def types(record_type: str | None = None) -> list[sch.RecordDocumentType]:
+    keep = sch.DOC_TYPES_BY_RECORD[record_type] if record_type else tuple(sch.DOC_TYPE_LABELS)
     return [sch.RecordDocumentType(code=k, label=v, needs_name=k == "other")
-            for k, v in sch.DOC_TYPE_LABELS.items()]
+            for k, v in sch.DOC_TYPE_LABELS.items() if k in keep]
 
 
 _SELECT = ("SELECT d.*, u.full_name FROM record_document d LEFT JOIN app_user u ON u.id = d.uploaded_by ")

@@ -11,6 +11,7 @@ import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
+  gstSlabChoicesSchema,
   noContentSchema,
   productPageSchema,
   quotationVersionsResponseSchema,
@@ -63,6 +64,7 @@ export async function listQuotations(
       sales_type: params.salesType,
       lead_id: params.leadId,
       partner_id: params.partnerId ?? undefined,
+      orderable: params.orderable === true ? true : undefined,
       current_only: params.currentOnly ? undefined : false,
     },
     schema: quotationPageSchema,
@@ -157,6 +159,22 @@ export function previewQuoteLines(
     path: "/pricing/quote-lines",
     body: request,
     schema: quotePreviewResponseSchema,
+    signal,
+  });
+}
+
+/**
+ * QUOT-015 · GET /pricing/gst-slabs — the slabs a line's GST dropdown and the freight offer,
+ * from the admin setting `gst_slab_choices`. Read once per screen.
+ */
+export function getGstSlabChoices(signal?: AbortSignal): Promise<string[]> {
+  return apiRequest({
+    dataId: "QUOT-015",
+    logger: log,
+    fn: "getGstSlabChoices",
+    method: "GET",
+    path: "/pricing/gst-slabs",
+    schema: gstSlabChoicesSchema,
     signal,
   });
 }

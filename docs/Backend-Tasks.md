@@ -66,7 +66,7 @@ in the same shape. Never renumber or reuse a number.
 
 - [x] **BE-019** · Find the order that carries a quotation: a `quotation_id` filter on `GET /orders` · SO-003 · low
 - [x] **BE-020** · Name the order on its events in the lead's timeline · SO-002, LEAD-005 · normal
-- [ ] **BE-029** · List only the quotations still free to order: an `orderable` filter on `GET /quotations` · SO-011 · low
+- [x] **BE-029** · List only the quotations still free to order: an `orderable` filter on `GET /quotations` · SO-011 · low
 
 **Messages** — added as the message screens are connected (MSG-001…).
 
@@ -78,35 +78,43 @@ in the same shape. Never renumber or reuse a number.
 
 **Subsidy** — added as the application screens are built (SUBS-004…).
 
-- [ ] **BE-023** · Find a lead's subsidy application: a `lead_id` filter on `GET /subsidy-applications` · SUBS-005 · normal
+- [x] **BE-023** · Find a lead's subsidy application: a `lead_id` filter on `GET /subsidy-applications` · SUBS-005 · normal
 
 **Product master** — added as the catalogue and price-list screens are built (MSTR-004…006).
 
-- [ ] **BE-024** · List the product categories and units: `GET /lookups/product-categories`, `GET /lookups/uoms` · MSTR-004 · normal
+- [x] **BE-024** · List the product categories and units: `GET /lookups/product-categories`, `GET /lookups/uoms` · MSTR-004 · normal
 
 **Documents** — added as the documents on records are built (DOC-001…003).
 
-- [ ] **BE-025** · Offer only the document types a record takes: `record_type` on `GET /documents/types` · DOC-002 · low
+- [x] **BE-025** · Offer only the document types a record takes: `record_type` on `GET /documents/types` · DOC-002 · low
 
 **Masters** — added as Admin → Masters is built (MSTR-009, MSTR-010).
 
-- [ ] **BE-026** · Show a list row's sort order, quality and kind: return them on `LookupItem` · MSTR-009 · low
+- [x] **BE-026** · Show a list row's sort order, quality and kind: return them on `LookupItem` · MSTR-009 · low
 
 **Schemes** — added as the schemes are built (SCHM-001…004).
 
-- [ ] **BE-027** · Name a scheme's targets, and list product categories with their ids · SCHM-001, SCHM-002 · normal
+- [x] **BE-027** · Name a scheme's targets, and list product categories with their ids · SCHM-001, SCHM-002 · normal
 
 **Marketing material** — added as it is built (MKT-002…004).
 
-- [ ] **BE-028** · Say which roles may order, approve and send marketing material: default grants for `marketing_material` · MKT-002, MKT-003, MKT-004 · normal
+- [x] **BE-028** · Say which roles may order, approve and send marketing material: default grants for `marketing_material` · MKT-002, MKT-003, MKT-004 · normal
 
 **Partner portal** — added from the dealer portal walk (item 38).
 
-- [ ] **BE-030** · Say on `GET /auth/me` whether tasks are on for dealers (`tasks_for_dealers`) · TASK-009, AUTH-002 · low
+- [x] **BE-030** · Say on `GET /auth/me` whether tasks are on for dealers (`tasks_for_dealers`) · TASK-009, AUTH-002 · low
 
 **Complaints** — added as the complaint screens grow (CMPL-013).
 
 - [ ] **BE-031** · A complaint's PDF, like a quotation's or an order's: `pdf_state` and `GET /complaints/{id}/pdf` · CMPL-013 · normal
+
+**Field tracking app** — added for the Android tracking app (TRK-008).
+
+- [ ] **BE-032** · A device token for the tracking app, so points upload while the app is closed · TRK-008 · high
+
+**Leads** — added with the Deleted leads list (LEAD-019).
+
+- [ ] **BE-033** · Restore a deleted lead, and say when and by whom it was deleted · LEAD-019, LEAD-011 · normal
 
 ---
 
@@ -478,7 +486,7 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-023 · Find a lead's subsidy application: a `lead_id` filter on `GET /subsidy-applications`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 9 Oct 2026 · SUBS-005
 - **What:** `GET /subsidy-applications?lead_id=` — the applications of one lead, newest first,
   in the caller's scope. The same filter on `/subsidy-applications/export` is welcome but not
@@ -492,12 +500,13 @@ in the same shape. Never renumber or reuse a number.
   exists the lead's card may miss an application that isn't on the first page.
 - **Done when:** `GET /subsidy-applications?lead_id=<uuid>` returns only that lead's
   applications.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #190
+- **Backend notes:** `GET /subsidy-applications?lead_id=<uuid>`, on `/export` too. That lead only, in your scope; leads merged into it are not followed. Empty means none you can see, not none exists: an application keeps the owner it was forwarded with, so a lead's later owner may get `[]` and Forward still answers 422 `already_forwarded` (GAP-512). Keep handling that.
+
 
 ### BE-024 · List the product categories and units: `GET /lookups/product-categories`, `GET /lookups/uoms`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 11 Oct 2026 · MSTR-004
 - **What:** two lookups the product form can offer as choices:
   - `GET /lookups/product-categories`: every category code (migration 010's seeds: DRIP
@@ -511,10 +520,13 @@ in the same shape. Never renumber or reuse a number.
   form opens.
 - **Done when:** both endpoints answer for anyone who may view `products`, and the form offers
   every code, used or not.
+- **Done in:** #190
+- **Backend notes:** `GET /lookups/product-categories` → `{id, code, name, sort_order, is_active}`; `GET /lookups/uoms` → `{id, code, name, decimals, is_active}`. Both need `products.view` (403 otherwise). Switched-off rows are listed, soft-deleted ones are not. `POST /products` does not refuse an inactive code, so hiding it is the form's job.
+
 
 ### BE-025 · Offer only the document types a record takes: `record_type` on `GET /documents/types`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 13 Oct 2026 · DOC-002
 - **What:** `GET /documents/types?record_type=lead` (and the other record types) answers only the
   types that belong on that record. Without the filter, the answer stays as today: every type.
@@ -524,10 +536,13 @@ in the same shape. Never renumber or reuse a number.
   picker from this list as the handover says, and won't hard-code which types to hide.
 - **Done when:** the filter answers the record's types only. The frontend will send the record's
   type and drop nothing itself.
+- **Done in:** #190
+- **Backend notes:** `GET /documents/types?record_type=lead|quotation|sales_order|dispatch|payment|dealer_application`. A dealer application answers its five types and `other`; every other record the ten general types. Omitted: every type, as before. Unknown: 422. The upload itself still accepts any type (GAP-516).
+
 
 ### BE-026 · Show a list row's sort order, quality and kind: return them on `LookupItem`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 15 Oct 2026 · MSTR-009
 - **What:** `GET /lookups/{list}` (and the `POST`/`PATCH` answers) carry each row's `sort_order`
   for sources and reasons, `quality` for sources, and `kind` for reasons, as `LookupCreate` takes
@@ -538,9 +553,13 @@ in the same shape. Never renumber or reuse a number.
   for them only when adding a row.
 - **Done when:** the three fields come back on every list row. The frontend will show them and
   offer to change sort order and quality in place.
+- **Done in:** #190
+- **Backend notes:** Every row of the lookup lists, and the POST/PATCH answers, carry `sort_order`, `quality`, `kind` (null where the list has none). `quality` is shown only to `masters.edit`, null for everyone else. `kind` on lost-reasons is always `lost`: won reasons are listed nowhere yet (GAP-513). `sort_order` is bounded to ±1,000,000. Answers show stored values: `quality` 0.555 comes back `"0.56"`.
+
+
 ### BE-027 · Name a scheme's targets, and list product categories with their ids
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 16 Oct 2026 · SCHM-001, SCHM-002
 - **What:**
   - Each entry of a scheme's `targets` gains `name`: the territory's, partner's, product's or
@@ -554,12 +573,13 @@ in the same shape. Never renumber or reuse a number.
   product category at all.
 - **Done when:** targets come with their names, and the categories come with their ids. The
   frontend then drops the per-target calls and offers categories in the form.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #190
+- **Backend notes:** Each target on every scheme read carries `name` (for `partner_type`, the type). Null outside your scope; a partner user never sees `partner` targets. Category ids: `GET /lookups/product-categories` (BE-024). `name` is accepted and ignored on input, so echoing targets is fine, but send `targets` on PATCH only when they changed: on a used scheme any `targets` key answers 409 `scheme_in_use`.
+
 
 ### BE-028 · Say which roles may order, approve and send marketing material: default grants for `marketing_material`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 17 Oct 2026 · MKT-002, MKT-003, MKT-004
 - **What:**
   - Migration 038 checks `marketing_material` (view, create, approve, edit, delete) but seeds no
@@ -572,12 +592,13 @@ in the same shape. Never renumber or reuse a number.
   them as above for now; without seeded grants the page is hidden for everyone on staging.
 - **Done when:** `GET /auth/me` returns `marketing_material` for those roles on a fresh database.
   The frontend then checks the mock against the seeded grants.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #190
+- **Backend notes:** Nothing to build: RBAC.md already grants `marketing_material` (dealers and field staff view+create; DM, SM approve; RM view+approve; marketing, admin, MD everything; board view), and the seeds carry it. Staging's `GET /auth/me` returns it for those roles. Please check the mock against staging.
+
 
 ### BE-029 · List only the quotations still free to order: an `orderable` filter on `GET /quotations`
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 18 Oct 2026 · SO-011
 - **What:**
   - Place order now offers the dealer's other accepted quotations, to make one consolidated
@@ -589,12 +610,13 @@ in the same shape. Never renumber or reuse a number.
   when `POST /orders` answers `409 quotation_on_order`; it then unticks and marks that quotation.
 - **Done when:** the filter (or the field) is in `quotations.md`. The frontend then lists only the
   free ones.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #190
+- **Backend notes:** `GET /quotations?orderable=true`: accepted, current, not deleted, on no live order (a draft, the caller's own included, or an order returned by an approver holds it; cancel or delete releases it). Combine with `partner_id` or `lead_id`. It narrows, it does not promise: an order you cannot see may hold a listed quotation, so keep handling 409 `quotation_on_order`.
+
 
 ### BE-030 · Say on `GET /auth/me` whether tasks are on for dealers (`tasks_for_dealers`)
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 18 Oct 2026 · TASK-009, AUTH-002
 - **What:**
   - A partner user can't read `GET /settings`. To learn whether `tasks_for_dealers` is on, the
@@ -605,8 +627,9 @@ in the same shape. Never renumber or reuse a number.
   refused `GET /tasks` call. The browser logs that as an error, which hides real ones in a walk.
 - **Done when:** `GET /auth/me` says whether tasks are on, or the grant follows the switch. The
   frontend then drops the probe.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** #190
+- **Backend notes:** `GET /auth/me` → `features: { tasks_for_dealers: bool }`, true when the setting is `on`. `permissions` still lists `tasks` for portal roles, so check both. Read once per session: after the admin flips the switch, a `/tasks` call can still answer 403.
+
 
 ### BE-031 · A complaint's PDF, like a quotation's or an order's: `pdf_state` and `GET /complaints/{id}/pdf`
 
@@ -626,5 +649,51 @@ in the same shape. Never renumber or reuse a number.
 - **Why:** the complaint page has no printable copy to send or file. Quotations and orders have one.
 - **Done when:** both are in `complaints.md`. The frontend already shows the button when
   `pdf_state` arrives, and the mock follows the shape above.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-032 · A device token for the tracking app, so points upload while the app is closed
+
+- **Status:** ⬜ Open
+- **Asked:** 21 Oct 2026 · TRK-008 · the Android tracking app (`Frontend/Docs/handoff-mobile-app.md`)
+- **What:**
+  - The app's background part is native code that runs while the app's screens are closed. It
+    can't use the web session:
+    - the access token lives only in the page's memory and lasts 15 minutes;
+    - the refresh cookie rotates. If both the web screens and the native part refreshed, one of
+      them would reuse a used token, and `refresh_reused` signs the person out everywhere.
+  - Proposed:
+    - `POST /tracking/device-token` with `{ device_id }`, signed in as usual. It returns a
+      long-lived token that is good **only** for `POST /locations/batch`,
+      `POST /tracking/duty/end` and `GET /me/tracking-config`, for that user and that device.
+    - It stops working when the person signs out, is deactivated or signed out everywhere, or
+      withdraws consent. A new call for the same device replaces the old token.
+    - The lifetime is the backend's call. A suggestion: 30 days, renewed whenever the app opens.
+- **Why:** without it, points wait on the phone until the person next opens the app. Nothing is
+  lost, since points are kept up to the retention period. But the team map shows field staff as
+  "stale" all day, and the day's km appear only after the app is opened.
+- **Done when:** it is in `tracking.md`, and in the contract's sequence in
+  `handover/field-tracking-contract.md`.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-033 · Restore a deleted lead, and say when and by whom it was deleted
+
+- **Status:** ⬜ Open
+- **Asked:** 22 Oct 2026 · LEAD-019 · the Deleted leads list
+- **What:**
+  - `GET /leads?deleted=true` lists deleted leads "to restore one", but nothing restores one. Proposed:
+    `POST /leads/{id}/restore`, needing `leads.delete`. It clears `deleted_at` and adds a
+    `lead.restored` event to the timeline. A lead that isn't deleted answers `200` unchanged.
+  - Say on each row of `GET /leads?deleted=true`: `deleted_at`, and `deleted_by` as
+    `{ id, full_name }`. The list could then show when and by whom, and sort by it.
+  - Say whether `GET /leads/{id}` opens a deleted lead for a `leads.delete` holder. Until then the
+    list doesn't link to it: the page would offer edits and stage changes on a lead nobody else
+    can see.
+  - What a restore does to the duplicate pairs the delete closed is the backend's call.
+- **Why:** a lead deleted by mistake can be found but not brought back. Today only a database edit
+  undoes it.
+- **Done when:** it is in `leads.md`. The frontend adds a **Restore** button to each row, the dates,
+  and a link to the lead if it opens.
 - **Done in:** —
 - **Backend notes:** —

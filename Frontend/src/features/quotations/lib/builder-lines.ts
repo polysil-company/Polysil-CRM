@@ -1,11 +1,14 @@
 import type { ImportLine } from "@/features/imports/api/imports.schemas";
-import type {
-  ProductPick,
-  QuotationLine,
-  QuotationLineRequest,
-  QuoteLinesRequest,
-  QuotePreview,
-  TaxTreatment,
+import {
+  takesGstChoice,
+  type Freight,
+  type FreightRequest,
+  type ProductPick,
+  type QuotationLine,
+  type QuotationLineRequest,
+  type QuoteLinesRequest,
+  type QuotePreview,
+  type TaxTreatment,
 } from "@/features/quotations/api/quotations.schemas";
 
 /**
@@ -19,7 +22,21 @@ export interface DraftLine {
   readonly product: ProductPick | null;
   readonly qty: string;
   readonly discounts: readonly [string, string, string];
+  /** QUOT-015 · The GST slab picked for this row; null follows the product's HSN. */
+  readonly gstSlab: string | null;
 }
+
+/** QUOT-015 · The freight box: an amount in rupees ("" for none) and a slab, if one was picked. */
+export interface DraftFreight {
+  readonly amount: string;
+  /** Null takes the default: the highest slab among the lines. */
+  readonly gstSlab: string | null;
+}
+
+export const NO_FREIGHT: DraftFreight = { amount: "", gstSlab: null };
+
+/** The backend's ceiling on a freight amount, in rupees. */
+const MAX_FREIGHT = 99_999_999.99;
 
 const NUMBER_PATTERN = /^\d+(\.\d+)?$/;
 
@@ -59,6 +76,29 @@ export function lineIssue(line: DraftLine): string | null {
   return null;
 }
 
+/** QUOT-015 · Why the freight can't be priced, in words; null when it can or there is none. */
+export function freightIssue(freight: DraftFreight): string | null {
+  const text = freight.amount.trim();
+  if (text === "") {
+    return null;
+  }
+  if (!/^\d+(\.\d{1,2})?$/.test(text) || Number(text) <= 0 || Number(text) > MAX_FREIGHT) {
+    return "Rupees above 0, with at most two decimals";
+  }
+  return null;
+}
+
+/** The freight a request carries, or null when the box is empty or not yet valid. */
+function freightRequestOf(freight: DraftFreight): FreightRequest | null {
+  if (freight.amount.trim() === "" || freightIssue(freight) !== null) {
+    return null;
+  }
+  return {
+    amount: freight.amount.trim(),
+    ...(freight.gstSlab === null ? {} : { gst_slab: freight.gstSlab }),
+  };
+}
+
 /** A row that is complete enough to price. */
 export function isPriceable(line: DraftLine): boolean {
   return line.product !== null && lineIssue(line) === null;
@@ -89,15 +129,31 @@ export interface PricingContext {
   readonly taxTreatment?: TaxTreatment;
 }
 
+/**
+ * QUOT-015 · A GST slab per line and freight: commercial and industrial sales, taxed at home.
+ * Every other document follows the HSN and takes no freight.
+ */
+export function allowsGstChoice(
+  context: Pick<PricingContext, "salesType" | "taxTreatment">,
+): boolean {
+  return (
+    takesGstChoice(context.salesType) &&
+    (context.taxTreatment === undefined || context.taxTreatment === "domestic")
+  );
+}
+
 /** The pricing request for every row that can be priced; unfinished rows wait. */
 export function previewRequestFor(
   lines: readonly DraftLine[],
   context: PricingContext,
+  freight: DraftFreight = NO_FREIGHT,
 ): PreviewPlan {
   const priceable = lines.filter(isPriceable);
   if (priceable.length === 0) {
     return { request: null, keys: [] };
   }
+  const choice = allowsGstChoice(context);
+  const freightRequest = choice ? freightRequestOf(freight) : null;
   return {
     request: {
       place_of_supply_territory_id: context.placeOfSupplyTerritoryId,
@@ -107,7 +163,9 @@ export function previewRequestFor(
         discount_pct: discountValue(line.discounts[0]) ?? "0",
         discount2_pct: discountValue(line.discounts[1]) ?? "0",
         discount3_pct: discountValue(line.discounts[2]) ?? "0",
+        ...(choice && line.gstSlab !== null ? { gst_slab: line.gstSlab } : {}),
       })),
+      ...(freightRequest === null ? {} : { freight: freightRequest }),
       ...(context.asOf === null ? {} : { as_of: context.asOf }),
       ...(context.partnerId === null ? {} : { partner_id: context.partnerId }),
       ...(context.salesType === null ? {} : { sales_type: context.salesType }),
@@ -153,6 +211,26 @@ export function linesToSave(plan: PreviewPlan, preview: QuotePreview): Quotation
   });
 }
 
+/** QUOT-015 · The freight a save sends: what the preview priced, or null for none. */
+export function freightToSave(plan: PreviewPlan): FreightRequest | null {
+  return plan.request?.freight ?? null;
+}
+
+/** QUOT-015 · The freight box for a saved draft. */
+export function draftFreightFrom(freight: Freight | null): DraftFreight {
+  return freight === null
+    ? NO_FREIGHT
+    : {
+        amount: trimZeros(freight.amount),
+        gstSlab: freight.gstSlabChosen ? trimZeros(freight.gstSlab) : null,
+      };
+}
+
+/** QUOT-015 · Two slabs are the same rate: "18", "18.0" and "18.000" alike. */
+export function sameSlab(a: string, b: string): boolean {
+  return Number(a) === Number(b);
+}
+
 /** The builder's rows for a saved draft. */
 export function draftLinesFrom(lines: readonly QuotationLine[], newKey: () => string): DraftLine[] {
   return lines.map((line) => ({
@@ -165,7 +243,7 @@ export function draftLinesFrom(lines: readonly QuotationLine[], newKey: () => st
       // Not on a saved line; the backend checks the unit's decimals on save.
       uomDecimals: 3,
       hsnCode: line.hsnCode,
-      gstSlab: line.gstSlab,
+      gstSlab: line.hsnSlab,
       packMultiple: null,
     },
     qty: trimZeros(line.qty),
@@ -174,6 +252,8 @@ export function draftLinesFrom(lines: readonly QuotationLine[], newKey: () => st
       trimZeros(line.discounts[1].pct),
       trimZeros(line.discounts[2].pct),
     ],
+    // A picked slab is re-sent on every save, or the line falls back to its HSN.
+    gstSlab: line.gstSlabChosen ? trimZeros(line.gstSlab) : null,
   }));
 }
 
@@ -204,6 +284,7 @@ export function draftLinesFromImport(
       trimZeros(line.discounts[1]),
       trimZeros(line.discounts[2]),
     ],
+    gstSlab: null,
   }));
 }
 
@@ -220,6 +301,8 @@ export interface SaveErrors {
   readonly header: Readonly<Record<string, string>>;
   /** Row errors by row key. */
   readonly lines: Readonly<Record<string, string>>;
+  /** QUOT-015 · A refusal of the freight, its amount or its slab; null when none. */
+  readonly freight: string | null;
 }
 
 const HEADER_FIELDS: Readonly<Record<string, string>> = {
@@ -256,11 +339,16 @@ export function routeSaveErrors(
 ): SaveErrors {
   const header: Record<string, string> = {};
   const lines: Record<string, string> = {};
+  let freight: string | null = null;
   for (const [path, reason] of Object.entries(fields)) {
     const text = sentence(reason);
     const headerField = HEADER_FIELDS[path];
     if (headerField !== undefined) {
       header[headerField] = text;
+      continue;
+    }
+    if (path === "freight" || path.startsWith("freight.")) {
+      freight ??= path === "freight.gst_slab" ? `GST: ${lowerFirst(text)}` : text;
       continue;
     }
     const match = LINE_FIELD_PATTERN.exec(path);
@@ -274,12 +362,17 @@ export function routeSaveErrors(
             ? "Quantity"
             : field.startsWith("discount")
               ? "Discount"
-              : "";
-      lines[key] ??=
-        label === "" ? text : `${label}: ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+              : field === "gst_slab"
+                ? "GST"
+                : "";
+      lines[key] ??= label === "" ? text : `${label}: ${lowerFirst(text)}`;
     }
   }
-  return { header, lines };
+  return { header, lines, freight };
+}
+
+function lowerFirst(text: string): string {
+  return `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
 }
 
 /** The backend's `fields` on any refusal, not only a 422 (a 409 rate_changed carries them too). */

@@ -346,6 +346,28 @@ class FreightOut(BaseModel):
     total: str = Field(description="The amount plus its tax.")
 
 
+class ProductCategoryItem(BaseModel):
+    """FS-070 (BE-024): a category the product form can offer."""
+
+    id: str = Field(description="What a scheme's `product_category` target takes.")
+    code: str = Field(description="What `POST /products` takes as `product_category`.")
+    name: str = Field(description="The category's display name.")
+    sort_order: int = Field(description="Lower first; the list is already in this order.")
+    is_active: bool = Field(description="A switched-off category is listed; offer it only "
+                                        "when the product already has it.")
+
+
+class UomItem(BaseModel):
+    """FS-070 (BE-024): a unit the product form can offer."""
+
+    id: str = Field(description="The unit's id.")
+    code: str = Field(description="What `POST /products` takes as `uom`.")
+    name: str = Field(description="The unit's display name.")
+    decimals: int = Field(description="How many decimals a quantity in this unit takes, 0 to 3.")
+    is_active: bool = Field(description="A switched-off unit is listed; offer it only when "
+                                        "the product already has it.")
+
+
 class GstSlabChoices(BaseModel):
     choices: list[str] = Field(description="The slabs the dropdown offers, from the admin "
                                            "setting `gst_slab_choices`.")

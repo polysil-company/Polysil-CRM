@@ -21,7 +21,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Holidays | 3 | [`holidays.md`](holidays.md) |
 | Imports | 6 | [`imports.md`](imports.md) |
 | Leads | 20 | [`leads.md`](leads.md) |
-| Lookups | 23 | [`lookups.md`](lookups.md) |
+| Lookups | 25 | [`lookups.md`](lookups.md) |
 | Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
 | Messages | 12 | [`messages.md`](messages.md) |
 | Notifications | 2 | [`notifications.md`](notifications.md) |

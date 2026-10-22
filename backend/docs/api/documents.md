@@ -91,6 +91,14 @@ with the one already there. Who may add depends on the record (FS-050).
 
 The document types and their labels, for the type picker. `other` needs a name.
 
+Send the record's `record_type` so the picker offers only what belongs on it.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `record_type` | query | `lead` \| `quotation` \| `sales_order` \| `dispatch` \| `payment` \| `dealer_application` \| null |  | FS-070: only the types this kind of record takes. A dealer application takes its five shop and tax documents and `other`; every other record the ten general types. Omitted: every type. |
+
 **Responses**
 
 | Status | Body | Meaning |

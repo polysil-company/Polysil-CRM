@@ -40,6 +40,17 @@ const MAX_LIMIT = 100;
 /** The backend stops counting here and says so with `total_capped`. */
 const TOTAL_CEILING = 1000;
 
+/** QUOT-015 · The lines whose GST slab was picked, on the document the step decides. */
+function gstChangedOn(step: MockApprovalStep): number {
+  const document =
+    step.docType === "quotation"
+      ? mockDb.quotations.find((item) => item.id === step.docId)
+      : step.docType === "sales_order"
+        ? mockDb.orders.find((item) => item.id === step.docId)
+        : undefined;
+  return document?.gst_changed_lines ?? 0;
+}
+
 function toRow(step: MockApprovalStep): QueuePageWire["data"][number] {
   return {
     step_id: step.stepId,
@@ -57,6 +68,7 @@ function toRow(step: MockApprovalStep): QueuePageWire["data"][number] {
       raised_at: step.raisedAt,
       discount_pct: step.discountPct,
       request_remark: step.requestRemark,
+      gst_changed_lines: gstChangedOn(step),
     },
     waiting_since: step.raisedAt,
   };

@@ -76,6 +76,8 @@ const partnerRef = z.object({
 const totalsSchema = z.object({
   gross: decimal,
   discount: decimal,
+  /** QUOT-015 · Freight before tax, "0.00" without; inside taxable and total, not gross. */
+  freight: decimal.default("0.00"),
   taxable: decimal,
   cgst: decimal,
   sgst: decimal,
@@ -171,9 +173,62 @@ export interface QuotationListParams {
   readonly leadId: string | null;
   /** SO-011 · Quotations of one channel partner; left out, every partner's. */
   readonly partnerId?: string | null;
+  /**
+   * SO-011 · Only accepted, current quotations on no live order (BE-029). It narrows, it
+   * doesn't promise: an order the caller can't see may still hold one (409 `quotation_on_order`).
+   */
+  readonly orderable?: boolean;
   /** Ask for the matching total ("1–25 of 49"). It costs the backend a count; off where unused. */
   readonly countTotal?: boolean;
 }
+
+// ── freight (QUOT-015, FS-069) ──────────────────────────────────────────────────
+
+/** The sale types that take a GST choice per line and freight; the rest follow the HSN. */
+export const GST_CHOICE_SALES_TYPES = ["commercial", "industrial"] as const;
+
+export function takesGstChoice(salesType: string | null): boolean {
+  return GST_CHOICE_SALES_TYPES.some((type) => type === salesType);
+}
+
+/** One freight charge, before tax, priced like a line. */
+export const freightWireSchema = z
+  .object({
+    amount: decimal,
+    gst_slab: decimal,
+    /** False when the slab is the default: the highest among the goods lines. */
+    gst_slab_chosen: z.boolean(),
+    cgst_rate: decimal,
+    sgst_rate: decimal,
+    igst_rate: decimal,
+    cgst: decimal,
+    sgst: decimal,
+    igst: decimal,
+    total: decimal,
+  })
+  .transform((wire) => ({
+    amount: wire.amount,
+    gstSlab: wire.gst_slab,
+    gstSlabChosen: wire.gst_slab_chosen,
+    cgst: { rate: wire.cgst_rate, amount: wire.cgst },
+    sgst: { rate: wire.sgst_rate, amount: wire.sgst },
+    igst: { rate: wire.igst_rate, amount: wire.igst },
+    total: wire.total,
+  }));
+
+export type Freight = z.output<typeof freightWireSchema>;
+export type FreightWire = z.input<typeof freightWireSchema>;
+
+/** FreightIn: rupees before tax, and a slab only when one was picked. */
+export interface FreightRequest {
+  readonly amount: string;
+  readonly gst_slab?: string;
+}
+
+/** GET /pricing/gst-slabs: the slabs a line's dropdown and freight offer. */
+export const gstSlabChoicesSchema = z
+  .object({ data: z.object({ choices: z.array(decimal) }) })
+  .transform(({ data }) => data.choices);
 
 // ── the document (QUOT-002) ───────────────────────────────────────────────────
 
@@ -196,7 +251,12 @@ const quotationLineWireSchema = z.object({
   discount3_amt: decimal,
   discount: decimal,
   taxable: decimal,
+  /** The slab used: the one picked (QUOT-015), else the HSN's. */
   gst_slab: decimal,
+  /** QUOT-015 · The product's HSN slab, whatever was picked. */
+  hsn_slab: decimal.optional(),
+  /** QUOT-015 · The slab was picked and differs from the HSN's: show it as changed. */
+  gst_slab_chosen: z.boolean().default(false),
   cgst_rate: decimal,
   sgst_rate: decimal,
   igst_rate: decimal,
@@ -239,6 +299,9 @@ export interface QuotationLine {
   readonly discount: string;
   readonly taxable: string;
   readonly gstSlab: string;
+  /** QUOT-015 · The HSN's slab; the same as `gstSlab` unless one was picked. */
+  readonly hsnSlab: string;
+  readonly gstSlabChosen: boolean;
   readonly cgst: TaxPart;
   readonly sgst: TaxPart;
   readonly igst: TaxPart;
@@ -271,6 +334,8 @@ function toLine(
     discount: wire.discount,
     taxable: wire.taxable,
     gstSlab: wire.gst_slab,
+    hsnSlab: wire.hsn_slab ?? wire.gst_slab,
+    gstSlabChosen: wire.gst_slab_chosen,
     cgst: { rate: wire.cgst_rate, amount: wire.cgst },
     sgst: { rate: wire.sgst_rate, amount: wire.sgst },
     igst: { rate: wire.igst_rate, amount: wire.igst },
@@ -372,6 +437,10 @@ export const quotationWireSchema = z.object({
   price_list: ref.nullable(),
   price_list_ids: z.array(z.string()),
   lines: z.array(quotationLineSchema),
+  /** QUOT-015 · The freight, or null. */
+  freight: freightWireSchema.nullish(),
+  /** QUOT-015 · Lines whose GST slab was picked. */
+  gst_changed_lines: z.number().int().nonnegative().default(0),
   totals: totalsSchema,
   is_provisional: z.boolean(),
   /** Each is "code: sentence". */
@@ -443,6 +512,8 @@ export const quotationSchema = quotationWireSchema.transform((wire) => ({
   priceEffectiveDate: wire.price_effective_date,
   priceList: wire.price_list,
   lines: wire.lines,
+  freight: wire.freight ?? null,
+  gstChangedLines: wire.gst_changed_lines,
   totals: wire.totals,
   isProvisional: wire.is_provisional,
   warnings: wire.warnings,
@@ -580,6 +651,8 @@ export interface QuoteLinesRequest {
     readonly discount_pct: string;
     readonly discount2_pct: string;
     readonly discount3_pct: string;
+    /** QUOT-015 · Only for a slab the user picked. */
+    readonly gst_slab?: string;
   }[];
   readonly as_of?: string;
   readonly partner_id?: string;
@@ -587,6 +660,8 @@ export interface QuoteLinesRequest {
   readonly sales_type?: string;
   /** SO-010 · An export's treatment, so the preview shows the tax it will store. */
   readonly tax_treatment?: TaxTreatment;
+  /** QUOT-015 · One freight charge; commercial and industrial only, with at least one line. */
+  readonly freight?: FreightRequest;
 }
 
 const previewLineWireSchema = quotationLineWireSchema.omit({ line_no: true });
@@ -599,6 +674,7 @@ export const quotePreviewResponseSchema = z
       intra_state: z.boolean(),
       price_list_ids: z.array(z.string()),
       lines: z.array(previewLineWireSchema),
+      freight: freightWireSchema.nullish(),
       totals: totalsSchema,
       warnings: z.array(z.string()),
     }),
@@ -607,6 +683,7 @@ export const quotePreviewResponseSchema = z
     asOf: data.as_of,
     intraState: data.intra_state,
     lines: data.lines.map((line, index) => toLine(line, index + 1)),
+    freight: data.freight ?? null,
     totals: data.totals,
     warnings: data.warnings,
   }));
@@ -623,6 +700,8 @@ export interface QuotationLineRequest {
   readonly discount3_pct: string;
   readonly price_list_item_id?: string;
   readonly gst_rate_id?: string;
+  /** QUOT-015 · Re-sent for every line whose slab was picked. */
+  readonly gst_slab?: string;
 }
 
 /** The party printed on the quotation; defaults from the lead. */
@@ -642,6 +721,8 @@ export interface CreateQuotationRequest {
   readonly party: PartyRequest;
   readonly terms: string | null;
   readonly lines: readonly QuotationLineRequest[];
+  /** QUOT-015 · Commercial and industrial only, with at least one line. */
+  readonly freight?: FreightRequest;
 }
 
 /** PATCH /quotations/{id} — a draft's header; the response re-prices the lines. */
@@ -657,6 +738,8 @@ export interface PatchQuotationRequest {
 /** PUT /quotations/{id}/lines — the whole basket, in order. */
 export interface ReplaceLinesRequest {
   readonly lines: readonly QuotationLineRequest[];
+  /** QUOT-015 · Omit to keep; null to remove. */
+  readonly freight?: FreightRequest | null;
   readonly expected_status: "draft";
 }
 

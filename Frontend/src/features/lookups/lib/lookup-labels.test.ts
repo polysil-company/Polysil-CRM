@@ -9,7 +9,17 @@ import {
 
 describe("[MSTR-002] lookup labels", () => {
   it("names a code from the loaded list", () => {
-    const items = [{ id: "1", code: "agri_fair", name: "Agri Fair", isActive: true }];
+    const items = [
+      {
+        id: "1",
+        code: "agri_fair",
+        name: "Agri Fair",
+        isActive: true,
+        sortOrder: 6,
+        quality: null,
+        kind: null,
+      },
+    ];
 
     expect(findLookupName(items, "agri_fair")).toBe("Agri Fair");
   });

@@ -45,6 +45,7 @@ the header without lines. An empty list means nothing in your scope.
 | `from` | query | string \| null |  | ISO date. |
 | `to` | query | string \| null |  | ISO date, inclusive. |
 | `current_only` | query | boolean |  | Hide superseded versions. On by default; switch it off to see every version of every number. |
+| `orderable` | query | boolean |  | FS-070: only quotations still free to order: accepted, current, and on no live order. Combine with `partner_id` or `lead_id`. It narrows, it does not promise: an order you cannot see may hold one, and `POST /orders` then answers 409 `quotation_on_order`. |
 | `limit` | query | integer |  |  |
 | `cursor` | query | string \| null |  | From a previous page's next_cursor. |
 | `include_total` | query | boolean |  | Also count how many match, for a "1 to 25 of 137" caption. Off by default; the count stops at 1,000 and sets `meta.total_capped`. |
@@ -145,6 +146,7 @@ narrow the filters. An empty list gives a file with the header row only.
 | `from` | query | string \| null |  | ISO date. |
 | `to` | query | string \| null |  | ISO date, inclusive. |
 | `current_only` | query | boolean |  | Hide superseded versions. On by default; switch it off to see every version of every number. |
+| `orderable` | query | boolean |  | FS-070: only quotations still free to order: accepted, current, and on no live order. Combine with `partner_id` or `lead_id`. It narrows, it does not promise: an order you cannot see may hold one, and `POST /orders` then answers 409 `quotation_on_order`. |
 
 **Responses**
 

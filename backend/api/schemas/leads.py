@@ -202,6 +202,15 @@ class LookupItem(BaseModel):
     code: str
     name: str
     is_active: bool = True
+    sort_order: int | None = Field(
+        default=None, description="Lower sorts first. Null for a list without one (MIS "
+        "systems). FS-070.")
+    quality: Decimal | None = Field(
+        default=None, description="Lead sources only: the source-quality factor in the "
+        "score, 0 to 1. Shown only to a caller with `masters.edit`; null otherwise. FS-070.")
+    kind: Literal["won", "lost"] | None = Field(
+        default=None, description="Reasons only. The lost-reasons list holds lost reasons "
+        "only. FS-070.")
 
 
 class PageMeta(BaseModel):
@@ -448,7 +457,7 @@ class LookupCreate(BaseModel):
     code: Annotated[str, Field(min_length=1, max_length=50, pattern=r"^[a-z0-9_]+$",
         description="Stable machine code, lowercase with underscores. Cannot change later.")]
     name: Annotated[str, Field(min_length=1, max_length=100, description="Display name.")]
-    sort_order: Annotated[int | None, Field(default=None,
+    sort_order: Annotated[int | None, Field(default=None, ge=-1_000_000, le=1_000_000,
         description="Sources and reasons only. Lower sorts first.")]
     quality: Annotated[Decimal | None, Field(default=None, ge=0, le=1,
         description="Sources only. The source-quality factor in the score, 0 to 1.")]
@@ -460,7 +469,7 @@ class LookupUpdate(BaseModel):
     """Switch a row on or off, or reorder it. Names are never edited in place."""
 
     is_active: bool | None = None
-    sort_order: int | None = None
+    sort_order: Annotated[int | None, Field(default=None, ge=-1_000_000, le=1_000_000)]
     quality: Annotated[Decimal | None, Field(default=None, ge=0, le=1,
         description="Sources only.")]
 
