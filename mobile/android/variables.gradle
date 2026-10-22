@@ -17,6 +17,7 @@ ext {
     playServicesLocationVersion = '21.4.0'
     roomVersion = '2.8.4'
     workManagerVersion = '2.11.2'
-    okhttpVersion = '5.5.1'
+    // 5.5.x needs compileSdk 37; Capacitor 8's AGP 8.13 stops at 36.
+    okhttpVersion = '5.3.2'
     serializationJsonVersion = '1.12.0'
 }

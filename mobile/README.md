@@ -50,7 +50,7 @@ Open **Duty** from the menu. Each card that shows is one thing to do; **Go on du
 - **Versions:**
   - Capacitor 8.5.3 and its template's Android Gradle Plugin 8.13.0, Gradle 8.14.3, SDK 36, minimum Android 7 (API 24).
   - Kotlin 2.4.21, KSP 2.3.12.
-  - Play Services Location 21.4.0, Room 2.8.4, WorkManager 2.11.2, OkHttp 5.5.1, kotlinx-serialization-json 1.12.0.
+  - Play Services Location 21.4.0, Room 2.8.4, WorkManager 2.11.2, OkHttp 5.3.2, kotlinx-serialization-json 1.12.0.
 - **Waiting on BE-032 (a device token):** the native side uploads with the web session's access token, handed over by `Frontend/src/lib/auth/session-store.ts`, until that token expires.
   - Points then wait on the phone, nothing is lost, and they go up when the app is next opened.
   - Until BE-032 lands, the team map shows staff as stale while the app is closed.

@@ -55,7 +55,7 @@ Field staff could check in to visits from a browser, and managers could see the 
 - **`server.url` in production:** Capacitor documents it as meant for live reload. We use it on purpose, as agreed, and keep it narrow: https only, no cleartext, our host only, an offline page.
 - **Versions:**
   - Capacitor 8.5.3 (latest), whose template pins the Android Gradle Plugin at 8.13.0 with Gradle 8.14.3 and SDK 36. AGP 9.2 is newer, but Capacitor 8's own Android library is built on AGP 8, so the template's version stays.
-  - Kotlin 2.4.21, KSP 2.3.12, Play Services Location 21.4.0, Room 2.8.4, WorkManager 2.11.2, OkHttp 5.5.1, kotlinx-serialization-json 1.12.0. All free and open source; no paid SDK.
+  - Kotlin 2.4.21, KSP 2.3.12, Play Services Location 21.4.0, Room 2.8.4, WorkManager 2.11.2, OkHttp 5.3.2, kotlinx-serialization-json 1.12.0. All free and open source; no paid SDK.
 - **Built, but not yet run as an Android build:** the build sandbox blocks `dl.google.com`, where the Android SDK and Google's Maven libraries are served. So `./gradlew lint test assembleDebug` couldn't run here; it runs in the new workflow. The upload rules' 15 unit tests did run here, as plain JVM tests with Kotlin 2.4.21.
 - **Choices written down:**
   - The GPS interval is `interval_seconds`, with the distance filter, as the contract says.
