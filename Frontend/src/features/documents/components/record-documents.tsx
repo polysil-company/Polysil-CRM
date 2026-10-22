@@ -385,7 +385,7 @@ function AttachForm({
   existing: readonly RecordDocument[];
   onClose: () => void;
 }): React.JSX.Element {
-  const types = useQuery(documentTypesQueryOptions());
+  const types = useQuery(documentTypesQueryOptions(recordType));
   const upload = useUploadDocument();
   const idempotency = useIdempotencyKey();
   const inputRef = useRef<HTMLInputElement>(null);

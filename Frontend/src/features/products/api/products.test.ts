@@ -9,7 +9,8 @@ import {
   closePriceList,
   createProduct,
   getHsnHistory,
-  listCatalogueFacets,
+  listProductCategories,
+  listUoms,
   listPriceListItems,
   listProducts,
   patchProduct,
@@ -90,13 +91,29 @@ describe("[MSTR-004] product catalogue", () => {
     ]);
   });
 
-  it("offers the categories and units in use, switched-off products included", async () => {
+  it("[BE-024] lists every category with its id, and every unit with its decimals", async () => {
     writeMockRole("admin");
-    const facets = await listCatalogueFacets();
+    const categories = await listProductCategories();
+    const units = await listUoms();
 
-    expect(facets.categories).toContain("PVC FITTINGS");
-    expect(facets.categories).toContain("Marketing");
-    expect(facets.units).toContainEqual({ code: "MTR", decimals: 2 });
+    expect(categories.map((category) => category.code)).toContain("HDPE PIPES");
+    expect(categories.find((category) => category.code === "Marketing")).toMatchObject({
+      id: expect.any(String),
+      name: "Marketing",
+      isActive: true,
+    });
+    expect(units.find((unit) => unit.code === "MTR")).toMatchObject({ decimals: 2 });
+  });
+
+  it("[BE-024] refuses a category or unit that isn't a code", async () => {
+    writeMockRole("admin");
+    const refused = await refusal(
+      createProduct({
+        body: { ...NEW_PRODUCT, product_category: "DRIPS", uom: "LTR" },
+        idempotencyKey: key(),
+      }),
+    );
+    expect(refused).toMatchObject({ status: 422 });
   });
 
   it("adds a product, and refuses a description already in the catalogue", async () => {

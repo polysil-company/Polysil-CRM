@@ -32,7 +32,8 @@ import {
   usePatchProduct,
 } from "@/features/products/api/products.mutations";
 import {
-  catalogueFacetsQueryOptions,
+  productCategoriesQueryOptions,
+  uomsQueryOptions,
   hsnHistoryQueryOptions,
 } from "@/features/products/api/products.queries";
 import {
@@ -165,8 +166,9 @@ function StandIn({ show }: { show: boolean }): React.JSX.Element | null {
 }
 
 /**
- * MSTR-004 · Add a product, or correct one. The category and unit are the catalogue's own
- * (no endpoint lists them yet, BE-024); a description already in use is refused. Editing, the
+ * MSTR-004 · Add a product, or correct one. The category and unit come from their lookups
+ * (BE-024): active ones, and a switched-off one the product already has; a description already
+ * in use is refused. Editing, the
  * tax heading follows (MSTR-005), and the product can be switched off or on.
  */
 export function ProductDialog({
@@ -178,7 +180,8 @@ export function ProductDialog({
   canEdit: boolean;
   onClose: () => void;
 }): React.JSX.Element {
-  const facets = useQuery(catalogueFacetsQueryOptions());
+  const categories = useQuery(productCategoriesQueryOptions());
+  const uoms = useQuery(uomsQueryOptions());
   const create = useCreateProduct();
   const patch = usePatchProduct();
   const idempotency = useIdempotencyKey();
@@ -227,14 +230,16 @@ export function ProductDialog({
     },
   });
 
-  const categoryItems = (facets.data?.categories ?? []).map((code) => ({
-    value: code,
-    label: code,
-  }));
-  const unitItems = (facets.data?.units ?? []).map((unit) => ({
-    value: unit.code,
-    label: `${unit.code} (${unit.decimals === 0 ? "whole numbers" : `${String(unit.decimals)} decimals`})`,
-  }));
+  // A switched-off category or unit is offered only to a product that already has it.
+  const categoryItems = (categories.data ?? [])
+    .filter((category) => category.isActive || category.code === product?.category)
+    .map((category) => ({ value: category.code, label: category.name }));
+  const unitItems = (uoms.data ?? [])
+    .filter((unit) => unit.isActive || unit.code === product?.uom)
+    .map((unit) => ({
+      value: unit.code,
+      label: `${unit.name} (${unit.decimals === 0 ? "whole numbers" : `${String(unit.decimals)} decimals`})`,
+    }));
   const blockItems = QUOTATION_CATEGORIES.map((value) => ({
     value,
     label: QUOTATION_CATEGORY_LABELS[value],
@@ -314,7 +319,7 @@ export function ProductDialog({
                 }
               >
                 <SelectValue
-                  placeholder={facets.isPending ? "Loading categories…" : "Choose a category"}
+                  placeholder={categories.isPending ? "Loading categories…" : "Choose a category"}
                 />
               </SelectTrigger>
               <SelectContent>
@@ -344,7 +349,7 @@ export function ProductDialog({
                 aria-invalid={errors.uom === undefined ? undefined : true}
                 aria-describedby={errors.uom === undefined ? undefined : "product-uom-error"}
               >
-                <SelectValue placeholder={facets.isPending ? "Loading units…" : "Choose a unit"} />
+                <SelectValue placeholder={uoms.isPending ? "Loading units…" : "Choose a unit"} />
               </SelectTrigger>
               <SelectContent>
                 {unitItems.map((item) => (

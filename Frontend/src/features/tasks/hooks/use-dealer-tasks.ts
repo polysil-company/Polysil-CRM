@@ -1,9 +1,6 @@
 "use client";
 
-import { useInfiniteQuery } from "@tanstack/react-query";
-
 import { useSession } from "@/features/session/hooks/use-session";
-import { taskListQueryOptions } from "@/features/tasks/api/tasks.queries";
 import type { TaskListParams, TaskStatus } from "@/features/tasks/api/tasks.schemas";
 import { can } from "@/lib/auth/permissions";
 
@@ -13,22 +10,17 @@ export function dealerTaskParams(status: TaskStatus): TaskListParams {
 }
 
 /**
- * TASK-009 · Whether a dealer user has tasks: portal roles hold `tasks` V:own E, but the backend
- * answers 403 on every tasks route while `tasks_for_dealers` is off, and a dealer can't read
- * the setting. So the open tasks are asked for once (the page shares the answer) and the
- * screen shows only when that works. Always false for staff.
+ * TASK-009 · Whether a dealer user has tasks: portal roles hold `tasks` V:own E, and the backend
+ * says on `GET /auth/me` whether `tasks_for_dealers` is on (BE-030). Both must hold. Read once
+ * per session, so a switch flipped since sign-in can still meet a 403, which the Tasks page
+ * explains. Always false for staff.
  */
 export function useDealerTasksOn(): boolean {
   const { data: session } = useSession();
-  const eligible =
+  return (
     session !== undefined &&
     session.userType === "partner_user" &&
-    can(session.permissions, "tasks", "view");
-  const query = useInfiniteQuery({
-    ...taskListQueryOptions(dealerTaskParams("open")),
-    enabled: eligible,
-    retry: false,
-    staleTime: 5 * 60_000,
-  });
-  return eligible && query.status === "success";
+    session.features.tasksForDealers &&
+    can(session.permissions, "tasks", "view")
+  );
 }
