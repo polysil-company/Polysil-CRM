@@ -51,7 +51,7 @@ function filterQuery(params: ApplicationListParams): Record<string, string | und
     status: params.status ?? undefined,
     stage: params.stage ?? undefined,
     q: params.q === "" ? undefined : params.q,
-    // TODO(SUBS-006): BE-023 — the backend ignores this until it adds the filter.
+    // BE-023 · one lead's applications, in the caller's scope; on the export too.
     lead_id: params.leadId ?? undefined,
   };
 }
@@ -89,11 +89,11 @@ export function getLeadScheme(leadId: string, signal?: AbortSignal): Promise<Lea
 }
 
 /** SUBS-005 · GET /subsidy-applications — newest first, in the caller's scope. */
-export async function listApplications(
+export function listApplications(
   params: ApplicationListParams & { cursor: string | null },
   signal?: AbortSignal,
 ): Promise<ApplicationPage> {
-  const page = await apiRequest({
+  return apiRequest({
     dataId: "SUBS-005",
     logger: log,
     fn: "listApplications",
@@ -102,8 +102,6 @@ export async function listApplications(
     schema: applicationPageSchema,
     signal,
   });
-  if (params.leadId === null) return page;
-  return { ...page, items: page.items.filter((row) => row.lead.id === params.leadId) };
 }
 
 /** SUBS-005 · GET /subsidy-applications/export — the list as Excel, with the same filters. */
@@ -113,7 +111,7 @@ export function exportApplications(params: ApplicationListParams): Promise<Downl
     logger: log,
     fn: "exportApplications",
     path: `${BASE}/export`,
-    query: filterQuery({ ...params, leadId: null }),
+    query: filterQuery(params),
   });
 }
 

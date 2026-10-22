@@ -43,6 +43,8 @@ const queueRowWireSchema = z.object({
     discount_pct: decimal.nullish(),
     /** Why the approval was asked, as the asker wrote it (backend #49). Null when none given. */
     request_remark: z.string().nullish(),
+    /** QUOT-015 · Lines whose GST slab was picked rather than taken from the HSN. */
+    gst_changed_lines: z.number().int().nonnegative().default(0),
   }),
   waiting_since: isoDateTime,
 });
@@ -68,6 +70,7 @@ const queueRowSchema = queueRowWireSchema.transform((wire) => ({
     raisedAt: wire.document.raised_at,
     discountPct: wire.document.discount_pct ?? null,
     requestRemark: wire.document.request_remark?.trim() || null,
+    gstChangedLines: wire.document.gst_changed_lines,
   },
   waitingSince: wire.waiting_since,
 }));

@@ -38,6 +38,8 @@ export const MOCK_ID_SPACE = {
   document: 0xd0c,
   dealerApplication: 0xda,
   orderBenefit: 0xbe,
+  productCategory: 0xca7,
+  uom: 0x00a,
 } as const;
 
 export const MOCK_STATE = { name: "Gujarat", code: "GJ" } as const;

@@ -7,6 +7,7 @@ import type {
   TimelineEventWire,
 } from "@/features/leads/api/leads.schemas";
 import {
+  GST_CHOICE_SALES_TYPES,
   PRICED_SALES_TYPES,
   TAX_TREATMENTS,
   QUOTATION_ANSWERS,
@@ -14,6 +15,8 @@ import {
   SALES_TYPES,
   type PublicQuotationWire,
   type QuotationVersionsWire,
+  takesGstChoice,
+  type FreightWire,
   type SendGate,
   type PdfLinkWire,
   type QuotationLineWire,
@@ -27,6 +30,7 @@ import { quotationApproverFor } from "@/mocks/data/approvals";
 import {
   MOCK_PRODUCTS,
   mockDraft,
+  mockFreight,
   mockLine,
   mockShareUrl,
   priceListItemId,
@@ -41,6 +45,7 @@ import { mockDb } from "@/mocks/db";
 import { exportTreatment, lutArnOn, withTaxTreatment } from "./export-sample";
 import { MOCK_CREATOR, newMockEvent, recordLeadEvent } from "./lead-events";
 import { applyScenario } from "./scenario";
+import { mockSettings } from "./settings";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
 import { calculate, checkCalculation } from "./subsidy";
 import { schemeForLead } from "./subsidy-applications";
@@ -100,6 +105,12 @@ const QUOTABLE_STAGES = ["qualified", "quoted", "negotiation", "won"];
 /** The mock's one stand-in rate, so the indicative-pricing banner can be previewed. */
 const PROVISIONAL_PRODUCT_INDEX = 1;
 
+/** QUOT-015 · A slab as sent: a number or a decimal string; null or left out for none. */
+const slabInSchema = z
+  .union([z.number(), z.string().regex(/^\d+(\.\d+)?$/)])
+  .nullish()
+  .transform((slab) => (slab === null || slab === undefined ? null : Number(slab)));
+
 export const lineInSchema = z.object({
   product_id: z.string().min(1),
   qty: z.coerce.number(),
@@ -108,9 +119,168 @@ export const lineInSchema = z.object({
   discount3_pct: z.coerce.number().default(0),
   price_list_item_id: z.string().nullish(),
   gst_rate_id: z.string().nullish(),
+  gst_slab: slabInSchema,
 });
 
 export type LineIn = z.infer<typeof lineInSchema>;
+
+/** QUOT-015 · FreightIn: rupees before tax, and a slab only when picked. */
+export const freightInSchema = z.object({
+  amount: z.union([z.number(), z.string()]),
+  gst_slab: slabInSchema,
+});
+
+export type FreightIn = z.infer<typeof freightInSchema>;
+
+/** A stored line as the request that made it; `keepChoice` false drops a picked slab. */
+export function storedLineIn(
+  line: Pick<
+    QuotationLineWire,
+    | "product_id"
+    | "qty"
+    | "discount_pct"
+    | "discount2_pct"
+    | "discount3_pct"
+    | "price_list_item_id"
+    | "gst_slab"
+    | "gst_slab_chosen"
+  >,
+  keepChoice: boolean,
+): LineIn {
+  return {
+    product_id: line.product_id,
+    qty: Number(line.qty),
+    discount_pct: Number(line.discount_pct),
+    discount2_pct: Number(line.discount2_pct),
+    discount3_pct: Number(line.discount3_pct),
+    price_list_item_id: line.price_list_item_id,
+    gst_slab: keepChoice && line.gst_slab_chosen === true ? Number(line.gst_slab) : null,
+  };
+}
+
+/** QUOT-015 · A stored freight as the request that made it; its default slab re-resolves. */
+export function storedFreightIn(freight: FreightWire | null): FreightIn | null {
+  return freight === null
+    ? null
+    : {
+        amount: freight.amount,
+        gst_slab: freight.gst_slab_chosen ? Number(freight.gst_slab) : null,
+      };
+}
+
+/**
+ * QUOT-015 · A draft whose type no longer takes a GST choice, re-priced without its picked
+ * slabs and freight and warning `gst_choice_cleared`; null when there was nothing to clear.
+ */
+function clearedGstChoice(quotation: QuotationWire): QuotationWire | null {
+  const choices = quotation.lines.filter((line) => line.gst_slab_chosen === true).length;
+  const freight = quotation.freight !== null && quotation.freight !== undefined;
+  if (GST_CHOICE_SALES_TYPES.some((type) => type === quotation.sales_type)) return null;
+  if (choices === 0 && !freight) return null;
+  const repriced = priceLines(quotation.lines.map((line) => storedLineIn(line, false)));
+  if (!repriced.ok) return null;
+  const what = [
+    ...(choices > 0 ? [`the GST choice on ${String(choices)} lines`] : []),
+    ...(freight ? ["the freight"] : []),
+  ];
+  return withLines(
+    quotation,
+    repriced.lines,
+    [
+      `gst_choice_cleared: ${what.join(" and ")} removed; this document type takes the HSN rate and no freight.`,
+    ],
+    null,
+  );
+}
+
+/** The slabs the admin offers (`gst_slab_choices`), as numbers. */
+function offeredSlabs(): number[] {
+  const setting = mockSettings().find((item) => item.key === "gst_slab_choices");
+  return Array.isArray(setting?.value) ? setting.value.map(Number) : [0, 5, 18, 40];
+}
+
+/** A slab differing from the product's HSN slab; the HSN's own is no choice (FS-069 rule 1). */
+function chosenSlabOf(line: LineIn): number | null {
+  const product = MOCK_PRODUCTS.find((item) => item.id === line.product_id);
+  return line.gst_slab === null || product === undefined || line.gst_slab === product.slab
+    ? null
+    : line.gst_slab;
+}
+
+/**
+ * QUOT-015 · The GST choices and freight refused as the backend refuses them (FS-069): only
+ * commercial and industrial at home take them, freight needs a line, a picked slab must be on
+ * the admin's list, and freight is rupees above 0 with at most two decimals.
+ */
+export function gstChoiceRefusal(
+  salesType: string | null,
+  domestic: boolean,
+  lines: readonly LineIn[],
+  freight: FreightIn | null | undefined,
+): Response | null {
+  const allows = domestic && GST_CHOICE_SALES_TYPES.some((type) => type === salesType);
+  if (freight !== null && freight !== undefined) {
+    if (!allows) {
+      return errorResponse(
+        422,
+        "freight_not_allowed",
+        "Freight is for commercial and industrial documents only.",
+        { freight: "Not allowed." },
+      );
+    }
+    if (lines.length === 0) {
+      return errorResponse(422, "freight_without_lines", "Freight needs at least one goods line.", {
+        freight: "Add a line first.",
+      });
+    }
+  }
+  const offered = offeredSlabs();
+  const refused: Record<string, string> = {};
+  lines.forEach((line, index) => {
+    const slab = chosenSlabOf(line);
+    if (slab === null) return;
+    refused[`lines[${String(index)}].gst_slab`] = !allows
+      ? "Not allowed on this document type."
+      : offered.includes(slab)
+        ? ""
+        : `${String(slab)} % is not one of the GST slabs offered.`;
+  });
+  const freightSlab = freight?.gst_slab ?? null;
+  if (freightSlab !== null && !offered.includes(freightSlab)) {
+    refused["freight.gst_slab"] = `${String(freightSlab)} % is not one of the GST slabs offered.`;
+  }
+  const fields = Object.fromEntries(Object.entries(refused).filter(([, reason]) => reason !== ""));
+  if (Object.keys(fields).length > 0) {
+    return errorResponse(
+      422,
+      allows ? "gst_slab_not_offered" : "gst_choice_not_allowed",
+      "A GST slab may be chosen on commercial and industrial documents only, from the slabs in force.",
+      fields,
+    );
+  }
+  if (freight !== null && freight !== undefined) {
+    const text = String(freight.amount);
+    if (!/^\d+(\.\d{1,2})?$/.test(text) || Number(text) <= 0 || Number(text) > 99_999_999.99) {
+      return errorResponse(
+        422,
+        "freight_amount_invalid",
+        "Freight must be above zero, at most 99999999.99, in rupees and paise.",
+        { "freight.amount": "Rupees above 0, with at most two decimals." },
+      );
+    }
+  }
+  return null;
+}
+
+/** QUOT-015 · The freight priced: without a slab, the highest among the priced lines. */
+export function pricedFreight(
+  freight: FreightIn | null | undefined,
+  lines: readonly QuotationLineWire[],
+): FreightWire | null {
+  if (freight === null || freight === undefined) return null;
+  const slab = freight.gst_slab ?? Math.max(...lines.map((line) => Number(line.gst_slab)));
+  return mockFreight(Math.round(Number(freight.amount) * 100), slab, freight.gst_slab !== null);
+}
 
 const partySchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -160,6 +330,7 @@ export function priceLines(
         discounts,
         MOCK_PRODUCTS.indexOf(product) === PROVISIONAL_PRODUCT_INDEX,
         mockDb.priceVersion,
+        chosenSlabOf(line),
       ),
     );
   }
@@ -182,6 +353,18 @@ export function rateChanges(lines: readonly LineIn[]): Record<string, string> {
     }
   }
   return fields;
+}
+
+/** BE-029 · Accepted, current, and on no order but a cancelled one. */
+function isOrderable(quotation: QuotationWire): boolean {
+  return (
+    quotation.status === "accepted" &&
+    quotation.superseded_by === null &&
+    !mockDb.orders.some(
+      (order) =>
+        order.status !== "cancelled" && order.quotations.some((item) => item.id === quotation.id),
+    )
+  );
 }
 
 function validation(fields: Record<string, string>): Response {
@@ -549,6 +732,8 @@ export const quotationHandlers = [
     const partnerId = url.searchParams.get("partner_id");
     const q = url.searchParams.get("q") ?? "";
     const currentOnly = url.searchParams.get("current_only") !== "false";
+    // BE-029 · accepted, current and on no live order
+    const orderable = url.searchParams.get("orderable") === "true";
 
     const matches =
       scenario === "empty"
@@ -560,6 +745,7 @@ export const quotationHandlers = [
               (leadId === null || leadId === "" || onLead(quotation, leadId)) &&
               (partnerId === null || partnerId === "" || quotation.partner?.id === partnerId) &&
               (!currentOnly || quotation.superseded_by === null) &&
+              (!orderable || isOrderable(quotation)) &&
               matchesSearch(quotation, q),
           );
     const counted = url.searchParams.get("include_total") === "true";
@@ -577,6 +763,15 @@ export const quotationHandlers = [
     return HttpResponse.json(body);
   }),
 
+  /** QUOT-015 · The slabs a line's dropdown and freight offer (`gst_slab_choices`). */
+  http.get(buildApiUrl("/pricing/gst-slabs"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    return HttpResponse.json({
+      data: { choices: offeredSlabs().map((slab) => String(slab)) },
+    });
+  }),
+
   http.post(buildApiUrl("/pricing/quote-lines"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
@@ -586,6 +781,8 @@ export const quotationHandlers = [
         place_of_supply_territory_id: z.string().min(1),
         lines: z.array(lineInSchema).min(1),
         tax_treatment: z.enum(TAX_TREATMENTS).default("domestic"),
+        sales_type: z.string().nullish(),
+        freight: freightInSchema.nullish(),
       })
       .safeParse(await request.json());
     if (!parsed.success) {
@@ -595,6 +792,15 @@ export const quotationHandlers = [
     if (!domestic.ok) {
       return validation(domestic.fields);
     }
+    // QUOT-015 · a GST choice and freight: commercial and industrial at home only
+    const choiceRefusal = gstChoiceRefusal(
+      parsed.data.sales_type ?? null,
+      parsed.data.tax_treatment === "domestic",
+      parsed.data.lines,
+      parsed.data.freight,
+    );
+    if (choiceRefusal !== null) return choiceRefusal;
+    const freight = pricedFreight(parsed.data.freight, domestic.lines);
     // SO-010 · the preview shows the tax an export will store
     const treatment = parsed.data.tax_treatment;
     const priced = {
@@ -607,7 +813,8 @@ export const quotationHandlers = [
         intra_state: treatment === "domestic",
         price_list_ids: [priced.lines[0]?.price_list_id ?? ""],
         lines: priced.lines.map(({ line_no: _lineNo, ...line }) => line),
-        totals: totalsOf(priced.lines),
+        freight,
+        totals: totalsOf(priced.lines, freight),
         warnings:
           provisional > 0
             ? [
@@ -635,6 +842,7 @@ export const quotationHandlers = [
         party: partySchema.optional(),
         terms: z.string().max(2000).nullish(),
         lines: z.array(lineInSchema).max(200).default([]),
+        freight: freightInSchema.nullish(),
       })
       .safeParse(raw);
     if (!parsed.success) {
@@ -676,6 +884,13 @@ export const quotationHandlers = [
       return validation(domestic.fields);
     }
     const treatment = salesType === "export" ? exportTreatment() : "domestic";
+    const choiceRefusal = gstChoiceRefusal(
+      salesType,
+      treatment === "domestic",
+      body.lines,
+      body.freight,
+    );
+    if (choiceRefusal !== null) return choiceRefusal;
     const priced = { lines: domestic.lines.map((line) => withTaxTreatment(line, treatment)) };
 
     const quotation = mockDraft({
@@ -692,6 +907,7 @@ export const quotationHandlers = [
         : { name: lead.farmer_name, mobile: lead.mobile, address: lead.village, gstin: null },
       terms: body.terms ?? null,
       lines: priced.lines,
+      freight: pricedFreight(body.freight, priced.lines),
       createdAt: new Date().toISOString(),
     });
     if (treatment !== "domestic") {
@@ -758,6 +974,9 @@ export const quotationHandlers = [
       }
       quotation.sales_type = body.sales_type;
     }
+    // QUOT-015 · a type without a GST choice clears the freight and every picked slab
+    const cleared = clearedGstChoice(quotation);
+    if (cleared !== null) Object.assign(quotation, cleared);
     if (body.party !== undefined) {
       quotation.party = {
         name: body.party.name,
@@ -785,7 +1004,12 @@ export const quotationHandlers = [
     if (replay.kind === "respond") return replay.response;
 
     const parsed = z
-      .object({ lines: z.array(lineInSchema).max(200), expected_status: z.string().optional() })
+      .object({
+        lines: z.array(lineInSchema).max(200),
+        /** QUOT-015 · omit to keep, null to remove */
+        freight: freightInSchema.nullish(),
+        expected_status: z.string().optional(),
+      })
       .safeParse(raw);
     if (!parsed.success) {
       return validation({ lines: "check every line" });
@@ -807,9 +1031,22 @@ export const quotationHandlers = [
       return validation(priced.fields);
     }
     const treatment = draft.quotation.tax_treatment ?? "domestic";
+    const choiceRefusal = gstChoiceRefusal(
+      draft.quotation.sales_type,
+      treatment === "domestic",
+      parsed.data.lines,
+      parsed.data.freight,
+    );
+    if (choiceRefusal !== null) return choiceRefusal;
+    const kept = takesGstChoice(draft.quotation.sales_type)
+      ? storedFreightIn(draft.quotation.freight ?? null)
+      : null;
+    const freightIn = parsed.data.freight === undefined ? kept : parsed.data.freight;
     const updated = withLines(
       draft.quotation,
       priced.lines.map((line) => withTaxTreatment(line, treatment)),
+      [],
+      priced.lines.length === 0 ? null : pricedFreight(freightIn, priced.lines),
     );
     mockDb.quotations = mockDb.quotations.map((item) => (item.id === updated.id ? updated : item));
     voidApproval(updated, "edited");
@@ -861,16 +1098,7 @@ export const quotationHandlers = [
         { send_gate: gate },
       );
     }
-    const changed = rateChanges(
-      quotation.lines.map((line) => ({
-        product_id: line.product_id,
-        qty: Number(line.qty),
-        discount_pct: Number(line.discount_pct),
-        discount2_pct: Number(line.discount2_pct),
-        discount3_pct: Number(line.discount3_pct),
-        price_list_item_id: line.price_list_item_id,
-      })),
-    );
+    const changed = rateChanges(quotation.lines.map((line) => storedLineIn(line, true)));
     if (Object.keys(changed).length > 0) {
       return errorResponse(
         409,

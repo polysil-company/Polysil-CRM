@@ -194,6 +194,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-012 | The customer's quotation page — /q/{token} (`GET /public/q/{token}`, `GET /public/q/{token}/pdf`) | shared | in-progress |
 | QUOT-013 | Export the quotation list to Excel (`GET /quotations/export`) | shared | in-progress |
 | QUOT-014 | A subsidised quotation's subsidy, for one farmer category (`PUT /quotations/{id}/subsidy`, `GET /quotations/{id}/subsidy/calculation`) | shared | in-progress |
+| QUOT-015 | A GST slab per line, and freight, on a commercial or industrial quotation or order (`GET /pricing/gst-slabs`; `gst_slab` and `freight` on the preview, the saves and the lines) | shared | in-progress |
 | SO-001 | Sales orders list (`GET /orders`) | shared | in-progress |
 | SO-002 | A sales order — the document, its approval chain, PDF and history (`GET /orders/{orderId}`, `GET /orders/{orderId}/pdf`, `GET /orders/{orderId}/timeline`) | shared | in-progress |
 | SO-003 | New order from accepted quotations, and a draft's header (`POST /orders`, `PATCH /orders/{orderId}`, `DELETE /orders/{orderId}`) | shared | in-progress |
@@ -255,7 +256,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | MSTR-001 | Masters — the Admin → Masters area: lists, lead scoring and offices (`/masters`) | shared | in-progress |
 | MSTR-002 | Lead lookups — sources, irrigation systems, lost reasons and the territory picker (`GET /lookups/*`) | shared | in-progress |
 | MSTR-003 | Product picker — search the catalogue (`GET /products`) | shared | in-progress |
-| MSTR-004 | Product catalogue — browse, add and correct products (`GET`/`POST /products`, `GET`/`PATCH /products/{id}`) | shared | in-progress |
+| MSTR-004 | Product catalogue — browse, add and correct products (`GET`/`POST /products`, `GET`/`PATCH /products/{id}`; the pickers from `GET /lookups/product-categories` and `/lookups/uoms`) | shared | in-progress |
 | MSTR-005 | Tax classification — a product's HSN code and each code's GST slab, from a date (`/products/{id}/hsn`, `/tax-rates`) | shared | in-progress |
 | MSTR-006 | Price lists — draft, fill the rate sheet, publish, close (`/price-lists*`) | shared | in-progress |
 | MSTR-007 | Excel import with column matching — price list rates, partners, order and quotation lines (`/imports*`) | shared | in-progress |

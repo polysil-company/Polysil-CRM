@@ -56,7 +56,7 @@ export const DEFAULT_ENTITLEMENT_DAYS = 90;
 const targetSchema = z.object({
   type: z.enum(TARGET_TYPES),
   id: z.string().min(1),
-  /** Not sent today: asked in BE-027. */
+  /** BE-027 · The record's name (for a partner type, the type); null outside your scope. */
   name: z.string().nullish(),
 });
 
@@ -274,14 +274,3 @@ export interface EntitlementListParams {
   readonly status: EntitlementStatus | null;
   readonly partnerId: string | null;
 }
-
-/** The one field a target's name is read from, whichever record it is. */
-export const targetRecordSchema = z
-  .object({
-    data: z.object({
-      name: z.string().optional(),
-      description: z.string().optional(),
-      level: z.string().optional(),
-    }),
-  })
-  .transform(({ data }) => data.name ?? data.description ?? null);

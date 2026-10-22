@@ -53,6 +53,8 @@ import {
 } from "@/features/quotations/components/builder-parts";
 import { emptyLine, usePricedLines } from "@/features/quotations/hooks/use-priced-lines";
 import {
+  draftFreightFrom,
+  freightToSave,
   linesToSave,
   readAnyFields,
   routeSaveErrors,
@@ -223,7 +225,7 @@ function draftLinesFromOrder(lines: readonly OrderLine[]): DraftLine[] {
       uom: line.uom,
       uomDecimals: line.uomDecimals,
       hsnCode: line.hsnCode,
-      gstSlab: line.gstSlab,
+      gstSlab: line.hsnSlab,
       packMultiple: null,
     },
     qty: trimZeros(line.qty),
@@ -232,6 +234,8 @@ function draftLinesFromOrder(lines: readonly OrderLine[]): DraftLine[] {
       trimZeros(line.discounts[1].pct),
       trimZeros(line.discounts[2].pct),
     ],
+    // QUOT-015 · A picked slab is re-sent on every save, or the line falls back to its HSN.
+    gstSlab: line.gstSlabChosen ? trimZeros(line.gstSlab) : null,
   }));
 }
 
@@ -320,10 +324,13 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
     }),
     [placeId, partnerId, asOf, orderType, taxTreatment],
   );
-  const priced = usePricedLines(context, () =>
-    source.mode === "edit" && source.order.lines.length > 0
-      ? draftLinesFromOrder(source.order.lines)
-      : [emptyLine()],
+  const priced = usePricedLines(
+    context,
+    () =>
+      source.mode === "edit" && source.order.lines.length > 0
+        ? draftLinesFromOrder(source.order.lines)
+        : [emptyLine()],
+    source.mode === "edit" ? draftFreightFrom(source.order.freight) : undefined,
   );
   const [formError, setFormError] = useState<{
     title: string;
@@ -346,6 +353,8 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         priced.plan.request !== null && priced.snapshot !== null
           ? linesToSave(priced.plan, priced.snapshot.preview)
           : [];
+      // QUOT-015 · Freight only where the order type takes it; elsewhere the backend clears it.
+      const freight = priced.gstChoice ? freightToSave(priced.plan) : undefined;
       const common = {
         delivery_address: orNull(values.deliveryAddress),
         payment_terms: values.paymentTerms,
@@ -367,6 +376,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
           place_of_supply_territory_id: values.place?.id ?? "",
           ...common,
           lines,
+          ...(freight === undefined || freight === null ? {} : { freight }),
           ...(showsStock && warehouseId !== null ? { warehouse_id: warehouseId } : {}),
         };
         return create.mutateAsync({ body, idempotencyKey: idempotency.keyFor(body) });
@@ -391,7 +401,11 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         ...(warehouseChanged ? { warehouse_id: warehouseId } : {}),
         expected_status: "draft" as const,
       };
-      const linesBody = { lines, expected_status: "draft" as const };
+      const linesBody = {
+        lines,
+        ...(freight === undefined ? {} : { freight }),
+        expected_status: "draft" as const,
+      };
       return saveDraft.mutateAsync({
         orderId: source.order.id,
         header: headerChanged
@@ -423,6 +437,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
     setSubsidyServer(subsidised ? subsidyFieldErrors(error) : {});
     const routed = routeSaveErrors(fields, priced.plan.keys);
     priced.setLineErrors(routed.lines);
+    priced.setFreightSaveError(routed.freight);
     for (const [field, message] of Object.entries(routed.header)) {
       const name = HEADER_FIELD_NAMES.find((candidate) => candidate === field);
       if (name !== undefined) form.setError(name, { type: "server", message });
@@ -511,7 +526,11 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         });
         return;
       default:
-        if (Object.keys(routed.header).length > 0 || Object.keys(routed.lines).length > 0) {
+        if (
+          Object.keys(routed.header).length > 0 ||
+          Object.keys(routed.lines).length > 0 ||
+          routed.freight !== null
+        ) {
           setFormError(null);
           return;
         }

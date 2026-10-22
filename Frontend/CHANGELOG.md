@@ -7,14 +7,16 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-106 changes, newest first. Each title opens its entry.
+108 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
 | 2026-10-22 | [Deleted leads, for those who may delete them](changelog/entries/2026-10-22--feature--LEAD-019--deleted-leads-for-those-who-may-delete-them.md) | `feature` | `LEAD-019` |
+| 2026-10-22 | [The backend's answers to BE-023 to BE-030, wired in](changelog/entries/2026-10-22--feature--MSTR-004--backend-answers-be-023-to-030.md) | `feature` | `MSTR-004` `SUBS-005` `SCHM-002` `DOC-001` `MSTR-009` `SO-011` `TASK-009` `AUTH-002` `MSTR-017` |
 | 2026-10-22 | [The Android app for field staff, with duty tracking](changelog/entries/2026-10-22--feature--TRK-008--android-tracking-app.md) | `feature` | `TRK-008` |
 | 2026-10-21 | [Dealers add their own sub-dealers](changelog/entries/2026-10-21--feature--CHNL-002--portal-sub-dealers.md) | `feature` | `CHNL-002` `CHNL-001` |
 | 2026-10-21 | [Download a complaint as PDF](changelog/entries/2026-10-21--feature--CMPL-013--complaint-pdf.md) | `feature` | `CMPL-013` |
+| 2026-10-21 | [A GST slab per item, and freight](changelog/entries/2026-10-21--feature--QUOT-015--gst-slab-and-freight.md) | `feature` | `QUOT-015` |
 | 2026-10-21 | [An HSN code on the New product form](changelog/entries/2026-10-21--fix--MSTR-005--hsn-on-the-new-product-form.md) | `fix` | `MSTR-005` `MSTR-004` |
 | 2026-10-18 | [Search and help](changelog/entries/2026-10-18--feature--BOT-001--assistant.md) | `feature` | `BOT-001` `BOT-002` |
 | 2026-10-18 | [Holidays, and complaint escalation](changelog/entries/2026-10-18--feature--CMPL-012--holidays-escalation.md) | `feature` | `CMPL-012` `MSTR-019` |
@@ -199,6 +201,73 @@ To check by hand in the mock, choose Preview as role → Admin, then:
 
 1. Open **Leads** and select **Deleted leads**: two leads, with the note above them.
 2. Select **Back to leads**.
+
+### The backend's answers to BE-023 to BE-030, wired in
+
+`feature` · `MSTR-004` `SUBS-005` `SCHM-002` `DOC-001` `MSTR-009` `SO-011` `TASK-009` `AUTH-002` `MSTR-017` · Nakul Srivastava · [entry](changelog/entries/2026-10-22--feature--MSTR-004--backend-answers-be-023-to-030.md)
+
+#### Before
+
+The backend shipped eight answers to the frontend's asks in #190 (`docs/Backend-Tasks.md`, BE-023 to BE-030). Until then the screens worked around each gap:
+
+- the lead's subsidy card filtered applications itself;
+- the product form read every product to learn the categories and units;
+- schemes read each target's name from its own record, one call per target;
+- the document type picker offered a dealer application's types on every record;
+- Masters couldn't show a row's order or quality;
+- Place order listed quotations already on an order;
+- a dealer's every page asked `/tasks` and got a refused request.
+
+#### Now
+
+- **BE-023 · The lead's subsidy application** comes from `GET /subsidy-applications?lead_id=`. The card no longer filters the rows itself. An empty answer means none the user can see, so Start still handles `already_forwarded`.
+- **BE-024 · The product form's pickers** come from `GET /lookups/product-categories` (by name) and `GET /lookups/uoms` (with each unit's decimals).
+  - Each picker offers the active rows, plus a switched-off one only to a product that already has it.
+  - The catalogue's Category filter lists every category too.
+  - Warranty periods now offer every active category, not only those already used.
+- **BE-027 · A scheme's targets** show the names the backend sends, with no extra calls. A target outside the user's scope shows its kind and a short id.
+  - **Product category** can now be added as a target: tick boxes from the categories, sent by id.
+  - The form still sends `targets` on an edit only when they changed, as the backend asks.
+- **BE-025 · The document type picker** asks for the record's own types (`GET /documents/types?record_type=`). A lead, quotation, order or dispatch no longer offers the GST certificate or the PAN card.
+- **BE-026 · Masters lists:**
+  - sources and lost reasons show their **Order**, and lost reasons their **Kind**;
+  - those who may edit masters also see a source's **Quality**, and get **Edit** for the order and the quality. Only what changed is sent, within ±1,000,000 and 0 to 1.
+- **BE-029 · Place order's other quotations** come from `GET /quotations?orderable=true`: accepted, current and on no live order. A `409 quotation_on_order` is still handled, for an order the user can't see.
+- **BE-030 · A dealer's Tasks item** follows `features.tasks_for_dealers` on `GET /auth/me`, so partner pages no longer make a refused `/tasks` call.
+- **BE-028** needed nothing built.
+
+#### Discussion
+
+- **The mock follows each answer:**
+  - the categories and units are the backend's seeds, with the mock catalogue's own unit codes (NOS, MTR at two decimals, SET);
+  - warranty terms use the same category ids;
+  - sources carry the seeded quality and order, and quality is null for those without `masters.edit`;
+  - scheme targets are named;
+  - `/auth/me` carries the switch.
+- **"Won" reasons:** the backend lists none yet (GAP-513), so every lost reason shows "Lost".
+
+#### Files changed
+
+- `src/features/subsidy/api/` — the `lead_id` filter is the backend's.
+- `src/features/products/` — the two lookups, their queries, the form's pickers and the catalogue filter.
+- `src/features/warranty/components/warranty-terms-panel.tsx` — every category.
+- `src/features/schemes/` — target names from the scheme; product category targets; the per-target calls removed.
+- `src/features/documents/` — types by record.
+- `src/features/lookups/api/lookups.schemas.ts`, `src/features/masters/` — order, quality and kind; the Edit dialog.
+- `src/features/quotations/api/`, `src/features/orders/components/consolidate-quotations.tsx` — `orderable`.
+- `src/features/session/api/session.schemas.ts`, `src/features/tasks/hooks/use-dealer-tasks.ts` — the switch on `/auth/me`.
+- `src/mocks/` — the lookups, record types, row fields, named targets, `orderable` and the switch.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`, `Docs/Plan.md`, `Docs/Tested-Features.md`.
+
+#### Tests
+
+- `products.test.ts`: the categories with ids, and the units with decimals; a code that isn't one refused.
+- `schemes.test.tsx`: a scheme's targets named; a product category added as a target, by id.
+- `documents.test.ts`: a lead's types without a dealer's, and a dealer application's five and Other.
+- `masters-ui.test.tsx`: order and quality shown; Edit refusing a quality over 1, then saving only the quality; quality hidden and Kind shown without `masters.edit`; only a changed field sent.
+- `quotations.test.ts`: `orderable` lists only free accepted quotations, and is sent as `orderable=true`.
+- `session.schemas.test.ts` and `dealer-tasks.test.tsx`: the switch read from `/auth/me`, off when missing, and no `/tasks` call to find out.
+- Existing suites updated for the new fields, the unit labels and the warranty categories.
 
 ### The Android app for field staff, with duty tracking
 
@@ -444,6 +513,60 @@ Walked as Admin on a desktop in light mode and a touch phone in dark mode, on a 
   - no button while the backend doesn't send `pdf_state`.
 
 To check by hand in the mock, open any closed complaint and select **Download PDF**.
+
+### A GST slab per item, and freight
+
+`feature` · `QUOT-015` · Nakul Srivastava · [entry](changelog/entries/2026-10-21--feature--QUOT-015--gst-slab-and-freight.md)
+
+#### Before
+
+Every item on a quotation or an order was taxed at its product's HSN slab, and there was no way to add freight. The backend now lets a commercial or industrial document pick each line's slab and add one freight charge (FS-069, `backend/docs/api/pricing.md`).
+
+#### Now
+
+- **A GST dropdown on each item** in the quotation builder and the order builder, for commercial and industrial sales only.
+  - It offers the slabs the admin chose (`GET /pricing/gst-slabs`, read once per screen), plus the item's own HSN slab even when that slab isn't in the list.
+  - It starts on the HSN slab, marked "(HSN)". Picking another slab says "Changed from 18%" under it. Picking the HSN slab again is no change.
+  - A slab is sent only for an item where one was picked, and re-sent on every save after that.
+- **Freight** sits under the items: an amount before tax and an optional GST slab. Without a slab it takes the highest among the items, and the line under it says so.
+  - Freight goes into the taxable value, the taxes and the total, never into gross or discount. The totals show it on its own row.
+  - The amount is checked as it's typed: rupees above 0, at most two decimals. Freight with no item says "Add an item first". Either one holds the save.
+  - It's sent on a new document, and on every edit of one, where an emptied box removes it.
+- **The backend's refusals land on their fields:** a slab on its item (`gst_choice_not_allowed`, `gst_slab_not_offered`), and the freight's on the freight (`freight_not_allowed`, `freight_without_lines`, `freight_amount_invalid`).
+- **The quotation and order pages** mark an item whose slab was picked ("Changed from HSN 18%"), and show "Freight (GST 18%)" in the totals.
+- **Approvals** say "GST changed on 2 lines" on the row and in the decision dialog.
+- **Company settings** gain "GST slabs an item or freight can be set to": a tick box per slab in force, at least one.
+- The Council's 40 % slab joins the list of GST slabs, so tax rates can be set at 40 % too.
+
+#### Discussion
+
+- **Subsidised, export, sample and the rest** show neither the dropdown nor freight. An export under a LUT doesn't take them either: the backend allows a choice only when the supply is taxed at home.
+- **A type changed away from commercial or industrial** is cleared by the backend (warning `gst_choice_cleared`), so the builder sends neither a slab nor freight for it.
+- **The PDF** is drawn by the backend. The customer's page shows only the total, which already includes freight.
+- **Orders made from quotations** (consolidate) take their quotations' freight on the backend. The mock doesn't add it up, and the screen sends no freight there.
+- **The mock** follows the backend's rules: the admin's list, the five refusals, freight priced like a line of one with no discount, and the default slab re-resolved on every save. It also seeds the `gst_slab_choices` setting (0, 5, 18, 40) and serves `GET /pricing/gst-slabs`.
+
+#### Files changed
+
+- `src/features/quotations/api/` — the freight and slab fields on lines, totals, previews and saves; `GET /pricing/gst-slabs` and its query.
+- `src/features/quotations/lib/builder-lines.ts`, `hooks/use-priced-lines.ts` — a picked slab per row, the freight box, what's sent, and where refusals go.
+- `src/features/quotations/components/` — the GST dropdown, the freight editor, the Freight total, the "Changed from" mark (`gst-change-mark.tsx`, new) and the builder's save.
+- `src/features/orders/` — the same on orders: the schema, the builder's save and the order page.
+- `src/features/approvals/` — `gst_changed_lines` on a row, shown on the inbox and in the dialog.
+- `src/features/settings/` — the `slabs` kind; `src/features/products/api/products.schemas.ts` — 40 %.
+- `src/mocks/` — the slabs endpoint and setting, choices and freight on previews, quotations and orders, and `gst_changed_lines` on approvals.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md` — QUOT-015.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/screenshots/quotations/` — records and screens.
+
+#### Tests
+
+- `builder-lines.test.ts`: a slab sent only where picked and only where the sale takes it; freight sent once it reads as rupees; the freight's problems in words; a refused slab and a refused freight routed; a draft's slab and freight read back.
+- `quotations.write.test.ts`, through the API: the slabs on offer; a picked slab and freight priced (freight in taxable and total, not gross); refused on a subsidised quotation; a slab off the list; a freight that isn't rupees.
+- `quotation-builder.test.tsx`: the HSN slab preset and nothing sent for it; 5 % picked and ₹1,500 freight saved; a bad amount on its field; a refused slab on its item, holding the save; none of it on a subsidised quotation; a draft's slab and freight loaded and sent again.
+- `order-builder.test.tsx`: 40 % on an item and freight at 5 % saved on a direct order; a refused freight on its field.
+- `quotations-ui.test.tsx`: the changed item marked and the freight in the totals.
+- `approvals-inbox.test.tsx`: "GST changed on 2 lines" on the row and in the dialog.
+- `company-settings.test.tsx`: the slabs through the API (in force, at least one, none twice), ticked and saved, and at least one needed.
 
 ### An HSN code on the New product form
 

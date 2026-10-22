@@ -1,6 +1,7 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 
 import {
+  getGstSlabChoices,
   getPublicQuotation,
   getQuotation,
   getQuotationSubsidyCalculation,
@@ -38,6 +39,7 @@ export const quotationKeys = {
   products: (q: string) => [...quotationKeys.all, "products", q] as const,
   previews: () => [...quotationKeys.all, "preview"] as const,
   preview: (request: QuoteLinesRequest) => [...quotationKeys.previews(), request] as const,
+  gstSlabs: () => [...quotationKeys.all, "gst-slabs"] as const,
   subsidyCalculation: (quotationId: string) =>
     [...quotationKeys.detail(quotationId), "subsidy-calculation"] as const,
 };
@@ -89,6 +91,16 @@ export function productSearchQueryOptions(q: string) {
     placeholderData: keepPreviousData,
     staleTime: 5 * 60_000,
     meta: { dataId: "MSTR-003" },
+  });
+}
+
+/** QUOT-015 · The GST slabs on offer; an admin changes them rarely, so one read per screen. */
+export function gstSlabChoicesQueryOptions() {
+  return queryOptions({
+    queryKey: quotationKeys.gstSlabs(),
+    queryFn: ({ signal }) => getGstSlabChoices(signal),
+    staleTime: 5 * 60_000,
+    meta: { dataId: "QUOT-015" },
   });
 }
 

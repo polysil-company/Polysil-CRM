@@ -6,6 +6,7 @@ import { mockDb, resetMockDb } from "@/mocks/db";
 
 import {
   createQuotation,
+  getGstSlabChoices,
   patchQuotation,
   previewQuoteLines,
   replaceQuotationLines,
@@ -191,5 +192,113 @@ describe("[QUOT-004] editing a draft", () => {
 
     expect(result.status).toBe(409);
     expect(["status_changed", "quotation_not_draft"]).toContain(result.code);
+  });
+});
+
+describe("[QUOT-015] GST slabs and freight, through the API", () => {
+  afterEach(() => {
+    resetMockDb();
+  });
+
+  /** The 422's code and fields, from a refused preview. */
+  async function refusal(promise: Promise<unknown>): Promise<{ code: string; fields: unknown }> {
+    try {
+      await promise;
+    } catch (error) {
+      if (isApiError(error)) {
+        const details = error.details;
+        const fields =
+          typeof details === "object" && details !== null && "fields" in details
+            ? details.fields
+            : null;
+        return { code: error.code ?? "", fields };
+      }
+      throw error;
+    }
+    throw new Error("The preview was not refused");
+  }
+
+  it("reads the slabs on offer", async () => {
+    expect(await getGstSlabChoices()).toEqual(["0", "5", "18", "40"]);
+  });
+
+  it("prices a picked slab and freight, which joins taxable and total but not gross", async () => {
+    const line = await firstProductLine("10");
+    const plain = await previewQuoteLines({
+      place_of_supply_territory_id: "t-1",
+      sales_type: "commercial",
+      lines: [line],
+    });
+    const preview = await previewQuoteLines({
+      place_of_supply_territory_id: "t-1",
+      sales_type: "commercial",
+      lines: [{ ...line, gst_slab: "5" }],
+      freight: { amount: "1000" },
+    });
+
+    const [priced] = preview.lines;
+    expect(priced).toMatchObject({ gstSlab: "5.000", gstSlabChosen: true });
+    expect(priced?.hsnSlab).toBe(plain.lines[0]?.gstSlab);
+    // Without a slab, freight takes the highest among the lines: here the picked 5 %.
+    expect(preview.freight).toMatchObject({
+      amount: "1000.00",
+      gstSlab: "5.000",
+      total: "1050.00",
+    });
+    expect(preview.totals.gross).toBe(plain.totals.gross);
+    expect(preview.totals.freight).toBe("1000.00");
+    expect(Number(preview.totals.taxable)).toBeCloseTo(Number(plain.totals.taxable) + 1000, 2);
+  });
+
+  it("refuses a slab or freight on a type that takes neither", async () => {
+    const line = await firstProductLine("10");
+    expect(
+      await refusal(
+        previewQuoteLines({
+          place_of_supply_territory_id: "t-1",
+          sales_type: "subsidised",
+          lines: [{ ...line, gst_slab: "5" }],
+        }),
+      ),
+    ).toMatchObject({
+      code: "gst_choice_not_allowed",
+      fields: { "lines[0].gst_slab": expect.any(String) },
+    });
+    expect(
+      await refusal(
+        previewQuoteLines({
+          place_of_supply_territory_id: "t-1",
+          sales_type: "subsidised",
+          lines: [line],
+          freight: { amount: "100" },
+        }),
+      ),
+    ).toMatchObject({ code: "freight_not_allowed", fields: { freight: expect.any(String) } });
+  });
+
+  it("refuses a slab off the list and a freight amount that isn't rupees", async () => {
+    const line = await firstProductLine("10");
+    expect(
+      await refusal(
+        previewQuoteLines({
+          place_of_supply_territory_id: "t-1",
+          sales_type: "industrial",
+          lines: [{ ...line, gst_slab: "28" }],
+        }),
+      ),
+    ).toMatchObject({ code: "gst_slab_not_offered" });
+    expect(
+      await refusal(
+        previewQuoteLines({
+          place_of_supply_territory_id: "t-1",
+          sales_type: "industrial",
+          lines: [line],
+          freight: { amount: "12.345" },
+        }),
+      ),
+    ).toMatchObject({
+      code: "freight_amount_invalid",
+      fields: { "freight.amount": expect.any(String) },
+    });
   });
 });

@@ -172,3 +172,55 @@ describe("[ADMN-007] CompanySettings", () => {
     expect(await screen.findByText("Each one more than the one before.")).toBeInTheDocument();
   });
 });
+
+describe("[QUOT-015] The GST slabs on offer", () => {
+  afterEach(reset);
+
+  it("takes slabs in force, at least one, none twice", async () => {
+    signInAs("admin");
+    const settings = await listSettings();
+    expect(settings.find((item) => item.key === "gst_slab_choices")).toMatchObject({
+      kind: "slabs",
+      value: ["0", "5", "18", "40"],
+    });
+    await expect(patchSettings({ values: { gst_slab_choices: ["5", "7"] } })).rejects.toMatchObject(
+      { status: 422 },
+    );
+    await expect(
+      patchSettings({ values: { gst_slab_choices: ["5", "5.0"] } }),
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(patchSettings({ values: { gst_slab_choices: [] } })).rejects.toMatchObject({
+      status: 422,
+    });
+  });
+
+  it("ticks the slabs an item may be set to, lowest first", async () => {
+    signInAs("admin");
+    const user = show(<CompanySettings />);
+
+    const slabs = await screen.findByRole("group", {
+      name: "GST slabs an item or freight can be set to",
+    });
+    expect(within(slabs).getByRole("checkbox", { name: "40%" })).toBeChecked();
+    await user.click(within(slabs).getByRole("checkbox", { name: "0%" }));
+    await user.click(within(slabs).getByRole("checkbox", { name: "12%" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+    expect(valueOf("gst_slab_choices")).toEqual(["5", "12", "18", "40"]);
+  });
+
+  it("needs at least one slab", async () => {
+    signInAs("admin");
+    const user = show(<CompanySettings />);
+
+    const slabs = await screen.findByRole("group", {
+      name: "GST slabs an item or freight can be set to",
+    });
+    for (const name of ["0%", "5%", "18%", "40%"]) {
+      await user.click(within(slabs).getByRole("checkbox", { name }));
+    }
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Choose at least one slab.")).toBeInTheDocument();
+  });
+});

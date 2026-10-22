@@ -191,3 +191,33 @@ describe("[QUOT-003] getQuotationPdf", () => {
     });
   });
 });
+
+describe("[SO-011] Quotations still free to order (BE-029)", () => {
+  afterEach(() => {
+    resetMockDb();
+  });
+
+  it("lists only accepted, current quotations on no live order", async () => {
+    const onOrder = mockDb.orders.find(
+      (order) => order.status !== "cancelled" && order.quotations.length > 0,
+    )?.quotations[0]?.id;
+    if (onOrder === undefined) throw new Error("No quotation on a live order in the mock");
+
+    const page = await listQuotations({ ...FIRST_PAGE, pageSize: 100, orderable: true });
+    expect(page.items.length).toBeGreaterThan(0);
+    expect(page.items.every((row) => row.status === "accepted")).toBe(true);
+    expect(page.items.map((row) => row.id)).not.toContain(onOrder);
+  });
+
+  it("asks the backend for them with orderable=true", async () => {
+    let asked: string | null = null;
+    server.use(
+      http.get(buildApiUrl("/quotations"), ({ request }) => {
+        asked = new URL(request.url).searchParams.get("orderable");
+        return HttpResponse.json({ data: [], meta: { limit: 25 } });
+      }),
+    );
+    await listQuotations({ ...FIRST_PAGE, orderable: true });
+    expect(asked).toBe("true");
+  });
+});

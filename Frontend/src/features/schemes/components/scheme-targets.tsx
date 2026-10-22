@@ -11,7 +11,7 @@ import { Icon } from "@/components/ui/icon";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
-import { targetNameQueryOptions } from "@/features/schemes/api/schemes.queries";
+import { productCategoriesQueryOptions } from "@/features/products/api/products.queries";
 import {
   PARTNER_TYPES,
   TARGET_TYPES,
@@ -29,22 +29,13 @@ export interface DraftTarget {
   readonly name: string | null;
 }
 
-/** A target's name: its own when sent (BE-027), else read from its record. */
+/**
+ * A target's name, as the backend sends it (BE-027). Null outside the reader's scope: the kind
+ * and a short id then.
+ */
 export function TargetName({ target }: { target: DraftTarget | SchemeTarget }): React.ReactNode {
-  const known = target.name ?? null;
-  const lookup =
-    known === null &&
-    (target.type === "territory" || target.type === "partner" || target.type === "product")
-      ? target.type
-      : null;
-  const query = useQuery({
-    ...targetNameQueryOptions(lookup ?? "territory", target.id),
-    enabled: lookup !== null,
-  });
   if (target.type === "partner_type") return PARTNER_TYPE_LABELS[target.id] ?? target.id;
-  if (known !== null) return known;
-  if (lookup !== null && typeof query.data === "string") return query.data;
-  return `${TARGET_TYPE_LABELS[target.type]} ${target.id.slice(0, 8)}…`;
+  return target.name ?? `${TARGET_TYPE_LABELS[target.type]} ${target.id.slice(0, 8)}…`;
 }
 
 /** SCHM-001 · Who a scheme is for: everyone, or a line per kind of target. */
@@ -87,12 +78,10 @@ export function TargetsSummary({
   );
 }
 
-const ADDABLE: readonly TargetType[] = ["territory", "partner_type", "partner", "product"];
-
 /**
  * SCHM-002 · Who a scheme is for. Empty means everyone; the same kind of target means any of
- * them, different kinds mean all. A product category can't be picked until the backend lists
- * categories with their ids (BE-027).
+ * them, different kinds mean all. A product category is picked from the categories, by id
+ * (BE-027).
  */
 export function TargetsEditor({
   value,
@@ -150,7 +139,7 @@ export function TargetsEditor({
             onValueChange={setKind}
             className="flex flex-wrap gap-x-4 gap-y-2"
           >
-            {ADDABLE.map((type) => (
+            {TARGET_TYPES.map((type) => (
               <label key={type} className="flex items-center gap-2 text-sm text-foreground">
                 <RadioGroupItem value={type} />
                 {TARGET_TYPE_LABELS[type]}
@@ -197,20 +186,71 @@ export function TargetsEditor({
                 add({ type: "partner", id: record.id, name: record.name });
               }}
             />
-          ) : (
+          ) : kind === "product" ? (
             <ProductSearchPicker
               id="scheme-target-product"
               onPick={(record) => {
                 add({ type: "product", id: record.id, name: record.name });
               }}
             />
+          ) : (
+            <CategoryChecks value={value} onAdd={add} onRemove={remove} />
           )}
           <p className="text-xs text-muted-foreground">
-            A partner also covers the dealers under it; a territory, everything inside it. Product
-            categories can be added once the backend lists them with their ids (BE-027).
+            A partner also covers the dealers under it; a territory, everything inside it.
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/** BE-027 · The product categories in use, ticked on and off as targets. */
+function CategoryChecks({
+  value,
+  onAdd,
+  onRemove,
+}: {
+  value: readonly DraftTarget[];
+  onAdd: (target: DraftTarget) => void;
+  onRemove: (target: DraftTarget) => void;
+}): React.JSX.Element {
+  const categories = useQuery(productCategoriesQueryOptions());
+  if (categories.isPending) {
+    return <p className="text-sm text-muted-foreground">Loading categories…</p>;
+  }
+  if (categories.isError) {
+    return <p className="text-sm text-muted-foreground">The categories couldn&apos;t be loaded.</p>;
+  }
+  // A switched-off category stays listed while the scheme already has it.
+  const shown = categories.data.filter(
+    (category) =>
+      category.isActive ||
+      value.some((item) => item.type === "product_category" && item.id === category.id),
+  );
+  return (
+    <div role="group" aria-label="Product categories" className="flex flex-wrap gap-x-4 gap-y-2">
+      {shown.map((category) => {
+        const target: DraftTarget = {
+          type: "product_category",
+          id: category.id,
+          name: category.name,
+        };
+        return (
+          <label key={category.id} className="flex items-center gap-2 text-sm text-foreground">
+            <Checkbox
+              checked={value.some(
+                (item) => item.type === "product_category" && item.id === category.id,
+              )}
+              onCheckedChange={(checked) => {
+                if (checked) onAdd(target);
+                else onRemove(target);
+              }}
+            />
+            {category.name}
+          </label>
+        );
+      })}
     </div>
   );
 }

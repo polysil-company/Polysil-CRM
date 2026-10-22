@@ -3,14 +3,21 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
-import { quotePreviewQueryOptions } from "@/features/quotations/api/quotations.queries";
+import {
+  gstSlabChoicesQueryOptions,
+  quotePreviewQueryOptions,
+} from "@/features/quotations/api/quotations.queries";
 import type { QuotePreview, QuoteLinesRequest } from "@/features/quotations/api/quotations.schemas";
 import {
+  allowsGstChoice,
+  freightIssue,
   isPriceable,
   lineIssue,
+  NO_FREIGHT,
   pricedByKey,
   previewRequestFor,
   routeSaveErrors,
+  type DraftFreight,
   type DraftLine,
   type PreviewPlan,
   type PricingContext,
@@ -27,8 +34,10 @@ const NOTHING_TO_PRICE: QuoteLinesRequest = { place_of_supply_territory_id: "", 
 
 const NO_PLACE: PreviewPlan = { request: null, keys: [] };
 
+const NO_CHOICES: readonly string[] = [];
+
 export function emptyLine(): DraftLine {
-  return { key: createRequestId(), product: null, qty: "", discounts: ["", "", ""] };
+  return { key: createRequestId(), product: null, qty: "", discounts: ["", "", ""], gstSlab: null };
 }
 
 /** The last preview that belongs to a plan, so rows keep their figures while the next loads. */
@@ -63,6 +72,19 @@ export interface PricedLines {
   readonly preview: UseQueryResult<QuotePreview>;
   readonly rowsWithIssues: number;
   readonly rowsReady: number;
+  /** QUOT-015 · A GST slab per line and freight are on offer for this sale. */
+  readonly gstChoice: boolean;
+  /** QUOT-015 · The slabs the dropdowns offer, besides each line's own HSN slab. */
+  readonly slabChoices: readonly string[];
+  readonly freight: DraftFreight;
+  readonly setFreight: (next: DraftFreight) => void;
+  /** QUOT-015 · Why the freight can't go, in words: typed wrong, refused by a save or the preview. */
+  readonly freightError: string | null;
+  /** The freight must change before a save. */
+  readonly freightBlocks: boolean;
+  readonly setFreightSaveError: (error: string | null) => void;
+  /** QUOT-015 · The freight as the preview priced it; null without freight. */
+  readonly pricedFreight: QuotePreview["freight"];
 }
 
 /**
@@ -73,14 +95,22 @@ export interface PricedLines {
 export function usePricedLines(
   context: PricingContext,
   initialLines: () => DraftLine[],
+  initialFreight: DraftFreight = NO_FREIGHT,
 ): PricedLines {
   const [lines, setLines] = useState<DraftLine[]>(initialLines);
   const [lineErrors, setLineErrors] = useState<Readonly<Record<string, string>>>({});
+  const [freight, setFreightState] = useState<DraftFreight>(initialFreight);
+  const [freightSaveError, setFreightSaveError] = useState<string | null>(null);
+  const gstChoice = allowsGstChoice(context);
+  const slabChoices = useQuery({ ...gstSlabChoicesQueryOptions(), enabled: gstChoice });
 
   // Nothing is priced until the screen knows where the goods go (an order typed in afresh).
   const plan = useMemo(
-    () => (context.placeOfSupplyTerritoryId === "" ? NO_PLACE : previewRequestFor(lines, context)),
-    [lines, context],
+    () =>
+      context.placeOfSupplyTerritoryId === ""
+        ? NO_PLACE
+        : previewRequestFor(lines, context, freight),
+    [lines, context, freight],
   );
   const debouncedPlan = useDebouncedValue(plan, PREVIEW_DEBOUNCE_MS);
   const preview = useQuery({
@@ -102,10 +132,18 @@ export function usePricedLines(
       preview.data !== undefined &&
       !preview.isPlaceholderData &&
       !preview.isFetching);
-  const previewErrors =
+  const previewRefusal =
     preview.isError && debouncedPlan === plan
-      ? routeSaveErrors(readFieldErrors(preview.error) ?? {}, debouncedPlan.keys).lines
-      : {};
+      ? routeSaveErrors(readFieldErrors(preview.error) ?? {}, debouncedPlan.keys)
+      : null;
+  const previewErrors = previewRefusal?.lines ?? {};
+  const rowsReady = lines.filter(isPriceable).length;
+  // What must be fixed before a save, then what a save or the preview refused.
+  const freightBlock =
+    (gstChoice ? freightIssue(freight) : null) ??
+    (gstChoice && freight.amount.trim() !== "" && rowsReady === 0 ? "Add an item first" : null) ??
+    previewRefusal?.freight ??
+    null;
 
   return {
     lines,
@@ -139,9 +177,22 @@ export function usePricedLines(
     upToDate,
     previewErrors,
     previewFailed:
-      preview.isError && debouncedPlan === plan && Object.keys(previewErrors).length === 0,
+      previewRefusal !== null &&
+      Object.keys(previewErrors).length === 0 &&
+      previewRefusal.freight === null,
     preview,
     rowsWithIssues: lines.filter((line) => lineIssue(line) !== null).length,
-    rowsReady: lines.filter(isPriceable).length,
+    rowsReady,
+    gstChoice,
+    slabChoices: slabChoices.data ?? NO_CHOICES,
+    freight,
+    setFreight: (next) => {
+      setFreightState(next);
+      setFreightSaveError(null);
+    },
+    freightError: freightBlock ?? freightSaveError,
+    freightBlocks: freightBlock !== null,
+    setFreightSaveError,
+    pricedFreight: plan.request?.freight === undefined ? null : (snapshot?.preview.freight ?? null),
   };
 }

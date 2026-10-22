@@ -30,6 +30,7 @@ import {
   DOC_TYPE_LABELS,
   decisionRefusal,
   documentTitle,
+  gstChangedText,
   missingRemarkMessage,
 } from "@/features/approvals/lib/approval-labels";
 import { formatRate } from "@/features/quotations/lib/quotation-labels";
@@ -164,6 +165,9 @@ function DecisionForm({
           {row.document.discountPct === null
             ? ""
             : ` · ${formatRate(row.document.discountPct)} discount`}
+          {gstChangedText(row.document.gstChangedLines) === null
+            ? ""
+            : ` · ${gstChangedText(row.document.gstChangedLines) ?? ""}`}
         </DialogDescription>
       </DialogHeader>
       <DialogBody>

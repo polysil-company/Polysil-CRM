@@ -9,17 +9,25 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ImportDialog } from "@/features/imports/components/import-dialog";
 import type { QuotePreview } from "@/features/quotations/api/quotations.schemas";
 import type { PricedLines } from "@/features/quotations/hooks/use-priced-lines";
 import { draftLinesFromImport } from "@/features/quotations/lib/builder-lines";
-import { parseWarnings } from "@/features/quotations/lib/quotation-labels";
+import { formatRate, parseWarnings } from "@/features/quotations/lib/quotation-labels";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { createRequestId } from "@/lib/api/request-id";
 import { formatCount, formatInr } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { QuotationLineRow } from "./quotation-line-row";
+import { QuotationLineRow, slabKey, slabOptions } from "./quotation-line-row";
 
 /**
  * QUOT-004, SO-005 · The pieces a quotation and an order builder share: the priced items, the
@@ -57,6 +65,7 @@ export function PricedItemsCard({
               pricing={priced.pricing}
               error={priced.lineErrors[line.key] ?? priced.previewErrors[line.key]}
               canRemove={priced.lines.length > 1 || line.product !== null || line.qty !== ""}
+              slabChoices={priced.gstChoice ? priced.slabChoices : null}
               onChange={priced.changeLine}
               onRemove={() => {
                 priced.removeLine(line.key);
@@ -82,6 +91,7 @@ export function PricedItemsCard({
             </Button>
           )}
         </div>
+        {priced.gstChoice ? <FreightEditor priced={priced} /> : null}
         {importInto === undefined ? null : (
           <ImportDialog
             kind="lines"
@@ -102,6 +112,99 @@ export function PricedItemsCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** The value the freight's slab dropdown uses for "no slab picked". */
+const DEFAULT_FREIGHT_SLAB = "default";
+
+/**
+ * QUOT-015 · One freight charge before tax, for a commercial or industrial sale. Without a slab
+ * it takes the highest among the items; the backend prices it like a line of one.
+ */
+function FreightEditor({ priced }: { priced: PricedLines }): React.JSX.Element {
+  const { freight, freightError, pricedFreight } = priced;
+  const errorId = "freight-error";
+  const items = [
+    { value: DEFAULT_FREIGHT_SLAB, label: "Highest of the items" },
+    ...slabOptions(priced.slabChoices, freight.gstSlab).map((slab) => ({
+      value: slab,
+      label: formatRate(slab),
+    })),
+  ];
+  return (
+    <fieldset
+      aria-describedby={freightError === null ? undefined : errorId}
+      className={cn(
+        "flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:p-4",
+        freightError !== null && "border-danger",
+      )}
+    >
+      <legend className="sr-only">Freight</legend>
+      <div className="grid grid-cols-12 gap-3">
+        <div className="col-span-12 flex flex-col gap-1.5 sm:col-span-6">
+          <label htmlFor="freight-amount" className="text-xs text-muted-foreground">
+            Freight before tax (optional)
+          </label>
+          <InputGroup>
+            <InputGroupAddon align="start">₹</InputGroupAddon>
+            <InputGroupInput
+              id="freight-amount"
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="0"
+              value={freight.amount}
+              aria-invalid={freightError === null ? undefined : true}
+              onChange={(event) => {
+                priced.setFreight({ ...freight, amount: event.target.value });
+              }}
+            />
+          </InputGroup>
+        </div>
+        <div className="col-span-12 flex flex-col gap-1.5 sm:col-span-6">
+          <label htmlFor="freight-gst" className="text-xs text-muted-foreground">
+            GST on freight
+          </label>
+          <Select
+            items={items}
+            value={freight.gstSlab === null ? DEFAULT_FREIGHT_SLAB : slabKey(freight.gstSlab)}
+            onValueChange={(next) => {
+              if (next === null) return;
+              priced.setFreight({
+                ...freight,
+                gstSlab: next === DEFAULT_FREIGHT_SLAB ? null : next,
+              });
+            }}
+          >
+            <SelectTrigger id="freight-gst">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {pricedFreight === null ? null : (
+        <p className={cn("text-xs text-foreground tabular-nums", priced.pricing && "opacity-60")}>
+          GST {formatRate(pricedFreight.gstSlab)}
+          {pricedFreight.gstSlabChosen ? "" : " (highest of the items)"}:{" "}
+          {Number(pricedFreight.igst.amount) > 0
+            ? formatInr(pricedFreight.igst.amount, { paise: true })
+            : `${formatInr(pricedFreight.cgst.amount, { paise: true })} + ${formatInr(pricedFreight.sgst.amount, { paise: true })}`}{" "}
+          · Freight total {formatInr(pricedFreight.total, { paise: true })}
+        </p>
+      )}
+      {freightError === null ? null : (
+        <p id={errorId} role="alert" className="text-xs text-danger">
+          {freightError}
+        </p>
+      )}
+    </fieldset>
   );
 }
 
@@ -151,6 +254,7 @@ export function saveBlocker(priced: PricedLines): string | null {
   if (priced.previewFailed || Object.keys(priced.previewErrors).length > 0) {
     return "Fix the pricing first.";
   }
+  if (priced.freightBlocks) return "Fix the freight first.";
   return null;
 }
 
@@ -210,6 +314,10 @@ function BuilderTotals({
   const rows: { label: string; value: string | null; strong?: boolean }[] = [
     { label: "Gross", value: totals?.gross ?? null },
     { label: "Discount", value: totals?.discount ?? null },
+    // QUOT-015 · Freight sits inside the taxable value, never in gross or discount.
+    ...(totals !== null && Number(totals.freight) > 0
+      ? [{ label: "Freight", value: totals.freight }]
+      : []),
     { label: "Taxable value", value: totals?.taxable ?? null },
     ...(intraState
       ? [

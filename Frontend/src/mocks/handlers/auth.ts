@@ -22,6 +22,7 @@ import { mockDb } from "@/mocks/db";
 
 import { mockConsumerMe } from "./portal";
 import { applyScenario } from "./scenario";
+import { mockSettings } from "./settings";
 
 /**
  * The backend's /auth endpoints (backend/docs/api/auth.md), mocked closely enough
@@ -315,6 +316,11 @@ export const authHandlers = [
       data: {
         ...me.data,
         must_change_password: me.data.user_type === "staff" && readMockMustChangePassword(),
+        // BE-030 · the admin's switch, so partner pages never probe /tasks
+        features: {
+          tasks_for_dealers:
+            mockSettings().find((setting) => setting.key === "tasks_for_dealers")?.value === "on",
+        },
       },
     });
   }),

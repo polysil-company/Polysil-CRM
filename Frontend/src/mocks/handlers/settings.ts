@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
+import { GST_SLABS } from "@/features/products/api/products.schemas";
 import type { SettingWire } from "@/features/settings/api/settings.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
@@ -62,6 +63,19 @@ function bands(key: string, value: number[], description: string): SettingWire {
   return {
     key,
     kind: "bands",
+    value,
+    allowed: null,
+    min: null,
+    max: null,
+    description,
+    updated_at: SEEDED_AT,
+  };
+}
+
+function slabs(key: string, value: string[], description: string): SettingWire {
+  return {
+    key,
+    kind: "slabs",
     value,
     allowed: null,
     min: null,
@@ -178,6 +192,12 @@ export function mockSettings(): SettingWire[] {
       ["state_manager", "regional_manager", "md_ceo"],
       "Who approves a replacement order, in order, before the Dispatch Manager. Each must be a manager who approves orders.",
     ),
+    // FS-069 (migration 077)
+    slabs(
+      "gst_slab_choices",
+      ["0", "5", "18", "40"],
+      "The GST slabs a commercial or industrial line, and freight, may be set to.",
+    ),
   ];
   return mockDb.settings;
 }
@@ -223,6 +243,16 @@ function problemOf(setting: SettingWire, value: unknown): string | null {
         })
         ? null
         : "four whole numbers, rising";
+    case "slabs":
+      return Array.isArray(value) &&
+        value.length > 0 &&
+        value.every(
+          (item) =>
+            typeof item === "string" && GST_SLABS.some((slab) => Number(slab) === Number(item)),
+        ) &&
+        new Set(value.map(Number)).size === value.length
+        ? null
+        : "GST slabs in force, at least one, none twice";
   }
 }
 

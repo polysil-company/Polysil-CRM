@@ -1,5 +1,6 @@
 import type { LeadWire } from "@/features/leads/api/leads.schemas";
 import type {
+  FreightWire,
   QuotationLineWire,
   QuotationStatus,
   QuotationSummaryWire,
@@ -87,7 +88,10 @@ export function mockLine(
   discounts: readonly [number, number, number],
   provisional: boolean,
   priceVersion = 0,
+  /** QUOT-015 · A slab picked over the product's HSN slab; null follows the HSN. */
+  chosenSlab: number | null = null,
 ): QuotationLineWire {
+  const slab = chosenSlab ?? product.slab;
   // A later price version moves the rate 5% a step, as a newly published list would.
   const rate = Math.round(product.rate * (1 + 0.05 * priceVersion));
   const gross = Math.round(rate * qty);
@@ -97,8 +101,8 @@ export function mockLine(
   const after2 = after1 - d2;
   const d3 = percentOf(after2, discounts[2]);
   const taxable = after2 - d3;
-  const cgst = percentOf(taxable, product.slab / 2);
-  const sgst = percentOf(taxable, product.slab / 2);
+  const cgst = percentOf(taxable, slab / 2);
+  const sgst = percentOf(taxable, slab / 2);
 
   return {
     line_no: lineNo,
@@ -119,9 +123,11 @@ export function mockLine(
     discount3_amt: paise(d3),
     discount: paise(d1 + d2 + d3),
     taxable: paise(taxable),
-    gst_slab: rate3(product.slab),
-    cgst_rate: rate3(product.slab / 2),
-    sgst_rate: rate3(product.slab / 2),
+    gst_slab: rate3(slab),
+    hsn_slab: rate3(product.slab),
+    gst_slab_chosen: chosenSlab !== null,
+    cgst_rate: rate3(slab / 2),
+    sgst_rate: rate3(slab / 2),
     igst_rate: "0.000",
     cgst: paise(cgst),
     sgst: paise(sgst),
@@ -150,15 +156,50 @@ function sumField(lines: readonly QuotationLineWire[], field: keyof QuotationLin
   return paise(total);
 }
 
-export function totalsOf(lines: readonly QuotationLineWire[]): QuotationWire["totals"] {
+/**
+ * QUOT-015 · Freight priced like a line of one with no discount, within the state: CGST and
+ * SGST each at half the slab, rounded on their own.
+ */
+export function mockFreight(amount: number, slab: number, chosen: boolean): FreightWire {
+  const cgst = percentOf(amount, slab / 2);
+  const sgst = percentOf(amount, slab / 2);
+  return {
+    amount: paise(amount),
+    gst_slab: rate3(slab),
+    gst_slab_chosen: chosen,
+    cgst_rate: rate3(slab / 2),
+    sgst_rate: rate3(slab / 2),
+    igst_rate: "0.000",
+    cgst: paise(cgst),
+    sgst: paise(sgst),
+    igst: "0.00",
+    total: paise(amount + cgst + sgst),
+  };
+}
+
+/** QUOT-015 · Lines whose GST slab was picked. */
+export function gstChangedLines(
+  lines: readonly { readonly gst_slab_chosen?: boolean | undefined }[],
+): number {
+  return lines.filter((line) => line.gst_slab_chosen === true).length;
+}
+
+/** The sums of the lines; freight joins taxable, the taxes and the total, never gross. */
+export function totalsOf(
+  lines: readonly QuotationLineWire[],
+  freight: FreightWire | null = null,
+): QuotationWire["totals"] {
+  const add = (sum: string, part: string | undefined): string =>
+    paise(Math.round(Number(sum) * 100) + Math.round(Number(part ?? "0") * 100));
   return {
     gross: sumField(lines, "gross"),
     discount: sumField(lines, "discount"),
-    taxable: sumField(lines, "taxable"),
-    cgst: sumField(lines, "cgst"),
-    sgst: sumField(lines, "sgst"),
-    igst: sumField(lines, "igst"),
-    total: sumField(lines, "total"),
+    freight: freight?.amount ?? "0.00",
+    taxable: add(sumField(lines, "taxable"), freight?.amount),
+    cgst: add(sumField(lines, "cgst"), freight?.cgst),
+    sgst: add(sumField(lines, "sgst"), freight?.sgst),
+    igst: add(sumField(lines, "igst"), freight?.igst),
+    total: add(sumField(lines, "total"), freight?.total),
   };
 }
 
@@ -382,6 +423,8 @@ export interface MockDraftInput {
   readonly party: QuotationWire["party"];
   readonly terms: string | null;
   readonly lines: readonly QuotationLineWire[];
+  /** QUOT-015 · The freight as priced; none when left out. */
+  readonly freight?: FreightWire | null;
   readonly createdAt: string;
 }
 
@@ -403,11 +446,14 @@ export function withLines(
   draft: QuotationWire,
   lines: readonly QuotationLineWire[],
   extraWarnings: readonly string[] = [],
+  freight: FreightWire | null = draft.freight ?? null,
 ): QuotationWire {
   return {
     ...draft,
     lines: [...lines],
-    totals: totalsOf(lines),
+    freight,
+    gst_changed_lines: gstChangedLines(lines),
+    totals: totalsOf(lines, freight),
     is_provisional: lines.some((line) => line.provisional_fields.length > 0),
     warnings: [...provisionalWarnings(lines), ...extraWarnings],
     discount: discountInfo(lines),
@@ -440,7 +486,9 @@ export function mockDraft(input: MockDraftInput): QuotationWire {
     price_list: PRICE_LIST,
     price_list_ids: [PRICE_LIST.id],
     lines,
-    totals: totalsOf(lines),
+    freight: input.freight ?? null,
+    gst_changed_lines: gstChangedLines(lines),
+    totals: totalsOf(lines, input.freight ?? null),
     is_provisional: provisional,
     warnings: provisionalWarnings(lines),
     terms: input.terms,

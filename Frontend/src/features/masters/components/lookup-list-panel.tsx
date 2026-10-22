@@ -36,7 +36,9 @@ import {
   LOOKUP_CODE_MAX_LENGTH,
   LOOKUP_CODE_PATTERN,
   LOOKUP_NAME_MAX_LENGTH,
+  LOOKUP_SORT_ORDER_LIMIT,
   type LookupCreateRequest,
+  type LookupUpdateRequest,
 } from "@/features/masters/api/masters.schemas";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { toUserFacingError } from "@/lib/api/error-messages";
@@ -196,6 +198,21 @@ function ListTable({
               <th scope="col" className="py-2 pr-3 text-left font-medium">
                 Code
               </th>
+              {listTakesSortOrder(list) ? (
+                <th scope="col" className="py-2 pr-3 text-right font-medium">
+                  Order
+                </th>
+              ) : null}
+              {listTakesQuality(list) && canEdit ? (
+                <th scope="col" className="py-2 pr-3 text-right font-medium">
+                  Quality
+                </th>
+              ) : null}
+              {listTakesKind(list) ? (
+                <th scope="col" className="py-2 pr-3 text-left font-medium">
+                  Kind
+                </th>
+              ) : null}
               <th scope="col" className="py-2 pr-3 text-left font-medium">
                 Status
               </th>
@@ -227,6 +244,8 @@ function ListRow({
   canEdit: boolean;
 }): React.JSX.Element {
   const update = useUpdateLookupItem(list);
+  const [editing, setEditing] = useState(false);
+  const editable = listTakesSortOrder(list) || listTakesQuality(list);
   const toggle = useAsyncAction({
     action: () => update.mutateAsync({ itemId: row.id, body: { is_active: !row.isActive } }),
     logger: log,
@@ -257,6 +276,19 @@ function ListRow({
         {row.name}
       </th>
       <td className="py-2 pr-3 font-mono text-xs text-muted-foreground">{row.code}</td>
+      {listTakesSortOrder(list) ? (
+        <td className="py-2 pr-3 text-right text-foreground tabular-nums">
+          {row.sortOrder === null ? "—" : formatNumber(row.sortOrder)}
+        </td>
+      ) : null}
+      {listTakesQuality(list) && canEdit ? (
+        <td className="py-2 pr-3 text-right text-foreground tabular-nums">{row.quality ?? "—"}</td>
+      ) : null}
+      {listTakesKind(list) ? (
+        <td className="py-2 pr-3 text-foreground">
+          {row.kind === null ? "—" : row.kind === "won" ? "Won" : "Lost"}
+        </td>
+      ) : null}
       <td className="py-2 pr-3">
         {row.isActive ? (
           <Badge size="sm" variant="success">
@@ -269,7 +301,20 @@ function ListRow({
         )}
       </td>
       {canEdit ? (
-        <td className="py-1 text-right">
+        <td className="py-1 text-right whitespace-nowrap">
+          {editable ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Edit ${row.name}`}
+              onClick={() => {
+                setEditing(true);
+              }}
+            >
+              Edit
+            </Button>
+          ) : null}
+          <EditItemDialog list={list} row={row} open={editing} onOpenChange={setEditing} />
           <Button
             variant="ghost"
             size="sm"
@@ -328,16 +373,53 @@ export function draftProblems(
   } else if (existing.some((item) => item.code === code)) {
     problems.code = "Already in use.";
   }
-  if (listTakesSortOrder(list) && draft.sortOrder.trim() !== "") {
-    if (!/^\d+$/.test(draft.sortOrder.trim())) problems.sortOrder = "A whole number, like 10.";
+  if (listTakesSortOrder(list)) {
+    const sortProblem = sortOrderProblem(draft.sortOrder);
+    if (sortProblem !== null) problems.sortOrder = sortProblem;
   }
-  if (listTakesQuality(list) && draft.quality.trim() !== "") {
-    const quality = Number(draft.quality.trim());
-    if (!/^\d+(\.\d+)?$/.test(draft.quality.trim()) || quality < 0 || quality > 1) {
-      problems.quality = "A number from 0 to 1, like 0.6.";
-    }
+  if (listTakesQuality(list)) {
+    const qualityProblem = qualityProblemOf(draft.quality);
+    if (qualityProblem !== null) problems.quality = qualityProblem;
   }
   return problems;
+}
+
+/** An empty box is fine; otherwise a whole number within the backend's bound (BE-026). */
+function sortOrderProblem(text: string): string | null {
+  const value = text.trim();
+  if (value === "") return null;
+  if (!/^-?\d+$/.test(value)) return "A whole number, like 10.";
+  if (Math.abs(Number(value)) > LOOKUP_SORT_ORDER_LIMIT) {
+    return "At most 1,000,000 either way.";
+  }
+  return null;
+}
+
+function qualityProblemOf(text: string): string | null {
+  const value = text.trim();
+  if (value === "") return null;
+  const quality = Number(value);
+  return !/^\d+(\.\d+)?$/.test(value) || quality < 0 || quality > 1
+    ? "A number from 0 to 1, like 0.6."
+    : null;
+}
+
+/** BE-026 · What an edit sends: only a sort order or quality that changed. */
+export function updateRequestOf(
+  list: LookupList,
+  row: LookupItem,
+  draft: { readonly sortOrder: string; readonly quality: string },
+): LookupUpdateRequest {
+  const sortOrder = draft.sortOrder.trim();
+  const quality = draft.quality.trim();
+  return {
+    ...(listTakesSortOrder(list) && sortOrder !== "" && Number(sortOrder) !== row.sortOrder
+      ? { sort_order: Number(sortOrder) }
+      : {}),
+    ...(listTakesQuality(list) && quality !== "" && Number(quality) !== Number(row.quality)
+      ? { quality }
+      : {}),
+  };
 }
 
 /** The request for a new row: only the fields this list takes, and only those filled in. */
@@ -559,6 +641,157 @@ function AddItemDialog({
               errorLabel="Not added"
             >
               Add
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** BE-026 · A row's place in pickers and, for a source, its quality. Name and code never change. */
+function EditItemDialog({
+  list,
+  row,
+  open,
+  onOpenChange,
+}: {
+  list: LookupList;
+  row: LookupItem;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}): React.JSX.Element {
+  const initial = {
+    sortOrder: row.sortOrder === null ? "" : String(row.sortOrder),
+    quality: row.quality ?? "",
+  };
+  const [draft, setDraft] = useState(initial);
+  const [problems, setProblems] = useState<Partial<Record<"sortOrder" | "quality", string>>>({});
+  const update = useUpdateLookupItem(list);
+  const body = updateRequestOf(list, row, draft);
+  const unchanged = Object.keys(body).length === 0;
+
+  const close = (): void => {
+    onOpenChange(false);
+    setDraft(initial);
+    setProblems({});
+  };
+
+  const submit = useAsyncAction({
+    action: () => update.mutateAsync({ itemId: row.id, body }),
+    logger: log,
+    fn: "handleEditLookupItem",
+    dataId: "MSTR-009",
+    onSuccess: (item) => {
+      toast.success(`${item.name} saved`, { description: LIST_COPY[list].title });
+      close();
+    },
+    onError: (error) => {
+      const fields = readFieldErrors(error) ?? {};
+      const mapped: Partial<Record<"sortOrder" | "quality", string>> = {};
+      if (fields.sort_order !== undefined) mapped.sortOrder = fields.sort_order;
+      if (fields.quality !== undefined) mapped.quality = fields.quality;
+      if (Object.keys(mapped).length > 0) {
+        setProblems(mapped);
+        return;
+      }
+      toast.error(`${row.name} not saved`, { description: toUserFacingError(error).description });
+    },
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) onOpenChange(true);
+        else close();
+      }}
+    >
+      <DialogContent size="sm">
+        <form
+          noValidate
+          aria-label={`Edit ${row.name}`}
+          className="flex min-h-0 flex-1 flex-col text-left"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const found: Partial<Record<"sortOrder" | "quality", string>> = {};
+            const sortProblem = listTakesSortOrder(list) ? sortOrderProblem(draft.sortOrder) : null;
+            const qualityProblem = listTakesQuality(list) ? qualityProblemOf(draft.quality) : null;
+            if (sortProblem !== null) found.sortOrder = sortProblem;
+            if (qualityProblem !== null) found.quality = qualityProblem;
+            setProblems(found);
+            if (Object.keys(found).length === 0 && !unchanged) void submit.run();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Edit {row.name}</DialogTitle>
+            <DialogDescription>
+              The name and code stay as they are; records that use this row keep it.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="flex flex-col gap-4">
+            {listTakesSortOrder(list) ? (
+              <Field data-invalid={problems.sortOrder === undefined ? undefined : true}>
+                <FieldLabel htmlFor={`lookup-edit-sort-${row.id}`}>Sort order</FieldLabel>
+                <Input
+                  id={`lookup-edit-sort-${row.id}`}
+                  inputMode="numeric"
+                  value={draft.sortOrder}
+                  aria-invalid={problems.sortOrder === undefined ? undefined : true}
+                  aria-describedby={`lookup-edit-sort-${row.id}-${problems.sortOrder === undefined ? "hint" : "error"}`}
+                  onChange={(event) => {
+                    setDraft((before) => ({ ...before, sortOrder: event.target.value }));
+                  }}
+                />
+                {problems.sortOrder === undefined ? (
+                  <FieldDescription id={`lookup-edit-sort-${row.id}-hint`}>
+                    Lower comes first in pickers.
+                  </FieldDescription>
+                ) : null}
+                <FieldError id={`lookup-edit-sort-${row.id}-error`}>
+                  {problems.sortOrder}
+                </FieldError>
+              </Field>
+            ) : null}
+            {listTakesQuality(list) ? (
+              <Field data-invalid={problems.quality === undefined ? undefined : true}>
+                <FieldLabel htmlFor={`lookup-edit-quality-${row.id}`}>Quality</FieldLabel>
+                <Input
+                  id={`lookup-edit-quality-${row.id}`}
+                  inputMode="decimal"
+                  value={draft.quality}
+                  aria-invalid={problems.quality === undefined ? undefined : true}
+                  aria-describedby={`lookup-edit-quality-${row.id}-${problems.quality === undefined ? "hint" : "error"}`}
+                  onChange={(event) => {
+                    setDraft((before) => ({ ...before, quality: event.target.value }));
+                  }}
+                />
+                {problems.quality === undefined ? (
+                  <FieldDescription id={`lookup-edit-quality-${row.id}-hint`}>
+                    0 to 1: how likely a lead from this source is to buy. It counts in the score.
+                  </FieldDescription>
+                ) : null}
+                <FieldError id={`lookup-edit-quality-${row.id}-error`}>
+                  {problems.quality}
+                </FieldError>
+              </Field>
+            ) : null}
+          </DialogBody>
+          <DialogFooter>
+            <DialogClose
+              render={<Button type="button" variant="outline" disabled={submit.isBusy} />}
+            >
+              Cancel
+            </DialogClose>
+            <Button
+              type="submit"
+              disabled={unchanged}
+              state={submit.state}
+              loadingLabel="Saving…"
+              successLabel="Saved"
+              errorLabel="Not saved"
+            >
+              Save
             </Button>
           </DialogFooter>
         </form>

@@ -144,10 +144,25 @@ function closed(): Response {
 }
 
 export const documentHandlers = [
-  http.get(buildApiUrl("/documents/types"), async () => {
+  http.get(buildApiUrl("/documents/types"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
-    return HttpResponse.json({ data: MOCK_DOCUMENT_TYPES });
+    // BE-025 · a dealer application takes its five types and Other; every other record the
+    // ten general ones; no record type, every type
+    const type = new URL(request.url).searchParams.get("record_type");
+    if (type === null) return HttpResponse.json({ data: MOCK_DOCUMENT_TYPES });
+    if (!isRecordType(type)) {
+      return errorResponse(422, "validation_error", "Check the fields.", {
+        record_type: "not a record type",
+      });
+    }
+    const general = MOCK_DOCUMENT_TYPES.slice(0, 10);
+    return HttpResponse.json({
+      data:
+        type === "dealer_application"
+          ? [...MOCK_DOCUMENT_TYPES.slice(10), ...general.filter((item) => item.code === "other")]
+          : general,
+    });
   }),
 
   http.get(buildApiUrl("/documents"), async ({ request }) => {

@@ -236,3 +236,203 @@ describe("[MSTR-007] Items from Excel", () => {
     expect(await within(item).findByText("Rate", {}, PRICED)).toBeInTheDocument();
   });
 });
+
+describe("[QUOT-015] A GST slab per item, and freight", () => {
+  afterEach(() => {
+    push.mockReset();
+    resetMockDb();
+    server.events.removeAllListeners();
+  });
+
+  /** The bodies of every preview and save, in order. */
+  function recordBodies(): { path: string; body: Record<string, unknown> }[] {
+    const bodies: { path: string; body: Record<string, unknown> }[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "GET") return;
+      const path = new URL(request.url).pathname;
+      void request
+        .clone()
+        .json()
+        .then((body: unknown) => {
+          if (typeof body === "object" && body !== null && !Array.isArray(body)) {
+            bodies.push({ path, body: Object.fromEntries(Object.entries(body)) });
+          }
+        });
+    });
+    return bodies;
+  }
+
+  function linesOf(body: Record<string, unknown>): Record<string, unknown>[] {
+    const lines = body.lines;
+    return Array.isArray(lines)
+      ? lines.flatMap((line: unknown) =>
+          typeof line === "object" && line !== null
+            ? [Object.fromEntries(Object.entries(line))]
+            : [],
+        )
+      : [];
+  }
+
+  it(
+    "presets an item to its HSN slab, sends a slab only once picked, and saves the freight",
+    PRICING_TEST,
+    async () => {
+      signInAsAdmin();
+      const bodies = recordBodies();
+      const user = showNew(leadAt("qualified"));
+      await screen.findByRole("form", { name: "New quotation" });
+      await addPipe(user, "10");
+      const item = screen.getByRole("listitem", { name: "Item 1" });
+      await within(item).findByText("Rate", {}, PRICED);
+
+      // The pipe's HSN slab is 18 %: shown, and no slab sent for it.
+      const gst = within(item).getByRole("combobox", { name: "GST for item 1" });
+      expect(gst).toHaveTextContent("18% (HSN)");
+      const previews = bodies.filter((entry) => entry.path.endsWith("/pricing/quote-lines"));
+      expect(previews.length).toBeGreaterThan(0);
+      expect(linesOf(previews.at(-1)?.body ?? {})[0]).not.toHaveProperty("gst_slab");
+
+      await user.click(gst);
+      // 0, 5, 18 and 40 from the setting; 18 is the HSN's own.
+      expect(await screen.findByRole("option", { name: "40%" })).toBeInTheDocument();
+      await user.click(screen.getByRole("option", { name: "5%" }));
+      expect(await within(item).findByText("Changed from 18%")).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText("Freight before tax (optional)"), "1500");
+      const totals = screen.getByLabelText("Totals");
+      expect(await within(totals).findByText("Freight", {}, PRICED)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/GST 5% \(highest of the items\)/, {}, PRICED),
+      ).toBeInTheDocument();
+
+      const save = screen.getByRole("button", { name: "Save draft" });
+      await waitFor(() => {
+        expect(save).toBeEnabled();
+      }, PRICED);
+      await user.click(save);
+      await waitFor(() => {
+        expect(push).toHaveBeenCalledTimes(1);
+      });
+
+      const created = bodies.find((entry) => entry.path.endsWith("/quotations"));
+      expect(linesOf(created?.body ?? {})[0]).toMatchObject({ gst_slab: "5" });
+      expect(created?.body.freight).toEqual({ amount: "1500" });
+      const [saved] = mockDb.quotations;
+      expect(saved?.lines[0]).toMatchObject({
+        gst_slab: "5.000",
+        hsn_slab: "18.000",
+        gst_slab_chosen: true,
+      });
+      expect(saved?.gst_changed_lines).toBe(1);
+      expect(saved?.freight).toMatchObject({ amount: "1500.00", gst_slab: "5.000" });
+      expect(saved?.totals.freight).toBe("1500.00");
+    },
+  );
+
+  it("says what's wrong with a freight amount on the field, and holds the save", async () => {
+    signInAsAdmin();
+    const user = showNew(leadAt("qualified"));
+    await screen.findByRole("form", { name: "New quotation" });
+
+    await user.type(screen.getByLabelText("Freight before tax (optional)"), "12.345");
+    expect(
+      await screen.findByText("Rupees above 0, with at most two decimals"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Freight before tax (optional)")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+  });
+
+  it("puts the backend's refusal of a picked slab on its item", PRICING_TEST, async () => {
+    signInAsAdmin();
+    const user = showNew(leadAt("qualified"));
+    await screen.findByRole("form", { name: "New quotation" });
+    await addPipe(user, "4");
+    const item = screen.getByRole("listitem", { name: "Item 1" });
+    await within(item).findByText("Rate", {}, PRICED);
+
+    // The admin takes 5 % off the list after the screen read it.
+    server.use(
+      http.post(buildApiUrl("/pricing/quote-lines"), () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: "gst_slab_not_offered",
+              message: "A GST slab may be chosen from the slabs in force.",
+              fields: { "lines[0].gst_slab": "5 % is not one of the GST slabs offered." },
+            },
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    await user.click(within(item).getByRole("combobox", { name: "GST for item 1" }));
+    await user.click(await screen.findByRole("option", { name: "5%" }));
+
+    expect(
+      await within(item).findByText("GST: 5 % is not one of the GST slabs offered.", {}, PRICED),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
+  });
+
+  it("offers neither a slab nor freight on a subsidised quotation", async () => {
+    signInAsAdmin();
+    const lead = mockDb.leads.find((item) => item.stage === "qualified");
+    if (lead === undefined) throw new Error("No qualified lead");
+    lead.inquiry_type = "subsidised";
+    showNew(lead.id);
+    await screen.findByRole("form", { name: "New quotation" });
+
+    expect(screen.queryByLabelText("Freight before tax (optional)")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "GST for item 1" })).not.toBeInTheDocument();
+  });
+
+  it("loads a draft's picked slab and freight, and sends them again on save", async () => {
+    signInAsAdmin();
+    const draft = mockDb.quotations.find(
+      (item) =>
+        item.status === "draft" &&
+        item.sales_type === "commercial" &&
+        item.superseded_by === null &&
+        item.lines.length > 0,
+    );
+    if (draft === undefined) throw new Error("No commercial draft");
+    const [first] = draft.lines;
+    if (first === undefined) throw new Error("No line");
+    const bodies = recordBodies();
+    // Chosen at 40 %, with ₹2,000 freight at the default slab.
+    draft.lines[0] = { ...first, gst_slab: "40.000", gst_slab_chosen: true };
+    draft.freight = {
+      amount: "2000.00",
+      gst_slab: "40.000",
+      gst_slab_chosen: false,
+      cgst_rate: "20.000",
+      sgst_rate: "20.000",
+      igst_rate: "0.000",
+      cgst: "400.00",
+      sgst: "400.00",
+      igst: "0.00",
+      total: "2800.00",
+    };
+    const user = userEvent.setup();
+    renderWithProviders(<EditQuotation quotationId={draft.id} />);
+
+    const form = await screen.findByRole("form", { name: /^Edit / });
+    const item = within(form).getByRole("listitem", { name: "Item 1" });
+    expect(within(item).getByRole("combobox", { name: "GST for item 1" })).toHaveTextContent("40%");
+    expect(within(form).getByLabelText("Freight before tax (optional)")).toHaveValue("2000");
+
+    const save = within(form).getByRole("button", { name: "Save changes" });
+    await waitFor(() => {
+      expect(save).toBeEnabled();
+    }, PRICED);
+    await user.click(save);
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledTimes(1);
+    });
+    const replaced = bodies.find((entry) => entry.path.endsWith("/lines"));
+    expect(linesOf(replaced?.body ?? {})[0]).toMatchObject({ gst_slab: "40" });
+    expect(replaced?.body.freight).toEqual({ amount: "2000" });
+  });
+});

@@ -14,10 +14,11 @@ import {
   type OrderWire,
   type SamplePricing,
 } from "@/features/orders/api/orders.schemas";
-import type {
-  PdfLinkWire,
-  QuotationLineWire,
-  TaxTreatment,
+import {
+  takesGstChoice,
+  type PdfLinkWire,
+  type QuotationLineWire,
+  type TaxTreatment,
 } from "@/features/quotations/api/quotations.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
@@ -64,7 +65,15 @@ import {
 } from "./export-sample";
 import { MOCK_CREATOR, newMockEvent } from "./lead-events";
 import { paymentsBlockFor } from "./payments";
-import { lineInSchema, priceLines, rateChanges } from "./quotations";
+import {
+  freightInSchema,
+  gstChoiceRefusal,
+  lineInSchema,
+  priceLines,
+  pricedFreight,
+  rateChanges,
+  storedFreightIn,
+} from "./quotations";
 import { applyOrderPoints, releaseOrderPoints } from "./rewards";
 import { applyScenario } from "./scenario";
 import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
@@ -452,6 +461,8 @@ const createSchema = z.object({
   payment_terms: z.enum(PAYMENT_TERMS).default("full_payment"),
   remarks: z.string().trim().max(2000).nullish(),
   lines: z.array(lineInSchema).max(200).default([]),
+  /** QUOT-015 · One freight charge; commercial and industrial only. */
+  freight: freightInSchema.nullish(),
   /** SO-008 · Typed in on a direct subsidised order; refused alongside quotations. */
   subsidy: subsidySchema.optional(),
   /** DISP-003 · "Order to"; staff only. */
@@ -462,6 +473,8 @@ const createSchema = z.object({
 
 const linesSchema = z.object({
   lines: z.array(lineInSchema).max(200),
+  /** QUOT-015 · omit to keep, null to remove */
+  freight: freightInSchema.nullish(),
   expected_status: expectedStatus,
 });
 
@@ -704,6 +717,14 @@ function createDirect(
   const sample = body.order_type === "sample";
   if (sample && listValue(domestic.lines) > sampleMaxValue()) return sampleOverLimit();
   const treatment = body.order_type === "export" ? exportTreatment() : "domestic";
+  // QUOT-015 · a GST choice and freight: commercial and industrial only
+  const choiceRefusal = gstChoiceRefusal(
+    body.order_type,
+    treatment === "domestic",
+    body.lines,
+    body.freight,
+  );
+  if (choiceRefusal !== null) return choiceRefusal;
   const pricing = sample ? samplePricing() : null;
   const priced = { lines: domestic.lines.map((line) => repriced(line, treatment, pricing)) };
   const me = mockMeFor(readMockRole()).data;
@@ -726,6 +747,7 @@ function createDirect(
     ownerOrgUnit: lead?.owner_org_unit ??
       me.org_unit ?? { id: "ou-head-office", name: "Head Office" },
     lines: priced.lines,
+    freight: pricedFreight(body.freight, priced.lines),
     orderType: body.order_type,
     deliveryAddress: body.delivery_address ?? null,
     paymentTerms: body.payment_terms,
@@ -1255,12 +1277,27 @@ export const orderHandlers = [
     if (order.order_type === "sample" && listValue(domestic.lines) > sampleMaxValue()) {
       return sampleOverLimit();
     }
+    const choiceRefusal = gstChoiceRefusal(
+      order.order_type,
+      (order.tax_treatment ?? "domestic") === "domestic",
+      parsed.data.lines,
+      parsed.data.freight,
+    );
+    if (choiceRefusal !== null) return choiceRefusal;
     const priced = {
       lines: domestic.lines.map((line) =>
         repriced(line, order.tax_treatment ?? "domestic", order.sample_pricing ?? null),
       ),
     };
-    Object.assign(order, withOrderLines(orderLinesFrom(priced.lines)));
+    const kept = takesGstChoice(order.order_type) ? storedFreightIn(order.freight ?? null) : null;
+    const freightIn = parsed.data.freight === undefined ? kept : parsed.data.freight;
+    Object.assign(
+      order,
+      withOrderLines(
+        orderLinesFrom(priced.lines),
+        priced.lines.length === 0 ? null : pricedFreight(freightIn, priced.lines),
+      ),
+    );
     applySubsidy(order);
     mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
     recordOrderEvent(order, "order.lines_replaced", { lines: priced.lines.length });
