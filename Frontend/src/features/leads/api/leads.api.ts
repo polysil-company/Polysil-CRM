@@ -61,6 +61,8 @@ export async function listLeads(params: LeadListParams, signal?: AbortSignal): P
       order: params.order,
       territory_id: params.areas.join(","),
       campaign_id: params.campaign,
+      // LEAD-019 · Left out unless asked for, as the backend's default is "not deleted".
+      deleted: params.deleted === true ? true : undefined,
     },
     schema: leadPageSchema,
     signal,
@@ -97,6 +99,7 @@ export function exportLeads(params: LeadListParams): Promise<DownloadedFile> {
       order: params.order,
       territory_id: params.areas.join(","),
       campaign_id: params.campaign,
+      deleted: params.deleted === true ? true : undefined,
     },
   });
 }

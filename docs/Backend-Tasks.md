@@ -108,6 +108,14 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-031** · A complaint's PDF, like a quotation's or an order's: `pdf_state` and `GET /complaints/{id}/pdf` · CMPL-013 · normal
 
+**Field tracking app** — added for the Android tracking app (TRK-008).
+
+- [ ] **BE-032** · A device token for the tracking app, so points upload while the app is closed · TRK-008 · high
+
+**Leads** — added with the Deleted leads list (LEAD-019).
+
+- [ ] **BE-033** · Restore a deleted lead, and say when and by whom it was deleted · LEAD-019, LEAD-011 · normal
+
 ---
 
 ## Details
@@ -641,5 +649,51 @@ in the same shape. Never renumber or reuse a number.
 - **Why:** the complaint page has no printable copy to send or file. Quotations and orders have one.
 - **Done when:** both are in `complaints.md`. The frontend already shows the button when
   `pdf_state` arrives, and the mock follows the shape above.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-032 · A device token for the tracking app, so points upload while the app is closed
+
+- **Status:** ⬜ Open
+- **Asked:** 21 Oct 2026 · TRK-008 · the Android tracking app (`Frontend/Docs/handoff-mobile-app.md`)
+- **What:**
+  - The app's background part is native code that runs while the app's screens are closed. It
+    can't use the web session:
+    - the access token lives only in the page's memory and lasts 15 minutes;
+    - the refresh cookie rotates. If both the web screens and the native part refreshed, one of
+      them would reuse a used token, and `refresh_reused` signs the person out everywhere.
+  - Proposed:
+    - `POST /tracking/device-token` with `{ device_id }`, signed in as usual. It returns a
+      long-lived token that is good **only** for `POST /locations/batch`,
+      `POST /tracking/duty/end` and `GET /me/tracking-config`, for that user and that device.
+    - It stops working when the person signs out, is deactivated or signed out everywhere, or
+      withdraws consent. A new call for the same device replaces the old token.
+    - The lifetime is the backend's call. A suggestion: 30 days, renewed whenever the app opens.
+- **Why:** without it, points wait on the phone until the person next opens the app. Nothing is
+  lost, since points are kept up to the retention period. But the team map shows field staff as
+  "stale" all day, and the day's km appear only after the app is opened.
+- **Done when:** it is in `tracking.md`, and in the contract's sequence in
+  `handover/field-tracking-contract.md`.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-033 · Restore a deleted lead, and say when and by whom it was deleted
+
+- **Status:** ⬜ Open
+- **Asked:** 22 Oct 2026 · LEAD-019 · the Deleted leads list
+- **What:**
+  - `GET /leads?deleted=true` lists deleted leads "to restore one", but nothing restores one. Proposed:
+    `POST /leads/{id}/restore`, needing `leads.delete`. It clears `deleted_at` and adds a
+    `lead.restored` event to the timeline. A lead that isn't deleted answers `200` unchanged.
+  - Say on each row of `GET /leads?deleted=true`: `deleted_at`, and `deleted_by` as
+    `{ id, full_name }`. The list could then show when and by whom, and sort by it.
+  - Say whether `GET /leads/{id}` opens a deleted lead for a `leads.delete` holder. Until then the
+    list doesn't link to it: the page would offer edits and stage changes on a lead nobody else
+    can see.
+  - What a restore does to the duplicate pairs the delete closed is the backend's call.
+- **Why:** a lead deleted by mistake can be found but not brought back. Today only a database edit
+  undoes it.
+- **Done when:** it is in `leads.md`. The frontend adds a **Restore** button to each row, the dates,
+  and a link to the lead if it opens.
 - **Done in:** —
 - **Backend notes:** —

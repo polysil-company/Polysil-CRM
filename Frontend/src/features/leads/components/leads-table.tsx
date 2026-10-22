@@ -1,6 +1,11 @@
 "use client";
 
-import { ArrowLeft01Icon, FilterRemoveIcon, UserAdd01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowLeft01Icon,
+  Delete02Icon,
+  FilterRemoveIcon,
+  UserAdd01Icon,
+} from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { PaginationState, RowSelectionState, SortingState } from "@tanstack/react-table";
 import { useState } from "react";
@@ -22,7 +27,7 @@ import {
 import { readFieldErrors } from "@/lib/api/errors";
 import { formatInrCompact, sumRupees } from "@/lib/format";
 
-import { leadColumns } from "./leads-columns";
+import { deletedLeadColumns, leadColumns } from "./leads-columns";
 
 /**
  * Columns that can carry a sort; the backend sorts `GET /leads` since BE-001. "createdAt" (the
@@ -115,7 +120,15 @@ export function LeadsTable(): React.JSX.Element {
       pending={<LeadsTableSkeleton />}
       isEmpty={(data) => data.items.length === 0 && pageIndex === 0}
       empty={
-        activeFilterCount > 0 ? (
+        // LEAD-019 · Filters narrow the deleted list too, so "no matches" still comes first.
+        activeFilterCount === 0 && params.deleted === true ? (
+          <EmptyState
+            icon={Delete02Icon}
+            title="No deleted leads"
+            description="Leads deleted from their page appear here. Only people who may delete leads see this list."
+            className={LEADS_EMPTY_FRAME_CLASSES}
+          />
+        ) : activeFilterCount > 0 ? (
           <EmptyState
             icon={FilterRemoveIcon}
             title="No leads match these filters"
@@ -175,7 +188,7 @@ export function LeadsTable(): React.JSX.Element {
           <>
             <DataTable
               label={LEADS_TABLE_LABEL}
-              columns={leadColumns}
+              columns={params.deleted === true ? deletedLeadColumns : leadColumns}
               data={data.items}
               getRowId={(lead) => lead.id}
               rowCount={data.total}

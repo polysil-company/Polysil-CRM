@@ -168,7 +168,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 
 ## Optional polish
 
-- [ ] A "Deleted leads" view with `deleted=true`, for `leads.delete` holders.
+- [x] A "Deleted leads" view with `deleted=true`, for `leads.delete` holders. LEAD-019, read-only; BE-033 asks for a restore (`feature/LEAD-019-deleted-leads`).
 - [ ] The mock's quotation pricing reads `mockDb.products` and the in-force price list, rather than the six `MOCK_PRODUCTS`.
 - [ ] Dark mode: a hovered row with an avatar fails colour contrast (the avatar's 5% white background on `bg-accent`; initials below 4.5:1). Seen in New message and New group (#133). A token change in `tokens.css`, so it reaches every screen.
 

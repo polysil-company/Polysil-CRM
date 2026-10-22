@@ -162,6 +162,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-016 | Customers: find one by name or mobile, with an area filter (`GET /customers`) | shared | in-progress |
 | LEAD-017 | A customer's page: details, its leads, quotations and orders, and the timeline across them (`GET /customers/{id}`, `/timeline`) | shared | in-progress |
 | LEAD-018 | Edit a customer and record or withdraw consent: staff with leads edit (`PATCH /customers/{id}`) | shared | in-progress |
+| LEAD-019 | Deleted leads: the list of soft-deleted leads, for `leads.delete` holders (`GET /leads?deleted=true`, `GET /leads/export?deleted=true`) | shared | in-progress |
 | RATE-001 | Rate an installation, a shipped product or a closed complaint's service (`POST /ratings`) | shared | in-progress |
 | RATE-002 | Ratings on an order or complaint, and the list with the low ones (`GET /ratings`) | shared | in-progress |
 | RATE-003 | Ratings by dealer, product or kind (`GET /ratings/summary`) | shared | in-progress |

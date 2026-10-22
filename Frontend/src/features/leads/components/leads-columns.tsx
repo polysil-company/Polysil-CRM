@@ -18,13 +18,9 @@ import { LeadStageBadge } from "./lead-stage-badge";
 
 const columnHelper = createDataTableColumnHelper<Lead>();
 
-function LeadNameCell({ lead }: { lead: Lead }): React.JSX.Element {
+function LeadNameText({ lead }: { lead: Lead }): React.JSX.Element {
   return (
-    <Link
-      href={`/leads/${lead.id}`}
-      transitionTypes={["nav-forward"]}
-      className="group/name flex min-w-0 flex-col rounded-sm focus-ring-inset"
-    >
+    <>
       <span className="truncate text-sm font-medium text-foreground underline-offset-4 group-hover/name:underline">
         {lead.customerName}
       </span>
@@ -32,7 +28,31 @@ function LeadNameCell({ lead }: { lead: Lead }): React.JSX.Element {
         <span className="font-mono">{lead.code}</span> · {lead.village ? `${lead.village}, ` : ""}
         {lead.territory.name}
       </span>
+    </>
+  );
+}
+
+function LeadNameCell({ lead }: { lead: Lead }): React.JSX.Element {
+  return (
+    <Link
+      href={`/leads/${lead.id}`}
+      transitionTypes={["nav-forward"]}
+      className="group/name flex min-w-0 flex-col rounded-sm focus-ring-inset"
+    >
+      <LeadNameText lead={lead} />
     </Link>
+  );
+}
+
+/**
+ * LEAD-019 · A deleted lead's name, not a link: its page would offer edits and stage changes
+ * on a lead nobody else can see, and the backend has no restore yet (BE-033).
+ */
+function DeletedLeadNameCell({ lead }: { lead: Lead }): React.JSX.Element {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <LeadNameText lead={lead} />
+    </div>
   );
 }
 
@@ -44,15 +64,8 @@ function NotRecorded(): React.JSX.Element {
   return <span className="text-sm text-subtle-foreground">{EMPTY_VALUE}</span>;
 }
 
-/** Columns in display order. Widths and breakpoints come from LEAD_COLUMN_META (shared with the skeleton). */
-export const leadColumns = columnHelper.columns([
-  createSelectionColumn(columnHelper, (lead) => lead.customerName),
-  columnHelper.accessor("customerName", {
-    header: "Customer",
-    enableSorting: true,
-    cell: ({ row }) => <LeadNameCell lead={row.original} />,
-    meta: LEAD_COLUMN_META.customerName,
-  }),
+/** The columns after the customer's name, shared by the live and the deleted lists. */
+const detailColumns = columnHelper.columns([
   columnHelper.accessor("stage", {
     header: "Stage",
     enableSorting: false,
@@ -116,4 +129,31 @@ export const leadColumns = columnHelper.columns([
     cell: ({ getValue }) => <span className="font-medium">{formatInr(getValue())}</span>,
     meta: LEAD_COLUMN_META.estimatedValue,
   }),
+]);
+
+/** Columns in display order. Widths and breakpoints come from LEAD_COLUMN_META (shared with the skeleton). */
+export const leadColumns = columnHelper.columns([
+  createSelectionColumn(columnHelper, (lead) => lead.customerName),
+  columnHelper.accessor("customerName", {
+    header: "Customer",
+    enableSorting: true,
+    cell: ({ row }) => <LeadNameCell lead={row.original} />,
+    meta: LEAD_COLUMN_META.customerName,
+  }),
+  ...detailColumns,
+]);
+
+/**
+ * LEAD-019 · The deleted leads: the same columns, the selection column kept so the layout and
+ * skeleton match, and names that are not links.
+ */
+export const deletedLeadColumns = columnHelper.columns([
+  createSelectionColumn(columnHelper, (lead) => lead.customerName),
+  columnHelper.accessor("customerName", {
+    header: "Customer",
+    enableSorting: true,
+    cell: ({ row }) => <DeletedLeadNameCell lead={row.original} />,
+    meta: LEAD_COLUMN_META.customerName,
+  }),
+  ...detailColumns,
 ]);

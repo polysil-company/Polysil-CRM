@@ -267,3 +267,16 @@ export function generateLeads(
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
     .map((lead) => leadWireSchema.parse(lead));
 }
+
+/**
+ * LEAD-019 · Two soft-deleted leads for the Deleted leads list: copies of the two oldest seeded
+ * leads under their own ids and numbers, so no other seeded count moves.
+ */
+export function seedDeletedLeads(leads: readonly LeadWire[]): LeadWire[] {
+  return leads.slice(-2).map((lead, index) => ({
+    ...lead,
+    id: mockUuid(MOCK_ID_SPACE.lead, 9001 + index),
+    inquiry_no: `POL/GJ/2026-27/${String(9001 + index).padStart(5, "0")}`,
+    duplicates: [],
+  }));
+}

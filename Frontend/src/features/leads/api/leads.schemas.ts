@@ -495,6 +495,11 @@ export interface LeadListParams {
   readonly areas: readonly string[];
   /** MKT-006 · A campaign id, `none` for leads without one, or null for any. */
   readonly campaign: string | null;
+  /**
+   * LEAD-019 · Only deleted leads. Sent only for `leads.delete` holders: the backend returns
+   * nothing to anyone else. Left out, the live leads.
+   */
+  readonly deleted?: boolean;
 }
 
 // ── the area filter (LEAD-001, backend #50) ──────────────────────────────────────

@@ -47,7 +47,7 @@ import { seedDocuments, type MockDocument } from "./data/documents";
 import { seedHolidays } from "./data/holidays";
 import type { MockImportBatch } from "./data/imports";
 import { seedQrCodes } from "./data/lead-capture";
-import { generateLeads } from "./data/leads";
+import { generateLeads, seedDeletedLeads } from "./data/leads";
 import { seedLookups, seedScoring } from "./data/lookups";
 import { seedMarketingOrders, seedMaterials, type MockMarketingOrder } from "./data/marketing";
 import { generateConversations, generateGroups, type MockGroupMember } from "./data/messages";
@@ -88,6 +88,8 @@ import { seedWarrantyTerms } from "./data/warranty";
 export interface MockDb {
   /** Newest first, in the backend's wire format. */
   leads: LeadWire[];
+  /** LEAD-019 · Soft-deleted leads: listed only with `deleted=true`, for `leads.delete` holders. */
+  deletedLeads: LeadWire[];
   /** Newest first, full documents; list rows are derived from them. */
   quotations: QuotationWire[];
   /** Quotation saves: Idempotency-Key → the request and the quotation it made or changed. */
@@ -305,6 +307,7 @@ function createMockDb(): MockDb {
   const { tasks, minutes } = seedMinutes(generateTasks(leads));
   return {
     leads,
+    deletedLeads: seedDeletedLeads(leads),
     customers,
     customerEvents: new Map(),
     quotations,

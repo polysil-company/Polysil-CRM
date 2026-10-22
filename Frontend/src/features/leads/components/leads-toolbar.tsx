@@ -6,6 +6,7 @@ import type * as React from "react";
 
 import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { FilterPill, SingleFilterPill } from "@/components/patterns/filter-pill";
+import { Notice } from "@/components/patterns/notice";
 import { SearchField } from "@/components/patterns/search-field";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -57,7 +58,10 @@ function sourcesMessage(isPending: boolean, isError: boolean): string {
  * stages at once but by one source and one inquiry type, so those two pills are single-choice.
  */
 export function LeadsToolbar(): React.JSX.Element {
-  const { params, setFilters, resetFilters, activeFilterCount } = useLeadListParams();
+  const { params, setFilters, resetFilters, setDeleted, activeFilterCount } = useLeadListParams();
+  // LEAD-019 · Deleted leads are listed only for those who may delete them.
+  const canDelete = useCan("leads", "delete");
+  const deletedView = params.deleted === true;
   // Duplicate review is staff work: a partner user gets an empty queue (walk F-1).
   const canEdit = useCan("leads", "edit");
   const staff = useIsStaff();
@@ -78,80 +82,100 @@ export function LeadsToolbar(): React.JSX.Element {
   }));
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex min-w-0 flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center">
-        <SearchField
-          label="Search leads"
-          placeholder="Name, mobile or inquiry number"
-          value={params.q}
-          onSearch={(q) => {
-            setFilters({ q });
-          }}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <FilterPill
-            label="Stage"
-            options={STAGE_OPTIONS}
-            selected={params.stage}
-            onChange={(stage) => {
-              setFilters({ stage });
+    <div className="flex flex-col gap-3">
+      {deletedView ? (
+        <Notice tone="info">
+          <p>
+            <span className="font-medium">Deleted leads.</span> Nobody without the right to delete
+            leads sees them. They can&apos;t be opened or brought back from here yet.
+          </p>
+        </Notice>
+      ) : null}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center">
+          <SearchField
+            label="Search leads"
+            placeholder="Name, mobile or inquiry number"
+            value={params.q}
+            onSearch={(q) => {
+              setFilters({ q });
             }}
           />
-          <SingleFilterPill
-            label="Source"
-            options={sourceOptions}
-            selected={params.source}
-            emptyMessage={sourcesMessage(sources.isPending, sources.isError)}
-            onChange={(source) => {
-              setFilters({ source });
-            }}
-          />
-          <LeadAreaFilter
-            selected={params.areas}
-            onChange={(areas) => {
-              setFilters({ areas });
-            }}
-          />
-          <SingleFilterPill
-            label="Type"
-            options={TYPE_OPTIONS}
-            selected={params.type}
-            onChange={(type) => {
-              setFilters({ type });
-            }}
-          />
-          {staff ? (
-            <SingleFilterPill
-              label="Campaign"
-              options={campaignOptions}
-              selected={params.campaign}
-              emptyMessage="Campaigns couldn't be loaded."
-              onChange={(campaign) => {
-                setFilters({ campaign });
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterPill
+              label="Stage"
+              options={STAGE_OPTIONS}
+              selected={params.stage}
+              onChange={(stage) => {
+                setFilters({ stage });
               }}
             />
-          ) : null}
-          {activeFilterCount > 0 ? (
-            <Button variant="ghost" size="sm" onClick={resetFilters}>
-              Reset filters
+            <SingleFilterPill
+              label="Source"
+              options={sourceOptions}
+              selected={params.source}
+              emptyMessage={sourcesMessage(sources.isPending, sources.isError)}
+              onChange={(source) => {
+                setFilters({ source });
+              }}
+            />
+            <LeadAreaFilter
+              selected={params.areas}
+              onChange={(areas) => {
+                setFilters({ areas });
+              }}
+            />
+            <SingleFilterPill
+              label="Type"
+              options={TYPE_OPTIONS}
+              selected={params.type}
+              onChange={(type) => {
+                setFilters({ type });
+              }}
+            />
+            {staff ? (
+              <SingleFilterPill
+                label="Campaign"
+                options={campaignOptions}
+                selected={params.campaign}
+                emptyMessage="Campaigns couldn't be loaded."
+                onChange={(campaign) => {
+                  setFilters({ campaign });
+                }}
+              />
+            ) : null}
+            {activeFilterCount > 0 ? (
+              <Button variant="ghost" size="sm" onClick={resetFilters}>
+                Reset filters
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {canDelete ? (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDeleted(!deletedView);
+              }}
+            >
+              {deletedView ? "Back to leads" : "Deleted leads"}
             </Button>
           ) : null}
+          {canReviewDuplicates && !deletedView ? (
+            <Link href="/leads/duplicates" className={buttonVariants({ variant: "ghost" })}>
+              Possible duplicates
+            </Link>
+          ) : null}
+          <DownloadExcelButton
+            download={() => exportLeads(params)}
+            fallbackName="leads.xlsx"
+            what={deletedView ? "deleted leads" : "leads"}
+            logger={log}
+            dataId="LEAD-009"
+          />
+          {canCreate && !deletedView ? <NewLeadDialog /> : null}
         </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {canReviewDuplicates ? (
-          <Link href="/leads/duplicates" className={buttonVariants({ variant: "ghost" })}>
-            Possible duplicates
-          </Link>
-        ) : null}
-        <DownloadExcelButton
-          download={() => exportLeads(params)}
-          fallbackName="leads.xlsx"
-          what="leads"
-          logger={log}
-          dataId="LEAD-009"
-        />
-        {canCreate ? <NewLeadDialog /> : null}
       </div>
     </div>
   );
