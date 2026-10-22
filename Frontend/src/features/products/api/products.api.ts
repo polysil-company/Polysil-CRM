@@ -31,8 +31,6 @@ import {
 const log = createLogger({ file: "features/products/api/products.api.ts", dataId: "MSTR-004" });
 
 export const PRODUCT_PAGE_SIZE = 50;
-/** The backend's ceiling on one page of products. */
-const PRODUCT_PAGE_MAX = 200;
 export const RATE_SHEET_PAGE_SIZE = 100;
 /** The backend's ceiling on one page of a rate sheet. */
 const RATE_SHEET_PAGE_MAX = 500;

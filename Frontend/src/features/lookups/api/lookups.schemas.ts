@@ -19,24 +19,44 @@ export const LOOKUP_LISTS = [
 ] as const;
 export type LookupList = (typeof LOOKUP_LISTS)[number];
 
-const lookupItemWireSchema = z.object({
+export const lookupItemWireSchema = z.object({
   id: z.string().min(1),
   code: z.string().min(1),
   name: z.string().min(1),
   /** Inactive rows are kept so old records still show a name; new records cannot use them. */
   is_active: z.boolean().optional(),
+  /** MSTR-009 (BE-026) · Lower first; sources and reasons. Null where a list has none. */
+  sort_order: z.number().int().nullish(),
+  /** BE-026 · A source's quality, 0 to 1; null for anyone without `masters.edit`. */
+  quality: z.union([z.string(), z.number()]).nullish(),
+  /** BE-026 · A reason's kind. */
+  kind: z.enum(["won", "lost"]).nullish(),
 });
+
+/** One row as screens read it. */
+export function toLookupItem(item: z.output<typeof lookupItemWireSchema>): {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number | null;
+  quality: string | null;
+  kind: "won" | "lost" | null;
+} {
+  return {
+    id: item.id,
+    code: item.code,
+    name: item.name,
+    isActive: item.is_active ?? true,
+    sortOrder: item.sort_order ?? null,
+    quality: item.quality === null || item.quality === undefined ? null : String(item.quality),
+    kind: item.kind ?? null,
+  };
+}
 
 export const lookupListResponseSchema = z
   .object({ data: z.array(lookupItemWireSchema) })
-  .transform(({ data }) =>
-    data.map((item) => ({
-      id: item.id,
-      code: item.code,
-      name: item.name,
-      isActive: item.is_active ?? true,
-    })),
-  );
+  .transform(({ data }) => data.map(toLookupItem));
 
 /** The backend's JSON, as the mock backend must produce it. */
 export type LookupListWire = z.input<typeof lookupListResponseSchema>;
