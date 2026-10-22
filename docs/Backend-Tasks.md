@@ -112,6 +112,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [ ] **BE-032** · A device token for the tracking app, so points upload while the app is closed · TRK-008 · high
 
+**Leads** — added with the Deleted leads list (LEAD-019).
+
+- [ ] **BE-033** · Restore a deleted lead, and say when and by whom it was deleted · LEAD-019, LEAD-011 · normal
+
 ---
 
 ## Details
@@ -670,5 +674,26 @@ in the same shape. Never renumber or reuse a number.
   "stale" all day, and the day's km appear only after the app is opened.
 - **Done when:** it is in `tracking.md`, and in the contract's sequence in
   `handover/field-tracking-contract.md`.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-033 · Restore a deleted lead, and say when and by whom it was deleted
+
+- **Status:** ⬜ Open
+- **Asked:** 22 Oct 2026 · LEAD-019 · the Deleted leads list
+- **What:**
+  - `GET /leads?deleted=true` lists deleted leads "to restore one", but nothing restores one. Proposed:
+    `POST /leads/{id}/restore`, needing `leads.delete`. It clears `deleted_at` and adds a
+    `lead.restored` event to the timeline. A lead that isn't deleted answers `200` unchanged.
+  - Say on each row of `GET /leads?deleted=true`: `deleted_at`, and `deleted_by` as
+    `{ id, full_name }`. The list could then show when and by whom, and sort by it.
+  - Say whether `GET /leads/{id}` opens a deleted lead for a `leads.delete` holder. Until then the
+    list doesn't link to it: the page would offer edits and stage changes on a lead nobody else
+    can see.
+  - What a restore does to the duplicate pairs the delete closed is the backend's call.
+- **Why:** a lead deleted by mistake can be found but not brought back. Today only a database edit
+  undoes it.
+- **Done when:** it is in `leads.md`. The frontend adds a **Restore** button to each row, the dates,
+  and a link to the lead if it opens.
 - **Done in:** —
 - **Backend notes:** —

@@ -3,6 +3,7 @@
 import {
   createParser,
   parseAsArrayOf,
+  parseAsBoolean,
   parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
@@ -22,6 +23,7 @@ import {
   type LeadStage,
   type SortOrder,
 } from "@/features/leads/api/leads.schemas";
+import { useCan } from "@/features/session/hooks/use-session";
 
 const DEFAULT_PAGE_SIZE = LEAD_PAGE_SIZES[0];
 
@@ -64,6 +66,8 @@ export const leadListSearchParams = {
   area: parseAsArrayOf(parseAsAreaId).withDefault([]),
   /** MKT-006 · A campaign id, or `none`. */
   campaign: parseAsAreaId,
+  /** LEAD-019 · The deleted leads instead of the live ones. */
+  deleted: parseAsBoolean.withDefault(false),
 };
 
 export interface LeadFilterPatch {
@@ -90,6 +94,8 @@ export interface LeadListParamsControls {
   firstPage: () => void;
   setPageSize: (pageSize: number) => void;
   resetFilters: () => void;
+  /** LEAD-019 · Switch between the live and the deleted leads; filters stay, paging restarts. */
+  setDeleted: (deleted: boolean) => void;
 }
 
 function normalizePageSize(value: number): number {
@@ -101,6 +107,8 @@ export function useLeadListParams(): LeadListParamsControls {
     history: "replace",
     clearOnDefault: true,
   });
+  // Only a `leads.delete` holder sees deleted leads; anyone else with the address gets the live list.
+  const canDelete = useCan("leads", "delete");
 
   const cursors = values.cursors.filter((cursor) => cursor !== "");
   const params: LeadListParams = {
@@ -116,6 +124,7 @@ export function useLeadListParams(): LeadListParamsControls {
     // A hand-edited URL may repeat an area or carry more than the backend takes.
     areas: [...new Set(values.area)].slice(0, MAX_LEAD_AREAS),
     campaign: values.campaign,
+    deleted: values.deleted && canDelete,
   };
 
   const activeFilterCount = [
@@ -156,6 +165,9 @@ export function useLeadListParams(): LeadListParamsControls {
     },
     setPageSize: (pageSize) => {
       void setValues({ pageSize: normalizePageSize(pageSize), cursors: null });
+    },
+    setDeleted: (deleted) => {
+      void setValues({ deleted, cursors: null });
     },
     resetFilters: () => {
       void setValues({

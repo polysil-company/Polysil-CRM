@@ -353,6 +353,14 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
   },
+  "LEAD-019": {
+    domain: "LEAD",
+    title: "Deleted leads — the list of soft-deleted leads, for leads.delete holders",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /leads?deleted=true", "GET /leads/export?deleted=true"],
+    notes: "Read-only: no restore on the backend yet (BE-033).",
+  },
 
   "RPT-001": {
     domain: "RPT",

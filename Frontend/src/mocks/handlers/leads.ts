@@ -145,7 +145,12 @@ function filterLeads(params: URLSearchParams): LeadWire[] {
       .filter((id) => id !== ""),
   );
 
-  return mockDb.leads.filter((lead) => {
+  // LEAD-019 · `deleted=true` lists only the deleted leads, and only for a deleter.
+  const deleted = params.get("deleted") === "true";
+  if (deleted && !mayDo("delete")) return [];
+  const pool = deleted ? mockDb.deletedLeads : mockDb.leads;
+
+  return pool.filter((lead) => {
     if (!leadInPartnerScope(lead)) return false;
     if (stages.length > 0 ? !stages.includes(lead.stage) : lead.stage === "merged") {
       return false;
@@ -1067,6 +1072,8 @@ export const leadHandlers = [
         if (link.state === "pending") settleLink(link.link_id, "dismissed");
       }
       mockDb.leads = mockDb.leads.filter((item) => item.id !== leadId);
+      // LEAD-019 · Soft delete, as on the backend: the lead moves to the deleted list.
+      mockDb.deletedLeads = [lead, ...mockDb.deletedLeads];
     }
     return new HttpResponse(null, { status: 204 });
   }),
