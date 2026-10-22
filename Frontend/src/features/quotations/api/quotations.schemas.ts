@@ -171,6 +171,11 @@ export interface QuotationListParams {
   readonly leadId: string | null;
   /** SO-011 · Quotations of one channel partner; left out, every partner's. */
   readonly partnerId?: string | null;
+  /**
+   * SO-011 · Only accepted, current quotations on no live order (BE-029). It narrows, it
+   * doesn't promise: an order the caller can't see may still hold one (409 `quotation_on_order`).
+   */
+  readonly orderable?: boolean;
   /** Ask for the matching total ("1–25 of 49"). It costs the backend a count; off where unused. */
   readonly countTotal?: boolean;
 }

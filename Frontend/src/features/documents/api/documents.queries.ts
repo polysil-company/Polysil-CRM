@@ -17,7 +17,7 @@ export const documentKeys = {
   record: (recordType: RecordType, recordId: string) =>
     [...documentKeys.all, "record", recordType, recordId] as const,
   lead: (leadId: string) => [...documentKeys.all, "lead", leadId] as const,
-  types: () => [...documentKeys.all, "types"] as const,
+  types: (recordType: RecordType | null) => [...documentKeys.all, "types", recordType] as const,
   link: (documentId: string) => [...documentKeys.all, "link", documentId] as const,
 };
 
@@ -39,11 +39,11 @@ export function documentsQueryOptions(scope: DocumentsScope) {
   });
 }
 
-/** DOC-001 · The type list changes only with a release. */
-export function documentTypesQueryOptions() {
+/** DOC-001 · The types a record takes (BE-025); the list changes only with a release. */
+export function documentTypesQueryOptions(recordType: RecordType | null = null) {
   return queryOptions({
-    queryKey: documentKeys.types(),
-    queryFn: ({ signal }) => listDocumentTypes(signal),
+    queryKey: documentKeys.types(recordType),
+    queryFn: ({ signal }) => listDocumentTypes(recordType, signal),
     staleTime: 30 * 60_000,
     meta: { dataId: "DOC-001" },
   });

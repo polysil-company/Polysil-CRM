@@ -13,7 +13,13 @@ import { can } from "@/lib/auth/permissions";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { todayInIndia } from "@/lib/format";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
-import { withCounts, type MockPriceList, type MockProductRecord } from "@/mocks/data/products";
+import {
+  MOCK_PRODUCT_CATEGORIES,
+  MOCK_UOMS,
+  withCounts,
+  type MockPriceList,
+  type MockProductRecord,
+} from "@/mocks/data/products";
 import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
 import { findMockTerritory } from "@/mocks/data/territories";
 import { mockDb } from "@/mocks/db";
@@ -88,12 +94,14 @@ function toWire(product: MockProductRecord, on: string): MockProductRecord {
   };
 }
 
+/** BE-024 · The unit codes `POST /products` takes, with their decimals. */
 function units(): Map<string, number> {
-  return new Map(mockDb.products.map((product) => [product.uom, product.uom_decimals] as const));
+  return new Map(MOCK_UOMS.map((unit) => [unit.code, unit.decimals] as const));
 }
 
+/** BE-024 · The category codes `POST /products` takes. */
 function categories(): Set<string> {
-  return new Set(mockDb.products.map((product) => product.product_category));
+  return new Set(MOCK_PRODUCT_CATEGORIES.map((category) => category.code));
 }
 
 const decimalField = z
@@ -198,6 +206,21 @@ function overlaps(
 }
 
 export const productHandlers = [
+  // BE-024 · the product form's pickers; anyone who may view products
+  http.get(buildApiUrl("/lookups/product-categories"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!allowed("products", "view")) return forbidden("products.view");
+    return HttpResponse.json({ data: MOCK_PRODUCT_CATEGORIES });
+  }),
+
+  http.get(buildApiUrl("/lookups/uoms"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!allowed("products", "view")) return forbidden("products.view");
+    return HttpResponse.json({ data: MOCK_UOMS });
+  }),
+
   http.get(buildApiUrl("/products"), async ({ request }) => {
     const { scenario, failure } = await applyScenario();
     if (failure) return failure;

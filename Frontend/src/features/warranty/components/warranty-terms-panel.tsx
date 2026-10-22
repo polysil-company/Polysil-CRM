@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { productCategoriesQueryOptions } from "@/features/products/api/products.queries";
 import { formatBusinessDay } from "@/features/subsidy/lib/application-labels";
 import { useSetWarrantyTerm } from "@/features/warranty/api/warranty.mutations";
 import { warrantyTermsQueryOptions } from "@/features/warranty/api/warranty.queries";
@@ -97,11 +98,19 @@ export function WarrantyTermsPanel({ canEdit }: { canEdit: boolean }): React.JSX
   const [setting, setSetting] = useState(false);
   const terms = query.data ?? [];
   const today = todayInIndia();
-  // TODO(MSTR-017): offer every product category once the backend lists them (BE-024).
+  // BE-024 · every active category, and any a period already names
+  const lookup = useQuery({ ...productCategoriesQueryOptions(), enabled: canEdit });
   const categories = [
-    ...new Map(
-      terms.flatMap((term) => (term.category === null ? [] : [[term.category.id, term.category]])),
-    ).values(),
+    ...new Map([
+      ...(lookup.data ?? [])
+        .filter((category) => category.isActive)
+        .map((category) => [category.id, { id: category.id, name: category.name }] as const),
+      ...terms.flatMap((term) =>
+        term.category === null
+          ? []
+          : [[term.category.id, { id: term.category.id, name: term.category.name }] as const],
+      ),
+    ]).values(),
   ];
 
   return (

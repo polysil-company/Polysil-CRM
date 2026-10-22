@@ -18,9 +18,10 @@ import { isPartnerRole } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { shiftCalendarDay, todayInIndia } from "@/lib/format";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
+import { MOCK_PRODUCT_CATEGORIES } from "@/mocks/data/products";
 import { mockSchemeId } from "@/mocks/data/schemes";
 import { mockMeFor } from "@/mocks/data/sessions";
-import { MOCK_TERRITORIES } from "@/mocks/data/territories";
+import { findMockTerritory, MOCK_TERRITORIES } from "@/mocks/data/territories";
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
@@ -64,11 +65,28 @@ function aimedAt(scheme: SchemeWire, partner: { id: string; type: string }): boo
   return match("partner_type") && match("partner");
 }
 
-/** What a partner user may see of a scheme: never its partner targets. */
+/** BE-027 · A target's name, as the backend sends it: the record's, or the type itself. */
+function targetName(target: SchemeWire["targets"][number]): string | null {
+  switch (target.type) {
+    case "partner_type":
+      return target.id;
+    case "territory":
+      return findMockTerritory(target.id)?.name ?? null;
+    case "partner":
+      return mockDb.partners.find((partner) => partner.id === target.id)?.name ?? null;
+    case "product":
+      return mockDb.products.find((product) => product.id === target.id)?.description ?? null;
+    case "product_category":
+      return MOCK_PRODUCT_CATEGORIES.find((category) => category.id === target.id)?.name ?? null;
+  }
+}
+
+/** What a reader sees of a scheme: named targets, and never partner targets for a partner user. */
 function forReader(scheme: SchemeWire): SchemeWire {
-  return myPartner() === null
-    ? scheme
-    : { ...scheme, targets: scheme.targets.filter((target) => target.type !== "partner") };
+  const targets = scheme.targets
+    .filter((target) => myPartner() === null || target.type !== "partner")
+    .map((target) => ({ type: target.type, id: target.id, name: targetName(target) }));
+  return { ...scheme, targets };
 }
 
 function refreshCurrent(scheme: SchemeWire): SchemeWire {

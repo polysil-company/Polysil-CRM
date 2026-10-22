@@ -7,10 +7,12 @@ import {
   priceListItemsPageSchema,
   priceListPageSchema,
   priceListSchema,
+  productCategoriesSchema,
   productPageSchema,
   productSchema,
   publishResultSchema,
   taxRatePageSchema,
+  uomsSchema,
   type CreatePriceListRequest,
   type CreateProductRequest,
   type HsnRow,
@@ -20,15 +22,15 @@ import {
   type PriceListSalesTypeFilter,
   type PriceListItemsPage,
   type Product,
+  type ProductCategory,
   type ProductListParams,
   type TaxRate,
+  type Uom,
 } from "./products.schemas";
 
 const log = createLogger({ file: "features/products/api/products.api.ts", dataId: "MSTR-004" });
 
 export const PRODUCT_PAGE_SIZE = 50;
-/** The backend's ceiling on one page of products. */
-const PRODUCT_PAGE_MAX = 200;
 export const RATE_SHEET_PAGE_SIZE = 100;
 /** The backend's ceiling on one page of a rate sheet. */
 const RATE_SHEET_PAGE_MAX = 500;
@@ -72,40 +74,30 @@ export function listProducts(
 }
 
 /**
- * MSTR-004 · The categories and units the catalogue uses, read from the catalogue itself,
- * active products and switched-off ones. No endpoint lists them yet (BE-024); the form offers
- * these so a typo never becomes a category of one.
+ * MSTR-004 · GET /lookups/product-categories — the categories, switched-off ones too (BE-024).
+ * Each carries its id, which a scheme's category target takes (BE-027).
  */
-export async function listCatalogueFacets(signal?: AbortSignal): Promise<{
-  categories: string[];
-  units: { code: string; decimals: number }[];
-}> {
-  const categories = new Set<string>();
-  const units = new Map<string, number>();
-  for (const active of [true, false]) {
-    for (let page = 1; page <= MAX_PAGES; page += 1) {
-      const result = await apiRequest({
-        dataId: "MSTR-004",
-        logger: log,
-        fn: "listCatalogueFacets",
-        path: "/products",
-        query: { active, page, limit: PRODUCT_PAGE_MAX },
-        schema: productPageSchema,
-        signal,
-      });
-      for (const product of result.items) {
-        categories.add(product.category);
-        units.set(product.uom, product.uomDecimals);
-      }
-      if (page * PRODUCT_PAGE_MAX >= result.total) break;
-    }
-  }
-  return {
-    categories: [...categories].sort((a, b) => a.localeCompare(b)),
-    units: [...units.entries()]
-      .map(([code, decimals]) => ({ code, decimals }))
-      .sort((a, b) => a.code.localeCompare(b.code)),
-  };
+export function listProductCategories(signal?: AbortSignal): Promise<ProductCategory[]> {
+  return apiRequest({
+    dataId: "MSTR-004",
+    logger: log,
+    fn: "listProductCategories",
+    path: "/lookups/product-categories",
+    schema: productCategoriesSchema,
+    signal,
+  });
+}
+
+/** MSTR-004 · GET /lookups/uoms — the units with their decimals, switched-off ones too (BE-024). */
+export function listUoms(signal?: AbortSignal): Promise<Uom[]> {
+  return apiRequest({
+    dataId: "MSTR-004",
+    logger: log,
+    fn: "listUoms",
+    path: "/lookups/uoms",
+    schema: uomsSchema,
+    signal,
+  });
 }
 
 /** MSTR-004 · POST /products — 409 `duplicate_description` for a description already in use. */

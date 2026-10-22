@@ -57,13 +57,20 @@ export function listLeadDocuments(leadId: string, signal?: AbortSignal): Promise
   });
 }
 
-/** DOC-001 · GET /documents/types — the type picker's choices; "other" needs a name. */
-export function listDocumentTypes(signal?: AbortSignal): Promise<DocumentType[]> {
+/**
+ * DOC-001 · GET /documents/types — the type picker's choices; "other" needs a name. With a
+ * record type, only the types that belong on that record (BE-025); without, every type.
+ */
+export function listDocumentTypes(
+  recordType: RecordType | null = null,
+  signal?: AbortSignal,
+): Promise<DocumentType[]> {
   return apiRequest({
     dataId: "DOC-001",
     logger: log,
     fn: "listDocumentTypes",
     path: "/documents/types",
+    query: { record_type: recordType ?? undefined },
     schema: documentTypesSchema,
     signal,
   });

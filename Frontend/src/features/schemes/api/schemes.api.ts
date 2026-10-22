@@ -6,7 +6,6 @@ import {
   schemePageSchema,
   schemeSchema,
   standingSchema,
-  targetRecordSchema,
   type EntitlementListParams,
   type EntitlementPage,
   type Scheme,
@@ -127,35 +126,6 @@ export function listEntitlements(
       cursor: params.cursor ?? undefined,
     },
     schema: entitlementPageSchema,
-    signal,
-  });
-}
-
-/** The targets whose own record names them; a partner type is its own name, and a product
- * category has no record to read until BE-027. */
-export type NamedTargetType = "territory" | "partner" | "product";
-
-const TARGET_PATHS: Readonly<Record<NamedTargetType, `/${string}`>> = {
-  territory: "/territories",
-  partner: "/partners",
-  product: "/products",
-};
-
-/**
- * SCHM-001 · A target's name, read from its own record while the backend sends none (BE-027).
- * Null when the record can't be read (it may need access the user doesn't have).
- */
-export function getTargetName(
-  type: NamedTargetType,
-  targetId: string,
-  signal?: AbortSignal,
-): Promise<string | null> {
-  return apiRequest({
-    dataId: "SCHM-001",
-    logger: log,
-    fn: "getTargetName",
-    path: `${TARGET_PATHS[type]}/${targetId}`,
-    schema: targetRecordSchema,
     signal,
   });
 }

@@ -1,9 +1,11 @@
 import type {
   HsnRowWire,
   PriceListWire,
+  ProductCategoriesWire,
   ProductWire,
   QuotationCategory,
   TaxRateWire,
+  UomsWire,
 } from "@/features/products/api/products.schemas";
 
 import { MOCK_PRODUCTS } from "./quotations";
@@ -28,6 +30,41 @@ export interface MockPriceList extends PriceListWire {
 }
 
 export const MOCK_CATALOGUE_START = "2026-04-01";
+
+/** BE-024, BE-027 · The backend's seeded categories (migration 010), in sort order. */
+export const MOCK_PRODUCT_CATEGORIES: ProductCategoriesWire["data"] = [
+  "DRIP COMPONENTS",
+  "HDPE PIPES",
+  "EMITTING PIPE",
+  "HDPE SPRINKLER SYSTEM",
+  "PVC FITTINGS",
+  "PVC PIPES",
+  "MINI SPRINKLER COMPONENTS",
+  "PLAIN LATERAL",
+  "SPRINKLER COMPONENTS",
+  "Marketing",
+].map((code, index) => ({
+  id: mockUuid(MOCK_ID_SPACE.productCategory, index + 1),
+  code,
+  name: code,
+  sort_order: index + 1,
+  is_active: true,
+}));
+
+/**
+ * BE-024 · The units. The backend seeds NOS., MTR (3 decimals), Set. and ML; the mock keeps the
+ * codes its own catalogue uses, metres at two decimals.
+ */
+export const MOCK_UOMS: UomsWire["data"] = [
+  { code: "NOS", name: "Numbers", decimals: 0 },
+  { code: "MTR", name: "Metres", decimals: 2 },
+  { code: "SET", name: "Sets", decimals: 0 },
+  { code: "ML", name: "Millilitres", decimals: 0 },
+].map((unit, index) => ({
+  ...unit,
+  id: mockUuid(MOCK_ID_SPACE.uom, index + 1),
+  is_active: true,
+}));
 
 /** The seeded categories (migration 010's list), and the units the mock uses. */
 const CATEGORY_OF: Readonly<Record<string, string>> = {
