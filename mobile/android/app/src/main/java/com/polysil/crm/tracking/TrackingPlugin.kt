@@ -1,6 +1,7 @@
 package com.polysil.crm.tracking
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -185,8 +186,13 @@ class TrackingPlugin : Plugin() {
             call.reject("No screen to open settings from", "no_activity")
             return
         }
-        val intent = if (first.resolveActivity(activity.packageManager) != null) first else fallback
-        activity.startActivity(intent)
+        // Launched directly: from Android 11, resolveActivity() can't see settings screens
+        // without <queries>, so asking first would always fall back.
+        try {
+            activity.startActivity(first)
+        } catch (missing: ActivityNotFoundException) {
+            activity.startActivity(fallback)
+        }
         call.resolve()
     }
 

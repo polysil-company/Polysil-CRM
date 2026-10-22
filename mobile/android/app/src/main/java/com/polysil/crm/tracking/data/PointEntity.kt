@@ -7,7 +7,7 @@ import com.polysil.crm.tracking.core.TrackPoint
 
 /** A stored fix. `seq` keeps them in the order they were taken, for oldest-first batches. */
 @Entity(tableName = "points")
-internal data class PointEntity(
+data class PointEntity(
     @PrimaryKey(autoGenerate = true) val seq: Long = 0,
     @ColumnInfo(index = true) val id: String,
     @ColumnInfo(name = "duty_id") val dutyId: String,

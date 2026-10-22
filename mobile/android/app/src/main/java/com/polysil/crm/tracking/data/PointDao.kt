@@ -5,7 +5,7 @@ import androidx.room.Insert
 import androidx.room.Query
 
 @Dao
-internal interface PointDao {
+interface PointDao {
     @Insert
     fun insert(point: PointEntity)
 

@@ -9,7 +9,7 @@ import com.polysil.crm.tracking.core.TrackPoint
 
 /** TRK-008 · Every fix stays here until the server counts or names it. */
 @Database(entities = [PointEntity::class], version = 1, exportSchema = false)
-internal abstract class TrackingDatabase : RoomDatabase() {
+abstract class TrackingDatabase : RoomDatabase() {
     abstract fun points(): PointDao
 
     companion object {
