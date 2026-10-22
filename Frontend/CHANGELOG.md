@@ -138,6 +138,7 @@ Field staff could check in to visits from a browser, and managers could see the 
     - WorkManager as the backup when the network returns.
 
     A boot receiver resumes a duty still open after a restart.
+
   - **The upload rules** follow the contract and live in plain Kotlin:
     - oldest first, at most `max_batch_points` per batch;
     - the `Idempotency-Key` is the sha256 of the sorted point ids;

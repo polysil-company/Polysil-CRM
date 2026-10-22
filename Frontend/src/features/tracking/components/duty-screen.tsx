@@ -78,6 +78,7 @@ export function DutyScreen(): React.JSX.Element {
     return (
       <EmptyState
         icon={SmartPhone01Icon}
+        level={2}
         title="Duty is in the Polysil app"
         description="Going on duty records your route, which only the Android app can do. Visits work here too."
         className="rounded-xl border border-dashed border-border"
@@ -92,6 +93,7 @@ export function DutyScreen(): React.JSX.Element {
     return (
       <EmptyState
         icon={Location01Icon}
+        level={2}
         title="Your role doesn't record a route"
         description="Duty is for field staff and their managers."
         className="rounded-xl border border-dashed border-border"
