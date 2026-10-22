@@ -33,7 +33,6 @@ import io
 import json
 import pathlib
 import time
-import warnings
 from decimal import Decimal
 from typing import Any
 
@@ -45,6 +44,7 @@ from sqlalchemy import text
 from api.config import Settings, get_settings
 from api.db.session import async_session_factory
 from api.domain import quotations as domain
+from api.pdf import render_pdf, renderer_available
 from api.services.clock import IST, today_ist
 from api.storage import Storage, get_storage
 from worker.jobs.outbox import enter_as_principal
@@ -194,31 +194,6 @@ def render_html(doc: dict[str, Any]) -> str:
         and Decimal(str(doc["subsidy"].get("flat_charge") or 0)) > 0,
         is_provisional=bool(q.get("is_provisional")),
         rendered_on=today_ist().strftime("%d %b %Y"))
-
-
-@functools.cache
-def renderer_available() -> str | None:
-    """None when WeasyPrint imports, else why not. Cached: the answer does not
-    change while the process lives, and the import is expensive."""
-    try:
-        # A DeprecationWarning is not a missing library. The test settings make
-        # warnings errors, and WeasyPrint warns when HarfBuzz-Subset is absent, so
-        # without this the probe called a working renderer unavailable and CI
-        # skipped every PDF test.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            import weasyprint  # noqa: F401
-    except Exception as exc:  # OSError on a missing native library, ImportError otherwise
-        return f"{type(exc).__name__}: {str(exc).splitlines()[0][:200]}"
-    return None
-
-
-def render_pdf(html: str) -> bytes:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        import weasyprint
-
-    return bytes(weasyprint.HTML(string=html).write_pdf())
 
 
 # ── the company profile (FS-064 rules 21 to 26) ──────────────────────────────

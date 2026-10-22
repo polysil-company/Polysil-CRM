@@ -1,7 +1,7 @@
 # ruff: noqa: E501  (route declarations)
 
 """/dealer-applications (staff) and /public/dealer-apply/{token} (the applicant),
-FS-051."""
+FS-051 and FS-071."""
 
 from __future__ import annotations
 
@@ -25,6 +25,10 @@ from api.schemas.dealer_applications import (
     DealerApplicationRemark,
     DealerApplicationRow,
     DealerGstLookup,
+    DepositRecord,
+    DepositRelaxation,
+    PartnerType,
+    StaffApplicationFields,
 )
 from api.schemas.leads import UUID_RE
 from api.services import dealer_applications as service
@@ -43,9 +47,21 @@ _ERRORS: dict[int | str, dict[str, object]] = {
     401: {"model": ErrorResponse, "description": "Not signed in."},
     403: {"model": ErrorResponse, "description": "Not staff who see partners; or not one who may decide."},
     404: {"model": ErrorResponse, "description": "No such application in your scope."},
-    409: {"model": ErrorResponse, "description": "`mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`."},
-    422: {"model": ErrorResponse, "description": "A field; `application_incomplete` lists what is missing."},
+    409: {"model": ErrorResponse, "description": "`mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`."},
+    422: {"model": ErrorResponse, "description": "A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`."},
 }
+_PDF: dict[int | str, dict[str, object]] = {
+    200: {"content": {"application/pdf": {}}, "description": "The data sheet."},
+    503: {"model": ErrorResponse, "description": "`busy`: other PDFs are being made, try again in a moment; `pdf_unavailable`."},
+}
+
+
+def _attachment(body: bytes, content_type: str, name: str) -> Response:
+    ext = "pdf" if content_type == "application/pdf" else "html"
+    # ASCII only, so any firm name makes a valid header (FS-071 E-11)
+    return Response(body, media_type=content_type, headers={
+        "Content-Disposition": f"attachment; filename=\"{name}.{ext}\"; filename*=UTF-8''{name}.{ext}",
+        "Cache-Control": "no-store"})
 _PUBLIC_ERRORS: dict[int | str, dict[str, object]] = {
     403: {"model": ErrorResponse, "description": "`no_session`: verify the mobile first, or again."},
     404: {"model": ErrorResponse, "description": "The link is unknown, expired or closed."},
@@ -76,9 +92,19 @@ async def create(body: DealerApplicationCreate, db: DbSession, caller: CallerDep
 @router.get("", response_model=Envelope[list[DealerApplicationRow]], responses=_ERRORS)
 async def list_applications(db: DbSession, caller: CallerDep,
                             status: Annotated[str | None, Query(description="Comma-separated statuses.")] = None,
-                            q: Annotated[str | None, Query(max_length=100)] = None) -> Envelope[list[DealerApplicationRow]]:
-    """The applications in your partners scope, newest first (at most 200)."""
-    return Envelope(data=await service.list_(db, caller, status=status, q=q))
+                            q: Annotated[str | None, Query(max_length=100)] = None,
+                            partner_type: PartnerType | None = None) -> Envelope[list[DealerApplicationRow]]:
+    """The applications in your partners scope, newest first (at most 200), with each
+    one's type and deposit status."""
+    return Envelope(data=await service.list_(db, caller, status=status, q=q, partner_type=partner_type))
+
+
+# before /{app_id}: Starlette matches the path first (FS-071 E-14)
+@router.get("/form.pdf", response_class=Response, responses={**_ERRORS, **_PDF})
+async def blank_form(caller: CallerDep, partner_type: PartnerType = "dealer") -> Response:
+    """The blank data sheet, to print and fill by hand. Needs `partners.view`."""
+    body, ctype, name = await service.blank_sheet(caller, partner_type)
+    return _attachment(body, ctype, name)
 
 
 @router.get("/{app_id}", response_model=Envelope[DealerApplication], responses=_ERRORS)
@@ -88,10 +114,20 @@ async def get_application(app_id: Id, db: DbSession, caller: CallerDep) -> Envel
     return Envelope(data=await service.get(db, caller, app_id))
 
 
+@router.get("/{app_id}/pdf", response_class=Response, responses={**_ERRORS, **_PDF})
+async def application_pdf(app_id: Id, db: DbSession, caller: CallerDep) -> Response:
+    """The data sheet filled from the application, as the client's paper form. The
+    bank account is masked to its last 4 digits for everyone. Made when asked."""
+    body, ctype, name = await service.sheet(db, caller, app_id)
+    return _attachment(body, ctype, name)
+
+
 @router.patch("/{app_id}", response_model=Envelope[DealerApplication], responses=_ERRORS)
-async def patch_application(app_id: Id, body: DealerApplicationFields, db: DbSession, caller: CallerDep,
+async def patch_application(app_id: Id, body: StaffApplicationFields, db: DbSession, caller: CallerDep,
                             claims: Claims, idem: IdemKey) -> JSONResponse:
-    """Fill or correct fields for the applicant, while draft, returned or submitted."""
+    """Fill or correct fields for the applicant, while draft, returned or submitted.
+    `partner_type` changes the type while draft or returned, before any deposit entry,
+    and re-reads that type's deposit (`409 deposit_recorded` after one)."""
     fields = service._clean_fields(body)
     return await _idem(db, claims, idem, f"PATCH /api/v1/dealer-applications/{app_id}", fields,
                        lambda: service.staff_action(db, caller, app_id, "patch", fields=fields))
@@ -108,11 +144,32 @@ async def submit(app_id: Id, db: DbSession, caller: CallerDep, claims: Claims, i
 async def decision(app_id: Id, body: DealerApplicationDecision, db: DbSession, caller: CallerDep, claims: Claims,
                    idem: IdemKey) -> JSONResponse:
     """Approve, reject or return a submitted application. Approving creates the dealer
-    (under `parent_id`, or directly under Polysil) and a login on the applicant's
-    mobile; the dealer then signs in with a WhatsApp code. A State Manager or above,
-    never whoever started it."""
+    (under `parent_id`, or directly under Polysil) or the distributor (always under
+    Polysil) and a login on the applicant's mobile, who then signs in with a WhatsApp
+    code. Only a role listed in the type's `*_application_deciders` setting, never
+    whoever started it. Approval waits for the deposit: `409 deposit_pending`."""
     return await _idem(db, claims, idem, f"POST /api/v1/dealer-applications/{app_id}/decision",
                        body.model_dump(mode="json"), lambda: service.decide(db, caller, app_id, body))
+
+
+@router.post("/{app_id}/deposit", response_model=Envelope[DealerApplication], responses=_ERRORS)
+async def record_deposit(app_id: Id, body: DepositRecord, db: DbSession, caller: CallerDep, claims: Claims,
+                         idem: IdemKey) -> JSONResponse:
+    """Record the deposit paid. Upload the pay slip first as a `deposit_slip` document
+    and name it in `slip_id`. The amount must cover the amount due. Each record is kept
+    in `deposit.history`; the latest counts. `409 deposit_not_due` when nothing is due."""
+    return await _idem(db, claims, idem, f"POST /api/v1/dealer-applications/{app_id}/deposit",
+                       body.model_dump(mode="json"), lambda: service.record_deposit(db, caller, app_id, body))
+
+
+@router.post("/{app_id}/deposit/relaxation", response_model=Envelope[DealerApplication], responses=_ERRORS)
+async def relax_deposit(app_id: Id, body: DepositRelaxation, db: DbSession, caller: CallerDep, claims: Claims,
+                        idem: IdemKey) -> JSONResponse:
+    """Lower the amount due, to 0 to waive it, with a reason. Only a role listed in the
+    `deposit_relaxation_roles` setting, never whoever started the application, and not
+    after a payment (`409 deposit_paid`). `403 not_your_relaxation`."""
+    return await _idem(db, claims, idem, f"POST /api/v1/dealer-applications/{app_id}/deposit/relaxation",
+                       body.model_dump(mode="json"), lambda: service.relax_deposit(db, caller, app_id, body))
 
 
 @router.post("/{app_id}/withdraw", response_model=Envelope[DealerApplication], responses=_ERRORS)
@@ -198,7 +255,7 @@ async def applicant_gstin(token: Token, gstin: Annotated[str, Path(max_length=20
 
 @public.post("/{token}/documents", status_code=201, responses=_PUBLIC_ERRORS)
 async def applicant_upload(token: Token, db: AnonSession, file: Annotated[UploadFile, File()],
-                           doc_type: Annotated[str, Form(pattern=r"^(gst_certificate|pan_card|cancelled_cheque|shop_photo|shop_licence|other)$")],
+                           doc_type: Annotated[str, Form(pattern=r"^(gst_certificate|pan_card|cancelled_cheque|shop_photo|shop_licence|deposit_slip|other)$")],
                            name: Annotated[str | None, Form(max_length=80)] = None,
                            session: Session = None) -> Response:
     """Upload a document: JPEG, PNG, WebP, HEIC or PDF, up to 10 MB."""
@@ -214,9 +271,18 @@ async def applicant_upload(token: Token, db: AnonSession, file: Annotated[Upload
     return JSONResponse({"data": got}, status_code=201 if got["created"] else 200)
 
 
+@public.get("/{token}/pdf", response_class=Response, responses={**_PUBLIC_ERRORS, **_PDF})
+async def applicant_pdf(token: Token, db: AnonSession, session: Session = None) -> Response:
+    """Your data sheet as filled so far, to print and sign. Needs `X-Apply-Session`,
+    so only while the application is a draft or returned."""
+    body, ctype, name = await service.applicant_sheet(db, token, session)
+    return _attachment(body, ctype, name)
+
+
 @public.delete("/{token}/documents/{doc_id}", status_code=204, responses=_PUBLIC_ERRORS)
 async def applicant_remove(token: Token, doc_id: Id, db: AnonSession, session: Session = None) -> Response:
-    """Remove one of your own uploads, while the application is a draft or returned."""
+    """Remove one of your own uploads, while the application is a draft or returned.
+    `409 document_in_use` for a pay slip a recorded payment names."""
     await service.applicant_document_remove(db, token, session, doc_id)
     return Response(status_code=204)
 
