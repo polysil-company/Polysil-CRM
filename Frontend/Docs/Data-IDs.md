@@ -178,6 +178,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | TRK-005 | My visits of a day, and one visit (`GET /visits`, `GET /visits/{id}`) | shared | in-progress |
 | TRK-006 | Tracking settings: the policy in force, and a new version from a date (`GET /tracking/policy`, `PUT /tracking/policy`) | shared | in-progress |
 | TRK-007 | Who looked at whose route, visits or the team map (`GET /tracking/view-log`) | shared | in-progress |
+| TRK-008 | The Android app's duty: go on and off duty, and the route recorded natively (`POST /tracking/duty/start`, `/tracking/duty/end`, `/locations/batch`) | shared | in-progress |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |

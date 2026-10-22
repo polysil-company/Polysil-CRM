@@ -1731,6 +1731,15 @@ export const DATA_IDS = {
     status: "in-progress",
     notes: "Admin and MD read it; for anyone else it is empty.",
   },
+  "TRK-008": {
+    domain: "TRK",
+    title: "The Android app's duty: go on and off duty, and the route recorded natively in between",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /tracking/duty/start", "POST /tracking/duty/end", "POST /locations/batch"],
+    notes:
+      "Capacitor shell (mobile/) plus our own Kotlin plugin: Fused location, a foreground service, Room, OkHttp, WorkManager. Uploads use the web session's token until BE-032 gives a device token.",
+  },
   "BOT-001": {
     domain: "BOT",
     title: "Find an action or a record from the command menu (`GET /assistant?q=`)",

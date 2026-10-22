@@ -1,0 +1,21 @@
+{
+  "name": "polysil-tracking-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TRK-008 · The Android app for field staff: the live web app in a Capacitor shell, and a native duty tracker.",
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "typescript": "6.0.3"
+  }
+}

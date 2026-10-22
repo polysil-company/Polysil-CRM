@@ -51,3 +51,29 @@ export function useBrowserFix(): { readonly state: FixState; readonly locate: ()
 
   return { state, locate };
 }
+
+/** TRK-008 · One fresh fix, for going on and off duty; refused with the reason when there's none. */
+export function getOneFix(): Promise<Fix> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      reject(new Error("unavailable"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracyM: Number.isFinite(position.coords.accuracy)
+            ? Math.round(position.coords.accuracy)
+            : null,
+          at: new Date(position.timestamp).toISOString(),
+        });
+      },
+      (error) => {
+        reject(new Error(error.code === error.PERMISSION_DENIED ? "denied" : "failed"));
+      },
+      OPTIONS,
+    );
+  });
+}

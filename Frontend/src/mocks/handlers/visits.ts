@@ -59,6 +59,32 @@ function noTracking(): Response {
   return errorResponse(403, "forbidden", "This role does not track.");
 }
 
+/** The config's batch limit, which the batch endpoint enforces. */
+const MAX_BATCH_POINTS = 500;
+
+/** TRK-008 · The caller's open duty, as the config names it. */
+function openDutyOf(userId: string): { id: string; started_at: string } | null {
+  const open = (mockDb.duties.get(userId) ?? []).find((duty) => duty.ended_at === null);
+  return open === undefined ? null : { id: open.id, started_at: open.started_at };
+}
+
+const dutyFixFields = {
+  id: z.string().min(1),
+  at: z.iso.datetime({ offset: true }),
+  sent_at: z.iso.datetime({ offset: true }).nullish(),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  accuracy_m: z.number().nonnegative().nullish(),
+};
+
+const batchPointSchema = z.object({
+  id: z.string().min(1),
+  duty_id: z.string().min(1),
+  recorded_at: z.iso.datetime({ offset: true }),
+  lat: z.number(),
+  lng: z.number(),
+});
+
 /** The visit, if it is the caller's own. */
 function ownVisit(visitId: unknown, userId: string): VisitWire | undefined {
   return mockDb.visits.find((visit) => visit.id === visitId && visit.user.id === userId);
@@ -148,11 +174,128 @@ export const visitHandlers = [
         days: [1, 2, 3, 4, 5, 6],
         timezone: "Asia/Kolkata",
       },
-      max_batch_points: 500,
+      max_batch_points: MAX_BATCH_POINTS,
       visit_photo_required: policy.visit_photo_required,
-      on_duty: null,
+      on_duty: openDutyOf(caller.id),
     };
     return HttpResponse.json({ data: config });
+  }),
+
+  // TRK-008 · Duty start: 201 new, 200 the one already open; consent first.
+  http.post(buildApiUrl("/tracking/duty/start"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const caller = me();
+    if (!caller.tracks) return noTracking();
+    const parsed = z
+      .object({ ...dutyFixFields, device_id: z.string().min(1) })
+      .safeParse(await request.json());
+    if (!parsed.success) {
+      return errorResponse(
+        422,
+        "validation_error",
+        "Some fields need correcting.",
+        fieldErrors(parsed.error.issues),
+      );
+    }
+    if (mockDb.trackingConsent.get(caller.id) !== currentPolicy().consent_version) {
+      return errorResponse(409, "consent_required", "Accept the tracking consent first.");
+    }
+    const duties = mockDb.duties.get(caller.id) ?? [];
+    const open = duties.find((duty) => duty.ended_at === null);
+    if (open !== undefined) return HttpResponse.json({ data: open });
+    const duty = {
+      id: parsed.data.id,
+      started_at: parsed.data.at,
+      ended_at: null,
+      end_reason: null,
+      outside_hours: false,
+    };
+    mockDb.duties.set(caller.id, [...duties, duty]);
+    return HttpResponse.json({ data: duty }, { status: 201 });
+  }),
+
+  // TRK-008 · Duty end; an ended duty answers unchanged.
+  http.post(buildApiUrl("/tracking/duty/end"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const caller = me();
+    if (!caller.tracks) return noTracking();
+    const parsed = z.object(dutyFixFields).safeParse(await request.json());
+    if (!parsed.success) {
+      return errorResponse(
+        422,
+        "validation_error",
+        "Some fields need correcting.",
+        fieldErrors(parsed.error.issues),
+      );
+    }
+    const duties = mockDb.duties.get(caller.id) ?? [];
+    const duty = duties.find((item) => item.id === parsed.data.id);
+    if (duty === undefined) return errorResponse(404, "duty_not_found", "No such duty of yours.");
+    if (duty.ended_at !== null) return HttpResponse.json({ data: duty });
+    const ended = { ...duty, ended_at: parsed.data.at, end_reason: "user" as const };
+    mockDb.duties.set(
+      caller.id,
+      duties.map((item) => (item.id === duty.id ? ended : item)),
+    );
+    return HttpResponse.json({ data: ended });
+  }),
+
+  // TRK-008 · The native uploader's batches: counted, duplicates, and points off any duty.
+  http.post(buildApiUrl("/locations/batch"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const caller = me();
+    if (!caller.tracks) return noTracking();
+    const parsed = z
+      .object({
+        device_id: z.string().min(1),
+        sent_at: z.iso.datetime({ offset: true }),
+        points: z.array(batchPointSchema),
+      })
+      .safeParse(await request.json());
+    if (!parsed.success) {
+      return errorResponse(
+        422,
+        "validation_error",
+        "Some fields need correcting.",
+        fieldErrors(parsed.error.issues),
+      );
+    }
+    if (parsed.data.points.length > MAX_BATCH_POINTS) {
+      return errorResponse(
+        422,
+        "batch_too_large",
+        `At most ${String(MAX_BATCH_POINTS)} points a batch.`,
+      );
+    }
+    const duties = mockDb.duties.get(caller.id) ?? [];
+    let accepted = 0;
+    let duplicates = 0;
+    const rejected: { id: string; reason: string }[] = [];
+    for (const point of parsed.data.points) {
+      if (mockDb.trackPoints.has(point.id)) {
+        duplicates += 1;
+      } else if (!duties.some((duty) => duty.id === point.duty_id)) {
+        rejected.push({ id: point.id, reason: "unknown_duty" });
+      } else {
+        mockDb.trackPoints.add(point.id);
+        accepted += 1;
+      }
+    }
+    const last = duties.at(-1) ?? null;
+    return HttpResponse.json({
+      data: {
+        accepted,
+        duplicates,
+        rejected,
+        duty:
+          last === null
+            ? null
+            : { id: last.id, ended_at: last.ended_at, end_reason: last.end_reason },
+      },
+    });
   }),
 
   http.post(buildApiUrl("/tracking/consent"), async ({ request }) => {
