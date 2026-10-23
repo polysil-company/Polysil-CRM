@@ -273,6 +273,8 @@ Record what each role actually sees. The backend's permissions decide, so a diff
 
 ## R. Not built yet: confirm they show as "Soon", and list them as 🚧
 
+> **Out of date (22 Oct 2026):** most of the items below are now built. Tasks, QR codes, Products, Users and Channel partners have their own cases in §T–§X, and the 22 Oct merges in §Y. For the rest, use the stories in [Tested-Features.md](Tested-Features.md). Only what Tested-Features lists under "Not built yet" is still 🚧.
+
 These are planned and the backend serves most of them. The app has no screens for them yet. In the client walkthrough, list each under **Not built yet** with one line on what it will do. Don't test them.
 
 - **Tasks and follow-ups**: daily follow-up calls and visits, the planner, meeting minutes.
@@ -296,6 +298,96 @@ Run this last, as one continuous flow. It is the demo the client will recognise.
 6. Each approver approves in turn, Accounts with a remark (N-05). The officer gets "approved" (P-04).
 7. Dispatch records a partial dispatch (O-02), then the rest.
 8. The lead's Activity tells the whole story in order (G-08).
+
+## T. Tasks and the day planner (TASK-001 … 008)
+
+Expected results from [Tested-Features.md](Tested-Features.md) "Tasks and the day planner" and `backend/docs/api/tasks.md`.
+
+| ID | Data ID | Role | Steps | Expected |
+| --- | --- | --- | --- | --- |
+| T-01 📱 | TASK-001 | Field Officer | Sales → **Tasks** (My day) | Overdue from earlier days on top, then today's tasks by time. Each shows its kind, time, the lead or dealer it's about, who gave it, notes. Or "A clear day". No error box. |
+| T-02 | TASK-001 | Field Officer | **Next day**, then pick a date a week ahead, then **Today** | The date is in the URL (`?date=`). A future day shows nothing overdue. Today returns. |
+| T-03 | TASK-004 | Field Officer | **New task** → submit empty | Each missing field is named on the field. |
+| T-04 | TASK-004 | Field Officer | New task → What `TEST call`, kind Call, today, no time, for yourself → Save | Listed on My day, due at 18:00. |
+| T-05 | TASK-005 | Field Officer | On the T-04 task: **Mark done** → what happened `TEST: done` | Shows as done with that text. |
+| T-06 | TASK-005 | Field Officer | Reopen the T-04 task, then **Cancel** it with reason `TEST cancel` | Reopened, then cancelled with the reason shown. |
+| T-07 | TASK-003 | Field Officer | On a `TEST` lead: add a task from the lead's Tasks card | The task is about that lead and is listed on its page. |
+| T-08 | TASK-002 | District Manager | Tasks → **Team** | One row per person below them: due, done, overdue. A row opens that person's day (`?user=`) with **Back to team**. |
+| T-09 | TASK-002 | Field Officer | Look for **Team** | Not offered. |
+| T-10 | TASK-008 | District Manager | Tasks → **All tasks** → filter status, kind, person, overdue only | The list narrows; filters stay in the URL. **Download Excel** saves a file. |
+| T-11 | TASK-007 | Field Officer | On a `TEST` lead: **Record minutes** with one action item | The minutes show; the item becomes a task marked "From meeting minutes", which opens `/tasks/minutes/{id}`. |
+
+## U. QR codes and the enquiry page (LEAD-013, LEAD-014)
+
+| ID | Data ID | Role | Steps | Expected |
+| --- | --- | --- | --- | --- |
+| U-01 📱 | LEAD-013 | Field Officer | Sales → **QR codes** | Each code drawn as a black-on-white QR with its name, on/off, six-character code, leads brought, campaign, dealer, area, age. Or an empty state. |
+| U-02 | LEAD-013 | District Manager | **New QR code** → name `TEST QR 1`, an area → Save | Listed with its code. |
+| U-03 | LEAD-013 | District Manager | On `TEST QR 1`: **Download to print**, **Copy link** | A PNG downloads; the link is copied. |
+| U-04 | LEAD-013 | District Manager | **Edit** `TEST QR 1` (rename `TEST QR 1b`), then **Switch off**, then on | Saved; the code and its link don't change. |
+| U-05 | LEAD-014 | — (signed out) | Open `/enquiry` | The form loads: name, mobile, area, village, system, how they'll buy, note. **Don't send a code** (no test mobile). |
+| U-06 | LEAD-014 | — (signed out) | Open the `TEST QR 1b` link | "Enquiry through …" or the area "from the code you scanned". Don't send a code. |
+
+## V. Products and prices (MSTR-004 … 006, MSTR-018)
+
+| ID | Data ID | Role | Steps | Expected |
+| --- | --- | --- | --- | --- |
+| V-01 📱 | MSTR-004 | Field Officer | Admin → **Products & prices** | The catalogue 50 at a time with a total: description, item code, category, block, unit, HSN and slab, MRP; "No HSN" and "Stand-in" chips. Read-only for an officer. |
+| V-02 | MSTR-004 | Any | Search a description; filter by category and status | The list narrows; filters and page in the URL. |
+| V-03 | MSTR-004 | Admin | **New product** → submit empty | Each missing field is named before anything is sent. |
+| V-04 | MSTR-004, BE-024 | Admin | New product → open the **Category** and **Unit** pickers | Both list the backend's categories and units (`GET /lookups/product-categories`, `/lookups/uoms`). |
+| V-05 | MSTR-005 | Admin | New product `TEST Product HSN` with a valid HSN (e.g. `84248200`) → Save | Created; its row shows the HSN and slab, **not** "No HSN". |
+| V-06 | MSTR-005 | Admin | New product `TEST Product bad HSN` with HSN `12` | The HSN field says why (four to eight digits) and nothing is sent; or, if the backend refuses it, "Product added, HSN not set: …" and the dialog stays open on Tax. |
+| V-07 | MSTR-005 | Any | **Tax rates** tab | The rates in force; find a code. |
+| V-08 | MSTR-006 | Any | **Price lists** tab → open a published list | Its phase, scope, dates and rates, read-only. |
+| V-09 | MSTR-018 | Any | **Seller GSTINs** tab | Our registrations with their LUTs by financial year. |
+
+## W. Users and roles (ADMN-001 … 006)
+
+Never change, lock, sign out or reset another person's account. Only the `TEST` person from W-03 is changed.
+
+| ID | Data ID | Role | Steps | Expected |
+| --- | --- | --- | --- | --- |
+| W-01 📱 | ADMN-001 | Admin | Admin → **Users & roles** | Newest first with a count; how each signs in, role, office or partner, last sign-in, open leads, "Deactivated"/"Temporary password" chips. |
+| W-02 | ADMN-001 | Admin | Search a name, then filter by role and status | The list narrows; filters in the URL. |
+| W-03 | ADMN-003 | Admin | **New person** → submit empty; then Staff `TEST Person 1`, email `test.person1@polysil.in`, role Field Officer, an office, a territory → Add | Missing fields named first. Added; the temporary password shows once with Copy. **Don't copy it into any file.** |
+| W-04 | ADMN-002 | Admin | Open your own row | Says "You"; no deactivate or delete. |
+| W-05 | ADMN-004 | Admin | On `TEST Person 1`: edit the name to `TEST Person 1b` → Save; then **Deactivate** | Only the change is sent; deactivated shows. |
+| W-06 | ADMN-001 | Field Officer | Open `/users` | "You don't have access" (or no menu item). |
+
+## X. Channel partners (CHNL-001 … 004, CHNL-007)
+
+| ID | Data ID | Role | Steps | Expected |
+| --- | --- | --- | --- | --- |
+| X-01 📱 | CHNL-001 | Field Officer | Channel → **Channel partners** | Newest first with a total; type, code, parent, territory, contact, active users. Read-only for an officer. |
+| X-02 | CHNL-001 | Any | Search, filter by type, then Closed | The list narrows. Open a distributor → **See the dealers under it**: filtered with an "Under …" chip. |
+| X-03 | CHNL-001 | Any | Open a partner | Four cards: Where it sits, Business, Contact, Credit terms (staff). |
+| X-04 | CHNL-002 | Admin | **Add partner** → Dealer → submit empty; then `TEST Dealer 1` under a distributor, a territory → Save | Missing fields named first. Added. |
+| X-05 | CHNL-003 | Admin | Edit `TEST Dealer 1`: payment terms 400 days, then 30 | 400 is refused (0 to 365); 30 saves. Code, type and parent can't change. |
+| X-06 | CHNL-004 | Admin | **Close** `TEST Dealer 1`, then **Reopen** | Close says how many users are signed out; reopened. |
+| X-07 | CHNL-007 | Admin | Channel partners → **Dealer applications** | The list with status filter and search. Don't start an application (it needs a mobile). |
+| X-08 | CHNL-001 | Dealer | Open `/partners` | Refused, or the portal view of its own business only. ⛔ without a dealer code. |
+
+## Y. What merged on 22 Oct
+
+| ID | Data ID | Role | Steps | Expected |
+| --- | --- | --- | --- | --- |
+| Y-01 | QUOT-015 | Field Officer | On a Qualified **commercial or industrial** `TEST` lead: New quotation → add an item | The item's GST dropdown starts on its HSN slab, marked "(HSN)". |
+| Y-02 | QUOT-015 | Field Officer | Change that item's slab | "Changed from …" on the item; totals follow. |
+| Y-03 | QUOT-015 | Field Officer | Add freight (amount before tax) | Freight on its own row; counted in taxable value and total, not in gross or discount. A wrong amount is named on the field. |
+| Y-04 | QUOT-015 | Field Officer | Save the draft and open it | "Changed from HSN …" on the item; "Freight (GST n%)" in the totals. |
+| Y-05 | QUOT-015 | District Manager | Approvals, for a draft with a changed slab sent for approval | "GST changed on n lines" beside the discount asked. |
+| Y-06 | QUOT-015 | Field Officer | On a **farmer (subsidised)** quotation | No slab dropdown and no freight. |
+| Y-07 | QUOT-015, SO | Field Officer | Place order on the accepted Y-04 quotation (or a direct order) | The same slab and freight controls on the order. |
+| Y-08 | LEAD-019 | Admin | Leads → **Deleted leads** | `?deleted=true`; a note that nobody else sees them; names aren't links; **Back to leads** returns. |
+| Y-09 | LEAD-019 | State Manager | Leads; then open `/leads?deleted=true` | No Deleted leads button; the address shows the live list. |
+| Y-10 | BE-023 | Any staff | A farmer lead's **subsidy** card | Shows the lead's own application (or none) without an error box. |
+| Y-16 | BE-028 | Field Officer, then Admin | Marketing → material | The officer can order material; Admin can approve and send. No "You don't have access". |
+| Y-11 | BE-025 | Field Officer | On a lead: Documents → add | The document types offered are the lead's. |
+| Y-12 | BE-027 | Admin | Schemes → open a scheme with targets | Targets show names, not ids. |
+| Y-13 | BE-026 | Admin | Masters → a lookup list | Order, quality and kind show and can be edited. |
+| Y-14 | BE-029 | Field Officer | **Place order** from a lead / New order | Only quotations free to order are offered. |
+| Y-15 | BE-030 | Dealer | Open the dealer's pages | No refused `GET /tasks` in the network log. ⛔ without a dealer code. |
 
 ---
 
