@@ -7,6 +7,7 @@ the token's hash and a session stored on the row."""
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import hashlib
 import hmac
 import json
@@ -14,6 +15,7 @@ import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import structlog
@@ -37,6 +39,7 @@ from api.errors import (
 from api.integrations import gst as gst_provider
 from api.schemas import dealer_applications as sch
 from api.services import people
+from api.services.clock import today_ist
 from api.services.complaints import _safe_filename
 from api.storage import Storage
 
@@ -79,7 +82,25 @@ def _raise_for(exc: DBAPIError) -> None:
         "DAPMU": ConflictError("This mobile already signs someone in.", code="mobile_in_use"),
         "DAPOP": ConflictError("An open application already has this mobile.", code="application_open"),
         "DAPCD": ConflictError("That partner code is taken.", code="code_in_use"),
-        "DAPFB": ForbiddenError("Only a State Manager or above, other than whoever started it, decides."),
+        "DAPFB": ForbiddenError("Only a role the settings name for this type decides, never whoever started it."),
+        # FS-071
+        "DAPTY": ValidationFailed(fields={"partner_type": "staff choose the type, while draft or returned"}),
+        "DAPDR": ConflictError("A deposit is recorded, so the type cannot change.", code="deposit_recorded"),
+        "DAPND": ConflictError("No deposit is due on this application.", code="deposit_not_due"),
+        "DAPAM": ValidationFailed(fields={"amount": "above 0 and not above the amount set"}),
+        "DAPSH": ValidationFailed("The amount is below the amount due.", code="deposit_short",
+                                  fields={"amount": "below the amount due"}),
+        "DAPPO": ValidationFailed(fields={"paid_on": "not after today, nor more than a year before the application"}),
+        "DAPSL": ValidationFailed(fields={"slip_id": "upload the pay slip as a deposit_slip document first"}),
+        "DAPRX": ForbiddenError("Only a role the settings name relaxes a deposit, never whoever started it.",
+                                code="not_your_relaxation"),
+        "DAPPD": ConflictError("A payment is recorded, so the deposit cannot be relaxed.", code="deposit_paid"),
+        "DAPRR": ValidationFailed(fields={"reason": "required"}),
+        "DAPNL": ValidationFailed("The new amount must be lower than the amount due.", code="not_lower",
+                                  fields={"amount_due": "lower than the amount due"}),
+        "DAPDP": ConflictError("The deposit is not paid or relaxed yet.", code="deposit_pending"),
+        "DAPDS": ConflictError("The pay slip of the recorded payment is missing.", code="deposit_slip_missing"),
+        "DAPPX": ValidationFailed(fields={"parent_id": "a distributor sits under Polysil; leave it out"}),
         "DAPRM": ValidationFailed(fields={"remark": "required to reject or return"}),
         "DAPPR": ValidationFailed(fields={"parent_id": "not an active distributor"}),
         "DAPPN": ValidationFailed(fields={"pan": "not the PAN inside the GSTIN"}),
@@ -97,11 +118,22 @@ def _raise_for(exc: DBAPIError) -> None:
 
 def _clean_fields(body: sch.DealerApplicationFields) -> dict[str, Any]:
     """The fields sent, upper-cased and checked against channel_partner's own shapes, so
-    approval never fails on a CHECK weeks later (edge E-7)."""
+    approval never fails on a CHECK weeks later (edge E-7). JSON-ready: dates, decimal
+    strings and rows as the database reads them (FS-071 E-3); `null` and `""` both
+    reach it as `""`, which it stores as SQL NULL."""
     out: dict[str, Any] = {}
     errors: dict[str, str] = {}
-    for name in body.model_fields_set:
-        value = getattr(body, name)
+    sent = body.model_dump(mode="json", exclude_unset=True)
+    today = today_ist()
+    if sent.get("established_on") and dt.date.fromisoformat(sent["established_on"]) > today:
+        errors["established_on"] = "not after today"
+    for i, row in enumerate(sent.get("previous_installations") or []):
+        if row["year"] > today.year:
+            errors[f"previous_installations[{i}].year"] = "not after this year"
+    for name, value in sent.items():
+        if isinstance(value, list):
+            out[name] = value
+            continue
         if isinstance(value, str):
             value = value.strip()
             if name in ("gstin", "pan", "bank_ifsc"):
@@ -144,19 +176,47 @@ async def lookup(raw: str) -> sch.DealerGstLookup:
 # ── staff ────────────────────────────────────────────────────────────────────
 
 _SELECT = """SELECT a.*, t.name AS territory_name, cb.full_name AS created_by_name, db.full_name AS decided_by_name,
-       dealer_application_missing(a.id) AS missing
+       dealer_application_missing(a.id) AS missing, dealer_application_deposit_status(a.id) AS deposit_status,
+       dealer_application_can(a.id) AS can
   FROM dealer_application a JOIN territory t ON t.id = a.territory_id
   LEFT JOIN app_user cb ON cb.id = a.created_by LEFT JOIN app_user db ON db.id = a.decided_by """
 
 
-async def _can_decide(db: AsyncSession, caller: Caller, row: Any) -> bool:
-    if row.status != "submitted" or str(row.created_by) == caller.user_id:
-        return False
-    r = (await db.execute(text(
-        "SELECT (NOT r.is_functional AND NOT r.is_portal AND r.level >= 3) "
-        "OR (app_has_permission('partners', 'create') AND app_scope('partners') = 'global') "
-        "FROM app_user u JOIN role r ON r.id = u.role_id WHERE u.id = app_current_user_id()"))).scalar_one_or_none()
-    return bool(r)
+def _str(v: Any) -> str | None:
+    return None if v is None else str(v)
+
+
+def working_capital_total(rows: list[dict[str, Any]] | None, other: Any) -> str | None:
+    """Summed here in Decimal from the validated rows; a row that does not parse is left
+    out rather than failing the read (FS-071 E-15)."""
+    if not rows and other is None:
+        return None
+    total = Decimal(str(other)) if other is not None else Decimal("0")
+    for row in rows or []:
+        try:
+            total += Decimal(str(row.get("amount_lakhs")))
+        except (InvalidOperation, ValueError, TypeError):
+            continue
+    return str(total.quantize(Decimal("0.01")))
+
+
+async def _deposit(db: AsyncSession, row: Any) -> sch.Deposit:
+    entries = (await db.execute(text(
+        "SELECT e.*, u.full_name AS by_name FROM dealer_application_deposit_entry e "
+        "LEFT JOIN app_user u ON u.id = e.created_by "
+        "WHERE e.application_id = CAST(:i AS uuid) ORDER BY e.created_at, e.id"), {"i": str(row.id)})).all()
+    names = await people.resolve(db, entries, [("created_by", "by_name")])
+    history = [sch.DepositEntry(
+        kind=e.kind, amount=str(e.amount) if e.kind == "payment" else None,
+        paid_on=e.paid_on.isoformat() if e.paid_on else None, reference=e.reference,
+        slip_id=_str(e.slip_id), from_due=_str(e.from_due), to=str(e.amount) if e.kind == "relaxation" else None,
+        reason=e.reason, by=names.user(e.created_by, e.by_name), at=e.created_at.isoformat()) for e in entries]
+    paid = next((e for e in reversed(entries) if e.kind == "payment"), None)
+    return sch.Deposit(status=row.deposit_status, amount_set=str(row.deposit_set), amount_due=str(row.deposit_due),
+                       paid_amount=str(paid.amount) if paid else None,
+                       paid_on=paid.paid_on.isoformat() if paid else None,
+                       reference=paid.reference if paid else None, slip_id=_str(paid.slip_id) if paid else None,
+                       history=history)
 
 
 async def get(db: AsyncSession, caller: Caller, app_id: str, *, apply_url: str | None = None) -> sch.DealerApplication:
@@ -164,13 +224,22 @@ async def get(db: AsyncSession, caller: Caller, app_id: str, *, apply_url: str |
     if row is None:
         raise NotFoundError("No such application.")
     names = await people.resolve(db, [row], [("created_by", "created_by_name"), ("decided_by", "decided_by_name")])
-    decide = await _can_decide(db, caller, row)
-    sees_bank = decide or "partners" in caller.deletes or (await db.execute(
+    can = {k: bool(v) for k, v in dict(row.can or {}).items()}
+    sees_bank = can.get("decide", False) or "partners" in caller.deletes or (await db.execute(
         text("SELECT app_has_permission('partners', 'edit')"))).scalar_one()
     acct = row.bank_account_no
-    open_ = row.status in ("draft", "returned", "submitted")
     return sch.DealerApplication(
-        id=str(row.id), status=row.status, firm_name=row.firm_name, contact_name=row.contact_name,
+        id=str(row.id), status=row.status, partner_type=row.partner_type,
+        telephone=row.telephone, established_on=row.established_on.isoformat() if row.established_on else None,
+        bank_name=row.bank_name, bank_branch=row.bank_branch, bank_address=row.bank_address,
+        working_capital=row.working_capital, other_sources_lakhs=_str(row.other_sources_lakhs),
+        working_capital_total_lakhs=working_capital_total(row.working_capital, row.other_sources_lakhs),
+        two_wheelers=row.two_wheelers, cars=row.cars, other_vehicles=row.other_vehicles,
+        office_area=_str(row.office_area), godown_area=_str(row.godown_area), area_unit=row.area_unit,
+        manpower=row.manpower, previous_installations=row.previous_installations,
+        sales_executives=row.sales_executives, technicians=row.technicians,
+        appointment_place=row.appointment_place, deposit=await _deposit(db, row),
+        firm_name=row.firm_name, contact_name=row.contact_name,
         mobile=row.mobile, territory={"id": str(row.territory_id), "name": row.territory_name},
         lead_id=str(row.lead_id) if row.lead_id else None, firm_type=row.firm_type,
         gst_registered=row.gst_registered, gstin=row.gstin, pan=row.pan, address=row.address,
@@ -186,10 +255,11 @@ async def get(db: AsyncSession, caller: Caller, app_id: str, *, apply_url: str |
         decision_remark=row.decision_remark, link_expires_at=row.link_expires_at.isoformat(),
         apply_url=apply_url, created_by=names.user(row.created_by, row.created_by_name),
         created_at=row.created_at.isoformat(),
-        can={"edit": open_, "decide": decide, "withdraw": open_, "renew": row.status in ("draft", "returned")})
+        can=can)
 
 
-async def list_(db: AsyncSession, caller: Caller, *, status: str | None, q: str | None) -> list[sch.DealerApplicationRow]:
+async def list_(db: AsyncSession, caller: Caller, *, status: str | None, q: str | None,
+                partner_type: str | None = None) -> list[sch.DealerApplicationRow]:
     if caller.partner_id is not None:
         raise ForbiddenError("Dealer applications are for staff.")
     where: list[str] = ["TRUE"]
@@ -197,14 +267,19 @@ async def list_(db: AsyncSession, caller: Caller, *, status: str | None, q: str 
     if status:
         where.append("a.status = ANY(CAST(:s AS text[]))")
         params["s"] = [x.strip() for x in status.split(",") if x.strip()]
+    if partner_type:
+        where.append("a.partner_type = :pt")
+        params["pt"] = partner_type
     if q:
         where.append("(a.firm_name ILIKE :q OR a.contact_name ILIKE :q OR a.mobile LIKE :q)")
         params["q"] = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     rows = (await db.execute(text(
-        "SELECT a.id, a.status, a.firm_name, a.contact_name, t.name AS territory_name, a.created_at, a.submitted_at "
+        "SELECT a.id, a.status, a.partner_type, dealer_application_deposit_status(a.id) AS deposit_status, "
+        "a.firm_name, a.contact_name, t.name AS territory_name, a.created_at, a.submitted_at "
         "FROM dealer_application a JOIN territory t ON t.id = a.territory_id WHERE " + " AND ".join(where) +
         " ORDER BY a.created_at DESC LIMIT 200"), params)).all()
-    return [sch.DealerApplicationRow(id=str(r.id), status=r.status, firm_name=r.firm_name, contact_name=r.contact_name,
+    return [sch.DealerApplicationRow(id=str(r.id), status=r.status, partner_type=r.partner_type,
+                                     deposit_status=r.deposit_status, firm_name=r.firm_name, contact_name=r.contact_name,
                                territory_name=r.territory_name, created_at=r.created_at.isoformat(),
                                submitted_at=r.submitted_at.isoformat() if r.submitted_at else None) for r in rows]
 
@@ -221,8 +296,8 @@ async def create(db: AsyncSession, caller: Caller, body: sch.DealerApplicationCr
     try:
         async with db.begin_nested():
             app_id = (await db.execute(text(
-                "SELECT dealer_application_create(:f, :c, :m, CAST(:t AS uuid), CAST(:l AS uuid), :h, :e)"),
-                {"f": body.firm_name, "c": body.contact_name, "m": mobile, "t": body.territory_id,
+                "SELECT dealer_application_create(:f, :c, :m, CAST(:t AS uuid), CAST(:l AS uuid), :h, :e, :pt)"),
+                {"pt": body.partner_type, "f": body.firm_name, "c": body.contact_name, "m": mobile, "t": body.territory_id,
                  "l": body.lead_id, "h": _hash(token), "e": expires})).scalar_one()
     except DBAPIError as exc:
         _raise_for(exc)
@@ -244,8 +319,8 @@ async def start_from_lead(db: AsyncSession, caller: Caller, *, lead_id: str, fir
     try:
         async with db.begin_nested():
             app_id = (await db.execute(text(
-                "SELECT dealer_application_create(:f, :c, :m, CAST(:t AS uuid), CAST(:l AS uuid), :h, :e)"),
-                {"f": firm, "c": firm, "m": mobile_db, "t": territory_id, "l": lead_id,
+                "SELECT dealer_application_create(:f, :c, :m, CAST(:t AS uuid), CAST(:l AS uuid), :h, :e, :pt)"),
+                {"pt": "dealer", "f": firm, "c": firm, "m": mobile_db, "t": territory_id, "l": lead_id,
                  "h": _hash(token), "e": datetime.now(UTC) + timedelta(days=LINK_DAYS)})).scalar_one()
     except DBAPIError as exc:
         reason = {"DAPMU": "mobile_in_use", "DAPOP": "application_open"}.get(_state(exc) or "")
@@ -283,6 +358,83 @@ async def decide(db: AsyncSession, caller: Caller, app_id: str, body: sch.Dealer
             await db.execute(text(
                 "SELECT * FROM dealer_application_decide(CAST(:i AS uuid), :d, :r, CAST(:p AS uuid), :c)"),
                 {"i": app_id, "d": body.decision, "r": body.remark, "p": body.parent_id, "c": body.code})
+    except DBAPIError as exc:
+        _raise_for(exc)
+        raise
+    return await get(db, caller, app_id)
+
+
+_PLACE = """SELECT
+    (SELECT t.name FROM territory_closure tc JOIN territory t ON t.id = tc.ancestor_id
+      WHERE tc.descendant_id = a.territory_id AND t.level = 'district' ORDER BY tc.depth LIMIT 1) AS district,
+    (SELECT t.name FROM territory_closure tc JOIN territory t ON t.id = tc.ancestor_id
+      WHERE tc.descendant_id = a.territory_id AND t.level = 'state' ORDER BY tc.depth LIMIT 1) AS state,
+    (SELECT p.code::text FROM channel_partner p WHERE p.id = a.partner_id) AS code
+  FROM dealer_application a WHERE a.id = CAST(:i AS uuid)"""
+
+
+async def sheet(db: AsyncSession, caller: Caller, app_id: str) -> tuple[bytes, str, str]:
+    """The filled data sheet: (body, content type, ASCII filename without extension)."""
+    from api.services import dealer_sheet
+    if caller.partner_id is not None:
+        raise ForbiddenError("Dealer applications are for staff.")
+    app = (await get(db, caller, app_id)).model_dump(mode="json")
+    place = (await db.execute(text(_PLACE), {"i": app_id})).one()
+    app.update(district=place.district, state=place.state)
+    body, ctype = await dealer_sheet.render(app, partner_type=app["partner_type"])
+    return body, ctype, dealer_sheet.filename(place.code or app_id[:8])
+
+
+async def blank_sheet(caller: Caller, partner_type: str) -> tuple[bytes, str, str]:
+    """The blank sheet, for staff who see partners. Cached per type in the process."""
+    from api.services import dealer_sheet
+    if caller.partner_id is not None or caller.user_type != "staff" or "partners" not in caller.scopes:
+        raise ForbiddenError("Dealer applications are for staff who see partners.")
+    body, ctype = await dealer_sheet.blank(partner_type)
+    return body, ctype, dealer_sheet.filename(f"blank-{partner_type}")
+
+
+async def applicant_sheet(db: AsyncSession, token: str, session: str | None) -> tuple[bytes, str, str]:
+    """The applicant's own sheet: needs the session, so it is the filled form they
+    can see on screen, while draft or returned."""
+    from api.services import dealer_sheet
+    if not session:
+        raise ForbiddenError("Verify your mobile first.", code="no_session")
+    app = await view(db, token, session)
+    if not app.get("session"):
+        raise ForbiddenError("Verify your mobile again.", code="no_session")
+    total = working_capital_total(app.get("working_capital"), app.get("other_sources_lakhs"))
+    app.update(working_capital_total_lakhs=total)
+    body, ctype = await dealer_sheet.render(app, partner_type=str(app.get("partner_type") or "dealer"))
+    return body, ctype, dealer_sheet.filename(str(app.get("id", ""))[:8])
+
+
+async def record_deposit(db: AsyncSession, caller: Caller, app_id: str, body: sch.DepositRecord) -> sch.DealerApplication:
+    """FS-071 rule 5: a payment with its slip. Each record is kept; the latest counts."""
+    if caller.partner_id is not None:
+        raise ForbiddenError("Dealer applications are for staff.")
+    if body.paid_on > today_ist():
+        raise ValidationFailed(fields={"paid_on": "not after today"})
+    try:
+        async with db.begin_nested():
+            await db.execute(text(
+                "SELECT dealer_application_deposit_record(CAST(:i AS uuid), CAST(:a AS numeric), :d, :r, CAST(:s AS uuid))"),
+                {"i": app_id, "a": body.amount, "d": body.paid_on, "r": body.reference, "s": body.slip_id})
+    except DBAPIError as exc:
+        _raise_for(exc)
+        raise
+    return await get(db, caller, app_id)
+
+
+async def relax_deposit(db: AsyncSession, caller: Caller, app_id: str, body: sch.DepositRelaxation) -> sch.DealerApplication:
+    """FS-071 rule 6: a lower amount due, with a reason, by a role the setting names."""
+    if caller.partner_id is not None:
+        raise ForbiddenError("Dealer applications are for staff.")
+    try:
+        async with db.begin_nested():
+            await db.execute(text(
+                "SELECT dealer_application_relax(CAST(:i AS uuid), CAST(:a AS numeric), :r)"),
+                {"i": app_id, "a": body.amount_due, "r": body.reason})
     except DBAPIError as exc:
         _raise_for(exc)
         raise
@@ -393,6 +545,8 @@ async def applicant_document_remove(db: AsyncSession, token: str, session: str |
                                 {"t": _hash(token), "s": _hash(session), "d": doc_id})).scalar_one()
     if outcome == "no_session":
         raise ForbiddenError("Verify your mobile again.", code="no_session")
+    if outcome == "in_use":
+        raise ConflictError("A recorded payment names this pay slip.", code="document_in_use")
     if outcome == "not_found":
         raise NotFoundError("No such document of yours.")
 

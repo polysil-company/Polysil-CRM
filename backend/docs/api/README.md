@@ -14,7 +14,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Complaints | 22 | [`complaints.md`](complaints.md) |
 | Customers | 4 | [`customers.md`](customers.md) |
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
-| Dealer Applications | 17 | [`dealer-applications.md`](dealer-applications.md) |
+| Dealer Applications | 22 | [`dealer-applications.md`](dealer-applications.md) |
 | Dealer Commission | 12 | [`dealer-commission.md`](dealer-commission.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
 | Documents | 6 | [`documents.md`](documents.md) |
