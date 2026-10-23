@@ -37,6 +37,8 @@ export const HIDE_BELOW_CLASSES = {
   md: "max-md:hidden",
   lg: "max-lg:hidden",
   xl: "max-xl:hidden",
+  "2xl": "max-2xl:hidden",
+  "3xl": "max-3xl:hidden",
 } as const;
 
 export interface DataTableColumnMeta {

@@ -84,6 +84,24 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps): React.JSX
   const typed = search.trim();
   const waiting = typed !== term || answer.isFetching;
 
+  // APP-009 (live test B-02) · The server's answer replaces the list after typing, and cmdk lost
+  // its highlight with it, so Enter did nothing. Each new answer highlights its first result.
+  const [highlighted, setHighlighted] = useState("");
+  const [answered, setAnswered] = useState<string | null>(null);
+  const firstAction = actions[0];
+  const firstRecord = records[0];
+  const firstResult =
+    firstAction !== undefined
+      ? `action:${firstAction.key}`
+      : firstRecord !== undefined
+        ? `record:${firstRecord.kind}:${firstRecord.id}`
+        : null;
+  const answerKey = firstResult === null ? null : `${term}\u0000${firstResult}`;
+  if (answerKey !== null && firstResult !== null && answerKey !== answered) {
+    setAnswered(answerKey);
+    setHighlighted(firstResult);
+  }
+
   const pages = session
     ? visibleNavSections(session.permissions, session.userType, undefined, gates)
         .flatMap((section) => section.items)
@@ -91,7 +109,10 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps): React.JSX
     : [];
 
   const changeOpen = (next: boolean): void => {
-    if (!next) setSearch("");
+    if (!next) {
+      setSearch("");
+      setAnswered(null);
+    }
     onOpenChange(next);
   };
 
@@ -106,7 +127,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps): React.JSX
       onOpenChange={changeOpen}
       description="Search for a page, an action, or a lead, customer, quotation, order or complaint"
     >
-      <Command loop>
+      <Command loop value={highlighted} onValueChange={setHighlighted}>
         <CommandInput
           value={search}
           onValueChange={setSearch}

@@ -249,6 +249,8 @@ describe("[ADMN-004] EditPerson", () => {
       expect(push).toHaveBeenCalledWith(`/users/${id}`);
     });
     expect(bodies).toEqual([{ full_name: "Dilip K. Parmar" }]);
+    // APP-009 (live test W-05) · the toast names the person as saved.
+    expect(await screen.findByText("Dilip K. Parmar saved")).toBeInTheDocument();
     server.events.removeAllListeners();
   });
 });

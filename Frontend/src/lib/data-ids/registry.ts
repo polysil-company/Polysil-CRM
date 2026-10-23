@@ -130,6 +130,12 @@ export const DATA_IDS = {
     owner: "frontend",
     status: "in-progress",
   },
+  "APP-009": {
+    domain: "APP",
+    title: "Fixes from the live test of 22–23 Oct — the frontend's share of Live-Test-Report.md",
+    owner: "frontend",
+    status: "in-progress",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",

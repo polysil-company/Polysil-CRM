@@ -60,6 +60,18 @@ const LIMIT_NAMES: Readonly<Record<ThresholdDocType, string>> = {
   complaint: "refund limit",
 };
 
+/** APP-009 (live test M-03) · When a changed limit starts to count, in the limit's own words. */
+function appliesFrom(docType: ThresholdDocType): string {
+  switch (docType) {
+    case "sales_order":
+      return "It applies from the next order.";
+    case "quotation":
+      return "It applies from the next discount request.";
+    case "complaint":
+      return "It applies from the next refund.";
+  }
+}
+
 /** What a limit at this level means, in one sentence. */
 function limitMeaning(target: LimitTarget): string {
   switch (target.docType) {
@@ -164,7 +176,7 @@ function LimitFormBody({
     onSuccess: () => {
       idempotency.reset();
       toast.success(`${who}'s ${what} changed`, {
-        description: "It applies from the next order or discount request.",
+        description: appliesFrom(target.docType),
       });
       closeSoon();
     },

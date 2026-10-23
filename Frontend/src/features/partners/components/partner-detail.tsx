@@ -106,6 +106,10 @@ function PartnerView({ partner }: { partner: Partner }): React.JSX.Element {
   const canEdit = useCan("partners", "edit");
   const canCreate = useCan("partners", "create");
   const staff = useIsStaff();
+  // APP-009 (live test X-03) · The ledger, credit and rating are payments data: without it the
+  // backend refuses all three (a field officer), so they aren't asked for.
+  const canSeePayments = useCan("payments", "view");
+  const seesPayments = staff && canSeePayments;
   // CHNL-002 · a distributor or dealer adds the next type down under itself only.
   const ownPartnerId = useSession().data?.partner?.id ?? null;
   const mayAddUnder = staff || partner.id === ownPartnerId;
@@ -299,11 +303,11 @@ function PartnerView({ partner }: { partner: Partner }): React.JSX.Element {
             </CardContent>
           </Card>
         ) : null}
-        {staff ? <PartnerCreditCard partnerId={partner.id} /> : null}
-        {staff ? <DealerRatingCard partnerId={partner.id} /> : null}
+        {seesPayments ? <PartnerCreditCard partnerId={partner.id} /> : null}
+        {seesPayments ? <DealerRatingCard partnerId={partner.id} /> : null}
       </div>
 
-      {staff ? <PartnerLedgerCard partnerId={partner.id} /> : null}
+      {seesPayments ? <PartnerLedgerCard partnerId={partner.id} /> : null}
 
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent size="sm">

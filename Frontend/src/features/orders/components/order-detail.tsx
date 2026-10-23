@@ -21,12 +21,13 @@ import { partnerTypeLabel } from "@/features/leads/lib/lead-labels";
 import { orderDetailQueryOptions } from "@/features/orders/api/orders.queries";
 import type { Order, OrderLine } from "@/features/orders/api/orders.schemas";
 import {
+  formatOrderQty,
   ORDER_PDF_LABELS,
   ORDER_TYPE_LABELS,
-  PAYMENT_TERMS_LABELS,
-  formatOrderQty,
   orderNumber,
+  PAYMENT_TERMS_LABELS,
   stepRoleLabel,
+  warehouseShortText,
 } from "@/features/orders/lib/order-labels";
 import { OrderPaymentsCard } from "@/features/payments/components/order-payments";
 import { GstChangeMark } from "@/features/quotations/components/gst-change-mark";
@@ -669,7 +670,7 @@ function LineStock({ line }: { line: OrderLine }): React.JSX.Element | null {
       )}
     >
       {line.stock.short
-        ? `Warehouse short: ${qty(line, line.stock.available)} ${line.uom} available`
+        ? warehouseShortText(line.stock.available, line.uom, line.uomDecimals)
         : `${qty(line, line.stock.available)} ${line.uom} available`}
     </span>
   );

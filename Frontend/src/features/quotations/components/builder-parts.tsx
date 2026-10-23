@@ -214,6 +214,7 @@ export function PricedSummary({ priced }: { priced: PricedLines }): React.JSX.El
     <>
       <BuilderTotals
         totals={priced.totals}
+        freightAmount={priced.snapshot?.preview.freight?.amount ?? null}
         intraState={priced.snapshot?.preview.intraState ?? true}
         stale={priced.pricing}
       />
@@ -304,20 +305,25 @@ export function TextField({
 
 function BuilderTotals({
   totals,
+  freightAmount,
   intraState,
   stale,
 }: {
   totals: QuotePreview["totals"] | null;
+  /**
+   * APP-009 (live test Y-03) · The priced freight before tax. The backend returns it beside the
+   * totals (`freight.amount`), not inside them, so `totals.freight` is only the mock's.
+   */
+  freightAmount: string | null;
   intraState: boolean;
   stale: boolean;
 }): React.JSX.Element {
+  const freight = freightAmount ?? totals?.freight ?? null;
   const rows: { label: string; value: string | null; strong?: boolean }[] = [
     { label: "Gross", value: totals?.gross ?? null },
     { label: "Discount", value: totals?.discount ?? null },
     // QUOT-015 · Freight sits inside the taxable value, never in gross or discount.
-    ...(totals !== null && Number(totals.freight) > 0
-      ? [{ label: "Freight", value: totals.freight }]
-      : []),
+    ...(freight !== null && Number(freight) > 0 ? [{ label: "Freight", value: freight }] : []),
     { label: "Taxable value", value: totals?.taxable ?? null },
     ...(intraState
       ? [

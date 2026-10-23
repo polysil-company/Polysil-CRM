@@ -58,6 +58,11 @@ export interface NavItem {
   readonly audience?: "staff" | "partner";
   /** "approvers": shown to whoever may approve an order or a quotation discount, whatever `module` says. */
   readonly visibleTo?: "approvers";
+  /**
+   * APP-009 (M-01) · Also shown to whoever may approve, besides those with `module`: approvers
+   * read the limits they work within, and only `module` holders change them.
+   */
+  readonly alsoTo?: "approvers";
   /** A live count shown next to the label. */
   readonly countSource?: "leads" | "messages" | "approvals" | "accounts";
   /**
@@ -429,7 +434,9 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         description: "How much each role may approve: an order's value and a quotation's discount.",
         icon: SlidersHorizontalIcon,
         module: "masters",
-        // GET /approvals/thresholds is 403 for anyone who is not staff (walk F-8).
+        // GET /approvals/thresholds is 403 for anyone who is not staff (walk F-8), and open to
+        // every staff role; approvers read it too (live test M-01).
+        alsoTo: "approvers",
         audience: "staff",
         dataId: "APPR-002",
         href: "/approval-limits",
@@ -544,6 +551,9 @@ export function canSeeNavItem(
   }
   if (item.visibleTo === "approvers") {
     return canApprove(permissions);
+  }
+  if (item.alsoTo === "approvers" && canApprove(permissions)) {
+    return true;
   }
   return item.module === null || can(permissions, item.module, "view");
 }
