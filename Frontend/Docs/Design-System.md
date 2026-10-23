@@ -208,6 +208,9 @@ is otherwise invisible.
 - **Layout constants:** `w-sidebar` 248px, `w-sidebar-rail` 56px (collapsed), `h-header` 56px.
 - **Page title:** the top bar carries it at `text-lg` with a `text-sm` description — top-bar chrome,
   not a page heading, so it uses the section-title size rather than `text-xl`.
+- **Breakpoints:** Tailwind's `sm`–`2xl`, plus `3xl` (1760px) for a wide list's optional columns,
+  which only fit beside the open sidebar from there. Hide a list's least-needed columns with
+  `hideBelow` so its main columns fit a 1440px laptop without scrolling (live test D-05).
 - **Wide tables** scroll inside their own area. Shift + wheel scrolls sideways
   (`useShiftWheelScroll`, built into `DataTable`); at either edge the wheel returns to the page.
 - **Table columns** take a width token from `COLUMN_WIDTH_CLASSES`. Give `fill` to every column

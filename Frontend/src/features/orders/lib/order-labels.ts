@@ -95,3 +95,15 @@ export function formatOrderQty(qty: string, decimals: number): string {
   const fixed = value.toFixed(Math.max(0, Math.min(3, decimals)));
   return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
 }
+
+/**
+ * APP-009 (live test N-04) · What a short warehouse says on an order line. Over-committed stock
+ * comes back below zero, and "-500 MTR available" reads badly, so that is said as what is missing.
+ */
+export function warehouseShortText(available: string, uom: string, decimals: number): string {
+  const value = available.trim();
+  if (value.startsWith("-")) {
+    return `Warehouse short by ${formatOrderQty(value.slice(1), decimals)} ${uom}`;
+  }
+  return `Warehouse short: only ${formatOrderQty(value, decimals)} ${uom} available`;
+}

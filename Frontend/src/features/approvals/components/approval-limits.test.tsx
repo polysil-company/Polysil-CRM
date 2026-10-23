@@ -82,6 +82,8 @@ describe("[APPR-002] ApprovalLimits", () => {
     await user.type(amount, "400000");
     await user.click(within(dialog).getByRole("button", { name: "Save limit" }));
     expect(await screen.findByText("State Manager's order limit changed")).toBeInTheDocument();
+    // APP-009 (live test M-03) · in the words of the limit changed, not "order or discount".
+    expect(screen.getByText("It applies from the next order.")).toBeInTheDocument();
     await waitFor(() => {
       expect(
         within(screen.getByRole("list", { name: "Order value, company-wide" })).getByText(

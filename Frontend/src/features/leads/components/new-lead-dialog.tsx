@@ -77,7 +77,11 @@ export function NewLeadDialog(): React.JSX.Element {
   const form = useForm<CreateLeadFormValues, unknown, CreateLeadRequest>({
     resolver: zodResolver(createLeadFormSchema),
     defaultValues: EMPTY_FORM,
-    mode: "onTouched",
+    // APP-009 (live test E-04) · The farmer's name has the focus when the dialog opens, so checking
+    // on leaving a field turned it red before anything was typed. Fields are checked on the first
+    // submit, then as they change.
+    mode: "onSubmit",
+    reValidateMode: "onChange",
   });
 
   // The dialog can be left before the success check has had its moment; the timer must not

@@ -365,7 +365,7 @@ export function ProductDialog({
                 }
               >
                 <SelectValue
-                  placeholder={categories.isPending ? "Loading categories…" : "Choose a category"}
+                  placeholder={pickerPlaceholder(categories, "categories", "a category")}
                 />
               </SelectTrigger>
               <SelectContent>
@@ -377,6 +377,7 @@ export function ProductDialog({
               </SelectContent>
             </Select>
             <FieldError id="product-category-error">{errors.category}</FieldError>
+            <PickerFailed query={categories} what="Categories" />
           </Field>
 
           <Field data-invalid={errors.uom === undefined ? undefined : true}>
@@ -395,7 +396,7 @@ export function ProductDialog({
                 aria-invalid={errors.uom === undefined ? undefined : true}
                 aria-describedby={errors.uom === undefined ? undefined : "product-uom-error"}
               >
-                <SelectValue placeholder={uoms.isPending ? "Loading units…" : "Choose a unit"} />
+                <SelectValue placeholder={pickerPlaceholder(uoms, "units", "a unit")} />
               </SelectTrigger>
               <SelectContent>
                 {unitItems.map((item) => (
@@ -406,6 +407,7 @@ export function ProductDialog({
               </SelectContent>
             </Select>
             <FieldError id="product-uom-error">{errors.uom}</FieldError>
+            <PickerFailed query={uoms} what="Units" />
           </Field>
 
           <Field>
@@ -801,5 +803,46 @@ function TaxHeading({
         </p>
       )}
     </section>
+  );
+}
+
+/** The state a picker's list query is in, as far as its placeholder and notice care. */
+interface PickerQuery {
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly refetch: () => Promise<unknown>;
+}
+
+/** APP-009 (live test V-04) · A picker says when its list is loading or failed, not just empty. */
+function pickerPlaceholder(query: PickerQuery, plural: string, one: string): string {
+  if (query.isPending) return `Loading ${plural}…`;
+  if (query.isError) return `The ${plural} couldn't be loaded`;
+  return `Choose ${one}`;
+}
+
+/** APP-009 (live test V-04) · Why a picker is empty when its list failed, with a retry. */
+function PickerFailed({
+  query,
+  what,
+}: {
+  query: PickerQuery;
+  what: string;
+}): React.JSX.Element | null {
+  if (!query.isError) return null;
+  return (
+    <p role="alert" className="flex flex-wrap items-center gap-x-2 text-sm text-destructive">
+      {what} couldn&apos;t be loaded.
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className="h-auto p-0"
+        onClick={() => {
+          void query.refetch();
+        }}
+      >
+        Try again
+      </Button>
+    </p>
   );
 }

@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
+import { getResponse, http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -8,6 +8,7 @@ import type { LeadStage } from "@/features/leads/api/leads.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb, resetMockDb } from "@/mocks/db";
+import { handlers } from "@/mocks/handlers";
 import { server } from "@/mocks/node";
 import { renderWithProviders } from "@/test/render";
 
@@ -434,5 +435,102 @@ describe("[QUOT-015] A GST slab per item, and freight", () => {
     const replaced = bodies.find((entry) => entry.path.endsWith("/lines"));
     expect(linesOf(replaced?.body ?? {})[0]).toMatchObject({ gst_slab: "40" });
     expect(replaced?.body.freight).toEqual({ amount: "2000" });
+  });
+});
+
+describe("[APP-009] The builder after the live test (I-03, I-05, Y-03)", () => {
+  afterEach(() => {
+    push.mockReset();
+    resetMockDb();
+    server.events.removeAllListeners();
+  });
+
+  /** The method and path of every write the screen makes from now on. */
+  function recordWrites(): string[] {
+    const writes: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "GET") return;
+      const path = new URL(request.url).pathname;
+      if (!path.endsWith("/pricing/quote-lines")) writes.push(`${request.method} ${path}`);
+    });
+    return writes;
+  }
+
+  it("keeps Save off on a quotation with no items, and says why (I-03)", async () => {
+    signInAsAdmin();
+    showNew(leadAt("qualified"));
+
+    await screen.findByRole("form", { name: "New quotation" });
+    expect(screen.getByText("Add at least one item.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
+  });
+
+  it("saves only the header when only the terms changed (I-05)", async () => {
+    signInAsAdmin();
+    const draft = mockDb.quotations.find(
+      (item) => item.status === "draft" && item.superseded_by === null && item.lines.length > 0,
+    );
+    if (draft === undefined) throw new Error("No draft with items");
+    const writes = recordWrites();
+    const user = userEvent.setup();
+    renderWithProviders(<EditQuotation quotationId={draft.id} />);
+
+    const form = await screen.findByRole("form", { name: /^Edit / });
+    await user.type(within(form).getByLabelText(/^Terms/), " Delivery in 10 days.");
+    const save = within(form).getByRole("button", { name: "Save changes" });
+    await waitFor(() => {
+      expect(save).toBeEnabled();
+    }, PRICED);
+    await user.click(save);
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith(`/quotations/${draft.id}`);
+    });
+    expect(writes).toEqual([`PATCH /api/v1/quotations/${draft.id}`]);
+  });
+
+  it("shows the freight in the summary from the priced freight, as the backend sends it (Y-03)", async () => {
+    signInAsAdmin();
+    const draft = mockDb.quotations.find(
+      (item) =>
+        item.status === "draft" &&
+        item.sales_type === "commercial" &&
+        item.superseded_by === null &&
+        item.lines.length > 0,
+    );
+    if (draft === undefined) throw new Error("No commercial draft");
+    draft.freight = {
+      amount: "500.00",
+      gst_slab: "5.000",
+      gst_slab_chosen: true,
+      cgst_rate: "2.500",
+      sgst_rate: "2.500",
+      igst_rate: "0.000",
+      cgst: "12.50",
+      sgst: "12.50",
+      igst: "0.00",
+      total: "525.00",
+    };
+    // The backend's QuoteTotals has no freight: it sits beside the totals.
+    server.use(
+      http.post(buildApiUrl("/pricing/quote-lines"), async ({ request }) => {
+        const answer = await getResponse([...handlers], request);
+        if (answer === undefined) throw new Error("No mock preview");
+        const body: unknown = await answer.json();
+        if (typeof body !== "object" || body === null || !("data" in body)) return answer;
+        const { data } = body;
+        if (typeof data !== "object" || data === null || !("totals" in data)) return answer;
+        const { totals } = data;
+        if (typeof totals !== "object" || totals === null) return answer;
+        const withoutFreight = Object.fromEntries(
+          Object.entries(totals).filter(([key]) => key !== "freight"),
+        );
+        return HttpResponse.json({ data: { ...data, totals: withoutFreight } });
+      }),
+    );
+    renderWithProviders(<EditQuotation quotationId={draft.id} />);
+
+    const totals = await screen.findByLabelText("Totals");
+    expect(await within(totals).findByText("Freight", {}, PRICED)).toBeInTheDocument();
   });
 });
