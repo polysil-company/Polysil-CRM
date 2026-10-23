@@ -1,0 +1,847 @@
+import { z } from "zod";
+
+import { orderPaymentsSchema } from "@/features/payments/api/payments.schemas";
+import {
+  freightWireSchema,
+  TAX_TREATMENTS,
+  type FreightRequest,
+  type QuotationLineRequest,
+} from "@/features/quotations/api/quotations.schemas";
+import { cursorPageSchema, type CursorPage, type PageMetaWire } from "@/lib/api/pagination";
+import { EMPTY_VALUE } from "@/lib/format";
+
+/**
+ * Sales orders contract (SO-001 … SO-004, DISP-002), from the backend's `Order`,
+ * `OrderSummary`, `OrderPage`, `Dispatch` and their requests (backend/docs/api/orders.md,
+ * backend/docs/handover/orders-api-contract.md).
+ *
+ * Money is a decimal string at two places, quantities at three. The screen prints what the
+ * backend sends and never computes a total. Blocks the caller may not see (lead, partner,
+ * owner, quotations) come back null or empty: the screen says "not visible to you".
+ */
+
+export const ORDER_STATUSES = [
+  "draft",
+  "submitted",
+  "approved",
+  "partially_dispatched",
+  "dispatched",
+  "closed_short",
+  "cancelled",
+] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export const ORDER_TYPES = [
+  "commercial",
+  "industrial",
+  "export",
+  "sample",
+  "marketing_material",
+  "subsidised",
+  "replacement",
+] as const;
+export type OrderType = (typeof ORDER_TYPES)[number];
+
+/** SO-010 · A sample's pricing, from the `sample_pricing` setting when it was made. */
+export const SAMPLE_PRICINGS = ["free", "charged"] as const;
+export type SamplePricing = (typeof SAMPLE_PRICINGS)[number];
+
+/** The types the backend accepts today; the others answer `order_type_unsupported`. */
+export const ORDERABLE_TYPES = ["commercial", "industrial"] as const satisfies readonly OrderType[];
+
+export const PAYMENT_TERMS = ["full_payment", "credit"] as const;
+export type PaymentTerms = (typeof PAYMENT_TERMS)[number];
+
+export const ORDER_PDF_STATES = ["none", "pending", "ready", "failed"] as const;
+export type OrderPdfState = (typeof ORDER_PDF_STATES)[number];
+
+const isoDateTime = z.iso.datetime({ offset: true });
+const isoDate = z.iso.date();
+const decimal = z.string().regex(/^-?\d+(\.\d+)?$/);
+/** A name the backend does not guarantee non-empty prints "—" rather than failing the order. */
+const displayText = z.string().transform((value) => (value.trim() === "" ? EMPTY_VALUE : value));
+
+const userRef = z
+  .object({ id: z.string().min(1), full_name: z.string() })
+  .transform((wire) => ({ id: wire.id, name: wire.full_name.trim() || "Unknown" }));
+const partnerRef = z
+  .object({ id: z.string().min(1), name: displayText, partner_type: z.string().nullish() })
+  .transform((wire) => ({ id: wire.id, name: wire.name, partnerType: wire.partner_type ?? null }));
+const territoryRef = z.object({ id: z.string().min(1), name: displayText, level: displayText });
+
+const totalsSchema = z.object({
+  gross: decimal,
+  discount: decimal,
+  /** QUOT-015 · Freight before tax, "0.00" without; inside taxable and total, not gross. */
+  freight: decimal.default("0.00"),
+  taxable: decimal,
+  cgst: decimal,
+  sgst: decimal,
+  igst: decimal,
+  total: decimal,
+});
+
+// ── scheme benefits (SCHM-005, `schemes-contract.md`, FS-031) ─────────────────────────
+
+export const ORDER_BENEFIT_KINDS = ["discount", "entitlement_used", "reward_redemption"] as const;
+export type OrderBenefitKind = (typeof ORDER_BENEFIT_KINDS)[number];
+
+export const ORDER_BENEFIT_STATUSES = ["applied", "reversed"] as const;
+
+const schemeRef = z.object({ id: z.string().min(1), code: z.string(), name: displayText });
+export type SchemeRef = z.output<typeof schemeRef>;
+
+/**
+ * A benefit on a submitted order: applied at submit, reversed when the order goes back to draft
+ * or is cancelled. It lowers `payable`, never the invoice.
+ */
+const orderBenefitSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(ORDER_BENEFIT_KINDS),
+    /** Null for reward points (FS-032). */
+    scheme: schemeRef.nullable(),
+    amount: decimal,
+    status: z.enum(ORDER_BENEFIT_STATUSES),
+    applied_at: isoDateTime,
+  })
+  .transform((wire) => ({
+    id: wire.id,
+    kind: wire.kind,
+    scheme: wire.scheme,
+    amount: wire.amount,
+    status: wire.status,
+    appliedAt: wire.applied_at,
+  }));
+export type OrderBenefit = z.output<typeof orderBenefitSchema>;
+
+export const ON_DELIVERY_KINDS = ["points", "next_order_credit"] as const;
+
+/**
+ * SCHM-005 · GET /orders/{id}/schemes, on a draft only: what submit would take off now
+ * (discounts and credits), what delivery would earn, and the payable.
+ */
+export const orderSchemePreviewSchema = z
+  .object({
+    data: z.object({
+      discounts: z.array(z.object({ scheme: schemeRef, basis: decimal, amount: decimal })),
+      entitlements: z.array(
+        z.object({ entitlement_id: z.string().min(1), scheme: schemeRef, amount: decimal }),
+      ),
+      /** Worked on the full quantity; the real figure uses what is dispatched. */
+      on_delivery: z.array(
+        z.object({
+          scheme: schemeRef,
+          kind: z.enum(ON_DELIVERY_KINDS),
+          points: z.number().int().nullable(),
+          basis: decimal,
+        }),
+      ),
+      total_benefit: decimal,
+      payable: decimal,
+    }),
+  })
+  .transform(({ data }) => ({
+    discounts: data.discounts,
+    credits: data.entitlements.map((credit) => ({
+      entitlementId: credit.entitlement_id,
+      scheme: credit.scheme,
+      amount: credit.amount,
+    })),
+    onDelivery: data.on_delivery,
+    totalBenefit: data.total_benefit,
+    payable: data.payable,
+  }));
+export type OrderSchemePreview = z.output<typeof orderSchemePreviewSchema>;
+export type OrderSchemePreviewWire = z.input<typeof orderSchemePreviewSchema>["data"];
+
+// ── the list (SO-001) ────────────────────────────────────────────────────────────
+
+const orderSummaryWireSchema = z.object({
+  id: z.string().min(1),
+  /** Null until the first submit. */
+  order_no: z.string().min(1).nullable(),
+  status: z.enum(ORDER_STATUSES),
+  order_type: z.enum(ORDER_TYPES),
+  party_name: z.string(),
+  partner: partnerRef.nullable(),
+  owner: userRef.nullable(),
+  totals: totalsSchema,
+  is_provisional: z.boolean(),
+  /** Share of the ordered quantity sent, 0 to 100. */
+  dispatched_pct: z.number().int().min(0).max(100),
+  /** The role of the next undecided approval step. */
+  approval_waiting_on: z.string().nullable(),
+  submitted_at: isoDateTime.nullable(),
+  created_at: isoDateTime,
+});
+
+export type OrderSummaryWire = z.input<typeof orderSummaryWireSchema>;
+
+const orderSummarySchema = orderSummaryWireSchema.transform((wire) => ({
+  id: wire.id,
+  orderNo: wire.order_no,
+  status: wire.status,
+  orderType: wire.order_type,
+  partyName: wire.party_name.trim() || "Unnamed party",
+  partner: wire.partner,
+  owner: wire.owner,
+  totals: wire.totals,
+  isProvisional: wire.is_provisional,
+  dispatchedPct: wire.dispatched_pct,
+  waitingOn: wire.approval_waiting_on,
+  submittedAt: wire.submitted_at,
+  createdAt: wire.created_at,
+}));
+
+export type OrderSummary = z.output<typeof orderSummarySchema>;
+
+/** GET /orders — one row at a time, so one odd row never blanks the page. */
+export const orderPageSchema = cursorPageSchema(orderSummarySchema);
+export type OrderPage = CursorPage<OrderSummary>;
+export type OrderPageWire = { data: OrderSummaryWire[]; meta: PageMetaWire };
+
+export const ORDER_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+export const DEFAULT_ORDER_PAGE_SIZE = 25;
+
+export interface OrderListParams {
+  readonly cursor: string | null;
+  readonly pageSize: number;
+  readonly q: string;
+  readonly status: readonly OrderStatus[];
+  readonly orderType: OrderType | null;
+  /** Only the user's own orders (`owner=me`). */
+  readonly mine: boolean;
+  readonly leadId: string | null;
+  /** Orders this quotation is or was on (BE-019); a cancelled order released it. */
+  readonly quotationId: string | null;
+  /** Territories, each with everything under it (`territory_id`, up to 20). */
+  readonly areas: readonly string[];
+  /** An office and the offices under it (`owner_org_unit_id`). */
+  readonly officeId: string | null;
+  /** ACCT-001: orders whose next approval step is this role's, e.g. `account_manager`. */
+  readonly waitingOn?: string | null;
+  /** ACCT-002: orders placed through this partner (`partner_id`). */
+  readonly partnerId?: string | null;
+}
+
+/** ACCT-001 · GET /orders/stats: counts by status, and submitted orders by whose step is next. */
+export const orderStatsSchema = z
+  .object({
+    total: z.number().int().nonnegative(),
+    by_status: z.record(z.string(), z.number().int().nonnegative()),
+    waiting_on: z.record(z.string(), z.number().int().nonnegative()),
+  })
+  .transform((wire) => ({
+    total: wire.total,
+    byStatus: wire.by_status,
+    waitingOn: wire.waiting_on,
+  }));
+
+export type OrderStats = z.output<typeof orderStatsSchema>;
+
+/** The role whose step is the Accounts queue (BE-022). */
+export const ACCOUNTS_ROLE = "account_manager";
+
+// ── the document (SO-002) ─────────────────────────────────────────────────────────
+
+const orderLineWireSchema = z.object({
+  id: z.string().min(1),
+  line_no: z.number().int().positive(),
+  product_id: z.string().min(1),
+  description: z.string(),
+  hsn_code: z.string(),
+  uom: z.string(),
+  /** How many decimals the unit takes; 0 for pieces. */
+  uom_decimals: z.number().int().min(0).max(3),
+  qty: decimal,
+  rate: decimal,
+  gross: decimal,
+  discount_pct: decimal,
+  discount1_amt: decimal,
+  after_discount1: decimal,
+  discount2_pct: decimal,
+  discount2_amt: decimal,
+  after_discount2: decimal,
+  discount3_pct: decimal,
+  discount3_amt: decimal,
+  discount: decimal,
+  taxable: decimal,
+  gst_slab: decimal,
+  /** QUOT-015 · The product's HSN slab when the line was priced. */
+  hsn_slab: decimal.optional(),
+  /** QUOT-015 · The slab was picked (FS-069). */
+  gst_slab_chosen: z.boolean().default(false),
+  cgst_rate: decimal,
+  sgst_rate: decimal,
+  igst_rate: decimal,
+  cgst: decimal,
+  sgst: decimal,
+  igst: decimal,
+  total: decimal,
+  provisional_fields: z.array(z.string()),
+  qty_dispatched: decimal,
+  qty_short: decimal,
+  qty_open: decimal,
+  /**
+   * DISP-003 · What the order's warehouse has left for this product; `short` when it is
+   * over-committed. Null once the line has shipped, or for a user without stock access.
+   */
+  stock: z.object({ available: decimal, short: z.boolean() }).nullish(),
+});
+
+export type OrderLineWire = z.input<typeof orderLineWireSchema>;
+
+const orderLineSchema = orderLineWireSchema.transform((wire) => ({
+  id: wire.id,
+  lineNo: wire.line_no,
+  productId: wire.product_id,
+  description: wire.description.trim() || EMPTY_VALUE,
+  hsnCode: wire.hsn_code,
+  uom: wire.uom,
+  uomDecimals: wire.uom_decimals,
+  qty: wire.qty,
+  rate: wire.rate,
+  gross: wire.gross,
+  discounts: [
+    { pct: wire.discount_pct, amount: wire.discount1_amt },
+    { pct: wire.discount2_pct, amount: wire.discount2_amt },
+    { pct: wire.discount3_pct, amount: wire.discount3_amt },
+  ] as const,
+  discount: wire.discount,
+  taxable: wire.taxable,
+  gstSlab: wire.gst_slab,
+  hsnSlab: wire.hsn_slab ?? wire.gst_slab,
+  gstSlabChosen: wire.gst_slab_chosen,
+  cgst: { rate: wire.cgst_rate, amount: wire.cgst },
+  sgst: { rate: wire.sgst_rate, amount: wire.sgst },
+  igst: { rate: wire.igst_rate, amount: wire.igst },
+  total: wire.total,
+  provisionalFields: wire.provisional_fields,
+  qtyDispatched: wire.qty_dispatched,
+  qtyShort: wire.qty_short,
+  qtyOpen: wire.qty_open,
+  stock: wire.stock ?? null,
+}));
+
+export type OrderLine = z.output<typeof orderLineSchema>;
+
+const approvalStepSchema = z
+  .object({
+    id: z.string().min(1),
+    seq: z.number().int().positive(),
+    role: z.string().min(1),
+    decided_role: z.string().nullish(),
+    decision: z.enum(["approve", "reject"]).nullish(),
+    by: userRef.nullish(),
+    remark: z.string().nullish(),
+    decided_at: isoDateTime.nullish(),
+    /**
+     * True on the step waiting now when nobody of its role can decide it: a higher manager
+     * decides it instead (walk F-11). Always false for a partner user.
+     */
+    stalled: z.boolean().nullish(),
+  })
+  .transform((wire) => ({
+    id: wire.id,
+    seq: wire.seq,
+    role: wire.role,
+    decidedRole: wire.decided_role ?? null,
+    decision: wire.decision ?? null,
+    by: wire.by ?? null,
+    remark: wire.remark ?? null,
+    decidedAt: wire.decided_at ?? null,
+    stalled: wire.stalled === true,
+  }));
+
+export type OrderApprovalStep = z.output<typeof approvalStepSchema>;
+
+/** A document's approval request: an order's, or a complaint refund's (CMPL-007). */
+export const approvalBlockSchema = z.object({
+  request_id: z.string().min(1),
+  status: z.enum(["pending", "approved", "rejected", "cancelled"]),
+  steps: z.array(approvalStepSchema),
+});
+
+const dispatchWireSchema = z.object({
+  id: z.string().min(1),
+  order: z.object({
+    id: z.string().min(1),
+    order_no: z.string().nullable(),
+    party_name: z.string(),
+  }),
+  dispatch_no: z.string().min(1),
+  dc_no: z.string().nullable(),
+  dc_date: isoDate.nullable(),
+  invoice_no: z.string().nullable(),
+  invoice_date: isoDate.nullable(),
+  dispatched_at: isoDateTime,
+  transporter: z.string().nullable(),
+  vehicle_no: z.string().nullable(),
+  dispatched_by: userRef.nullable(),
+  voided_at: isoDateTime.nullable(),
+  void_remark: z.string().nullable(),
+  lines: z.array(
+    z.object({ order_line_id: z.string().min(1), line_no: z.number().int(), qty: decimal }),
+  ),
+  /** invoice_before_dc, duplicate_invoice_no: recorded anyway. */
+  warnings: z.array(z.string()).optional(),
+  /** DISP-003 · Where the goods left from. */
+  warehouse: z.object({ id: z.string().min(1), code: z.string(), name: z.string() }).nullish(),
+});
+
+export type DispatchWire = z.input<typeof dispatchWireSchema>;
+
+const dispatchSchema = dispatchWireSchema.transform((wire) => ({
+  id: wire.id,
+  orderId: wire.order.id,
+  /** The order it shipped against, as the dispatch log names it. */
+  order: {
+    id: wire.order.id,
+    orderNo: wire.order.order_no,
+    partyName: wire.order.party_name.trim() || "Unnamed party",
+  },
+  dispatchNo: wire.dispatch_no,
+  dcNo: wire.dc_no,
+  dcDate: wire.dc_date,
+  invoiceNo: wire.invoice_no,
+  invoiceDate: wire.invoice_date,
+  dispatchedAt: wire.dispatched_at,
+  transporter: wire.transporter,
+  vehicleNo: wire.vehicle_no,
+  dispatchedBy: wire.dispatched_by,
+  voidedAt: wire.voided_at,
+  voidRemark: wire.void_remark,
+  lines: wire.lines.map((line) => ({
+    orderLineId: line.order_line_id,
+    lineNo: line.line_no,
+    qty: line.qty,
+  })),
+  warnings: wire.warnings ?? [],
+  warehouse: wire.warehouse ?? null,
+}));
+
+export type Dispatch = z.output<typeof dispatchSchema>;
+
+/** DISP-001 · GET /dispatches — the dispatch log, newest first, one row at a time. */
+export const dispatchPageSchema = cursorPageSchema(dispatchSchema);
+export type DispatchPage = CursorPage<Dispatch>;
+export type DispatchPageWire = { data: DispatchWire[]; meta: PageMetaWire };
+
+/** Dispatches a page of the log asks for. */
+export const DISPATCH_PAGE_SIZE = 25;
+
+export interface DispatchListParams {
+  /** An Indian calendar day, `YYYY-MM-DD`; null for no lower bound. */
+  readonly from: string | null;
+  /** Inclusive; null for no upper bound. */
+  readonly to: string | null;
+}
+
+/** SO-008 · GET /orders/{id} `subsidy` (FS-054). */
+const subsidyBlockWireSchema = z.object({
+  /** The material amount, or the order total when `material_is_total`. */
+  material_amount: decimal,
+  subsidy_amount: decimal,
+  /** The farmer's share, material less subsidy when derived: what the order collects. */
+  farmer_payable: decimal,
+  material_is_total: z.boolean(),
+  farmer_payable_is_derived: z.boolean(),
+  leads: z.array(z.object({ id: z.string().min(1), inquiry_no: z.string().nullable() })),
+});
+
+export const orderWireSchema = z.object({
+  doc_type: z.literal("sales_order").optional(),
+  id: z.string().min(1),
+  order_no: z.string().min(1).nullable(),
+  status: z.enum(ORDER_STATUSES),
+  order_type: z.enum(ORDER_TYPES),
+  /** SO-010 · Fixed at create. */
+  tax_treatment: z.enum(TAX_TREATMENTS).default("domestic"),
+  /** SO-010 · The buyer's country; null unless an export. */
+  export_country: z.string().nullish(),
+  /** SO-010 · The LUT an export_lut order is zero-rated under; taken at submit, null on a draft. */
+  lut_arn: z.string().nullish(),
+  /** SO-010 · On a sample only: free (every line 100 % off) or charged. */
+  sample_pricing: z.enum(SAMPLE_PRICINGS).nullish(),
+  party: z.object({
+    name: z.string(),
+    mobile: z.string().nullish(),
+    address: z.string().nullish(),
+    gstin: z.string().nullish(),
+  }),
+  partner: partnerRef.nullable(),
+  lead: z.object({ id: z.string().min(1), inquiry_no: z.string().min(1) }).nullable(),
+  /** DISP-003 · Where the order is served from ("Order to"); null means the default warehouse. */
+  warehouse: z.object({ id: z.string().min(1), code: z.string(), name: z.string() }).nullish(),
+  quotations: z.array(
+    z.object({
+      id: z.string().min(1),
+      quote_no: z.string().nullable(),
+      version: z.number().int().positive(),
+    }),
+  ),
+  owner: userRef.nullable(),
+  owner_org_unit: z.object({ id: z.string().min(1), name: displayText }),
+  territory: territoryRef,
+  delivery_address: z.string().nullable(),
+  payment_terms: z.enum(PAYMENT_TERMS),
+  seller: z
+    .object({
+      gstin: displayText,
+      legal_name: displayText,
+      address: z.string().nullable(),
+      state_code: displayText,
+    })
+    .nullable(),
+  place_of_supply: territoryRef,
+  intra_state: z.boolean(),
+  price_effective_date: isoDate,
+  tax_date: isoDate.nullable(),
+  is_provisional: z.boolean(),
+  lines: z.array(orderLineSchema),
+  /** QUOT-015 · The freight, or null. */
+  freight: freightWireSchema.nullish(),
+  /** QUOT-015 · Lines whose GST slab was picked: shown to an approver. */
+  gst_changed_lines: z.number().int().nonnegative().default(0),
+  totals: totalsSchema,
+  approval: approvalBlockSchema.nullable(),
+  last_rejection: z.object({ remark: z.string(), role: z.string(), at: isoDateTime }).nullable(),
+  dispatches: z.array(dispatchSchema),
+  /** "code: sentence", as on a quotation. */
+  warnings: z.array(z.string()),
+  /** SO-008 · A subsidised order's subsidy (FS-054, FS-057); null on every other type. */
+  subsidy: subsidyBlockWireSchema.nullish(),
+  /**
+   * What the buyer owes: the total less applied scheme benefits. On a subsidised order it is
+   * the farmer's share, at most the total, less benefits (`subsidy-completion.md` §1).
+   */
+  payable: decimal.nullish(),
+  /** SCHM-005 · Scheme benefits, applied at submit (FS-031). */
+  benefits: z.array(orderBenefitSchema).nullish(),
+  /** ACCT-004 · Payable, received, balance, instalments, receipts; null without `payments`. */
+  payments: orderPaymentsSchema.nullish(),
+  remarks: z.string().nullable(),
+  pdf_state: z.enum(ORDER_PDF_STATES),
+  pdf_error: z.string().nullish(),
+  confirmation: z.enum(["queued", "no_mobile", "disabled"]).nullish(),
+  submitted_at: isoDateTime.nullable(),
+  approved_at: isoDateTime.nullable(),
+  cancelled_at: isoDateTime.nullable(),
+  cancel_remark: z.string().nullable(),
+  closed_at: isoDateTime.nullable(),
+  close_remark: z.string().nullable(),
+  /** FS-036: how many times the order was taken back to draft after approval. */
+  amend_count: z.number().int().nonnegative().default(0),
+  /** The approved total the last amend started from; null when never amended. */
+  amended_from_total: z.string().nullish(),
+  /** Why it was last amended; staff only, so a partner reads null. */
+  amend_reason: z.string().nullish(),
+  created_at: isoDateTime,
+});
+
+export type OrderWire = z.input<typeof orderWireSchema>;
+
+export const orderSchema = orderWireSchema.transform((wire) => ({
+  id: wire.id,
+  orderNo: wire.order_no,
+  status: wire.status,
+  orderType: wire.order_type,
+  taxTreatment: wire.tax_treatment,
+  exportCountry: wire.export_country ?? null,
+  lutArn: wire.lut_arn ?? null,
+  samplePricing: wire.sample_pricing ?? null,
+  party: {
+    name: wire.party.name.trim() || "Unnamed party",
+    mobile: wire.party.mobile ?? null,
+    address: wire.party.address ?? null,
+    gstin: wire.party.gstin ?? null,
+  },
+  partner: wire.partner,
+  lead: wire.lead === null ? null : { id: wire.lead.id, code: wire.lead.inquiry_no },
+  warehouse: wire.warehouse ?? null,
+  quotations: wire.quotations.map((quotation) => ({
+    id: quotation.id,
+    quoteNo: quotation.quote_no,
+    version: quotation.version,
+  })),
+  owner: wire.owner,
+  ownerOrgUnit: wire.owner_org_unit,
+  territory: wire.territory,
+  deliveryAddress: wire.delivery_address,
+  paymentTerms: wire.payment_terms,
+  seller:
+    wire.seller === null
+      ? null
+      : {
+          gstin: wire.seller.gstin,
+          legalName: wire.seller.legal_name,
+          address: wire.seller.address,
+          stateCode: wire.seller.state_code,
+        },
+  placeOfSupply: wire.place_of_supply,
+  intraState: wire.intra_state,
+  priceEffectiveDate: wire.price_effective_date,
+  taxDate: wire.tax_date,
+  isProvisional: wire.is_provisional,
+  lines: wire.lines,
+  freight: wire.freight ?? null,
+  gstChangedLines: wire.gst_changed_lines,
+  totals: wire.totals,
+  approval: wire.approval,
+  lastRejection: wire.last_rejection,
+  dispatches: wire.dispatches,
+  warnings: wire.warnings,
+  subsidy:
+    wire.subsidy == null
+      ? null
+      : {
+          materialAmount: wire.subsidy.material_amount,
+          subsidyAmount: wire.subsidy.subsidy_amount,
+          farmerPayable: wire.subsidy.farmer_payable,
+          materialIsTotal: wire.subsidy.material_is_total,
+          farmerPayableIsDerived: wire.subsidy.farmer_payable_is_derived,
+          /** In order; the first is the order's lead. A null number is a lead you can't see. */
+          leads: wire.subsidy.leads.map((lead) => ({ id: lead.id, code: lead.inquiry_no ?? null })),
+        },
+  payable: wire.payable ?? null,
+  benefits: wire.benefits ?? [],
+  payments: wire.payments ?? null,
+  remarks: wire.remarks,
+  pdfState: wire.pdf_state,
+  pdfError: wire.pdf_error ?? null,
+  confirmation: wire.confirmation ?? null,
+  submittedAt: wire.submitted_at,
+  approvedAt: wire.approved_at,
+  cancelledAt: wire.cancelled_at,
+  cancelRemark: wire.cancel_remark,
+  closedAt: wire.closed_at,
+  closeRemark: wire.close_remark,
+  amendCount: wire.amend_count,
+  amendedFromTotal: wire.amended_from_total ?? null,
+  amendReason: wire.amend_reason ?? null,
+  createdAt: wire.created_at,
+}));
+
+export type Order = z.output<typeof orderSchema>;
+
+/** GET /orders/{id} and every order-returning write: `{ data: Order }`. */
+export const orderResponseSchema = z.object({ data: orderSchema }).transform(({ data }) => data);
+
+/** POST /orders/{id}/dispatches: `{ data: Dispatch }`. */
+export const dispatchResponseSchema = z
+  .object({ data: dispatchSchema })
+  .transform(({ data }) => data);
+
+/** DELETE answers 204 with no body. */
+export const noContentSchema = z.undefined();
+
+// ── writes (SO-003, SO-004, DISP-002) ─────────────────────────────────────────────
+
+/**
+ * POST /orders from accepted quotations: the order takes the rest from them. A subsidised
+ * order is made from one subsidised quotation and takes its subsidy from it (FS-057 rule 8).
+ */
+export interface CreateOrderFromQuotations {
+  /** SO-010 · Export quotations make an export order (422 type_mismatch otherwise). */
+  readonly order_type: (typeof ORDERABLE_TYPES)[number] | "subsidised" | "export";
+  readonly quotation_ids: readonly string[];
+  readonly delivery_address: string | null;
+  readonly payment_terms: PaymentTerms;
+  readonly remarks: string | null;
+}
+
+/** SO-008, SO-010 · The types staff may make beyond the everyday ones (FS-042, FS-054). */
+export type StaffOrderType = (typeof ORDERABLE_TYPES)[number] | "subsidised" | "export" | "sample";
+
+/** The buyer printed on an order: the farmer, or the dealer on a consolidated order. */
+export interface OrderPartyRequest {
+  readonly name: string;
+  readonly mobile: string | null;
+  readonly address: string | null;
+  readonly gstin: string | null;
+}
+
+/**
+ * SO-005 · POST /orders typed in line by line: the party, where the goods go (or the lead's
+ * place), and the lines as the pricing preview priced them. `partner_id` is left out for a
+ * direct sale by staff; it names the lead's dealer when there is one.
+ */
+export interface CreateDirectOrder {
+  /**
+   * SO-008 · Subsidised (staff only) takes `subsidy` and no `lead_id` (FS-054). SO-010 · Export
+   * and sample are staff only too (403 `type_staff_only`).
+   */
+  readonly order_type: StaffOrderType;
+  /** SO-010 · Required on an export, refused on any other type. */
+  readonly export_country?: string;
+  readonly lead_id?: string;
+  /** SO-008 · The leads (the first is the order's lead) and amounts of a subsidised order. */
+  readonly subsidy?: OrderSubsidyRequest;
+  readonly partner_id?: string;
+  readonly party: OrderPartyRequest;
+  readonly place_of_supply_territory_id: string;
+  readonly delivery_address: string | null;
+  readonly payment_terms: PaymentTerms;
+  readonly remarks: string | null;
+  readonly lines: readonly QuotationLineRequest[];
+  /** QUOT-015 · One freight charge before tax; commercial and industrial only. */
+  readonly freight?: FreightRequest;
+  /** DISP-003 · "Order to"; null or left out means the default. Staff only (a dealer gets 422). */
+  readonly warehouse_id?: string | null;
+}
+
+/** SO-005 · PUT /orders/{id}/lines — every line of a draft, priced as new. */
+export interface ReplaceOrderLinesRequest {
+  readonly lines: readonly QuotationLineRequest[];
+  /** QUOT-015 · Omit to keep; null to remove. */
+  readonly freight?: FreightRequest | null;
+  readonly expected_status: "draft";
+}
+
+/** PATCH /orders/{id} — a draft's header, as far as the screens edit it. */
+export interface PatchOrderRequest {
+  readonly order_type?: (typeof ORDERABLE_TYPES)[number];
+  /** SO-010 · Omit to keep. Required on an export. */
+  readonly export_country?: string | null;
+  readonly party?: OrderPartyRequest;
+  readonly delivery_address?: string | null;
+  readonly payment_terms?: PaymentTerms;
+  readonly remarks?: string | null;
+  /** DISP-003 · "Order to"; null means the default. Staff only. */
+  readonly warehouse_id?: string | null;
+  readonly expected_status: "draft";
+}
+
+/** SO-008 · PUT /orders/{id}/subsidy — a subsidised draft's leads and amounts. */
+export interface OrderSubsidyRequest {
+  /** 1 to 50; the first stays the order's lead (422 first_lead_fixed). */
+  readonly lead_ids: readonly string[];
+  /** Left out: the order total, read at the time. */
+  readonly material_amount?: string;
+  readonly subsidy_amount: string;
+  /** Left out: material less subsidy. */
+  readonly farmer_payable?: string;
+}
+
+export interface ExpectedStatusRequest {
+  readonly expected_status: OrderStatus;
+}
+
+/** POST /orders/{id}/cancel, /close-short, /amend and /dispatches/{id}/void: a reason is required. */
+export interface RemarkRequest {
+  readonly remark: string;
+  readonly expected_status: OrderStatus;
+}
+
+/** POST /orders/{id}/dispatches. */
+export interface CreateDispatchRequest {
+  readonly dc_no: string | null;
+  readonly dc_date: string | null;
+  readonly invoice_no: string | null;
+  readonly invoice_date: string | null;
+  readonly dispatched_at: string;
+  readonly transporter: string | null;
+  readonly vehicle_no: string | null;
+  readonly lines: readonly { readonly order_line_id: string; readonly qty: string }[];
+  /** DISP-003 · Where the goods left from; left out means the order's warehouse, then the default. */
+  readonly warehouse_id?: string | null;
+}
+
+export const ORDER_REMARK_MAX_LENGTH = 1000;
+
+/** A reason in a dialog: cancelling, voiding, closing short. Required. */
+export const requiredRemarkFormSchema = z.object({
+  remark: z
+    .string()
+    .trim()
+    .min(1, { message: "Say why. It is kept on the order and its history." })
+    .max(ORDER_REMARK_MAX_LENGTH, { message: "Keep it under 1,000 characters" }),
+});
+export type RequiredRemarkForm = z.infer<typeof requiredRemarkFormSchema>;
+
+/** The draft header a person may change on this screen. */
+export const orderHeaderFormSchema = z.object({
+  deliveryAddress: z.string().trim().max(500, { message: "Keep the address under 500 characters" }),
+  paymentTerms: z.enum(PAYMENT_TERMS),
+  remarks: z.string().trim().max(2000, { message: "Keep the remarks under 2,000 characters" }),
+});
+export type OrderHeaderForm = z.infer<typeof orderHeaderFormSchema>;
+
+/** The part of a line the dispatch form checks a quantity against. */
+export interface DispatchableLine {
+  readonly id: string;
+  readonly qtyOpen: string;
+  readonly uomDecimals: number;
+}
+
+const DISPATCH_TEXT_MAX = 60;
+
+/**
+ * The record-dispatch form, for one order's lines: each quantity at most what is open, in
+ * the line's unit precision; at least one line sent; the time it left not in the future.
+ * The backend checks the same, and answers with the same field names.
+ */
+const dispatchFormBaseSchema = z.object({
+  dispatchedAt: z.string().min(1, { message: "When the goods left" }),
+  dcNo: z.string().trim().max(DISPATCH_TEXT_MAX, { message: "Keep it under 60 characters" }),
+  dcDate: z.string(),
+  invoiceNo: z.string().trim().max(DISPATCH_TEXT_MAX, { message: "Keep it under 60 characters" }),
+  invoiceDate: z.string(),
+  transporter: z.string().trim().max(120, { message: "Keep it under 120 characters" }),
+  vehicleNo: z.string().trim().max(20, { message: "Keep it under 20 characters" }),
+  lines: z.array(z.object({ orderLineId: z.string().min(1), qty: z.string().trim() })),
+});
+
+export function dispatchFormSchemaFor(
+  lines: readonly DispatchableLine[],
+  now: () => number = Date.now,
+): typeof dispatchFormBaseSchema {
+  return dispatchFormBaseSchema.superRefine((form, ctx) => {
+    const leftAt = Date.parse(form.dispatchedAt);
+    if (Number.isNaN(leftAt)) {
+      ctx.addIssue({ code: "custom", path: ["dispatchedAt"], message: "Enter a date and time" });
+    } else if (leftAt > now() + 60_000) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["dispatchedAt"],
+        message: "It can't be in the future",
+      });
+    }
+    let sending = 0;
+    for (const [index, entry] of form.lines.entries()) {
+      if (entry.qty === "" || Number(entry.qty) === 0) {
+        continue;
+      }
+      const line = lines.find((item) => item.id === entry.orderLineId);
+      const path = ["lines", index, "qty"];
+      if (!/^\d+(\.\d+)?$/.test(entry.qty)) {
+        ctx.addIssue({ code: "custom", path, message: "A number, like 12 or 2.5" });
+      } else if (line !== undefined) {
+        const decimals = (entry.qty.split(".")[1] ?? "").replace(/0+$/, "").length;
+        if (decimals > line.uomDecimals) {
+          ctx.addIssue({
+            code: "custom",
+            path,
+            message:
+              line.uomDecimals === 0
+                ? "Whole units only"
+                : `At most ${String(line.uomDecimals)} decimals`,
+          });
+        } else if (Number(entry.qty) > Number(line.qtyOpen)) {
+          ctx.addIssue({ code: "custom", path, message: "More than is still open" });
+        }
+      }
+      sending += 1;
+    }
+    if (sending === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["lines"],
+        message: "Enter what left for at least one item",
+      });
+    }
+  });
+}
+
+export type DispatchForm = z.infer<typeof dispatchFormBaseSchema>;
