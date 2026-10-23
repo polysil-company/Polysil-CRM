@@ -199,7 +199,9 @@ Each fix is listed by the report's issue number.
   - A `3xl` breakpoint (1760 px) is added to `tokens.css` for this.
 - **13 · Freight in the builder.** The summary shows Freight on its own row from the `freight` the backend returns beside the totals. `QuoteTotals` has no freight field, so the row never appeared on the real backend.
 - **14 · New lead form.** Fields are checked on the first **Create lead**, then as they change. The farmer's name, focused when the dialog opens, no longer turns red just for being left.
-- **15 · Partner page for a field officer.** The ledger, credit and rating cards ask the backend only with `payments` view. A field officer's partner page made three refused calls before.
+- **15 · Partner page for a field officer.** Each card asks only when the backend's rule lets the user read it. A field officer's partner page made three refused calls before.
+  - The ledger and rating need `payments` view (`routers/payments.py`, `ratings.py`).
+  - The credit also opens to staff who edit partners (`partner_credit_position`, migration 047), so a district or state manager keeps it.
 - **16 · Rename toast.** It names the person as saved ("TEST Person 1b saved"), not as the page opened.
 - **17 · Limit wording.** A changed limit says when it applies in its own words: the next order, discount request or refund.
 - **18 · Approver wording.** "Waiting for an Admin sales…", "an MD": the article goes by sound.
@@ -257,7 +259,7 @@ New or extended, each named for its issue:
 - `quotation-lifecycle.test.ts`: `withArticle`.
 - `approval-limits.test.tsx`: "It applies from the next order."
 - `users-ui.test.tsx`: the toast names the person as saved.
-- `partners-ui.test.tsx`: a field officer's partner page doesn't ask for the ledger, credit or rating.
+- `partners-ui.test.tsx`: a field officer's partner page doesn't ask for the ledger, credit or rating. A state manager's asks for the credit only.
 - `products-ui.test.tsx`: a failed category list says so, with **Try again**.
 - `leads-ui.test.tsx`: the farmer's name isn't marked wrong for being left empty.
 

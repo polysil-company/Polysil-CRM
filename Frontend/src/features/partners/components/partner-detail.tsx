@@ -106,10 +106,12 @@ function PartnerView({ partner }: { partner: Partner }): React.JSX.Element {
   const canEdit = useCan("partners", "edit");
   const canCreate = useCan("partners", "create");
   const staff = useIsStaff();
-  // APP-009 (live test X-03) · The ledger, credit and rating are payments data: without it the
-  // backend refuses all three (a field officer), so they aren't asked for.
+  // APP-009 (live test X-03) · Ask only for what the backend serves, so a field officer's page
+  // makes no refused calls. The ledger and rating need payments view (routers/payments.py,
+  // ratings.py); the credit also opens to staff who edit partners (partner_credit_position, 047).
   const canSeePayments = useCan("payments", "view");
   const seesPayments = staff && canSeePayments;
+  const seesCredit = staff && (canSeePayments || canEdit);
   // CHNL-002 · a distributor or dealer adds the next type down under itself only.
   const ownPartnerId = useSession().data?.partner?.id ?? null;
   const mayAddUnder = staff || partner.id === ownPartnerId;
@@ -303,7 +305,7 @@ function PartnerView({ partner }: { partner: Partner }): React.JSX.Element {
             </CardContent>
           </Card>
         ) : null}
-        {seesPayments ? <PartnerCreditCard partnerId={partner.id} /> : null}
+        {seesCredit ? <PartnerCreditCard partnerId={partner.id} /> : null}
         {seesPayments ? <DealerRatingCard partnerId={partner.id} /> : null}
       </div>
 

@@ -348,6 +348,21 @@ describe("[CHNL-004] PartnerDetail", () => {
     expect(asked.filter((path) => /\/(ledger|credit|dealer-rating)$/.test(path))).toEqual([]);
     server.events.removeAllListeners();
   });
+
+  it("asks a partner editor for the credit, but not for the ledger or rating (APP-009, X-03)", async () => {
+    signInAs("state_manager");
+    const asked: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      asked.push(new URL(request.url).pathname);
+    });
+    show(<PartnerDetail partnerId={idOf("Saurashtra Agro Distributors")} />);
+    await screen.findByRole("article", { name: "Saurashtra Agro Distributors" });
+    await waitFor(() => {
+      expect(asked.some((path) => path.endsWith("/credit"))).toBe(true);
+    });
+    expect(asked.filter((path) => /\/(ledger|dealer-rating)$/.test(path))).toEqual([]);
+    server.events.removeAllListeners();
+  });
 });
 
 describe("[CHNL-006] GSTIN details on the partner form", () => {
