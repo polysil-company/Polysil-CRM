@@ -203,6 +203,9 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
         : [emptyLine()],
     source.mode === "edit" ? draftFreightFrom(source.quotation.freight) : undefined,
   );
+  // APP-009 (I-05) · The lines as the draft opened, so a terms-only edit doesn't re-save them and
+  // add "Items changed" to the history. The plan is worked out from the rows, so it is ready here.
+  const [openingLines] = useState(() => JSON.stringify(priced.plan.request));
   const [formError, setFormError] = useState<{
     title: string;
     description: string;
@@ -237,6 +240,11 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
         return create.mutateAsync({ body, idempotencyKey: idempotency.keyFor(body) });
       }
       const headerChanged = JSON.stringify(values) !== JSON.stringify(initialHeader);
+      // A new sale type re-prices the lines, so they go too; so does a save with nothing changed.
+      const sendLines =
+        !headerChanged ||
+        values.salesType !== initialHeader.salesType ||
+        JSON.stringify(priced.plan.request) !== openingLines;
       const headerBody = {
         sales_type: values.salesType,
         ...(values.salesType === "export" ? { export_country: values.exportCountry.trim() } : {}),
@@ -254,10 +262,12 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
         header: headerChanged
           ? { body: headerBody, idempotencyKey: idempotency.keyFor(headerBody) }
           : null,
-        lines: {
-          body: linesBody,
-          idempotencyKey: idempotency.keyFor({ id: source.quotation.id, ...linesBody }),
-        },
+        lines: sendLines
+          ? {
+              body: linesBody,
+              idempotencyKey: idempotency.keyFor({ id: source.quotation.id, ...linesBody }),
+            }
+          : null,
       });
     },
     logger: log,
@@ -365,7 +375,8 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
     }
   }
 
-  const blocker = saveBlocker(priced);
+  // APP-009 (I-03) · A quotation needs at least one item, as an order does.
+  const blocker = priced.rowsReady === 0 ? "Add at least one item." : saveBlocker(priced);
   const canSave = blocker === null && priced.upToDate && !save.isBusy;
   const saveHint = blocker;
 

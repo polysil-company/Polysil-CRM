@@ -12,6 +12,30 @@
 - **Blockers for the client demo (§S): none.** §S ran end to end in one go (see the end of this report).
 - **Biggest finding:** the dev API is behind `integration`. BE-023 to BE-030 are ticked Done in `docs/Backend-Tasks.md`, but none of them is deployed. Issues 1, 4, 5 and 9 come from that.
 
+## Where each issue stands (23 Oct)
+
+| # | Fixed by | How |
+|---|---|---|
+| 1 | Backend: **BE-034** | Redeploy the API from `integration` |
+| 2 | Frontend: APP-009, and backend **BE-035** | Save is off until there is an item; the API should refuse it too |
+| 3 | Frontend: APP-009 | Approval limits opens, read-only, to whoever may approve |
+| 4 | Backend **BE-034**; frontend APP-009 | The pickers now say the list failed, with **Try again** |
+| 5 | Backend: **BE-034** | — |
+| 6 | Backend: **BE-036** | — |
+| 7 | Frontend: APP-009 (wording); decision **BE-038** | "Warehouse short by 500 MTR" |
+| 8 | Frontend: APP-009 | A terms-only edit sends only the header |
+| 9 | Backend: **BE-034** | — |
+| 10 | Decision: **BE-037** | The screens follow `/auth/me` |
+| 11 | Frontend: APP-009 | The first answer is highlighted; Enter opens it |
+| 12 | Frontend: APP-009 | The lists fit 1280–1760 px; optional columns appear from 1536 or 1760 px |
+| 13 | Frontend: APP-009 | The builder reads the freight the backend returns beside the totals |
+| 14 | Frontend: APP-009 | The new lead form checks fields on the first submit, then as they change |
+| 15 | Frontend: APP-009 | Ledger, credit and rating are asked for only with `payments` view |
+| 16 | Frontend: APP-009 | The toast names the person as saved |
+| 17 | Frontend: APP-009 | "It applies from the next refund" (or order, or discount request) |
+| 18 | Frontend: APP-009 | "an Admin sales", "an MD" |
+| 19 | Frontend: APP-009 | `src/app/icon.svg` |
+
 ## Issues, most serious first
 
 | # | Case | Data ID | Role | Device | What happened | Expected | Evidence |

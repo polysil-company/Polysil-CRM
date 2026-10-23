@@ -8,10 +8,12 @@ export const QUOTATION_COLUMN_META = {
   number: { width: "lg", isRowHeader: true },
   party: { width: "fill" },
   status: { width: "sm" },
-  salesType: { width: "sm", hideBelow: "xl" },
+  // APP-009 (live test D-05) · The row spilt past its frame on a laptop and hid Total: the
+  // optional columns wait for the room.
+  salesType: { width: "sm", hideBelow: "3xl" },
   owner: { width: "fill", hideBelow: "lg" },
-  sentAt: { width: "sm", hideBelow: "md" },
-  validUntil: { width: "sm", hideBelow: "lg" },
+  sentAt: { width: "sm", hideBelow: "2xl" },
+  validUntil: { width: "sm", hideBelow: "3xl" },
   total: { width: "sm", align: "end" },
 } as const satisfies Record<string, DataTableColumnMeta>;
 

@@ -1,15 +1,17 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import type * as NextNavigation from "next/navigation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CommandMenu } from "@/components/layout/command-menu";
 import { listAssistantActions, searchAssistant } from "@/features/assistant/api/assistant.api";
+import type { AssistantActionWire } from "@/features/assistant/api/assistant.schemas";
 import { isApiError } from "@/lib/api/errors";
 import { buildApiUrl } from "@/lib/api/url";
 import type { Role } from "@/lib/auth/roles";
 import { writeMockRole } from "@/lib/dev/mock-settings";
+import { MOCK_ASSISTANT_ACTIONS } from "@/mocks/data/assistant";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
@@ -148,6 +150,47 @@ describe("[BOT-001] CommandMenu", () => {
     const actions = await screen.findByRole("group", { name: "Actions" });
     await user.click(await within(actions).findByText("New quotation"));
     expect(router.push).toHaveBeenCalledWith("/quotations/new");
+  });
+
+  it("highlights the first answer after typing, so Enter opens it (APP-009, live test B-02)", async () => {
+    reset();
+    signInAs("admin");
+    // As on the live server: the answer for what was typed arrives after the starter set, and
+    // holds none of the starter's actions.
+    const wire = (key: string): AssistantActionWire => {
+      const found = MOCK_ASSISTANT_ACTIONS.find((action) => action.key === key);
+      if (found === undefined) throw new Error(`No mock action ${key}`);
+      return {
+        key: found.key,
+        title: found.title,
+        hint: found.hint,
+        screen: found.screen,
+        module: found.module,
+      };
+    };
+    server.use(
+      http.get(buildApiUrl("/assistant"), async ({ request }) => {
+        const q = new URL(request.url).searchParams.get("q") ?? "";
+        if (q === "") {
+          return HttpResponse.json({
+            data: { actions: [wire("lead.create"), wire("quotation.create")], records: [] },
+          });
+        }
+        await delay(150);
+        return HttpResponse.json({ data: { actions: [wire("complaint.create")], records: [] } });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<CommandMenu open onOpenChange={vi.fn()} />);
+    await screen.findByRole("option", { name: /New lead/ });
+    await user.type(screen.getByRole("combobox"), "comp");
+    const answer = await screen.findByRole("option", { name: /Raise a complaint/ });
+    await waitFor(() => {
+      expect(answer).toHaveAttribute("aria-selected", "true");
+    });
+
+    await user.keyboard("{Enter}");
+    expect(router.push).toHaveBeenCalledTimes(1);
   });
 
   it("opens a lead found by its number", async () => {

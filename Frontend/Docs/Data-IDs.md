@@ -131,6 +131,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | APP-006 | Route guards — a page the user may not open shows access denied, not the page | frontend | in-progress |
 | APP-007 | Release menu — a deployment shows and opens only the screens it releases | frontend | in-progress |
 | APP-008 | Partner portal — what a dealer, distributor or sub-dealer sees: their own leads and dashboard, and no staff screens | frontend | in-progress |
+| APP-009 | Fixes from the live test of 22–23 Oct: the frontend's share of `Live-Test-Report.md` | frontend | in-progress |
 | OBS-001 | Logger utility with runtime log level | frontend | in-progress |
 | OBS-002 | API client — request IDs, error normalisation, response contract validation | shared | in-progress |
 | DS-001 | Design tokens and component library | frontend | in-progress |

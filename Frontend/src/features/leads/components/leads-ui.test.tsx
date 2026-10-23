@@ -293,6 +293,17 @@ describe("[LEAD-002] NewLeadDialog", () => {
     expect(within(dialog).getByText("Choose the irrigation system.")).toBeInTheDocument();
   });
 
+  it("does not mark the farmer's name wrong for being left before anything was typed (APP-009, E-04)", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NewLeadDialog />, { searchParams: "?newLead=true" });
+
+    const dialog = await screen.findByRole("dialog", { name: "New lead" });
+    await user.click(within(dialog).getByLabelText(/^Farmer name/));
+    await user.click(within(dialog).getByLabelText(/^Mobile number/));
+
+    expect(within(dialog).queryByText("Enter the farmer's name.")).not.toBeInTheDocument();
+  });
+
   it("does not mark a dropdown wrong just because it was opened", async () => {
     const user = userEvent.setup();
     renderWithProviders(<NewLeadDialog />, { searchParams: "?newLead=true" });

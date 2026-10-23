@@ -80,22 +80,23 @@ export interface UpdateDraftInput {
   readonly quotationId: string;
   /** Sent only when the header changed. */
   readonly header: SaveInput<PatchQuotationRequest> | null;
-  readonly lines: SaveInput<ReplaceLinesRequest>;
+  /** Sent unless only the header changed (APP-009, I-05); one of the two is always sent. */
+  readonly lines: SaveInput<ReplaceLinesRequest> | null;
 }
 
 /**
  * QUOT-004 · Save an existing draft: the header first when it changed (it re-prices), then the
- * whole basket. The lines' answer is the document as saved.
+ * whole basket unless only the header changed. The last answer is the document as saved.
  */
 export function useUpdateDraft(): UseMutationResult<Quotation, Error, UpdateDraftInput> {
   const applySaved = useApplySaved();
   return useMutation({
     mutationKey: [...quotationKeys.all, "update"],
     mutationFn: async ({ quotationId, header, lines }) => {
-      if (header !== null) {
-        await patchQuotation(quotationId, header);
-      }
-      return replaceQuotationLines(quotationId, lines);
+      const patched = header === null ? null : await patchQuotation(quotationId, header);
+      if (lines !== null) return replaceQuotationLines(quotationId, lines);
+      if (patched === null) throw new Error("A draft save sends the header, the lines or both.");
+      return patched;
     },
     meta: { dataId: "QUOT-004" },
     onSuccess: applySaved,

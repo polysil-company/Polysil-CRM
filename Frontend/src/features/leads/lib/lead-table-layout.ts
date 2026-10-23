@@ -14,9 +14,11 @@ export const LEAD_COLUMN_META = {
   customerName: { width: "fill", isRowHeader: true },
   stage: { width: "sm" },
   source: { width: "sm", hideBelow: "lg" },
-  crops: { width: "fill", hideBelow: "xl" },
+  // APP-009 (live test D-05) · The row spilt past its frame on a laptop: crops, then the
+  // follow-up (empty until BE-002), wait for the room.
+  crops: { width: "fill", hideBelow: "3xl" },
   owner: { width: "fill", hideBelow: "lg" },
-  followUpAt: { width: "sm", hideBelow: "sm" },
+  followUpAt: { width: "sm", hideBelow: "2xl" },
   estimatedValue: { width: "md", align: "end" },
 } as const satisfies Record<string, DataTableColumnMeta>;
 
