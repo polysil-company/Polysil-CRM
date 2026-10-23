@@ -7,12 +7,13 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-110 changes, newest first. Each title opens its entry.
+111 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
 | 2026-10-23 | [Live test of the staging app: an issue report and a client walkthrough](changelog/entries/2026-10-23--docs--APP-008--live-test-of-the-staging-app-report-and-walkthrough.md) | `docs` | `APP-008` |
 | 2026-10-23 | [Fixes from the live test](changelog/entries/2026-10-23--fix--APP-009--fixes-from-the-live-test.md) | `fix` | `APP-009` `QUOT-004` `APPR-002` `MSTR-004` `BOT-001` |
+| 2026-10-23 | [A scheme test that raced its save](changelog/entries/2026-10-23--fix--SCHM-002--a-scheme-test-that-raced-its-save.md) | `fix` | `SCHM-002` |
 | 2026-10-22 | [Deleted leads, for those who may delete them](changelog/entries/2026-10-22--feature--LEAD-019--deleted-leads-for-those-who-may-delete-them.md) | `feature` | `LEAD-019` |
 | 2026-10-22 | [The backend's answers to BE-023 to BE-030, wired in](changelog/entries/2026-10-22--feature--MSTR-004--backend-answers-be-023-to-030.md) | `feature` | `MSTR-004` `SUBS-005` `SCHM-002` `DOC-001` `MSTR-009` `SO-011` `TASK-009` `AUTH-002` `MSTR-017` |
 | 2026-10-22 | [The Android app for field staff, with duty tracking](changelog/entries/2026-10-22--feature--TRK-008--android-tracking-app.md) | `feature` | `TRK-008` |
@@ -269,6 +270,32 @@ New or extended, each named for its issue:
 
 1. As a state manager, open **Approval limits**: three ladders, read-only.
 2. As Admin, open **New quotation** on a qualified lead: Save is off, with "Add at least one item."
+
+### A scheme test that raced its save
+
+`fix` · `SCHM-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-23--fix--SCHM-002--a-scheme-test-that-raced-its-save.md)
+
+#### Before
+
+On the `integration` → `staging` pull request (#202), CI failed once in `schemes.test.tsx`, at "adds a product category as a target, by its id". The same commit passed on the `integration` run. The test waited for the "Scheme created" toast, then read the mock database for the new scheme, and found nothing.
+
+#### Now
+
+Both scheme-creating tests wait for the scheme to be in the mock database before reading it. Only the tests changed; the app is untouched.
+
+#### Discussion
+
+- **The cause:** sonner keeps its toasts in a module-level store. The test above it also shows "Scheme created", so that toast can still be there when the next test's toaster mounts. The wait then finishes before this test's save has answered.
+- **On a busy CI runner** the read lost the race. Waiting for the record itself removes the race whatever toasts remain.
+- **This is not a skipped or retried test:** both assertions are unchanged.
+
+#### Files changed
+
+- `src/features/schemes/components/schemes.test.tsx`: wait for the saved scheme in both creation tests.
+
+#### Tests
+
+`src/features/schemes/components/schemes.test.tsx`: 14 tests, passing three runs in a row locally.
 
 ## 22 October 2026
 
