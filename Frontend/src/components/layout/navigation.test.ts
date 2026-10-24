@@ -139,6 +139,15 @@ describe("[APP-006] route guards", () => {
     expect(canOpenPath("/approvals", mockPermissionsFor("employee"), "staff")).toBe(false);
   });
 
+  it("opens Approval limits, read-only, to an approver without masters (APP-009, live test M-01)", () => {
+    expect(canOpenPath("/approval-limits", mockPermissionsFor("state_manager"), "staff")).toBe(
+      true,
+    );
+    expect(
+      canOpenPath("/approval-limits", mockPermissionsFor("state_manager"), "partner_user"),
+    ).toBe(false);
+  });
+
   it("opens Channel partners to whoever reads partners, and dealer applications to staff only (CHNL-001, CHNL-002)", () => {
     expect(canOpenPath("/partners", mockPermissionsFor("employee"), "staff")).toBe(true);
     expect(canOpenPath("/partners/new", admin, "staff")).toBe(true);

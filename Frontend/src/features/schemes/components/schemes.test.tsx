@@ -246,6 +246,11 @@ describe("[SCHM-002] SchemeForm", () => {
     await user.click(screen.getByRole("button", { name: "Create scheme" }));
 
     expect(await screen.findByText("Scheme created")).toBeInTheDocument();
+    // The toast can be an earlier test's (sonner keeps its toasts in a module store), so wait
+    // for the scheme itself before reading it.
+    await waitFor(() => {
+      expect(mockDb.schemes.some((scheme) => scheme.code === "PTS-NEW")).toBe(true);
+    });
     const created = mockDb.schemes.find((scheme) => scheme.code === "PTS-NEW");
     expect(created).toMatchObject({ scheme_type: "order_points", benefit: { kind: "points" } });
     expect(push).toHaveBeenCalledWith(`/schemes/${created?.id ?? ""}`);
@@ -343,8 +348,12 @@ describe("[SCHM-002] Named targets and product categories (BE-027)", () => {
 
     expect(await screen.findByText("Scheme created")).toBeInTheDocument();
     const hdpe = MOCK_PRODUCT_CATEGORIES.find((category) => category.code === "HDPE PIPES");
-    expect(mockDb.schemes.find((scheme) => scheme.code === "PTS-HDPE")?.targets).toEqual([
-      { type: "product_category", id: hdpe?.id },
-    ]);
+    // Wait for the scheme itself: the toast can be left over from the test above (sonner keeps
+    // its toasts in a module store), which made this read race the save on a busy CI runner.
+    await waitFor(() => {
+      expect(mockDb.schemes.find((scheme) => scheme.code === "PTS-HDPE")?.targets).toEqual([
+        { type: "product_category", id: hdpe?.id },
+      ]);
+    });
   });
 });

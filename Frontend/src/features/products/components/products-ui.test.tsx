@@ -585,3 +585,26 @@ describe("[MSTR-013] Import polish", () => {
     });
   });
 });
+
+describe("[APP-009] The product form's pickers when their list fails (live test V-04)", () => {
+  afterEach(() => {
+    resetMockDb();
+    writeMockRole("state_manager");
+  });
+
+  it("says the categories couldn't be loaded, and offers to try again", async () => {
+    signInAs("admin");
+    server.use(
+      http.get(buildApiUrl("/lookups/product-categories"), () =>
+        HttpResponse.json({ detail: "Not Found" }, { status: 404 }),
+      ),
+    );
+    const user = show(<ProductMaster />);
+    await user.click(await screen.findByRole("button", { name: "New product" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(await within(dialog).findByText(/^Categories couldn.t be loaded\./)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(within(dialog).queryByText(/^Units couldn.t be loaded\./)).not.toBeInTheDocument();
+  });
+});

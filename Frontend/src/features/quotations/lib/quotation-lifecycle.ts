@@ -368,7 +368,8 @@ export function draftSendNotice(
   const limit = discount.ownerLimitPct === null ? null : formatRate(discount.ownerLimitPct);
   const step = approval?.steps[0] ?? null;
   const waiting = approval?.steps.find((candidate) => candidate.decision === null) ?? null;
-  const approver = step === null ? "a manager" : `a ${roleLabel(step.decidedRole ?? step.role)}`;
+  const approver =
+    step === null ? "a manager" : withArticle(roleLabel(step.decidedRole ?? step.role));
 
   switch (discount.sendGate) {
     case "none_needed":
@@ -420,4 +421,16 @@ export function draftSendNotice(
           .join(" "),
       };
   }
+}
+
+/**
+ * APP-009 (live test J-03) · "a District manager", but "an Admin sales" and "an MD": the article
+ * goes by sound, so an initialism counts by how its first letter is said.
+ */
+export function withArticle(label: string): string {
+  const initialism = /^[A-Z]{2,}\b/.test(label);
+  const vowelSound = initialism
+    ? "AEFHILMNORSX".includes(label.charAt(0))
+    : /^[aeiou]/i.test(label);
+  return vowelSound ? `an ${label}` : `a ${label}`;
 }

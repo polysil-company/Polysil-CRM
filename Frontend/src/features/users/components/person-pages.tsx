@@ -255,9 +255,10 @@ function EditPersonForm({ user }: { user: UserDetail }): React.JSX.Element {
     logger: log,
     fn: "handleEditPerson",
     dataId: "ADMN-004",
-    onSuccess: () => {
+    onSuccess: (saved) => {
       idempotency.reset();
-      toast.success(`${user.name} saved`);
+      // APP-009 (live test W-05) · The name as saved, not as the page opened.
+      toast.success(`${saved.name} saved`);
       router.push(`/users/${user.id}`);
     },
     onError: (error) => {

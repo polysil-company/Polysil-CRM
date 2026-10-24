@@ -130,6 +130,12 @@ export const DATA_IDS = {
     owner: "frontend",
     status: "in-progress",
   },
+  "APP-009": {
+    domain: "APP",
+    title: "Fixes from the live test of 22–23 Oct — the frontend's share of Live-Test-Report.md",
+    owner: "frontend",
+    status: "in-progress",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",
@@ -598,6 +604,14 @@ export const DATA_IDS = {
     status: "in-progress",
     notes:
       "422 `quotations_disagree` names the field; 409 `quotation_on_order` names the quotation.",
+  },
+  "SO-012": {
+    domain: "SO",
+    title:
+      "An order for a dealer or distributor, typed in by staff: the dealer picked, their rates and details (`POST /orders` with `partner_id`)",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lookups/partners", "GET /partners/{partnerId}", "POST /orders"],
   },
   "APPR-001": {
     domain: "APPR",

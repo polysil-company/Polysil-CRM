@@ -131,6 +131,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | APP-006 | Route guards — a page the user may not open shows access denied, not the page | frontend | in-progress |
 | APP-007 | Release menu — a deployment shows and opens only the screens it releases | frontend | in-progress |
 | APP-008 | Partner portal — what a dealer, distributor or sub-dealer sees: their own leads and dashboard, and no staff screens | frontend | in-progress |
+| APP-009 | Fixes from the live test of 22–23 Oct: the frontend's share of `Live-Test-Report.md` | frontend | in-progress |
 | OBS-001 | Logger utility with runtime log level | frontend | in-progress |
 | OBS-002 | API client — request IDs, error normalisation, response contract validation | shared | in-progress |
 | DS-001 | Design tokens and component library | frontend | in-progress |
@@ -206,6 +207,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SO-009 | Warranty on an order: each line's dispatches with start, end and status, and the claims raised (`GET /orders/{id}/warranty`) | shared | in-progress |
 | SO-010 | Export and sample orders: the buyer's country, the tax treatment and LUT, and free or charged samples, on orders and quotations (FS-042) | shared | in-progress |
 | SO-011 | A consolidated order: one draft from several accepted quotations of one dealer (`POST /orders` with several `quotation_ids`) | shared | in-progress |
+| SO-012 | An order for a dealer or distributor, typed in by staff: the dealer picked, their rates and details (`POST /orders` with `partner_id`) | shared | in-progress |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
 | CMPL-001 | Complaints list — filters, waiting on me, counts (`GET /complaints`, `GET /complaints/stats`) | shared | in-progress |

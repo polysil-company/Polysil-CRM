@@ -82,7 +82,13 @@ export function ProductCatalogue({ canEdit }: { canEdit: boolean }): React.JSX.E
             label="Category"
             options={categoryOptions}
             selected={params.category}
-            emptyMessage={categories.isPending ? "Loading categories…" : "No categories yet."}
+            emptyMessage={
+              categories.isPending
+                ? "Loading categories…"
+                : categories.isError
+                  ? "Categories couldn't be loaded."
+                  : "No categories yet."
+            }
             onChange={(category) => {
               setFilters({ category });
             }}

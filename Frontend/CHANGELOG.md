@@ -7,10 +7,14 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-108 changes, newest first. Each title opens its entry.
+112 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-24 | [An order for a dealer or distributor, typed in by staff](changelog/entries/2026-10-24--feature--SO-012--an-order-for-a-dealer-or-distributor-typed-in-by-staff.md) | `feature` | `SO-012` `LEAD-008` |
+| 2026-10-23 | [Live test of the staging app: an issue report and a client walkthrough](changelog/entries/2026-10-23--docs--APP-008--live-test-of-the-staging-app-report-and-walkthrough.md) | `docs` | `APP-008` |
+| 2026-10-23 | [Fixes from the live test](changelog/entries/2026-10-23--fix--APP-009--fixes-from-the-live-test.md) | `fix` | `APP-009` `QUOT-004` `APPR-002` `MSTR-004` `BOT-001` |
+| 2026-10-23 | [A scheme test that raced its save](changelog/entries/2026-10-23--fix--SCHM-002--a-scheme-test-that-raced-its-save.md) | `fix` | `SCHM-002` |
 | 2026-10-22 | [Deleted leads, for those who may delete them](changelog/entries/2026-10-22--feature--LEAD-019--deleted-leads-for-those-who-may-delete-them.md) | `feature` | `LEAD-019` |
 | 2026-10-22 | [The backend's answers to BE-023 to BE-030, wired in](changelog/entries/2026-10-22--feature--MSTR-004--backend-answers-be-023-to-030.md) | `feature` | `MSTR-004` `SUBS-005` `SCHM-002` `DOC-001` `MSTR-009` `SO-011` `TASK-009` `AUTH-002` `MSTR-017` |
 | 2026-10-22 | [The Android app for field staff, with duty tracking](changelog/entries/2026-10-22--feature--TRK-008--android-tracking-app.md) | `feature` | `TRK-008` |
@@ -119,6 +123,242 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 24 October 2026
+
+### An order for a dealer or distributor, typed in by staff
+
+`feature` · `SO-012` `LEAD-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-24--feature--SO-012--an-order-for-a-dealer-or-distributor-typed-in-by-staff.md)
+
+#### Before
+
+Staff could only order for a dealer or distributor through a lead whose channel partner was that dealer, or from the dealer's accepted quotations (SO-011). A new order typed in directly had no way to name a dealer, so it was priced as a direct sale. The client said this blocked their staff from processing existing dealers' and distributors' orders (24 Oct).
+
+#### Now
+
+**For a dealer or distributor**, on **New order** without a lead (commercial or industrial, staff only):
+
+- **Search:** by name, code or contact person, among the dealers and distributors the user can see. It is the same search as the lead's **Assign** dialog.
+- **Rates:** picking one sends `partner_id`, so the backend prices the order at that dealer's rates.
+- **Details filled in:** the party's name, mobile, address and GSTIN, and the place of supply, come from the dealer's record. All stay editable.
+- **If the dealer's record can't be loaded,** the field says so. The order still uses their rates; the details are typed in.
+- **Not offered:**
+  - on an order from a lead, which brings its own partner;
+  - on export, sample or subsidised orders;
+  - to a dealer's own users, who order for themselves.
+
+**Backend asks** in `docs/Backend-Tasks.md`. Each says whether it can start before the client answers the questions in the document _Polysil CRM — Employees on dealers_ (24 Oct):
+
+- **BE-039:** a quotation for a dealer, with no farmer's lead. Can start now.
+- **BE-040:** the employee(s) on a dealer. The link can start now; what it grants waits.
+- **BE-041:** a leaver's leads go to their dealer. Waits.
+
+#### Discussion
+
+- **Frontend only.** The backend already takes `partner_id` from staff on a direct order (`services/orders.py`). It prices at that partner's tier and checks the partner is one the caller can see.
+- **One search for dealers.** The lead's **Assign** dialog and this field share the search, moved to `choice-picker.tsx`. The dialog behaves as before (its tests pass unchanged).
+- **The party is filled once, on picking.** Later edits stay. A slower answer for an earlier pick never overwrites a later one.
+- **A campaign test given its own time budget.** It waits out the "Not saved" moment (a fixed few seconds) and types about 45 characters, which together sat at the 5 s default. It failed twice on a busy machine (#193 and this branch). It now has 15 s; its assertions are unchanged.
+- **Commercial and industrial only.** These are the sale types a dealer buys under. A dealer's export or sample would be a new rule, so it is not offered.
+
+#### Files changed
+
+- `src/features/orders/components/order-builder.tsx`: the dealer field, `partner_id`, and the party filled from the dealer.
+- `src/features/leads/components/choice-picker.tsx`: new; the searchable picker and the partner search, moved from the Assign dialog.
+- `src/features/leads/components/lead-assign-dialog.tsx`: uses them.
+- `src/mocks/handlers/orders.ts`: a direct order takes a dealer staff picked, as the backend does.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-012.
+- `docs/Backend-Tasks.md`: BE-039 to BE-041.
+- `src/features/campaigns/components/campaigns.test.tsx`: an explicit 15 s budget for "adds a campaign, refusing a taken name".
+- `Docs/Tested-Features.md`.
+
+#### Tests
+
+- **New,** in `src/features/orders/components/order-builder.test.tsx`, `[SO-012] An order for a dealer or distributor, typed in by staff` (3 tests):
+  - picking a dealer fills the party and place, and the saved order sends `partner_id` and has the dealer as its partner;
+  - the field isn't on an order from a lead;
+  - it isn't offered to a dealer's own users.
+- **Unchanged and passing:** `lead-assign.test.tsx`.
+
+To check by hand in the mock, as Admin:
+
+1. Open **Sales orders → New order**.
+2. Under **For a dealer or distributor**, type part of a dealer's name and pick it. The party and place fill in.
+3. Add an item and save.
+
+## 23 October 2026
+
+### Live test of the staging app: an issue report and a client walkthrough
+
+`docs` · `APP-008` · Claude · [entry](changelog/entries/2026-10-23--docs--APP-008--live-test-of-the-staging-app-report-and-walkthrough.md)
+
+#### Before
+
+`Docs/Live-Test-Plan.md` set out 146 cases (§A–§Y) for testing the hosted app against the real backend, but nobody had run them against `polysil-test.pranayx.tech` since the 22 Oct merges. Nothing written down said which screens work on the real backend, which don't, or why.
+
+#### Now
+
+- **`Docs/Live-Test-Report.md`, for the developers:**
+  - **Results:** 146 cases run as each staff role, on a desktop and on a phone in dark mode. 121 ✅ · 14 ⚠️ · 4 ❌ · 7 ⛔.
+  - **19 issues, most serious first,** each with steps, the failing request and its `x-request-id`, and the likely layer. The main ones:
+    - The dev API is behind `integration`: BE-023…BE-030 are not deployed.
+    - A quotation can be saved with no items (QUOT-004).
+    - The State Manager can't open Approval limits, although the API serves them (APP-001 nav gate).
+    - The product form's Category and Unit pickers are empty (BE-024).
+    - Master lists show no sort order or quality (BE-026).
+    - The dashboard's overdue count disagrees with Tasks.
+  - **Also in the report:**
+    - the sidebar each role sees;
+    - the phone pass;
+    - §S, the whole client story, run end to end with timings;
+    - the blocked cases (no dealer login);
+    - every TEST record created, for clean-up.
+- **`Docs/Client-Feature-Walkthrough.md`, for the client:** per functionality, in plain words, what works, what works with a problem, what doesn't work yet, and how to try it. It ends with the whole story as numbered steps.
+- **Evidence:** `Docs/screenshots/live-test/`, 10 JPEG screenshots, one per ⚠️/❌ that needed one. No passwords or real customer data on screen.
+
+#### Discussion
+
+- **Which host:** the developers confirmed in chat to test `polysil-test.pranayx.tech`, although the Caddy config names it staging.
+- **The real-WhatsApp API:** the API sends real WhatsApp (`/health` → `"whatsapp":"11za"`). So every TEST lead used the test mobile the developers gave. No quotation was sent on WhatsApp, and no OTP code was sent.
+- **Roles:** there is no Regional Manager or dealer login, so the dealer cases are ⛔.
+- **The limit changed for M-03** was put back to its original value.
+- **Script slip:** a script mistake marked an older test task done. It was reopened at once; the report says so.
+- **Not fixed here:** no code changed in this PR. Each issue is for its owner to pick up, under its Data ID:
+  - **frontend:** I-03, M-01, B-02, I-05, D-05, Y-03, E-04, X-03, W-05, M-03, J-03, favicon;
+  - **backend:** redeploy BE-023…030; the empty-quotation guard; the dashboard's overdue count;
+  - **client:** dispatching without stock; whether the State Manager may delete leads.
+
+#### Files changed
+
+- `Docs/Live-Test-Report.md` — new: the issue report, all results, and the test data created.
+- `Docs/Client-Feature-Walkthrough.md` — new: the plain-language walkthrough.
+- `Docs/screenshots/live-test/` — 10 screenshots of the issues.
+
+#### Tests
+
+No code changed, so there's no automated test. The report itself is the record of a manual and Playwright run against the live staging app on 22–23 Oct 2026. Re-run a case by following its steps in `Docs/Live-Test-Plan.md`, as the role named, at `https://polysil-test.pranayx.tech`.
+
+### Fixes from the live test
+
+`fix` · `APP-009` `QUOT-004` `APPR-002` `MSTR-004` `BOT-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-23--fix--APP-009--fixes-from-the-live-test.md)
+
+#### Before
+
+The live test of 22–23 Oct (PR #200, `Docs/Live-Test-Report.md`) ran 146 cases on the hosted app: 121 ✅, 14 ⚠️, 4 ❌, 7 ⛔. Thirteen of its 19 issues were the frontend's.
+
+#### Now
+
+Each fix is listed by the report's issue number.
+
+- **2 · A quotation needs an item.** Save stays off with "Add at least one item.", as on a new order. Before, an empty ₹0 draft could be saved and sent.
+- **3 · Approval limits for approvers.** A state manager or anyone else who may approve now opens Approval limits, read-only. Only `masters.edit` changes them. The backend already served the ladders to every staff role.
+- **4 · Pickers that failed say so.** If the category or unit list can't be loaded, the picker says "The categories couldn't be loaded", with **Try again**, instead of opening empty. The catalogue's Category filter says the same.
+- **7 · Warehouse wording.** Over-committed stock reads "Warehouse short by 500 MTR", not "Warehouse short: -500 MTR available". Some stock left reads "only 40 NOS available".
+- **8 · Terms-only edits.** Editing only a draft's customer or terms sends only the header. The history no longer adds "Items changed". A new sale type still re-saves the items, since it re-prices them.
+- **11 · Ctrl + K.** When the search answer replaces the list, its first result is highlighted, so Enter opens it.
+- **12 · Lists that fit.**
+  - The Leads and Quotations lists fit their frame from 1280 to 1760 px.
+  - **Leads:** Crops shows from 1760 px; Follow-up (empty until BE-002) from 1536.
+  - **Quotations:** Type and Valid until show from 1760 px; Sent from 1536.
+  - A `3xl` breakpoint (1760 px) is added to `tokens.css` for this.
+- **13 · Freight in the builder.** The summary shows Freight on its own row from the `freight` the backend returns beside the totals. `QuoteTotals` has no freight field, so the row never appeared on the real backend.
+- **14 · New lead form.** Fields are checked on the first **Create lead**, then as they change. The farmer's name, focused when the dialog opens, no longer turns red just for being left.
+- **15 · Partner page for a field officer.** Each card asks only when the backend's rule lets the user read it. A field officer's partner page made three refused calls before.
+  - The ledger and rating need `payments` view (`routers/payments.py`, `ratings.py`).
+  - The credit also opens to staff who edit partners (`partner_credit_position`, migration 047), so a district or state manager keeps it.
+- **16 · Rename toast.** It names the person as saved ("TEST Person 1b saved"), not as the page opened.
+- **17 · Limit wording.** A changed limit says when it applies in its own words: the next order, discount request or refund.
+- **18 · Approver wording.** "Waiting for an Admin sales…", "an MD": the article goes by sound.
+- **19 · Tab icon.** The browser tab shows the droplet mark (`src/app/icon.svg`).
+
+**Backend asks** in `docs/Backend-Tasks.md`:
+
+- **BE-034:** redeploy the API from `integration`. This covers issues 1, 4, 5 and 9.
+- **BE-035:** refuse a quotation with no items.
+- **BE-036:** the dashboard's overdue count.
+- **BE-037 and BE-038:** decisions on who may delete leads and on dispatches below zero stock.
+
+The report gains a table of where each issue stands.
+
+#### Discussion
+
+- **Approval limits:** the menu item keeps `masters` for administrators and adds `alsoTo: "approvers"`. A field officer, who approves nothing, still doesn't see it. The backend lets every staff role read the ladders, so this opens a page the API already serves and adds no rule.
+- **Terms-only edits:** what the lines were when the draft opened is compared with what would be sent. With nothing changed at all, the lines are still sent, as before, so a save always answers with the document.
+- **Lists that fit:** columns are hidden by breakpoint rather than shrunk, because the fill columns' floors keep names readable. The breakpoints were measured in the mock with the sidebar open.
+- **Not changed:**
+  - **Issue 6** (the dashboard's count) comes from the backend (BE-036).
+  - **Issue 10:** the screens follow `/auth/me`, so a state manager sees Deleted leads wherever the backend grants `leads.delete` (BE-037).
+  - **Issue 7:** whether a dispatch may take stock below zero is the client's decision (BE-038).
+
+#### Files changed
+
+- `src/features/quotations/components/quotation-builder.tsx`: an item is needed to save; a terms-only edit sends only the header.
+- `src/features/quotations/api/quotations.mutations.ts`: `useUpdateDraft` takes `lines: null`.
+- `src/features/quotations/components/builder-parts.tsx`: freight from the preview's `freight`.
+- `src/features/quotations/lib/quotation-lifecycle.ts`: `withArticle`.
+- `src/features/quotations/lib/quotation-table-layout.ts`, `src/features/leads/lib/lead-table-layout.ts`: column breakpoints.
+- `src/components/patterns/data-table/table-features.ts`: `2xl` and `3xl` hide-below classes.
+- `src/styles/tokens.css`, `Docs/Design-System.md`: the `3xl` breakpoint.
+- `src/components/layout/navigation.ts`: `alsoTo: "approvers"` on Approval limits.
+- `src/components/layout/command-menu.tsx`: the first answer highlighted.
+- `src/features/products/components/product-dialog.tsx`, `product-catalogue.tsx`: picker failures.
+- `src/features/orders/lib/order-labels.ts`, `src/features/orders/components/order-detail.tsx`: `warehouseShortText`.
+- `src/features/leads/components/new-lead-dialog.tsx`: validation on submit, then on change.
+- `src/features/partners/components/partner-detail.tsx`: payments cards gated on `payments` view.
+- `src/features/users/components/person-pages.tsx`: the saved name in the toast.
+- `src/features/approvals/components/approval-limit-dialog.tsx`: `appliesFrom`.
+- `src/app/icon.svg`: new.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: APP-009.
+- `docs/Backend-Tasks.md`: BE-034 to BE-038.
+- Records: `Docs/Live-Test-Report.md` (status table) and `Docs/Tested-Features.md`.
+
+#### Tests
+
+New or extended, each named for its issue:
+
+- `quotation-builder.test.tsx`, `[APP-009] The builder after the live test`: no items keeps Save off; a terms-only edit makes one PATCH and no lines PUT; freight shows from the preview's `freight` when `totals` has none.
+- `navigation.test.ts`: a state manager opens Approval limits; a partner doesn't.
+- `assistant.test.tsx`: after typing, the server's first answer is highlighted and Enter opens it. The test mirrors the live timing and fails without the fix.
+- `order-labels.test.ts` (new): the shortfall wording.
+- `quotation-lifecycle.test.ts`: `withArticle`.
+- `approval-limits.test.tsx`: "It applies from the next order."
+- `users-ui.test.tsx`: the toast names the person as saved.
+- `partners-ui.test.tsx`: a field officer's partner page doesn't ask for the ledger, credit or rating. A state manager's asks for the credit only.
+- `products-ui.test.tsx`: a failed category list says so, with **Try again**.
+- `leads-ui.test.tsx`: the farmer's name isn't marked wrong for being left empty.
+
+**Lists:** measured in the mock with Playwright at 1280, 1440, 1536 and 1760 px. Each table's width now equals its frame.
+
+**To check by hand in the mock:**
+
+1. As a state manager, open **Approval limits**: three ladders, read-only.
+2. As Admin, open **New quotation** on a qualified lead: Save is off, with "Add at least one item."
+
+### A scheme test that raced its save
+
+`fix` · `SCHM-002` · Nakul Srivastava · [entry](changelog/entries/2026-10-23--fix--SCHM-002--a-scheme-test-that-raced-its-save.md)
+
+#### Before
+
+On the `integration` → `staging` pull request (#202), CI failed once in `schemes.test.tsx`, at "adds a product category as a target, by its id". The same commit passed on the `integration` run. The test waited for the "Scheme created" toast, then read the mock database for the new scheme, and found nothing.
+
+#### Now
+
+Both scheme-creating tests wait for the scheme to be in the mock database before reading it. Only the tests changed; the app is untouched.
+
+#### Discussion
+
+- **The cause:** sonner keeps its toasts in a module-level store. The test above it also shows "Scheme created", so that toast can still be there when the next test's toaster mounts. The wait then finishes before this test's save has answered.
+- **On a busy CI runner** the read lost the race. Waiting for the record itself removes the race whatever toasts remain.
+- **This is not a skipped or retried test:** both assertions are unchanged.
+
+#### Files changed
+
+- `src/features/schemes/components/schemes.test.tsx`: wait for the saved scheme in both creation tests.
+
+#### Tests
+
+`src/features/schemes/components/schemes.test.tsx`: 14 tests, passing three runs in a row locally.
 
 ## 22 October 2026
 

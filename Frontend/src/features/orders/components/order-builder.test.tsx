@@ -329,3 +329,77 @@ describe("[QUOT-015] An order's GST slab per item, and freight", () => {
     expect(push).not.toHaveBeenCalled();
   });
 });
+
+describe("[SO-012] An order for a dealer or distributor, typed in by staff", () => {
+  afterEach(() => {
+    push.mockReset();
+    resetMockDb();
+    writeMockRole("admin");
+    server.events.removeAllListeners();
+  });
+
+  it(
+    "fills the party from the dealer picked, and saves the order for that dealer",
+    PRICING_TEST,
+    async () => {
+      signInAs("admin");
+      const dealer = mockDb.partners.find(
+        (partner) =>
+          partner.partner_type === "dealer" &&
+          partner.territory !== null &&
+          partner.mobile !== null,
+      );
+      if (dealer === undefined) throw new Error("No dealer with a mobile and an area");
+      const sent: unknown[] = [];
+      server.events.on("request:start", ({ request }) => {
+        if (request.method === "POST" && new URL(request.url).pathname.endsWith("/orders")) {
+          void request
+            .clone()
+            .json()
+            .then((body: unknown) => sent.push(body));
+        }
+      });
+      const user = show(<NewDirectOrder leadId={null} />);
+      await screen.findByRole("form", { name: "New order" });
+
+      await user.type(
+        await screen.findByLabelText("For a dealer or distributor"),
+        dealer.name.slice(0, 6),
+      );
+      await user.click(await screen.findByRole("option", { name: new RegExp(dealer.name) }));
+      await waitFor(() => {
+        expect(screen.getByLabelText("Party")).toHaveValue(dealer.name);
+      });
+      expect(screen.getByLabelText("Where the goods go")).toHaveValue(dealer.territory?.name ?? "");
+
+      await addPipe(user, "10");
+      const save = screen.getByRole("button", { name: "Save draft order" });
+      await waitFor(() => {
+        expect(save).toBeEnabled();
+      }, PRICED);
+      await user.click(save);
+      await waitFor(() => {
+        expect(push).toHaveBeenCalledTimes(1);
+      });
+      expect(sent[0]).toMatchObject({ partner_id: dealer.id, party: { name: dealer.name } });
+      expect(mockDb.orders[0]?.partner).toMatchObject({ id: dealer.id, partner_type: "dealer" });
+    },
+  );
+
+  it("isn't offered on an order from a lead, which brings its own partner", async () => {
+    signInAs("admin");
+    show(<NewDirectOrder leadId={leadAt("qualified")} />);
+    await screen.findByRole("form", { name: "New order" });
+    expect(screen.queryByLabelText("For a dealer or distributor")).not.toBeInTheDocument();
+  });
+
+  it("isn't offered to a dealer's own users, who order for themselves", async () => {
+    signInAs("dealer");
+    show(<NewDirectOrder leadId={null} />);
+    await screen.findByRole("form", { name: "New order" });
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: "Commercial" })).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText("For a dealer or distributor")).not.toBeInTheDocument();
+  });
+});

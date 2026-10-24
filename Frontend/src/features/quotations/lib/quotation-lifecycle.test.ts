@@ -6,11 +6,12 @@ import { ApiError } from "@/lib/api/errors";
 
 import {
   draftSendNotice,
+  isShownInHistory,
   lifecycleRefusal,
   quotationActions,
-  isShownInHistory,
   quotationHistoryEntry,
   sendStepFor,
+  withArticle,
 } from "./quotation-lifecycle";
 
 const TODAY = "2026-09-28";
@@ -239,5 +240,14 @@ describe("[QUOT-010] quotationHistoryEntry", () => {
     expect(quotationHistoryEntry(event("quotation.viewed", { open_count: "four" })).detail).toBe(
       null,
     );
+  });
+});
+
+describe("[APP-009] Who a discount waits for (live test J-03)", () => {
+  it('puts "an" before a role that starts with a vowel sound', () => {
+    expect(withArticle("Admin sales")).toBe("an Admin sales");
+    expect(withArticle("State Manager")).toBe("a State Manager");
+    expect(withArticle("MD")).toBe("an MD");
+    expect(withArticle("QC manager")).toBe("a QC manager");
   });
 });
