@@ -394,8 +394,13 @@ async def purge_expired_sessions(ctx: dict[str, Any]) -> int:
             text("SELECT import_batch_purge(:cut)"),
             {"cut": now - IMPORT_RETENTION},
         )).scalar_one()
+        # FS-072: device tokens are credentials, kept no longer than they work
+        device_tokens = (await session.execute(
+            text("SELECT tracking_device_token_purge(:cut)"), {"cut": now},
+        )).scalar_one()
 
     log.info("retention.purged", sessions=sessions, attempts=attempts, idempotency=idem,
-             outbox=outbox, lead_codes=codes, webhook_calls=webhook, imports=imports)
+             outbox=outbox, lead_codes=codes, webhook_calls=webhook, imports=imports,
+             device_tokens=device_tokens)
     return (int(sessions) + int(attempts) + int(idem) + int(outbox) + int(codes) + int(webhook)
             + int(imports))

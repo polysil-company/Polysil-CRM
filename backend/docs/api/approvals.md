@@ -301,6 +301,7 @@ One approval chain.
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
 | `submitted_at` | string \| null | yes |  |
+| `pdf_state` | `none` \| `ready` |  | FS-074: `ready` once the complaint has a number and is not a draft; GET /complaints/{id}/pdf then gives a link. `none` otherwise, including a complaint returned to its raiser. Never `pending` or `failed`: the PDF is made when asked for. Default `none`. |
 
 **`DecisionRequest`**
 

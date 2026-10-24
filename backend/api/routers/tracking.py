@@ -20,6 +20,8 @@ from pydantic import BaseModel
 from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.domain import complaints as uploads
+from api.domain.auth import hash_refresh_token, new_device_token
+from api.errors import ConflictError, ForbiddenError, ValidationFailed
 from api.idempotency import payload_digest, run_idempotent
 from api.schemas import tracking as sch
 from api.schemas.auth import Envelope, ErrorResponse
@@ -131,6 +133,46 @@ async def duty_end(body: sch.DutyEnd, db: DbSession, caller: CallerDep, claims: 
     return await _idem(db, claims, idem, "POST /api/v1/tracking/duty/end", _digest(body), work)
 
 
+# ── the device token (FS-072) ───────────────────────────────────────────────
+
+_DEVICE_TOKEN_ROUTE = "POST /api/v1/tracking/device-token"
+
+
+@router.post("/device-token", status_code=201, response_model=Envelope[sch.DeviceToken],
+             responses=_MUTATION_ERRORS, dependencies=[Depends(require("tracking", "create"))])
+async def device_token(body: sch.DeviceTokenIn, db: DbSession, caller: CallerDep, claims: Claims,
+                       idem: IdemKey) -> Response:
+    """A token for the app's background service, so points upload while the app is
+    closed. Call it after duty start and every time the app opens while a duty is
+    open, one call at a time, and hand the last answer to the native service. A new
+    one for the same device replaces the old. It works only on POST /locations/batch,
+    POST /tracking/duty/end and GET /me/tracking-config; every other signed-in route
+    answers `403 device_token_not_allowed`. On `401` or any `403` with it, keep the
+    points and wait for the app to open. A replay of the same key answers
+    `409 idempotency_replay_unavailable`: the token is never stored, so retry with a
+    new key. `401`: the session ended meanwhile."""
+    if claims.device_id is not None:      # get_db refuses this route already; a second belt
+        raise ForbiddenError("A device token cannot make another.", code="device_token_not_allowed")
+    token = new_device_token()
+
+    async def work() -> tuple[int, dict[str, Any]]:
+        out = await service.issue_device_token(
+            db, caller, session_id=claims.sid, token_version=claims.token_version,
+            device_id=body.device_id, token_hash=hash_refresh_token(token),
+            ttl=get_settings().device_token_ttl)
+        # stored without the token (EC-1): a replay can never hand it out again
+        return 201, {"data": out.model_dump(mode="json")}
+
+    outcome = await run_idempotent(db, key=idem, user_id=claims.sub, route=_DEVICE_TOKEN_ROUTE,
+                                   payload_hash=_digest(body), work=work)
+    if outcome.status_code != 201:
+        return JSONResponse(outcome.body, status_code=outcome.status_code)
+    if outcome.replayed:
+        raise ConflictError("That token was already handed out and is not kept. Ask again with a new key.",
+                            code="idempotency_replay_unavailable")
+    return JSONResponse({"data": {**outcome.body["data"], "token": token}}, status_code=201)
+
+
 # ── location batches ────────────────────────────────────────────────────────
 
 @locations.post("/batch", response_model=Envelope[sch.BatchResult], responses=_MUTATION_ERRORS,
@@ -142,6 +184,11 @@ async def location_batch(body: sch.BatchIn, db: DbSession, caller: CallerDep, cl
     later. When `duty.ended_at` is set, stop tracking. Use a new key per distinct
     payload (the sha256 of the sorted point ids). `422 batch_too_large`: split.
     `422 bad_clock`: the phone's clock is more than a day off."""
+    # FS-072 EC-11: before the key is reserved, so the refusal is not stored
+    if claims.device_id is not None and body.device_id != claims.device_id:
+        raise ValidationFailed("This device token belongs to another device.", code="device_mismatch",
+                               fields={"device_id": "not the device this token was issued to"})
+
     async def work() -> tuple[int, BaseModel]:
         return 200, await service.batch(db, caller, body)
     return await _idem(db, claims, idem, "POST /api/v1/locations/batch", _digest(body), work)

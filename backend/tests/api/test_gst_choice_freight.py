@@ -140,14 +140,14 @@ async def test_freight_follows_a_picked_line_until_its_own_slab_is_picked(
 
 async def test_emptying_the_basket_under_freight_is_refused(
         client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue) -> None:
+    """FS-073 (BE-035): an empty basket is refused before freight is looked at, so
+    no_lines, with or without freight."""
     h = await _auth(client, quoter)
     q = await _draft(client, h, qenv, catalogue, freight={"amount": "500.00"})
-    r = await client.put(f"{V1}/quotations/{q['id']}/lines", json={"lines": []},
-                         headers={**h, **_key()})
-    assert r.status_code == 422 and r.json()["error"]["code"] == "freight_without_lines", r.text
-    r = await client.put(f"{V1}/quotations/{q['id']}/lines",
-                         json={"lines": [], "freight": None}, headers={**h, **_key()})
-    assert r.status_code == 200, r.text
+    for body in ({"lines": []}, {"lines": [], "freight": None}):
+        r = await client.put(f"{V1}/quotations/{q['id']}/lines", json=body,
+                             headers={**h, **_key()})
+        assert r.status_code == 422 and r.json()["error"]["code"] == "no_lines", r.text
 
 
 async def test_saving_the_basket_keeps_freight_and_the_resent_choice(

@@ -298,3 +298,20 @@ class ViewLogRow(BaseModel):
 class ViewLogPage(BaseModel):
     data: list[ViewLogRow]
     meta: PageMeta
+
+
+# ── FS-072: the device token ────────────────────────────────────────────────
+
+class DeviceTokenIn(_In):
+    device_id: DeviceId
+
+
+class DeviceToken(BaseModel):
+    token: str | None = Field(description=(
+        "pdt_ and 43 more characters. Shown once: the server keeps only its hash. Send it as "
+        "`Authorization: Bearer` on POST /locations/batch, POST /tracking/duty/end and "
+        "GET /me/tracking-config, and nowhere else."))
+    user_id: str = Field(description="Whose token it is. Send a person's points only with their own token.")
+    device_id: str
+    expires_at: str = Field(description="30 days from now. It dies earlier on sign-out, sign out everywhere, "
+                                        "deactivation, a password reset, or a newer token for this device.")

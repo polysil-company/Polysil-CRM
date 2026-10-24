@@ -454,6 +454,14 @@ def f_lead() -> None:
               "Not here: inbound WhatsApp as a source (GAP-337, question 3a.1),\n"
               "dealership enquiries (GAP-135). Editing a QR code: canvas 46.",
               w=560, colour=GREY)
+    e += note("nRedRestore", 920, 980,
+              "DELETE AND RESTORE (FS-073)\n\n"
+              "Delete closes the lead's pairs as dismissed in its own\n"
+              "transaction. POST /leads/{id}/restore reopens every pair\n"
+              "a delete closed (lead_reopen_links, 080), matched by the\n"
+              "lead.deleted event's time. A deleted lead is read only:\n"
+              "409 lead_deleted. The owner is kept (GAP-524).",
+              w=460, colour=RED)
     write("04-lead-capture", e)
 
 
@@ -1782,6 +1790,12 @@ def f_complaints() -> None:
               "targets have no UPDATE grant; only the definers\n"
               "write them. A submitted complaint's lines are frozen\n"
               "by a trigger as well as by the service.", w=420, colour=GREEN)
+    e += note("nYellow4", 1240, 1900,
+              "PDF (FS-074): GET /complaints/{id}/pdf, made when asked,\n"
+              "from what the caller sees; no internal notes; a dealer\n"
+              "never sees an escalation. Two renders per process,\n"
+              "shared with the data sheet. complaint-pdf/ never\n"
+              "cleaned yet (GAP-527).", w=420, colour=YELLOW)
     write("15-complaints", e)
 
 
@@ -1864,6 +1878,7 @@ def f_field_tracking() -> None:
         ("t1", "GET /me/tracking-config\nfilters, hours, consent version, open duty", BLUE),
         ("t2", "POST /tracking/consent (current version)\nwithdraw: ends the open duty", BLUE),
         ("t3", "POST /tracking/duty/start {id from the phone}\n200 + the open one if already on duty", BLUE),
+        ("t3b", "POST /tracking/device-token {device_id} (FS-072)\nat duty start and every app open; pdt_ token\nto the native service: batch, duty end, config", VIOLET),
         ("t4", "POST /locations/batch {sent_at, points}\nown ids = duplicates; skew corrected; reasons named", VIOLET),
         ("t5", "location_point + tracking_latest (forward only)\nduty.last_point_at; answer carries the duty state", GREEN),
         ("t6", "POST /tracking/duty/end, or the worker:\nidle 30 min after hours, or 14 h; end = last point", BLUE),
@@ -1911,6 +1926,15 @@ def f_field_tracking() -> None:
     e += note("nYellow1", 1240, 820,
               "Stand-ins: hours Mon-Sat 9-7, photo optional, 90-day\n"
               "retention, our consent text (GAP-191 to GAP-201).", w=420, colour=YELLOW)
+    e += note("nRed4", 1240, 960,
+              "THE DEVICE TOKEN NEVER REFRESHES (FS-072)\n\n"
+              "It dies with its session family: sign-out, sign out\n"
+              "everywhere, reuse, deactivation, a version bump. On 401\n"
+              "or ANY 403 the native service stops and keeps its points.\n"
+              "One issue call in flight: each replaces the last token.", w=420, colour=RED)
+    e += note("nYellow2", 1240, 1180,
+              "One person per phone, 3 phones per person, 30 days\n"
+              "(GAP-522, question 9.5).", w=420, colour=YELLOW)
     write("29-field-tracking", e)
 
 

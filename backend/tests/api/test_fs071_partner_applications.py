@@ -12,6 +12,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import text
 
+from api import pdf
 from api.pdf import renderer_available
 from api.services import dealer_sheet
 from tests.api import test_dealer_applications as fs051
@@ -333,7 +334,7 @@ async def test_the_printed_sheet(client: httpx.AsyncClient, shop: Shop, sessions
 
     monkeypatch.setattr(dealer_sheet, "get_settings", lambda: type("S", (), {"pdf_renderer": "weasyprint"})())
     monkeypatch.setattr(dealer_sheet, "renderer_available", lambda: None)
-    monkeypatch.setattr(dealer_sheet, "_active", dealer_sheet.MAX_RENDERS)
+    monkeypatch.setattr(pdf, "_active", pdf.MAX_RENDERS)
     r = await client.get(f"{url}/pdf", headers=sm)
     assert r.status_code == 503 and r.json()["error"]["code"] == "busy"
 
@@ -350,13 +351,13 @@ async def test_the_sheet_renders_a_pdf_and_fetches_nothing(monkeypatch: pytest.M
          "deposit": {"status": "paid", "paid_amount": "50000.00", "paid_on": "2026-10-01"}}, partner_type="dealer")
     assert ctype == "application/pdf" and body.startswith(b"%PDF")
 
-    fetcher = dealer_sheet.logo_only_fetcher()
+    fetcher = pdf.logo_only_fetcher()
     with pytest.raises(ValueError):
         fetcher.fetch("http://169.254.169.254/x")
     with pytest.raises(ValueError):
         fetcher.fetch("file:///etc/passwd")
-    fetcher.fetch(dealer_sheet._logo()).close()
-    raw = f'<img src="{dealer_sheet._logo()}"><img src="http://169.254.169.254/x"><img src="file:///etc/passwd">'
+    fetcher.fetch(pdf.logo()).close()
+    raw = f'<img src="{pdf.logo()}"><img src="http://169.254.169.254/x"><img src="file:///etc/passwd">'
     assert render_pdf(raw, fetcher).startswith(b"%PDF")
 
 

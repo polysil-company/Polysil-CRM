@@ -332,7 +332,7 @@ async def test_patching_a_draft_reprices_and_uppercases_the_gstin(
     assert stale.status_code == 409 and stale.json()["error"]["code"] == "status_changed"
 
 
-async def test_lines_are_replaced_wholesale_and_may_be_empty_on_a_draft(
+async def test_lines_are_replaced_wholesale_and_never_emptied(
         client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue) -> None:
     h = await _auth(client, quoter)
     q = await _draft(client, h, qenv, catalogue)
@@ -342,12 +342,26 @@ async def test_lines_are_replaced_wholesale_and_may_be_empty_on_a_draft(
     assert r.status_code == 200, r.text
     lines = r.json()["data"]["lines"]
     assert [ln["line_no"] for ln in lines] == [1, 2] and lines[0]["gross"] == "206.38"
+    # FS-073 (BE-035): an empty basket is refused, and the lines stay as they were
     empty = await client.put(f"{V1}/quotations/{q['id']}/lines", headers={**h, **_key()},
                              json={"lines": []})
-    assert empty.status_code == 200 and empty.json()["data"]["totals"]["total"] == "0.00"
-    r = await client.post(f"{V1}/quotations/{q['id']}/send", json={"channel": "none"},
-                          headers={**h, **_key()})
-    assert r.status_code == 422 and r.json()["error"]["code"] == "no_lines"
+    assert empty.status_code == 422 and empty.json()["error"]["code"] == "no_lines", empty.text
+    assert empty.json()["error"]["fields"] == {"lines": "empty"}
+    kept = (await client.get(f"{V1}/quotations/{q['id']}", headers=h)).json()["data"]
+    assert len(kept["lines"]) == 2
+
+
+async def test_a_quotation_is_never_created_empty(
+        client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue) -> None:
+    """FS-073 (BE-035): before, an empty create made a draft for 0.00 that reached Send."""
+    h = await _auth(client, quoter)
+    body = _create_body((await _qualified_lead(client, h, qenv))["id"], catalogue)
+    for lines in ([], None):
+        payload = {k: v for k, v in body.items() if k != "lines"}
+        if lines is not None:
+            payload["lines"] = lines
+        r = await client.post(f"{V1}/quotations", headers={**h, **_key()}, json=payload)
+        assert r.status_code == 422 and r.json()["error"]["code"] == "no_lines", r.text
 
 
 # ── send ─────────────────────────────────────────────────────────────────────

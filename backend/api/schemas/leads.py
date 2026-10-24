@@ -193,6 +193,12 @@ class Lead(BaseModel):
     duplicates: list[DuplicateRef] = Field(
         default_factory=list,
         description="Pending duplicate links whose other lead you can also see.")
+    deleted_at: str | None = Field(
+        default=None, description="Set on a deleted lead (FS-073). Only leads.delete holders "
+                                  "see one. While set, every change answers 409 lead_deleted; "
+                                  "POST /leads/{id}/restore brings it back.")
+    deleted_by: UserRef | None = Field(
+        default=None, description="Who deleted it, from the timeline. Null on a live lead.")
 
 
 class LookupItem(BaseModel):
@@ -346,7 +352,8 @@ class TimelineEvent(BaseModel):
     event's own detail (the stage change, the note text, and so on)."""
 
     id: str
-    kind: str = Field(description="e.g. lead.created, lead.stage_changed, lead.note_added.")
+    kind: str = Field(description="e.g. lead.created, lead.stage_changed, lead.note_added, "
+                                  "lead.deleted, lead.restored (payload duplicates_reopened).")
     occurred_at: str
     actor: UserRef | None = Field(default=None, description="Who caused the event, if known.")
     payload: dict[str, object] = Field(

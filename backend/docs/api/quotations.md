@@ -105,7 +105,7 @@ that blocks them.
 | `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `party` | Party \| null |  | Defaults from the lead. |
 | `terms` | string \| null |  | Free text printed at the foot. |
-| `lines` | QuotationLineIn[] |  | Zero to 200. A draft may be saved empty; sending needs at least one. |
+| `lines` | QuotationLineIn[] |  | One to 200. None is 422 no_lines (FS-073). |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. |
 
 **Responses**
@@ -292,7 +292,7 @@ allowed on a draft; sending needs at least one.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `lines` | QuotationLineIn[] | yes | The whole basket, in order. |
+| `lines` | QuotationLineIn[] | yes | The whole basket, in order. Empty is 422 no_lines (FS-073). |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
@@ -912,7 +912,7 @@ Every version of the number, oldest first. Any version's id works.
 | `export_country` | string \| null |  | The buyer's country. Required on an export, refused on any other type. |
 | `party` | Party \| null |  | Defaults from the lead. |
 | `terms` | string \| null |  | Free text printed at the foot. |
-| `lines` | QuotationLineIn[] |  | Zero to 200. A draft may be saved empty; sending needs at least one. |
+| `lines` | QuotationLineIn[] |  | One to 200. None is 422 no_lines (FS-073). |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. |
 
 **`QuotationLine`**
@@ -1084,7 +1084,7 @@ Every version of the number, oldest first. Any version's id works.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
+| `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added, lead.deleted, lead.restored (payload duplicates_reopened). |
 | `occurred_at` | string | yes |  |
 | `actor` | UserRef \| null |  | Who caused the event, if known. |
 | `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |
@@ -1143,6 +1143,6 @@ Every version of the number, oldest first. Any version's id works.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `lines` | QuotationLineIn[] | yes | The whole basket, in order. |
+| `lines` | QuotationLineIn[] | yes | The whole basket, in order. Empty is 422 no_lines (FS-073). |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |

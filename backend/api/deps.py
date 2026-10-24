@@ -43,7 +43,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.authz.predicate import Caller
 from api.config import Settings, get_settings
 from api.db.session import async_session_factory, enter_role
-from api.domain.auth import AccessClaims, decode_access_token
+from api.domain.auth import (
+    AccessClaims,
+    decode_access_token,
+    hash_refresh_token,
+    is_device_token,
+)
 from api.errors import (
     ApiError,
     ForbiddenError,
@@ -106,6 +111,25 @@ def _consumer_allowed(request: Request) -> bool:
     return any(path == p or path.startswith(p + "/") for p in _CONSUMER_PREFIXES)
 
 
+# FS-072: a device token reaches these three and nothing else. Exact (method,
+# template) pairs, and no matched route means no (plan review EC-8: fail closed).
+_DEVICE_TOKEN_ALLOWED = frozenset({("POST", "/locations/batch"), ("POST", "/tracking/duty/end"),
+                                   ("GET", "/me/tracking-config")})
+
+# Run as the owner, before any claim is set: the function is the owner's alone
+# (it maps a hash to a user). Returns the family's live session, so the claims
+# query below checks it exactly as it checks an access token's.
+_DEVICE_QUERY = text("SELECT * FROM tracking_device_token_resolve(:h)")
+
+
+def _device_route_allowed(request: Request) -> bool:
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    if not path:
+        return False
+    return (request.method.upper(), _API_PREFIX_RE.sub("", path)) in _DEVICE_TOKEN_ALLOWED
+
+
 def bearer_token(request: Request) -> str | None:
     """The Bearer token, or None. Public because /auth/logout needs to read a
     session id out of an access token without requiring a valid one."""
@@ -130,12 +154,24 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
     if token is None:
         raise UnauthenticatedError()
 
-    claims = decode_access_token(token, settings.jwt_secret.get_secret_value(),
-                                 algorithm=settings.jwt_algorithm)
-    if claims is None:
-        raise UnauthenticatedError()
+    device = is_device_token(token)
+    claims: AccessClaims | None = None
+    if not device:
+        claims = decode_access_token(token, settings.jwt_secret.get_secret_value(),
+                                     algorithm=settings.jwt_algorithm)
+        if claims is None:
+            raise UnauthenticatedError()
 
     async with async_session_factory() as session, session.begin():
+        if claims is None:
+            # FS-072: resolve first, so an unknown token is 401 before any 403
+            found = (await session.execute(
+                _DEVICE_QUERY, {"h": hash_refresh_token(token)})).one_or_none()
+            if found is None:
+                raise UnauthenticatedError()
+            claims = AccessClaims(sub=str(found.user_id), sid=str(found.session_id),
+                                  token_version=int(found.token_version),
+                                  device_id=found.device_id)
         row = (
             await session.execute(_CLAIMS_QUERY, {"sid": claims.sid, "sub": claims.sub})
         ).one_or_none()
@@ -152,6 +188,9 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
             raise PasswordChangeRequiredError()
         if row.user_type == "consumer" and not _consumer_allowed(request):
             raise ForbiddenError("This is for staff and dealers.", code="consumer_not_allowed")
+        if device and not _device_route_allowed(request):
+            raise ForbiddenError("A device token is only for sending locations and ending duty.",
+                                 code="device_token_not_allowed")
 
         # TRANSACTION-LOCAL. The third argument is the whole point: a plain SET
         # here leaks this user's identity onto whichever request next borrows this
