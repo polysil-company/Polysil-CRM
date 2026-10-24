@@ -5,7 +5,7 @@ import { AlertCircleIcon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type * as React from "react";
 import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -21,6 +21,11 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import type { Lead } from "@/features/leads/api/leads.schemas";
+import {
+  type Choice,
+  NO_PARTNER,
+  PartnerSearchField,
+} from "@/features/leads/components/choice-picker";
 import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
 import { useCreateOrder, useSaveOrderDraft } from "@/features/orders/api/orders.mutations";
@@ -39,6 +44,7 @@ import {
   orderNumber,
 } from "@/features/orders/lib/order-labels";
 import { orderRefusal } from "@/features/orders/lib/order-lifecycle";
+import { partnerDetailQueryOptions } from "@/features/partners/api/partners.queries";
 import { quotationKeys } from "@/features/quotations/api/quotations.queries";
 import {
   EXPORT_COUNTRY_MAX_LENGTH,
@@ -296,14 +302,47 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   const [subsidyShown, setSubsidyShown] = useState(false);
   const [subsidyServer, setSubsidyServer] = useState<SubsidyProblems>({});
 
-  const partnerId =
-    source.mode === "create"
-      ? (source.lead?.channelPartner?.id ?? null)
-      : (source.order.partner?.id ?? null);
   const asOf = source.mode === "edit" ? source.order.priceEffectiveDate : null;
   const placeId = place?.id ?? "";
   // MSTR-008 · The order's type picks its sale type's price list first, as the save will.
   const orderType = useWatch({ control: form.control, name: "orderType" });
+  // SO-012 · Staff typing in an order for a dealer or distributor name them here: the order is
+  // priced at their rates (partner_id) and their details fill in the party. A lead brings its own
+  // partner; a draft keeps the one it was saved with.
+  const picksBuyer = source.mode === "create" && source.lead === null && staff;
+  const dealerSale = orderType === "commercial" || orderType === "industrial";
+  const [buyer, setBuyer] = useState<Choice>(NO_PARTNER);
+  const [buyerError, setBuyerError] = useState<string | null>(null);
+  const latestBuyer = useRef("");
+  const partnerId =
+    source.mode === "create"
+      ? (source.lead?.channelPartner?.id ??
+        (picksBuyer && dealerSale && buyer.id !== "" ? buyer.id : null))
+      : (source.order.partner?.id ?? null);
+  const chooseBuyer = (next: Choice): void => {
+    setBuyer(next);
+    setBuyerError(null);
+    latestBuyer.current = next.id;
+    if (next.id === "") return;
+    queryClient.fetchQuery(partnerDetailQueryOptions(next.id)).then(
+      (partner) => {
+        // A later pick wins over a slower answer for an earlier one.
+        if (latestBuyer.current !== partner.id) return;
+        const set = { shouldDirty: true, shouldValidate: true } as const;
+        form.setValue("partyName", partner.name, set);
+        form.setValue("partyMobile", partner.mobile ?? "", set);
+        form.setValue("partyAddress", partner.address ?? "", set);
+        form.setValue("partyGstin", partner.gstin ?? "", set);
+        if (partner.territory !== null) form.setValue("place", partner.territory, set);
+      },
+      () => {
+        if (latestBuyer.current !== next.id) return;
+        setBuyerError(
+          "Their details couldn't be loaded. Fill them in below; the order still uses their rates.",
+        );
+      },
+    );
+  };
   // SO-010 · An export is priced with the tax it will store: its own once made, else the
   // setting. A sample shows what the setting makes of it.
   const exportOrSample = orderType === "export" || orderType === "sample";
@@ -701,6 +740,17 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
                     )}
                   />
                 )}
+                {picksBuyer && dealerSale ? (
+                  <PartnerSearchField
+                    id="order-partner"
+                    label="For a dealer or distributor"
+                    description="Optional. Picking one prices the order at their rates and fills in their details below."
+                    value={buyer}
+                    error={buyerError}
+                    onChange={chooseBuyer}
+                    className="sm:col-span-2"
+                  />
+                ) : null}
                 <TextField
                   id="order-party-name"
                   label="Party"
