@@ -251,7 +251,7 @@ row names its record (`record_label`). Only records you can see.
 | `record_type` | `lead` \| `quotation` \| `sales_order` \| `dispatch` \| `payment` \| `dealer_application` | yes |  |
 | `record_id` | string | yes |  |
 | `record_label` | string \| null |  | The inquiry, quote, order or dispatch number, on the lead view. |
-| `doc_type` | `purchase_order` \| `payment_proof` \| `signed_quotation` \| `invoice` \| `delivery_challan` \| `transport_receipt` \| `site_photo` \| `land_record` \| `subsidy_document` \| `other` \| `gst_certificate` \| `pan_card` \| `cancelled_cheque` \| `shop_photo` \| `shop_licence` | yes |  |
+| `doc_type` | `purchase_order` \| `payment_proof` \| `signed_quotation` \| `invoice` \| `delivery_challan` \| `transport_receipt` \| `site_photo` \| `land_record` \| `subsidy_document` \| `other` \| `gst_certificate` \| `pan_card` \| `cancelled_cheque` \| `shop_photo` \| `shop_licence` \| `deposit_slip` | yes |  |
 | `doc_type_label` | string | yes |  |
 | `name` | string \| null | yes | The user's name for it; always set for `other`. |
 | `filename` | string | yes |  |

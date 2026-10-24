@@ -29,7 +29,8 @@ Conventions for every endpoint in this file:
 
 **List Applications**
 
-The applications in your partners scope, newest first (at most 200).
+The applications in your partners scope, newest first (at most 200), with each
+one's type and deposit status.
 
 **Parameters**
 
@@ -37,6 +38,7 @@ The applications in your partners scope, newest first (at most 200).
 |---|---|---|---|---|
 | `status` | query | string \| null |  | Comma-separated statuses. |
 | `q` | query | string \| null |  |  |
+| `partner_type` | query | `dealer` \| `distributor` \| null |  |  |
 
 **Responses**
 
@@ -46,8 +48,8 @@ The applications in your partners scope, newest first (at most 200).
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
-| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`. |
-| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
 
 ---
 
@@ -76,6 +78,7 @@ mobile already signs in staff or a partner user.
 | `mobile` | string | yes | Any Indian form; it becomes the dealer's login. |
 | `territory_id` | string | yes |  |
 | `lead_id` | string \| null |  |  |
+| `partner_type` | `dealer` \| `distributor` |  | The deposit due is copied from this type's setting now. Default `dealer`. |
 
 **Responses**
 
@@ -85,8 +88,34 @@ mobile already signs in staff or a partner user.
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
-| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`. |
-| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
+
+---
+
+## `GET /api/v1/dealer-applications/form.pdf`
+
+**Blank Form**
+
+The blank data sheet, to print and fill by hand. Needs `partners.view`.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `partner_type` | query | `dealer` \| `distributor` |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The data sheet. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
+| `404` | `ErrorResponse` | No such application in your scope. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
+| `503` | `ErrorResponse` | `busy`: other PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -111,8 +140,8 @@ Documents: `GET /documents?record_type=dealer_application&record_id=`.
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
-| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`. |
-| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
 
 ---
 
@@ -121,6 +150,8 @@ Documents: `GET /documents?record_type=dealer_application&record_id=`.
 **Patch Application**
 
 Fill or correct fields for the applicant, while draft, returned or submitted.
+`partner_type` changes the type while draft or returned, before any deposit entry,
+and re-reads that type's deposit (`409 deposit_recorded` after one).
 
 **Parameters**
 
@@ -131,7 +162,7 @@ Fill or correct fields for the applicant, while draft, returned or submitted.
 
 **Request body**
 
-**`DealerApplicationFields`**
+**`StaffApplicationFields`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -151,6 +182,25 @@ Fill or correct fields for the applicant, while draft, returned or submitted.
 | `bank_account_name` | string \| null |  |  |
 | `bank_account_no` | string \| null |  |  |
 | `bank_ifsc` | string \| null |  |  |
+| `telephone` | string \| null |  |  |
+| `established_on` | date \| null |  | From 1900, not after today. |
+| `bank_name` | string \| null |  |  |
+| `bank_branch` | string \| null |  |  |
+| `bank_address` | string \| null |  |  |
+| `working_capital` | WorkingCapitalRow[] \| null |  |  |
+| `other_sources_lakhs` | string \| null |  |  |
+| `two_wheelers` | integer \| null |  |  |
+| `cars` | integer \| null |  |  |
+| `other_vehicles` | string \| null |  |  |
+| `office_area` | string \| null |  |  |
+| `godown_area` | string \| null |  |  |
+| `area_unit` | `sq_m` \| `sq_ft` \| null |  |  |
+| `manpower` | ManpowerRow[] \| null |  |  |
+| `previous_installations` | InstallationRow[] \| null |  |  |
+| `sales_executives` | integer \| null |  |  |
+| `technicians` | integer \| null |  |  |
+| `appointment_place` | string \| null |  |  |
+| `partner_type` | `dealer` \| `distributor` \| null |  |  |
 
 **Responses**
 
@@ -160,8 +210,8 @@ Fill or correct fields for the applicant, while draft, returned or submitted.
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
-| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`. |
-| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
 
 ---
 
@@ -170,9 +220,10 @@ Fill or correct fields for the applicant, while draft, returned or submitted.
 **Decision**
 
 Approve, reject or return a submitted application. Approving creates the dealer
-(under `parent_id`, or directly under Polysil) and a login on the applicant's
-mobile; the dealer then signs in with a WhatsApp code. A State Manager or above,
-never whoever started it.
+(under `parent_id`, or directly under Polysil) or the distributor (always under
+Polysil) and a login on the applicant's mobile, who then signs in with a WhatsApp
+code. Only a role listed in the type's `*_application_deciders` setting, never
+whoever started it. Approval waits for the deposit: `409 deposit_pending`.
 
 **Parameters**
 
@@ -189,8 +240,8 @@ never whoever started it.
 |---|---|---|---|
 | `decision` | `approve` \| `reject` \| `return` | yes |  |
 | `remark` | string \| null |  | Required to reject or return. |
-| `parent_id` | string \| null |  | An active distributor; null: directly under Polysil. |
-| `code` | string \| null |  | The partner code; null: the next DLR-<state>-0001. |
+| `parent_id` | string \| null |  | A dealer's active distributor; null: directly under Polysil. Always null for a distributor. |
+| `code` | string \| null |  | The partner code; null: the next DLR-<state>-0001, or DIST-<state>-0001 for a distributor. |
 
 **Responses**
 
@@ -200,8 +251,84 @@ never whoever started it.
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
-| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`. |
-| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
+
+---
+
+## `POST /api/v1/dealer-applications/{app_id}/deposit`
+
+**Record Deposit**
+
+Record the deposit paid. Upload the pay slip first as a `deposit_slip` document
+and name it in `slip_id`. The amount must cover the amount due. Each record is kept
+in `deposit.history`; the latest counts. `409 deposit_not_due` when nothing is due.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `app_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`DepositRecord`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes | Rupees, a decimal string above 0, at least the amount due. |
+| `paid_on` | date | yes | Not after today; not more than a year before the application. |
+| `reference` | string \| null |  |  |
+| `slip_id` | string | yes | A deposit_slip document on this application. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_DealerApplication_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
+| `404` | `ErrorResponse` | No such application in your scope. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
+
+---
+
+## `POST /api/v1/dealer-applications/{app_id}/deposit/relaxation`
+
+**Relax Deposit**
+
+Lower the amount due, to 0 to waive it, with a reason. Only a role listed in the
+`deposit_relaxation_roles` setting, never whoever started the application, and not
+after a payment (`409 deposit_paid`). `403 not_your_relaxation`.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `app_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`DepositRelaxation`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount_due` | string | yes | The new amount due, below the current one; 0 waives it. |
+| `reason` | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_DealerApplication_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
+| `404` | `ErrorResponse` | No such application in your scope. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
 
 ---
 
@@ -227,8 +354,35 @@ session stop working.
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
-| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`. |
-| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
+
+---
+
+## `GET /api/v1/dealer-applications/{app_id}/pdf`
+
+**Application Pdf**
+
+The data sheet filled from the application, as the client's paper form. The
+bank account is masked to its last 4 digits for everyone. Made when asked.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `app_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The data sheet. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
+| `404` | `ErrorResponse` | No such application in your scope. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
+| `503` | `ErrorResponse` | `busy`: other PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -253,8 +407,8 @@ Submit for the applicant. `422 application_incomplete` lists what is missing.
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
-| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`. |
-| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
 
 ---
 
@@ -287,8 +441,8 @@ Close an open application. The link stops working.
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
-| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`. |
-| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
 
 ---
 
@@ -314,8 +468,8 @@ configured (`lookup: found`); `unavailable` without one.
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not staff who see partners; or not one who may decide. |
 | `404` | `ErrorResponse` | No such application in your scope. |
-| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`. |
-| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing. |
+| `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
+| `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
 
 ---
 
@@ -379,6 +533,24 @@ Save fields, while the application is a draft or returned.
 | `bank_account_name` | string \| null |  |  |
 | `bank_account_no` | string \| null |  |  |
 | `bank_ifsc` | string \| null |  |  |
+| `telephone` | string \| null |  |  |
+| `established_on` | date \| null |  | From 1900, not after today. |
+| `bank_name` | string \| null |  |  |
+| `bank_branch` | string \| null |  |  |
+| `bank_address` | string \| null |  |  |
+| `working_capital` | WorkingCapitalRow[] \| null |  |  |
+| `other_sources_lakhs` | string \| null |  |  |
+| `two_wheelers` | integer \| null |  |  |
+| `cars` | integer \| null |  |  |
+| `other_vehicles` | string \| null |  |  |
+| `office_area` | string \| null |  |  |
+| `godown_area` | string \| null |  |  |
+| `area_unit` | `sq_m` \| `sq_ft` \| null |  |  |
+| `manpower` | ManpowerRow[] \| null |  |  |
+| `previous_installations` | InstallationRow[] \| null |  |  |
+| `sales_executives` | integer \| null |  |  |
+| `technicians` | integer \| null |  |  |
+| `appointment_place` | string \| null |  |  |
 
 **Responses**
 
@@ -420,6 +592,7 @@ Upload a document: JPEG, PNG, WebP, HEIC or PDF, up to 10 MB.
 **Applicant Remove**
 
 Remove one of your own uploads, while the application is a draft or returned.
+`409 document_in_use` for a pay slip a recorded payment names.
 
 **Parameters**
 
@@ -462,6 +635,32 @@ The GSTIN read from itself, for the form's "Fetch details" button.
 | `403` | `ErrorResponse` | `no_session`: verify the mobile first, or again. |
 | `404` | `ErrorResponse` | The link is unknown, expired or closed. |
 | `422` | `ErrorResponse` | `invalid_code`, `rate_limited`, `application_incomplete`, or a field. |
+
+---
+
+## `GET /api/v1/public/dealer-apply/{token}/pdf`
+
+**Applicant Pdf**
+
+Your data sheet as filled so far, to print and sign. Needs `X-Apply-Session`,
+so only while the application is a draft or returned.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `token` | path | string | yes |  |
+| `X-Apply-Session` | header | string \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The data sheet. |
+| `403` | `ErrorResponse` | `no_session`: verify the mobile first, or again. |
+| `404` | `ErrorResponse` | The link is unknown, expired or closed. |
+| `422` | `ErrorResponse` | `invalid_code`, `rate_limited`, `application_incomplete`, or a field. |
+| `503` | `ErrorResponse` | `busy`: other PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -558,6 +757,7 @@ Five wrong tries burn the code; ask for a new one.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `status` | `draft` \| `submitted` \| `returned` \| `approved` \| `rejected` \| `withdrawn` | yes |  |
+| `partner_type` | `dealer` \| `distributor` | yes |  |
 | `firm_name` | string | yes |  |
 | `contact_name` | string | yes |  |
 | `mobile` | string | yes |  |
@@ -577,6 +777,26 @@ Five wrong tries burn the code; ask for a new one.
 | `bank_account_name` | string \| null | yes |  |
 | `bank_account_no` | string \| null | yes | Masked to the last 4 digits unless you can decide or edit partners. |
 | `bank_ifsc` | string \| null | yes |  |
+| `telephone` | string \| null | yes |  |
+| `established_on` | string \| null | yes |  |
+| `bank_name` | string \| null | yes |  |
+| `bank_branch` | string \| null | yes |  |
+| `bank_address` | string \| null | yes |  |
+| `working_capital` | object[] \| null | yes |  |
+| `other_sources_lakhs` | string \| null | yes |  |
+| `working_capital_total_lakhs` | string \| null | yes | The rows plus other sources; null when neither is filled. |
+| `two_wheelers` | integer \| null | yes |  |
+| `cars` | integer \| null | yes |  |
+| `other_vehicles` | string \| null | yes |  |
+| `office_area` | string \| null | yes |  |
+| `godown_area` | string \| null | yes |  |
+| `area_unit` | `sq_m` \| `sq_ft` | yes |  |
+| `manpower` | object[] \| null | yes |  |
+| `previous_installations` | object[] \| null | yes |  |
+| `sales_executives` | integer \| null | yes |  |
+| `technicians` | integer \| null | yes |  |
+| `appointment_place` | string \| null | yes |  |
+| `deposit` | Deposit | yes |  |
 | `gst_lookup` | object \| null | yes |  |
 | `gst_state_mismatch` | boolean | yes |  |
 | `missing` | string[] | yes | What is still needed to submit. |
@@ -589,7 +809,7 @@ Five wrong tries burn the code; ask for a new one.
 | `apply_url` | string \| null |  | Only right after creating or renewing: the token is not stored. |
 | `created_by` | UserRef \| null | yes |  |
 | `created_at` | string | yes |  |
-| `can` | object | yes | edit, decide, withdraw, renew. |
+| `can` | object | yes | edit, decide, withdraw, renew, record_deposit, relax_deposit. |
 
 **`DealerApplicationCreate`**
 
@@ -600,6 +820,7 @@ Five wrong tries burn the code; ask for a new one.
 | `mobile` | string | yes | Any Indian form; it becomes the dealer's login. |
 | `territory_id` | string | yes |  |
 | `lead_id` | string \| null |  |  |
+| `partner_type` | `dealer` \| `distributor` |  | The deposit due is copied from this type's setting now. Default `dealer`. |
 
 **`DealerApplicationDecision`**
 
@@ -607,8 +828,8 @@ Five wrong tries burn the code; ask for a new one.
 |---|---|---|---|
 | `decision` | `approve` \| `reject` \| `return` | yes |  |
 | `remark` | string \| null |  | Required to reject or return. |
-| `parent_id` | string \| null |  | An active distributor; null: directly under Polysil. |
-| `code` | string \| null |  | The partner code; null: the next DLR-<state>-0001. |
+| `parent_id` | string \| null |  | A dealer's active distributor; null: directly under Polysil. Always null for a distributor. |
+| `code` | string \| null |  | The partner code; null: the next DLR-<state>-0001, or DIST-<state>-0001 for a distributor. |
 
 **`DealerApplicationFields`**
 
@@ -630,6 +851,24 @@ Five wrong tries burn the code; ask for a new one.
 | `bank_account_name` | string \| null |  |  |
 | `bank_account_no` | string \| null |  |  |
 | `bank_ifsc` | string \| null |  |  |
+| `telephone` | string \| null |  |  |
+| `established_on` | date \| null |  | From 1900, not after today. |
+| `bank_name` | string \| null |  |  |
+| `bank_branch` | string \| null |  |  |
+| `bank_address` | string \| null |  |  |
+| `working_capital` | WorkingCapitalRow[] \| null |  |  |
+| `other_sources_lakhs` | string \| null |  |  |
+| `two_wheelers` | integer \| null |  |  |
+| `cars` | integer \| null |  |  |
+| `other_vehicles` | string \| null |  |  |
+| `office_area` | string \| null |  |  |
+| `godown_area` | string \| null |  |  |
+| `area_unit` | `sq_m` \| `sq_ft` \| null |  |  |
+| `manpower` | ManpowerRow[] \| null |  |  |
+| `previous_installations` | InstallationRow[] \| null |  |  |
+| `sales_executives` | integer \| null |  |  |
+| `technicians` | integer \| null |  |  |
+| `appointment_place` | string \| null |  |  |
 
 **`DealerApplicationRemark`**
 
@@ -643,6 +882,8 @@ Five wrong tries burn the code; ask for a new one.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `status` | `draft` \| `submitted` \| `returned` \| `approved` \| `rejected` \| `withdrawn` | yes |  |
+| `partner_type` | `dealer` \| `distributor` | yes |  |
+| `deposit_status` | `paid` \| `waived` \| `pending` \| `not_required` | yes |  |
 | `firm_name` | string | yes |  |
 | `contact_name` | string | yes |  |
 | `territory_name` | string | yes |  |
@@ -663,6 +904,50 @@ Five wrong tries burn the code; ask for a new one.
 | `trade_name` | string \| null |  |  |
 | `address` | string \| null |  |  |
 | `status` | string \| null |  |  |
+
+**`Deposit`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `status` | `paid` \| `waived` \| `pending` \| `not_required` | yes |  |
+| `amount_set` | string | yes | Copied from the type's setting when the application was made. |
+| `amount_due` | string | yes | After any relaxation. |
+| `paid_amount` | string \| null | yes |  |
+| `paid_on` | string \| null | yes |  |
+| `reference` | string \| null | yes |  |
+| `slip_id` | string \| null | yes |  |
+| `history` | DepositEntry[] | yes | Payments and relaxations, oldest first. |
+
+**`DepositEntry`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `kind` | `payment` \| `relaxation` | yes |  |
+| `amount` | string \| null |  | A payment's amount. |
+| `paid_on` | string \| null |  |  |
+| `reference` | string \| null |  |  |
+| `slip_id` | string \| null |  |  |
+| `from_due` | string \| null |  | A relaxation's old amount due. |
+| `to` | string \| null |  | A relaxation's new amount due. |
+| `reason` | string \| null |  |  |
+| `by` | UserRef \| null |  |  |
+| `at` | string | yes |  |
+
+**`DepositRecord`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes | Rupees, a decimal string above 0, at least the amount due. |
+| `paid_on` | date | yes | Not after today; not more than a year before the application. |
+| `reference` | string \| null |  |  |
+| `slip_id` | string | yes | A deposit_slip document on this application. |
+
+**`DepositRelaxation`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `amount_due` | string | yes | The new amount due, below the current one; 0 waives it. |
+| `reason` | string | yes |  |
 
 **`Envelope_DealerApplicantSession_`**
 
@@ -702,12 +987,79 @@ Five wrong tries burn the code; ask for a new one.
 |---|---|---|---|
 | `error` | ErrorBody | yes |  |
 
+**`InstallationRow`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `year` | integer | yes | Not after this year. |
+| `customers` | integer | yes |  |
+| `description` | string | yes |  |
+| `scope` | `supply` \| `installation` \| `both` | yes |  |
+| `cost_lakhs` | string | yes |  |
+
+**`ManpowerRow`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `category` | string | yes |  |
+| `qualification` | string \| null |  |  |
+| `work_type` | string \| null |  |  |
+| `experience_years` | integer \| null |  |  |
+| `people` | integer | yes |  |
+
+**`StaffApplicationFields`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `firm_name` | string \| null |  |  |
+| `contact_name` | string \| null |  |  |
+| `firm_type` | `proprietorship` \| `partnership` \| `llp` \| `company` \| null |  |  |
+| `gst_registered` | boolean \| null |  |  |
+| `gstin` | string \| null |  | Checked for shape and check character. |
+| `pan` | string \| null |  |  |
+| `address` | string \| null |  |  |
+| `pincode` | string \| null |  |  |
+| `email` | string \| null |  |  |
+| `godown_address` | string \| null |  |  |
+| `years_in_business` | integer \| null |  |  |
+| `current_brands` | string \| null |  |  |
+| `notes` | string \| null |  |  |
+| `bank_account_name` | string \| null |  |  |
+| `bank_account_no` | string \| null |  |  |
+| `bank_ifsc` | string \| null |  |  |
+| `telephone` | string \| null |  |  |
+| `established_on` | date \| null |  | From 1900, not after today. |
+| `bank_name` | string \| null |  |  |
+| `bank_branch` | string \| null |  |  |
+| `bank_address` | string \| null |  |  |
+| `working_capital` | WorkingCapitalRow[] \| null |  |  |
+| `other_sources_lakhs` | string \| null |  |  |
+| `two_wheelers` | integer \| null |  |  |
+| `cars` | integer \| null |  |  |
+| `other_vehicles` | string \| null |  |  |
+| `office_area` | string \| null |  |  |
+| `godown_area` | string \| null |  |  |
+| `area_unit` | `sq_m` \| `sq_ft` \| null |  |  |
+| `manpower` | ManpowerRow[] \| null |  |  |
+| `previous_installations` | InstallationRow[] \| null |  |  |
+| `sales_executives` | integer \| null |  |  |
+| `technicians` | integer \| null |  |  |
+| `appointment_place` | string \| null |  |  |
+| `partner_type` | `dealer` \| `distributor` \| null |  |  |
+
 **`UserRef`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
+
+**`WorkingCapitalRow`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `facility` | string | yes |  |
+| `amount_lakhs` | string | yes |  |
 
 **`_Code`**
 

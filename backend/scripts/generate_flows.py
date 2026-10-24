@@ -2556,6 +2556,27 @@ def f_live_checks() -> None:
          ("n4", "Not yet: a production account (GAP-498), a storage\nwrite (499), the dealer steps (500), a browser (501).", YELLOW)])
 
 
+def f_partner_recruitment() -> None:
+    _columns(
+        "71-partner-recruitment", "Recruiting a dealer or a distributor",
+        "Staff start it, the applicant fills the data sheet, the deposit is paid or relaxed, a decider approves.",
+        "BUILT. FS-051 (dealers), FS-071 (distributors, data sheet, deposit, PDF): migrations 062, 078.",
+        [("s1", "POST /dealer-applications {partner_type}\ndeposit copied from <type>_deposit_amount, kept", BLUE),
+         ("s2", "applicant: link + WhatsApp code; fills the\ndata sheet; uploads documents and the slip", GREY),
+         ("s3", "submit: FS-051's fields + <type>_application_required", BLUE),
+         ("s4", "POST /deposit {amount, paid_on, slip_id}\nor POST /deposit/relaxation {amount_due, reason}", YELLOW),
+         ("s5", "decision: a role in <type>_application_deciders;\nrefused while the deposit is pending", GREEN),
+         ("s6", "approve: dealer DLR-<st>-0001 under a distributor or Polysil;\ndistributor DIST-<st>-0001 under Polysil; a login", GREEN)],
+        [("d1", "GET /dealer-applications/{id}/pdf: the sheet, filled\nGET /dealer-applications/form.pdf: blank", VIOLET),
+         ("d2", "relax: deposit_relaxation_roles, never the creator,\nnever after a payment; each one kept", YELLOW),
+         ("d3", "every payment kept; the latest counts;\nits slip cannot be removed", GREEN),
+         ("d4", "closed application: its documents frozen,\neven for the uploader", GREEN)],
+        [("n1", "THE AMOUNT IS COPIED AT CREATION\n\nChanging a deposit setting changes new applications\nonly. Applications open on 22 Oct 2026 carry 0.", RED),
+         ("n2", "A SETTING CAN GIVE A JUNIOR ROLE A MANAGER'S POWER\n\nA decider creates partners and logins. The settings\naccept any staff role (GAP-517).", RED),
+         ("n3", "PDF IN THE API: two at a time per process,\na third gets 503 busy. Account always masked.", YELLOW),
+         ("n4", "Not yet: the applicant after submit (GAP-519),\nrefunds (GAP-520), a distributor's territory\nlevel (GAP-521).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2570,4 +2591,5 @@ if __name__ == "__main__":
     f_export_sample_orders(); f_ratings(); f_warranty()
     f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
     f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy(); f_live_checks()
+    f_partner_recruitment()
     print(f"\nwrote to {OUT}")
