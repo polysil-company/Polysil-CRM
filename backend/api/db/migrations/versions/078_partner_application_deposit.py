@@ -263,7 +263,7 @@ BEGIN
         UPDATE dealer_application SET partner_type = v_type, deposit_set = v_set, deposit_due = v_set WHERE id = p_id;
         INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload)
         VALUES ('dealer_application', p_id, v_old.lead_id, 'dealer_application.type_changed', app_current_user_id(),
-                jsonb_build_object('from', v_old.partner_type, 'to', v_type, 'deposit_set', v_set::text));
+                jsonb_build_object('from', v_old.partner_type, 'to', v_type, 'deposit_set', v_set::numeric(14,2)::text));
     END IF;
     UPDATE dealer_application SET
            {_SETS},
@@ -434,7 +434,7 @@ BEGIN
     VALUES (p_id, 'payment', p_amount, p_paid_on, NULLIF(btrim(p_reference), ''), p_slip, app_current_user_id());
     INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload)
     VALUES ('dealer_application', p_id, a.lead_id, 'dealer_application.deposit_recorded', app_current_user_id(),
-            jsonb_build_object('amount', p_amount::text, 'previous_amount', v_prev::text, 'paid_on', p_paid_on, 'slip_id', p_slip));
+            jsonb_build_object('amount', p_amount::numeric(14,2)::text, 'previous_amount', v_prev::numeric(14,2)::text, 'paid_on', p_paid_on, 'slip_id', p_slip));
 END $fn$"""
 
 RELAX = """CREATE FUNCTION dealer_application_relax(p_id uuid, p_due numeric, p_reason text) RETURNS void
@@ -468,7 +468,7 @@ BEGIN
     UPDATE dealer_application SET deposit_due = p_due WHERE id = p_id;
     INSERT INTO activity_event (entity_type, entity_id, lead_id, kind, actor_id, payload)
     VALUES ('dealer_application', p_id, a.lead_id, 'dealer_application.deposit_relaxed', app_current_user_id(),
-            jsonb_build_object('from', a.deposit_due::text, 'to', p_due::text));
+            jsonb_build_object('from', a.deposit_due::text, 'to', p_due::numeric(14,2)::text));
 END $fn$"""
 
 # ── the decision: the setting decides who, the deposit gates, a distributor branch ──

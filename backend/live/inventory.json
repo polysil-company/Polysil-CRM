@@ -14,6 +14,7 @@
   "/api/v1/customers": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/dashboard/overview": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/dealer-applications": {"query": {}, "public": false, "skip": {}, "forbidden": []},
+  "/api/v1/dealer-applications/form.pdf": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/dealer-commissions": {"query": {}, "public": false, "skip": {}, "forbidden": ["production"]},
   "/api/v1/dealer-commissions/export": {"query": {}, "public": false, "skip": {"production": "its date filter answers 422 (paid_from binds text to a date cast); unbounded it would drain up to 5,001 rows"}, "forbidden": ["production"]},
   "/api/v1/dispatches": {"query": {}, "public": false, "skip": {}, "forbidden": []},

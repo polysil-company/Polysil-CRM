@@ -52,7 +52,7 @@ def logo_only_fetcher() -> Any:
 
     logo = _logo()
     if hasattr(weasyprint, "URLFetcher"):
-        class _LogoOnly(weasyprint.URLFetcher):  # type: ignore[misc, name-defined]
+        class _LogoOnly(weasyprint.URLFetcher):  # type: ignore[misc, name-defined, unused-ignore]
             def fetch(self, url: str, headers: Any = None) -> Any:
                 if url != logo:
                     raise ValueError("the data sheet fetches nothing but its logo")

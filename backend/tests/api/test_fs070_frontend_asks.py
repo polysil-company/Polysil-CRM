@@ -74,13 +74,14 @@ async def test_the_lookups_need_products_view(client: httpx.AsyncClient, shop: S
 async def test_document_types_follow_the_record(client: httpx.AsyncClient, shop: Shop) -> None:
     h = await endpoints._as(client, shop, "field_officer")
     every = {x["code"] for x in (await client.get(f"{V1}/documents/types", headers=h)).json()["data"]}
-    assert len(every) == 15
+    assert len(every) == 16  # FS-071 added deposit_slip
     lead = {x["code"] for x in (await client.get(f"{V1}/documents/types", headers=h,
                                                  params={"record_type": "lead"})).json()["data"]}
     dealer = {x["code"] for x in (await client.get(f"{V1}/documents/types", headers=h,
                                                    params={"record_type": "dealer_application"})).json()["data"]}
     assert "gst_certificate" not in lead and "invoice" in lead and "other" in lead
-    assert dealer == {"gst_certificate", "pan_card", "cancelled_cheque", "shop_photo", "shop_licence", "other"}
+    assert dealer == {"gst_certificate", "pan_card", "cancelled_cheque", "shop_photo", "shop_licence", "deposit_slip",
+                      "other"}
     r = await client.get(f"{V1}/documents/types", headers=h, params={"record_type": "farm"})
     assert r.status_code == 422, r.text
 

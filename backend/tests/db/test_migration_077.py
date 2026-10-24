@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tests.db.conftest import Fixtures
 from tests.db.test_migration_012 import _as_owner, _lead, _quotation
 from tests.db.test_migration_013 import _order, _submit, _world
+from tests.db.test_migration_078 import _run as _run_078
 
 VERSIONS = Path(__file__).resolve().parents[2] / "api" / "db" / "migrations" / "versions"
 
@@ -161,8 +162,11 @@ async def test_the_migration_runs_over_a_sent_quotation_and_a_submitted_order(
     assert (await db.execute(text("SELECT status::text FROM sales_order WHERE id = CAST(:o AS uuid)"),
                              {"o": order})).scalar_one() == "submitted"
 
+    # the database is at head: step down through 078 first, as alembic would
+    await _run_078(db, "downgrade")
     await _run(db, "downgrade")
     await _run(db, "upgrade")
+    await _run_078(db, "upgrade")
 
     for table, key, ref in (("quotation_line", "quotation_id", sent),
                             ("order_line", "sales_order_id", order)):
@@ -187,6 +191,7 @@ async def test_the_downgrade_refuses_while_a_document_carries_freight(
         "taxable = taxable + 100, total = total + 118 WHERE id = CAST(:q AS uuid)"), {"q": q})
     async with db.begin_nested() as sp:
         with pytest.raises(DBAPIError) as err:
+            await _run_078(db, "downgrade")
             await _run(db, "downgrade")
         await sp.rollback()
     assert "documents carry freight" in str(err.value), err.value
