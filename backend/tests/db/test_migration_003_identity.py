@@ -68,6 +68,8 @@ PRE_AUTH = {
                               "p_name text, p_key text, p_filename text, p_content_type text, "
                               "p_size integer, p_sha text"),
     "dealer_apply_document_remove": "p_token_hash text, p_session_hash text, p_doc uuid",
+    # FS-072: logout drops the tracking app's device tokens of the session's family
+    "tracking_device_token_forget": "p_session uuid",
 }
 
 

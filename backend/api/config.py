@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     # phone. Changing it is a config edit; existing sessions keep their own expiry,
     # because expires_at is stamped on the row at issue (FS-001 EC-13).
     refresh_token_ttl: timedelta = timedelta(days=30)
+    # FS-072: the tracking app's device token; renewed every time the app opens
+    device_token_ttl: timedelta = timedelta(days=30)
 
     # FS-001 rule 17 and section 8.2. A used refresh token re-presented inside this
     # window replays the cached bundle and creates nothing. It does NOT rotate again:

@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.services import auth as service
 from tests.api.conftest import Dealer, Staff
+from tests.db.test_migration_003_identity import PRE_AUTH
 
 pytestmark = pytest.mark.db
 
@@ -73,7 +74,9 @@ def _offenders(statements: list[str]) -> list[str]:
     bad = []
     for statement in statements:
         names = {token.lower() for token in _IDENTIFIER.findall(statement)}
-        calls_definer = any(name.startswith("auth_") for name in names)
+        # the auth_ definers, and the other pre-auth ones the 003 test enumerates
+        # (FS-072: logout calls tracking_device_token_forget)
+        calls_definer = any(name.startswith("auth_") or name in PRE_AUTH for name in names)
         touches_table = bool(names & set(_TABLES))
         if not calls_definer or touches_table:
             bad.append(statement)

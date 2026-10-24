@@ -687,6 +687,36 @@ lead can be reopened; anything else is `422 stage_terminal`.
 
 ---
 
+## `POST /api/v1/leads/{lead_id}/restore`
+
+**Restore**
+
+Bring a deleted lead back (FS-073). Needs `leads.delete` and `leads.edit`. The
+duplicate pairs a delete closed are reopened, and the duplicate check runs again. A lead that
+is not deleted comes back unchanged. The owner is kept, even one who has since
+left: offer Assign when `owner` is inactive. `404` out of scope.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `lead_id` | path | string | yes |  |
+| `idempotency-key` | header | string \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_Lead_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | The action is not in your permissions. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `409` | `ErrorResponse` | Key reused, or the stage moved on. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `GET /api/v1/leads/{lead_id}/timeline`
 
 **Get Timeline**
@@ -900,6 +930,8 @@ with the current stage in `fields.stage`.
 | `created_at` | string | yes |  |
 | `created_by` | UserRef \| null | yes |  |
 | `duplicates` | DuplicateRef[] |  | Pending duplicate links whose other lead you can also see. |
+| `deleted_at` | string \| null |  | Set on a deleted lead (FS-073). Only leads.delete holders see one. While set, every change answers 409 lead_deleted; POST /leads/{id}/restore brings it back. |
+| `deleted_by` | UserRef \| null |  | Who deleted it, from the timeline. Null on a live lead. |
 
 **`LeadArea`**
 
@@ -1099,7 +1131,7 @@ with the current stage in `fields.stage`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
+| `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added, lead.deleted, lead.restored (payload duplicates_reopened). |
 | `occurred_at` | string | yes |  |
 | `actor` | UserRef \| null |  | Who caused the event, if known. |
 | `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |

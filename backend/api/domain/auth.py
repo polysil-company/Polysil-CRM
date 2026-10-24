@@ -61,6 +61,9 @@ class AccessClaims:
     sub: str
     sid: str
     token_version: int
+    # FS-072: set only when the caller used a device token, so the batch can check
+    # that it names the token's own device (EC-11)
+    device_id: str | None = None
 
 
 def new_refresh_token() -> str:
@@ -75,6 +78,21 @@ def new_refresh_token() -> str:
 
 def hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+# FS-072: the tracking app's device token. JWTs start "eyJ", so get_db tells the
+# two apart by the prefix and never hands one to the other's check.
+DEVICE_TOKEN_PREFIX = "pdt_"
+
+
+def new_device_token() -> str:
+    """256 bits, as a refresh token, behind a prefix. Hashed with SHA-256 for the
+    same reason (rule 3)."""
+    return DEVICE_TOKEN_PREFIX + secrets.token_urlsafe(REFRESH_TOKEN_BYTES)
+
+
+def is_device_token(token: str) -> bool:
+    return token.startswith(DEVICE_TOKEN_PREFIX)
 
 
 def generate_otp(length: int) -> str:

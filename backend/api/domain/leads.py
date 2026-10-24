@@ -151,11 +151,15 @@ def score(
 
 # GAP-284: client question 20.1 is open. The suggested answer is applied: duplicate
 # handling, staff notes and the lost reason are internal; the dealer's own words stay.
+# FS-074 (plan review R-4): a dealer never sees a complaint's escalation, which the
+# complaint's detail already hides from them; the lead's timeline carries it too.
 PARTNER_HIDDEN_KINDS: frozenset[str] = frozenset(
-    {"lead.duplicate_flagged", "lead.duplicate_dismissed", "lead.merged"})
-# the stage change stays (the dealer sees the lead is lost); its staff words do not
+    {"lead.duplicate_flagged", "lead.duplicate_dismissed", "lead.merged", "complaint.escalated"})
+# the stage change stays (the dealer sees the lead is lost); its staff words do not.
+# A restore stays (the lead is back); the duplicate pairs it reopened do not (FS-073
+# code review F-1): they can name another dealer's lead.
 PARTNER_STRIPPED_KEYS: frozenset[str] = frozenset(
-    {"lost_reason_id", "lost_reason", "lost_note", "note"})
+    {"lost_reason_id", "lost_reason", "lost_note", "note", "duplicates_reopened"})
 
 
 def partner_timeline_entry(kind: str, payload: dict[str, object], *,
@@ -166,7 +170,7 @@ def partner_timeline_entry(kind: str, payload: dict[str, object], *,
         return payload
     if kind in PARTNER_HIDDEN_KINDS or kind == "lead.note_added":
         return None
-    if kind in ("lead.stage_changed", "lead.reopened"):
+    if kind in ("lead.stage_changed", "lead.reopened", "lead.restored"):
         return {k: v for k, v in payload.items() if k not in PARTNER_STRIPPED_KEYS}
     return payload
 

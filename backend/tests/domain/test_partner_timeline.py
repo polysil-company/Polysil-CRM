@@ -8,7 +8,7 @@ from api.domain.leads import partner_timeline_entry
 
 
 @pytest.mark.parametrize("kind", ["lead.duplicate_flagged", "lead.duplicate_dismissed",
-                                  "lead.merged", "lead.note_added"])
+                                  "lead.merged", "lead.note_added", "complaint.escalated"])
 def test_staff_entries_are_hidden(kind: str) -> None:
     assert partner_timeline_entry(kind, {"note": "x"}, own=False) is None
 
@@ -30,3 +30,9 @@ def test_a_stage_change_keeps_the_stages_and_drops_the_words(kind: str) -> None:
 def test_everything_else_passes_unchanged() -> None:
     payload = {"to": "x"}
     assert partner_timeline_entry("lead.assigned", payload, own=False) is payload
+
+
+def test_a_restore_keeps_the_event_and_drops_the_pairs() -> None:
+    """FS-073 code review F-1: the reopened pairs can name another dealer's lead."""
+    payload = {"actor_name": "A", "duplicates_reopened": [{"link_id": "l", "lead_id": "other"}]}
+    assert partner_timeline_entry("lead.restored", payload, own=False) == {"actor_name": "A"}

@@ -41,6 +41,7 @@ from api.schemas.complaints import (
     WithdrawIn,
 )
 from api.schemas.leads import UUID_RE, TimelinePage
+from api.schemas.quotations import PdfLink
 from api.services import complaints as service
 from api.services import exports
 from api.storage import get_storage
@@ -294,6 +295,23 @@ async def timeline(complaint_id: Id, db: DbSession, caller: CallerDep,
                    cursor: Cursor = None) -> TimelinePage:
     """The complaint's events, newest first. A dealer never sees who decided."""
     return await service.timeline(db, caller, complaint_id, limit=limit, cursor=cursor)
+
+
+@router.get("/{complaint_id}/pdf", response_model=Envelope[PdfLink],
+            responses={**_ERRORS,
+                       503: {"model": ErrorResponse,
+                             "description": "`busy`: two PDFs are being made, retry in a few "
+                                            "seconds. `storage_unavailable`, `pdf_unavailable`."}},
+            dependencies=[Depends(require("complaints", "view"))])
+async def complaint_pdf(complaint_id: Id, db: DbSession, caller: CallerDep) -> Envelope[PdfLink]:
+    """A ten-minute link to the complaint as a PDF (FS-074), made now from what you
+    can see: open it in a new tab, do not fetch it with the bearer token. Only when
+    `pdf_state` is `ready`; `404` otherwise. A dealer's copy leaves out what the
+    dealer's page leaves out, and nobody's copy carries internal notes. `503 busy`:
+    try again in a few seconds."""
+    from api.services import complaint_pdf
+    return Envelope(data=await complaint_pdf.pdf_link(
+        db, caller, complaint_id, get_storage(get_settings(), bounded=True)))
 
 
 # ── attachments (ADR-041) ────────────────────────────────────────────────────

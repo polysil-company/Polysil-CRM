@@ -229,6 +229,13 @@ async def _rows(db: AsyncSession, where: str, params: dict[str, Any]) -> list[An
                                   params)).all())
 
 
+def pdf_state(complaint_no: str | None, status: str) -> sch.PdfState:
+    """FS-074 rule 1: a numbered complaint that is not a draft. A draft cancelled
+    before it was ever submitted has no number (EC-5); a returned one is a draft
+    again (EC-10, GAP-526)."""
+    return "ready" if complaint_no and status != "draft" else "none"
+
+
 async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> sch.Complaint:
     rows = await _rows(db, "c.id = CAST(:id AS uuid)", {"id": complaint_id})
     if not rows:
@@ -314,7 +321,7 @@ async def get_complaint(db: AsyncSession, caller: Caller, complaint_id: str) -> 
         else r.resolution_escalated_at.isoformat(),
         can=await _can(db, caller, r),
         created_at=r.created_at.isoformat(), updated_at=r.updated_at.isoformat(),
-        submitted_at=_iso(r.submitted_at))
+        submitted_at=_iso(r.submitted_at), pdf_state=pdf_state(r.complaint_no, r.status_text))
 
 
 async def _remedy(db: AsyncSession, complaint_id: str, portal: bool) -> sch.Remedy | None:
@@ -422,7 +429,8 @@ async def list_complaints(db: AsyncSession, caller: Caller, *, status: list[str]
         owner=names.user(r.owner_user_id, r.owner_name), first_submitted_at=_iso(r.first_submitted_at),
         breached=(domain.breached(r.response_due_at, r.responded_at, now)
                   or domain.breached(r.resolution_due_at, r.resolved_at, now)),
-        created_at=r.created_at.isoformat()) for r in rows],
+        created_at=r.created_at.isoformat(),
+        pdf_state=pdf_state(r.complaint_no, r.status_text)) for r in rows],
         meta=PageMeta(limit=limit, next_cursor=next_cursor))
 
 
@@ -864,9 +872,13 @@ async def timeline(db: AsyncSession, caller: Caller, complaint_id: str, *, limit
         "SELECT e.id, e.kind, e.occurred_at, e.actor_id, e.payload, u.full_name FROM activity_event e "
         "LEFT JOIN app_user u ON u.id = e.actor_id "
         "WHERE e.entity_type = 'complaint' AND e.entity_id = CAST(:c AS uuid) "
+        # FS-074 EC-1: a dealer never sees an escalation, as the detail already hides
+        # its times. In SQL, so a page is never short with a cursor still to follow.
+        "AND NOT (CAST(:portal AS boolean) AND e.kind = 'complaint.escalated') "
         "AND (CAST(:bat AS timestamptz) IS NULL OR (e.occurred_at, e.id) < (CAST(:bat AS timestamptz), CAST(:bid AS uuid))) "
         "ORDER BY e.occurred_at DESC, e.id DESC LIMIT :lim"),
-        {"c": complaint_id, "bat": before_at, "bid": before_id, "lim": limit + 1})).all()
+        {"c": complaint_id, "bat": before_at, "bid": before_id, "lim": limit + 1,
+         "portal": portal})).all()
     next_cursor = None
     if len(rows) > limit:
         rows = rows[:limit]

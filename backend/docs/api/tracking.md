@@ -123,6 +123,48 @@ config names.
 
 ---
 
+## `POST /api/v1/tracking/device-token`
+
+**Device Token**
+
+A token for the app's background service, so points upload while the app is
+closed. Call it after duty start and every time the app opens while a duty is
+open, one call at a time, and hand the last answer to the native service. A new
+one for the same device replaces the old. It works only on POST /locations/batch,
+POST /tracking/duty/end and GET /me/tracking-config; every other signed-in route
+answers `403 device_token_not_allowed`. On `401` or any `403` with it, keep the
+points and wait for the app to open. A replay of the same key answers
+`409 idempotency_replay_unavailable`: the token is never stored, so retry with a
+new key. `401`: the session ended meanwhile.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`DeviceTokenIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `device_id` | string | yes | The app install's own id. The same for every request from one install. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `201` | `Envelope_DeviceToken_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | This role does not track. |
+| `404` | `ErrorResponse` | Not yours, or not in your team. |
+| `409` | `ErrorResponse` | See `code`. Never retry a 4xx under the same key. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
 ## `POST /api/v1/tracking/duty/end`
 
 **Duty End**
@@ -608,6 +650,21 @@ the bearer token.
 | `accepted_version` | string \| null | yes | The newest version this user accepted and did not withdraw. Null when none. |
 | `text` | string | yes | What the consent screen shows. |
 
+**`DeviceToken`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `token` | string \| null | yes | pdt_ and 43 more characters. Shown once: the server keeps only its hash. Send it as `Authorization: Bearer` on POST /locations/batch, POST /tracking/duty/end and GET /me/tracking-config, and nowhere else. |
+| `user_id` | string | yes | Whose token it is. Send a person's points only with their own token. |
+| `device_id` | string | yes |  |
+| `expires_at` | string | yes | 30 days from now. It dies earlier on sign-out, sign out everywhere, deactivation, a password reset, or a newer token for this device. |
+
+**`DeviceTokenIn`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `device_id` | string | yes | The app install's own id. The same for every request from one install. |
+
 **`DocRef`**
 
 | Field | Type | Required | Notes |
@@ -665,6 +722,12 @@ the bearer token.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | Consent | yes |  |
+
+**`Envelope_DeviceToken_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | DeviceToken | yes |  |
 
 **`Envelope_Duty_`**
 

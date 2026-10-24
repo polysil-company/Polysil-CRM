@@ -32,6 +32,7 @@ from api.errors import (
     ForbiddenError,
     NotFoundError,
     ServiceUnavailableError,
+    UnauthenticatedError,
     ValidationFailed,
 )
 from api.schemas import tracking as sch
@@ -739,3 +740,18 @@ async def view_log(db: AsyncSession, *, subject_user_id: str | None, limit: int,
             what=r.what, viewed_date=None if r.viewed_date is None else r.viewed_date.isoformat(),
             viewed_at=r.viewed_at.isoformat()) for r in page],
         meta=PageMeta(limit=limit, next_cursor=next_cursor))
+
+
+# ── FS-072: the device token ────────────────────────────────────────────────
+
+async def issue_device_token(db: AsyncSession, caller: Caller, *, session_id: str, token_version: int,
+                             device_id: str, token_hash: str, ttl: dt.timedelta) -> sch.DeviceToken:
+    """The definer checks the session and the version under the family lock, and
+    returns null when either moved: that is a 401, as an expired access token."""
+    expires = (await db.execute(text(
+        "SELECT tracking_device_token_issue(CAST(:s AS uuid), :tv, :d, :h, :ttl)"),
+        {"s": session_id, "tv": token_version, "d": device_id, "h": token_hash, "ttl": ttl})).scalar_one()
+    if expires is None:
+        raise UnauthenticatedError()
+    return sch.DeviceToken(token=None, user_id=caller.user_id, device_id=device_id,
+                           expires_at=expires.isoformat())

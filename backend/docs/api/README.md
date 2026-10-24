@@ -11,7 +11,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Assistant | 2 | [`assistant.md`](assistant.md) |
 | Auth | 7 | [`auth.md`](auth.md) |
 | Campaigns | 5 | [`campaigns.md`](campaigns.md) |
-| Complaints | 22 | [`complaints.md`](complaints.md) |
+| Complaints | 23 | [`complaints.md`](complaints.md) |
 | Customers | 4 | [`customers.md`](customers.md) |
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
 | Dealer Applications | 22 | [`dealer-applications.md`](dealer-applications.md) |
@@ -20,7 +20,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Documents | 6 | [`documents.md`](documents.md) |
 | Holidays | 3 | [`holidays.md`](holidays.md) |
 | Imports | 6 | [`imports.md`](imports.md) |
-| Leads | 20 | [`leads.md`](leads.md) |
+| Leads | 21 | [`leads.md`](leads.md) |
 | Lookups | 25 | [`lookups.md`](lookups.md) |
 | Marketing Material | 11 | [`marketing-material.md`](marketing-material.md) |
 | Messages | 12 | [`messages.md`](messages.md) |
@@ -49,7 +49,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Targets | 3 | [`targets.md`](targets.md) |
 | Tasks | 14 | [`tasks.md`](tasks.md) |
 | Territories | 4 | [`territories.md`](territories.md) |
-| Tracking | 16 | [`tracking.md`](tracking.md) |
+| Tracking | 17 | [`tracking.md`](tracking.md) |
 | Users | 10 | [`users.md`](users.md) |
 | Warranty | 3 | [`warranty.md`](warranty.md) |
 

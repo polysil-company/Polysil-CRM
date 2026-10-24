@@ -16,54 +16,15 @@ Rendered when asked, in the API, not stored (spec section 5, plan review R-5):
 from __future__ import annotations
 
 import asyncio
-import base64
-import functools
-import pathlib
 import re
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-
 from api.config import get_settings
 from api.errors import ServiceUnavailableError
-from api.pdf import render_pdf, renderer_available
-
-TEMPLATES = pathlib.Path(__file__).resolve().parents[1] / "templates"
-LOGO = pathlib.Path(__file__).resolve().parents[2] / "worker" / "templates" / "assets" / "polysil-logo.png"
-MAX_RENDERS = 2
-
-_env = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=select_autoescape(["html"]),
-                   trim_blocks=True, lstrip_blocks=True)
-_active = 0
-
-
-@functools.cache
-def _logo() -> str:
-    return "data:image/png;base64," + base64.b64encode(LOGO.read_bytes()).decode("ascii")
-
-
-def logo_only_fetcher() -> Any:
-    """WeasyPrint's fetcher for the sheet: only the bundled logo, a data URI. Anything
-    else a firm's name or address might smuggle in is refused, and WeasyPrint draws
-    the page without it (E-12). WeasyPrint 70 takes a `URLFetcher` object and calls
-    it; older versions took a function (code review F-1)."""
-    import weasyprint
-
-    logo = _logo()
-    if hasattr(weasyprint, "URLFetcher"):
-        class _LogoOnly(weasyprint.URLFetcher):  # type: ignore[misc, name-defined, unused-ignore]
-            def fetch(self, url: str, headers: Any = None) -> Any:
-                if url != logo:
-                    raise ValueError("the data sheet fetches nothing but its logo")
-                return super().fetch(url, headers)
-        return _LogoOnly(allowed_protocols={"data"})
-
-    def legacy(url: str) -> Any:  # pragma: no cover - WeasyPrint before URLFetcher
-        if url != logo:
-            raise ValueError("the data sheet fetches nothing but its logo")
-        return weasyprint.default_url_fetcher(url)
-    return legacy
+from api.pdf import env as _env
+from api.pdf import logo as _logo
+from api.pdf import logo_only_fetcher, render_pdf, render_slot, renderer_available
 
 
 def _money(v: Any) -> str:
@@ -149,19 +110,13 @@ def filename(label: str) -> str:
 async def render(app: dict[str, Any] | None, *, partner_type: str) -> tuple[bytes, str]:
     """(body, content type). `pdf_renderer = "html"` answers the HTML, for a box
     without the renderer's libraries, as the quotation does."""
-    global _active
     page = html(app, partner_type=partner_type)
     if get_settings().pdf_renderer == "html":
         return page.encode("utf-8"), "text/html; charset=utf-8"
     if renderer_available():
         raise ServiceUnavailableError("PDFs cannot be made right now.", code="pdf_unavailable")
-    if _active >= MAX_RENDERS:
-        raise ServiceUnavailableError("Busy making other PDFs. Try again in a moment.", code="busy")
-    _active += 1
-    try:
+    with render_slot():
         return await asyncio.to_thread(render_pdf, page, logo_only_fetcher()), "application/pdf"
-    finally:
-        _active -= 1
 
 
 _blank: dict[str, tuple[bytes, str]] = {}
