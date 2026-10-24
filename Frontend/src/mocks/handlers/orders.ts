@@ -738,10 +738,7 @@ function createDirect(
       address: body.party.address ?? null,
       gstin: body.party.gstin ?? null,
     },
-    partner:
-      body.partner_id != null && partner != null && partner.id === body.partner_id
-        ? { id: partner.id, name: partner.name, partner_type: partner.partner_type }
-        : null,
+    partner: orderPartner(body.partner_id, partner),
     placeOfSupply: { id: place.id, name: place.name, level: place.level },
     owner: { id: me.id, full_name: me.full_name },
     ownerOrgUnit: lead?.owner_org_unit ??
@@ -777,6 +774,24 @@ function createDirect(
   mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
   recordOrderEvent(order, "order.created", {});
   return HttpResponse.json({ data: settle(order) }, { status: 201 });
+}
+
+/**
+ * The partner a direct order names: the lead's own, or (SO-012) any dealer or distributor staff
+ * pick, as the backend allows. Unknown ids price as a direct sale.
+ */
+function orderPartner(
+  partnerId: string | null | undefined,
+  leadPartner: { id: string; name: string; partner_type: string } | null | undefined,
+): { id: string; name: string; partner_type: string } | null {
+  if (partnerId == null) return null;
+  if (leadPartner != null && leadPartner.id === partnerId) {
+    return { id: leadPartner.id, name: leadPartner.name, partner_type: leadPartner.partner_type };
+  }
+  const picked = mockDb.partners.find((item) => item.id === partnerId);
+  return picked === undefined
+    ? null
+    : { id: picked.id, name: picked.name, partner_type: picked.partner_type };
 }
 
 export const orderHandlers = [

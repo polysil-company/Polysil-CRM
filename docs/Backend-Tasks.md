@@ -124,6 +124,12 @@ in the same shape. Never renumber or reuse a number.
 - [ ] **BE-037** · Decide: may a state manager delete leads? The test box grants it; RBAC.md and the mock don't · LEAD-011, LEAD-019 · normal
 - [ ] **BE-038** · Decide: may a dispatch take a warehouse's stock below zero? · DISP-002, MSTR-015 · normal
 
+**Dealers and their employees** — the client's ask of 24 Oct. The questions are in the client document *Polysil CRM — Employees on dealers* (24 Oct); each item says whether it can start before the answers.
+
+- [ ] **BE-039** · A quotation for a dealer or distributor, with no farmer's lead · QUOT-004, QUOT-006 · high · **can start now**
+- [ ] **BE-040** · The employee(s) who look after a dealer or distributor · CHNL-001 · high · **the link can start now; what it grants waits on the client**
+- [ ] **BE-041** · An employee's leads go to their dealer when the employee leaves · ADMN-004, LEAD-008 · normal · **waits on the client**
+
 ---
 
 ## Details
@@ -796,5 +802,52 @@ in the same shape. Never renumber or reuse a number.
 - **Why:** stock below zero means the books and the warehouse disagree.
 - **Done when:** the rule is decided. If dispatches must not take stock below zero:
   `409 insufficient_stock` on the dispatch, and the frontend shows it.
+- **Done in:** —
+- **Backend notes:** —
+
+
+### BE-039 · A quotation for a dealer or distributor, with no farmer's lead
+
+- **Status:** ⬜ Open · **can start now**
+- **Asked:** 24 Oct 2026 · QUOT-004, QUOT-006 · the client: "employees can't process existing dealers' and distributors' quotations"
+- **What:**
+  - Today `POST /quotations` needs a `lead_id`: every quotation is a farmer's. The client needs quotations where **the dealer is the buyer**, buying stock, with no farmer involved.
+  - Proposed: `lead_id` optional on `POST /quotations` when `partner_id` is given, for staff with `quotations.create`.
+    - The party defaults from the partner record (name, mobile, address, GSTIN), and the place of supply from its territory. Both can be overridden, as today.
+    - Priced at the partner's tier, as today with `partner_id`.
+  - Send (`channel: whatsapp`), PDF, approval and "Place order" behave as for a lead's quotation. The order from it has the dealer as the party, as SO-011 does.
+  - Lists and filters (`GET /quotations?partner_id=`) need to work without a lead; the lead column is empty.
+- **Why it can start now:** the client's open questions 6 and 7 (approvals, delivery address) only change defaults. The defaults above match how orders already work.
+- **Done when:** it is in `quotations.md`. The frontend then adds "New quotation for a dealer", reusing the dealer picker built for SO-012.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-040 · The employee(s) who look after a dealer or distributor
+
+- **Status:** ⬜ Open · **the link can start now; what it grants waits on the client**
+- **Asked:** 24 Oct 2026 · CHNL-001 · the client: "there is no employee selection in dealer, need to add employees in dealer"
+- **What:**
+  - **Can start now:**
+    - Store which staff users look after each partner, allowing **several per partner**. That covers either answer to question 1.
+    - Read it on `GET /partners/{id}` and the list, and set it on `POST` and `PATCH /partners`.
+    - Filter `GET /partners?employee_id=` and `GET /lookups/partners?mine=true`, for "my dealers".
+  - **Waits on the client** (questions 2–5): whether a sub-dealer follows its dealer's employee; who may set it (Admin only, or managers too); what it grants (the dealer's orders, payments, ledger and credit); and whether only the assigned employee may make the dealer's quotations and orders.
+- **Done when:** the link is in `partners.md`. The frontend adds the field to the partner form and "My dealers". The rules follow the client's answers.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-041 · An employee's leads go to their dealer when the employee leaves
+
+- **Status:** ⬜ Open · **waits on the client**
+- **Asked:** 24 Oct 2026 · ADMN-004, LEAD-008 · agreed with the client earlier; questions 8–11 of the client document
+- **What:**
+  - Today `POST /users/{id}/handover` moves a leaver's open leads to another **employee**.
+  - The client wants them to go to **the leaver's dealer** (BE-040), who then handles them.
+  - Open:
+    - which dealer, when the employee had several (the lead's own partner, one the admin picks, or one in the lead's area);
+    - leads with no dealer to go to: the manager?
+    - does the dealer become the owner, or do the leads wait for a new employee;
+    - automatic on deactivation, or the admin's choice each time.
+- **Done when:** the client answers, and the rule is in `users.md`.
 - **Done in:** —
 - **Backend notes:** —

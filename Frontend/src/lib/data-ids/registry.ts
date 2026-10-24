@@ -605,6 +605,14 @@ export const DATA_IDS = {
     notes:
       "422 `quotations_disagree` names the field; 409 `quotation_on_order` names the quotation.",
   },
+  "SO-012": {
+    domain: "SO",
+    title:
+      "An order for a dealer or distributor, typed in by staff: the dealer picked, their rates and details (`POST /orders` with `partner_id`)",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lookups/partners", "GET /partners/{partnerId}", "POST /orders"],
+  },
   "APPR-001": {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",
