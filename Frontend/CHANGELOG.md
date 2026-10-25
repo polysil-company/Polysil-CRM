@@ -7,11 +7,12 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-113 changes, newest first. Each title opens its entry.
+114 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
 | 2026-10-25 | [Restore a deleted lead](changelog/entries/2026-10-25--feature--LEAD-020--restore-a-deleted-lead.md) | `feature` | `LEAD-020` `LEAD-019` `RPT-001` |
+| 2026-10-25 | [An HSN test that raced a leftover toast](changelog/entries/2026-10-25--test--MSTR-005--an-hsn-test-that-raced-a-leftover-toast.md) | `test` | `MSTR-005` |
 | 2026-10-24 | [An order for a dealer or distributor, typed in by staff](changelog/entries/2026-10-24--feature--SO-012--an-order-for-a-dealer-or-distributor-typed-in-by-staff.md) | `feature` | `SO-012` `LEAD-008` |
 | 2026-10-23 | [Live test of the staging app: an issue report and a client walkthrough](changelog/entries/2026-10-23--docs--APP-008--live-test-of-the-staging-app-report-and-walkthrough.md) | `docs` | `APP-008` |
 | 2026-10-23 | [Fixes from the live test](changelog/entries/2026-10-23--fix--APP-009--fixes-from-the-live-test.md) | `fix` | `APP-009` `QUOT-004` `APPR-002` `MSTR-004` `BOT-001` |
@@ -181,6 +182,40 @@ Two answers from the live test also waited on the backend:
 - "neither offered nor shown" now signs in as a District Manager, who may not delete.
 
 **`lead-assign.test.tsx`:** mocks `next/navigation`. These tests sign in as a State Manager, whose lead page now has Delete, which uses the router.
+
+### An HSN test that raced a leftover toast
+
+`test` · `MSTR-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-25--test--MSTR-005--an-hsn-test-that-raced-a-leftover-toast.md)
+
+#### Before
+
+"Creates the product, then sets its HSN" (PR #191) failed in CI on #208, and the next test failed after it.
+
+- The test waited for the "Product added" toast, then checked that both calls had gone.
+- Sonner keeps toasts in a module store across tests, so the earlier "adds a product" test's toast was already on screen. The check ran before this test's HSN call had started.
+- That late call was then caught by the next test's call recorder. This is the same cause as SCHM-002 (#203).
+
+#### Now
+
+The test waits on what it checks:
+
+- both calls;
+- the HSN saved in the mock;
+- the row's "No HSN" badge gone.
+
+No screen code changes.
+
+#### Discussion
+
+A shared fix, clearing sonner's store after every test, would touch every toast test. Waiting on the outcome is local and matches #203.
+
+#### Files changed
+
+- `src/features/products/components/products-ui.test.tsx`
+
+#### Tests
+
+The file's 23 tests pass. The failure only shows under CI load: the CI log of #208's second run showed `[POST]` without the `PUT`, and the next test caught the leftover `PUT`.
 
 ## 24 October 2026
 
