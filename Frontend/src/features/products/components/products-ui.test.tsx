@@ -194,13 +194,20 @@ describe("[MSTR-005] A new product's HSN code", () => {
     await user.type(within(dialog).getByLabelText("HSN code (optional)"), "84248200");
     await user.click(within(dialog).getByRole("button", { name: "Add the product" }));
 
-    expect(await screen.findByText("Product added")).toBeInTheDocument();
-    expect(calls).toEqual(["POST /api/v1/products", "PUT /api/v1/products/:id/hsn"]);
+    // Wait on the calls, not the toast: sonner keeps the earlier test's "Product added" in its
+    // module store, so the text can be found before this test's HSN call has gone.
+    await waitFor(() => {
+      expect(calls).toEqual(["POST /api/v1/products", "PUT /api/v1/products/:id/hsn"]);
+    });
+    await waitFor(() => {
+      expect(
+        mockDb.products.find((item) => item.description === "ONLINE DRIPPER 4 LPH")?.hsn_code,
+      ).toBe("84248200");
+    });
     const row = await screen.findByRole("button", { name: /^ONLINE DRIPPER 4 LPH/ });
-    expect(within(row).queryByText("No HSN")).not.toBeInTheDocument();
-    expect(
-      mockDb.products.find((item) => item.description === "ONLINE DRIPPER 4 LPH")?.hsn_code,
-    ).toBe("84248200");
+    await waitFor(() => {
+      expect(within(row).queryByText("No HSN")).not.toBeInTheDocument();
+    });
   });
 
   it("makes only the product when no HSN is given, and names a bad code first", async () => {
