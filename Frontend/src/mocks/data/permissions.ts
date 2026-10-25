@@ -123,8 +123,13 @@ export function mockPermissionsFor(role: Role): MockModulePermission[] {
     case "employee":
       return fieldStaff("own");
     case "district_manager":
-    case "state_manager":
       return manager("org_subtree");
+    case "state_manager":
+      // RBAC.md §6.1: leads V:org CED, so a state manager also deletes and restores (BE-037).
+      return [
+        ...manager("org_subtree").filter((entry) => entry.module !== "leads"),
+        grant("leads", ["view", "create", "edit", "delete"], "org_subtree"),
+      ];
     case "regional_manager":
       // Regional Managers watch subsidy applications but don't change them (handover).
       return [

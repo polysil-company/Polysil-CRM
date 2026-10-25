@@ -278,5 +278,8 @@ export function seedDeletedLeads(leads: readonly LeadWire[]): LeadWire[] {
     id: mockUuid(MOCK_ID_SPACE.lead, 9001 + index),
     inquiry_no: `POL/GJ/2026-27/${String(9001 + index).padStart(5, "0")}`,
     duplicates: [],
+    // LEAD-020 · When and by whom, as the backend answers (BE-033).
+    deleted_at: `2026-10-${String(20 + index).padStart(2, "0")}T11:30:00+05:30`,
+    deleted_by: lead.owner,
   }));
 }

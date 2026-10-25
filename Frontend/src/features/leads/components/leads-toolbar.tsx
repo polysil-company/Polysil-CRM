@@ -87,7 +87,7 @@ export function LeadsToolbar(): React.JSX.Element {
         <Notice tone="info">
           <p>
             <span className="font-medium">Deleted leads.</span> Nobody without the right to delete
-            leads sees them. They can&apos;t be opened or brought back from here yet.
+            leads sees them. Restore one to open it again.
           </p>
         </Notice>
       ) : null}

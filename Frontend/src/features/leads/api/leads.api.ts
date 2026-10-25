@@ -196,6 +196,29 @@ export async function deleteLead({
   });
 }
 
+/**
+ * LEAD-020 · POST /leads/{id}/restore — bring a deleted lead back (BE-033, FS-073). Needs
+ * `leads.delete` and `leads.edit`. Its owner is kept, and the duplicate check runs again. A lead
+ * that isn't deleted comes back unchanged.
+ */
+export function restoreLead({
+  leadId,
+  idempotencyKey,
+}: {
+  leadId: string;
+  idempotencyKey: string;
+}): Promise<Lead> {
+  return apiRequest({
+    dataId: "LEAD-020",
+    logger: log,
+    fn: "restoreLead",
+    method: "POST",
+    path: `/leads/${encodeURIComponent(leadId)}/restore`,
+    idempotencyKey,
+    schema: leadResponseSchema,
+  });
+}
+
 /** LEAD-012 · GET /leads/duplicates — the review queue, newest first. */
 export function listDuplicates(
   cursor: string | null,

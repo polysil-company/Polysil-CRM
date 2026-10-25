@@ -12,9 +12,10 @@ import { TagList, toneForLabel } from "@/components/patterns/tag";
 import type { Lead } from "@/features/leads/api/leads.schemas";
 import { LEAD_COLUMN_META } from "@/features/leads/lib/lead-table-layout";
 import { LookupName } from "@/features/lookups/components/lookup-name";
-import { EMPTY_VALUE, formatInr } from "@/lib/format";
+import { EMPTY_VALUE, formatDate, formatInr } from "@/lib/format";
 
 import { LeadStageBadge } from "./lead-stage-badge";
+import { RestoreLeadButton } from "./restore-lead-button";
 
 const columnHelper = createDataTableColumnHelper<Lead>();
 
@@ -46,12 +47,19 @@ function LeadNameCell({ lead }: { lead: Lead }): React.JSX.Element {
 
 /**
  * LEAD-019 · A deleted lead's name, not a link: its page would offer edits and stage changes
- * on a lead nobody else can see, and the backend has no restore yet (BE-033).
+ * on a lead nobody else can see. Restore (LEAD-020) brings it back first.
  */
 function DeletedLeadNameCell({ lead }: { lead: Lead }): React.JSX.Element {
   return (
     <div className="flex min-w-0 flex-col">
       <LeadNameText lead={lead} />
+      {lead.deletedAt === null ? null : (
+        // LEAD-020 · When and by whom, from the backend (BE-033).
+        <span className="truncate text-xs text-subtle-foreground">
+          Deleted {formatDate(lead.deletedAt)}
+          {lead.deletedBy ? ` by ${lead.deletedBy.name}` : ""}
+        </span>
+      )}
     </div>
   );
 }
@@ -145,7 +153,7 @@ export const leadColumns = columnHelper.columns([
 
 /**
  * LEAD-019 · The deleted leads: the same columns, the selection column kept so the layout and
- * skeleton match, and names that are not links.
+ * skeleton match, names that are not links, and Restore at the end (LEAD-020).
  */
 export const deletedLeadColumns = columnHelper.columns([
   createSelectionColumn(columnHelper, (lead) => lead.customerName),
@@ -156,4 +164,10 @@ export const deletedLeadColumns = columnHelper.columns([
     meta: LEAD_COLUMN_META.customerName,
   }),
   ...detailColumns,
+  columnHelper.display({
+    id: "restore",
+    header: () => <span className="sr-only">Restore</span>,
+    cell: ({ row }) => <RestoreLeadButton lead={row.original} />,
+    meta: LEAD_COLUMN_META.restore,
+  }),
 ]);

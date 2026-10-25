@@ -20,6 +20,8 @@ export const LEAD_COLUMN_META = {
   owner: { width: "fill", hideBelow: "lg" },
   followUpAt: { width: "sm", hideBelow: "2xl" },
   estimatedValue: { width: "md", align: "end" },
+  /** LEAD-020 · Deleted leads only, so it isn't in the live list's skeleton. */
+  restore: { width: "sm", align: "end" },
 } as const satisfies Record<string, DataTableColumnMeta>;
 
 const COLUMN_ORDER = [

@@ -95,6 +95,10 @@ export const leadWireSchema = z.object({
   last_activity_at: isoDateTime,
   created_at: isoDateTime,
   created_by: userRefSchema.nullable(),
+  /** LEAD-020 · When a deleted lead was deleted (FS-073); only `leads.delete` holders see it. */
+  deleted_at: isoDateTime.nullish(),
+  /** LEAD-020 · Who deleted it, from the timeline; null on a live lead. */
+  deleted_by: userRefSchema.nullish(),
   /**
    * LEAD-015 · Only on the answer that wins a dealership lead (FS-053): the dealer application
    * it started and the link to send the applicant, shown once; or why none was started.
@@ -173,6 +177,8 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   lastActivityAt: wire.last_activity_at,
   createdAt: wire.created_at,
   createdBy: wire.created_by ? { id: wire.created_by.id, name: wire.created_by.full_name } : null,
+  deletedAt: wire.deleted_at ?? null,
+  deletedBy: wire.deleted_by ? { id: wire.deleted_by.id, name: wire.deleted_by.full_name } : null,
   dealerApplication: wire.dealer_application
     ? {
         id: wire.dealer_application.id,

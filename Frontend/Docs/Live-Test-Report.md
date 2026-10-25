@@ -21,11 +21,11 @@
 | 3 | Frontend: APP-009 | Approval limits opens, read-only, to whoever may approve |
 | 4 | Backend **BE-034**; frontend APP-009 | The pickers now say the list failed, with **Try again** |
 | 5 | Backend: **BE-034** | — |
-| 6 | Backend: **BE-036** | — |
+| 6 | Backend: **BE-036** (#206: counts follow-ups on leads only) | The card now reads "Overdue follow-ups on leads" (LEAD-020 PR) |
 | 7 | Frontend: APP-009 (wording); decision **BE-038** | "Warehouse short by 500 MTR" |
 | 8 | Frontend: APP-009 | A terms-only edit sends only the header |
 | 9 | Backend: **BE-034** | — |
-| 10 | Decision: **BE-037** | The screens follow `/auth/me` |
+| 10 | Decision: **BE-037** (#206: the State Manager may delete leads) | The screens follow `/auth/me`; the mock now grants it too |
 | 11 | Frontend: APP-009 | The first answer is highlighted; Enter opens it |
 | 12 | Frontend: APP-009 | The lists fit 1280–1760 px; optional columns appear from 1536 or 1760 px |
 | 13 | Frontend: APP-009 | The builder reads the freight the backend returns beside the totals |
