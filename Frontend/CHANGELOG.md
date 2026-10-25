@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-112 changes, newest first. Each title opens its entry.
+113 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-25 | [An HSN test that raced a leftover toast](changelog/entries/2026-10-25--test--MSTR-005--an-hsn-test-that-raced-a-leftover-toast.md) | `test` | `MSTR-005` |
 | 2026-10-24 | [An order for a dealer or distributor, typed in by staff](changelog/entries/2026-10-24--feature--SO-012--an-order-for-a-dealer-or-distributor-typed-in-by-staff.md) | `feature` | `SO-012` `LEAD-008` |
 | 2026-10-23 | [Live test of the staging app: an issue report and a client walkthrough](changelog/entries/2026-10-23--docs--APP-008--live-test-of-the-staging-app-report-and-walkthrough.md) | `docs` | `APP-008` |
 | 2026-10-23 | [Fixes from the live test](changelog/entries/2026-10-23--fix--APP-009--fixes-from-the-live-test.md) | `fix` | `APP-009` `QUOT-004` `APPR-002` `MSTR-004` `BOT-001` |
@@ -123,6 +124,42 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 25 October 2026
+
+### An HSN test that raced a leftover toast
+
+`test` · `MSTR-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-25--test--MSTR-005--an-hsn-test-that-raced-a-leftover-toast.md)
+
+#### Before
+
+"Creates the product, then sets its HSN" (PR #191) failed in CI on #208, and the next test failed after it.
+
+- The test waited for the "Product added" toast, then checked that both calls had gone.
+- Sonner keeps toasts in a module store across tests, so the earlier "adds a product" test's toast was already on screen. The check ran before this test's HSN call had started.
+- That late call was then caught by the next test's call recorder. This is the same cause as SCHM-002 (#203).
+
+#### Now
+
+The test waits on what it checks:
+
+- both calls;
+- the HSN saved in the mock;
+- the row's "No HSN" badge gone.
+
+No screen code changes.
+
+#### Discussion
+
+A shared fix, clearing sonner's store after every test, would touch every toast test. Waiting on the outcome is local and matches #203.
+
+#### Files changed
+
+- `src/features/products/components/products-ui.test.tsx`
+
+#### Tests
+
+The file's 23 tests pass. The failure only shows under CI load: the CI log of #208's second run showed `[POST]` without the `PUT`, and the next test caught the leftover `PUT`.
 
 ## 24 October 2026
 
