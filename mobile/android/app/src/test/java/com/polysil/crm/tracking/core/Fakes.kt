@@ -39,9 +39,9 @@ data class Sent(val body: String, val key: String, val token: String, val ids: L
 class ScriptedTransport(private val replies: MutableList<(Sent) -> TransportResponse?>) : BatchTransport {
     val sent = mutableListOf<Sent>()
 
-    override fun postBatch(body: String, idempotencyKey: String, accessToken: String): TransportResponse {
+    override fun postBatch(body: String, idempotencyKey: String, token: String): TransportResponse {
         val ids = Regex("\"id\":\"([^\"]+)\"").findAll(body).map { it.groupValues[1] }.toList()
-        val request = Sent(body, idempotencyKey, accessToken, ids)
+        val request = Sent(body, idempotencyKey, token, ids)
         sent += request
         val reply: (Sent) -> TransportResponse? =
             if (replies.isEmpty()) { sent -> okFor(sent) } else replies.removeAt(0)

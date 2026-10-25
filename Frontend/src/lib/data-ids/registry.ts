@@ -1785,7 +1785,17 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["POST /tracking/duty/start", "POST /tracking/duty/end", "POST /locations/batch"],
     notes:
-      "Capacitor shell (mobile/) plus our own Kotlin plugin: Fused location, a foreground service, Room, OkHttp, WorkManager. Uploads use the web session's token until BE-032 gives a device token.",
+      "Capacitor shell (mobile/) plus our own Kotlin plugin: Fused location, a foreground service, Room, OkHttp, WorkManager. Uploads use the phone's device token (TRK-009).",
+  },
+  "TRK-009": {
+    domain: "TRK",
+    title:
+      "The phone's device token, so the route uploads while the app is closed (`POST /tracking/device-token`)",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /tracking/device-token"],
+    notes:
+      "BE-032. Asked for after duty start and on every launch while a duty is open, one call at a time. The native side keeps it sealed with an Android Keystore key and sends it on batches; on 401 or any 403 it forgets it and keeps the points.",
   },
   "BOT-001": {
     domain: "BOT",
