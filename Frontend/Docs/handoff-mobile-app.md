@@ -73,7 +73,7 @@ interface TrackingPlugin {
   checkPermissions(): Promise<TrackingPermissions>;
   requestPermissions(): Promise<TrackingPermissions>; // fine location, then "all the time", notifications (13+)
   openBatterySettings(): Promise<void>; // ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-  setAccessToken(o: { token: string; expiresAt: string }): Promise<void>; // the web app calls this after each sign-in or refresh
+  setDeviceToken(o: { token: string; expiresAt: string; userId: string }): Promise<void>; // TRK-009: the device token (BE-032); empty forgets it
   start(o: StartOptions): Promise<void>; // dutyId, intervalSeconds, distanceFilterM, maxBatchPoints, apiBaseUrl
   stop(): Promise<void>;
   flush(): Promise<FlushResult>; // upload now: { accepted, duplicates, rejected, pending }
@@ -127,6 +127,8 @@ interface TrackingPlugin {
 8. **Reboot:** a `BOOT_COMPLETED` receiver restarts the service if a duty is still open. Android allows this only with background location, which step 2 requires.
 
 ## Sign-in in the background: BE-032
+
+> **Done (TRK-009, 25 Oct 2026):** the backend shipped the device token in #206, and the app uses it. `setAccessToken` and the session-token hand-off are gone. What follows is the history.
 
 - **The problem:** the web app's access token lives only in memory and lasts 15 minutes. The refresh cookie rotates, so the native code **must not** refresh it itself: two refreshers trigger `refresh_reused`, which signs the person out everywhere.
 - **Until BE-032 lands:**

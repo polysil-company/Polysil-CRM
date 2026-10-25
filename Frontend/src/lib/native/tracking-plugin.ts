@@ -24,8 +24,16 @@ export interface PolysilTrackingPlugin {
   requestPermissions(): Promise<unknown>;
   openBatterySettings(): Promise<void>;
   openSettings(options: { readonly which: "app" | "location" }): Promise<void>;
-  /** Only `lib/auth/session-store.ts` calls this: the one place a token leaves the API client. */
-  setAccessToken(options: { readonly token: string; readonly expiresAt: string }): Promise<void>;
+  /**
+   * TRK-009 · The device token (BE-032); an empty token forgets it. Only
+   * `features/tracking/native/device-token.ts` calls this. The session's own token never leaves
+   * the API client.
+   */
+  setDeviceToken(options: {
+    readonly token: string;
+    readonly expiresAt: string;
+    readonly userId: string;
+  }): Promise<void>;
   start(options: NativeStartOptions): Promise<void>;
   stop(): Promise<void>;
   flush(): Promise<unknown>;
@@ -66,7 +74,7 @@ const webTracker: PolysilTrackingPlugin = {
     }),
   openBatterySettings: () => Promise.resolve(),
   openSettings: () => Promise.resolve(),
-  setAccessToken: () => Promise.resolve(),
+  setDeviceToken: () => Promise.resolve(),
   start: () => Promise.resolve(),
   stop: () => Promise.resolve(),
   flush: () => Promise.resolve({ accepted: 0, duplicates: 0, rejected: 0, pending: 0 }),

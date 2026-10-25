@@ -78,6 +78,18 @@ export function openPhoneSettings(which: "app" | "location"): Promise<void> {
   return PolysilTracking.openSettings({ which });
 }
 
+/** TRK-009 · What the native uploader needs of a device token. */
+export interface NativeDeviceToken {
+  readonly token: string;
+  readonly expiresAt: string;
+  readonly userId: string;
+}
+
+/** TRK-009 · Hands the device token to the native uploader, which keeps it sealed on the phone. */
+export function handDeviceTokenToNative(token: NativeDeviceToken): Promise<void> {
+  return PolysilTracking.setDeviceToken(token);
+}
+
 export function startNativeTracking(options: NativeStartOptions): Promise<void> {
   return PolysilTracking.start(options);
 }

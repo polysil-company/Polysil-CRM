@@ -51,7 +51,8 @@ Open **Duty** from the menu. Each card that shows is one thing to do; **Go on du
   - Capacitor 8.5.3 and its template's Android Gradle Plugin 8.13.0, Gradle 8.14.3, SDK 36, minimum Android 7 (API 24).
   - Kotlin 2.4.21, KSP 2.3.12.
   - Play Services Location 21.4.0, Room 2.8.4, WorkManager 2.11.2, OkHttp 5.3.2, kotlinx-serialization-json 1.12.0.
-- **Waiting on BE-032 (a device token):** the native side uploads with the web session's access token, handed over by `Frontend/src/lib/auth/session-store.ts`, until that token expires.
-  - Points then wait on the phone, nothing is lost, and they go up when the app is next opened.
-  - Until BE-032 lands, the team map shows staff as stale while the app is closed.
-  - Once it lands, Duty requests the device token at start and keeps it in encrypted storage.
+- **The device token (TRK-009, BE-032):** the native side uploads with a token of its own, so points go up while the app is closed.
+  - The screens ask for it (`POST /tracking/device-token`) after duty start and on every launch while a duty is open, one call at a time, and hand it over with `setDeviceToken`.
+  - `DeviceTokenStore.kt` keeps it sealed with AES-GCM under an Android Keystore key. The backend suggested `EncryptedSharedPreferences`, which androidx.security has deprecated; its reference points to the Keystore, used here directly with no extra library.
+  - It lasts 30 days, and only while the sign-in it came from lives. On `401` or any `403` the native side forgets it and keeps every point. They go up once the app is opened and hands over a new one.
+  - One person per phone (client question 9.5): a new token for this phone replaces anyone else's.

@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
+import type { DeviceTokenWire } from "@/features/tracking/api/duty.schemas";
 import { type VisitWire, VISIT_OUTCOMES } from "@/features/tracking/api/tracking.schemas";
 import {
   VISIT_PHOTO_MAX,
@@ -10,6 +11,7 @@ import {
   type VisitPageWire,
   type VisitPhotoWire,
 } from "@/features/tracking/api/visits.schemas";
+import { createRequestId } from "@/lib/api/request-id";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
 import { readMockRole } from "@/lib/dev/mock-settings";
@@ -58,6 +60,9 @@ function me(): { id: string; full_name: string; tracks: boolean } {
 function noTracking(): Response {
   return errorResponse(403, "forbidden", "This role does not track.");
 }
+
+/** How long a device token lasts (`device_token_ttl` on the backend). */
+const DEVICE_TOKEN_DAYS = 30;
 
 /** The config's batch limit, which the batch endpoint enforces. */
 const MAX_BATCH_POINTS = 500;
@@ -240,6 +245,30 @@ export const visitHandlers = [
       duties.map((item) => (item.id === duty.id ? ended : item)),
     );
     return HttpResponse.json({ data: ended });
+  }),
+
+  // TRK-009 · The phone's own token for background uploads (BE-032); shown once, 30 days.
+  http.post(buildApiUrl("/tracking/device-token"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const caller = me();
+    if (!caller.tracks) return noTracking();
+    const parsed = z.object({ device_id: z.string().min(1) }).safeParse(await request.json());
+    if (!parsed.success) {
+      return errorResponse(
+        422,
+        "validation_error",
+        "Some fields need correcting.",
+        fieldErrors(parsed.error.issues),
+      );
+    }
+    const token: DeviceTokenWire = {
+      token: `pdt_${createRequestId().replaceAll("-", "")}`,
+      user_id: caller.id,
+      device_id: parsed.data.device_id,
+      expires_at: new Date(Date.now() + DEVICE_TOKEN_DAYS * 86_400_000).toISOString(),
+    };
+    return HttpResponse.json({ data: token }, { status: 201 });
   }),
 
   // TRK-008 · The native uploader's batches: counted, duplicates, and points off any duty.

@@ -124,11 +124,31 @@ class UploaderTest {
     }
 
     @Test
-    fun `a 403 stops tracking`() {
+    fun `a 403 stops tracking and keeps the points and the key`() {
         val store = MemoryStore((1..2).map(::point))
-        val transport = ScriptedTransport(mutableListOf({ error(403, "forbidden") }))
-        assertEquals(UploadResult.Forbidden, uploader(store, MemoryLedger(), transport).uploadAll(500))
+        val ledger = MemoryLedger()
+        val transport = ScriptedTransport(mutableListOf({ error(403, "insufficient_permission") }))
+        assertEquals(UploadResult.Forbidden, uploader(store, ledger, transport).uploadAll(500))
         assertEquals(2, store.count())
+        // Refused before the server recorded the key: the same body goes again with a new token.
+        assertTrue(ledger.burned.isEmpty())
+        assertEquals(transport.sent.single().key, ledger.current?.key)
+    }
+
+    @Test
+    fun `after a 401 the same body goes again under the same key with the new token`() {
+        val store = MemoryStore((1..2).map(::point))
+        val ledger = MemoryLedger()
+        val transport = ScriptedTransport(mutableListOf({ error(401, "unauthenticated") }))
+        assertEquals(UploadResult.WaitingForToken, uploader(store, ledger, transport, token = "pdt_old").uploadAll(500))
+
+        val result = uploader(store, ledger, transport, token = "pdt_new").uploadAll(500)
+
+        assertEquals(UploadResult.Done(2, 0, 0), result)
+        assertEquals(transport.sent[0].key, transport.sent[1].key)
+        assertEquals(transport.sent[0].body, transport.sent[1].body)
+        assertEquals("pdt_new", transport.sent[1].token)
+        assertEquals(0, store.count())
     }
 
     @Test
