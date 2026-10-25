@@ -29,7 +29,7 @@ data class TransportResponse(val status: Int, val body: String)
 
 fun interface BatchTransport {
     @Throws(IOException::class)
-    fun postBatch(body: String, idempotencyKey: String, accessToken: String): TransportResponse
+    fun postBatch(body: String, idempotencyKey: String, token: String): TransportResponse
 }
 
 /** What an upload run ended with. */
@@ -37,7 +37,7 @@ sealed interface UploadResult {
     /** Every waiting point went (or nothing was waiting). */
     data class Done(val accepted: Int, val duplicates: Int, val rejected: Int) : UploadResult
 
-    /** No valid token, or a `401`: the points wait for the web app to hand over a new one. */
+    /** No usable device token, or a `401`: the points wait for the screens to hand over a new one. */
     data object WaitingForToken : UploadResult
 
     /** Offline, a timeout or a `5xx`: the same body goes again later, with backoff. */
@@ -46,7 +46,7 @@ sealed interface UploadResult {
     /** The server ended the duty: stop tracking. The batch's points are deleted first. */
     data class ServerEndedDuty(val endReason: String?) : UploadResult
 
-    /** `403`: this role doesn't track. Stop. */
+    /** Any `403`: this role doesn't track (now). Stop; the points and the batch's key are kept. */
     data object Forbidden : UploadResult
 
     /** `422 bad_clock`: the phone's clock is more than a day off. Say so; the key is used up. */
@@ -63,7 +63,9 @@ sealed interface UploadResult {
  *   `duty.ended_at` set: stop.
  * - `422 batch_too_large`: split, each part under its own key.
  * - `422 bad_clock`: tell the person.
- * - `401`: keep the points and wait for a new token. `403`: stop.
+ * - `401` or any `403` (contract §1 step 9): keep every point and the batch in flight, and wait
+ *   for a new device token. Both are refused before the server records the key, so the same body
+ *   may go again under it.
  * - Any other `4xx`: never retry under the same key. The key is recorded as used, and the next run
  *   halves the batch until the point at fault is alone; that point is then dropped, since the
  *   server will never take it.
@@ -76,8 +78,8 @@ class Uploader(
     private val deviceId: String,
     /** The phone's clock now, ISO 8601 with an offset: a batch's `sent_at`. */
     private val sentAt: () -> String,
-    /** A token that is still valid, or null. */
-    private val accessToken: () -> String?,
+    /** The device token while it is usable, or null. */
+    private val token: () -> String?,
 ) {
     fun uploadAll(maxBatchPoints: Int): UploadResult {
         require(maxBatchPoints > 0) { "maxBatchPoints must be above 0" }
@@ -87,11 +89,11 @@ class Uploader(
         var size = maxBatchPoints
         // A guard against a loop that never ends: every pass sends or deletes something.
         repeat(MAX_PASSES) {
-            val token = accessToken() ?: return UploadResult.WaitingForToken
+            val bearer = token() ?: return UploadResult.WaitingForToken
             val batch = ledger.inFlight() ?: nextBatch(size) ?: return UploadResult.Done(accepted, duplicates, rejected)
             ledger.setInFlight(batch)
             val response = try {
-                transport.postBatch(batch.body, batch.key, token)
+                transport.postBatch(batch.body, batch.key, bearer)
             } catch (error: IOException) {
                 return UploadResult.RetryLater(error.message ?: "network error")
             }
@@ -109,17 +111,15 @@ class Uploader(
                         return UploadResult.ServerEndedDuty(answer.dutyEndReason)
                     }
                 }
-                response.status == 401 -> {
-                    // Refused before the key was recorded: the same body may go again.
-                    return UploadResult.WaitingForToken
-                }
+                // Refused before the key was recorded: the same body may go again.
+                response.status == 401 -> return UploadResult.WaitingForToken
+                response.status == 403 -> return UploadResult.Forbidden
                 response.status >= 500 -> return UploadResult.RetryLater("server ${response.status}")
                 else -> {
                     ledger.setInFlight(null)
                     ledger.burn(batch.key)
                     val code = parseErrorCode(response.body)
                     when {
-                        response.status == 403 -> return UploadResult.Forbidden
                         code == "bad_clock" -> return UploadResult.BadClock
                         code == "batch_too_large" -> size = maxOf(1, batch.ids.size / 2)
                         else -> {

@@ -50,3 +50,26 @@ export interface DutyEndRequest {
   readonly lng: number;
   readonly accuracy_m: number | null;
 }
+
+/**
+ * TRK-009 · `POST /tracking/device-token` (BE-032, contract §1 step 3a): the phone's own token for
+ * location batches, duty end and the tracking config. 30 days, and only while this sign-in lives.
+ * `token` is shown once; the server keeps only its hash.
+ */
+const deviceTokenWireSchema = z.object({
+  token: z.string().startsWith("pdt_").nullable(),
+  user_id: z.string().min(1),
+  device_id: z.string().min(1),
+  expires_at: isoDateTime,
+});
+export type DeviceTokenWire = z.input<typeof deviceTokenWireSchema>;
+
+export const deviceTokenSchema = z
+  .object({ data: deviceTokenWireSchema })
+  .transform(({ data }) => ({
+    token: data.token,
+    userId: data.user_id,
+    deviceId: data.device_id,
+    expiresAt: data.expires_at,
+  }));
+export type DeviceToken = z.output<typeof deviceTokenSchema>;

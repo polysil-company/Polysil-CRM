@@ -11,13 +11,14 @@ import java.util.concurrent.TimeUnit
 
 /**
  * TRK-008 · `POST /locations/batch` from native code, never from the WebView: Android slows the
- * WebView's requests a few minutes after the app goes to the background.
+ * WebView's requests a few minutes after the app goes to the background. Sent with the device
+ * token (TRK-009), never the web session's.
  */
 internal class OkHttpTransport(private val apiBaseUrl: String) : BatchTransport {
-    override fun postBatch(body: String, idempotencyKey: String, accessToken: String): TransportResponse {
+    override fun postBatch(body: String, idempotencyKey: String, token: String): TransportResponse {
         val request = Request.Builder()
             .url("${apiBaseUrl.trimEnd('/')}/locations/batch")
-            .header("Authorization", "Bearer $accessToken")
+            .header("Authorization", "Bearer $token")
             .header("Idempotency-Key", idempotencyKey)
             .header("x-data-id", "TRK-008")
             .header("x-request-id", UUID.randomUUID().toString())

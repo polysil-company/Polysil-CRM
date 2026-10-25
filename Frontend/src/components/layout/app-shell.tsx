@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type * as React from "react";
 
+import { DeviceTokenOnLaunch } from "@/features/tracking/components/device-token-on-launch";
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut";
 
 import { AppHeader } from "./app-header";
@@ -57,6 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }): React.JSX
         </div>
       </div>
       <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} />
+      <DeviceTokenOnLaunch />
     </CommandMenuContext>
   );
 }
