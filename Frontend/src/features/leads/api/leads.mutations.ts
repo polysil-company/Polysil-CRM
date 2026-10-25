@@ -18,6 +18,7 @@ import {
   mergeLead,
   patchLead,
   reopenLead,
+  restoreLead,
   transitionLead,
   type AddLeadNoteInput,
   type AssignLeadInput,
@@ -168,6 +169,25 @@ export function useDeleteLead(): UseMutationResult<void, Error, Parameters<typeo
       queryClient.removeQueries({ queryKey: leadKeys.detail(leadId) });
       void queryClient.invalidateQueries({ queryKey: leadKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: leadKeys.stats() });
+      void queryClient.invalidateQueries({ queryKey: leadKeys.duplicates() });
+    },
+  });
+}
+
+/** LEAD-020 · Bring a deleted lead back: it leaves the deleted list and rejoins the leads. */
+export function useRestoreLead(): UseMutationResult<
+  Lead,
+  Error,
+  Parameters<typeof restoreLead>[0]
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...leadKeys.all, "restore"],
+    mutationFn: restoreLead,
+    meta: { dataId: "LEAD-020" },
+    onSuccess: (lead) => {
+      applyLeadChange(queryClient, lead);
+      // The duplicate pairs the delete closed are open again.
       void queryClient.invalidateQueries({ queryKey: leadKeys.duplicates() });
     },
   });

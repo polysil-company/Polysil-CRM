@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
 import type { LeadStage } from "@/features/leads/api/leads.schemas";
@@ -15,6 +15,9 @@ import { server } from "@/mocks/node";
 import { renderWithProviders } from "@/test/render";
 
 import { LeadDetail } from "./lead-detail";
+
+// A State Manager may delete leads (RBAC.md §6.1, BE-037), so the page's Delete needs a router.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), notFound: vi.fn() }));
 
 function leadAt(stage: LeadStage): (typeof mockDb.leads)[number] {
   const lead = mockDb.leads.find((item) => item.stage === stage && item.merged_into === null);

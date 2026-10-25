@@ -107,14 +107,15 @@ function DashboardContent({ data }: { data: Overview }): React.JSX.Element {
           footnote="Of the period's new leads, won now"
         />
         <StatCard
-          label="Overdue follow-ups"
+          label="Overdue follow-ups on leads"
           icon={Clock01Icon}
           value={formatNumber(figure(kpis.overdueFollowUps.value))}
           delta={overdue.delta}
           increaseIsGood={false}
           trend={overdue.trend}
-          trendLabel={describeTrend(overdue.trend, "Overdue follow-ups")}
-          footnote="Open tasks past their due date"
+          trendLabel={describeTrend(overdue.trend, "Overdue follow-ups on leads")}
+          // BE-036: the backend counts follow-ups on leads only, not every overdue task.
+          footnote="Lead tasks past their due date"
         />
       </section>
 

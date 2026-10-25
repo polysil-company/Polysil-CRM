@@ -365,9 +365,18 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     endpoints: ["GET /leads?deleted=true", "GET /leads/export?deleted=true"],
-    notes: "Read-only: no restore on the backend yet (BE-033).",
+    notes: "Restore on each row is LEAD-020 (BE-033).",
   },
-
+  "LEAD-020": {
+    domain: "LEAD",
+    title:
+      "Restore a deleted lead, and say when and by whom it was deleted (`POST /leads/{id}/restore`)",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{id}/restore"],
+    notes:
+      "BE-033, FS-073. On Deleted leads, for people who may delete and edit leads. The owner is kept; the duplicate check runs again.",
+  },
   "RPT-001": {
     domain: "RPT",
     title: "Dashboard overview — KPIs, pipeline, follow-ups, area by system, targets",
