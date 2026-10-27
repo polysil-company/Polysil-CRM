@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type * as React from "react";
 
-import { BrandMark } from "@/components/patterns/brand-mark";
+import { BrandLogo } from "@/components/patterns/brand-mark";
 
 export const metadata: Metadata = {
   // A customer link carries its secret in the path; never pass it on to another site.
@@ -20,8 +20,7 @@ export default function PublicLayout({
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <header className="mx-auto flex w-full max-w-lg items-center gap-2.5 px-4 py-5 sm:px-6">
-        <BrandMark className="size-8" />
-        <span className="text-sm font-semibold text-foreground">Polysil Irrigation</span>
+        <BrandLogo className="h-10" priority />
       </header>
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 sm:px-6">{children}</main>
       <footer className="px-4 py-6 text-center text-xs text-subtle-foreground">

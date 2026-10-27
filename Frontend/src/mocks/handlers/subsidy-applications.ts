@@ -458,7 +458,7 @@ function objectUrlOf(file: Blob): string {
   try {
     return URL.createObjectURL(file);
   } catch {
-    return "/icon.svg";
+    return "/icon.png";
   }
 }
 
@@ -959,7 +959,7 @@ export const subsidyApplicationHandlers = [
         : undefined;
     return HttpResponse.json({
       data: {
-        url: file === undefined ? "/icon.svg" : objectUrlOf(file),
+        url: file === undefined ? "/icon.png" : objectUrlOf(file),
         expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
       },
     });

@@ -39,11 +39,11 @@ const photoFiles = new Map<string, Blob>();
 
 function linkTo(photoId: string): string {
   const file = photoFiles.get(photoId);
-  if (file === undefined) return "/icon.svg";
+  if (file === undefined) return "/icon.png";
   try {
     return URL.createObjectURL(file);
   } catch {
-    return "/icon.svg";
+    return "/icon.png";
   }
 }
 
