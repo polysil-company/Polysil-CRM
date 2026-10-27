@@ -1,0 +1,22 @@
+# Duty · After 10 minutes in the background: the points went up without opening the app.
+appId: com.polysil.crm
+tags: [duty]
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "Sign in"
+    file: ../common/sign-in.yaml
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Duty"
+- extendedWaitUntil:
+    visible: "On duty since .*"
+    timeout: 30000
+- assertVisible: "Last upload"
+- assertNotVisible: "Not yet"
+# The calm "kept on the phone" notice means the device token is missing (TRK-009).
+- assertNotVisible: "Points are kept on the phone and go up the next time the app is open."
+- assertNotVisible: "Your role doesn't record a route, so duty has stopped."
+- takeScreenshot: 06-after-background

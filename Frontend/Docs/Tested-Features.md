@@ -86,6 +86,7 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-15--feature--A
 Details and tests: [foundation](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [sidebar and titles](../changelog/entries/2026-09-15--feature--APP-005--collapsible-sidebar-and-page-titles-in-the-top-bar.md).
 
 - **APP-001 · Navigation follows permissions.** The sidebar, command menu, sales tabs and "New lead" show only what the role may use. 🧪 🌐
+- **APP-010 · Polysil's logo** (from the quotation PDF's logo) on sign-in ([desktop, light](screenshots/brand/sign-in-desktop-light.jpg), [phone, dark](screenshots/brand/sign-in-phone-dark.jpg)) and the public pages, the leaf on a white tile in the sidebar ([desktop, dark](screenshots/brand/app-desktop-dark.jpg)) and the portal, the browser tab, and the Android app's icon and splash. Checked in the mock with Playwright, light and dark. 👀
 - **APP-005 · The sidebar collapses** to an icon rail on desktop (Ctrl/⌘ + B); the page title and description sit in the top bar. 🧪
 - **APP-001 · Command menu** opens and closes from the keyboard; light and dark themes. 🧪 🌐
 

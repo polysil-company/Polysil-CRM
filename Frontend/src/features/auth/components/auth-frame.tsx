@@ -1,6 +1,6 @@
 import type * as React from "react";
 
-import { BrandMark } from "@/components/patterns/brand-mark";
+import { BrandLogo } from "@/components/patterns/brand-mark";
 
 import { DripField } from "./drip-field";
 
@@ -13,12 +13,11 @@ export function AuthFrame({ children }: { children: React.ReactNode }): React.JS
   return (
     <div className="grid min-h-dvh bg-background lg:grid-cols-2">
       <main className="flex min-w-0 flex-col px-4 py-6 sm:px-10 sm:py-8">
-        <div className="flex items-center gap-2.5">
-          <BrandMark className="size-8" />
-          <div className="flex min-w-0 flex-col">
-            <span className="text-sm font-semibold text-foreground">Polysil</span>
-            <span className="text-xs text-muted-foreground">CRM & DMS</span>
-          </div>
+        <div className="flex items-center gap-3">
+          <BrandLogo className="h-11" priority />
+          <span className="border-l border-border pl-3 text-xs font-medium text-muted-foreground">
+            CRM & DMS
+          </span>
         </div>
         <div className="flex flex-1 items-center justify-center py-10">{children}</div>
         <p className="text-xs text-subtle-foreground">Polysil Irrigation · Vadodara, Gujarat</p>

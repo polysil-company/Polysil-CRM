@@ -1,0 +1,39 @@
+# Smoke · The main pages open from the phone menu (read only: nothing is created).
+appId: com.polysil.crm
+tags: [smoke]
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "Sign in"
+    file: ../common/sign-in.yaml
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Leads"
+- assertVisible: "Leads"
+- takeScreenshot: 03-leads
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Quotations"
+- assertVisible: "Quotations"
+- takeScreenshot: 03-quotations
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Sales orders"
+- assertVisible: "Sales orders"
+- takeScreenshot: 03-sales-orders
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Tasks"
+- assertVisible: "Tasks"
+- takeScreenshot: 03-tasks
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Visits"
+- assertVisible: "Visits"
+- takeScreenshot: 03-visits

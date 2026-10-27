@@ -420,7 +420,7 @@ function objectUrlOf(file: Blob): string {
   try {
     return URL.createObjectURL(file);
   } catch {
-    return "/icon.svg";
+    return "/icon.png";
   }
 }
 
@@ -1310,7 +1310,7 @@ export const complaintHandlers = [
     if (attachment === undefined) return errorResponse(404, "not_found", "No such file.");
     const file = mockDb.complaintFiles.get(attachment.id);
     // A seeded file has no bytes in the mock; a picture stands in for it.
-    const url = file === undefined ? "/icon.svg" : objectUrlOf(file);
+    const url = file === undefined ? "/icon.png" : objectUrlOf(file);
     return HttpResponse.json({
       data: { url, expires_at: new Date(Date.now() + 10 * 60_000).toISOString() },
     });

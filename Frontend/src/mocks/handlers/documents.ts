@@ -127,11 +127,11 @@ function live(): MockDocument[] {
 /** The uploaded file as a link; a stand-in where the runtime can't make one (jsdom), or seeded. */
 function linkFor(documentId: string): string {
   const file = mockDb.documentFiles.get(documentId);
-  if (file === undefined) return "/icon.svg";
+  if (file === undefined) return "/icon.png";
   try {
     return URL.createObjectURL(file);
   } catch {
-    return "/icon.svg";
+    return "/icon.png";
   }
 }
 
