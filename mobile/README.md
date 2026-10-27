@@ -45,6 +45,7 @@ Open **Duty** from the menu. Each card that shows is one thing to do; **Go on du
   cd android && ./gradlew lint test assembleDebug
   ```
 - **Release:** run **Actions → Android APK → Run workflow**. It builds `polysil-tracking-<version>.apk`, signed with the keystore from the repository secrets (`POLYSIL_KEYSTORE_BASE64`, `POLYSIL_KEYSTORE_PASSWORD`, `POLYSIL_KEY_ALIAS`, `POLYSIL_KEY_PASSWORD`).
+  - The APK is also published on the repo's **Releases** page: one release per version (tag `android-v<version>`), with an APK named for the site it opens, e.g. `polysil-tracking-0.1.1-crm.polysilirrigation.com.apk`. A build for another site adds its own APK to the same release; building the same version again replaces that APK.
   - The keystore never goes in the repository: `*.jks` and `*.keystore` are ignored.
   - Bump `versionCode` and `versionName` in `android/app/build.gradle` on every release.
 - **Logo (APP-010):** the launcher icons, splash screens and the web app's logo are drawn from the logo on the quotation PDFs (`backend/worker/templates/assets/polysil-logo.png`). Run `node mobile/scripts/make-brand-assets.mjs [logo.png]` from the repo root to redraw them all, for example when the client sends a sharper logo.
