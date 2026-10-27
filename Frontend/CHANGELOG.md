@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-115 changes, newest first. Each title opens its entry.
+116 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-26 | [Full product names in the product picker](changelog/entries/2026-10-26--fix--MSTR-003--full-product-names-in-the-product-picker.md) | `fix` | `MSTR-003` |
 | 2026-10-25 | [Restore a deleted lead](changelog/entries/2026-10-25--feature--LEAD-020--restore-a-deleted-lead.md) | `feature` | `LEAD-020` `LEAD-019` `RPT-001` |
 | 2026-10-25 | [The phone's own token for route uploads](changelog/entries/2026-10-25--feature--TRK-009--the-phone-s-own-token-for-route-uploads.md) | `feature` | `TRK-009` `TRK-008` |
 | 2026-10-25 | [An HSN test that raced a leftover toast](changelog/entries/2026-10-25--test--MSTR-005--an-hsn-test-that-raced-a-leftover-toast.md) | `test` | `MSTR-005` |
@@ -126,6 +127,39 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 26 October 2026
+
+### Full product names in the product picker
+
+`fix` · `MSTR-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-26--fix--MSTR-003--full-product-names-in-the-product-picker.md)
+
+#### Before
+
+The client asked for this on 26 Oct: "Quotation > Product drop down > full product name not displayed". The product list in the quotation builder was only as wide as the product field, about a third of the row. Each name was cut to one line with "…", so two sizes of one pipe could read alike. Once a product was chosen, the field cut its name off too.
+
+#### Now
+
+- **The list is wider than the field:** 32 rem on a desktop, never narrower than the field, and never past the screen's edge. On a phone it takes the screen's width.
+- **Names wrap** in the list instead of being cut off, and so do the unit, HSN and code beneath them.
+- **The chosen product's full name** shows in small text under the field, and the field's tooltip gives it too.
+- The complaint form uses the same picker, so it gets the same fix.
+
+#### Discussion
+
+- An input can't wrap its text, so the full name goes under the field rather than in it.
+- **Not done:** making the product column wider in the row. Quantity, three discounts and GST share the row, and wrapping the list fixes the ask without squeezing them.
+
+#### Files changed
+
+- `src/features/quotations/components/product-picker.tsx`: the list's width, wrapped names, and the full name under the field.
+- `src/features/quotations/components/product-picker.test.tsx` (new).
+- `Docs/Tested-Features.md`, `Docs/screenshots/quotations/product-picker-*.jpg`.
+
+#### Tests
+
+- `product-picker.test.tsx`: after choosing "EMITTING PIPE 16 MM 40 CM SPACING 2 LPH", the full name shows under the field, and the field's `title` carries it.
+- Checked in the mock with Playwright on a 1440 px desktop in light mode and a 360 px phone in dark mode. The screenshots are linked from `Tested-Features.md`.
 
 ## 25 October 2026
 
