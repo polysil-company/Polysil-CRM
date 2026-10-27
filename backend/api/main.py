@@ -123,7 +123,10 @@ def create_app() -> FastAPI:
         query = request.scope.get("query_string", b"").lower()
         raw_path = request.scope.get("raw_path", b"").lower()
         nul = b"%00" in query or b"%00" in raw_path or "\x00" in request.url.path
+        # A webhook keeps whatever the provider sent and strips NULs itself
+        # (FS-038): refusing it there would make the provider retry for ever.
         if not nul and request.method in ("POST", "PUT", "PATCH") and \
+                "/webhooks/" not in request.url.path and \
                 request.headers.get("content-type", "").startswith("application/json"):
             # Starlette caches the body, so the route reads it again for free.
             nul = _JSON_NUL.search(await request.body()) is not None
