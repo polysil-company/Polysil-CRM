@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-117 changes, newest first. Each title opens its entry.
+118 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-28 | [The APK on the Releases page](changelog/entries/2026-10-28--chore--TRK-008--the-apk-on-the-releases-page.md) | `chore` | `TRK-008` |
 | 2026-10-27 | [Polysil's logo everywhere, and phone tests with Maestro](changelog/entries/2026-10-27--feature--APP-010--polysil-s-logo-everywhere-and-phone-tests-with-maestro.md) | `feature` | `APP-010` `TRK-008` |
 | 2026-10-26 | [Full product names in the product picker](changelog/entries/2026-10-26--fix--MSTR-003--full-product-names-in-the-product-picker.md) | `fix` | `MSTR-003` |
 | 2026-10-25 | [Restore a deleted lead](changelog/entries/2026-10-25--feature--LEAD-020--restore-a-deleted-lead.md) | `feature` | `LEAD-020` `LEAD-019` `RPT-001` |
@@ -128,6 +129,40 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 28 October 2026
+
+### The APK on the Releases page
+
+`chore` · `TRK-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-28--chore--TRK-008--the-apk-on-the-releases-page.md)
+
+#### Before
+
+The signed APK was attached to its workflow run as a zipped artifact. To get it, you had to find the run, unzip the download, and fetch it again within 90 days.
+
+#### Now
+
+- Every signed build is also published on the repo's **Releases** page:
+  - one release per version, tagged `android-v<version>` and titled "Polysil app <version>";
+  - the APK is named for the site it opens, for example `polysil-tracking-0.1.1-crm.polysilirrigation.com.apk`.
+- **Another site:** a build for the test site adds its own APK to the same release, so it never replaces the client's.
+- **Same version again:** that APK is replaced.
+- The run's artifact stays as before.
+
+#### Discussion
+
+- **Write permission:** only the signed-release job may write to the repo's contents, which it needs to publish a release. Pull request builds stay read only.
+- **Private repo:** a release can only be downloaded by someone with access to the repo, as with the artifacts. Staff without GitHub still get the APK by WhatsApp or Drive.
+
+#### Files changed
+
+- `.github/workflows/android-apk.yml`: the release job's `contents: write` permission, the version as a step output, and the "Publish it as a release" step.
+- `mobile/README.md`: where to find releases.
+
+#### Tests
+
+- The workflow file parses as YAML.
+- The first run on `staging` publishes `android-v0.1.1`. Its result is noted in the pull request.
 
 ## 27 October 2026
 

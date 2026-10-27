@@ -2,7 +2,8 @@
 #
 # - On a pull request that touches mobile/: lint, unit tests and a debug APK.
 # - On demand (Actions → Android APK → Run workflow): a signed release APK,
-#   polysil-tracking-<version>.apk, attached to the run as an artifact.
+#   polysil-tracking-<version>.apk, attached to the run as an artifact and published as a
+#   GitHub Release (tag android-v<version>) to download from the repo's Releases page.
 #
 # The release keystore and its passwords live only in GitHub secrets and the owner's
 # password manager, never in the repository:
@@ -88,6 +89,9 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Only this job writes: it publishes the APK as a release. Pull request builds stay read only.
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: mobile
@@ -139,6 +143,7 @@ jobs:
           version=$(grep -oE 'versionName "[^"]+"' android/app/build.gradle | sed -E 's/versionName "([^"]+)"/\1/')
           cp android/app/build/outputs/apk/release/app-release.apk "polysil-tracking-${version}.apk"
           echo "file=polysil-tracking-${version}.apk" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Forget the keystore
         if: always()
@@ -149,3 +154,28 @@ jobs:
           name: ${{ steps.name.outputs.file }}
           path: mobile/${{ steps.name.outputs.file }}
           retention-days: 90
+
+      # One release per version. Its APK is named for the site it opens, so a build for the test
+      # site never replaces the client's. Building the same version again replaces that APK.
+      - name: Publish it as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.name.outputs.version }}
+          FILE: ${{ steps.name.outputs.file }}
+          SERVER_URL: ${{ inputs.server-url }}
+        run: |
+          host=$(printf '%s' "${SERVER_URL:-staging}" | sed -E 's#^https?://##; s#/.*$##')
+          asset="polysil-tracking-${VERSION}-${host}.apk"
+          cp "$FILE" "$asset"
+          tag="android-v${VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$asset" --clobber
+          else
+            gh release create "$tag" "$asset" \
+              --target "$GITHUB_SHA" \
+              --title "Polysil app ${VERSION}" \
+              --notes "Android APK ${VERSION}, built from \`${GITHUB_REF_NAME}\` (${GITHUB_SHA::7}) by run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}.
+
+          Each APK is named for the site it opens. Download the one for your site, open it on the phone, and allow installing from this source. Phones with an older version update in place."
+          fi
+          echo "::notice::Released ${asset} as ${tag}"
