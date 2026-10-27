@@ -36,6 +36,7 @@ Open **Duty** from the menu. Each card that shows is one thing to do; **Go on du
   - WorkManager as the backup when the network comes back.
 
   The upload rules live in plain Kotlin (`tracking/core/`) with JVM unit tests. The web side is `Frontend/src/features/tracking/native/` and the Duty screen.
+
 - **Which site it opens:** `CAP_SERVER_URL` when you run `npx cap sync android`; the staging web app without it. A production APK must set it. Only https, no cleartext, and navigation stays on that host. Capacitor documents `server.url` as meant for live reload; we use it on purpose so screen changes need no new APK.
 - **Build locally:** Node 24, JDK 21, the Android SDK (platform 36).
   ```bash
@@ -46,6 +47,8 @@ Open **Duty** from the menu. Each card that shows is one thing to do; **Go on du
 - **Release:** run **Actions → Android APK → Run workflow**. It builds `polysil-tracking-<version>.apk`, signed with the keystore from the repository secrets (`POLYSIL_KEYSTORE_BASE64`, `POLYSIL_KEYSTORE_PASSWORD`, `POLYSIL_KEY_ALIAS`, `POLYSIL_KEY_PASSWORD`).
   - The keystore never goes in the repository: `*.jks` and `*.keystore` are ignored.
   - Bump `versionCode` and `versionName` in `android/app/build.gradle` on every release.
+- **Logo (APP-010):** the launcher icons, splash screens and the web app's logo are drawn from the logo on the quotation PDFs (`backend/worker/templates/assets/polysil-logo.png`). Run `node mobile/scripts/make-brand-assets.mjs [logo.png]` from the repo root to redraw them all, for example when the client sends a sharper logo.
+- **Testing on a phone:** Maestro flows and a step-by-step guide for a testing agent are in [`maestro/README.md`](maestro/README.md).
   - A change to the web app alone needs no new APK.
 - **Versions:**
   - Capacitor 8.5.3 and its template's Android Gradle Plugin 8.13.0, Gradle 8.14.3, SDK 36, minimum Android 7 (API 24).

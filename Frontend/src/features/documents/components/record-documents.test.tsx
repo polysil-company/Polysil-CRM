@@ -59,7 +59,7 @@ describe("[DOC-001] RecordDocuments", () => {
     expect(rows[0]).toHaveTextContent("IMG_4412.HEIC · 2.3 MB");
     expect(
       await within(list).findByRole("link", { name: /^Download Advance, NEFT/ }),
-    ).toHaveAttribute("href", "/icon.svg");
+    ).toHaveAttribute("href", "/icon.png");
     expect(await within(list).findByRole("link", { name: /^Open Purchase order/ })).toHaveAttribute(
       "target",
       "_blank",

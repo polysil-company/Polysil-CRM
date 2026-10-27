@@ -136,6 +136,15 @@ export const DATA_IDS = {
     owner: "frontend",
     status: "in-progress",
   },
+  "APP-010": {
+    domain: "APP",
+    title:
+      "Polysil's logo everywhere: sign-in, sidebar, portal, public pages, browser tab, Android icon and splash",
+    owner: "frontend",
+    status: "in-progress",
+    notes:
+      "From the logo on the quotation PDFs (backend/worker/templates/assets/polysil-logo.png); mobile/scripts/make-brand-assets.mjs redraws every size.",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",
