@@ -15,7 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.config import get_settings
 from api.services import auth as auth_service
+from tests.api import test_customers as customers_t
 from tests.api import test_order_endpoints as endpoints
+from tests.api import test_portal as portal_t
 from tests.api.conftest import V1
 
 pytestmark = pytest.mark.db
@@ -105,3 +107,41 @@ async def test_the_definer_refuses_a_consumer_and_no_claim(sessions: Sessions) -
                     await s.execute(text("SELECT * FROM me_email_preferences_set(false, false)"))
     finally:
         await s.close()
+
+
+# ── ISS-226: the consumer refusal, through the route and with a certain consumer ──
+
+portal_on = portal_t.portal_on
+
+
+async def test_a_consumer_cannot_set_email_preferences_and_a_replay_answers_the_same(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions, portal_on: None) -> None:
+    ho = await endpoints._as(client, shop, "field_officer")
+    m = customers_t._mobile()
+    try:
+        lead = await customers_t._lead(client, ho, shop, m)
+        await customers_t._move(client, ho, lead["id"], "contacted", "qualified")
+        hc = await portal_t._sign_in(client, sessions, m)
+        key = _key()
+        for _ in range(2):
+            r = await client.put(f"{V1}/me/email-preferences", headers={**hc, **key},
+                                 json={"notices": False, "morning_summary": False})
+            assert r.status_code == 403, r.text
+            assert r.json()["error"]["code"] == "consumer_not_allowed"
+        # The definer refuses this consumer too, so the guard is not the only wall.
+        s = sessions()
+        try:
+            consumer = str((await s.execute(text(
+                "SELECT id FROM app_user WHERE mobile = :m AND user_type = 'consumer'"),
+                {"m": "91" + m})).scalar_one())
+            await s.rollback()
+            async with s.begin():
+                await s.execute(text("SELECT set_config('app.current_user_id', :u, true)"), {"u": consumer})
+                await s.execute(text(f"SET LOCAL ROLE {get_settings().db_app_role}"))
+                with pytest.raises(DBAPIError, match=r"42501|not a staff|no caller"):
+                    await s.execute(text("SELECT * FROM me_email_preferences_set(false, false)"))
+        finally:
+            await s.close()
+    finally:
+        await portal_t._forget(sessions, [m])
+        await customers_t._cleanup(sessions, [m])

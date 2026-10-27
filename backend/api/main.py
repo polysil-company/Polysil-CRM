@@ -6,6 +6,7 @@ owns logic. Nothing here knows a business rule.
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -84,6 +85,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await engine.dispose()
 
 
+# ISS-229: JSON may carry a NUL as the escape \u0000; Postgres text refuses it.
+# An odd run of backslashes before "u0000" is the escape; an even run is a literal
+# backslash followed by the text "u0000", which is allowed.
+_JSON_NUL = re.compile(rb"(?<!\\)(?:\\\\)*\\u0000")
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     # FS-038 rule 2: uvicorn's access log writes the webhook path, secret and all
@@ -115,7 +122,12 @@ def create_app() -> FastAPI:
         # back a 500 (Schemathesis, 27 Oct). One answer for every route instead.
         query = request.scope.get("query_string", b"").lower()
         raw_path = request.scope.get("raw_path", b"").lower()
-        if b"%00" in query or b"%00" in raw_path or "\x00" in request.url.path:
+        nul = b"%00" in query or b"%00" in raw_path or "\x00" in request.url.path
+        if not nul and request.method in ("POST", "PUT", "PATCH") and \
+                request.headers.get("content-type", "").startswith("application/json"):
+            # Starlette caches the body, so the route reads it again for free.
+            nul = _JSON_NUL.search(await request.body()) is not None
+        if nul:
             err = ValidationFailed("A request may not contain a NUL character.",
                                    code="invalid_character")
             return JSONResponse(status_code=err.status_code, content=err.envelope(),

@@ -31,6 +31,7 @@ from schemathesis.specs.openapi.checks import response_schema_conformance
 from starlette.testclient import TestClient
 
 from api.config import get_settings
+from api.integrations.cache import get_redis
 from api.main import app
 
 pytestmark = pytest.mark.db
@@ -51,6 +52,16 @@ def _dsn() -> str:
     return url.replace("postgresql+asyncpg://", "postgresql://")
 
 
+@pytest.fixture(autouse=True)
+def _redis_per_event_loop() -> Iterator[None]:
+    """Replaces the conftest fixture of this name. Each Schemathesis call runs the
+    app on a loop of its own, so the cached client is dropped, not closed: closing
+    it from the test's loop raised "attached to a different loop" (CI, 27 Oct)."""
+    get_redis.cache_clear()
+    yield
+    get_redis.cache_clear()
+
+
 @pytest.fixture(scope="module")
 def headers() -> Iterator[dict[str, str]]:
     email = f"schema_{uuid.uuid4().hex[:8]}@polysil.in"
@@ -67,6 +78,7 @@ def headers() -> Iterator[dict[str, str]]:
         with TestClient(app, client=("127.0.0.1", 50000)) as client:
             r = client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
             assert r.status_code == 200, r.text
+            get_redis.cache_clear()
             yield {"Authorization": f"Bearer {r.json()['data']['access_token']}"}
     finally:
         with psycopg.connect(_dsn(), autocommit=True, prepare_threshold=None) as c:
@@ -83,6 +95,7 @@ def headers() -> Iterator[dict[str, str]]:
 @settings(max_examples=int(os.environ.get("SCHEMATHESIS_EXAMPLES", "8")), deadline=None,
           suppress_health_check=list(HealthCheck))
 def test_no_get_route_errors_or_breaks_its_schema(case: Any, headers: dict[str, str]) -> None:
+    get_redis.cache_clear()  # a client from the previous call's loop is no use here
     response = case.call(headers=headers)
     status = response.status_code
     if status >= 500:

@@ -170,16 +170,44 @@ def test_reads_are_gated_on_view() -> None:
 
 # ── 3: over HTTP ─────────────────────────────────────────────────────────────
 
-# Refusals a handler adds on top of the matrix: the cell is granted, and the route
-# still answers 403 for these roles, by a rule of its own.
-BEYOND_THE_MATRIX: dict[str, tuple[set[str], str]] = {
-    "GET /api/v1/planner/team": ({"field_officer"}, "the team view needs tasks at org_subtree or global (FS-014)"),
+# Refusals a handler adds on top of the gate: the cell is granted, and the route
+# still answers 403 by a rule of its own. Each rule is worked out from the grants,
+# not listed by role, so a matrix change moves the expectation with it.
+VIEW_SCOPE = {(g.role, g.module): g.scope for g in GRANTS if g.action == "view"}
+
+# api/services/reports.py _need(): a report also needs view on the modules it reads.
+REPORT_NEEDS: dict[str, tuple[str, ...]] = {
+    "lead-conversion": ("leads",), "lost-leads": ("leads",), "salesperson-performance": ("leads",),
+    "follow-ups": ("tasks",), "dealer-performance": ("sales_orders", "partners"),
+    "campaign-performance": ("leads",), "territory-performance": ("leads",),
+    "complaints": ("complaints",), "sales-forecast": ("leads",), "insights": ("leads",),
+}
+
+
+def _team_view(role: str) -> bool:
+    """api/services/tasks.py team(): tasks viewed at org_subtree or global (FS-014)."""
+    return VIEW_SCOPE.get((role, "tasks")) in ("org_subtree", "global")
+
+
+BEYOND_THE_MATRIX: dict[str, tuple[Any, str]] = {
+    "GET /api/v1/planner/team": (_team_view, "the team view is for managers (FS-014)"),
+    **{f"GET /api/v1/reports/{name}": (
+        lambda role, mods=mods: all((role, m) in VIEW_SCOPE for m in mods),
+        f"the report also needs view on {', '.join(mods)}") for name, mods in REPORT_NEEDS.items()},
+}
+
+# With the dummy id the definer refuses a record the caller cannot see with 403,
+# not 404, so a granted role and a refused one answer alike. Over HTTP only the
+# refusal is checked here; the grant side is the feature tests' (FS-011, FS-015).
+RECORD_CHECKED: dict[str, str] = {
+    "DELETE /api/v1/orders/{order_id}": "order_delete() refuses an order not visible with 42501",
+    "GET /api/v1/complaints/{complaint_id}/assignees": "complaint_assignees() refuses with 42501",
 }
 
 
 def _allowed(role: str, r: Route) -> bool:
     extra = BEYOND_THE_MATRIX.get(f"{r.method} {r.path}")
-    if extra and role in extra[0]:
+    if extra and not extra[0](role):
         return False
     return all(any((role, m, a) in GRANTED for m, a in g) for g in r.gates)
 
@@ -245,6 +273,8 @@ async def test_each_role_is_refused_exactly_where_the_matrix_is_blank(
     for r in GATED:
         resp = await _call(client, headers, r)
         expected = not _allowed(role, r)
+        if not expected and f"{r.method} {r.path}" in RECORD_CHECKED:
+            continue
         if _refused(resp) != expected:
             wrong.append(f"{r.method} {r.path}: matrix says {'refuse' if expected else 'allow'}, "
                          f"API answered {resp.status_code} {resp.text[:120]}")
@@ -255,4 +285,6 @@ def test_the_exceptions_name_real_routes_and_roles() -> None:
     keys = {f"{r.method} {r.path}" for r in GATED}
     assert set(BEYOND_THE_MATRIX) <= keys
     assert set(READ_FOR_AN_ACTION) <= {r.path for r in GATED}
-    assert all(roles <= set(STAFF_ROLES) for roles, _ in BEYOND_THE_MATRIX.values())
+    assert set(RECORD_CHECKED) <= keys
+    assert {f"GET /api/v1/reports/{n}" for n in REPORT_NEEDS} <= keys, "a report was renamed"
+    assert all(m in MODULES for mods in REPORT_NEEDS.values() for m in mods)
