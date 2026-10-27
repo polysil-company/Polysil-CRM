@@ -111,4 +111,9 @@ for (const dir of readdirSync(res).filter((d) => d.startsWith("drawable"))) {
   copyFileSync(file + ".tmp", file);
   rmSync(file + ".tmp");
 }
+// BrandMark and BrandLogo give these sizes to <Image>: update them in brand-mark.tsx if they change.
+for (const file of ["polysil-mark.png", "polysil-logo.png"]) {
+  const { width, height } = await sharp(path.join(brand, file)).metadata();
+  console.log(`${file}: ${width}×${height} (keep brand-mark.tsx in step)`);
+}
 console.log("done");
