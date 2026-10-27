@@ -39,6 +39,8 @@ dev = [
     "mypy>=1.11",
     "psycopg[binary]>=3.2",
     "types-redis",
+    "hypothesis>=6.100",
+    "schemathesis>=4.30",
 ]
 
 [build-system]

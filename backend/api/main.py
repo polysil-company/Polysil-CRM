@@ -21,6 +21,7 @@ from api.db.session import engine
 from api.deps import assert_runtime_role
 from api.errors import (
     ApiError,
+    ValidationFailed,
     api_error_handler,
     internal_error_handler,
     validation_error_handler,
@@ -110,6 +111,15 @@ def create_app() -> FastAPI:
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        # Postgres refuses a NUL in text, so `?q=%00` reached the database and came
+        # back a 500 (Schemathesis, 27 Oct). One answer for every route instead.
+        query = request.scope.get("query_string", b"").lower()
+        raw_path = request.scope.get("raw_path", b"").lower()
+        if b"%00" in query or b"%00" in raw_path or "\x00" in request.url.path:
+            err = ValidationFailed("A request may not contain a NUL character.",
+                                   code="invalid_character")
+            return JSONResponse(status_code=err.status_code, content=err.envelope(),
+                                headers={"X-Request-ID": request_id})
         structlog.contextvars.bind_contextvars(request_id=request_id,
                                                path=redact_path(request.url.path))
         try:

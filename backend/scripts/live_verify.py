@@ -213,6 +213,26 @@ def run_live(code_root: Path, files: list[str], extra: dict[str, str]) -> Check:
                  "" if done.returncode == 0 else f"pytest exit {done.returncode}, see above")
 
 
+def load(target: str, env: dict[str, str], repo: Path, *, users: int, seconds: int,
+         ssh_argv: Callable[[dict[str, str]], list[str]]) -> int:
+    """Test build-out 7: scripts/load_test.py through the tunnel, with the check
+    account in its environment as the live suite gets it. Staging only."""
+    if target != "staging":
+        print("  load runs against staging only")
+        return 2
+    lacking = missing(env, ("LIVE_CHECK_EMAIL", "LIVE_CHECK_PASSWORD"))
+    if lacking:
+        print("  not set in the env file: " + ", ".join(lacking))
+        return 2
+    base = {k: v for k, v in os.environ.items() if not k.upper().startswith("PYTEST_")}
+    argv = [sys.executable, str(repo / "scripts" / "load_test.py"),
+            "--users", str(users), "--seconds", str(seconds)]
+    with tunnel(ssh_argv(env), env) as port:
+        extra = live_env(target, base_url(target, env, port), env, journey=False)
+        return subprocess.run(argv, cwd=repo, env={**base, **extra},
+                              timeout=seconds + 300).returncode
+
+
 def report(checks: list[Check], target: str = "staging") -> bool:
     print("\n  verify")
     for c in checks:
