@@ -334,8 +334,14 @@ async def test_the_printed_sheet(client: httpx.AsyncClient, shop: Shop, sessions
 
     monkeypatch.setattr(dealer_sheet, "get_settings", lambda: type("S", (), {"pdf_renderer": "weasyprint"})())
     monkeypatch.setattr(dealer_sheet, "renderer_available", lambda: None)
-    monkeypatch.setattr(pdf, "_active", pdf.MAX_RENDERS)
-    r = await client.get(f"{url}/pdf", headers=sm)
+    taken = 0
+    while pdf.slots.acquire(blocking=False):
+        taken += 1
+    try:
+        r = await client.get(f"{url}/pdf", headers=sm)
+    finally:
+        for _ in range(taken):
+            pdf.slots.release()
     assert r.status_code == 503 and r.json()["error"]["code"] == "busy"
 
 

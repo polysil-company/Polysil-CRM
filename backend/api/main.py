@@ -190,6 +190,7 @@ def create_app() -> FastAPI:
     # Base path is /api/v1. The version is in the path rather than a header so a
     # breaking change can run alongside its predecessor (ADR-028).
     app.include_router(auth.router, prefix=API_PREFIX)
+    app.include_router(auth.me_router, prefix=API_PREFIX)
     app.include_router(leads.router, prefix=API_PREFIX)
     app.include_router(leads.lookups, prefix=API_PREFIX)
     app.include_router(lead_qr.router, prefix=API_PREFIX)

@@ -98,6 +98,7 @@ class Database:
     applied: tuple[str, ...]
     dead: int
     failures: int
+    dead_email: int = 0      # FS-078 SF-3: email apart, so an SMTP problem reads as one
 
 
 async def read_database() -> Database:
@@ -114,10 +115,17 @@ async def read_database() -> Database:
         dead = int((await session.execute(text(
             "SELECT count(*) FROM notification_outbox "
             "WHERE state = 'dead' AND created_at > now() - interval '1 day'"))).scalar_one())
+        dead_email = int((await session.execute(text(
+            # answers, not failures (FS-078 SF-3): the same list as worker/jobs/email.py
+            "SELECT count(*) FILTER (WHERE channel = 'email' AND coalesce(error, '') NOT IN "
+            "('already read', 'recipient no longer eligible', 'email off')) "
+            "FROM notification_outbox "
+            "WHERE state = 'dead' AND created_at > now() - interval '1 day'"))).scalar_one())
         failures = int((await session.execute(text(
             "SELECT count(*) FROM notification_failure "
             "WHERE created_at > now() - interval '1 day'"))).scalar_one())
-    return Database(read_only=mode, applied=applied, dead=dead, failures=failures)
+    return Database(read_only=mode, applied=applied, dead=dead, failures=failures,
+                    dead_email=dead_email)
 
 
 def script_heads() -> tuple[str, ...]:
@@ -224,8 +232,8 @@ def check_outbox_dead(database: Database) -> Result:
     """A count to read, never a failure: one dead row is not an outage, and what
     is normal differs by box."""
     return Result("outbox_dead", "pass",
-                  f"{database.dead} dead outbox rows and {database.failures} notification "
-                  f"failures created in the last day")
+                  f"{database.dead} dead outbox rows ({database.dead_email} of them failed "
+                  f"emails) and {database.failures} notification failures created in the last day")
 
 
 # ── the run ──────────────────────────────────────────────────────────────────

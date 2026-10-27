@@ -47,6 +47,11 @@ class ExportTooLargeError(ApiError):
     code = "export_too_large"
 
 
+class FormatNotAvailableError(ApiError):
+    status_code = 422
+    code = "format_not_available"
+
+
 class FilterNotExportableError(ApiError):
     status_code = 422
     code = "filter_not_exportable"
@@ -66,7 +71,7 @@ Page = tuple[Sequence[BaseModel], str | None]
 
 
 async def drain(fetch: Callable[[str | None], Awaitable[Page]], *,
-                cap: int | None = None) -> list[dict[str, Any]]:
+                cap: int | None = None, message: str | None = None) -> list[dict[str, Any]]:
     """Every row the list would show, across all pages, as JSON dicts.
 
     `fetch(cursor)` returns one page and the next cursor (None on the last). Stops
@@ -81,7 +86,7 @@ async def drain(fetch: Callable[[str | None], Awaitable[Page]], *,
         rows.extend(i.model_dump(mode="json") for i in items)
         if len(rows) > cap:
             raise ExportTooLargeError(
-                f"This list has more than {cap} rows. Narrow the filters and try again.")
+                message or f"This list has more than {cap} rows. Narrow the filters and try again.")
         if not cursor:
             return rows
 
@@ -187,16 +192,82 @@ def workbook(title: str, columns: Sequence[Column], rows: Sequence[dict[str, Any
     return out.getvalue()
 
 
-def filename(stem: str, today: dt.date | None = None) -> str:
+def filename(stem: str, today: dt.date | None = None, *, ext: str = "xlsx") -> str:
     day = today or dt.datetime.now(IST).date()
-    return f"{stem}-{day.isoformat()}.xlsx"
+    return f"{stem}-{day.isoformat()}.{ext}"
 
 
-def log_export(user_id: str, stem: str, filters: dict[str, Any], count: int) -> None:
+def log_export(user_id: str, stem: str, filters: dict[str, Any], count: int, *,
+               fmt: str = "xlsx") -> None:
     """One line per export: who, which list, which filters were set (names only, as
-    `q` can hold a mobile number: rule 13), and how many rows left."""
+    `q` can hold a mobile number: rule 13), the format, and how many rows left."""
     used = sorted(k for k, v in filters.items() if v not in (None, "", False))
-    log.info("export", list=stem, user=user_id, filters=used, rows=count)
+    log.info("export", list=stem, user=user_id, filters=used, rows=count, format=fmt)
+
+
+# ── CSV (FS-077) ─────────────────────────────────────────────────────────────
+
+CSV_TYPE: Final = "text/csv; charset=utf-8"
+PDF_TYPE: Final = "application/pdf"
+# a spreadsheet reads these as the start of a formula; the full-width forms too, as
+# some locales do (FS-077 EC-17, plan review N-4)
+_FORMULA_START: Final = ("=", "+", "-", "@", "\t", "\r",
+                         "\uff1d", "\uff0b", "\uff0d", "\uff20")
+_PLAIN_NUMBER: Final = re.compile(r"[+-]?\d+(\.\d+)?")
+_CENT: Final = Decimal("0.01")
+
+
+def money_text(value: Decimal) -> str:
+    """`1050.00`: two places, no exponent, never `-0.00` (FS-077 EC-20, plan review S-8)."""
+    q = value.quantize(_CENT)
+    if q == 0:
+        q = abs(q)
+    return format(q, "f")
+
+
+def decimal_text(value: Decimal) -> str:
+    text_ = format(value, "f")
+    return text_[1:] if text_.startswith("-") and value == 0 else text_
+
+
+def formula_safe(value: str) -> str:
+    """A leading `'` on text a spreadsheet would run as a formula. A value that is
+    wholly a plain number (a `+91` mobile, `-5`) cannot be a formula and is left
+    alone (FS-077 EC-4)."""
+    if value.startswith(_FORMULA_START) and not _PLAIN_NUMBER.fullmatch(value):
+        return "'" + value
+    return value
+
+
+def csv_text(value: Any, kind: Kind) -> str | None:
+    """One CSV field from a `cell_value()` result: None stays None (an empty,
+    unquoted field: ADR-047), every text value is formula-guarded after cleaning."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return formula_safe(value)
+    if isinstance(value, Decimal):
+        return money_text(value) if kind == "money" else decimal_text(value)
+    if isinstance(value, dt.datetime):
+        return value.strftime("%Y-%m-%d %H:%M")
+    if isinstance(value, dt.date):
+        return value.isoformat()
+    return str(value)
+
+
+def csv_bytes(columns: Sequence[Column], rows: Sequence[dict[str, Any]]) -> bytes:
+    """UTF-8 with a byte-order mark, so a spreadsheet reads Gujarati and Hindi names;
+    CRLF; every value quoted and a hidden figure an empty unquoted field, which a
+    database import reads as null (FS-077 EC-16)."""
+    import csv
+
+    out = io.StringIO(newline="")
+    writer = csv.writer(out, quoting=csv.QUOTE_NOTNULL, lineterminator="\r\n")
+    writer.writerow([col.header for col in columns])
+    for item in rows:
+        writer.writerow([csv_text(cell_value(_get(item, col.path), col.kind), col.kind)
+                         for col in columns])
+    return ("﻿" + out.getvalue()).encode("utf-8")
 
 
 # ── the columns of each list (FS-030 6.1) ────────────────────────────────────

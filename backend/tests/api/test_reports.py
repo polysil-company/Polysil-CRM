@@ -240,3 +240,87 @@ async def test_territory_performance_keeps_leads_above_the_level(client: httpx.A
                              params={"level": "taluka", "territory_id": shop.district})).json()["data"]
     assert data["totals"]["leads"] == 1
     assert data["rows"][0]["territory"] == {"id": None, "name": "Above this level"}
+
+
+# ── FS-077: CSV and PDF ─────────────────────────────────────────────────────
+
+def _csv_rows(r: httpx.Response) -> list[list[str]]:
+    import csv as csv_mod
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("text/csv")
+    return list(csv_mod.reader(io.StringIO(r.content.decode("utf-8").lstrip("\ufeff"))))
+
+
+@pytest.fixture
+def html_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The html renderer: the page as text, no WeasyPrint needed (EC-15)."""
+    from api.services import report_pdf
+    monkeypatch.setattr(report_pdf, "get_settings", lambda: type("S", (), {"pdf_renderer": "html"})())
+
+
+async def test_every_report_comes_as_csv_and_pdf(client: httpx.AsyncClient, shop: Shop, html_pdf: None) -> None:
+    fo = await endpoints._as(client, shop, "field_officer")
+    await notif._lead(client, shop, fo)
+    await _lost(client, shop, fo)
+    dm = await endpoints._as(client, shop, "district_manager")
+    for name, params in (("lead-conversion", {}), ("salesperson-performance", {}), ("lost-leads", {}),
+                         ("follow-ups", {}), ("dealer-performance", {}),
+                         ("territory-performance", {"level": "district"}), ("complaints", {}),
+                         ("campaign-performance", {})):
+        data = (await client.get(f"{V1}/reports/{name}", headers=dm, params=params)).json()["data"]
+        assert data["row_count"] >= len(data["rows"]), name
+        rows = _csv_rows(await client.get(f"{V1}/reports/{name}", headers=dm, params={**params, "format": "csv"}))
+        cols = report_exports.columns(name, data)
+        assert rows[0] == [c.header for c in cols], name
+        assert "Total" in [r[0] for r in rows], name
+        r = await client.get(f"{V1}/reports/{name}", headers=dm, params={**params, "format": "pdf"})
+        assert r.status_code == 200, (name, r.text)
+        assert r.headers["content-disposition"].endswith('.html"') and r.headers["cache-control"] == "no-store"
+        assert cols[0].header in r.text and "Made by" in r.text and "None" not in r.text, name
+
+
+async def test_a_hidden_figure_is_blank_in_csv_too(client: httpx.AsyncClient, shop: Shop) -> None:
+    """ADR-047 in the new format: Accounts sees no tasks or visits."""
+    await notif._lead(client, shop, await endpoints._as(client, shop, "field_officer"))
+    accounts = await endpoints._as(client, shop, "account_manager")
+    rows = _csv_rows(await client.get(f"{V1}/reports/salesperson-performance", headers=accounts,
+                                      params={"territory_id": shop.district, "format": "csv"}))
+    visits = rows[0].index("Visits")
+    assert len(rows) > 2 and all(row[visits] == "" for row in rows[1:])
+
+
+async def test_a_busy_pdf_is_refused_before_the_report_runs(
+        client: httpx.AsyncClient, shop: Shop, monkeypatch: pytest.MonkeyPatch, no_pdf_slots: object) -> None:
+    """EC-9, plan review S-2: the 503 costs no queries."""
+    from api.services import report_pdf
+    from api.services import reports as service
+    monkeypatch.setattr(report_pdf, "get_settings", lambda: type("S", (), {"pdf_renderer": "weasyprint"})())
+    monkeypatch.setattr(report_pdf, "renderer_available", lambda: None)
+    ran: list[int] = []
+    real = service.lead_conversion
+
+    async def spy(*a: object, **k: object) -> object:
+        ran.append(1)
+        return await real(*a, **k)
+
+    monkeypatch.setattr(service, "lead_conversion", spy)
+    dm = await endpoints._as(client, shop, "district_manager")
+    r = await client.get(f"{V1}/reports/lead-conversion", headers=dm, params={"format": "pdf"})
+    assert r.status_code == 503 and r.json()["error"]["code"] == "busy", r.text
+    assert ran == []
+    monkeypatch.setattr(report_pdf, "renderer_available", lambda: "no libraries")
+    r = await client.get(f"{V1}/reports/lead-conversion", headers=dm, params={"format": "pdf"})
+    assert r.status_code == 503 and r.json()["error"]["code"] == "pdf_unavailable", r.text
+
+
+@pytest.mark.skipif(__import__("api.pdf", fromlist=["renderer_available"]).renderer_available() is not None,
+                    reason="needs WeasyPrint's libraries (CI has them)")
+async def test_a_real_report_pdf_renders(client: httpx.AsyncClient, shop: Shop, monkeypatch: pytest.MonkeyPatch) -> None:
+    from api.services import report_pdf
+    monkeypatch.setattr(report_pdf, "get_settings", lambda: type("S", (), {"pdf_renderer": "weasyprint"})())
+    await notif._lead(client, shop, await endpoints._as(client, shop, "field_officer"))
+    dm = await endpoints._as(client, shop, "district_manager")
+    r = await client.get(f"{V1}/reports/campaign-performance", headers=dm, params={"format": "pdf"})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/pdf" and r.content.startswith(b"%PDF")
+    assert r.headers["content-disposition"].endswith('.pdf"')

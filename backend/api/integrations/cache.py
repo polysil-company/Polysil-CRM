@@ -159,27 +159,35 @@ async def read_bundle(key: str) -> dict[str, Any] | None:
 # sign-in is already down when Redis is; the acknowledgement path has no reason
 # to stop.
 
+# FS-078 SF-2: each channel has its own keys under a prefix, so an SMTP outage
+# never pauses sign-in codes. WhatsApp keeps "wa" by default.
 BREAKER_COUNT = "wa:breaker:count"
 BREAKER_OPEN = "wa:breaker:open"
+
+
+def _key(prefix: str, name: str) -> str:
+    return f"{prefix}:{name}"
 BREAKER_WINDOW = timedelta(seconds=60)
 BREAKER_THRESHOLD = 3
 
 
-async def breaker_is_open() -> bool:
+async def breaker_is_open(prefix: str = "wa") -> bool:
     try:
-        return bool(await get_redis().exists(BREAKER_OPEN))
+        return bool(await get_redis().exists(_key(prefix, "breaker:open")))
     except Exception as exc:
         log.warning("outbox.breaker_unavailable", kind=type(exc).__name__)
         return False
 
 
-async def breaker_note_transient() -> bool:
+async def breaker_note_transient(prefix: str = "wa") -> bool:
     """One transient failure. Opens the breaker at the third inside one fixed
     window (hit_rate_limit is a fixed window) and says so. Called after the row's
     own UPDATE has committed, never before."""
     try:
-        if await hit_rate_limit(BREAKER_COUNT, BREAKER_THRESHOLD - 1, BREAKER_WINDOW):
-            await get_redis().setex(BREAKER_OPEN, int(BREAKER_WINDOW.total_seconds()), "1")
+        if await hit_rate_limit(_key(prefix, "breaker:count"), BREAKER_THRESHOLD - 1,
+                                BREAKER_WINDOW):
+            await get_redis().setex(_key(prefix, "breaker:open"),
+                                    int(BREAKER_WINDOW.total_seconds()), "1")
             return True
     except Exception as exc:
         log.warning("outbox.breaker_unavailable", kind=type(exc).__name__)
@@ -198,27 +206,27 @@ _RELEASE = ("if redis.call('get', KEYS[1]) == ARGV[1] then "
             "return redis.call('del', KEYS[1]) else return 0 end")
 
 
-async def drain_lock_take(token: str, ttl: timedelta) -> bool:
+async def drain_lock_take(token: str, ttl: timedelta, prefix: str = "wa") -> bool:
     """True when this drain may run: it took the lock, or Redis is unreachable."""
     try:
-        return bool(await get_redis().set(DRAIN_LOCK, token, nx=True,
+        return bool(await get_redis().set(_key(prefix, "drain:lock"), token, nx=True,
                                           ex=int(ttl.total_seconds())))
     except Exception as exc:
         log.warning("outbox.drain_lock_unavailable", kind=type(exc).__name__)
         return True
 
 
-async def drain_lock_release(token: str) -> None:
+async def drain_lock_release(token: str, prefix: str = "wa") -> None:
     """Only the holder's own token is released: a drain that outlived its lock
     must not free the next drain's."""
     try:
-        await get_redis().eval(_RELEASE, 1, DRAIN_LOCK, token)
+        await get_redis().eval(_RELEASE, 1, _key(prefix, "drain:lock"), token)
     except Exception as exc:
         log.warning("outbox.drain_lock_unavailable", kind=type(exc).__name__)
 
 
-async def breaker_reset() -> None:
+async def breaker_reset(prefix: str = "wa") -> None:
     try:
-        await get_redis().delete(BREAKER_COUNT, BREAKER_OPEN)
+        await get_redis().delete(_key(prefix, "breaker:count"), _key(prefix, "breaker:open"))
     except Exception as exc:
         log.warning("outbox.breaker_unavailable", kind=type(exc).__name__)

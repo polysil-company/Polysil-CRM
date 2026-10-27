@@ -220,6 +220,21 @@ class Settings(BaseSettings):
     # FS-007 rule 12: rows that are not pending are purged after this.
     outbox_retention: timedelta = timedelta(days=90)
 
+    # FS-078: email notices. "none" collects nothing and ends any pending email row
+    # (EC-15, EC-24); nothing is sent until the client gives us an account (GAP-536)
+    email_provider: Literal["none", "mock", "smtp"] = "none"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_security: Literal["starttls", "ssl"] = "starttls"
+    email_from: str | None = None
+    # outside production, every email goes to this one address (EC-23)
+    email_redirect_to: str | None = None
+    # per socket operation, and the whole send (EC-16)
+    smtp_socket_timeout: float = 10.0
+    smtp_send_deadline: float = 30.0
+
     sms_provider: Literal["msg91", "mock"] = "mock"
     msg91_key: SecretStr | None = None
 
@@ -351,9 +366,35 @@ class Settings(BaseSettings):
             raise ValueError("whatsapp_webhook_secret must be at least 32 characters")
         return self
 
+    @model_validator(mode="after")
+    def _email_is_configured(self) -> Settings:
+        """FS-078 EC-23, EC-24, EC-32: refused at startup rather than failing every
+        send, a mock that sends nothing in production, staging mailing real people,
+        and a port that would make STARTTLS fall back or SSL never handshake."""
+        if self.email_provider == "mock" and self.environment == "production":
+            raise ValueError("email_provider is mock in production; no email would leave")
+        if self.email_provider == "smtp":
+            missing = [n for n in ("smtp_host", "smtp_username", "smtp_password", "email_from")
+                       if getattr(self, n) is None]
+            if missing:
+                raise ValueError(f"email_provider is smtp but {', '.join(missing)} unset")
+            if self.environment != "production" and self.email_redirect_to is None:
+                raise ValueError("email_provider is smtp outside production; set "
+                                 "email_redirect_to so no real person is mailed")
+            from api.integrations.email.provider import parse_address
+            for name in ("email_redirect_to", "email_from"):
+                value = getattr(self, name)
+                if value is not None and parse_address(value) is None:
+                    raise ValueError(f"{name} is not one email address")
+            if (self.smtp_security, self.smtp_port) in (("ssl", 587), ("starttls", 465)):
+                raise ValueError(f"smtp_security {self.smtp_security} does not go with port "
+                                 f"{self.smtp_port}")
+        return self
+
     @field_validator("whatsapp_template_quotation_share", "r2_endpoint", "r2_bucket",
                      "r2_access_key_id", "r2_secret_access_key", "whatsapp_webhook_secret",
-                     mode="before")
+                     "smtp_host", "smtp_username", "smtp_password", "email_from",
+                     "email_redirect_to", mode="before")
     @classmethod
     def _empty_is_unset(cls, v: object) -> object:
         """The compose files pass `${VAR:-}`, and an empty string is not a value:

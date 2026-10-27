@@ -130,12 +130,13 @@ queue to pay.
 
 **Export Commissions**
 
-The commission report as Excel, with the same filters (FS-030).
+The commission report as Excel or CSV, with the same filters (FS-030).
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
 | `status` | query | string \| null |  | Comma-separated: calculated,approved. |
 | `partner_id` | query | string \| null |  |  |
 | `paid_from` | query | string \| null |  | ISO date. |
@@ -145,13 +146,13 @@ The commission report as Excel, with the same filters (FS-030).
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The workbook, as an attachment. |
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted, or `own_decision`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
 | `409` | `ErrorResponse` | `not_closed`, `commission_exists`, `status_changed`. |
-| `422` | `ErrorResponse` | `no_partner`, `no_rate`, `remark_required`, a field. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

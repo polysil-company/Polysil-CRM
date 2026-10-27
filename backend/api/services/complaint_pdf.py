@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.authz.predicate import Caller
 from api.config import get_settings
 from api.errors import NotFoundError, ServiceUnavailableError
-from api.pdf import env, logo, logo_only_fetcher, render_pdf, render_slot, renderer_available
+from api.pdf import env, logo, logo_only_fetcher, render_limited, renderer_available
 from api.schemas import complaints as sch
 from api.schemas.quotations import PdfLink
 from api.services import complaints
@@ -149,14 +149,14 @@ async def pdf_link(db: AsyncSession, caller: Caller, complaint_id: str,
     extension, content_type = (("html", "text/html; charset=utf-8") if html_mode
                                else ("pdf", "application/pdf"))
     key = f"complaint-pdf/{c.id}/{digest}.{extension}"
-    with render_slot():
-        body = (page.encode("utf-8") if html_mode
-                else await asyncio.to_thread(render_pdf, page, logo_only_fetcher()))
-        try:
-            await asyncio.to_thread(storage.put, key, body, content_type)
-        except Exception as exc:   # network errors are not RuntimeError (plan review R-6)
-            log.warning("complaint.storage_unavailable", reason=type(exc).__name__)
-            raise ServiceUnavailableError(_STORAGE_DOWN, code="storage_unavailable") from exc
+    # only the render is limited; the upload holds no GIL (FS-077 plan review S-1)
+    body = (page.encode("utf-8") if html_mode
+            else await asyncio.to_thread(render_limited, page, logo_only_fetcher))
+    try:
+        await asyncio.to_thread(storage.put, key, body, content_type)
+    except Exception as exc:   # network errors are not RuntimeError (plan review R-6)
+        log.warning("complaint.storage_unavailable", reason=type(exc).__name__)
+        raise ServiceUnavailableError(_STORAGE_DOWN, code="storage_unavailable") from exc
     name = filename(c.complaint_no, extension)
     try:
         url, expires = storage.presign_get(key, filename=name)

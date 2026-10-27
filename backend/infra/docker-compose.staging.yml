@@ -114,6 +114,15 @@ services:
       DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
       WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
       WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+      # FS-078: email notices; none until the client gives an account (GAP-536)
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-none}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_REDIRECT_TO: ${EMAIL_REDIRECT_TO:-}
       # 11za's originWebsite, sent on every request; the account's own setting
       WHATSAPP_ORIGIN_WEBSITE: ${WHATSAPP_ORIGIN_WEBSITE:-}
       # FS-005: the share link's origin (the frontend; the API refuses to start
@@ -184,6 +193,15 @@ services:
       DB_APP_ROLE: ${DB_APP_ROLE:-app_role}
       WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
       WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+      # FS-078: email notices; none until the client gives an account (GAP-536)
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-none}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_REDIRECT_TO: ${EMAIL_REDIRECT_TO:-}
       # 11za's originWebsite, sent on every request; the account's own setting
       WHATSAPP_ORIGIN_WEBSITE: ${WHATSAPP_ORIGIN_WEBSITE:-}
       # FS-005: the share link's origin (the frontend; the API refuses to start
@@ -232,6 +250,15 @@ services:
       # after every migration. Without these it saw the mock and changed nothing.
       WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
       WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+      # FS-078: email notices; none until the client gives an account (GAP-536)
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-none}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_REDIRECT_TO: ${EMAIL_REDIRECT_TO:-}
       WHATSAPP_ORIGIN_WEBSITE: ${WHATSAPP_ORIGIN_WEBSITE:-}
       # Settings refuses to load outside local without it, so alembic and the
       # seeds need it too, not only the API and the worker.

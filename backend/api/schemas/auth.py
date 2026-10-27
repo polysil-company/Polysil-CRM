@@ -221,6 +221,15 @@ class Features(BaseModel):
         "`/tasks` call can still answer 403.")
 
 
+class EmailPreferences(BaseModel):
+    """The two email switches (FS-078). Both are on for a new user."""
+
+    notices: bool = Field(description="Email me updates I have not seen: a notice still "
+                          "unread 10 minutes after it arrived is emailed, several in one email.")
+    morning_summary: bool = Field(description="Email me a morning summary at 08:00 IST, Monday "
+                                  "to Saturday, when I have tasks due today or overdue.")
+
+
 class MeResponse(BaseModel):
     """What the frontend needs to render navigation and hide controls.
 
@@ -250,6 +259,13 @@ class MeResponse(BaseModel):
     permissions: list[ModulePermission] = Field(default_factory=list)
     features: Features = Field(default_factory=Features,
                                description="Admin switches that change the screens (FS-070).")
+    email_preferences: EmailPreferences = Field(
+        default_factory=lambda: EmailPreferences(notices=True, morning_summary=True),
+        description="Your two email switches (FS-078).")
+    email_available: bool = Field(
+        default=False,
+        description="False while the CRM sends no email, or when you have no usable email "
+        "address. Hide the two switches when false.")
 
 
 class OwnPasswordChange(BaseModel):

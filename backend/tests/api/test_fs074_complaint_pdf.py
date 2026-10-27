@@ -16,7 +16,6 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api import pdf
 from api.pdf import renderer_available
 from api.services import complaint_pdf
 from api.storage import UnconfiguredStorage
@@ -168,11 +167,13 @@ async def test_storage_down_is_503(client: httpx.AsyncClient, shop: Shop, monkey
 
 
 async def test_busy_is_shared_with_the_data_sheet(client: httpx.AsyncClient, shop: Shop, kept: _Keep,
-                                                  monkeypatch: pytest.MonkeyPatch) -> None:
-    """EC-4: one limit for both documents."""
+                                                  monkeypatch: pytest.MonkeyPatch, no_pdf_slots: object) -> None:
+    """EC-4: one limit for both documents. The html mode renders nothing and takes
+    no slot, so the renderer's mode is set (FS-077 plan review S-1)."""
     fo = await ct._as(client, shop, "field_officer")
     c = await _submitted(client, shop, fo)
-    monkeypatch.setattr(pdf, "_active", pdf.MAX_RENDERS)
+    monkeypatch.setattr(complaint_pdf, "get_settings", lambda: type("S", (), {"pdf_renderer": "weasyprint"})())
+    monkeypatch.setattr(complaint_pdf, "renderer_available", lambda: None)
     r = await client.get(f"{V1}/complaints/{c['id']}/pdf", headers=fo)
     assert r.status_code == 503 and ct._code(r) == "busy", r.text
 

@@ -14,7 +14,8 @@ from typing import Any, Final
 from api.services.exports import Column
 
 # the report name in the URL is the file stem's tail and the key here
-NAMES: Final = ("lead-conversion", "salesperson-performance", "lost-leads", "follow-ups",
+NAMES: Final = ("sales-forecast", "insights",
+                 "lead-conversion", "salesperson-performance", "lost-leads", "follow-ups",
                 "dealer-performance", "territory-performance", "complaints",
                 "campaign-performance")
 
@@ -85,7 +86,34 @@ def columns(report: str, data: dict[str, Any]) -> tuple[Column, ...]:
                 Column("Actual cost", "cost_actual", "money"), Column("Cost", "cost", "money"),
                 Column("Cost per lead", "cost_per_lead", "money"),
                 Column("Cost per win", "cost_per_won", "money"))
+    if report == "sales-forecast":
+        months = [*(data.get("months") or []), "later"]
+        return (Column(group, "key.label"), Column("Open leads", "open", "int"),
+                Column("With a value", "with_value", "int"),
+                Column("Pipeline value", "pipeline_value", "money"),
+                Column("Weighted value", "weighted_value", "money"),
+                *(Column("Later" if m == "later" else m, f"by_month.{m}", "money") for m in months),
+                Column("Valued by quotation", "valued_by.quotation", "int"),
+                Column("Valued by estimate", "valued_by.estimate", "int"))
+    if report == "insights":
+        return (Column("Insight", "title"), Column("Figure", "figure", "decimal"),
+                Column("Previous", "previous", "decimal"), Column("Unit", "unit"))
     raise ValueError(f"no columns for report {report!r}")
+
+
+def _dig(row: dict[str, Any], path: str) -> Any:
+    value: Any = row
+    for part in path.split("."):
+        value = value.get(part) if isinstance(value, dict) else None
+    return value
+
+
+def _has_key(row: dict[str, Any], path: str) -> bool:
+    """Present, whatever the value: a hidden total is still a total (N-1)."""
+    head, _, rest = path.partition(".")
+    if head not in row:
+        return False
+    return _has_key(row[head], rest) if rest else True
 
 
 def _put(row: dict[str, Any], path: str, value: Any) -> None:
@@ -94,6 +122,47 @@ def _put(row: dict[str, Any], path: str, value: Any) -> None:
         _put(row.setdefault(head, {}), rest, value)
     else:
         row[head] = value
+
+
+# sentences, not figures: a Total line would be empty (code review F-5)
+NO_TOTAL: Final = frozenset({"insights"})
+
+
+def total_row(report: str, data: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """The Total line, and the headers of the columns it totals. A column counts as
+    totalled when its key is present, whatever the value: a hidden total is still a
+    total the reader may not see (ADR-047, FS-077 plan review N-1)."""
+    cols = columns(report, data)
+    if report in NO_TOTAL:
+        return {}, []
+    totals = data.get("totals") or {}
+    total: dict[str, Any] = {}
+    _put(total, cols[0].path, "Total")
+    totalled: list[str] = []
+    for col in cols[1:]:
+        key = _TOTAL_KEY.get((report, col.path), col.path)
+        if _has_key(totals, key):
+            _put(total, col.path, _dig(totals, key))
+            totalled.append(col.header)
+    return total, totalled
+
+
+def notes(report: str, data: dict[str, Any]) -> list[dict[str, Any]]:
+    """The notes under a report, as data, so each format writes them its own way
+    (FS-077 EC-21). Kinds: refunds, truncated, partial_totals."""
+    cols = columns(report, data)
+    out: list[dict[str, Any]] = []
+    refunds = (data.get("totals") or {}).get("refunds")
+    if isinstance(refunds, dict):
+        out.append({"kind": "refunds", "count": refunds.get("count"),
+                    "amount": refunds.get("amount")})
+    _, totalled = total_row(report, data)
+    figures = [c.header for c in cols[1:] if c.kind in ("int", "money", "decimal")]
+    if totalled and len(totalled) < len(figures):
+        out.append({"kind": "partial_totals", "columns": totalled})
+    if data.get("truncated"):
+        out.append({"kind": "truncated", "row_count": data.get("row_count")})
+    return out
 
 
 def rows(report: str, data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -107,9 +176,10 @@ def rows(report: str, data: dict[str, Any]) -> list[dict[str, Any]]:
     _put(total, first, "Total")
     for col in cols[1:]:
         key = _TOTAL_KEY.get((report, col.path), col.path)
-        if key in totals:
-            total[col.path] = totals[key]
-    out.append(total)
+        if _has_key(totals, key):
+            _put(total, col.path, _dig(totals, key))
+    if report not in NO_TOTAL:
+        out.append(total)
     refunds = totals.get("refunds")
     if isinstance(refunds, dict):
         note: dict[str, Any] = {}

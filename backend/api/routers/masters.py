@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.idempotency import Outcome, payload_digest, run_idempotent
-from api.routers.exporting import XLSX_RESPONSE, export, filters_of
+from api.routers.exporting import EXPORT_RESPONSE, ExportFormat, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE
 from api.schemas.masters import (
@@ -237,11 +237,12 @@ async def list_partners(
                                        cursor=cursor)
 
 
-@partners.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+@partners.get("/export", response_class=Response, responses={**_ERRORS, **EXPORT_RESPONSE},
               dependencies=[Depends(require("partners", "view"))])
 async def export_partners(
     db: DbSession, caller: CallerDep,
     filters: Annotated[dict[str, Any], Depends(filters_of(list_partners))],
+    fmt: ExportFormat = "xlsx",
 ) -> Response:
     """Download the partner list as an Excel file, with the same filters as the list.
 
@@ -250,7 +251,8 @@ async def export_partners(
     token, then save the blob. More than 5,000 rows is `422 export_too_large`:
     narrow the filters. An empty list gives a file with the header row only.
     """
-    return await export(list_partners, stem="partners", title="Partners", columns=exports.PARTNERS,
+    return await export(list_partners, fmt=fmt, stem="partners", title="Partners",
+                        columns=exports.PARTNERS,
                         user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 

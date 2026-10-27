@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.idempotency import payload_digest, run_idempotent
-from api.routers.exporting import XLSX_RESPONSE, export, filters_of
+from api.routers.exporting import REPORT_EXPORT_RESPONSE, ExportFormat, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.subsidy_follow_ups import (
     AgePage,
@@ -55,11 +55,11 @@ async def ageing(db: DbSession, status: Status = None,
     return await service.ageing(db, status=status, stage=stage, q=q, cursor=cursor, limit=limit)
 
 
-@reports.get("/ageing/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE}, dependencies=_VIEW)
+@reports.get("/ageing/export", response_class=Response, responses={**_ERRORS, **REPORT_EXPORT_RESPONSE}, dependencies=_VIEW)
 async def ageing_export(db: DbSession, caller: CallerDep,
-                        filters: Annotated[dict[str, Any], Depends(filters_of(ageing))]) -> Response:
-    """The ageing view as Excel, with the same filters."""
-    return await export(ageing, stem="subsidy-ageing", title="Subsidy ageing", columns=exports.SUBSIDY_AGEING,
+                        filters: Annotated[dict[str, Any], Depends(filters_of(ageing))], fmt: ExportFormat = "xlsx") -> Response:
+    """The ageing view as Excel or CSV or PDF, with the same filters."""
+    return await export(ageing, fmt=fmt, allow_pdf=True, stem="subsidy-ageing", title="Subsidy ageing", columns=exports.SUBSIDY_AGEING,
                         user_id=caller.user_id, filters=filters, db=db)
 
 
@@ -70,11 +70,11 @@ async def stages(db: DbSession, status: Status = "open") -> StagePage:
     return await service.stage_report(db, status)
 
 
-@reports.get("/stages/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE}, dependencies=_VIEW)
+@reports.get("/stages/export", response_class=Response, responses={**_ERRORS, **REPORT_EXPORT_RESPONSE}, dependencies=_VIEW)
 async def stages_export(db: DbSession, caller: CallerDep,
-                        filters: Annotated[dict[str, Any], Depends(filters_of(stages))]) -> Response:
-    """The stage report as Excel."""
-    return await export(stages, stem="subsidy-stages", title="Subsidy stages", columns=exports.SUBSIDY_STAGES,
+                        filters: Annotated[dict[str, Any], Depends(filters_of(stages))], fmt: ExportFormat = "xlsx") -> Response:
+    """The stage report as Excel or CSV or PDF."""
+    return await export(stages, fmt=fmt, allow_pdf=True, stem="subsidy-stages", title="Subsidy stages", columns=exports.SUBSIDY_STAGES,
                         user_id=caller.user_id, filters=filters, db=db)
 
 
@@ -85,11 +85,11 @@ async def supply(db: DbSession, status: Status = None) -> SupplyPage:
     return await service.supply_report(db, status)
 
 
-@reports.get("/supply/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE}, dependencies=_VIEW)
+@reports.get("/supply/export", response_class=Response, responses={**_ERRORS, **REPORT_EXPORT_RESPONSE}, dependencies=_VIEW)
 async def supply_export(db: DbSession, caller: CallerDep,
-                        filters: Annotated[dict[str, Any], Depends(filters_of(supply))]) -> Response:
-    """The supply report as Excel."""
-    return await export(supply, stem="subsidy-supply", title="Subsidy supply", columns=exports.SUBSIDY_SUPPLY,
+                        filters: Annotated[dict[str, Any], Depends(filters_of(supply))], fmt: ExportFormat = "xlsx") -> Response:
+    """The supply report as Excel or CSV or PDF."""
+    return await export(supply, fmt=fmt, allow_pdf=True, stem="subsidy-supply", title="Subsidy supply", columns=exports.SUBSIDY_SUPPLY,
                         user_id=caller.user_id, filters=filters, db=db)
 
 

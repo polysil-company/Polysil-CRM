@@ -43,10 +43,11 @@ may not see is null.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -68,16 +69,17 @@ Cost figures need campaigns.view; sales need sales_orders. Staff only.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -96,17 +98,18 @@ breaches, and refunds paid.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 | `group_by` | query | `type` \| `status` \| `severity` |  |  |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -124,16 +127,17 @@ the all-time received and balance.
 | `from` | query | date \| null |  | IST date, inclusive. Default: 30 days before `to`. |
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
-| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -148,16 +152,49 @@ Open tasks per person, as of now: due today and overdue by age. Staff only.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
+
+---
+
+## `GET /api/v1/reports/insights`
+
+**Insights**
+
+Plain sentences about the period against the same number of days before it
+(FS-079): the lost reason that is growing, the stage most losses come from, the
+best and worst lead sources, how quotations are answered, how fast new leads are
+contacted. Rows come in a fixed order; a missing row means its data was too thin,
+not that something is wrong. `link` names the report behind a row. Staff only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `from` | query | date \| null |  | IST date, inclusive. Default: 30 days before `to`. |
+| `to` | query | date \| null |  | IST date, inclusive. Default: today. |
+| `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
+| `owner_id` | query | string \| null |  | One person. |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
+| `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -176,17 +213,18 @@ each stage, won, lost and are open, and the conversion rate.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 | `group_by` | query | `source` \| `owner` \| `territory` |  |  |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -205,17 +243,57 @@ stage they dropped off at.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 | `group_by` | query | `reason` \| `owner` |  |  |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
+
+---
+
+## `GET /api/v1/reports/sales-forecast`
+
+**Sales Forecast**
+
+What the open pipeline is likely to bring in, and roughly when (FS-079).
+
+Each open lead's value (its newest live quotation, GST included, else its
+estimated value) is weighted by the win rate of the stage it is at. Win rates
+come from leads won or lost in the last `history_days`, across your whole lead
+scope: the territory and owner filters choose the rows, not the rates
+(`filters.rates_from`). `rates` lists each stage's rate so the screen can explain
+the number; `low_confidence` marks a stage that borrowed an earlier stage's rate.
+With too little history, every weighted figure is null and `reason` is
+`not_enough_history`; never 0. `by_month` is this month, the next two, and
+`later`. Staff only.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
+| `owner_id` | query | string \| null |  | One person. |
+| `group_by` | query | `owner` \| `territory` \| `source` |  |  |
+| `level` | query | `district` \| `taluka` |  | With `group_by=territory`: the level rows roll up to. |
+| `history_days` | query | integer |  | How far back the win rates look: leads won or lost in these days. |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
+| `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -234,16 +312,17 @@ and overdue. A figure you may not see is null. Staff only.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
-| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -260,17 +339,18 @@ Per district or taluka: leads, won, conversion, orders and value. Staff only.
 | `from` | query | date \| null |  | IST date, inclusive. Default: 30 days before `to`. |
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
-| `format` | query | `json` \| `xlsx` |  | `xlsx`: the same rows as an Excel file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. |
 | `level` | query | `district` \| `taluka` |  |  |
+| `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The report as JSON; with `format=xlsx`, the same rows as an Excel attachment. |
+| `200` | - | The report as JSON; with `format=xlsx`, `csv` or `pdf`, the same rows as an attachment. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No reports.view, or not the report's base module, or a dealer on a staff report. |
 | `422` | `ErrorResponse` | A bad window or filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
