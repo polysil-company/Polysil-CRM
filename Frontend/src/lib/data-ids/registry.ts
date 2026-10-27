@@ -365,9 +365,18 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     endpoints: ["GET /leads?deleted=true", "GET /leads/export?deleted=true"],
-    notes: "Read-only: no restore on the backend yet (BE-033).",
+    notes: "Restore on each row is LEAD-020 (BE-033).",
   },
-
+  "LEAD-020": {
+    domain: "LEAD",
+    title:
+      "Restore a deleted lead, and say when and by whom it was deleted (`POST /leads/{id}/restore`)",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /leads/{id}/restore"],
+    notes:
+      "BE-033, FS-073. On Deleted leads, for people who may delete and edit leads. The owner is kept; the duplicate check runs again.",
+  },
   "RPT-001": {
     domain: "RPT",
     title: "Dashboard overview — KPIs, pipeline, follow-ups, area by system, targets",
@@ -604,6 +613,14 @@ export const DATA_IDS = {
     status: "in-progress",
     notes:
       "422 `quotations_disagree` names the field; 409 `quotation_on_order` names the quotation.",
+  },
+  "SO-012": {
+    domain: "SO",
+    title:
+      "An order for a dealer or distributor, typed in by staff: the dealer picked, their rates and details (`POST /orders` with `partner_id`)",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lookups/partners", "GET /partners/{partnerId}", "POST /orders"],
   },
   "APPR-001": {
     domain: "APPR",
@@ -1768,7 +1785,17 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["POST /tracking/duty/start", "POST /tracking/duty/end", "POST /locations/batch"],
     notes:
-      "Capacitor shell (mobile/) plus our own Kotlin plugin: Fused location, a foreground service, Room, OkHttp, WorkManager. Uploads use the web session's token until BE-032 gives a device token.",
+      "Capacitor shell (mobile/) plus our own Kotlin plugin: Fused location, a foreground service, Room, OkHttp, WorkManager. Uploads use the phone's device token (TRK-009).",
+  },
+  "TRK-009": {
+    domain: "TRK",
+    title:
+      "The phone's device token, so the route uploads while the app is closed (`POST /tracking/device-token`)",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /tracking/device-token"],
+    notes:
+      "BE-032. Asked for after duty start and on every launch while a duty is open, one call at a time. The native side keeps it sealed with an Android Keystore key and sends it on batches; on 401 or any 403 it forgets it and keeps the points.",
   },
   "BOT-001": {
     domain: "BOT",

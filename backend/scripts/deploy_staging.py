@@ -52,7 +52,7 @@ FRONTEND_SRC = ROOT / "scripts" / "local" / "reviewstaging" / "Frontend"
 # RELEASED is the matching backend scope
 RELEASED_NAV = ("dashboard", "messages", "leads", "qr-codes", "quotations", "sales-orders",
                 "approvals", "tasks", "dispatch", "approval-limits", "products", "users",
-                "channel-partners")
+                "channel-partners", "team-map", "duty", "visits")
 # --source: the code comes from a checkout of the shared repo (its backend/ and
 # Frontend/), the release branch; the client's data files always come from here
 CODE_ROOT = ROOT

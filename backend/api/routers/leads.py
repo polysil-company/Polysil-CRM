@@ -444,6 +444,25 @@ async def delete(
     return JSONResponse(outcome.body, status_code=outcome.status_code)
 
 
+@router.post("/{lead_id}/restore", response_model=Envelope[Lead], responses=_LEAD_ERRORS,
+             dependencies=[Depends(require("leads", "delete")), Depends(require("leads", "edit"))])
+async def restore(
+    lead_id: LeadId, db: DbSession, caller: CallerDep, claims: Claims, idem: IdemKey,
+) -> JSONResponse:
+    """Bring a deleted lead back (FS-073). Needs `leads.delete` and `leads.edit`. The
+    duplicate pairs a delete closed are reopened, and the duplicate check runs again. A lead that
+    is not deleted comes back unchanged. The owner is kept, even one who has since
+    left: offer Assign when `owner` is inactive. `404` out of scope."""
+    async def work() -> tuple[int, dict]:
+        lead = await service.restore_lead(db, caller, lead_id)
+        return status.HTTP_200_OK, {"data": lead.model_dump(mode="json")}
+
+    outcome = await run_idempotent(
+        db, key=idem, user_id=claims.sub, route=f"POST /api/v1/leads/{lead_id}/restore",
+        payload_hash=payload_digest({}), work=work)
+    return JSONResponse(outcome.body, status_code=outcome.status_code)
+
+
 @router.post("/duplicates/{link_id}/dismiss", response_model=Envelope[DismissResult],
              responses=_LEAD_ERRORS, dependencies=[Depends(require("leads", "edit"))])
 async def dismiss_duplicate(

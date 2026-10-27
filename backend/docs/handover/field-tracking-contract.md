@@ -20,11 +20,25 @@ All paths are under `/api/v1`. Coordinates are JSON numbers in degrees. Times ar
 1. `GET /me/tracking-config` at start, and after every duty start.
 2. If `consent.accepted_version` differs from `consent.required_version`: show the consent screen, then `POST /tracking/consent`.
 3. Start duty: `POST /tracking/duty/start` with an id the phone generates. **Use the id in the answer**, which may differ from yours (a reinstall mid-duty gets the open session back).
+3a. Get a device token (FS-072, BE-032): `POST /tracking/device-token {device_id}`, from the screens, with the access token. Do it after duty start **and on every app launch while a duty is open**. One call at a time: hand the native service only the last answer. Store `token` in `EncryptedSharedPreferences`. The native service sends it as `Authorization: Bearer pdt_…` on steps 5 and 8 and on `GET /me/tracking-config`, and never refreshes anything.
 4. Configure the plugin with `interval_seconds` and `distance_filter_m`. Store every fix locally with a new uuid.
 5. Every `interval_seconds`, or on reconnect: `POST /locations/batch`, oldest first, at most `max_batch_points` per batch.
 6. Delete a stored point only after a batch answer counts it or names it.
 7. When a batch answer's `duty.ended_at` is set, stop tracking and flip the toggle off. The server ended the duty: idle after hours, or consent withdrawn.
 8. End duty: `POST /tracking/duty/end`.
+9. With the device token, on **`401` or any `403`**: stop sending, keep every point, and wait for the screens to hand over a new token on the next launch. `401` means the session ended (signed out, signed out everywhere, deactivated, password reset, 30 days). `403 insufficient_permission` means the role lost tracking. Retrying only drains the battery.
+
+### The device token, in short
+
+| | |
+|---|---|
+| Good for | `POST /locations/batch`, `POST /tracking/duty/end`, `GET /me/tracking-config`. Every other signed-in route: `403 device_token_not_allowed` |
+| Lasts | 30 days from its issue, and only while the sign-in it came from is alive. A refresh keeps it alive |
+| Replaced by | a new issue for the same device. The old one answers `401` from then |
+| One person per phone | issuing for a device deletes any other person's token on that `device_id`. Send a person's points only with that person's token (`user_id` in the answer). Client question 9.5 |
+| A batch with it | must carry the token's own `device_id`, else `422 device_mismatch` |
+| A replayed issue key | `409 idempotency_replay_unavailable`: the token is never stored. Issue again with a new key |
+| Consent withdrawn | the token keeps working; the batch answers `200` and rejects every point as `consent_withdrawn`, so the queue drains |
 
 Ask Android for "Allow all the time" location and to ignore battery optimisation when duty starts. Say why in plain words; staff switch tracking off when it drains the battery.
 

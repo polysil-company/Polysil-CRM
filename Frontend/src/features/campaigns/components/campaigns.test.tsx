@@ -195,7 +195,9 @@ describe("[MKT-005] CampaignsPage", () => {
     expect(within(list).getAllByText(/Planned|Spent/).length).toBeGreaterThan(0);
   });
 
-  it("adds a campaign, refusing a taken name on its field", async () => {
+  // It waits out the "Not saved" moment (a fixed few seconds) and types ~45 characters, which
+  // together sat at the 5 s default and failed on a busy runner: it gets its own budget.
+  it("adds a campaign, refusing a taken name on its field", { timeout: 15_000 }, async () => {
     reset("admin");
     const user = show();
     await user.click(await screen.findByRole("button", { name: "New campaign" }));

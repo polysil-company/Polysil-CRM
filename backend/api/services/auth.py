@@ -552,6 +552,11 @@ async def logout(db: AsyncSession, *, session_id: str | None,
     await db.execute(
         text("SELECT auth_revoke_sessions(CAST(:s AS uuid), NULL)"), {"s": target}
     )
+    # FS-072: the tracking app's device tokens die with the sign-out. By family,
+    # because the session named may already have been rotated (EC-3, ISS-218).
+    await db.execute(
+        text("SELECT tracking_device_token_forget(CAST(:s AS uuid))"), {"s": target}
+    )
 
 
 # ── /auth/me ─────────────────────────────────────────────────────────────────

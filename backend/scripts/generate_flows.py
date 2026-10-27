@@ -454,6 +454,14 @@ def f_lead() -> None:
               "Not here: inbound WhatsApp as a source (GAP-337, question 3a.1),\n"
               "dealership enquiries (GAP-135). Editing a QR code: canvas 46.",
               w=560, colour=GREY)
+    e += note("nRedRestore", 920, 980,
+              "DELETE AND RESTORE (FS-073)\n\n"
+              "Delete closes the lead's pairs as dismissed in its own\n"
+              "transaction. POST /leads/{id}/restore reopens every pair\n"
+              "a delete closed (lead_reopen_links, 080), matched by the\n"
+              "lead.deleted event's time. A deleted lead is read only:\n"
+              "409 lead_deleted. The owner is kept (GAP-524).",
+              w=460, colour=RED)
     write("04-lead-capture", e)
 
 
@@ -1782,6 +1790,12 @@ def f_complaints() -> None:
               "targets have no UPDATE grant; only the definers\n"
               "write them. A submitted complaint's lines are frozen\n"
               "by a trigger as well as by the service.", w=420, colour=GREEN)
+    e += note("nYellow4", 1240, 1900,
+              "PDF (FS-074): GET /complaints/{id}/pdf, made when asked,\n"
+              "from what the caller sees; no internal notes; a dealer\n"
+              "never sees an escalation. Two renders per process,\n"
+              "shared with the data sheet. complaint-pdf/ never\n"
+              "cleaned yet (GAP-527).", w=420, colour=YELLOW)
     write("15-complaints", e)
 
 
@@ -1864,6 +1878,7 @@ def f_field_tracking() -> None:
         ("t1", "GET /me/tracking-config\nfilters, hours, consent version, open duty", BLUE),
         ("t2", "POST /tracking/consent (current version)\nwithdraw: ends the open duty", BLUE),
         ("t3", "POST /tracking/duty/start {id from the phone}\n200 + the open one if already on duty", BLUE),
+        ("t3b", "POST /tracking/device-token {device_id} (FS-072)\nat duty start and every app open; pdt_ token\nto the native service: batch, duty end, config", VIOLET),
         ("t4", "POST /locations/batch {sent_at, points}\nown ids = duplicates; skew corrected; reasons named", VIOLET),
         ("t5", "location_point + tracking_latest (forward only)\nduty.last_point_at; answer carries the duty state", GREEN),
         ("t6", "POST /tracking/duty/end, or the worker:\nidle 30 min after hours, or 14 h; end = last point", BLUE),
@@ -1911,6 +1926,15 @@ def f_field_tracking() -> None:
     e += note("nYellow1", 1240, 820,
               "Stand-ins: hours Mon-Sat 9-7, photo optional, 90-day\n"
               "retention, our consent text (GAP-191 to GAP-201).", w=420, colour=YELLOW)
+    e += note("nRed4", 1240, 960,
+              "THE DEVICE TOKEN NEVER REFRESHES (FS-072)\n\n"
+              "It dies with its session family: sign-out, sign out\n"
+              "everywhere, reuse, deactivation, a version bump. On 401\n"
+              "or ANY 403 the native service stops and keeps its points.\n"
+              "One issue call in flight: each replaces the last token.", w=420, colour=RED)
+    e += note("nYellow2", 1240, 1180,
+              "One person per phone, 3 phones per person, 30 days\n"
+              "(GAP-522, question 9.5).", w=420, colour=YELLOW)
     write("29-field-tracking", e)
 
 
@@ -2556,6 +2580,27 @@ def f_live_checks() -> None:
          ("n4", "Not yet: a production account (GAP-498), a storage\nwrite (499), the dealer steps (500), a browser (501).", YELLOW)])
 
 
+def f_partner_recruitment() -> None:
+    _columns(
+        "71-partner-recruitment", "Recruiting a dealer or a distributor",
+        "Staff start it, the applicant fills the data sheet, the deposit is paid or relaxed, a decider approves.",
+        "BUILT. FS-051 (dealers), FS-071 (distributors, data sheet, deposit, PDF): migrations 062, 078.",
+        [("s1", "POST /dealer-applications {partner_type}\ndeposit copied from <type>_deposit_amount, kept", BLUE),
+         ("s2", "applicant: link + WhatsApp code; fills the\ndata sheet; uploads documents and the slip", GREY),
+         ("s3", "submit: FS-051's fields + <type>_application_required", BLUE),
+         ("s4", "POST /deposit {amount, paid_on, slip_id}\nor POST /deposit/relaxation {amount_due, reason}", YELLOW),
+         ("s5", "decision: a role in <type>_application_deciders;\nrefused while the deposit is pending", GREEN),
+         ("s6", "approve: dealer DLR-<st>-0001 under a distributor or Polysil;\ndistributor DIST-<st>-0001 under Polysil; a login", GREEN)],
+        [("d1", "GET /dealer-applications/{id}/pdf: the sheet, filled\nGET /dealer-applications/form.pdf: blank", VIOLET),
+         ("d2", "relax: deposit_relaxation_roles, never the creator,\nnever after a payment; each one kept", YELLOW),
+         ("d3", "every payment kept; the latest counts;\nits slip cannot be removed", GREEN),
+         ("d4", "closed application: its documents frozen,\neven for the uploader", GREEN)],
+        [("n1", "THE AMOUNT IS COPIED AT CREATION\n\nChanging a deposit setting changes new applications\nonly. Applications open on 22 Oct 2026 carry 0.", RED),
+         ("n2", "A SETTING CAN GIVE A JUNIOR ROLE A MANAGER'S POWER\n\nA decider creates partners and logins. The settings\naccept any staff role (GAP-517).", RED),
+         ("n3", "PDF IN THE API: two at a time per process,\na third gets 503 busy. Account always masked.", YELLOW),
+         ("n4", "Not yet: the applicant after submit (GAP-519),\nrefunds (GAP-520), a distributor's territory\nlevel (GAP-521).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2570,4 +2615,5 @@ if __name__ == "__main__":
     f_export_sample_orders(); f_ratings(); f_warranty()
     f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
     f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy(); f_live_checks()
+    f_partner_recruitment()
     print(f"\nwrote to {OUT}")

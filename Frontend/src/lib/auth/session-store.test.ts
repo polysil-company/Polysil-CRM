@@ -174,45 +174,24 @@ describe("[AUTH-004] session store", () => {
   });
 });
 
-describe("[TRK-008] The token handed to the Android app's tracker", () => {
+describe("[TRK-009] The session's token inside the Android app", () => {
   afterEach(() => {
     vi.doUnmock("@/lib/native/tracking-plugin");
     document.cookie = "polysil_session=; Max-Age=0; Path=/";
   });
 
-  it("hands each new token over inside the app, and an empty one on sign-out", async () => {
-    const setAccessToken = vi.fn((_handed: { token: string; expiresAt: string }) =>
-      Promise.resolve(),
-    );
+  it("never leaves the API client: the tracker gets a device token of its own", async () => {
+    const setDeviceToken = vi.fn(() => Promise.resolve());
     vi.resetModules();
     vi.doMock("@/lib/native/tracking-plugin", () => ({
       isNativeApp: () => true,
-      PolysilTracking: { setAccessToken },
+      PolysilTracking: { setDeviceToken },
     }));
     const { store, signIn } = await loadPage();
 
     await signIn();
-    expect(setAccessToken).toHaveBeenCalledTimes(1);
-    const handed = setAccessToken.mock.calls.at(0)?.[0];
-    expect(handed?.token).not.toBe("");
-    expect(Date.parse(handed?.expiresAt ?? "")).toBeGreaterThan(Date.now());
-
     store.endSession("signed-out");
-    expect(setAccessToken).toHaveBeenLastCalledWith({
-      token: "",
-      expiresAt: new Date(0).toISOString(),
-    });
-  });
 
-  it("never calls the tracker in a browser", async () => {
-    const setAccessToken = vi.fn(() => Promise.resolve());
-    vi.resetModules();
-    vi.doMock("@/lib/native/tracking-plugin", () => ({
-      isNativeApp: () => false,
-      PolysilTracking: { setAccessToken },
-    }));
-    const { signIn } = await loadPage();
-    await signIn();
-    expect(setAccessToken).not.toHaveBeenCalled();
+    expect(setDeviceToken).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,14 @@
 import { apiRequest } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
-import { dutySchema, type Duty, type DutyEndRequest, type DutyStartRequest } from "./duty.schemas";
+import {
+  deviceTokenSchema,
+  dutySchema,
+  type DeviceToken,
+  type Duty,
+  type DutyEndRequest,
+  type DutyStartRequest,
+} from "./duty.schemas";
 
 const log = createLogger({ file: "features/tracking/api/duty.api.ts", dataId: "TRK-008" });
 
@@ -42,5 +49,29 @@ export function endDuty({
     body,
     idempotencyKey,
     schema: dutySchema,
+  });
+}
+
+/**
+ * TRK-009 · A token for the phone's background uploads (BE-032). A new one for this device replaces
+ * the old. `409 idempotency_replay_unavailable` on a reused key: ask again with a new one.
+ */
+export function issueDeviceToken({
+  deviceId,
+  idempotencyKey,
+}: {
+  readonly deviceId: string;
+  readonly idempotencyKey: string;
+}): Promise<DeviceToken> {
+  return apiRequest({
+    dataId: "TRK-009",
+    logger: log,
+    fn: "issueDeviceToken",
+    method: "POST",
+    path: "/tracking/device-token",
+    body: { device_id: deviceId },
+    idempotencyKey,
+    schema: deviceTokenSchema,
+    sensitive: true,
   });
 }

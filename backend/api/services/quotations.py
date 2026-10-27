@@ -850,10 +850,18 @@ async def _request_remarks(db: AsyncSession, quotation_id: str) -> dict[str, str
 
 # ── create ───────────────────────────────────────────────────────────────────
 
+def _need_lines(lines: list[Any]) -> None:
+    """FS-073 (BE-035): a quotation has an item from the start. The same code as
+    sending an empty draft, so the three calls give one answer."""
+    if not lines:
+        raise ValidationFailed("Add at least one line.", code="no_lines", fields={"lines": "empty"})
+
+
 async def create_quotation(db: AsyncSession, caller: Caller, body: sch.QuotationCreate,
                            settings: Settings) -> sch.Quotation:
     if caller.partner_id is not None:
         raise ForbiddenError("Partner users do not raise quotations.")
+    _need_lines(body.lines)
     stage = await _lock_lead(db, body.lead_id, require_open=True)
     if stage not in domain.CREATABLE_ON:
         raise ValidationFailed(
@@ -1089,6 +1097,7 @@ async def replace_lines(db: AsyncSession, caller: Caller, quotation_id: str,
     row = await _lock_quotation(db, quotation_id)
     _expect(row, body.expected_status)
     _must_be_draft(row)
+    _need_lines(body.lines)
     ctx = await _price(db, partner_id=str(row.partner_id) if row.partner_id else None,
                        pos_territory_id=str(row.place_of_supply_territory_id),
                        seller_gstin_id=str(row.seller_gstin_id), as_of=row.price_effective_date,

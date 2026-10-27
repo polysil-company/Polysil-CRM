@@ -14,7 +14,8 @@ from api.schemas.leads import UserRef
 RecordType = Literal["lead", "quotation", "sales_order", "dispatch", "payment", "dealer_application"]
 DocType = Literal["purchase_order", "payment_proof", "signed_quotation", "invoice", "delivery_challan",
                   "transport_receipt", "site_photo", "land_record", "subsidy_document", "other",
-                  "gst_certificate", "pan_card", "cancelled_cheque", "shop_photo", "shop_licence"]
+                  "gst_certificate", "pan_card", "cancelled_cheque", "shop_photo", "shop_licence",
+                  "deposit_slip"]
 
 DOC_TYPE_LABELS: Final[dict[str, str]] = {
     "purchase_order": "Purchase order",
@@ -33,13 +34,15 @@ DOC_TYPE_LABELS: Final[dict[str, str]] = {
     "cancelled_cheque": "Cancelled cheque",
     "shop_photo": "Shop photo",
     "shop_licence": "Shop licence",
+    # FS-071: the pay slip of the deposit
+    "deposit_slip": "Deposit pay slip",
 }
 
 # FS-070 (BE-025): the types each record takes. A dealer application takes the set its
 # applicant upload accepts (routers/dealer_applications.py); every other record the
 # general ones. `other` belongs everywhere. The upload does not enforce this (GAP-516).
 _DEALER_DOCS: Final = ("gst_certificate", "pan_card", "cancelled_cheque", "shop_photo",
-                       "shop_licence", "other")
+                       "shop_licence", "deposit_slip", "other")
 _GENERAL_DOCS: Final = (*(k for k in DOC_TYPE_LABELS if k not in _DEALER_DOCS), "other")
 DOC_TYPES_BY_RECORD: Final[dict[str, tuple[str, ...]]] = {
     "lead": _GENERAL_DOCS, "quotation": _GENERAL_DOCS, "sales_order": _GENERAL_DOCS,

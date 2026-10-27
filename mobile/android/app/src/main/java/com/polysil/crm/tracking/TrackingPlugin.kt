@@ -14,12 +14,13 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
+import com.polysil.crm.tracking.core.DeviceToken
 import java.util.concurrent.Executors
 
 /**
  * TRK-008 · The web app's handle on duty tracking (`Frontend/src/features/tracking/native/`). The
- * web side calls the API for duty start and end; this keeps the fixes, uploads them natively, and
- * reports back. Events: `status`, and `serverEndedDuty` when a batch answer ends the duty.
+ * web side calls the API for duty start and end and fetches the device token (TRK-009); this keeps
+ * the fixes, uploads them natively with that token, and reports back. Events: `status`, and `serverEndedDuty` when a batch answer ends the duty.
  */
 @CapacitorPlugin(
     name = "PolysilTracking",
@@ -112,15 +113,32 @@ class TrackingPlugin : Plugin() {
         startSettings(call, target, Intent(Settings.ACTION_SETTINGS))
     }
 
-    /** The web app's access token and when it expires; empty to forget it (signed out). */
+    /**
+     * TRK-009 · The device token from `POST /tracking/device-token` (BE-032), handed over after duty
+     * start and on every launch while a duty is open; empty to forget it. Kept sealed on disk.
+     */
     @PluginMethod
-    fun setAccessToken(call: PluginCall) {
+    fun setDeviceToken(call: PluginCall) {
         val token = call.getString("token").orEmpty()
         val expiresAt = call.getString("expiresAt")?.let(::parseIsoTime) ?: 0L
-        AccessTokenHolder.set(token, expiresAt)
-        call.resolve()
-        // Points that waited for a token go up now.
-        if (token.isNotEmpty()) worker.execute { UploadRunner.run(context) }
+        val userId = call.getString("userId").orEmpty()
+        if (token.isNotEmpty() && (expiresAt <= 0L || userId.isEmpty())) {
+            call.reject("token, expiresAt and userId are needed", "invalid_options")
+            return
+        }
+        worker.execute {
+            val kept = UploadRunner.acceptToken(
+                context,
+                if (token.isEmpty()) null else DeviceToken(token, expiresAt, userId),
+            )
+            if (!kept) {
+                call.reject("The phone couldn't keep the token", "token_not_kept")
+                return@execute
+            }
+            call.resolve()
+            // Points that waited for a token go up now.
+            if (token.isNotEmpty()) UploadRunner.run(context)
+        }
     }
 
     @PluginMethod

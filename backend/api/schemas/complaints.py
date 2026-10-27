@@ -18,6 +18,11 @@ Severity = Literal["low", "medium", "high"]
 Status = Literal["draft", "submitted", "under_qc", "qc_approved", "qc_rejected", "cancelled",
                  "remedy_pending", "closed"]
 Kind = Literal["photo", "document", "challan"]
+PdfState = Literal["none", "ready"]
+_PDF_STATE = ("FS-074: `ready` once the complaint has a number and is not a draft; "
+              "GET /complaints/{id}/pdf then gives a link. `none` otherwise, including a "
+              "complaint returned to its raiser. Never `pending` or `failed`: the PDF is "
+              "made when asked for.")
 _Id = Annotated[str, Field(pattern=UUID_RE)]
 _Text = Annotated[str, Field(min_length=1, max_length=domain.TEXT_MAX)]
 _Short = Annotated[str, Field(min_length=1, max_length=60)]
@@ -315,6 +320,7 @@ class Complaint(BaseModel):
     created_at: str
     updated_at: str
     submitted_at: str | None
+    pdf_state: PdfState = Field(default="none", description=_PDF_STATE)
 
 
 class ComplaintSummary(BaseModel):
@@ -330,6 +336,7 @@ class ComplaintSummary(BaseModel):
     first_submitted_at: str | None
     breached: bool = Field(description="Either target missed.")
     created_at: str
+    pdf_state: PdfState = Field(default="none", description=_PDF_STATE)
 
 
 class ComplaintPage(BaseModel):

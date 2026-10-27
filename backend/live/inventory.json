@@ -14,6 +14,7 @@
   "/api/v1/customers": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/dashboard/overview": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/dealer-applications": {"query": {}, "public": false, "skip": {}, "forbidden": []},
+  "/api/v1/dealer-applications/form.pdf": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/dealer-commissions": {"query": {}, "public": false, "skip": {}, "forbidden": ["production"]},
   "/api/v1/dealer-commissions/export": {"query": {}, "public": false, "skip": {"production": "its date filter answers 422 (paid_from binds text to a date cast); unbounded it would drain up to 5,001 rows"}, "forbidden": ["production"]},
   "/api/v1/dispatches": {"query": {}, "public": false, "skip": {}, "forbidden": []},
@@ -114,11 +115,11 @@
   "/api/v1/tax-rates": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/territories": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/tracking/policy": {"query": {}, "public": false, "skip": {}, "forbidden": []},
-  "/api/v1/tracking/team/latest": {"query": {}, "public": false, "skip": {"production": "writes tracking_view_log rows (api/services/tracking.py team_latest)"}, "forbidden": ["production"]},
-  "/api/v1/tracking/view-log": {"query": {}, "public": false, "skip": {}, "forbidden": ["production"]},
+  "/api/v1/tracking/team/latest": {"query": {}, "public": false, "skip": {"production": "writes tracking_view_log rows (api/services/tracking.py team_latest)"}, "forbidden": []},
+  "/api/v1/tracking/view-log": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/users": {"query": {}, "public": false, "skip": {}, "forbidden": []},
   "/api/v1/users/export": {"query": {}, "public": false, "skip": {"production": "no date filter; would drain up to 5,001 rows"}, "forbidden": []},
-  "/api/v1/visits": {"query": {}, "public": false, "skip": {"production": "writes tracking_view_log rows (api/services/tracking.py list_visits)"}, "forbidden": ["production"]},
+  "/api/v1/visits": {"query": {}, "public": false, "skip": {"production": "writes tracking_view_log rows (api/services/tracking.py list_visits)"}, "forbidden": []},
   "/api/v1/warehouses": {"query": {}, "public": false, "skip": {}, "forbidden": ["production"]},
   "/api/v1/warranty-terms": {"query": {}, "public": false, "skip": {}, "forbidden": []}
 }

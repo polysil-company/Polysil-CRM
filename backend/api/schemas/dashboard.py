@@ -25,8 +25,12 @@ class Kpis(BaseModel):
     pipeline_value: Kpi = Field(description="Summed estimated value of open leads, now.")
     new_leads: Kpi = Field(description="Leads created in the period.")
     conversion_rate: Kpi = Field(description="Of the period's new leads, the percentage won now.")
-    overdue_follow_ups: Kpi = Field(description="Open tasks on leads overdue now, the same "
-                                    "figure as follow_ups_overdue on GET /leads/stats.")
+    overdue_follow_ups: Kpi = Field(description=(
+        "Open tasks **on leads** you can see, matching the dashboard's filters, due in the "
+        "90 days before today: the same figure as follow_ups_overdue on GET /leads/stats. "
+        "A task with no lead, or on a dealer, is not counted, so it can be lower than "
+        "Tasks → My day, which counts every open task assigned to you (FS-073, BE-036). "
+        "Label it \"Overdue follow-ups on leads\"."))
 
 
 class Period(BaseModel):

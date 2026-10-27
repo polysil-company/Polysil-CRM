@@ -30,6 +30,7 @@ import { mockLookupRows } from "@/mocks/data/lookups";
 import { leadInPartnerScope } from "@/mocks/data/partner-scope";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { MOCK_ID_SPACE, MOCK_PARTNERS, MOCK_STAFF, mockUuid } from "@/mocks/data/reference";
+import { mockMeFor } from "@/mocks/data/sessions";
 import {
   findMockTerritory,
   MOCK_TERRITORIES,
@@ -1072,10 +1073,44 @@ export const leadHandlers = [
         if (link.state === "pending") settleLink(link.link_id, "dismissed");
       }
       mockDb.leads = mockDb.leads.filter((item) => item.id !== leadId);
-      // LEAD-019 · Soft delete, as on the backend: the lead moves to the deleted list.
-      mockDb.deletedLeads = [lead, ...mockDb.deletedLeads];
+      // LEAD-019 · Soft delete, as on the backend: the lead moves to the deleted list,
+      // with when and by whom (LEAD-020).
+      const caller = mockMeFor(readMockRole()).data;
+      mockDb.deletedLeads = [
+        {
+          ...lead,
+          deleted_at: new Date().toISOString(),
+          deleted_by: { id: caller.id, full_name: caller.full_name },
+        },
+        ...mockDb.deletedLeads,
+      ];
     }
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  /**
+   * LEAD-020 · Restore a deleted lead (BE-033): needs leads delete and edit. It rejoins the
+   * leads with its owner; a lead that isn't deleted comes back unchanged.
+   */
+  http.post(buildApiUrl("/leads/:leadId/restore"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    const leadId = String(params.leadId);
+    const key = request.headers.get("idempotency-key")?.trim() ?? "";
+    if (key === "") {
+      return errorResponse(400, "idempotency_key_required", "An Idempotency-Key is required.");
+    }
+    if (!mayDo("delete") || !mayDo("edit")) {
+      return errorResponse(403, "forbidden", "You may not restore leads.");
+    }
+    const live = mockDb.leads.find((item) => item.id === leadId);
+    if (live !== undefined) return HttpResponse.json({ data: live });
+    const deleted = mockDb.deletedLeads.find((item) => item.id === leadId);
+    if (deleted === undefined) return errorResponse(404, "not_found", "No such lead.");
+    const restored: LeadWire = { ...deleted, deleted_at: null, deleted_by: null };
+    mockDb.deletedLeads = mockDb.deletedLeads.filter((item) => item.id !== leadId);
+    mockDb.leads = [restored, ...mockDb.leads];
+    return HttpResponse.json({ data: restored });
   }),
 
   /** LEAD-012 · Merge this lead (the loser) into the survivor. */

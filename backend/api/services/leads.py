@@ -32,7 +32,13 @@ from api.config import get_settings
 from api.domain import leads as domain
 from api.domain import tasks as task_domain
 from api.domain.orders import actor_hidden_from_partner
-from api.errors import ForbiddenError, NotFoundError, StageChangedError, ValidationFailed
+from api.errors import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    StageChangedError,
+    ValidationFailed,
+)
 from api.integrations.messages import TEMPLATE_LEAD_ACK
 from api.schemas.leads import (
     Assignee,
@@ -133,7 +139,16 @@ SELECT l.id, l.inquiry_no, l.stage, l.inquiry_type,
        l.first_contacted_at, l.last_activity_at, l.created_at,
        l.created_by, cb.full_name AS created_by_name,
        CASE WHEN (SELECT app_current_partner()) IS NULL THEN l.campaign_id END AS campaign_id,
-       cmp.name::text AS campaign_name, l.customer_id
+       cmp.name::text AS campaign_name, l.customer_id,
+       l.deleted_at,
+       -- FS-073 (BE-033): who deleted it, from the newest lead.deleted event. The
+       -- name is the one the event recorded, so a deleter outside the reader's
+       -- office still has one (EC-9).
+       CASE WHEN l.deleted_at IS NOT NULL THEN (
+           SELECT json_build_object('id', e.actor_id, 'full_name', e.payload ->> 'actor_name')
+             FROM activity_event e
+            WHERE e.lead_id = l.id AND e.kind = 'lead.deleted'
+            ORDER BY e.occurred_at DESC, e.id DESC LIMIT 1) END AS deleted_by_json
   FROM lead l
   JOIN mis_system ms ON ms.id = l.mis_system_id
   JOIN lead_source src ON src.id = l.lead_source_id
@@ -625,7 +640,18 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
         campaign_id=str(row.campaign_id) if row.campaign_id else None,
         campaign_name=row.campaign_name,
         customer_id=str(row.customer_id) if row.customer_id else None,
+        deleted_at=_iso(row.deleted_at),
+        deleted_by=_deleted_by(row.deleted_by_json),
         duplicates=duplicates)
+
+
+def _deleted_by(raw: Any) -> UserRef | None:
+    if not raw:
+        return None
+    d = raw if isinstance(raw, dict) else json.loads(raw)
+    if not d.get("id"):
+        return None
+    return UserRef(id=str(d["id"]), full_name=d.get("full_name") or "")
 
 
 # ── lifecycle: transition, reopen, notes, timeline ───────────────────────────
@@ -644,13 +670,23 @@ async def _lock(db: AsyncSession, lead_id: str) -> Any:
         {"id": lead_id})).one_or_none()
 
 
+async def _lock_live(db: AsyncSession, lead_id: str) -> Any:
+    """_lock, then FS-073 rule 2: a deleted lead's row is read only until restored.
+    Checked on the locked row and before any other refusal, so a deleted lost lead
+    answers lead_deleted, not stage_terminal (EC-8)."""
+    row = await _lock(db, lead_id)
+    if row is None:
+        raise NotFoundError("No such lead.")
+    if row.deleted_at is not None:
+        raise ConflictError("This lead was deleted. Restore it first.", code="lead_deleted")
+    return row
+
+
 async def transition_lead(db: AsyncSession, caller: Caller, lead_id: str,
                           body: LeadTransition) -> Lead:
     """Move a lead along the lifecycle (rules 8-10). Validated against the stage the
     row holds under the lock, not the one the caller saw."""
-    row = await _lock(db, lead_id)
-    if row is None:
-        raise NotFoundError("No such lead.")
+    row = await _lock_live(db, lead_id)
     current = row.stage
     if body.expected_stage and body.expected_stage != current:
         raise StageChangedError(f"The lead is now {current}.", fields={"stage": current})
@@ -721,9 +757,7 @@ async def reopen_lead(db: AsyncSession, caller: Caller, lead_id: str,
     one back to the stage it was swept from (FS-035). A lost lead's reason and note
     move to the timeline and are cleared on the row, and reopen_count goes up; a
     dormant lead's does not, because the count is the conversion report's."""
-    row = await _lock(db, lead_id)
-    if row is None:
-        raise NotFoundError("No such lead.")
+    row = await _lock_live(db, lead_id)
     if row.stage not in domain.REOPENABLE:
         raise ValidationFailed("Only a lost or dormant lead can be reopened.",
                                code="stage_terminal", fields={"stage": row.stage})
@@ -755,8 +789,7 @@ async def add_note(db: AsyncSession, caller: Caller, lead_id: str,
                    body: LeadNote) -> TimelineEvent:
     """Append a note to a lead's timeline (rule 16). It bumps last_activity_at and
     counts toward engagement, so the score is recomputed."""
-    if await _lock(db, lead_id) is None:
-        raise NotFoundError("No such lead.")
+    await _lock_live(db, lead_id)
     actor = await _actor_name(db)
     ev = await _emit(db, lead_id=lead_id, kind="lead.note_added", actor_id=caller.user_id,
                      actor_name=actor, note=body.note)
@@ -991,9 +1024,7 @@ async def assign_lead(db: AsyncSession, caller: Caller, lead_id: str,
         if not ok:
             raise ValidationFailed(fields={"owner_user_id": "not assignable by you"})
 
-    row = await _lock(db, lead_id)
-    if row is None:
-        raise NotFoundError("No such lead.")
+    row = await _lock_live(db, lead_id)
     if row.stage in domain.TERMINAL:
         raise ValidationFailed("This lead is closed and cannot be reassigned.",
                                code="stage_terminal", fields={"stage": row.stage})
@@ -1088,9 +1119,7 @@ async def patch_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadP
     Required fields cannot be cleared, which is also the qualification gate: a
     qualified lead can never lose one. A territory move re-routes the owning unit
     (rule 4) and must keep the row in the caller's scope (stage 4)."""
-    row = await _lock(db, lead_id)
-    if row is None:
-        raise NotFoundError("No such lead.")
+    row = await _lock_live(db, lead_id)
     if row.stage in domain.TERMINAL:
         raise ValidationFailed("This lead is closed and cannot be edited.",
                                code="stage_terminal", fields={"stage": row.stage})
@@ -1238,6 +1267,38 @@ async def delete_lead(db: AsyncSession, caller: Caller, lead_id: str) -> None:
     await db.execute(text("UPDATE lead SET deleted_at = now() WHERE id = :id"), {"id": lead_id})
 
 
+async def restore_lead(db: AsyncSession, caller: Caller, lead_id: str) -> Lead:
+    """FS-073 (BE-033): bring a deleted lead back. A live lead is returned as it is.
+
+    lead_reopen_links() (080) reopens the pairs a delete closed, hidden ones
+    included, as lead_close_links() closed them; a pair dismissed by hand stays
+    dismissed. Then the check runs again, for leads that came to look like it
+    meanwhile. None of that on a merged lead: its pairs could only be dismissed
+    (EC-4). The reopened pairs go in the event's payload (rule 7)."""
+    row = await _lock(db, lead_id)
+    if row is None:
+        raise NotFoundError("No such lead.")
+    if row.deleted_at is None:
+        return await get_lead(db, caller, lead_id)
+    await db.execute(text("UPDATE lead SET deleted_at = NULL WHERE id = :id"), {"id": lead_id})
+    reopened: list[dict[str, str]] = []
+    if row.stage != "merged":
+        reopened = [{"link_id": str(r.link_id), "lead_id": str(r.other_lead_id)}
+                    for r in (await db.execute(text(
+                        "SELECT * FROM lead_reopen_links(CAST(:id AS uuid))"),
+                        {"id": lead_id})).all()]
+        cur = (await db.execute(text(
+            "SELECT mobile, email, farmer_name, village, territory_id FROM lead WHERE id = :id"),
+            {"id": lead_id})).one()
+        await _detect_duplicates(db, caller, lead_id, mobile=cur.mobile, email=cur.email,
+                                 farmer_name=cur.farmer_name, village=cur.village,
+                                 territory_id=str(cur.territory_id))
+    await _emit(db, lead_id=lead_id, kind="lead.restored", actor_id=caller.user_id,
+                actor_name=await _actor_name(db), duplicates_reopened=reopened)
+    await _rescore(db, lead_id)
+    return await get_lead(db, caller, lead_id)
+
+
 # ── duplicates (rules 6 and 13) ──────────────────────────────────────────────
 
 _NAME_GEO_THRESHOLD = 0.6   # GAP-047: an assumption until the client tunes it
@@ -1369,8 +1430,24 @@ async def merge_lead(db: AsyncSession, caller: Caller, lead_id: str, body: LeadM
     if body.into_lead_id == lead_id:
         raise ValidationFailed("A lead cannot merge into itself.", code="merge_self",
                                fields={"into_lead_id": "same lead"})
-    if await _lock(db, lead_id) is None:
-        raise NotFoundError("No such lead.")
+    # FS-073 EC-2: both rows locked in lead_merge()'s own order (least id first),
+    # then neither may be deleted. Checked after the locks, so a delete cannot
+    # commit between the check and the merge.
+    survivor_deleted: Any = None
+    # uuid order, as lead_merge()'s least()/greatest(): a string sort would put an
+    # uppercase id first and lock in the other order (code review F-2)
+    for lid in sorted((lead_id, body.into_lead_id), key=uuid.UUID):
+        if lid == lead_id:
+            loser = await _lock(db, lead_id)
+            if loser is None:
+                raise NotFoundError("No such lead.")
+        else:
+            survivor_deleted = (await db.execute(text(
+                "SELECT deleted_at IS NOT NULL FROM lead WHERE id = CAST(:id AS uuid) FOR UPDATE"),
+                {"id": lid})).scalar_one_or_none()
+    if loser.deleted_at is not None or survivor_deleted:
+        raise ConflictError("A deleted lead cannot be merged. Restore it first.",
+                            code="lead_deleted")
     try:
         await db.execute(text("SELECT lead_merge(CAST(:loser AS uuid), CAST(:surv AS uuid))"),
                          {"loser": lead_id, "surv": body.into_lead_id})

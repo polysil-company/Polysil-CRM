@@ -200,4 +200,9 @@ async def remove(db: AsyncSession, caller: Caller, document_id: str) -> None:
             raise NotFoundError("No such document.") from exc
         if code == "DOCFB":
             raise ForbiddenError("Only whoever added it, or a staff editor, removes it.") from exc
+        # FS-071: a decided application's documents are frozen; a payment's slip stays
+        if code == "DOCCL":
+            raise ConflictError("This record is closed; its documents stay.", code="record_closed") from exc
+        if code == "DOCIU":
+            raise ConflictError("A recorded payment names this pay slip.", code="document_in_use") from exc
         raise

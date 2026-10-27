@@ -553,6 +553,35 @@ Replace a draft's products, 1 to 20, each once.
 
 ---
 
+## `GET /api/v1/complaints/{complaint_id}/pdf`
+
+**Complaint Pdf**
+
+A ten-minute link to the complaint as a PDF (FS-074), made now from what you
+can see: open it in a new tab, do not fetch it with the bearer token. Only when
+`pdf_state` is `ready`; `404` otherwise. A dealer's copy leaves out what the
+dealer's page leaves out, and nobody's copy carries internal notes. `503 busy`:
+try again in a few seconds.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `complaint_id` | path | string | yes |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_PdfLink_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Not yours to do. |
+| `404` | `ErrorResponse` | Not in your scope. |
+| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, retry in a few seconds. `storage_unavailable`, `pdf_unavailable`. |
+
+---
+
 ## `POST /api/v1/complaints/{complaint_id}/qc`
 
 **Quality**
@@ -915,6 +944,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `created_at` | string | yes |  |
 | `updated_at` | string | yes |  |
 | `submitted_at` | string \| null | yes |  |
+| `pdf_state` | `none` \| `ready` |  | FS-074: `ready` once the complaint has a number and is not a draft; GET /complaints/{id}/pdf then gives a link. `none` otherwise, including a complaint returned to its raiser. Never `pending` or `failed`: the PDF is made when asked for. Default `none`. |
 
 **`ComplaintCreate`**
 
@@ -979,6 +1009,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `first_submitted_at` | string \| null | yes |  |
 | `breached` | boolean | yes | Either target missed. |
 | `created_at` | string | yes |  |
+| `pdf_state` | `none` \| `ready` |  | FS-074: `ready` once the complaint has a number and is not a draft; GET /complaints/{id}/pdf then gives a link. `none` otherwise, including a complaint returned to its raiser. Never `pending` or `failed`: the PDF is made when asked for. Default `none`. |
 
 **`Envelope_Any_`**
 
@@ -997,6 +1028,12 @@ The complaint's events, newest first. A dealer never sees who decided.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | Complaint | yes |  |
+
+**`Envelope_PdfLink_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | PdfLink | yes |  |
 
 **`Envelope_Stats_`**
 
@@ -1091,6 +1128,14 @@ The complaint's events, newest first. A dealer never sees who decided.
 | `hidden` | boolean |  | True when you can no longer see it: show 'not visible'. The other fields are then null. Default `False`. |
 | `name` | string \| null |  |  |
 | `partner_type` | string \| null |  | dealer or distributor. |
+
+**`PdfLink`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `url` | string | yes | Open it in a new tab. Valid for ten minutes. |
+| `expires_at` | string | yes |  |
+| `filename` | string | yes |  |
 
 **`ProductRef`**
 
@@ -1234,7 +1279,7 @@ The complaint's events, newest first. A dealer never sees who decided.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added. |
+| `kind` | string | yes | e.g. lead.created, lead.stage_changed, lead.note_added, lead.deleted, lead.restored (payload duplicates_reopened). |
 | `occurred_at` | string | yes |  |
 | `actor` | UserRef \| null |  | Who caused the event, if known. |
 | `payload` | object |  | The event's own detail. Added at read time: `lead.merged` carries `loser_inquiry_no` and `survivor_inquiry_no`; each of `lead.duplicate_flagged`'s `matches` carries `inquiry_no`; `lead.duplicate_dismissed` carries `other_lead_id` and `other_inquiry_no`. A number is null when you cannot see that lead. For a channel partner, staff notes, the lost reason and duplicate handling are left out. |

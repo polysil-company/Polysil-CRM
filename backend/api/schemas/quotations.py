@@ -147,7 +147,7 @@ class QuotationCreate(BaseModel):
                                         description="Free text printed at the foot.")]
     lines: Annotated[list[QuotationLineIn], Field(
         default_factory=list, max_length=MAX_LINES,
-        description="Zero to 200. A draft may be saved empty; sending needs at least one.")]
+        description="One to 200. None is 422 no_lines (FS-073).")]
     freight: FreightIn | None = Field(default=None, description=_FREIGHT_IN)
 
     @property
@@ -190,8 +190,9 @@ class QuotationPatch(BaseModel):
 class LinesReplace(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    lines: Annotated[list[QuotationLineIn], Field(max_length=MAX_LINES,
-                                                   description="The whole basket, in order.")]
+    lines: Annotated[list[QuotationLineIn], Field(
+        max_length=MAX_LINES,
+        description="The whole basket, in order. Empty is 422 no_lines (FS-073).")]
     freight: FreightIn | None = Field(
         default=None, description=_FREIGHT_IN + " Omit to keep; null to remove.")
     expected_status: Status | None = None

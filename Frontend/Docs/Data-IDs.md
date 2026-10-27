@@ -164,6 +164,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | LEAD-017 | A customer's page: details, its leads, quotations and orders, and the timeline across them (`GET /customers/{id}`, `/timeline`) | shared | in-progress |
 | LEAD-018 | Edit a customer and record or withdraw consent: staff with leads edit (`PATCH /customers/{id}`) | shared | in-progress |
 | LEAD-019 | Deleted leads: the list of soft-deleted leads, for `leads.delete` holders (`GET /leads?deleted=true`, `GET /leads/export?deleted=true`) | shared | in-progress |
+| LEAD-020 | Restore a deleted lead, and say when and by whom it was deleted (`POST /leads/{id}/restore`) | shared | in-progress |
 | RATE-001 | Rate an installation, a shipped product or a closed complaint's service (`POST /ratings`) | shared | in-progress |
 | RATE-002 | Ratings on an order or complaint, and the list with the low ones (`GET /ratings`) | shared | in-progress |
 | RATE-003 | Ratings by dealer, product or kind (`GET /ratings/summary`) | shared | in-progress |
@@ -181,6 +182,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | TRK-006 | Tracking settings: the policy in force, and a new version from a date (`GET /tracking/policy`, `PUT /tracking/policy`) | shared | in-progress |
 | TRK-007 | Who looked at whose route, visits or the team map (`GET /tracking/view-log`) | shared | in-progress |
 | TRK-008 | The Android app's duty: go on and off duty, and the route recorded natively (`POST /tracking/duty/start`, `/tracking/duty/end`, `/locations/batch`) | shared | in-progress |
+| TRK-009 | The phone's device token, so the route uploads while the app is closed (`POST /tracking/device-token`) | shared | in-progress |
 | QUOT-001 | Quotations list — the Quotations page and a lead's quotations (`GET /quotations`) | shared | in-progress |
 | QUOT-002 | Quotation detail — the document as the backend prints it (`GET /quotations/{quotationId}`) | shared | in-progress |
 | QUOT-003 | Open a quotation's PDF (`GET /quotations/{quotationId}/pdf`) | shared | in-progress |
@@ -207,6 +209,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SO-009 | Warranty on an order: each line's dispatches with start, end and status, and the claims raised (`GET /orders/{id}/warranty`) | shared | in-progress |
 | SO-010 | Export and sample orders: the buyer's country, the tax treatment and LUT, and free or charged samples, on orders and quotations (FS-042) | shared | in-progress |
 | SO-011 | A consolidated order: one draft from several accepted quotations of one dealer (`POST /orders` with several `quotation_ids`) | shared | in-progress |
+| SO-012 | An order for a dealer or distributor, typed in by staff: the dealer picked, their rates and details (`POST /orders` with `partner_id`) | shared | in-progress |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
 | CMPL-001 | Complaints list — filters, waiting on me, counts (`GET /complaints`, `GET /complaints/stats`) | shared | in-progress |

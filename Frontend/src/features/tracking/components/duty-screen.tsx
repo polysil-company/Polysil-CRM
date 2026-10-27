@@ -33,6 +33,7 @@ import {
   uploadProblem,
   type DutyBlocker,
 } from "@/features/tracking/lib/duty-labels";
+import { renewDeviceToken } from "@/features/tracking/native/device-token";
 import {
   flushNativeTracking,
   getNativeDevice,
@@ -201,6 +202,11 @@ function DutyPanel({ config }: { config: TrackingConfig }): React.JSX.Element {
         distanceFilterM: config.distanceFilterM,
         maxBatchPoints: config.maxBatchPoints,
         apiBaseUrl: absoluteApiBase(),
+      });
+      // Then the phone's own token, so points go up while the app is closed (TRK-009). Without
+      // one the points wait on the phone, so the duty stays on and the status says so.
+      await renewDeviceToken().catch((error: unknown) => {
+        log.warn("handleGoOnDuty", "On duty without a device token yet", { error });
       });
       return queryClient.fetchQuery({ ...nativeStatusQueryOptions(), staleTime: 0 });
     },

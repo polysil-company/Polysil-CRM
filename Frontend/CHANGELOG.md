@@ -7,10 +7,15 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-111 changes, newest first. Each title opens its entry.
+116 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-26 | [Full product names in the product picker](changelog/entries/2026-10-26--fix--MSTR-003--full-product-names-in-the-product-picker.md) | `fix` | `MSTR-003` |
+| 2026-10-25 | [Restore a deleted lead](changelog/entries/2026-10-25--feature--LEAD-020--restore-a-deleted-lead.md) | `feature` | `LEAD-020` `LEAD-019` `RPT-001` |
+| 2026-10-25 | [The phone's own token for route uploads](changelog/entries/2026-10-25--feature--TRK-009--the-phone-s-own-token-for-route-uploads.md) | `feature` | `TRK-009` `TRK-008` |
+| 2026-10-25 | [An HSN test that raced a leftover toast](changelog/entries/2026-10-25--test--MSTR-005--an-hsn-test-that-raced-a-leftover-toast.md) | `test` | `MSTR-005` |
+| 2026-10-24 | [An order for a dealer or distributor, typed in by staff](changelog/entries/2026-10-24--feature--SO-012--an-order-for-a-dealer-or-distributor-typed-in-by-staff.md) | `feature` | `SO-012` `LEAD-008` |
 | 2026-10-23 | [Live test of the staging app: an issue report and a client walkthrough](changelog/entries/2026-10-23--docs--APP-008--live-test-of-the-staging-app-report-and-walkthrough.md) | `docs` | `APP-008` |
 | 2026-10-23 | [Fixes from the live test](changelog/entries/2026-10-23--fix--APP-009--fixes-from-the-live-test.md) | `fix` | `APP-009` `QUOT-004` `APPR-002` `MSTR-004` `BOT-001` |
 | 2026-10-23 | [A scheme test that raced its save](changelog/entries/2026-10-23--fix--SCHM-002--a-scheme-test-that-raced-its-save.md) | `fix` | `SCHM-002` |
@@ -122,6 +127,258 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 26 October 2026
+
+### Full product names in the product picker
+
+`fix` · `MSTR-003` · Nakul Srivastava · [entry](changelog/entries/2026-10-26--fix--MSTR-003--full-product-names-in-the-product-picker.md)
+
+#### Before
+
+The client asked for this on 26 Oct: "Quotation > Product drop down > full product name not displayed". The product list in the quotation builder was only as wide as the product field, about a third of the row. Each name was cut to one line with "…", so two sizes of one pipe could read alike. Once a product was chosen, the field cut its name off too.
+
+#### Now
+
+- **The list is wider than the field:** 32 rem on a desktop, never narrower than the field, and never past the screen's edge. On a phone it takes the screen's width.
+- **Names wrap** in the list instead of being cut off, and so do the unit, HSN and code beneath them.
+- **The chosen product's full name** shows in small text under the field, and the field's tooltip gives it too.
+- The complaint form uses the same picker, so it gets the same fix.
+
+#### Discussion
+
+- An input can't wrap its text, so the full name goes under the field rather than in it.
+- **Not done:** making the product column wider in the row. Quantity, three discounts and GST share the row, and wrapping the list fixes the ask without squeezing them.
+
+#### Files changed
+
+- `src/features/quotations/components/product-picker.tsx`: the list's width, wrapped names, and the full name under the field.
+- `src/features/quotations/components/product-picker.test.tsx` (new).
+- `Docs/Tested-Features.md`, `Docs/screenshots/quotations/product-picker-*.jpg`.
+
+#### Tests
+
+- `product-picker.test.tsx`: after choosing "EMITTING PIPE 16 MM 40 CM SPACING 2 LPH", the full name shows under the field, and the field's `title` carries it.
+- Checked in the mock with Playwright on a 1440 px desktop in light mode and a 360 px phone in dark mode. The screenshots are linked from `Tested-Features.md`.
+
+## 25 October 2026
+
+### Restore a deleted lead
+
+`feature` · `LEAD-020` `LEAD-019` `RPT-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-25--feature--LEAD-020--restore-a-deleted-lead.md)
+
+#### Before
+
+Deleted leads (LEAD-019) was read only. A lead deleted by mistake stayed deleted, since the backend had no way to bring one back (BE-033). The list didn't say when or by whom a lead was deleted.
+
+Two answers from the live test also waited on the backend:
+
+- the dashboard's overdue count disagreed with Tasks (BE-036);
+- whether a State Manager may delete leads (BE-037).
+
+#### Now
+
+- **Restore** on each row of Deleted leads, for anyone who may delete and edit leads, as the backend requires.
+  - It calls `POST /leads/{id}/restore` (BE-033, #206).
+  - The lead goes back to the leads list with its owner, and the toast links to it.
+  - A refusal says why, and the lead stays deleted.
+  - The live list has no Restore.
+- **When and by whom.** Each deleted row says "Deleted 20 Oct by Bharat Vaghela", from `deleted_at` and `deleted_by`.
+- **The State Manager may delete and restore leads in the mock**, as RBAC.md §6.1 gives them (`V:org CED`, BE-037). The test box already granted it.
+- **The dashboard card** now reads "Overdue follow-ups on leads", with "Lead tasks past their due date" beneath. The backend counts follow-ups on leads only (BE-036), which is why it can be lower than Tasks.
+
+#### Discussion
+
+- **Who sees Restore.** `useCan("leads", "delete")` and `useCan("leads", "edit")` together, the backend's own pair. Hiding is a courtesy; the backend enforces it.
+- **Opening a restored lead.** It's a link in the toast, not a toast button. A link needs no router in the cell and works with typed routes.
+- **Not done:** an inactive owner. The backend keeps the owner even after they leave and suggests offering Assign. A lead's `owner` carries no active flag, so the frontend can't tell yet. The owner can be changed on the lead's page as usual.
+- **`409 lead_deleted`** needs nothing new. Deleted leads aren't linked anywhere, and an error that slips through shows the backend's message, like any other conflict.
+
+#### Files changed
+
+- `src/features/leads/api/leads.schemas.ts`: `deleted_at` and `deleted_by`, read as `deletedAt` and `deletedBy`.
+- `src/features/leads/api/leads.api.ts`, `leads.mutations.ts`: `restoreLead` and `useRestoreLead`.
+- `src/features/leads/components/restore-lead-button.tsx` (new), `leads-columns.tsx`, `src/features/leads/lib/lead-table-layout.ts`: the Restore column and the "Deleted … by …" line.
+- `src/features/leads/components/leads-toolbar.tsx`: the notice no longer says they can't be brought back.
+- `src/features/dashboard/components/dashboard-overview.tsx`: the card's label.
+- `src/mocks/handlers/leads.ts`, `src/mocks/data/leads.ts`, `src/mocks/data/permissions.ts`: restore, stamps on delete, and the State Manager's grant.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: LEAD-020.
+- `src/features/leads/components/lead-assign.test.tsx`: a router mock for the State Manager's Delete.
+- Records: `Docs/Tested-Features.md`, `Docs/Live-Test-Report.md` (issues 6 and 10).
+
+#### Tests
+
+**`leads-deleted.test.tsx`:**
+
+- each deleted row has Restore, and going back to the live list removes it;
+- a row says when and by whom; Restore makes one request with an idempotency key, then the lead leaves the deleted list and rejoins the leads;
+- a State Manager opens Deleted leads and can restore;
+- a refused restore says so, and the lead stays deleted;
+- "neither offered nor shown" now signs in as a District Manager, who may not delete.
+
+**`lead-assign.test.tsx`:** mocks `next/navigation`. These tests sign in as a State Manager, whose lead page now has Delete, which uses the router.
+
+### The phone's own token for route uploads
+
+`feature` · `TRK-009` `TRK-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-25--feature--TRK-009--the-phone-s-own-token-for-route-uploads.md)
+
+#### Before
+
+The Android app's tracker uploaded the route with the web session's access token. `session-store.ts` handed it over after each sign-in and refresh. That token lasts 15 minutes and lives only while the screens are open. Once the app was closed, points waited on the phone until it was opened again, and the team map showed field staff as stale all day. It was also the one place a session token left the API client.
+
+#### Now
+
+- **The phone's own token (BE-032, backend #206).**
+  - After **Go on duty**, and on every launch of the app while a duty is open, the screens call `POST /tracking/device-token` with the phone's device id.
+  - The answer goes to the native tracker (`setDeviceToken`), which uploads with it while the app is closed.
+  - The token is good only for location batches, duty end and the tracking config. It lasts 30 days, and only while the sign-in it came from lives.
+- **One call at a time.** Callers that arrive together share one call, so the tracker only gets the newest answer. Each call uses a new key, since the server never replays a token.
+- **Kept safe on the phone.** `DeviceTokenStore.kt` seals the token with AES-GCM under a key kept in the Android Keystore.
+- **When the server refuses it** (`401`, or any `403`), the tracker forgets the token and keeps every point. The batch in flight keeps its key, since the server refused it before recording the key. Points go up once the next launch hands over a new token. Before, a `403` used up the key, so its points could later be dropped.
+- **The session token stays home.** `setAccessToken` and its hand-off in `session-store.ts` are gone, and so is the exception in `AGENTS.md` §6. The new exception there names the device token.
+- **The duty stays on without a token.** If no token can be had when going on duty, the duty stays on. The points wait on the phone, and the Duty screen says so calmly.
+- **Records:** BE-031 to BE-038 are ticked in `docs/Backend-Tasks.md`, with the backend's notes from #206.
+
+#### Discussion
+
+- **Storage.** The backend suggested `EncryptedSharedPreferences`. androidx.security has deprecated it, and its reference points to the Android Keystore with `KeyGenerator` instead. That is what `DeviceTokenStore.kt` does, with no extra library. A backup restored onto another phone carries the sealed text but not the key, so it reads as no token, and the next launch asks again.
+- **Where the launch call lives.** `DeviceTokenOnLaunch` sits in `AppShell`, so it runs on every signed-in page, not only on Duty. It renders nothing, and does nothing in a browser or while off duty.
+- **Expiry format.** The expiry goes to the phone as `toISOString()`. Android's `SimpleDateFormat` misreads the server's microseconds.
+- **Known limits.**
+  - One person per phone (client question 9.5). If two people share a phone, points left from the first one's duty go with the second one's token, and the server refuses them.
+  - The tracker's own `GET /me/tracking-config` and duty end still go through the screens, which is enough for now.
+- **Before the APK:** the backend needs migrations 078 to 080 on each box (on the client's through #207 and its deploy). Until then, `POST /tracking/device-token` answers 404, and points wait on the phone as before.
+
+#### Files changed
+
+- `src/features/tracking/api/duty.schemas.ts`, `duty.api.ts`: `deviceTokenSchema` and `issueDeviceToken` (`sensitive`).
+- `src/features/tracking/native/device-token.ts` (new): `renewDeviceToken`, one call at a time.
+- `src/features/tracking/native/tracking-bridge.ts`, `src/lib/native/tracking-plugin.ts`: `setDeviceToken` replaces `setAccessToken`.
+- `src/features/tracking/components/device-token-on-launch.tsx` (new), `src/components/layout/app-shell.tsx`: the launch rule.
+- `src/features/tracking/components/duty-screen.tsx`: the token after going on duty.
+- `src/lib/auth/session-store.ts`: the hand-off removed.
+- `src/mocks/handlers/visits.ts`: `POST /tracking/device-token`.
+- `mobile/android/…/tracking/`:
+  - `DeviceTokenStore.kt` and `core/DeviceToken.kt` are new;
+  - `UploadRunner.kt`, `TrackingPlugin.kt`, `OkHttpTransport.kt` and `core/Uploader.kt` are changed;
+  - `AccessTokenHolder.kt` is removed.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: TRK-009.
+- Records: `AGENTS.md` §6, `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/handoff-mobile-app.md`, `mobile/README.md` and `docs/Backend-Tasks.md`.
+
+#### Tests
+
+- **`device-token.test.tsx` (new):**
+  - callers that arrive together share one call;
+  - a later call goes under a new key;
+  - the expiry goes over in milliseconds and UTC;
+  - an answer with no token hands nothing over;
+  - a dealer is refused;
+  - on launch, the token is asked for only in the app and only on duty.
+- **`duty.test.tsx`:**
+  - going on duty runs duty start, tracker start, the token, then the hand-over;
+  - a token failure leaves the duty on.
+- **`session-store.test.ts`:** signing in and out inside the app hands the tracker nothing.
+- **Kotlin, `DeviceTokenTest` and `UploaderTest`:**
+  - the expiry margin, and a blank token is never sent;
+  - a `403` keeps the points and the key;
+  - after a `401` the same body goes again under the same key with the new token.
+  - The Kotlin core was compiled and its 18 JVM tests run here. The Android build and lint run in CI.
+
+### An HSN test that raced a leftover toast
+
+`test` · `MSTR-005` · Nakul Srivastava · [entry](changelog/entries/2026-10-25--test--MSTR-005--an-hsn-test-that-raced-a-leftover-toast.md)
+
+#### Before
+
+"Creates the product, then sets its HSN" (PR #191) failed in CI on #208, and the next test failed after it.
+
+- The test waited for the "Product added" toast, then checked that both calls had gone.
+- Sonner keeps toasts in a module store across tests, so the earlier "adds a product" test's toast was already on screen. The check ran before this test's HSN call had started.
+- That late call was then caught by the next test's call recorder. This is the same cause as SCHM-002 (#203).
+
+#### Now
+
+The test waits on what it checks:
+
+- both calls;
+- the HSN saved in the mock;
+- the row's "No HSN" badge gone.
+
+No screen code changes.
+
+#### Discussion
+
+A shared fix, clearing sonner's store after every test, would touch every toast test. Waiting on the outcome is local and matches #203.
+
+#### Files changed
+
+- `src/features/products/components/products-ui.test.tsx`
+
+#### Tests
+
+The file's 23 tests pass. The failure only shows under CI load: the CI log of #208's second run showed `[POST]` without the `PUT`, and the next test caught the leftover `PUT`.
+
+## 24 October 2026
+
+### An order for a dealer or distributor, typed in by staff
+
+`feature` · `SO-012` `LEAD-008` · Nakul Srivastava · [entry](changelog/entries/2026-10-24--feature--SO-012--an-order-for-a-dealer-or-distributor-typed-in-by-staff.md)
+
+#### Before
+
+Staff could only order for a dealer or distributor through a lead whose channel partner was that dealer, or from the dealer's accepted quotations (SO-011). A new order typed in directly had no way to name a dealer, so it was priced as a direct sale. The client said this blocked their staff from processing existing dealers' and distributors' orders (24 Oct).
+
+#### Now
+
+**For a dealer or distributor**, on **New order** without a lead (commercial or industrial, staff only):
+
+- **Search:** by name, code or contact person, among the dealers and distributors the user can see. It is the same search as the lead's **Assign** dialog.
+- **Rates:** picking one sends `partner_id`, so the backend prices the order at that dealer's rates.
+- **Details filled in:** the party's name, mobile, address and GSTIN, and the place of supply, come from the dealer's record. All stay editable.
+- **If the dealer's record can't be loaded,** the field says so. The order still uses their rates; the details are typed in.
+- **Not offered:**
+  - on an order from a lead, which brings its own partner;
+  - on export, sample or subsidised orders;
+  - to a dealer's own users, who order for themselves.
+
+**Backend asks** in `docs/Backend-Tasks.md`. Each says whether it can start before the client answers the questions in the document _Polysil CRM — Employees on dealers_ (24 Oct):
+
+- **BE-039:** a quotation for a dealer, with no farmer's lead. Can start now.
+- **BE-040:** the employee(s) on a dealer. The link can start now; what it grants waits.
+- **BE-041:** a leaver's leads go to their dealer. Waits.
+
+#### Discussion
+
+- **Frontend only.** The backend already takes `partner_id` from staff on a direct order (`services/orders.py`). It prices at that partner's tier and checks the partner is one the caller can see.
+- **One search for dealers.** The lead's **Assign** dialog and this field share the search, moved to `choice-picker.tsx`. The dialog behaves as before (its tests pass unchanged).
+- **The party is filled once, on picking.** Later edits stay. A slower answer for an earlier pick never overwrites a later one.
+- **A campaign test given its own time budget.** It waits out the "Not saved" moment (a fixed few seconds) and types about 45 characters, which together sat at the 5 s default. It failed twice on a busy machine (#193 and this branch). It now has 15 s; its assertions are unchanged.
+- **Commercial and industrial only.** These are the sale types a dealer buys under. A dealer's export or sample would be a new rule, so it is not offered.
+
+#### Files changed
+
+- `src/features/orders/components/order-builder.tsx`: the dealer field, `partner_id`, and the party filled from the dealer.
+- `src/features/leads/components/choice-picker.tsx`: new; the searchable picker and the partner search, moved from the Assign dialog.
+- `src/features/leads/components/lead-assign-dialog.tsx`: uses them.
+- `src/mocks/handlers/orders.ts`: a direct order takes a dealer staff picked, as the backend does.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: SO-012.
+- `docs/Backend-Tasks.md`: BE-039 to BE-041.
+- `src/features/campaigns/components/campaigns.test.tsx`: an explicit 15 s budget for "adds a campaign, refusing a taken name".
+- `Docs/Tested-Features.md`.
+
+#### Tests
+
+- **New,** in `src/features/orders/components/order-builder.test.tsx`, `[SO-012] An order for a dealer or distributor, typed in by staff` (3 tests):
+  - picking a dealer fills the party and place, and the saved order sends `partner_id` and has the dealer as its partner;
+  - the field isn't on an order from a lead;
+  - it isn't offered to a dealer's own users.
+- **Unchanged and passing:** `lead-assign.test.tsx`.
+
+To check by hand in the mock, as Admin:
+
+1. Open **Sales orders → New order**.
+2. Under **For a dealer or distributor**, type part of a dealer's name and pick it. The party and place fill in.
+3. Add an item and save.
 
 ## 23 October 2026
 

@@ -1,6 +1,7 @@
 package com.polysil.crm.tracking
 
 import android.content.Context
+import com.polysil.crm.tracking.core.DeviceToken
 import com.polysil.crm.tracking.core.UploadResult
 import com.polysil.crm.tracking.core.Uploader
 import com.polysil.crm.tracking.data.RoomPointStore
@@ -16,8 +17,25 @@ internal data class FlushOutcome(val accepted: Int, val duplicates: Int, val rej
 internal object UploadRunner {
     private val lock = Any()
 
+    /**
+     * TRK-009 · Keeps the device token the screens handed over (an empty one forgets it). Under the
+     * run's lock, so a run that ends on a `401` for the old token can't forget the new one.
+     */
+    fun acceptToken(context: Context, token: DeviceToken?): Boolean = synchronized(lock) {
+        val tokens = DeviceTokenStore(context)
+        if (token == null || token.token.isBlank()) {
+            tokens.clear()
+            return true
+        }
+        val kept = tokens.save(token)
+        TrackingPrefs(context).lastError = if (kept) null else "token_not_kept"
+        return kept
+    }
+
     fun run(context: Context): FlushOutcome = synchronized(lock) {
         val prefs = TrackingPrefs(context)
+        val tokens = DeviceTokenStore(context)
+        val held = tokens.load()
         val store = RoomPointStore(TrackingDatabase.get(context).points())
         val apiBaseUrl = prefs.apiBaseUrl
         if (apiBaseUrl == null) {
@@ -29,7 +47,7 @@ internal object UploadRunner {
             transport = OkHttpTransport(apiBaseUrl),
             deviceId = prefs.deviceId,
             sentAt = { isoTime(System.currentTimeMillis()) },
-            accessToken = { AccessTokenHolder.valid() },
+            token = { held?.usable(System.currentTimeMillis()) },
         )
         val maxBatch = prefs.duty?.maxBatchPoints ?: DEFAULT_MAX_BATCH
         val result = uploader.uploadAll(maxBatch)
@@ -40,7 +58,12 @@ internal object UploadRunner {
                 prefs.lastError = null
                 outcome = FlushOutcome(result.accepted, result.duplicates, result.rejected, store.count())
             }
-            UploadResult.WaitingForToken -> prefs.lastError = "waiting_for_sign_in"
+            UploadResult.WaitingForToken -> {
+                // No token, an expired one, or a `401`: it is dead either way. Forgetting it stops
+                // the timer's runs from sending until the screens hand over a new one.
+                tokens.clear()
+                prefs.lastError = "waiting_for_sign_in"
+            }
             is UploadResult.RetryLater -> {
                 prefs.lastError = "offline"
                 UploadWorker.enqueue(context)
@@ -53,6 +76,8 @@ internal object UploadRunner {
                 TrackingEvents.serverEnded(statusOf(context), result.endReason)
             }
             UploadResult.Forbidden -> {
+                // Contract §1 step 9: stop and keep the points; a new token comes on the next launch.
+                tokens.clear()
                 prefs.lastError = "forbidden"
                 prefs.duty = null
                 TrackingService.stop(context)

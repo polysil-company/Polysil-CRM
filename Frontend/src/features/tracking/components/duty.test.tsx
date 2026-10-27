@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Toaster } from "@/components/ui/sonner";
 import { endDuty, startDuty } from "@/features/tracking/api/duty.api";
 import type {
+  NativeDeviceToken,
   NativeStartOptions,
   TrackingPermissions,
   TrackingStatus,
@@ -31,6 +32,8 @@ interface Phone {
   /** What happened, in order: API calls and tracker calls together. */
   calls: string[];
   started: NativeStartOptions | null;
+  /** The device token the tracker was handed last. */
+  deviceToken: NativeDeviceToken | null;
   statusListener: ((status: TrackingStatus) => void) | null;
   endedListener: ((status: TrackingStatus, reason: string | null) => void) | null;
 }
@@ -56,6 +59,7 @@ const phone = vi.hoisted((): Phone => ({
   manufacturer: "Google",
   calls: [],
   started: null,
+  deviceToken: null,
   statusListener: null,
   endedListener: null,
 }));
@@ -81,6 +85,11 @@ vi.mock("@/features/tracking/native/tracking-bridge", () => ({
     phone.calls.push(`openSettings:${which}`);
     return Promise.resolve();
   }),
+  handDeviceTokenToNative: (token: NativeDeviceToken) => {
+    phone.calls.push("tracker.setDeviceToken");
+    phone.deviceToken = token;
+    return Promise.resolve();
+  },
   startNativeTracking: (options: NativeStartOptions) => {
     phone.calls.push("tracker.start");
     phone.started = options;
@@ -142,6 +151,7 @@ function recordDutyCalls(): void {
     const path = new URL(request.url).pathname;
     if (path.endsWith("/tracking/duty/start")) phone.calls.push("api.start");
     if (path.endsWith("/tracking/duty/end")) phone.calls.push("api.end");
+    if (path.endsWith("/tracking/device-token")) phone.calls.push("api.deviceToken");
   });
 }
 
@@ -177,6 +187,7 @@ function resetPhone(): void {
   phone.manufacturer = "Google";
   phone.calls = [];
   phone.started = null;
+  phone.deviceToken = null;
   stubLocation();
 }
 
@@ -315,7 +326,17 @@ describe("[TRK-008] DutyScreen", () => {
     await user.click(await screen.findByRole("button", { name: "Go on duty" }));
 
     expect(await screen.findByRole("button", { name: "Go off duty" })).toBeInTheDocument();
-    expect(phone.calls).toEqual(["api.start", "tracker.start"]);
+    // TRK-009: the phone's own token comes after the duty, from the API to the tracker.
+    expect(phone.calls).toEqual([
+      "api.start",
+      "tracker.start",
+      "api.deviceToken",
+      "tracker.setDeviceToken",
+    ]);
+    expect(phone.deviceToken).toMatchObject({
+      token: expect.stringMatching(/^pdt_/),
+      userId: mockMeFor("employee").data.id,
+    });
     expect(phone.started).toMatchObject({
       dutyId: "server-duty",
       intervalSeconds: 120,
@@ -324,6 +345,27 @@ describe("[TRK-008] DutyScreen", () => {
     });
     expect(phone.started?.apiBaseUrl).toMatch(/^https?:\/\/.+\/api\/v1$/);
     expect(screen.getByText(/^On duty since /)).toBeInTheDocument();
+  });
+
+  it("[TRK-009] stays on duty when the device token can't be had, and the points wait", async () => {
+    signInAs("employee");
+    consented("employee");
+    recordDutyCalls();
+    server.use(
+      http.post(buildApiUrl("/tracking/device-token"), () =>
+        HttpResponse.json(
+          { error: { code: "internal_error", message: "Something went wrong." } },
+          { status: 500 },
+        ),
+      ),
+    );
+    const user = show();
+    await user.click(await screen.findByRole("button", { name: "Go on duty" }));
+
+    expect(await screen.findByRole("button", { name: "Go off duty" })).toBeInTheDocument();
+    expect(phone.calls).toContain("tracker.start");
+    expect(phone.calls).not.toContain("tracker.setDeviceToken");
+    expect(phone.deviceToken).toBeNull();
   });
 
   it("goes off duty: upload what waits, end it on the server, then stop the tracker", async () => {

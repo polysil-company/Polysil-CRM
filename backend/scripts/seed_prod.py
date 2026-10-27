@@ -38,7 +38,7 @@ from scripts.generate_permission_seed import load_grants  # noqa: E402
 # dispatch, tasks, users and roles, offices, territories and dealers, products and
 # price lists, staff messages. The dashboard and the bell need no module.
 RELEASED = ("leads", "quotations", "sales_orders", "dispatch", "tasks", "users", "masters",
-            "partners", "products", "pricing", "chat")
+            "partners", "products", "pricing", "chat", "tracking")
 
 # seed_demo's sixteen roles, verbatim: the matrix names them
 ROLES: list[tuple[str, str, int, bool, bool]] = [
