@@ -17,7 +17,7 @@ from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
 from api.domain import complaints as domain
 from api.idempotency import payload_digest, run_idempotent
-from api.routers.exporting import XLSX_RESPONSE, export, filters_of
+from api.routers.exporting import EXPORT_RESPONSE, ExportFormat, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.complaints import (
     Assignee,
@@ -129,11 +129,11 @@ async def complaint_stats(db: DbSession) -> Envelope[Stats]:
     return Envelope(data=await service.stats(db, get_storage(get_settings())))
 
 
-@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+@router.get("/export", response_class=Response, responses={**_ERRORS, **EXPORT_RESPONSE},
             dependencies=[Depends(require("complaints", "view"))])
 async def export_complaints(
     db: DbSession, caller: CallerDep,
-    filters: Annotated[dict[str, Any], Depends(filters_of(list_complaints))],
+    filters: Annotated[dict[str, Any], Depends(filters_of(list_complaints))], fmt: ExportFormat = "xlsx",
 ) -> Response:
     """Download the complaint list as an Excel file, with the same filters as the list.
 
@@ -146,7 +146,7 @@ async def export_complaints(
         # the queue is one page with no cursor: draining it would stop at 100 (FS-030 rule 10)
         raise exports.FilterNotExportableError(
             "The approval queue cannot be exported. Remove the awaiting filter.")
-    return await export(list_complaints, stem="complaints", title="Complaints", columns=exports.COMPLAINTS,
+    return await export(list_complaints, fmt=fmt, stem="complaints", title="Complaints", columns=exports.COMPLAINTS,
                         user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 

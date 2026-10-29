@@ -76,6 +76,7 @@ def _database(monkeypatch: pytest.MonkeyPatch, *, read_only: str = "on",
         "SELECT version_num FROM alembic_version": [(v,) for v in applied],
         "SELECT count(*) FROM notification_outbox": [(3,)],
         "SELECT count(*) FROM notification_failure": [(1,)],
+        "SELECT count(*) FILTER (WHERE channel = 'email' AND": [(2,)],
     }
     monkeypatch.setattr(lc, "async_session_factory", lambda: _Session(answers, log))
     return log
@@ -161,7 +162,8 @@ def test_the_first_statement_is_set_transaction_read_only(
     log = _database(monkeypatch)
     database = _run(lc.read_database())
     assert log[:3] == ["BEGIN", "SET TRANSACTION READ ONLY", "SHOW transaction_read_only"]
-    assert database == lc.Database(read_only="on", applied=("077",), dead=3, failures=1)
+    assert database == lc.Database(read_only="on", applied=("077",), dead=3, failures=1,
+                                   dead_email=2)
     assert log.count("BEGIN") == 1, "one transaction for every read"
     for sql in log:
         assert "SESSION" not in sql.upper() and "default_transaction" not in sql

@@ -23,6 +23,7 @@ from api.domain.auth import decode_access_token
 from api.errors import ForbiddenError, RefreshFailedError, error_response
 from api.idempotency import redacted_digest, run_idempotent
 from api.schemas.auth import (
+    EmailPreferences,
     Envelope,
     ErrorResponse,
     LoginRequest,
@@ -413,4 +414,33 @@ async def change_password(
         payload_hash=payload_hash, work=work)
     if outcome.status_code == status.HTTP_204_NO_CONTENT:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return JSONResponse(outcome.body, status_code=outcome.status_code)
+
+
+# ── FS-078: the email switches ───────────────────────────────────────────────
+
+me_router = APIRouter(prefix="/me", tags=["auth"])
+
+
+@me_router.put(
+    "/email-preferences", response_model=Envelope[EmailPreferences],
+    responses={**_ERRORS,
+               400: {"model": ErrorResponse, "description": "Idempotency-Key missing."},
+               409: {"model": ErrorResponse,
+                     "description": "The key was used for a different body."}},
+)
+async def put_email_preferences(body: EmailPreferences, db: DbSession, claims: Claims,
+                                idem: IdemKey) -> Response:
+    """Turn your own email notices and morning summary on or off. Both fields are
+    required. Any signed-in staff or partner user; a consumer gets 403. Only show
+    the switches while `email_available` on `GET /auth/me` is true.
+    **`Idempotency-Key` is required.**"""
+    async def work() -> tuple[int, dict]:
+        out = await service.set_email_preferences(
+            db, notices=body.notices, morning_summary=body.morning_summary)
+        return status.HTTP_200_OK, {"data": out.model_dump(mode="json")}
+
+    outcome = await run_idempotent(
+        db, key=idem, user_id=claims.sub, route="PUT /api/v1/me/email-preferences",
+        payload_hash=redacted_digest(body.model_dump(mode="json"), []), work=work)
     return JSONResponse(outcome.body, status_code=outcome.status_code)

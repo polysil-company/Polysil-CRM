@@ -128,6 +128,7 @@ narrow the filters. An empty list gives a file with the header row only.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
 | `q` | query | string \| null |  | Name, email or mobile substring. |
 | `user_type` | query | string \| null |  | staff, partner_user or consumer. Left out, the list is staff and partner users: farmers' portal accounts (FS-044) only when asked. |
 | `role` | query | string \| null |  | A role code. |
@@ -139,10 +140,10 @@ narrow the filters. An empty list gives a file with the header row only.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The workbook, as an attachment. |
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions, or a temporary password must be changed first (`password_change_required`). |
-| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

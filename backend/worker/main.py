@@ -26,6 +26,7 @@ from api.integrations.whatsapp import get_provider
 from api.integrations.whatsapp.check import check_templates, unconfigured_templates
 from api.storage import get_storage
 from worker.jobs.complaints import complaint_escalation
+from worker.jobs.email import email_collect, email_drain, email_morning
 from worker.jobs.leads import lead_dormancy
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
@@ -66,6 +67,10 @@ async def on_startup(ctx: dict[str, Any]) -> None:
     unset = unconfigured_templates(settings)
     if unset:
         log.warning("whatsapp.templates_unconfigured", keys=unset)
+    # FS-078: built once, beside the WhatsApp provider; none means no email at all
+    from api.integrations.email import get_email_provider
+    ctx["email_provider"] = get_email_provider(settings)
+    log.info("email.provider", provider=settings.email_provider)
     # FS-005: the cron hours are UTC arithmetic, and arq reads the process clock.
     tz = time.strftime("%Z")
     if time.timezone != 0 and settings.environment != "local":
@@ -100,7 +105,8 @@ class WorkerSettings:
     redis_settings = _redis_settings()
     functions: ClassVar[list] = [outbox_drain, purge_expired_sessions,
                                  quotation_render_due, quotation_expire, order_render_due,
-                                 scheme_nightly, lead_dormancy, complaint_escalation]
+                                 scheme_nightly, lead_dormancy, complaint_escalation,
+                                 email_collect, email_drain, email_morning]
     cron_jobs: ClassVar[list] = CRON_JOBS
     on_startup = on_startup
     on_shutdown = on_shutdown

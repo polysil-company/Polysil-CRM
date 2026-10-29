@@ -73,7 +73,7 @@ SALE_TYPES = ("commercial", "industrial", "export", "subsidised")
 # the statuses an order is paid in (031 _PAYABLE)
 PAYABLE = ("submitted", "approved", "partially_dispatched", "dispatched", "closed_short")
 STAFF_ONLY = frozenset({"salesperson-performance", "follow-ups", "territory-performance",
-                        "campaign-performance"})
+                        "campaign-performance", "sales-forecast", "insights"})
 
 
 def _has(caller: Caller, module: str) -> bool:
@@ -227,7 +227,7 @@ async def lead_conversion(db: AsyncSession, caller: Caller, f: Filters, group_by
     total = sum(g["leads"] for g in groups.values())
     won = sum(g["won"] for g in groups.values())
     page, cut = _page(out)
-    return {"group_by": group_by, "rows": page, "truncated": cut, "filters": f.out(),
+    return {"group_by": group_by, "rows": page, "truncated": cut, "row_count": len(out), "filters": f.out(),
             "totals": {"leads": total, "won": won, "conversion_pct": str(domain.pct(won, total))}}
 
 
@@ -270,7 +270,7 @@ async def lost_leads(db: AsyncSession, caller: Caller, f: Filters, group_by: str
             "by_stage": dict(g["by_stage"])}
            for k, g in sorted(groups.items(), key=lambda kv: -kv[1]["count"])]
     page, cut = _page(out)
-    return {"group_by": group_by, "rows": page, "truncated": cut, "filters": f.out(), "totals": {"lost": total}}
+    return {"group_by": group_by, "rows": page, "truncated": cut, "row_count": len(out), "filters": f.out(), "totals": {"lost": total}}
 
 
 # ── salesperson performance ─────────────────────────────────────────────────
@@ -336,7 +336,7 @@ async def salesperson_performance(db: AsyncSession, caller: Caller, f: Filters) 
                     "tasks_done": v.get("tasks_done", 0) if sees("tasks", k) else None,
                     "tasks_overdue": v.get("tasks_overdue", 0) if sees("tasks", k) else None})
     page, cut = _page(out)
-    return {"rows": page, "truncated": cut, "filters": f.out(),
+    return {"rows": page, "truncated": cut, "row_count": len(out), "filters": f.out(),
             "totals": {"leads_created": sum(r["leads_created"] for r in out),
                        "leads_won": sum(r["leads_won"] for r in out)}}
 
@@ -366,7 +366,7 @@ async def follow_ups(db: AsyncSession, caller: Caller, f: Filters) -> dict[str, 
             "oldest_due_at": g["oldest_due_at"].isoformat() if g["oldest_due_at"] else None}
            for k, g in sorted(per.items(), key=lambda kv: kv[1]["oldest_due_at"] or now)]
     page, cut = _page(out)
-    return {"rows": page, "truncated": cut, "filters": {"as_of": now.isoformat(), "owner_id": f.owner_id},
+    return {"rows": page, "truncated": cut, "row_count": len(out), "filters": {"as_of": now.isoformat(), "owner_id": f.owner_id},
             "totals": {b: sum(r[b] for r in out) for b in buckets}}
 
 
@@ -430,7 +430,7 @@ async def dealer_performance(db: AsyncSession, caller: Caller, f: Filters) -> di
             "complaints": v.get("complaints", 0) if has_c else None}
            for k, v in sorted(per.items(), key=lambda kv: -Decimal(kv[1].get("order_value") or 0))]
     page, cut = _page(out)
-    return {"rows": page, "truncated": cut, "filters": f.out(),
+    return {"rows": page, "truncated": cut, "row_count": len(out), "filters": f.out(),
             "totals": {"orders": sum(r["orders"] for r in out),
                        "order_value": _money(sum(Decimal(r["order_value"]) for r in out))}}
 
@@ -522,7 +522,7 @@ async def campaign_performance(db: AsyncSession, caller: Caller, f: Filters) -> 
     totals: dict[str, Any] = {"leads": sum(r["leads"] for r in out), "won": sum(r["won"] for r in out),
                               "sales_value": _money(sum(Decimal(r["sales_value"]) for r in out)) if see_sales else None,
                               "cost": _money(sum(Decimal(r["cost"]) for r in out)) if see_cost else None}
-    return {"rows": page, "truncated": cut, "filters": f.out(), "totals": totals}
+    return {"rows": page, "truncated": cut, "row_count": len(out), "filters": f.out(), "totals": totals}
 
 
 # ── territory performance ───────────────────────────────────────────────────
@@ -557,7 +557,7 @@ async def territory_performance(db: AsyncSession, caller: Caller, f: Filters, le
             "order_value": _money(v.get("order_value")) if has_o else None}
            for k, v in sorted(per.items(), key=lambda kv: -(kv[1].get("leads") or 0))]
     page, cut = _page(out)
-    return {"level": level, "rows": page, "truncated": cut, "filters": f.out(),
+    return {"level": level, "rows": page, "truncated": cut, "row_count": len(out), "filters": f.out(),
             "totals": {"leads": sum(r["leads"] for r in out), "won": sum(r["won"] for r in out)}}
 
 
@@ -589,7 +589,7 @@ async def complaints(db: AsyncSession, caller: Caller, f: Filters, group_by: str
     out = [{"key": {"id": str(r.k), "label": labels.get(str(r.k), str(r.k))}, "count": r.n, "resolved": r.resolved,
             "resolved_within_sla_pct": str(domain.pct(r.in_sla, r.resolved)), "response_breaches": r.breaches}
            for r in sorted(rows, key=lambda x: -x.n)]
-    return {"group_by": group_by, "rows": out, "truncated": False, "filters": f.out(),
+    return {"group_by": group_by, "rows": out, "truncated": False, "row_count": len(out), "filters": f.out(),
             "totals": {"count": sum(r["count"] for r in out), "resolved": sum(r["resolved"] for r in out),
                        "refunds": {"count": refunds.n, "amount": _money(refunds.v)}}}
 

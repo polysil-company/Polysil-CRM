@@ -17,6 +17,7 @@ from api.deps import Claims, DbSession, IdemKey, require
 from api.idempotency import payload_digest, run_idempotent
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.subsidy_schemes import (
+    UUID_RE,
     LeadScheme,
     SchemeDetail,
     SchemeRow,
@@ -64,7 +65,7 @@ async def list_schemes(db: DbSession, _: Claims) -> Envelope[list[SchemeRow]]:
 
 
 @router.get("/for-lead/{lead_id}", response_model=Envelope[LeadScheme], responses=_ERRORS)
-async def for_lead(lead_id: Annotated[str, Path(pattern=r"^[0-9a-fA-F-]{36}$")], db: DbSession,
+async def for_lead(lead_id: Annotated[str, Path(pattern=UUID_RE)], db: DbSession,
                    _: Claims) -> Envelope[LeadScheme]:
     """The scheme a subsidy application on this lead uses: the active scheme of the
     lead's state. Send its `code` as `scheme` in the calculation preview and in

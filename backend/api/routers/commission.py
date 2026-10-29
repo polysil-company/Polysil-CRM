@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require, require_any
 from api.idempotency import payload_digest, run_idempotent
-from api.routers.exporting import XLSX_RESPONSE, export, filters_of
+from api.routers.exporting import EXPORT_RESPONSE, ExportFormat, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.commission import (
     Commission,
@@ -104,11 +104,11 @@ async def list_commissions(
                                           paid_to=paid_to, cursor=cursor, limit=limit)
 
 
-@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE}, dependencies=[_READ])
+@router.get("/export", response_class=Response, responses={**_ERRORS, **EXPORT_RESPONSE}, dependencies=[_READ])
 async def export_commissions(db: DbSession, caller: CallerDep,
-                             filters: Annotated[dict[str, Any], Depends(filters_of(list_commissions))]) -> Response:
-    """The commission report as Excel, with the same filters (FS-030)."""
-    return await export(list_commissions, stem="dealer-commissions", title="Dealer commissions",
+                             filters: Annotated[dict[str, Any], Depends(filters_of(list_commissions))], fmt: ExportFormat = "xlsx") -> Response:
+    """The commission report as Excel or CSV, with the same filters (FS-030)."""
+    return await export(list_commissions, fmt=fmt, stem="dealer-commissions", title="Dealer commissions",
                         columns=exports.DEALER_COMMISSIONS, user_id=caller.user_id, filters=filters, db=db)
 
 

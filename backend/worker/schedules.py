@@ -11,6 +11,7 @@ from __future__ import annotations
 from arq import cron
 
 from worker.jobs.complaints import complaint_escalation
+from worker.jobs.email import email_collect, email_drain, email_morning
 from worker.jobs.leads import lead_dormancy
 from worker.jobs.orders import order_render_due
 from worker.jobs.outbox import outbox_drain, purge_expired_sessions
@@ -50,4 +51,12 @@ CRON_JOBS: list = [
     # FS-028: a missed complaint target rings within five minutes; minutes 0 and 1
     # are tracking's, so this takes 2
     cron(complaint_escalation, minute=set(range(2, 60, 5))),
+    # FS-078: email. Collect at minute 3, 8, 13 ..., clear of tracking and complaints;
+    # the drain at seconds 15 and 45, between the WhatsApp ticks; the morning
+    # summary every 10 minutes 02:00 to 05:50 UTC Monday to Saturday, and the job
+    # itself keeps 08:00 to 11:00 IST
+    cron(email_collect, minute=set(range(3, 60, 5))),
+    cron(email_drain, second={15, 45}),
+    cron(email_morning, weekday={0, 1, 2, 3, 4, 5}, hour={2, 3, 4, 5},
+         minute={0, 10, 20, 30, 40, 50}),
 ]

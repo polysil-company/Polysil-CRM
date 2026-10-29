@@ -60,12 +60,13 @@ interval with no end counts to today and says `running`.
 
 **Ageing Export**
 
-The ageing view as Excel, with the same filters.
+The ageing view as Excel or CSV or PDF, with the same filters.
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
 | `status` | query | `open` \| `full_fp_received` \| `cancelled` \| null |  |  |
 | `stage` | query | string \| null |  | A stage code. |
 | `q` | query | string \| null |  | Application, registration number or farmer. |
@@ -74,12 +75,13 @@ The ageing view as Excel, with the same filters.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The workbook, as an attachment. |
+| `200` | - | The file, as an attachment: Excel, CSV or PDF. |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
-| `422` | `ErrorResponse` | `revision_in_past`, a field. |
+| `422` | `ErrorResponse` | `export_too_large`: a PDF holds 1,000 rows at most; a bad filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -113,24 +115,26 @@ days in each stage, in stage order. Only stages holding an application appear.
 
 **Stages Export**
 
-The stage report as Excel.
+The stage report as Excel or CSV or PDF.
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
 | `status` | query | `open` \| `full_fp_received` \| `cancelled` \| null |  |  |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The workbook, as an attachment. |
+| `200` | - | The file, as an attachment: Excel, CSV or PDF. |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
-| `422` | `ErrorResponse` | `revision_in_past`, a field. |
+| `422` | `ErrorResponse` | `export_too_large`: a PDF holds 1,000 rows at most; a bad filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 
@@ -164,24 +168,26 @@ Supplied means stage 7's supply date is recorded. Cancelled applications are lef
 
 **Supply Export**
 
-The supply report as Excel.
+The supply report as Excel or CSV or PDF.
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
 | `status` | query | `open` \| `full_fp_received` \| `cancelled` \| null |  |  |
 
 **Responses**
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The workbook, as an attachment. |
+| `200` | - | The file, as an attachment: Excel, CSV or PDF. |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted. |
 | `409` | `ErrorResponse` | `revision_on_start_date`, `later_revision_exists`. |
-| `422` | `ErrorResponse` | `revision_in_past`, a field. |
+| `422` | `ErrorResponse` | `export_too_large`: a PDF holds 1,000 rows at most; a bad filter. |
+| `503` | `ErrorResponse` | `busy`: two PDFs are being made, try again in a moment; `pdf_unavailable`. |
 
 ---
 

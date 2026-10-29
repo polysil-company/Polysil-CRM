@@ -212,4 +212,97 @@ def test_every_export_takes_every_filter_its_list_takes() -> None:
             continue
         listed = {p["name"] for p in paths[path.removesuffix("/export")]["get"].get("parameters", [])}
         exported = {p["name"] for p in ops["get"].get("parameters", [])}
-        assert exported == listed - paging, path
+        # FS-077 EC-13: every export takes `format`, and nothing else beyond the list's own
+        assert "format" in exported, path
+        assert exported - {"format"} == listed - paging, path
+
+
+# ── FS-077: CSV and PDF ─────────────────────────────────────────────────────
+
+def _csv(r: httpx.Response) -> list[dict[str, str]]:
+    import csv as csv_mod
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("text/csv")
+    assert r.headers["content-disposition"].endswith('.csv"')
+    assert r.content.startswith("\ufeff".encode()), "a byte-order mark for Excel"
+    return list(csv_mod.DictReader(io.StringIO(r.content.decode("utf-8").lstrip("\ufeff"))))
+
+
+async def test_a_list_as_csv_holds_the_same_rows_as_excel_and_keeps_scope(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    tag = uuid.uuid4().hex[:8]
+    fo, dm = shop.ids["field_officer"], shop.ids["district_manager"]
+    await _leads(sessions, shop, tag, [fo, fo, dm])
+    admin = await endpoints._as(client, shop, "admin_sales")
+    q = {"q": f"Export Farmer {tag}"}
+    xlsx = _rows(await client.get(f"{V1}/leads/export", headers=admin, params=q))
+    rows = _csv(await client.get(f"{V1}/leads/export", headers=admin, params={**q, "format": "csv"}))
+    assert sorted(r["Inquiry no"] for r in rows) == sorted(r["Inquiry no"] for r in xlsx)
+    assert rows[0]["Estimated value"] == "125000.50", "money as plain two-place text"
+    assert rows[0]["Mobile"].startswith("+91"), "a mobile is not formula-guarded (EC-4)"
+    h = await endpoints._as(client, shop, "field_officer")
+    mine = _csv(await client.get(f"{V1}/leads/export", headers=h, params={**q, "format": "csv"}))
+    assert sorted(r["Inquiry no"] for r in mine) == [f"EXP-{tag}-0", f"EXP-{tag}-1"], \
+        "the negative: a field officer's CSV never holds the manager's lead"
+
+
+async def test_pdf_on_a_list_is_refused_before_any_row_is_read(
+        client: httpx.AsyncClient, shop: Shop, monkeypatch: pytest.MonkeyPatch) -> None:
+    """EC-14: the drain never runs for a refused request."""
+    calls: list[int] = []
+    real = exports.drain
+
+    async def spy(*a: Any, **k: Any) -> Any:
+        calls.append(1)
+        return await real(*a, **k)
+
+    monkeypatch.setattr(exports, "drain", spy)
+    h = await endpoints._as(client, shop, "admin_sales")
+    for path in ("leads", "quotations", "orders", "partners"):
+        r = await client.get(f"{V1}/{path}/export", headers=h, params={"format": "pdf"})
+        assert r.status_code == 422 and r.json()["error"]["code"] == "format_not_available", (path, r.text)
+    assert calls == []
+    r = await client.get(f"{V1}/leads/export", headers=h, params={"format": "CSV"})
+    assert r.status_code == 422, "formats are lower case"
+
+
+async def test_every_export_file_is_never_cached(client: httpx.AsyncClient, shop: Shop) -> None:
+    """EC-25."""
+    h = await endpoints._as(client, shop, "admin_sales")
+    for fmt in ("xlsx", "csv"):
+        r = await client.get(f"{V1}/partners/export", headers=h, params={"format": fmt, "q": "zz none"})
+        assert r.status_code == 200, r.text
+        assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
+
+
+async def test_every_list_export_answers_csv(client: httpx.AsyncClient, shop: Shop) -> None:
+    """EC-13: no route silently ignores `format` and answers Excel."""
+    h = await endpoints._as(client, shop, "admin_sales")
+    for path in ("leads", "quotations", "orders", "complaints", "tasks", "subsidy-applications",
+                 "partners", "users"):
+        params = {"q": "no such row zz"} if path != "tasks" else {"task_type": "call"}
+        _csv(await client.get(f"{V1}/{path}/export", headers=h, params={**params, "format": "csv"}))
+
+
+@pytest.mark.usefixtures("fake_engine")
+async def test_a_subsidy_report_comes_as_csv_and_pdf_and_a_large_pdf_is_refused(
+        client: httpx.AsyncClient, office: subsidy.Office, monkeypatch: pytest.MonkeyPatch) -> None:
+    from api.routers import exporting
+    from api.services import report_pdf
+    fo = await subsidy._as(client, office, "field_officer")
+    await subsidy._app(client, office, fo)
+    sc = await subsidy._as(client, office, "state_coordinator")
+    url = f"{V1}/subsidy-reports/stages/export"
+    rows = _csv(await client.get(url, headers=sc, params={"format": "csv"}))
+    assert rows and "Stage" in rows[0]
+    monkeypatch.setattr(report_pdf, "get_settings", lambda: type("S", (), {"pdf_renderer": "html"})())
+    r = await client.get(url, headers=sc, params={"format": "pdf"})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("text/html"), "the html renderer labels itself (EC-15)"
+    assert r.headers["content-disposition"].endswith('.html"')
+    assert "Subsidy stages" in r.text and "Status: open" in r.text
+    monkeypatch.setattr(exporting, "PDF_MAX_ROWS", 0)
+    r = await client.get(url, headers=sc, params={"format": "pdf"})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "export_too_large", r.text
+    assert "Use Excel or CSV" in r.json()["error"]["message"]
+    assert _csv(await client.get(url, headers=sc, params={"format": "csv"})), "CSV has no PDF cap"

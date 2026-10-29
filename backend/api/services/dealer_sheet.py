@@ -24,7 +24,7 @@ from api.config import get_settings
 from api.errors import ServiceUnavailableError
 from api.pdf import env as _env
 from api.pdf import logo as _logo
-from api.pdf import logo_only_fetcher, render_pdf, render_slot, renderer_available
+from api.pdf import logo_only_fetcher, render_limited, renderer_available
 
 
 def _money(v: Any) -> str:
@@ -115,8 +115,7 @@ async def render(app: dict[str, Any] | None, *, partner_type: str) -> tuple[byte
         return page.encode("utf-8"), "text/html; charset=utf-8"
     if renderer_available():
         raise ServiceUnavailableError("PDFs cannot be made right now.", code="pdf_unavailable")
-    with render_slot():
-        return await asyncio.to_thread(render_pdf, page, logo_only_fetcher()), "application/pdf"
+    return await asyncio.to_thread(render_limited, page, logo_only_fetcher), "application/pdf"
 
 
 _blank: dict[str, tuple[bytes, str]] = {}

@@ -84,13 +84,16 @@ IMPORT_RETENTION = timedelta(days=7)
 
 # FOR UPDATE SKIP LOCKED is what lets more than one worker run without two of them
 # sending the same message. The partial index on (next_attempt_at) WHERE
-# state = 'pending' is what makes this a lookup rather than a scan.
+# state = 'pending' AND channel <> 'email' is what makes this a lookup rather than
+# a scan. Email rows are worker/jobs/email.py's (FS-078); an `sms` row is still
+# claimed here and dies "no adapter" (EC-17).
 _CLAIM_ONE = text(
     """
     SELECT id, channel::text AS channel, template_key, recipient, payload, attempts,
            created_at, EXTRACT(EPOCH FROM (now() - created_at)) AS age_seconds
       FROM notification_outbox
      WHERE state = 'pending'
+       AND channel <> 'email'
        AND next_attempt_at <= now()
      ORDER BY next_attempt_at
      LIMIT 1
@@ -398,9 +401,14 @@ async def purge_expired_sessions(ctx: dict[str, Any]) -> int:
         device_tokens = (await session.execute(
             text("SELECT tracking_device_token_purge(:cut)"), {"cut": now},
         )).scalar_one()
+        # FS-078: the morning summary's keys go with the outbox rows they guarded
+        morning = (await session.execute(
+            text("SELECT email_morning_sent_purge(:cut)"),
+            {"cut": (now - settings.outbox_retention).date()},
+        )).scalar_one()
 
     log.info("retention.purged", sessions=sessions, attempts=attempts, idempotency=idem,
              outbox=outbox, lead_codes=codes, webhook_calls=webhook, imports=imports,
-             device_tokens=device_tokens)
+             device_tokens=device_tokens, email_morning=morning)
     return (int(sessions) + int(attempts) + int(idem) + int(outbox) + int(codes) + int(webhook)
             + int(imports))

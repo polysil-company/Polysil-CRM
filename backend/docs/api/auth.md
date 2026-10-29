@@ -292,7 +292,56 @@ response on a slow connection does not sign the user out of everything.
 
 ---
 
+## `PUT /api/v1/me/email-preferences`
+
+**Put Email Preferences**
+
+Turn your own email notices and morning summary on or off. Both fields are
+required. Any signed-in staff or partner user; a consumer gets 403. Only show
+the switches while `email_available` on `GET /auth/me` is true.
+**`Idempotency-Key` is required.**
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `idempotency-key` | header | string \| null |  |  |
+
+**Request body**
+
+**`EmailPreferences`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `notices` | boolean | yes | Email me updates I have not seen: a notice still unread 10 minutes after it arrived is emailed, several in one email. |
+| `morning_summary` | boolean | yes | Email me a morning summary at 08:00 IST, Monday to Saturday, when I have tasks due today or overdue. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_EmailPreferences_` | Successful Response |
+| `400` | `ErrorResponse` | Idempotency-Key missing. |
+| `401` | `ErrorResponse` | Not signed in, or credentials rejected. |
+| `409` | `ErrorResponse` | The key was used for a different body. |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## Models
+
+**`EmailPreferences`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `notices` | boolean | yes | Email me updates I have not seen: a notice still unread 10 minutes after it arrived is emailed, several in one email. |
+| `morning_summary` | boolean | yes | Email me a morning summary at 08:00 IST, Monday to Saturday, when I have tasks due today or overdue. |
+
+**`Envelope_EmailPreferences_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | EmailPreferences | yes |  |
 
 **`Envelope_MeResponse_`**
 
@@ -358,6 +407,8 @@ response on a slow connection does not sign the user out of everything.
 | `must_change_password` | boolean |  | True while a temporary password set by an administrator is in force. Until the person changes it, every route except this one and POST /auth/password answers 403 `password_change_required`; show the change-password screen. Default `False`. |
 | `permissions` | ModulePermission[] |  |  |
 | `features` | Features |  | Admin switches that change the screens (FS-070). |
+| `email_preferences` | EmailPreferences |  | Your two email switches (FS-078). |
+| `email_available` | boolean |  | False while the CRM sends no email, or when you have no usable email address. Hide the two switches when false. Default `False`. |
 
 **`ModulePermission`**
 

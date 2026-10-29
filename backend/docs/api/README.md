@@ -9,7 +9,7 @@ any endpoint change, so it is always current rather than a snapshot.
 |---|---|---|
 | Approvals | 5 | [`approvals.md`](approvals.md) |
 | Assistant | 2 | [`assistant.md`](assistant.md) |
-| Auth | 7 | [`auth.md`](auth.md) |
+| Auth | 8 | [`auth.md`](auth.md) |
 | Campaigns | 5 | [`campaigns.md`](campaigns.md) |
 | Complaints | 23 | [`complaints.md`](complaints.md) |
 | Customers | 4 | [`customers.md`](customers.md) |
@@ -35,7 +35,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Public | 6 | [`public.md`](public.md) |
 | Quotations | 16 | [`quotations.md`](quotations.md) |
 | Ratings | 4 | [`ratings.md`](ratings.md) |
-| Reports | 9 | [`reports.md`](reports.md) |
+| Reports | 11 | [`reports.md`](reports.md) |
 | Rewards | 19 | [`rewards.md`](rewards.md) |
 | Schemes | 6 | [`schemes.md`](schemes.md) |
 | Seller Gstins | 3 | [`seller-gstins.md`](seller-gstins.md) |

@@ -6,9 +6,12 @@ data sheet (FS-071) and the complaint (FS-074), and `api/` never imports `worker
 `render_pdf` and `renderer_available`.
 
 For the API's own renders (FS-074 EC-4, plan review R-1):
-- `render_slot()`: at most two at once in a process, across both documents. A third
-  answers 503 `busy`. WeasyPrint's layout holds the GIL, and each render keeps the
-  request's pooled connection open.
+- `render_limited()`: at most two at once in a process, across every document. A
+  third answers 503 `busy`. WeasyPrint's layout holds the GIL, and each render keeps
+  the request's pooled connection open. The limit is taken inside the worker thread,
+  so a cancelled request cannot free its slot while its render runs on (FS-077 EC-2).
+- `slot_free()`: a cheap look before a request does work it would waste. Best
+  effort: the thread decides.
 - `env`: autoescape on for `.html` templates; nothing is marked safe.
 - `logo_only_fetcher()`: the renderer fetches nothing but the bundled logo.
 """
@@ -16,11 +19,11 @@ For the API's own renders (FS-074 EC-4, plan review R-1):
 from __future__ import annotations
 
 import base64
-import contextlib
 import functools
 import pathlib
+import threading
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -34,21 +37,29 @@ MAX_RENDERS = 2
 
 env = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=select_autoescape(["html"]),
                   trim_blocks=True, lstrip_blocks=True)
-_active = 0
+slots = threading.BoundedSemaphore(MAX_RENDERS)
+BUSY = "Busy making other PDFs. Try again in a moment."
 
 
-@contextlib.contextmanager
-def render_slot() -> Iterator[None]:
-    """No await between the check and the increment, so two requests on the event
-    loop cannot both take the last slot."""
-    global _active
-    if _active >= MAX_RENDERS:
-        raise ServiceUnavailableError("Busy making other PDFs. Try again in a moment.", code="busy")
-    _active += 1
+def slot_free() -> bool:
+    if not slots.acquire(blocking=False):
+        return False
+    slots.release()
+    return True
+
+
+def render_limited(html: str, make_fetcher: Callable[[], Any] | None = None) -> bytes:
+    """Run in a worker thread (`asyncio.to_thread`). The slot is taken first and
+    released by this thread when the render ends, whatever happened to the request
+    that asked for it. Cancelling the awaiting task does not stop the thread.
+    `make_fetcher` (such as `logo_only_fetcher`) is called only once a slot is held:
+    building it imports WeasyPrint, which a refused request should not pay for."""
+    if not slots.acquire(blocking=False):
+        raise ServiceUnavailableError(BUSY, code="busy")
     try:
-        yield
+        return render_pdf(html, make_fetcher() if make_fetcher else None)
     finally:
-        _active -= 1
+        slots.release()
 
 
 @functools.cache

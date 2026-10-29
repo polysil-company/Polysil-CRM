@@ -14,12 +14,26 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 
 import httpx
+import pytest
 import pytest_asyncio
 from argon2 import PasswordHasher
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api import pdf
 from tests.conftest import Dealer, Staff
+
+
+@pytest.fixture
+def no_pdf_slots() -> object:
+    """Every PDF render slot taken, as two long renders would hold them, and given
+    back afterwards (FS-077 plan review S-1)."""
+    taken = 0
+    while pdf.slots.acquire(blocking=False):
+        taken += 1
+    yield
+    for _ in range(taken):
+        pdf.slots.release()
 
 
 @contextlib.asynccontextmanager
