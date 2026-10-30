@@ -1,0 +1,138 @@
+import type { LookupList, LookupListWire } from "@/features/lookups/api/lookups.schemas";
+
+import { MOCK_ID_SPACE, mockUuid } from "./reference";
+
+type LookupRow = LookupListWire["data"][number];
+
+/** The backend's seeded rows (backend/api/db/migrations/versions/006_leads.py), in its order. */
+const SEEDS: Readonly<Record<LookupList, readonly (readonly [code: string, name: string])[]>> = {
+  "lead-sources": [
+    ["whatsapp", "WhatsApp"],
+    ["website", "Website"],
+    ["employee", "Employee"],
+    ["dealer", "Dealer"],
+    ["campaign", "Campaign"],
+    ["agri_fair", "Agri Fair"],
+    ["farmer_meeting", "Farmer Meeting"],
+    ["qr_code", "QR Code"],
+    ["form_link", "Form Link"],
+  ],
+  "mis-systems": [
+    ["drip", "Drip"],
+    ["mini_sprinkler", "Mini Sprinkler"],
+    ["sprinkler", "Sprinkler"],
+    ["automation", "Automation"],
+    ["other", "Other"],
+  ],
+  // backend/api/db/migrations/versions/018_tasks_planner.py
+  "meeting-types": [
+    ["by_call", "By call"],
+    ["survey_design", "Survey & Design"],
+    ["cd_understanding", "C & D understanding"],
+    ["won_or_wait", "Won or wait"],
+    ["follow_up", "Follow-up"],
+  ],
+  // backend/api/db/migrations/versions/019_complaints.py
+  "complaint-types": [
+    ["short_material", "Short Material"],
+    ["dripline", "Dripline / Lateral / PVC"],
+    ["components", "Components"],
+    ["oem_components", "OEM's Components"],
+    ["material_handling", "Material Handling"],
+  ],
+  "lost-reasons": [
+    ["price", "Price"],
+    ["competitor", "Competitor"],
+    ["no_response", "No response"],
+    ["product_mismatch", "Product mismatch"],
+    ["financing_not_approved", "Financing not approved"],
+    ["out_of_area", "Out of area"],
+  ],
+  // A few of the 78 the backend seeds (migration 021), with their real codes.
+  crops: [
+    ["banana", "Banana"],
+    ["castor", "Castor"],
+    ["chillies", "Chillies"],
+    ["cotton", "Cotton"],
+    ["cumin", "Cumin"],
+    ["groundnut", "Groundnut"],
+    ["mango", "Mango"],
+    ["onion", "Onion"],
+    ["papaya", "Papaya"],
+    ["pomegranate", "Pomegranate"],
+    ["potato", "Potato"],
+    ["sugarcane", "Sugarcane"],
+    ["tomato", "Tomato"],
+    ["wheat", "Wheat"],
+  ],
+};
+
+const LIST_OFFSET: Readonly<Record<LookupList, number>> = {
+  "lead-sources": 100,
+  "mis-systems": 200,
+  "lost-reasons": 300,
+  crops: 400,
+  "meeting-types": 500,
+  "complaint-types": 600,
+};
+
+/** Every row of one list, as GET /lookups/{list} returns it. */
+/** BE-026 · The seeded sources' quality (migration 006), by code. */
+const SOURCE_QUALITY: Readonly<Record<string, string>> = {
+  whatsapp: "0.60",
+  website: "0.60",
+  employee: "0.80",
+  dealer: "0.70",
+  campaign: "0.50",
+  agri_fair: "0.70",
+  farmer_meeting: "0.80",
+  qr_code: "0.50",
+  form_link: "0.50",
+};
+
+export function mockLookupRows(list: LookupList): LookupRow[] {
+  const ordered = list === "lead-sources" || list === "lost-reasons";
+  return SEEDS[list].map(([code, name], index) => ({
+    id: mockUuid(MOCK_ID_SPACE.lookup, LIST_OFFSET[list] + index + 1),
+    code,
+    name,
+    is_active: true,
+    // BE-026 · each row's place, a source's quality, a reason's kind; null where a list has none
+    sort_order: ordered ? index + 1 : null,
+    quality: list === "lead-sources" ? (SOURCE_QUALITY[code] ?? "0.50") : null,
+    kind: list === "lost-reasons" ? "lost" : null,
+  }));
+}
+
+/** The codes of one list, for generating leads that use them. */
+export function mockLookupCodes(list: LookupList): string[] {
+  return SEEDS[list].map(([code]) => code);
+}
+
+/** Every list, editable, as Masters starts them (MSTR-009). */
+export function seedLookups(): Record<LookupList, LookupRow[]> {
+  return {
+    "lead-sources": mockLookupRows("lead-sources"),
+    "mis-systems": mockLookupRows("mis-systems"),
+    "lost-reasons": mockLookupRows("lost-reasons"),
+    crops: mockLookupRows("crops"),
+    "meeting-types": mockLookupRows("meeting-types"),
+    "complaint-types": mockLookupRows("complaint-types"),
+  };
+}
+
+/** The backend's seeded score settings (migration 006), in its order (by key). */
+export function seedScoring(): { key: string; value: string }[] {
+  return [
+    ["engagement_cap", "10.00"],
+    ["speed_fast_hours", "24.00"],
+    ["speed_slow_hours", "72.00"],
+    ["threshold_hot", "70.00"],
+    ["threshold_warm", "40.00"],
+    ["value_cap", "500000.00"],
+    ["w_engagement", "20.00"],
+    ["w_source", "25.00"],
+    ["w_speed", "20.00"],
+    ["w_value", "35.00"],
+  ].map(([key = "", value = ""]) => ({ key, value }));
+}

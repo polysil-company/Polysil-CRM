@@ -1,0 +1,400 @@
+"use client";
+
+import {
+  ArrowLeft01Icon,
+  BubbleChatIcon,
+  InformationCircleIcon,
+  UserGroupIcon,
+} from "@hugeicons/core-free-icons";
+import { useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { notFound, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import type * as React from "react";
+import { toast } from "sonner";
+
+import { EmptyState } from "@/components/patterns/empty-state";
+import { QueryView } from "@/components/patterns/query-view";
+import { Avatar, AvatarFallback, getInitials } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
+import { Icon } from "@/components/ui/icon";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useMarkConversationRead } from "@/features/messages/api/messages.mutations";
+import {
+  conversationListQueryOptions,
+  conversationMessagesQueryOptions,
+  conversationQueryOptions,
+  groupMembersQueryOptions,
+  messageKeys,
+} from "@/features/messages/api/messages.queries";
+import {
+  conversationName,
+  sendMessageRequestSchema,
+  type Conversation,
+  type GroupConversation,
+  type Message,
+} from "@/features/messages/api/messages.schemas";
+import {
+  continuesGroup,
+  describePerson,
+  formatDayLabel,
+} from "@/features/messages/lib/format-messages";
+import { useSession } from "@/features/session/hooks/use-session";
+import { useNow } from "@/hooks/use-now";
+import { isApiError } from "@/lib/api/errors";
+import { isSameDay } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+import { GroupInfoDialog, memberCountLabel } from "./group-info-dialog";
+import { MessageBubble } from "./message-bubble";
+import { MessageComposer } from "./message-composer";
+
+/**
+ * MSG-002 · One conversation: who it is with, the messages grouped by day, and the
+ * composer. Unread messages are marked as read while the conversation is open.
+ * An unknown conversation renders the not-found page. In a group (MSG-006) each sender is
+ * named from the member list, and a 404 means the user is out of it: it leaves the screen.
+ */
+export function ConversationThread({
+  conversationId,
+}: {
+  conversationId: string;
+}): React.JSX.Element {
+  const { data: session } = useSession();
+  const myId = session?.user.id ?? null;
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const [infoOpen, setInfoOpen] = useState(false);
+  const thread = useQuery(conversationMessagesQueryOptions(conversationId));
+  const conversations = useQuery(conversationListQueryOptions());
+  const listed = conversations.data?.items.find((item) => item.id === conversationId);
+  // A conversation nobody has written in yet is not listed: it is read on its own (BE-021).
+  const unlisted = useQuery({
+    ...conversationQueryOptions(conversationId),
+    enabled: conversations.status !== "pending" && listed === undefined,
+  });
+  const { mutate: markConversationRead } = useMarkConversationRead();
+
+  const conversation = listed ?? unlisted.data ?? null;
+  const group = conversation?.kind === "group" ? conversation : null;
+  // Loaded once per group thread, to name each sender (a message carries only `sender_id`).
+  const members = useQuery({
+    ...groupMembersQueryOptions(conversationId),
+    enabled: group !== null,
+  });
+  const unreadCount = conversation?.unreadCount ?? 0;
+  const newestShown = thread.data?.items.at(-1)?.id ?? null;
+  const participantLeft = conversation?.kind === "direct" && !conversation.participant.isActive;
+  const removedFromGroup =
+    group !== null &&
+    thread.status === "error" &&
+    isApiError(thread.error) &&
+    thread.error.status === 404;
+
+  const senderNameOf = (senderId: string): string =>
+    members.data?.find((member) => member.person.id === senderId)?.person.name ?? "A colleague";
+
+  const leaveScreen = (): void => {
+    setInfoOpen(false);
+    void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+    router.replace("/messages");
+  };
+
+  const pendingBodies = useMutationState({
+    filters: { mutationKey: [...messageKeys.all, "send", conversationId], status: "pending" },
+    select: (mutation) => {
+      const parsed = sendMessageRequestSchema.safeParse(mutation.state.variables);
+      return parsed.success ? parsed.data.body : null;
+    },
+  }).filter((body): body is string => body !== null);
+
+  // Opening the conversation, or new messages arriving while it is open, reads them, up to the
+  // newest one on screen: a message that lands meanwhile stays unread (MSG-005, `up_to`).
+  useEffect(() => {
+    if (unreadCount > 0 && newestShown !== null) {
+      markConversationRead({ conversationId, upTo: newestShown });
+    }
+  }, [conversationId, unreadCount, newestShown, markConversationRead]);
+
+  // A 404 while polling a group means the user was removed: say so and leave it (MSG-006).
+  useEffect(() => {
+    if (removedFromGroup) {
+      toast.info("You're no longer in this group", {
+        description: group.group.name,
+      });
+      void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+      router.replace("/messages");
+    }
+  }, [removedFromGroup, group, queryClient, router]);
+
+  if (
+    !removedFromGroup &&
+    thread.status === "error" &&
+    isApiError(thread.error) &&
+    thread.error.status === 404
+  ) {
+    notFound();
+  }
+
+  const participantName = conversation === null ? null : conversationName(conversation);
+
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <ThreadHeader
+        conversation={conversation}
+        loading={conversations.status === "pending" || unlisted.isLoading}
+        onOpenInfo={() => {
+          setInfoOpen(true);
+        }}
+      />
+      {group === null ? null : (
+        <GroupInfoDialog
+          conversation={group}
+          myId={myId}
+          open={infoOpen}
+          onOpenChange={setInfoOpen}
+          onLeft={leaveScreen}
+        />
+      )}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <QueryView
+          query={thread}
+          pending={<MessageLogSkeleton />}
+          isEmpty={(page) => page.items.length === 0 && pendingBodies.length === 0}
+          empty={
+            <div className="flex flex-1 items-center justify-center p-6">
+              <EmptyState
+                icon={BubbleChatIcon}
+                title={
+                  participantName === null
+                    ? "No messages yet"
+                    : group === null
+                      ? `Say hello to ${participantName}`
+                      : `Start the conversation in ${participantName}`
+                }
+                description="Write below. You can share a lead from its page to talk about it here."
+              />
+            </div>
+          }
+        >
+          {(page) => (
+            <MessageLog
+              messages={page.items}
+              pendingBodies={pendingBodies}
+              myId={myId}
+              senderNameOf={group === null ? () => participantName ?? "Colleague" : senderNameOf}
+              namesSenders={group !== null}
+            />
+          )}
+        </QueryView>
+      </div>
+      <MessageComposer
+        conversationId={conversationId}
+        recipientName={participantName}
+        disabled={thread.status !== "success"}
+        closedNotice={
+          participantLeft
+            ? `${participantName ?? "This colleague"} has left Polysil. The conversation stays here to read; new messages can't be sent.`
+            : null
+        }
+        onParticipantLeft={() => {
+          void queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+        }}
+      />
+    </div>
+  );
+}
+
+function ThreadHeader({
+  conversation,
+  loading,
+  onOpenInfo,
+}: {
+  conversation: Conversation | null;
+  loading: boolean;
+  onOpenInfo: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-2 sm:px-4">
+      <Link
+        href="/messages"
+        aria-label="All conversations"
+        className={cn(buttonVariants({ variant: "ghost", size: "icon-md" }), "md:hidden")}
+      >
+        <Icon icon={ArrowLeft01Icon} />
+      </Link>
+      {conversation === null ? (
+        loading ? (
+          <div role="status" aria-label="Loading conversation" className="flex items-center gap-3">
+            <Skeleton className="size-10 rounded-full" />
+            <div className="flex flex-col gap-1.5">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          </div>
+        ) : (
+          <h2 className="text-sm font-semibold text-foreground">Conversation</h2>
+        )
+      ) : conversation.kind === "group" ? (
+        <GroupHeading conversation={conversation} onOpenInfo={onOpenInfo} />
+      ) : (
+        <>
+          <Avatar size="lg">
+            <AvatarFallback>{getInitials(conversation.participant.name)}</AvatarFallback>
+          </Avatar>
+          <div className="flex min-w-0 flex-col">
+            <h2 className="truncate text-sm font-semibold text-foreground">
+              {conversation.participant.name}
+            </h2>
+            <p className="truncate text-xs text-muted-foreground">
+              {describePerson(conversation.participant)}
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A group's name and size, with Group info (MSG-006). */
+function GroupHeading({
+  conversation,
+  onOpenInfo,
+}: {
+  conversation: GroupConversation;
+  onOpenInfo: () => void;
+}): React.JSX.Element {
+  return (
+    <>
+      <Avatar size="lg">
+        <AvatarFallback>
+          <Icon icon={UserGroupIcon} />
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h2 className="truncate text-sm font-semibold text-foreground">
+          {conversation.group.name}
+        </h2>
+        <p className="truncate text-xs text-muted-foreground">
+          {memberCountLabel(conversation.group.memberCount)}
+        </p>
+      </div>
+      <Button variant="ghost" size="sm" onClick={onOpenInfo}>
+        <Icon icon={InformationCircleIcon} />
+        Group info
+      </Button>
+    </>
+  );
+}
+
+function MessageLog({
+  messages,
+  pendingBodies,
+  myId,
+  senderNameOf,
+  namesSenders,
+}: {
+  messages: readonly Message[];
+  pendingBodies: readonly string[];
+  myId: string | null;
+  /** Who sent a message, by `sender_id`. */
+  senderNameOf: (senderId: string) => string;
+  /** A group shows each sender's name above their messages. */
+  namesSenders: boolean;
+}): React.JSX.Element {
+  const now = new Date(useNow());
+  const endRef = useRef<HTMLDivElement>(null);
+  const lastId = messages.at(-1)?.id;
+  const pendingCount = pendingBodies.length;
+
+  // Keep the newest message in view as messages arrive or are sent.
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [lastId, pendingCount]);
+
+  return (
+    <div
+      role="log"
+      aria-label="Messages"
+      className="min-h-0 flex-1 scrollbar-thin overflow-y-auto px-3 pt-2 pb-4 sm:px-6"
+    >
+      <ol className="flex flex-col">
+        {messages.map((message, index) => {
+          const previous = messages[index - 1];
+          const newDay =
+            previous === undefined || !isSameDay(previous.createdAt, message.createdAt);
+          const mine = message.senderId === myId;
+          const startsRun = !continuesGroup(previous, message);
+          return (
+            <li key={message.id} className="flex flex-col">
+              {newDay ? (
+                <div className="my-3 flex items-center gap-3 text-xs text-subtle-foreground">
+                  <span aria-hidden="true" className="h-px flex-1 bg-border" />
+                  <time dateTime={message.createdAt} suppressHydrationWarning>
+                    {formatDayLabel(message.createdAt, now)}
+                  </time>
+                  <span aria-hidden="true" className="h-px flex-1 bg-border" />
+                </div>
+              ) : null}
+              <MessageBubble
+                body={message.body}
+                resource={message.resource}
+                createdAt={message.createdAt}
+                mine={mine}
+                senderName={senderNameOf(message.senderId)}
+                showSender={namesSenders ? !mine && startsRun : false}
+                grouped={!startsRun}
+                showTime={!continuesGroup(message, messages[index + 1])}
+              />
+            </li>
+          );
+        })}
+        {pendingBodies.map((body, index) => (
+          <li key={`pending-${String(index)}`} className="flex flex-col">
+            <MessageBubble
+              body={body}
+              resource={null}
+              createdAt={null}
+              mine
+              senderName="You"
+              grouped={false}
+              showTime={false}
+            />
+          </li>
+        ))}
+      </ol>
+      <div ref={endRef} />
+    </div>
+  );
+}
+
+function MessageLogSkeleton(): React.JSX.Element {
+  return (
+    <div
+      role="status"
+      aria-label="Loading messages"
+      className="flex flex-1 flex-col gap-3 px-3 py-4 sm:px-6"
+    >
+      {["w-56", "w-40", "w-64", "w-32"].map((width, index) => (
+        <Skeleton
+          key={width}
+          className={cn("h-9 rounded-2xl", width, index % 2 === 1 && "self-end")}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Route-level fallback while the conversation page loads. */
+export function ConversationThreadSkeleton(): React.JSX.Element {
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
+        <Skeleton className="size-10 rounded-full" />
+        <Skeleton className="h-3.5 w-32" />
+      </div>
+      <MessageLogSkeleton />
+    </div>
+  );
+}

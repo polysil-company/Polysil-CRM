@@ -1,0 +1,128 @@
+
+LOOPIFY SOLUTIONS
+Polysil Irrigation — CRM & Dealer Portal: Business Requirement Document
+1. Scope of Work
+The platform covers two connected systems:
+Internal CRM: used by the sales, marketing and management team to manage leads, tasks, schemes, quotes, approvals and reporting across the entire channel hierarchy: Depot → Distributor → Dealer → Sub Dealer → Agent → Institutional Sales → Consumer/Employees.
+Dealer / Customer Relationship Portal: a self-service portal for Dealers, Sub Dealers and Agents to place orders, track dispatch, view pricing, make payments, raise complaints and track ratings — plus a direct mobile-number based customer relationship layer for end consumers.
+2. Detailed Feature List
+2.1 Lead Generation & Marketing
+Lead Generation Management: Central lead inbox capturing enquiries from every channel with source, owner, stage and value tracked against each lead.
+Auto Lead Capturing (API Based): Automatic lead creation from Meta (Facebook/Instagram) Ads, your website enquiry forms, Google Ads and other landing pages via API — no manual data entry required.
+Marketing Activities: Plan, log and track campaigns, exhibitions, dealer meets and promotional drives, linked back to the leads and sales they generate.
+New Leads from Social Media & Other Sources: API-based integration pulls in enquiries from social platforms directly into the CRM lead pipeline in real time.
+Lead Priority: Every lead is automatically scored and tagged Hot / Warm / Cold (or High / Medium / Low) based on source quality, enquiry value, response time and engagement level, so the sales team always works the highest-probability leads first instead of a flat, unordered list.
+Duplicate Lead Detection: Every new enquiry is automatically checked against existing leads and customers by mobile number, email and name + location. Matching records are flagged for the owner to review and merge, so the same customer contacting through two channels (e.g., a call and a Facebook enquiry) is not tracked as two separate leads.
+Cause of Multiple Leads: For any customer who generates more than one lead, the system records and reports the source of each occurrence (e.g., Facebook enquiry → follow-up call → store walk-in). This exposes overlapping marketing spend, repeat enquiries and channel effectiveness at a glance.
+Lead Won / Lost Tracking: Every lead that is closed is marked Won or Lost with a mandatory reason (price, competitor, no response, product mismatch, financing not approved, out of area, etc.) plus a free-text note. Management can then see exactly where and why business is being lost, and use it to coach the team and improve conversion.
+2.2 Scheme, Territory & Sales Tracking
+Scheme Management — State / District / Taluka wise: Create and manage discount and promotional schemes targeted by state, district and taluka, so regional offers can be rolled out and tracked independently across Gujarat and beyond.
+3-Way Sales Tracking: Sales are tracked separately across three business lines — Retail / B2C sales, Dealer & Distributor (channel) sales, and Industrial / Institutional sales — each with its own pipeline, targets and reporting.
+Instant Quote: Generate a product-wise, GST-calculated quotation in seconds from the CRM and share it with the customer instantly.
+Quotation Status Lifecycle: Every quotation moves through a defined, trackable status: Sent → Viewed → Accepted / Rejected / Negotiation / Expired → Follow-up. A complete quotation history is maintained against each customer, making it clear exactly where a deal is stalling and what needs to improve to close it.
+2.3 Task, Planning & Reminders
+Task Management: Assign, track and close calls, visits, meetings and follow-ups against every lead, dealer or complaint.
+Daily Work Planner: Each team member gets a day-wise planner of scheduled calls, visits and meetings so field work is organised in advance.
+Reminders & Notifications: Automatic email and SMS/WhatsApp reminders and notifications for pending tasks, follow-ups, payment due dates and scheme expiry — nothing falls through the cracks.
+In-Out MOMs: Log Minutes of Meetings for every dealer visit or client meeting, with action items tracked to closure.
+Approvals: Structured approval workflow for discounts, scheme extensions and expenses, routed to the right manager with one-click approve/reject.
+2.4 Rewards, Gifting & Feedback
+Reward System: Track dealer and team performance to automatically qualify participants for reward tiers.
+Gifting on Meet Category: Manage gifting for dealer meets and events, categorised by dealer tier (Gold/Silver/Bronze etc.) so the right gift reaches the right category.
+Services & Feedback: Capture post-installation service requests and customer feedback/ratings, closing the loop on service quality.
+2.5 Subsidy & Farmer Payment Management
+Subsidy Management: For every farmer/consumer purchase eligible for a government or company subsidy, the system tracks the subsidy amount, approval status and disbursal separately from the customer's own payment — giving a clear, audit-ready record of who has been paid, what is pending, and what subsidy component is outstanding for each farmer customer.
+Farmer Payment Tracking: Full payment ledger per farmer/consumer covering advance, subsidy portion, balance due and final settlement.
+2.6 WhatsApp Integration (End-to-End)
+WhatsApp Business API Messaging: Official WhatsApp Business API connection used across the entire customer and dealer journey — not just one function.
+Lead & Sales Messaging: New lead acknowledgement, quotation sharing, order confirmation and payment reminders sent automatically over WhatsApp.
+Complaint & Support Messaging: Complaint registration confirmation, status updates and resolution confirmation sent to the customer/dealer over WhatsApp.
+WhatsApp Lead Dashboard: A dedicated dashboard to view, assign and respond to every WhatsApp conversation and lead in one place, tied back to the CRM record.
+2.7 Field Sales App, Location Tracking & Team Hierarchy
+Location Tracking Sales App: Mobile app for field sales staff with live location tracking, visit check-in/check-out and route history.
+Sales Manager App: A separate manager-facing app to monitor the team's daily visits, locations, task completion and performance on a map and in reports.
+Hierarchy-Level Team Management: Role-based access mapped to your organisational hierarchy (Management → Regional/Area Manager → Sales Manager → Sales Executive/Sales Boy) so each level sees exactly the data relevant to their team.
+2.8 Customer Support Module
+Complaints & Tracking: Log, assign and track every complaint from raise to resolution, with SLA timers and status visibility to the customer.
+Dealer–Customer–Quality Assessment Connection: A connected workflow linking the Dealer, the end Customer and the internal Quality Assessment team, so a field complaint can be routed to quality assessment and back to the dealer without losing information in between.
+Refund Approval Workflow: Formal approval flow for refund requests raised after quality assessment, routed to the appropriate approver before disbursal.
+Warranty Tracking: Track warranty status, start/end dates and claim history for every unit sold, linked to the customer and dealer record.
+New Change / Replacement Tracking: Track requests for part replacement, upgrades or configuration changes raised by dealers or customers, end-to-end.
+Rating System: Dealers and customers can rate service, installation and product quality, feeding into the dealer performance and reward system.
+2.9 360° Customer & Channel View
+Unified Customer Timeline: A single click on any customer or dealer record opens one consolidated view joining Calls, Visits, WhatsApp conversations, Quotations, Follow-ups, Complaints, Payments, Schemes, Rewards and Ratings for that customer — there is no need to open separate modules to piece the relationship together, even though each activity is still stored and managed in its own module.
+Loss / Drop-off Point Identification: Because every interaction is joined chronologically against the customer record, the team can instantly see at exactly which stage — and after how much time — a customer was lost, making it possible to target follow-up and fix the specific step that is causing drop-off.
+Improvement Insight: Combined with the quotation history and lead won/lost reasons, the 360° view highlights recurring patterns (e.g., slow follow-up, repeated price objections) so management knows precisely where the team needs to improve.
+2.10 Dashboard & Usability
+Attractive Dashboard: A single-glance dashboard with lead funnel, pipeline value, task reminders, scheme performance and dealer leaderboard, tailored to each role.
+Language Friendly: Interface available in English, Hindi and Gujarati so every team member and dealer, regardless of language comfort, can use the system with ease.
+3. Dealer Portal / Customer Relationship Portal
+A dedicated portal for Dealers, Sub Dealers and Agents, plus a direct-to-consumer relationship layer:
+Sales Order: Dealers raise sales orders directly against live pricing and stock availability.
+Material Planning (Stock & Advance Planning): Forward stock and material planning tools so dealers and the depot can plan requirements in advance rather than reacting to shortages.
+Dispatch Tracking: Visibility of dispatch status from order confirmation through to delivery.
+Pricing & Discounting: Tiered pricing by channel level (Distributor / Dealer / Sub Dealer) with active scheme discounts reflected automatically.
+Stock Management: Live stock visibility across depots/warehouses, with low-stock indicators.
+Accounts / Payments: Dealer-wise ledger of payments received and pending, with support for NEFT, UPI and cheque records.
+Rewards (Gifting): Dealer-side visibility of reward eligibility and gifting status.
+Rating System: Dealer performance and service ratings, tied into regular accounting and reconciliation.
+Adding Agent: Dealers/Sub Dealers can add and manage their own agents under the correct hierarchy.
+Complaints & Tracking: Dealers can raise and track complaints on the customer's behalf, feeding into the same Customer Support module.
+Promotional Activities Support: Dealer-facing visibility of running schemes and promotional material to support local selling.
+Customer Relationship Portal: Direct mobile-number based lead and company detail capture for end consumers, with marketing/branding content and rating — giving Polysil a direct relationship layer with the end customer, independent of the dealer.
+4. Reports & Analytics
+The following reports are generated explicitly from the data captured across the CRM, WhatsApp, quotation, payment and complaint modules described above, so performance and gaps are visible without manual compilation:
+Lead Conversion Report: Stage-wise funnel from new lead to won, with conversion percentage by source, salesperson and territory.
+Salesperson Performance Report: Calls, visits, quotations sent, leads converted and revenue generated per salesperson over a selected period.
+Target vs Achievement Report: Planned target versus actual achievement by salesperson, dealer, territory and time period, updated in real time.
+Sales Forecast Report: Projected sales based on open pipeline value, quotation stage and historical conversion rates.
+Lost Lead Analysis Report: Breakdown of all lost leads by reason code, source, salesperson and territory, to identify where and why business is being lost.
+Follow-up Pending / Overdue Report: Live list of all follow-ups, tasks and quotations that are due or overdue, by owner and ageing.
+Dealer Performance Report: Order volume, payment behaviour, complaint history and ratings per dealer, used as an input to the reward system.
+Territory Performance Report: Sales, scheme utilisation and lead conversion rolled up by state, district and taluka.
+Campaign Performance Report: Leads, conversions and revenue generated per marketing campaign or exhibition, measured against campaign cost.
+Complaint / SLA Report: Complaint volume, resolution time against SLA, repeat-complaint rate and refund outcomes.
+5. User Roles, Permissions & Audit Trail
+Access across the CRM and Dealer Portal is role-based. Every role is explicitly defined by what it can View, Create/Edit, Approve and Delete, so no module is left with undefined or default access.
+Role
+	View
+	Create / Edit
+	Approve
+	Delete
+	
+Management / Director
+	All modules
+	All modules
+	All approvals
+	Yes (with audit log)
+	
+Regional / Area Manager
+	Own region
+	Leads, schemes, tasks (own region)
+	Discounts & scheme extensions up to defined limit
+	No
+	
+Sales Manager
+	Own team
+	Leads, quotations, tasks, MOMs (own team)
+	Team-level approvals only
+	No
+	
+Sales Executive / Sales Boy
+	Own leads & dealers
+	Own leads, visits, quotations, follow-ups
+	No approval rights
+	No
+	
+Dealer / Sub Dealer / Agent (Portal)
+	Own orders, ledger, complaints
+	Own orders, complaints, agent addition
+	No approval rights
+	No
+	
+
+5.1 Change History / Audit Log
+Full Audit Trail: Every create, edit, approve, reject and delete action across leads, quotations, schemes, payments, complaints and reports is logged automatically with the user, timestamp, module and the old value → new value.
+Accountability: Because every change is attributed to a specific user and time-stamped, any incorrect, unauthorised or disputed change can be traced back and corrected with full accountability.
+Read-Only History View: The audit log itself is view-only and cannot be edited or deleted by any role below Management, ensuring the trail cannot be tampered with.
+Note: Priority scoring, duplicate detection, won/lost reasons, the 360° customer view and the reports above work together so management can clearly see where the team needs to work harder and where the process needs to improve.

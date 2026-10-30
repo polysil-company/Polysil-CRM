@@ -1,0 +1,1805 @@
+import { http, HttpResponse } from "msw";
+import { z } from "zod";
+
+import type { TimelineEventWire, TimelinePageWire } from "@/features/leads/api/leads.schemas";
+import {
+  ORDER_STATUSES,
+  ORDER_TYPES,
+  ORDERABLE_TYPES,
+  PAYMENT_TERMS,
+  type DispatchPageWire,
+  type DispatchWire,
+  type OrderPageWire,
+  type OrderStatus,
+  type OrderWire,
+  type SamplePricing,
+} from "@/features/orders/api/orders.schemas";
+import {
+  takesGstChoice,
+  type PdfLinkWire,
+  type QuotationLineWire,
+  type TaxTreatment,
+} from "@/features/quotations/api/quotations.schemas";
+import { buildApiUrl } from "@/lib/api/url";
+import { can } from "@/lib/auth/permissions";
+import { PARTNER_ROLES, type Role } from "@/lib/auth/roles";
+import { readMockRole } from "@/lib/dev/mock-settings";
+import { calendarDayOf, formatNumber } from "@/lib/format";
+import { orderQueueStep, type MockApprovalStep } from "@/mocks/data/approvals";
+import {
+  applyOrderBenefits,
+  previewOrderSchemes,
+  reverseOrderBenefits,
+} from "@/mocks/data/order-schemes";
+import {
+  applyDispatch,
+  chainFor,
+  chainSteps,
+  milli,
+  mockDirectOrder,
+  mockOrderFromQuotations,
+  nextMockId,
+  orderLinesFrom,
+  orderNumber,
+  qtyText,
+  statusFromLines,
+  toOrderSummary,
+  withOrderLines,
+} from "@/mocks/data/orders";
+import { partnerInScope } from "@/mocks/data/partner-scope";
+import { mockPermissionsFor } from "@/mocks/data/permissions";
+import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
+import { mockMeFor } from "@/mocks/data/sessions";
+import { findMockTerritory, mockTerritoryLineage } from "@/mocks/data/territories";
+import { newestFirst } from "@/mocks/data/timeline";
+import { mockDb } from "@/mocks/db";
+
+import {
+  asFreeSample,
+  exportTreatment,
+  listValue,
+  lutArnOn,
+  sampleMaxValue,
+  samplePricing,
+  withTaxTreatment,
+} from "./export-sample";
+import { MOCK_CREATOR, newMockEvent } from "./lead-events";
+import { paymentsBlockFor } from "./payments";
+import {
+  freightInSchema,
+  gstChoiceRefusal,
+  lineInSchema,
+  priceLines,
+  pricedFreight,
+  rateChanges,
+  storedFreightIn,
+} from "./quotations";
+import { applyOrderPoints, releaseOrderPoints } from "./rewards";
+import { applyScenario } from "./scenario";
+import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
+import { dispatchWarehouseFor, orderStockFor, recordDispatchStock, warehouseChoice } from "./stock";
+
+/**
+ * SO-001 … SO-004, DISP-002 · The backend's sales orders (backend/docs/api/orders.md,
+ * dispatch.md): the list with its filters, the document, its PDF and history; a draft from
+ * accepted quotations, its header, deleting it; submit into the approval chain, cancel;
+ * recording and voiding dispatches, and closing short — with the backend's refusals.
+ *
+ * The chain is decided in the approvals inbox (handlers/approvals.ts), which calls
+ * `decideOrderStep` here. Only the mock does this: an approved order's PDF is ready a few
+ * seconds later.
+ */
+
+const DEFAULT_LIMIT = 25;
+const MAX_LIMIT = 100;
+/** The backend stops counting here and says so with `total_capped`. */
+const TOTAL_CEILING = 1000;
+const PDF_LINK_MINUTES = 10;
+const PDF_RENDER_MS = 2500;
+const REMARK_MAX_LENGTH = 1000;
+
+// ── helpers ─────────────────────────────────────────────────────────────────────
+
+export function findOrder(orderId: string): OrderWire | undefined {
+  return mockDb.orders.find((item) => item.id === orderId);
+}
+
+/** What time has done since the last read: an approved order's PDF finished rendering. */
+function settle(order: OrderWire): OrderWire {
+  const readyAt = mockDb.orderPdfReadyAt.get(order.id);
+  if (readyAt !== undefined && Date.now() >= readyAt && order.pdf_state === "pending") {
+    order.pdf_state = "ready";
+    mockDb.orderPdfReadyAt.delete(order.id);
+  }
+  // ACCT-004 · worked out on every read, as the backend does.
+  order.payments = paymentsBlockFor(order);
+  // DISP-003 · each open line's stock in the order's warehouse, for those who may see stock.
+  orderStockFor(order);
+  return order;
+}
+
+function validation(fields: Record<string, string>): Response {
+  return errorResponse(422, "validation_error", "Some fields need correcting.", fields);
+}
+
+function allowed(
+  role: Role,
+  module: "sales_orders" | "dispatch",
+  action: "create" | "edit" | "delete",
+): boolean {
+  return can(mockPermissionsFor(role), module, action);
+}
+
+function isStatus(value: string): value is OrderStatus {
+  return ORDER_STATUSES.some((status) => status === value);
+}
+
+/** Order number, party name or the mobile's digits (contains). */
+function matchesSearch(order: OrderWire, q: string): boolean {
+  const query = q.trim().toLowerCase();
+  if (query === "") {
+    return true;
+  }
+  const digits = query.replace(/\D/g, "");
+  return (
+    (order.order_no ?? "").toLowerCase().includes(query) ||
+    order.party.name.toLowerCase().includes(query) ||
+    (digits.length >= 3 && (order.party.mobile ?? "").replace(/\D/g, "").includes(digits))
+  );
+}
+
+/** Replays a write sent again with its Idempotency-Key, or says it is fresh. */
+function replayWrite(
+  request: Request,
+  body: unknown,
+  status = 200,
+): { kind: "fresh"; key: string; serialized: string } | { kind: "respond"; response: Response } {
+  const key = request.headers.get("idempotency-key")?.trim() ?? "";
+  if (key === "") {
+    return {
+      kind: "respond",
+      response: errorResponse(
+        400,
+        "idempotency_key_required",
+        "An Idempotency-Key header is required.",
+      ),
+    };
+  }
+  const serialized = JSON.stringify({
+    path: new URL(request.url).pathname,
+    method: request.method,
+    body,
+  });
+  const replay = mockDb.orderWrites.get(key);
+  if (replay === undefined) {
+    return { kind: "fresh", key, serialized };
+  }
+  if (replay.body !== serialized) {
+    return {
+      kind: "respond",
+      response: errorResponse(
+        409,
+        "idempotency_key_reused",
+        "This Idempotency-Key was already used.",
+      ),
+    };
+  }
+  const order = findOrder(replay.orderId);
+  return {
+    kind: "respond",
+    response:
+      order === undefined
+        ? new HttpResponse(null, { status: 204 })
+        : HttpResponse.json({ data: order }, { status }),
+  };
+}
+
+/**
+ * SO-001, SO-006 · The orders a list or its export asks for: statuses, type, owner, lead,
+ * quotation, search, areas (an order sits in an area when its territory or any above it is
+ * one), an office (the order's office, or any office above it, is the one asked for) and
+ * `waiting_on`, the role whose approval step is next (BE-022).
+ */
+function filteredOrders(params: URLSearchParams, statuses?: readonly string[]): OrderWire[] {
+  const wanted =
+    statuses ?? (params.get("status") ?? "").split(",").filter((value) => value !== "");
+  const orderType = params.get("order_type");
+  const owner = params.get("owner");
+  const leadId = params.get("lead_id");
+  const quotationId = params.get("quotation_id");
+  const q = params.get("q") ?? "";
+  const areas = new Set(
+    (params.get("territory_id") ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id !== ""),
+  );
+  const officeId = params.get("owner_org_unit_id");
+  const waitingOn = params.get("waiting_on");
+  const partnerId = params.get("partner_id");
+  return mockDb.orders.filter(
+    (order) =>
+      (wanted.length === 0 || wanted.includes(order.status)) &&
+      (orderType === null || order.order_type === orderType) &&
+      (owner === null || order.owner?.id === (owner === "me" ? MOCK_CREATOR?.id : owner)) &&
+      (leadId === null || order.lead?.id === leadId) &&
+      (quotationId === null ||
+        order.quotations.some((quotation) => quotation.id === quotationId)) &&
+      (areas.size === 0 ||
+        mockTerritoryLineage(order.territory.id).some((territory) => areas.has(territory.id))) &&
+      (officeId === null || officeId === "" || inOfficeTree(order.owner_org_unit.id, officeId)) &&
+      (waitingOn === null ||
+        waitingOn === "" ||
+        toOrderSummary(order).approval_waiting_on === waitingOn) &&
+      (partnerId === null || partnerId === "" || order.partner?.id === partnerId) &&
+      partnerInScope(order.partner) &&
+      matchesSearch(order, q),
+  );
+}
+
+/** True when the office is the one asked for, or sits anywhere under it. */
+function inOfficeTree(officeId: string, ancestorId: string): boolean {
+  let current: string | null = officeId;
+  for (let hops = 0; current !== null && hops < 10; hops += 1) {
+    if (current === ancestorId) return true;
+    const id: string = current;
+    current = mockDb.offices.find((office) => office.id === id)?.parent?.id ?? null;
+  }
+  return false;
+}
+
+/** 404, or 409 status_changed when the screen showed another status. */
+function orderAt(
+  orderId: string,
+  expectedStatus: unknown,
+): { ok: true; order: OrderWire } | { ok: false; response: Response } {
+  const order = findOrder(orderId);
+  if (order === undefined) {
+    return { ok: false, response: errorResponse(404, "not_found", "No such order.") };
+  }
+  if (typeof expectedStatus === "string" && expectedStatus !== order.status) {
+    return {
+      ok: false,
+      response: errorResponse(
+        409,
+        "status_changed",
+        "The order has moved on since you loaded it.",
+        {
+          status: order.status,
+        },
+      ),
+    };
+  }
+  return { ok: true, order };
+}
+
+// ── history ─────────────────────────────────────────────────────────────────────
+
+/** An order's history: derived once from what the seed says happened, then written to. */
+function orderEventsOf(order: OrderWire): TimelineEventWire[] {
+  const known = mockDb.orderEvents.get(order.id);
+  if (known !== undefined) {
+    return known;
+  }
+  const owner =
+    order.owner === null ? null : { id: order.owner.id, full_name: order.owner.full_name };
+  const at = (
+    kind: string,
+    occurredAt: string,
+    payload: Record<string, unknown>,
+    actor: TimelineEventWire["actor"] = owner,
+  ): TimelineEventWire => ({
+    ...newMockEvent(kind, { actor_name: actor?.full_name ?? "", ...payload }),
+    occurred_at: occurredAt,
+    actor,
+  });
+  const derived: TimelineEventWire[] = [at("order.created", order.created_at, {})];
+  if (order.submitted_at !== null) {
+    derived.push(at("order.submitted", order.submitted_at, { order_no: order.order_no }));
+  }
+  for (const step of order.approval?.steps ?? []) {
+    const decidedAt = step.decided_at ?? null;
+    const by = step.by ?? null;
+    if (decidedAt !== null && step.decision !== null && step.decision !== undefined) {
+      derived.push(
+        at(
+          "approval.decided",
+          decidedAt,
+          { seq: step.seq, role: step.role, decision: step.decision, remark: step.remark ?? null },
+          by === null ? null : { id: by.id, full_name: by.full_name },
+        ),
+      );
+    }
+  }
+  if (order.last_rejection !== null) {
+    derived.push(
+      at("order.returned", order.last_rejection.at, { remark: order.last_rejection.remark }, null),
+    );
+  }
+  if (order.approved_at !== null) {
+    derived.push(at("order.approved", order.approved_at, {}, null));
+  }
+  for (const dispatch of order.dispatches) {
+    derived.push(
+      at(
+        "dispatch.recorded",
+        dispatch.dispatched_at,
+        { dispatch_no: dispatch.dispatch_no },
+        dispatch.dispatched_by,
+      ),
+    );
+  }
+  if (order.closed_at !== null) {
+    derived.push(at("order.closed_short", order.closed_at, { remark: order.close_remark }));
+  }
+  if (order.cancelled_at !== null) {
+    derived.push(at("order.cancelled", order.cancelled_at, { remark: order.cancel_remark }));
+  }
+  derived.sort(newestFirst);
+  mockDb.orderEvents.set(order.id, derived);
+  return derived;
+}
+
+function recordOrderEvent(order: OrderWire, kind: string, payload: Record<string, unknown>): void {
+  mockDb.orderEvents.set(order.id, [newMockEvent(kind, payload), ...orderEventsOf(order)]);
+}
+
+// ── the chain ───────────────────────────────────────────────────────────────────
+
+/** Closes the order's waiting queue row, when its request ends before a decision. */
+function closeQueueRow(order: OrderWire): void {
+  const requestId = order.approval?.request_id;
+  for (const step of mockDb.approvalSteps) {
+    if (step.requestId === requestId && step.decision === null) {
+      step.closed = "deleted";
+    }
+  }
+}
+
+function enqueue(step: MockApprovalStep | null): void {
+  if (step !== null) {
+    mockDb.approvalSteps.push(step);
+  }
+}
+
+/**
+ * APPR-001 · A decision on an order's step, from the approvals inbox: an approval passes it to
+ * the next step or, at the last, approves the order (its PDF renders, the farmer is told); a
+ * return sends it back to draft with the reason. The inbox has checked the step is open.
+ */
+export function decideOrderStep(
+  order: OrderWire,
+  stepId: string,
+  decision: "approve" | "reject",
+  remark: string | null,
+  role: Role,
+): void {
+  const approval = order.approval;
+  if (approval === null) {
+    return;
+  }
+  const me = mockMeFor(role).data;
+  const decidedAt = new Date().toISOString();
+  const steps = approval.steps.map((item) =>
+    item.id === stepId
+      ? {
+          ...item,
+          decision,
+          decided_role: me.role?.code === item.role ? null : (me.role?.code ?? null),
+          by: { id: me.id, full_name: me.full_name },
+          remark,
+          decided_at: decidedAt,
+        }
+      : item,
+  );
+  const decided = steps.find((item) => item.id === stepId);
+  order.approval = { ...approval, steps };
+  recordOrderEvent(order, "approval.decided", {
+    seq: decided?.seq ?? null,
+    role: decided?.role ?? null,
+    decision,
+    remark,
+  });
+
+  if (decision === "reject") {
+    order.status = "draft";
+    reverseOrderBenefits(order, mockDb.entitlements);
+    releaseOrderPoints(order);
+    order.approval = { ...order.approval, status: "rejected" };
+    order.last_rejection = { remark: remark ?? "", role: decided?.role ?? "", at: decidedAt };
+    recordOrderEvent(order, "order.returned", { remark });
+    return;
+  }
+  const next = orderQueueStep(order);
+  if (next !== null) {
+    enqueue(next);
+    return;
+  }
+  order.status = "approved";
+  order.approval = { ...order.approval, status: "approved" };
+  order.approved_at = decidedAt;
+  order.pdf_state = "pending";
+  order.confirmation = order.party.mobile ? "queued" : "no_mobile";
+  mockDb.orderPdfReadyAt.set(order.id, Date.now() + PDF_RENDER_MS);
+  recordOrderEvent(order, "order.approved", {});
+}
+
+// ── request bodies ──────────────────────────────────────────────────────────────
+
+const remarkText = z.string().trim().max(REMARK_MAX_LENGTH);
+const expectedStatus = z.enum(ORDER_STATUSES).nullish();
+
+const orderPartySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  mobile: z.string().trim().nullish(),
+  address: z.string().trim().max(500).nullish(),
+  gstin: z
+    .string()
+    .trim()
+    .regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/)
+    .nullish(),
+});
+
+const rupeesText = z.string().regex(/^\d+(\.\d{1,2})?$/);
+
+/** SO-008 · PUT /orders/{id}/subsidy (FS-054 SubsidyBlockIn). */
+const subsidySchema = z.strictObject({
+  lead_ids: z.array(z.string().min(1)).min(1).max(50),
+  material_amount: rupeesText.nullish(),
+  subsidy_amount: rupeesText,
+  farmer_payable: rupeesText.nullish(),
+});
+
+const createSchema = z.object({
+  order_type: z.enum(ORDER_TYPES).default("commercial"),
+  quotation_ids: z.array(z.string().min(1)).default([]),
+  lead_id: z.string().min(1).nullish(),
+  partner_id: z.string().min(1).nullish(),
+  party: orderPartySchema.nullish(),
+  place_of_supply_territory_id: z.string().min(1).nullish(),
+  delivery_address: z.string().trim().max(500).nullish(),
+  payment_terms: z.enum(PAYMENT_TERMS).default("full_payment"),
+  remarks: z.string().trim().max(2000).nullish(),
+  lines: z.array(lineInSchema).max(200).default([]),
+  /** QUOT-015 · One freight charge; commercial and industrial only. */
+  freight: freightInSchema.nullish(),
+  /** SO-008 · Typed in on a direct subsidised order; refused alongside quotations. */
+  subsidy: subsidySchema.optional(),
+  /** DISP-003 · "Order to"; staff only. */
+  warehouse_id: z.string().min(1).nullish(),
+  /** SO-010 · Required on an export, refused on any other type. */
+  export_country: z.string().trim().max(100).nullish(),
+});
+
+const linesSchema = z.object({
+  lines: z.array(lineInSchema).max(200),
+  /** QUOT-015 · omit to keep, null to remove */
+  freight: freightInSchema.nullish(),
+  expected_status: expectedStatus,
+});
+
+/** The lead stages an order may be placed on (backend domain LEAD_STAGES_ORDERABLE). */
+const ORDERABLE_STAGES: readonly string[] = ["qualified", "quoted", "negotiation", "won"];
+
+const patchSchema = z.object({
+  order_type: z.enum(ORDER_TYPES).nullish(),
+  party: orderPartySchema.nullish(),
+  delivery_address: z.string().trim().max(500).nullish(),
+  payment_terms: z.enum(PAYMENT_TERMS).nullish(),
+  remarks: z.string().trim().max(2000).nullish(),
+  /** DISP-003 · "Order to"; staff only. */
+  warehouse_id: z.string().min(1).nullish(),
+  /** SO-010 · Omit to keep; required on an export. */
+  export_country: z.string().trim().max(100).nullish(),
+  expected_status: expectedStatus,
+});
+
+const remarkSchema = z.object({ remark: remarkText.min(1), expected_status: expectedStatus });
+
+const dispatchSchema = z.object({
+  dc_no: z.string().trim().max(60).nullish(),
+  dc_date: z.iso.date().nullish(),
+  invoice_no: z.string().trim().max(60).nullish(),
+  invoice_date: z.iso.date().nullish(),
+  dispatched_at: z.iso.datetime({ offset: true }),
+  transporter: z.string().trim().max(120).nullish(),
+  vehicle_no: z.string().trim().max(20).nullish(),
+  lines: z.array(
+    z.object({ order_line_id: z.string().min(1), qty: z.string().regex(/^\d+(\.\d+)?$/) }),
+  ),
+  /** DISP-003 · Where the goods left from; else the order's warehouse, then the default. */
+  warehouse_id: z.string().min(1).nullish(),
+});
+
+function orderableType(value: string): value is (typeof ORDERABLE_TYPES)[number] {
+  return ORDERABLE_TYPES.some((type) => type === value);
+}
+
+function nextSerial(): number {
+  return (
+    mockDb.orders.reduce((max, item) => {
+      const serial = Number(item.order_no?.split("/").at(-1) ?? "0");
+      return Number.isFinite(serial) ? Math.max(max, serial) : max;
+    }, 0) + 1
+  );
+}
+
+/** A live order already carries the quotation: one live order each. */
+function onLiveOrder(quotationId: string): boolean {
+  return mockDb.orders.some(
+    (order) =>
+      order.status !== "cancelled" &&
+      order.quotations.some((quotation) => quotation.id === quotationId),
+  );
+}
+
+function paise(value: string): number {
+  return Math.round(Number(value) * 100);
+}
+
+function rupees(value: number): string {
+  return (value / 100).toFixed(2);
+}
+
+/**
+ * SO-008 · The order's subsidy block from what was written (FS-054 rule 3a): a missing material
+ * is the order total now, a missing payable is material less subsidy; with its warnings.
+ */
+function applySubsidy(order: OrderWire): void {
+  const raw = mockDb.orderSubsidies.get(order.id);
+  if (raw === undefined) return;
+  const material = paise(raw.material ?? order.totals.total);
+  const subsidy = paise(raw.subsidy);
+  const derived = material - subsidy;
+  const payable = raw.payable === null ? derived : paise(raw.payable);
+  order.subsidy = {
+    material_amount: rupees(material),
+    subsidy_amount: rupees(subsidy),
+    farmer_payable: rupees(payable),
+    material_is_total: raw.material === null,
+    farmer_payable_is_derived: raw.payable === null,
+    leads: raw.leadIds.map((id) => ({
+      id,
+      inquiry_no: mockDb.leads.find((lead) => lead.id === id)?.inquiry_no ?? null,
+    })),
+  };
+  // FS-055 rule 4: the order is paid by the farmer's share, never below 0 or above the total
+  order.payable = rupees(Math.max(0, Math.min(paise(order.totals.total), payable)));
+  order.warnings = [
+    ...order.warnings.filter(
+      (warning) =>
+        !warning.startsWith("subsidy_above_material") &&
+        !warning.startsWith("farmer_payable_not_material_less_subsidy"),
+    ),
+    ...(subsidy > material
+      ? ["subsidy_above_material: the subsidy is more than the material"]
+      : []),
+    ...(raw.payable !== null && payable !== derived
+      ? ["farmer_payable_not_material_less_subsidy: the farmer payable differs"]
+      : []),
+  ];
+}
+
+function isStaff(): boolean {
+  return mockMeFor(readMockRole()).data.user_type === "staff";
+}
+
+/** FS-054 rule 3: each named lead seen by the caller and qualified or later. */
+function subsidyLeadsRefusal(ids: readonly string[]): Response | null {
+  for (const id of ids) {
+    const lead = mockDb.leads.find((item) => item.id === id);
+    if (lead === undefined) {
+      return errorResponse(422, "lead_not_visible", "You cannot see that lead.", {
+        "subsidy.lead_ids": id,
+      });
+    }
+    if (!ORDERABLE_STAGES.includes(lead.stage)) {
+      return errorResponse(422, "lead_not_open", `A named lead is ${lead.stage}.`, {
+        "subsidy.lead_ids": id,
+      });
+    }
+  }
+  return null;
+}
+
+/** FS-054 rule 4: the subsidy and the payable at most the material, or the total now. */
+function subsidyAmountsRefusal(
+  body: z.infer<typeof subsidySchema>,
+  total: string,
+): Response | null {
+  const material = paise(body.material_amount ?? total);
+  if (paise(body.subsidy_amount) > material) {
+    return errorResponse(
+      422,
+      "subsidy_above_material",
+      "The subsidy is more than the material amount.",
+      { "subsidy.subsidy_amount": body.subsidy_amount },
+    );
+  }
+  if (body.farmer_payable != null && paise(body.farmer_payable) > material) {
+    return errorResponse(
+      422,
+      "payable_above_material",
+      "The farmer payable is more than the material amount.",
+      { "subsidy.farmer_payable": body.farmer_payable },
+    );
+  }
+  return null;
+}
+
+// ── handlers ────────────────────────────────────────────────────────────────────
+
+/**
+ * SO-005 · POST /orders typed in line by line: the party, the place of supply (or the lead's),
+ * and lines priced as the preview priced them; a lead must be qualified or later.
+ */
+/** SO-010 · A line priced domestically, then taxed as an export or given as a free sample. */
+function repriced(
+  line: QuotationLineWire,
+  treatment: TaxTreatment,
+  pricing: SamplePricing | null,
+): QuotationLineWire {
+  const taxed = withTaxTreatment(line, treatment);
+  return pricing === "free" ? asFreeSample(taxed) : taxed;
+}
+
+function sampleOverLimit(): Response {
+  return errorResponse(
+    422,
+    "sample_over_limit",
+    `A sample may be worth up to ₹${formatNumber(sampleMaxValue())} at list price.`,
+  );
+}
+
+/** SO-010 · An export needs the buyer's country and no GSTIN; no other type takes a country. */
+function orderExportRefusal(
+  orderType: string,
+  country: string | null | undefined,
+  gstin: string | null | undefined,
+): Response | null {
+  const named = country !== null && country !== undefined && country.trim() !== "";
+  if (orderType === "export" && !named) {
+    return errorResponse(422, "export_country_required", "An export needs the buyer's country.", {
+      export_country: "Enter the buyer's country.",
+    });
+  }
+  if (orderType !== "export" && named) {
+    return errorResponse(422, "export_country_not_export", "Only an export takes a country.", {
+      export_country: "Only an export takes a country.",
+    });
+  }
+  if (orderType === "export" && gstin !== null && gstin !== undefined && gstin !== "") {
+    return errorResponse(422, "export_party_gstin", "An export buyer has no GSTIN.", {
+      "party.gstin": "An export buyer has no GSTIN.",
+    });
+  }
+  return null;
+}
+
+function createDirect(
+  body: z.infer<typeof createSchema>,
+  replay: { key: string; serialized: string },
+): Response {
+  if (body.party == null) {
+    return validation({ party: "required" });
+  }
+  // FS-054 rule 6: a subsidised order's first named lead is its lead and routes it
+  const subsidyIds = body.subsidy === undefined ? [] : [...new Set(body.subsidy.lead_ids)];
+  const leadRef = subsidyIds[0] ?? body.lead_id;
+  const lead = leadRef == null ? undefined : mockDb.leads.find((item) => item.id === leadRef);
+  if (leadRef != null && lead === undefined) {
+    return errorResponse(422, "lead_not_visible", "You cannot see that lead.", {
+      lead_id: leadRef,
+    });
+  }
+  if (lead !== undefined && !ORDERABLE_STAGES.includes(lead.stage)) {
+    return errorResponse(422, "lead_not_open", `The lead is ${lead.stage}.`, {
+      lead_stage: lead.stage,
+    });
+  }
+  const placeId = body.place_of_supply_territory_id ?? lead?.territory.id ?? null;
+  const place = placeId === null ? undefined : findMockTerritory(placeId);
+  if (place === undefined) {
+    return validation({ place_of_supply_territory_id: "required" });
+  }
+  if (body.lines.length === 0) {
+    return validation({ lines: "at least one line" });
+  }
+  const changed = rateChanges(body.lines);
+  if (Object.keys(changed).length > 0) {
+    return errorResponse(409, "rate_changed", "Prices or tax changed since the preview.", changed);
+  }
+  const domestic = priceLines(body.lines);
+  if (!domestic.ok) {
+    return validation(domestic.fields);
+  }
+  // SO-010 · a sample is worth at most the setting at list price; an export is taxed by its own
+  const sample = body.order_type === "sample";
+  if (sample && listValue(domestic.lines) > sampleMaxValue()) return sampleOverLimit();
+  const treatment = body.order_type === "export" ? exportTreatment() : "domestic";
+  // QUOT-015 · a GST choice and freight: commercial and industrial only
+  const choiceRefusal = gstChoiceRefusal(
+    body.order_type,
+    treatment === "domestic",
+    body.lines,
+    body.freight,
+  );
+  if (choiceRefusal !== null) return choiceRefusal;
+  const pricing = sample ? samplePricing() : null;
+  const priced = { lines: domestic.lines.map((line) => repriced(line, treatment, pricing)) };
+  const me = mockMeFor(readMockRole()).data;
+  const partner = lead?.assigned_partner;
+  const order = mockDirectOrder({
+    id: mockUuid(MOCK_ID_SPACE.order, 1000 + mockDb.orderWrites.size),
+    lead,
+    party: {
+      name: body.party.name,
+      mobile: body.party.mobile ?? null,
+      address: body.party.address ?? null,
+      gstin: body.party.gstin ?? null,
+    },
+    partner: orderPartner(body.partner_id, partner),
+    placeOfSupply: { id: place.id, name: place.name, level: place.level },
+    owner: { id: me.id, full_name: me.full_name },
+    ownerOrgUnit: lead?.owner_org_unit ??
+      me.org_unit ?? { id: "ou-head-office", name: "Head Office" },
+    lines: priced.lines,
+    freight: pricedFreight(body.freight, priced.lines),
+    orderType: body.order_type,
+    deliveryAddress: body.delivery_address ?? null,
+    paymentTerms: body.payment_terms,
+    remarks: body.remarks ?? null,
+    createdAt: new Date().toISOString(),
+  });
+  order.tax_treatment = treatment;
+  order.export_country = treatment === "domestic" ? null : (body.export_country ?? null);
+  order.sample_pricing = pricing;
+  order.lut_arn = null;
+  if (treatment !== "domestic") order.intra_state = false;
+  if (body.subsidy !== undefined) {
+    const refusal = subsidyAmountsRefusal(body.subsidy, order.totals.total);
+    if (refusal !== null) return refusal;
+    mockDb.orderSubsidies.set(order.id, {
+      material: body.subsidy.material_amount ?? null,
+      subsidy: body.subsidy.subsidy_amount,
+      payable: body.subsidy.farmer_payable ?? null,
+      leadIds: subsidyIds,
+    });
+    applySubsidy(order);
+  }
+  const warehouse = warehouseChoice(body.warehouse_id);
+  if (warehouse instanceof Response) return warehouse;
+  order.warehouse = warehouse;
+  mockDb.orders.unshift(order);
+  mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+  recordOrderEvent(order, "order.created", {});
+  return HttpResponse.json({ data: settle(order) }, { status: 201 });
+}
+
+/**
+ * The partner a direct order names: the lead's own, or (SO-012) any dealer or distributor staff
+ * pick, as the backend allows. Unknown ids price as a direct sale.
+ */
+function orderPartner(
+  partnerId: string | null | undefined,
+  leadPartner: { id: string; name: string; partner_type: string } | null | undefined,
+): { id: string; name: string; partner_type: string } | null {
+  if (partnerId == null) return null;
+  if (leadPartner != null && leadPartner.id === partnerId) {
+    return { id: leadPartner.id, name: leadPartner.name, partner_type: leadPartner.partner_type };
+  }
+  const picked = mockDb.partners.find((item) => item.id === partnerId);
+  return picked === undefined
+    ? null
+    : { id: picked.id, name: picked.name, partner_type: picked.partner_type };
+}
+
+export const orderHandlers = [
+  /**
+   * DISP-001 · GET /dispatches — every dispatch on the orders the user can see, newest first,
+   * voided ones included (marked), filtered by order, partner and the day it was sent.
+   */
+  http.get(buildApiUrl("/dispatches"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const url = new URL(request.url);
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(1, Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT) || DEFAULT_LIMIT),
+    );
+    const cursorParam = url.searchParams.get("cursor");
+    const offset = cursorParam === null ? 0 : decodeCursor(cursorParam);
+    if (offset === null) {
+      return validation({ cursor: "malformed cursor" });
+    }
+    const orderId = url.searchParams.get("order_id");
+    const partnerId = url.searchParams.get("partner_id");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const matches =
+      scenario === "empty"
+        ? []
+        : mockDb.orders
+            .filter(
+              (order) =>
+                (orderId === null || order.id === orderId) &&
+                (partnerId === null || order.partner?.id === partnerId),
+            )
+            .flatMap((order) => order.dispatches)
+            .filter((dispatch) => {
+              const day = calendarDayOf(dispatch.dispatched_at);
+              return (from === null || day >= from) && (to === null || day <= to);
+            })
+            .sort(
+              (a, b) => b.dispatched_at.localeCompare(a.dispatched_at) || b.id.localeCompare(a.id),
+            );
+    const body: DispatchPageWire = {
+      data: matches.slice(offset, offset + limit),
+      meta: {
+        limit,
+        next_cursor: offset + limit < matches.length ? encodeCursor(offset + limit) : null,
+      },
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.get(buildApiUrl("/orders"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const url = new URL(request.url);
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(1, Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT) || DEFAULT_LIMIT),
+    );
+    const cursorParam = url.searchParams.get("cursor");
+    const offset = cursorParam === null ? 0 : decodeCursor(cursorParam);
+    if (offset === null) {
+      return validation({ cursor: "malformed cursor" });
+    }
+    const statuses = (url.searchParams.get("status") ?? "")
+      .split(",")
+      .filter((value) => value !== "");
+    if (!statuses.every(isStatus)) {
+      return validation({ status: "unknown status" });
+    }
+    const matches = scenario === "empty" ? [] : filteredOrders(url.searchParams, statuses);
+    const counted = url.searchParams.get("include_total") === "true";
+    const hasMore = offset + limit < matches.length;
+    const body: OrderPageWire = {
+      data: matches.slice(offset, offset + limit).map((order) => toOrderSummary(settle(order))),
+      meta: {
+        limit,
+        next_cursor: hasMore ? encodeCursor(offset + limit) : null,
+        total: counted ? Math.min(matches.length, TOTAL_CEILING) : null,
+        total_capped: counted && matches.length > TOTAL_CEILING,
+      },
+    };
+    return HttpResponse.json(body);
+  }),
+
+  /** ACCT-001 · Counts by status, and submitted orders by whose step is next. Before :orderId. */
+  http.get(buildApiUrl("/orders/stats"), async ({ request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const matches = scenario === "empty" ? [] : filteredOrders(new URL(request.url).searchParams);
+    const byStatus = Object.fromEntries(ORDER_STATUSES.map((status) => [status, 0]));
+    const waitingOn: Record<string, number> = {};
+    for (const order of matches) {
+      byStatus[order.status] = (byStatus[order.status] ?? 0) + 1;
+      const role = toOrderSummary(order).approval_waiting_on;
+      if (role !== null) waitingOn[role] = (waitingOn[role] ?? 0) + 1;
+    }
+    return HttpResponse.json({ total: matches.length, by_status: byStatus, waiting_on: waitingOn });
+  }),
+
+  /** SO-006 · The list as a file. Before /orders/:orderId. */
+  http.get(buildApiUrl("/orders/export"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    return mockWorkbook(
+      "orders",
+      ["Number", "Status", "Party", "Total"],
+      filteredOrders(new URL(request.url).searchParams).map((order) => [
+        order.order_no ?? "Draft",
+        order.status,
+        order.party.name,
+        order.totals.total,
+      ]),
+    );
+  }),
+
+  http.get(buildApiUrl("/orders/:orderId"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const order = findOrder(String(params.orderId));
+    return order === undefined || !partnerInScope(order.partner)
+      ? errorResponse(404, "not_found", "No such order.")
+      : HttpResponse.json({ data: settle(order) });
+  }),
+
+  // SCHM-005 · the scheme panel on a draft: nothing is stored by reading it.
+  http.get(buildApiUrl("/orders/:orderId/schemes"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const order = findOrder(String(params.orderId));
+    if (order === undefined) return errorResponse(404, "not_found", "No such order.");
+    if (order.status !== "draft") {
+      return errorResponse(409, "order_not_draft", "Read the benefits on the order instead.");
+    }
+    return HttpResponse.json({
+      data: previewOrderSchemes(order, mockDb.schemes, mockDb.entitlements),
+    });
+  }),
+
+  http.get(buildApiUrl("/orders/:orderId/pdf"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const found = findOrder(String(params.orderId));
+    if (found === undefined || found.approved_at === null) {
+      return errorResponse(404, "not_found", "An order has a PDF once it is approved.");
+    }
+    const order = settle(found);
+    if (order.status === "cancelled") {
+      return errorResponse(409, "order_cancelled", "The order was cancelled.");
+    }
+    if (order.pdf_state === "pending") {
+      return errorResponse(409, "pdf_pending", "The PDF is still being prepared.");
+    }
+    if (order.pdf_state === "failed") {
+      return errorResponse(409, "pdf_failed", order.pdf_error ?? "The PDF could not be made.");
+    }
+    const filename = `${(order.order_no ?? "order").replace(/\//g, "-")}.pdf`;
+    const body: PdfLinkWire = {
+      data: {
+        // TODO(SO-002): the mock has no PDFs; the real link is a signed storage URL.
+        url: `https://files.polysil.example/orders/${filename}`,
+        expires_at: new Date(Date.now() + PDF_LINK_MINUTES * 60 * 1000).toISOString(),
+        filename,
+      },
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.get(buildApiUrl("/orders/:orderId/timeline"), async ({ params, request }) => {
+    const { scenario, failure } = await applyScenario();
+    if (failure) return failure;
+
+    const order = findOrder(String(params.orderId));
+    if (order === undefined) {
+      return errorResponse(404, "not_found", "No such order.");
+    }
+    const url = new URL(request.url);
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(1, Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT) || DEFAULT_LIMIT),
+    );
+    const cursorParam = url.searchParams.get("cursor");
+    const offset = cursorParam === null ? 0 : decodeCursor(cursorParam);
+    if (offset === null) {
+      return validation({ cursor: "malformed cursor" });
+    }
+    const events = scenario === "empty" ? [] : [...orderEventsOf(order)].sort(newestFirst);
+    const hasMore = offset + limit < events.length;
+    const body: TimelinePageWire = {
+      data: events.slice(offset, offset + limit),
+      meta: { limit, next_cursor: hasMore ? encodeCursor(offset + limit) : null },
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.post(buildApiUrl("/orders"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw, 201);
+    if (replay.kind === "respond") return replay.response;
+    if (!allowed(readMockRole(), "sales_orders", "create")) {
+      return errorResponse(403, "forbidden", "You cannot place orders.");
+    }
+    const parsed = createSchema.safeParse(raw);
+    if (!parsed.success) {
+      return validation({ order_type: "check the order's fields" });
+    }
+    const body = parsed.data;
+    const subsidised = body.order_type === "subsidised";
+    // SO-010 · exports and samples, staff only
+    const special = body.order_type === "export" || body.order_type === "sample";
+    if (!orderableType(body.order_type) && !subsidised && !special) {
+      return errorResponse(
+        422,
+        "order_type_unsupported",
+        "Only commercial and industrial orders are built.",
+        {
+          order_type: body.order_type,
+        },
+      );
+    }
+    if ((subsidised || special) && !isStaff()) {
+      return errorResponse(
+        403,
+        "type_staff_only",
+        "Subsidised, export and sample orders are raised by Polysil staff.",
+      );
+    }
+    if (body.order_type === "sample" && body.quotation_ids.length > 0) {
+      return errorResponse(422, "sample_from_quotation", "A sample's items are typed in.", {
+        quotation_ids: "not allowed",
+      });
+    }
+    if (body.quotation_ids.length === 0) {
+      const exportRefusal = orderExportRefusal(
+        body.order_type,
+        body.export_country,
+        body.party?.gstin,
+      );
+      if (exportRefusal !== null) return exportRefusal;
+    }
+    if (!subsidised && body.subsidy !== undefined) {
+      return errorResponse(422, "subsidy_not_allowed", "Only a subsidised order takes a subsidy.", {
+        subsidy: "not allowed",
+      });
+    }
+    if (subsidised && body.quotation_ids.length > 0 && new Set(body.quotation_ids).size !== 1) {
+      return errorResponse(
+        422,
+        "subsidised_quotation_count",
+        "A subsidised order is made from one quotation.",
+        { quotation_ids: "exactly one" },
+      );
+    }
+    if (subsidised && body.quotation_ids.length > 0 && body.subsidy !== undefined) {
+      return errorResponse(422, "subsidy_from_quotation", "The subsidy comes from the quotation.", {
+        subsidy: "not allowed",
+      });
+    }
+    if (subsidised && body.quotation_ids.length === 0) {
+      if (body.subsidy === undefined) {
+        return errorResponse(
+          422,
+          "subsidy_missing",
+          "A subsidised order needs its subsidy and leads.",
+          {
+            subsidy: "required",
+          },
+        );
+      }
+      if (body.lead_id != null) {
+        return errorResponse(
+          422,
+          "lead_from_subsidy",
+          "A subsidised order takes its leads from subsidy.lead_ids.",
+          { lead_id: "use subsidy.lead_ids" },
+        );
+      }
+      const refusal = subsidyLeadsRefusal([...new Set(body.subsidy.lead_ids)]);
+      if (refusal !== null) return refusal;
+    }
+    if (body.quotation_ids.length === 0) {
+      return createDirect(body, replay);
+    }
+    const quotations = body.quotation_ids.map((id) =>
+      mockDb.quotations.find((item) => item.id === id),
+    );
+    for (const [index, quotation] of quotations.entries()) {
+      if (quotation === undefined) {
+        return errorResponse(404, "not_found", "No such quotation.");
+      }
+      if (quotation.status !== "accepted" || quotation.superseded_by !== null) {
+        return errorResponse(
+          422,
+          "quotation_not_accepted",
+          `Quotation ${quotation.quote_no ?? "draft"} is ${quotation.status}; only an accepted, current quotation is ordered.`,
+          { quotation_ids: body.quotation_ids[index] ?? "" },
+        );
+      }
+      if (onLiveOrder(quotation.id)) {
+        return errorResponse(409, "quotation_on_order", "The quotation is already on an order.", {
+          quotation_ids: quotation.id,
+        });
+      }
+    }
+    const found = quotations.filter((item) => item !== undefined);
+    const first = found[0];
+    if (first === undefined) {
+      return validation({ quotation_ids: "at least one accepted quotation" });
+    }
+    if (found.some((item) => (item.sales_type === "export") !== (body.order_type === "export"))) {
+      return errorResponse(
+        422,
+        "type_mismatch",
+        "An export order is made from export quotations, and only them.",
+        { order_type: body.order_type },
+      );
+    }
+    if (found.some((item) => (item.sales_type === "subsidised") !== subsidised)) {
+      return errorResponse(
+        422,
+        "type_mismatch",
+        "A subsidised order is made from a subsidised quotation, and only it.",
+        { order_type: body.order_type },
+      );
+    }
+    const fromQuote = subsidised ? first.subsidy : null;
+    if (subsidised && fromQuote == null) {
+      return errorResponse(
+        422,
+        "quotation_subsidy_missing",
+        "The quotation has no subsidy calculation.",
+        { quotation_ids: first.id },
+      );
+    }
+    const disagrees = found.find(
+      (item) =>
+        item.partner?.id !== first.partner?.id ||
+        item.place_of_supply.territory.id !== first.place_of_supply.territory.id,
+    );
+    if (disagrees !== undefined) {
+      const field = disagrees.partner?.id !== first.partner?.id ? "partner_id" : "place_of_supply";
+      return errorResponse(422, "quotations_disagree", "The quotations disagree.", {
+        [field]: "differs",
+      });
+    }
+    if (new Set(found.map((item) => item.lead?.id)).size > 1 && first.partner === null) {
+      return errorResponse(422, "partner_required", "Orders from several leads need their dealer.");
+    }
+    const order = mockOrderFromQuotations({
+      id: mockUuid(MOCK_ID_SPACE.order, 1000 + mockDb.orderWrites.size),
+      quotations: found,
+      lead: mockDb.leads.find((lead) => lead.id === first.lead?.id),
+      orderType: body.order_type,
+      deliveryAddress: body.delivery_address ?? null,
+      paymentTerms: body.payment_terms,
+      remarks: body.remarks ?? null,
+      createdAt: new Date().toISOString(),
+    });
+    const me = mockMeFor(readMockRole()).data;
+    order.owner = { id: me.id, full_name: me.full_name };
+    // SO-010 · an order from export quotations is taxed as they are
+    order.tax_treatment = first.tax_treatment ?? "domestic";
+    order.export_country = first.export_country ?? null;
+    order.sample_pricing = null;
+    order.lut_arn = null;
+    if (order.tax_treatment !== "domestic") order.intra_state = false;
+    if (fromQuote != null && first.lead !== null) {
+      // FS-057 rule 8: material is the calculation's cost; AP's state GST joins the subsidy
+      mockDb.orderSubsidies.set(order.id, {
+        material: fromQuote.total_cost,
+        subsidy: rupees(paise(fromQuote.subsidy) + paise(fromQuote.gst_paid_by_state ?? "0")),
+        payable: fromQuote.farmer_share,
+        leadIds: [first.lead.id],
+      });
+      applySubsidy(order);
+    }
+    const warehouse = warehouseChoice(body.warehouse_id);
+    if (warehouse instanceof Response) return warehouse;
+    order.warehouse = warehouse;
+    mockDb.orders.unshift(order);
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.created", {});
+    return HttpResponse.json({ data: settle(order) }, { status: 201 });
+  }),
+
+  http.patch(buildApiUrl("/orders/:orderId"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    const parsed = patchSchema.safeParse(raw);
+    if (!parsed.success) {
+      return validation({ delivery_address: "check the header's fields" });
+    }
+    const target = orderAt(String(params.orderId), parsed.data.expected_status);
+    if (!target.ok) return target.response;
+    const { order } = target;
+    if (order.status !== "draft") {
+      return errorResponse(409, "order_not_draft", "Only a draft can be changed.");
+    }
+    const body = parsed.data;
+    if (body.export_country !== undefined) {
+      const exportRefusal = orderExportRefusal(
+        order.order_type,
+        body.export_country,
+        body.party === undefined || body.party === null ? order.party.gstin : body.party.gstin,
+      );
+      if (exportRefusal !== null) return exportRefusal;
+      order.export_country = body.export_country ?? null;
+    }
+    if (body.order_type != null) {
+      if (!orderableType(body.order_type)) {
+        return errorResponse(422, "order_type_unsupported", "Only commercial and industrial.", {
+          order_type: body.order_type,
+        });
+      }
+      // FS-042 rule 18: an order from quotations, or a subsidised one, keeps its type
+      const fixed = order.quotations.length > 0 || order.order_type === "subsidised";
+      if (body.order_type !== order.order_type && fixed) {
+        return errorResponse(422, "order_type_fixed", "This order's type is fixed.", {
+          order_type: order.order_type,
+        });
+      }
+      order.order_type = body.order_type;
+    }
+    if (body.warehouse_id !== undefined) {
+      const warehouse = warehouseChoice(body.warehouse_id);
+      if (warehouse instanceof Response) return warehouse;
+      order.warehouse = warehouse;
+    }
+    if (body.party != null) {
+      if (order.quotations.length > 0) {
+        return errorResponse(422, "fixed_by_quotation", "The quotations fix the party.", {
+          party: "fixed by the quotations",
+        });
+      }
+      order.party = {
+        name: body.party.name,
+        mobile: body.party.mobile ?? null,
+        address: body.party.address ?? null,
+        gstin: body.party.gstin ?? null,
+      };
+    }
+    if (body.delivery_address !== undefined) order.delivery_address = body.delivery_address || null;
+    if (body.payment_terms !== undefined && body.payment_terms !== null)
+      order.payment_terms = body.payment_terms;
+    if (body.remarks !== undefined) order.remarks = body.remarks || null;
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.updated", {});
+    return HttpResponse.json({ data: order });
+  }),
+
+  /** SO-005 · Replace a draft's lines, priced as new. */
+  http.put(buildApiUrl("/orders/:orderId/lines"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    if (!allowed(readMockRole(), "sales_orders", "edit")) {
+      return errorResponse(403, "forbidden", "You cannot change orders.");
+    }
+    const parsed = linesSchema.safeParse(raw);
+    if (!parsed.success) {
+      return validation({ lines: "every line with a product and a quantity" });
+    }
+    const target = orderAt(String(params.orderId), parsed.data.expected_status);
+    if (!target.ok) return target.response;
+    const { order } = target;
+    if (order.status !== "draft") {
+      return errorResponse(409, "order_not_draft", "Only a draft can be changed.");
+    }
+    const changed = rateChanges(parsed.data.lines);
+    if (Object.keys(changed).length > 0) {
+      return errorResponse(
+        409,
+        "rate_changed",
+        "Prices or tax changed since the preview.",
+        changed,
+      );
+    }
+    const domestic = priceLines(parsed.data.lines);
+    if (!domestic.ok) {
+      return validation(domestic.fields);
+    }
+    if (order.order_type === "sample" && listValue(domestic.lines) > sampleMaxValue()) {
+      return sampleOverLimit();
+    }
+    const choiceRefusal = gstChoiceRefusal(
+      order.order_type,
+      (order.tax_treatment ?? "domestic") === "domestic",
+      parsed.data.lines,
+      parsed.data.freight,
+    );
+    if (choiceRefusal !== null) return choiceRefusal;
+    const priced = {
+      lines: domestic.lines.map((line) =>
+        repriced(line, order.tax_treatment ?? "domestic", order.sample_pricing ?? null),
+      ),
+    };
+    const kept = takesGstChoice(order.order_type) ? storedFreightIn(order.freight ?? null) : null;
+    const freightIn = parsed.data.freight === undefined ? kept : parsed.data.freight;
+    Object.assign(
+      order,
+      withOrderLines(
+        orderLinesFrom(priced.lines),
+        priced.lines.length === 0 ? null : pricedFreight(freightIn, priced.lines),
+      ),
+    );
+    applySubsidy(order);
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.lines_replaced", { lines: priced.lines.length });
+    return HttpResponse.json({ data: order });
+  }),
+
+  /** SO-008 · Replace a subsidised draft's subsidy (FS-054 rule 5); the first lead stays. */
+  http.put(buildApiUrl("/orders/:orderId/subsidy"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    if (!allowed(readMockRole(), "sales_orders", "edit")) {
+      return errorResponse(403, "forbidden", "You cannot change orders.");
+    }
+    const parsed = subsidySchema.safeParse(raw);
+    if (!parsed.success) {
+      const field = String(parsed.error.issues[0]?.path[0] ?? "subsidy_amount");
+      return validation({ [`subsidy.${field}`]: "Enter rupees, with at most two decimals." });
+    }
+    const order = findOrder(String(params.orderId));
+    if (order === undefined) {
+      return errorResponse(404, "not_found", "No such order.");
+    }
+    if (order.status !== "draft") {
+      return errorResponse(409, "order_not_draft", "Only a draft can be changed.", {
+        status: order.status,
+      });
+    }
+    if (order.order_type !== "subsidised") {
+      return errorResponse(
+        422,
+        "order_type_not_subsidised",
+        "Only a subsidised order takes a subsidy.",
+        { order_type: order.order_type },
+      );
+    }
+    if (!isStaff()) {
+      return errorResponse(
+        403,
+        "type_staff_only",
+        "Subsidised orders are raised by Polysil staff.",
+      );
+    }
+    const body = parsed.data;
+    const ids = [...new Set(body.lead_ids)];
+    if (order.lead === null || ids[0] !== order.lead.id) {
+      return errorResponse(
+        422,
+        "first_lead_fixed",
+        "The first lead routes the order and cannot change.",
+        { "subsidy.lead_ids": order.lead?.id ?? "none" },
+      );
+    }
+    const refusal = subsidyLeadsRefusal(ids) ?? subsidyAmountsRefusal(body, order.totals.total);
+    if (refusal !== null) return refusal;
+    mockDb.orderSubsidies.set(order.id, {
+      material: body.material_amount ?? null,
+      subsidy: body.subsidy_amount,
+      payable: body.farmer_payable ?? null,
+      leadIds: ids,
+    });
+    applySubsidy(order);
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.updated", {});
+    return HttpResponse.json({ data: order });
+  }),
+
+  http.delete(buildApiUrl("/orders/:orderId"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const replay = replayWrite(request, null, 204);
+    if (replay.kind === "respond") return replay.response;
+    if (!allowed(readMockRole(), "sales_orders", "delete")) {
+      return errorResponse(403, "forbidden", "Only a holder of delete removes a draft.");
+    }
+    const order = findOrder(String(params.orderId));
+    if (order === undefined) {
+      return errorResponse(404, "not_found", "No such order.");
+    }
+    if (order.order_no !== null || order.status !== "draft") {
+      return errorResponse(
+        409,
+        "order_was_submitted",
+        "A submitted order is cancelled, not deleted.",
+      );
+    }
+    mockDb.orders = mockDb.orders.filter((item) => item.id !== order.id);
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.post(buildApiUrl("/orders/:orderId/submit"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    const parsed = z.object({ expected_status: expectedStatus }).safeParse(raw);
+    const target = orderAt(
+      String(params.orderId),
+      parsed.success ? parsed.data.expected_status : null,
+    );
+    if (!target.ok) return target.response;
+    const { order } = target;
+    if (order.status !== "draft") {
+      return errorResponse(409, "order_not_draft", "Only a draft can be submitted.");
+    }
+    if (order.lines.length === 0) {
+      return errorResponse(422, "no_lines", "Add a line first.");
+    }
+    // SO-010 · a free sample's total is 0.00 by design; its approval runs on the list value
+    const freeSample = order.sample_pricing === "free";
+    if (Number(order.totals.total) <= 0 && !freeSample) {
+      return errorResponse(422, "zero_total", "The order's total is zero.");
+    }
+    if (order.order_type === "sample" && Number(order.totals.gross) > sampleMaxValue()) {
+      return sampleOverLimit();
+    }
+    if (order.tax_treatment === "export_lut") {
+      const arn = lutArnOn(new Date().toISOString().slice(0, 10));
+      if (arn === null) {
+        return errorResponse(
+          422,
+          "lut_missing",
+          "No LUT covers this date. Ask an admin to record this year's LUT.",
+        );
+      }
+      order.lut_arn = arn;
+    }
+    order.order_no ??= orderNumber(nextSerial());
+    // SCHM-005 · submit stores what the preview showed, numbered with the order.
+    applyOrderBenefits(
+      order,
+      previewOrderSchemes(order, mockDb.schemes, mockDb.entitlements),
+      mockDb.entitlements,
+      (index) => mockUuid(MOCK_ID_SPACE.orderBenefit, mockDb.orders.indexOf(order) * 100 + index),
+    );
+    // RWD-004 · held reward points come off what is left to pay.
+    applyOrderPoints(
+      order,
+      mockUuid(MOCK_ID_SPACE.orderBenefit, mockDb.orders.indexOf(order) * 100 + 99),
+    );
+    order.status = "submitted";
+    order.submitted_at = new Date().toISOString();
+    order.approval = {
+      request_id: mockUuid(MOCK_ID_SPACE.approval, 80_000 + mockDb.approvalSteps.length),
+      status: "pending",
+      steps: chainSteps(
+        chainFor(
+          freeSample ? order.totals.gross : order.totals.total,
+          mockDb.thresholds,
+          order.territory.id,
+        ),
+        200_000 + mockDb.approvalSteps.length * 10,
+      ),
+    };
+    enqueue(orderQueueStep(order));
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.submitted", { order_no: order.order_no });
+    return HttpResponse.json({ data: order });
+  }),
+
+  http.post(buildApiUrl("/orders/:orderId/cancel"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    const parsed = remarkSchema.safeParse(raw);
+    if (!parsed.success) {
+      return validation({ remark: "Say why." });
+    }
+    const target = orderAt(String(params.orderId), parsed.data.expected_status);
+    if (!target.ok) return target.response;
+    const { order } = target;
+    if (order.lines.some((line) => milli(line.qty_dispatched) > 0)) {
+      return errorResponse(
+        409,
+        "order_dispatched",
+        "Something has shipped; close it short instead.",
+      );
+    }
+    if (!["draft", "submitted", "approved"].includes(order.status)) {
+      return errorResponse(409, "order_not_cancellable", "This order cannot be cancelled.");
+    }
+    const role = readMockRole();
+    const holdsDelete = allowed(role, "sales_orders", "delete");
+    if (order.status === "approved" && !holdsDelete) {
+      return errorResponse(403, "forbidden", "Only a holder of delete cancels an approved order.");
+    }
+    if (!holdsDelete && order.owner?.id !== mockMeFor(role).data.id) {
+      return errorResponse(403, "forbidden", "The owner cancels their own order.");
+    }
+    closeQueueRow(order);
+    if (order.approval?.status === "pending") {
+      order.approval = { ...order.approval, status: "cancelled" };
+    }
+    order.status = "cancelled";
+    order.cancelled_at = new Date().toISOString();
+    order.cancel_remark = parsed.data.remark;
+    reverseOrderBenefits(order, mockDb.entitlements);
+    releaseOrderPoints(order);
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.cancelled", { remark: parsed.data.remark });
+    return HttpResponse.json({ data: order });
+  }),
+
+  // SO-007 · An approved order back to draft under its number (FS-036, migration 041).
+  http.post(buildApiUrl("/orders/:orderId/amend"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    const parsed = remarkSchema.safeParse(raw);
+    if (!parsed.success) {
+      return errorResponse(422, "remark_required", "Say why the order is amended.", {
+        remark: "Say why the order is amended.",
+      });
+    }
+    const target = orderAt(String(params.orderId), parsed.data.expected_status);
+    if (!target.ok) return target.response;
+    const { order } = target;
+    const role = readMockRole();
+    const isPartner = PARTNER_ROLES.some((partnerRole) => partnerRole === role);
+    const me = mockMeFor(role).data.id;
+    if (isPartner || !(allowed(role, "sales_orders", "edit") || order.owner?.id === me)) {
+      return errorResponse(403, "forbidden", "Not permitted to amend this order.");
+    }
+    if (order.order_type === "replacement") {
+      return errorResponse(422, "order_type_fixed", "A replacement order follows its complaint.");
+    }
+    if (order.dispatches.some((dispatch) => dispatch.voided_at === null)) {
+      return errorResponse(409, "order_dispatched", "The order has shipped.");
+    }
+    if (order.dispatches.length > 0) {
+      return errorResponse(
+        409,
+        "voided_dispatch_holds_lines",
+        "A voided dispatch still names this order's lines.",
+      );
+    }
+    if (order.status !== "approved") {
+      return errorResponse(409, "status_changed", `The order is now ${order.status}.`, {
+        status: order.status,
+      });
+    }
+    order.amend_count = (order.amend_count ?? 0) + 1;
+    order.amended_from_total = order.totals.total;
+    order.amend_reason = parsed.data.remark;
+    order.status = "draft";
+    reverseOrderBenefits(order, mockDb.entitlements);
+    releaseOrderPoints(order);
+    order.approved_at = null;
+    order.pdf_state = "none";
+    order.pdf_error = null;
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.amended", {
+      from: "approved",
+      to: "draft",
+      amend: order.amend_count,
+      from_total: order.totals.total,
+    });
+    return HttpResponse.json({ data: order });
+  }),
+
+  http.post(buildApiUrl("/orders/:orderId/close-short"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    if (!allowed(readMockRole(), "dispatch", "edit")) {
+      return errorResponse(403, "forbidden", "Dispatch closes an order short.");
+    }
+    const parsed = remarkSchema.safeParse(raw);
+    if (!parsed.success) {
+      return validation({ remark: "Say why." });
+    }
+    const target = orderAt(String(params.orderId), parsed.data.expected_status);
+    if (!target.ok) return target.response;
+    const { order } = target;
+    if (order.status !== "approved" && order.status !== "partially_dispatched") {
+      return errorResponse(
+        409,
+        "order_not_dispatchable",
+        "Only an approved order is closed short.",
+      );
+    }
+    order.lines = order.lines.map((line) => ({
+      ...line,
+      qty_short: line.qty_open,
+      qty_open: "0.000",
+    }));
+    order.status = "closed_short";
+    order.closed_at = new Date().toISOString();
+    order.close_remark = parsed.data.remark;
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "order.closed_short", { remark: parsed.data.remark });
+    return HttpResponse.json({ data: order });
+  }),
+
+  http.post(buildApiUrl("/orders/:orderId/dispatches"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const key = request.headers.get("idempotency-key")?.trim() ?? "";
+    if (key === "") {
+      return errorResponse(
+        400,
+        "idempotency_key_required",
+        "An Idempotency-Key header is required.",
+      );
+    }
+    const serialized = JSON.stringify({ path: new URL(request.url).pathname, body: raw });
+    const replay = mockDb.orderWrites.get(key);
+    if (replay !== undefined) {
+      if (replay.body !== serialized) {
+        return errorResponse(
+          409,
+          "idempotency_key_reused",
+          "This Idempotency-Key was already used.",
+        );
+      }
+      const dispatch = findOrder(replay.orderId)?.dispatches.at(-1);
+      return dispatch === undefined
+        ? errorResponse(404, "not_found", "No such dispatch.")
+        : HttpResponse.json({ data: dispatch }, { status: 201 });
+    }
+    if (!allowed(readMockRole(), "dispatch", "create")) {
+      return errorResponse(403, "forbidden", "Dispatch records what left.");
+    }
+    const parsed = dispatchSchema.safeParse(raw);
+    if (!parsed.success) {
+      return validation({ dispatched_at: "When the goods left, with the time." });
+    }
+    const order = findOrder(String(params.orderId));
+    if (order === undefined) {
+      return errorResponse(404, "not_found", "No such order.");
+    }
+    if (order.status !== "approved" && order.status !== "partially_dispatched") {
+      return errorResponse(409, "order_not_dispatchable", "Only an approved order ships.");
+    }
+    const body = parsed.data;
+    if (Date.parse(body.dispatched_at) > Date.now() + 60_000) {
+      return validation({ dispatched_at: "Cannot be in the future." });
+    }
+    if (body.lines.length === 0) {
+      return validation({ lines: "At least one line." });
+    }
+    const fields: Record<string, string> = {};
+    const seen = new Set<string>();
+    let code = "validation_error";
+    for (const [index, sent] of body.lines.entries()) {
+      const line = order.lines.find((item) => item.id === sent.order_line_id);
+      const at = `lines[${String(index)}].qty`;
+      if (seen.has(sent.order_line_id)) {
+        fields[`lines[${String(index)}].order_line_id`] = "This line is already in the dispatch.";
+        code = "duplicate_line";
+      } else if (line === undefined) {
+        fields[`lines[${String(index)}].order_line_id`] = "Not a line of this order.";
+        code = "line_not_on_order";
+      } else if (milli(sent.qty) <= 0) {
+        fields[at] = "More than zero.";
+      } else if ((sent.qty.split(".")[1] ?? "").replace(/0+$/, "").length > line.uom_decimals) {
+        fields[at] =
+          line.uom_decimals === 0
+            ? "Whole units only."
+            : `At most ${String(line.uom_decimals)} decimals.`;
+        code = "unit_precision";
+      } else if (milli(sent.qty) > milli(line.qty_open)) {
+        fields[at] = `At most ${line.qty_open}, what is still open.`;
+        code = "over_open_quantity";
+      }
+      seen.add(sent.order_line_id);
+    }
+    if (Object.keys(fields).length > 0) {
+      return errorResponse(422, code, "Some lines need correcting.", fields);
+    }
+    const warnings: string[] = [];
+    if (body.invoice_date && body.dc_date && body.invoice_date < body.dc_date) {
+      warnings.push("invoice_before_dc");
+    }
+    const invoiceNo = body.invoice_no ?? null;
+    if (
+      invoiceNo !== null &&
+      invoiceNo !== "" &&
+      mockDb.orders.some((item) =>
+        item.dispatches.some(
+          (dispatch) => dispatch.invoice_no === invoiceNo && dispatch.voided_at === null,
+        ),
+      )
+    ) {
+      warnings.push("duplicate_invoice_no");
+    }
+    const sequence = order.dispatches.length + 1;
+    const me = mockMeFor(readMockRole()).data;
+    const leftFrom = dispatchWarehouseFor(order, body.warehouse_id);
+    if (leftFrom instanceof Response) return leftFrom;
+    const dispatch: DispatchWire = {
+      warehouse: leftFrom,
+      id: nextMockId("dispatch"),
+      order: { id: order.id, order_no: order.order_no, party_name: order.party.name },
+      dispatch_no: `D/${order.order_no ?? "draft"}/${String(sequence)}`,
+      dc_no: body.dc_no || null,
+      dc_date: body.dc_date ?? null,
+      invoice_no: invoiceNo || null,
+      invoice_date: body.invoice_date ?? null,
+      dispatched_at: body.dispatched_at,
+      transporter: body.transporter || null,
+      vehicle_no: body.vehicle_no || null,
+      dispatched_by: { id: me.id, full_name: me.full_name },
+      voided_at: null,
+      void_remark: null,
+      lines: body.lines.map((sent) => ({
+        order_line_id: sent.order_line_id,
+        line_no: order.lines.find((line) => line.id === sent.order_line_id)?.line_no ?? 0,
+        qty: qtyText(milli(sent.qty)),
+      })),
+      warnings,
+    };
+    order.dispatches = [...order.dispatches, dispatch];
+    applyDispatch(order, dispatch, 1);
+    recordDispatchStock(order, dispatch, 1);
+    mockDb.orderWrites.set(key, { body: serialized, orderId: order.id });
+    recordOrderEvent(order, "dispatch.recorded", { dispatch_no: dispatch.dispatch_no });
+    return HttpResponse.json({ data: dispatch }, { status: 201 });
+  }),
+
+  http.post(buildApiUrl("/dispatches/:dispatchId/void"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+
+    const raw: unknown = await request.json();
+    const replay = replayWrite(request, raw);
+    if (replay.kind === "respond") return replay.response;
+    if (!allowed(readMockRole(), "dispatch", "edit")) {
+      return errorResponse(403, "forbidden", "Dispatch voids a dispatch.");
+    }
+    const parsed = remarkSchema.safeParse(raw);
+    if (!parsed.success) {
+      return validation({ remark: "Say why." });
+    }
+    const order = mockDb.orders.find((item) =>
+      item.dispatches.some((dispatch) => dispatch.id === params.dispatchId),
+    );
+    const dispatch = order?.dispatches.find((item) => item.id === params.dispatchId);
+    if (order === undefined || dispatch === undefined) {
+      return errorResponse(404, "not_found", "No such dispatch.");
+    }
+    if (
+      typeof parsed.data.expected_status === "string" &&
+      parsed.data.expected_status !== order.status
+    ) {
+      return errorResponse(409, "status_changed", "The order has moved on since you loaded it.", {
+        status: order.status,
+      });
+    }
+    if (dispatch.voided_at !== null) {
+      return errorResponse(409, "dispatch_voided", "This dispatch is already void.");
+    }
+    if (order.status === "closed_short" || order.status === "cancelled") {
+      return errorResponse(409, "order_closed", "The order is closed.");
+    }
+    const voided: DispatchWire = {
+      ...dispatch,
+      voided_at: new Date().toISOString(),
+      void_remark: parsed.data.remark,
+    };
+    order.dispatches = order.dispatches.map((item) => (item.id === dispatch.id ? voided : item));
+    applyDispatch(order, dispatch, -1);
+    recordDispatchStock(order, dispatch, -1);
+    order.status = statusFromLines(order.lines);
+    mockDb.orderWrites.set(replay.key, { body: replay.serialized, orderId: order.id });
+    recordOrderEvent(order, "dispatch.voided", {
+      dispatch_no: dispatch.dispatch_no,
+      remark: parsed.data.remark,
+    });
+    return HttpResponse.json({ data: order });
+  }),
+];

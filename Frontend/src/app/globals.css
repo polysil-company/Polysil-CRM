@@ -1,0 +1,6 @@
+/*
+ * Stylesheet entry point. Do not add styles here —
+ * every design decision lives in src/styles/tokens.css.
+ */
+@import "tailwindcss";
+@import "../styles/tokens.css";
