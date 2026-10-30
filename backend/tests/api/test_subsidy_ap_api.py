@@ -36,7 +36,7 @@ def _dsn() -> str:
     return re.sub(r"^postgresql\+\w+://", "postgresql://", str(get_settings().database_url))
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def ap() -> AsyncIterator[None]:
     with psycopg.connect(_dsn()) as conn:
         existed = conn.execute("SELECT 1 FROM subsidy_scheme WHERE code = 'AP'").fetchone()

@@ -246,6 +246,19 @@ async def test_the_cohort_and_value_queries_use_their_indexes(sessions: Sessions
         # the question that matters: can the partial index be used at all
         await s.execute(text("SET LOCAL enable_seqscan = off"))
         await s.execute(text("SET LOCAL enable_sort = off"))
+        # On a near-empty table every index on stage costs the same and the pick is a
+        # coin toss (seen on CI with ix_lead_territory_stage). Drop the other stage
+        # indexes inside this transaction, which rolls back, so only the question
+        # "is the partial index usable" is left.
+        await s.execute(text("SET LOCAL lock_timeout = '5s'"))
+        rivals = (await s.execute(text(
+            "SELECT i.indexrelid::regclass::text FROM pg_index i "
+            "JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) "
+            "WHERE i.indrelid = 'lead'::regclass AND a.attname = 'stage' "
+            "AND i.indexrelid <> 'ix_lead_lost_at'::regclass "
+            "AND NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conindid = i.indexrelid)"))).scalars().all()
+        for name in rivals:
+            await s.execute(text(f"DROP INDEX {name}"))
         plan = "\n".join(r[0] for r in (await s.execute(text(
             "EXPLAIN SELECT id FROM lead WHERE stage = 'lost' AND lost_at >= now() - interval '180 days'"))).all())
         assert "ix_lead_lost_at" in plan, plan
