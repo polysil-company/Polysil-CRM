@@ -162,7 +162,11 @@ export function MapView({
   }, [ready, markers, paths]);
 
   return (
-    <div className={cn("relative overflow-hidden rounded-xl border border-border", className)}>
+    // `isolate`: Leaflet stacks its panes and controls at z-index 400 to 1000. Kept inside the
+    // map's own stacking context, they stay under the app's menus, dialogs and toasts.
+    <div
+      className={cn("relative isolate overflow-hidden rounded-xl border border-border", className)}
+    >
       <div
         ref={container}
         role="region"

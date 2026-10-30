@@ -28,14 +28,20 @@ export const trackingPermissionsSchema = z.object({
 });
 export type TrackingPermissions = z.output<typeof trackingPermissionsSchema>;
 
+/**
+ * A field the tracker leaves empty. Android's JSON drops a key whose value is null instead of
+ * sending `null`, so an empty field arrives missing: read missing as null.
+ */
+const emptyAsNull = z.string().nullable().default(null);
+
 export const trackingStatusSchema = z.object({
   onDuty: z.boolean(),
-  dutyId: z.string().nullable(),
-  since: z.string().nullable(),
-  lastUploadAt: z.string().nullable(),
+  dutyId: emptyAsNull,
+  since: emptyAsNull,
+  lastUploadAt: emptyAsNull,
   pendingPoints: z.number().int().nonnegative(),
   /** offline, waiting_for_sign_in, bad_clock, forbidden, location_denied, refused:…; null when all went. */
-  lastError: z.string().nullable(),
+  lastError: emptyAsNull,
 });
 export type TrackingStatus = z.output<typeof trackingStatusSchema>;
 

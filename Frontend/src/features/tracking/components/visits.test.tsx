@@ -65,9 +65,21 @@ function stubLocation(answer: "fix" | "denied"): void {
   });
 }
 
+/** What the browser says about location for this site, before anything is asked. */
+function stubPermission(state: "granted" | "prompt" | null): void {
+  Object.defineProperty(navigator, "permissions", {
+    configurable: true,
+    value:
+      state === null
+        ? undefined
+        : { query: (): Promise<{ state: string }> => Promise.resolve({ state }) },
+  });
+}
+
 function reset(): void {
   resetMockDb();
   writeMockRole("admin");
+  stubPermission(null);
 }
 
 async function codeOf(call: Promise<unknown>): Promise<string | null> {
@@ -252,6 +264,47 @@ describe("[TRK-005] MyVisits", () => {
     await user.click(within(form).getByRole("button", { name: "Locate me" }));
     expect(await within(form).findByText(/Location is blocked for this site/)).toBeInTheDocument();
     expect(within(form).getByRole("button", { name: "Check in" })).toBeDisabled();
+  });
+
+  it("takes the location by itself once it is allowed, at check-in and check-out", async () => {
+    reset();
+    signInAs("employee");
+    mockDb.trackingConsent.set(mockMeFor("employee").data.id, "v1");
+    stubLocation("fix");
+    stubPermission("granted");
+    const user = userEvent.setup();
+    renderWithProviders(<MyVisits />);
+    await user.click(await screen.findByRole("button", { name: "Check in" }));
+    const form = await screen.findByRole("form", { name: "Check in" });
+
+    // No tap on Locate me: the fix is there, and it can still be taken again.
+    expect(await within(form).findByText(/to within 12 m/)).toBeInTheDocument();
+    expect(within(form).getByRole("button", { name: "Locate again" })).toBeInTheDocument();
+    await user.click(within(form).getByRole("button", { name: "Another place" }));
+    await user.type(within(form).getByLabelText("Place"), "Taluka office");
+    await user.click(within(form).getByRole("button", { name: "Check in" }));
+
+    await user.click(await screen.findByRole("button", { name: "Check out" }));
+    const out = await screen.findByRole("form", { name: "Check out" });
+    expect(await within(out).findByText(/to within 12 m/)).toBeInTheDocument();
+  });
+
+  it("asks with a tap the first time, and says what the location is for", async () => {
+    reset();
+    signInAs("employee");
+    mockDb.trackingConsent.set(mockMeFor("employee").data.id, "v1");
+    stubLocation("fix");
+    stubPermission("prompt");
+    const user = userEvent.setup();
+    renderWithProviders(<MyVisits />);
+    await user.click(await screen.findByRole("button", { name: "Check in" }));
+    const form = await screen.findByRole("form", { name: "Check in" });
+
+    expect(
+      await within(form).findByText("Your location is taken when you check in."),
+    ).toBeInTheDocument();
+    expect(within(form).getByRole("button", { name: "Locate me" })).toBeInTheDocument();
+    expect(within(form).queryByText(/to within/)).not.toBeInTheDocument();
   });
 
   it("tells a role without tracking", async () => {

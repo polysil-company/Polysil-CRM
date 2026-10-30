@@ -7,10 +7,12 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-118 changes, newest first. Each title opens its entry.
+120 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-10-30 | [Visits take the location by themselves once allowed](changelog/entries/2026-10-30--feature--TRK-003--visits-take-the-location-by-themselves-once-allowed.md) | `feature` | `TRK-003` `TRK-004` |
+| 2026-10-30 | [Duty on Android, and the map under the menu](changelog/entries/2026-10-30--fix--TRK-008--duty-on-android-and-the-map-under-the-menu.md) | `fix` | `TRK-008` `TRK-001` |
 | 2026-10-28 | [The APK on the Releases page](changelog/entries/2026-10-28--chore--TRK-008--the-apk-on-the-releases-page.md) | `chore` | `TRK-008` |
 | 2026-10-27 | [Polysil's logo everywhere, and phone tests with Maestro](changelog/entries/2026-10-27--feature--APP-010--polysil-s-logo-everywhere-and-phone-tests-with-maestro.md) | `feature` | `APP-010` `TRK-008` |
 | 2026-10-26 | [Full product names in the product picker](changelog/entries/2026-10-26--fix--MSTR-003--full-product-names-in-the-product-picker.md) | `fix` | `MSTR-003` |
@@ -129,6 +131,83 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 30 October 2026
+
+### Visits take the location by themselves once allowed
+
+`feature` · `TRK-003` `TRK-004` · Nakul Srivastava · [entry](changelog/entries/2026-10-30--feature--TRK-003--visits-take-the-location-by-themselves-once-allowed.md)
+
+#### Before
+
+To check in or out of a visit, the person tapped **Locate me** every time, even after allowing location long ago. The check-out form also said "Your location is taken when you check in".
+
+#### Now
+
+- **Location already allowed:** opening check-in or check-out takes a fresh fix straight away. The client asked for this on 30 Oct.
+  - In the Android app, "allowed" means Android's own permission; in a browser, it means the site's.
+  - The accuracy and **Locate again** still show, so a rough fix taken indoors can be taken again before saving.
+- **Not allowed yet:** the form waits for a tap on **Locate me**, as before, so Android's permission question only ever follows the person's own tap.
+- Check-out says "Your location is taken when you check out."
+
+#### Discussion
+
+- **Why not ask on open as well:** a permission prompt that appears unasked as a form opens is easy to refuse by reflex, and a refusal is then sticky in Android. Asking only after a tap keeps it intentional. After that, nothing is asked again.
+- **Freshness:** each form takes a new fix (`maximumAge: 0`), never a remembered one, so a check-in records where the person is now.
+- **Fallback:** if the permission can't be read (an older browser, an error), the form behaves as before and waits for **Locate me**.
+
+#### Files changed
+
+- `src/features/tracking/hooks/use-browser-fix.ts`: `locationAlreadyAllowed`, and `useBrowserFix({ autoWhenAllowed })`.
+- `src/features/tracking/components/fix-panel.tsx`: `action` ("check in" or "check out") in the waiting line.
+- `src/features/tracking/components/check-in-form.tsx`, `open-visit.tsx`: take the location by themselves.
+- `src/features/tracking/components/visits.test.tsx`, `Docs/Tested-Features.md`.
+
+#### Tests
+
+`visits.test.tsx`:
+
+- with location allowed, check-in and check-out both show "to within 12 m" without a tap, and **Locate again** is offered;
+- with location not yet allowed, the form shows **Locate me**, says what the location is for, and holds no fix.
+
+### Duty on Android, and the map under the menu
+
+`fix` · `TRK-008` `TRK-001` · Nakul Srivastava · [entry](changelog/entries/2026-10-30--fix--TRK-008--duty-on-android-and-the-map-under-the-menu.md)
+
+#### Before
+
+The first trial on a phone (APK 0.1.1, 30 Oct) found two bugs:
+
+- **Duty showed "Something went wrong"** whenever the person was off duty.
+  - The tracker reports its status with the duty, start time, last upload and error left empty. Android's JSON (`org.json`) drops a key whose value is null instead of sending `null`.
+  - The status schema required each key, so the whole answer was refused.
+  - The same refusal also stopped the device token's renewal on launch (TRK-009), since that reads the same status.
+  - Tests never caught it, because they replace the tracker with a stand-in that sends every key.
+- **The Team map covered the phone menu.** Leaflet stacks its panes and controls at z-index 400 to 1000, above the app's menu sheet (layer 40 to 80).
+
+#### Now
+
+- **The status schema reads a missing field as empty (`null`).** Off duty, Duty shows the toggle and the setup cards. This is a web fix, so it reaches phones without a new APK.
+- **The map keeps its layers inside its own box** (`isolate` on `MapView`). The menu, dialogs, popovers and toasts draw over it everywhere it's used: Team map, a person's route, and visit check-in.
+
+#### Discussion
+
+- **Why a web fix rather than an Android one:** the Kotlin side could send `JSONObject.NULL` instead, but that needs a new APK on every phone. Reading a missing key as null fixes the phones already installed, and stays right if the Kotlin side changes.
+- **Not changed:** the other tracker answers (permissions, device, flush) never carry an empty field.
+
+#### Files changed
+
+- `src/features/tracking/native/tracking-bridge.ts`: `emptyAsNull` for `dutyId`, `since`, `lastUploadAt` and `lastError`.
+- `src/components/patterns/map-view.tsx`: `isolate` on the map's frame.
+- `src/features/tracking/native/tracking-bridge.test.ts`: the status as Android sends it.
+- `Docs/screenshots/tracking/team-map-menu-open-phone-light.jpg`.
+
+#### Tests
+
+- `tracking-bridge.test.ts`:
+  - the off-duty answer `{ onDuty: false, pendingPoints: 0 }` reads with every empty field as `null`;
+  - an on-duty answer keeps what it sends.
+- **Map:** at 360 px in the mock, with the menu open over Team map, the point under the menu belongs to the menu, not the map (checked with Playwright; screenshot linked above).
 
 ## 28 October 2026
 

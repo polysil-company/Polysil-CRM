@@ -80,7 +80,7 @@ export function CheckInForm({
   const [visitId, setVisitId] = useState(createRequestId);
   const [problem, setProblem] = useState<string | null>(null);
   const [openVisit, setOpenVisit] = useState<string | null>(null);
-  const { state: fix, locate } = useBrowserFix();
+  const { state: fix, locate } = useBrowserFix({ autoWhenAllowed: true });
   const checkIn = useCheckIn();
   const consent = useAcceptConsent();
   const keys = useIdempotencyKey();
@@ -290,7 +290,7 @@ export function CheckInForm({
           )}
           <FieldError>{problem ?? undefined}</FieldError>
         </Field>
-        <FixPanel state={fix} onLocate={locate} />
+        <FixPanel state={fix} onLocate={locate} action="check in" />
       </DialogBody>
       <DialogFooter>
         <DialogClose render={<Button type="button" variant="outline" disabled={save.isBusy} />}>
