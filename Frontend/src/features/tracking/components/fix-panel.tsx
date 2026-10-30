@@ -17,9 +17,12 @@ import { formatNumber } from "@/lib/format";
 export function FixPanel({
   state,
   onLocate,
+  action,
 }: {
   state: FixState;
   onLocate: () => void;
+  /** What the location is for, said before it is taken. */
+  action: "check in" | "check out";
 }): React.JSX.Element {
   return (
     <div
@@ -62,7 +65,7 @@ export function FixPanel({
           ) : state.status === "failed" ? (
             <span className="text-danger">Your location couldn&apos;t be found. Try again.</span>
           ) : (
-            <span className="text-muted-foreground">Your location is taken when you check in.</span>
+            <span className="text-muted-foreground">Your location is taken when you {action}.</span>
           )}
         </div>
       </div>

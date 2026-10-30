@@ -51,6 +51,7 @@ from api.errors import (
 )
 from api.integrations import cache
 from api.schemas.auth import (
+    EmailPreferences,
     Features,
     MeResponse,
     ModulePermission,
@@ -567,7 +568,7 @@ _ME_QUERY = text(
            r.code AS role_code, r.name AS role_name,
            o.id AS org_id, o.name AS org_name,
            u.partner_id, cp.name AS partner_name, cp.partner_type::text AS partner_type,
-           u.must_change_password
+           u.must_change_password, u.email::text AS email, u.email_notices, u.email_morning
       FROM app_user u
       LEFT JOIN role r     ON r.id = u.role_id
       LEFT JOIN org_unit o ON o.id = u.org_unit_id
@@ -620,7 +621,34 @@ async def me(db: AsyncSession, *, user_id: str) -> MeResponse:
             for p in perms
         ],
         features=Features(tasks_for_dealers=tasks_on),
+        email_preferences=EmailPreferences(notices=bool(row.email_notices),
+                                           morning_summary=bool(row.email_morning)),
+        email_available=email_available(row.user_type, row.email),
     )
+
+
+def email_available(user_type: str, email: str | None) -> bool:
+    """FS-078: email is on for this box, and this person can receive it."""
+    from api.integrations.email.provider import parse_address
+    return (get_settings().email_provider != "none"
+            and user_type in ("staff", "partner_user") and parse_address(email) is not None)
+
+
+async def set_email_preferences(db: AsyncSession, *, notices: bool,
+                                morning_summary: bool) -> EmailPreferences:
+    """The caller's own switches, through the definer (FS-078): the self policy does
+    not admit an UPDATE without users.edit. A consumer is refused (EC-21)."""
+    from sqlalchemy.exc import DBAPIError
+
+    from api.errors import ForbiddenError
+    try:
+        row = (await db.execute(text("SELECT * FROM me_email_preferences_set(:n, :m)"),
+                                {"n": notices, "m": morning_summary})).one()
+    except DBAPIError as exc:
+        if str(getattr(exc.orig, "sqlstate", "") or "") == "42501":
+            raise ForbiddenError("Email is for staff and partner users only.") from exc
+        raise
+    return EmailPreferences(notices=row.notices, morning_summary=row.morning_summary)
 
 
 # ── own password (FS-006 4) ──────────────────────────────────────────────────

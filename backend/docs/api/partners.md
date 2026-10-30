@@ -120,6 +120,7 @@ narrow the filters. An empty list gives a file with the header row only.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
 | `q` | query | string \| null |  | Name, code or contact person substring. |
 | `partner_type` | query | string \| null |  | distributor, dealer or sub_dealer. |
 | `parent_id` | query | string \| null |  | Children of this partner. |
@@ -129,10 +130,10 @@ narrow the filters. An empty list gives a file with the header row only.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The workbook, as an attachment. |
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | The action is not in your permissions. |
-| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

@@ -206,12 +206,13 @@ District Manager over the office; there is no draft.
 
 **Export Orders**
 
-Marketing orders as Excel, with the same filters (FS-030).
+Marketing orders as Excel or CSV, with the same filters (FS-030).
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
 | `status` | query | string \| null |  | Comma-separated statuses. |
 | `partner_id` | query | string \| null |  |  |
 | `awaiting` | query | string \| null |  | `me`: the ones you may approve now. |
@@ -221,13 +222,13 @@ Marketing orders as Excel, with the same filters (FS-030).
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The workbook, as an attachment. |
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not permitted; `own_order`, `not_your_approval`. |
 | `404` | `ErrorResponse` | Not found in your scope. |
 | `409` | `ErrorResponse` | `status_changed`, `code_taken`, `price_changed_today`. |
-| `422` | `ErrorResponse` | `material_inactive`, `remark_required`, a field. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

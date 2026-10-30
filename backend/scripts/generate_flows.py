@@ -683,7 +683,7 @@ def f_outbox() -> None:
     for i, (eid, lbl, c) in enumerate([("mock", "Mock\n(default, local)", GREY),
                                        ("za", "11za\nWhatsApp\nsendTemplate", GREEN),
                                        ("sms", "SMS\nnot built (ADR-040)", GREY),
-                                       ("mail", "Email\nnot built", GREY)]):
+                                       ("mail", "Email (FS-078)\nown drain, off until\nan account (GAP-536)", YELLOW)]):
         els = node(eid, 1280, i * 92, lbl, w=180, h=70, colour=c, size=14)
         n[eid] = els[0]; e += els
         e += edge(f"e_p_{eid}", n["port"], n[eid], colour=c, dashed=(eid != "za"))
@@ -2601,6 +2601,63 @@ def f_partner_recruitment() -> None:
          ("n4", "Not yet: the applicant after submit (GAP-519),\nrefunds (GAP-520), a distributor's territory\nlevel (GAP-521).", YELLOW)])
 
 
+def f_report_exports() -> None:
+    _columns(
+        "72-report-exports", "CSV and PDF exports",
+        "Every list: Excel or CSV. Every report: Excel, CSV or PDF. Same rows as the screen.",
+        "BUILT. FS-077 (REQ-1211): ?format=xlsx|csv|pdf on the 10 list exports, 3 subsidy exports and every report.",
+        [("s1", "GET /<list>/export?format=csv\nGET /reports/<name>?format=csv|pdf", BLUE),
+         ("s2", "the list or report code itself, the caller's session:\nscope, RLS and masking as on screen", GREEN),
+         ("s3", "CSV: UTF-8 with BOM, formula cells neutralised,\nmoney as 1050.00; then Total, then notes", BLUE),
+         ("s4", "PDF: report.html, A4 landscape, IST times,\nIndian grouping; at most 1,000 rows", VIOLET),
+         ("s5", "Cache-Control: no-store, nosniff;\none export log line after the file is made", GREY)],
+        [("d1", "format=pdf on a list: 422 format_not_available", YELLOW),
+         ("d2", "render slot taken in the thread; the fetcher\nbuilt only once the slot is held", GREEN),
+         ("d3", "insights: no Total line (sentences, not figures)", GREY)],
+        [("n1", "A CSV IS READ BY EXCEL TOO\n\nA cell starting = + - @ (full-width forms too) gets\na leading apostrophe. Plain numbers, negatives\nincluded, are left as numbers.", RED),
+         ("n2", "PDF RENDERS: two at a time per process, shared with\ncomplaints and dealer sheets. A third: 503 busy.\nslot_free() can race one render (ISS-225).", YELLOW),
+         ("n3", "Not yet: PDF for lists (GAP-535), names in the\nfilter line (GAP-534).", YELLOW)])
+
+
+def f_email_notices() -> None:
+    _columns(
+        "73-email-notices", "Email notices and the morning summary",
+        "An unread notice by email after 10 minutes; a morning task summary at 08:00 IST.",
+        "BUILT, SWITCHED OFF. FS-078 (REQ-007, REQ-303): migration 082. EMAIL_PROVIDER=none until the client gives an account (GAP-536).",
+        [("s1", "a notice lands in the bell (FS-018)", BLUE),
+         ("s2", "email_collect, every 5 min: email_notice_collect(50)\nunread, 10 min to 24 h old, not yet queued", VIOLET),
+         ("s3", "per person: advisory lock (10), queue every notice,\none outbox row {ids: newest 20, total}", GREEN),
+         ("s4", "email_drain, every 30 s: claims channel = 'email',\nnotices before summaries", VIOLET),
+         ("s5", "email_notice_resolve at send: the address now,\nthe notices still unread", GREEN),
+         ("s6", "SMTP: titles, times, links; never a body", BLUE)],
+        [("d1", "email_morning, 08:00 to 11:00 IST, Mon to Sat:\none row per person with tasks due or overdue", VIOLET),
+         ("d2", "email_morning_sent (user, IST day): once a day,\nhowever many runs overlap", GREEN),
+         ("d3", "PUT /me/email-preferences: the person's own\ntwo switches; /auth/me says email_available", BLUE),
+         ("d4", "none: nothing collected; pending email rows\nend 'email off'", GREY)],
+        [("n1", "RESOLVED AT SEND, NEVER FROZEN\n\nThe row holds a user id and notice ids. Read since,\nswitched off, deactivated, partner closed: the row\nends dead ('already read', 'not eligible') and that\nis not counted as a failure.", GREEN),
+         ("n2", "SMTP BY PHASE\n\nconnect, TLS, AUTH, MAIL FROM: transient, breaker.\n5xx RCPT or DATA: permanent. A deadline after\nDATA started: dead, 'may have arrived', never resent.\nKeys email:breaker:*, apart from WhatsApp's.", RED),
+         ("n3", "STAGING NEVER MAILS PEOPLE\n\nOutside production, smtp needs EMAIL_REDIRECT_TO:\nevery email goes to that one address.", RED),
+         ("n4", "Not yet: an account (GAP-536), bounces (GAP-539),\nlinks beyond five record types (GAP-551),\nwhat may leave by email (GAP-549, Q 36.3).", YELLOW)])
+
+
+def f_forecast_insights() -> None:
+    _columns(
+        "74-forecast-insights", "Sales forecast and insights",
+        "Open pipeline weighted by stage win rates, by month; plain sentences about the period.",
+        "BUILT. FS-079: GET /reports/sales-forecast, GET /reports/insights; migration 081 (indexes). Staff only.",
+        [("s1", "win rates per stage: leads won or lost in the\nlast history_days (90 to 365, default 180)", BLUE),
+         ("s2", "each open lead's value: newest live quotation\n(GST incl., merged leads' too) else the estimate", GREEN),
+         ("s3", "weighted = value x the rate of its stage,\nrounded per lead", BLUE),
+         ("s4", "month = created + median days to win;\nthis month, the next two, later", BLUE),
+         ("s5", "rows by owner, territory (district or taluka)\nor source; CSV and PDF as every report", VIOLET)],
+        [("d1", "fewer than 30 closed: weighted figures null,\nreason not_enough_history; never 0", YELLOW),
+         ("d2", "a stage with too few: borrows the earlier\nstage's rate, low_confidence", YELLOW),
+         ("d3", "insights: lost reason rising, drop-off stage,\nsources, quotation answers, first contact", GREY)],
+        [("n1", "RATES FROM THE WHOLE SCOPE\n\nOwner and territory filters choose the rows, not\nthe rates. A field officer's rates are their own\nleads only (GAP-545, Q 36.4).", RED),
+         ("n2", "SCOPE TWICE: scope_predicate on lead and on\nquotation, RLS beneath. A quotation the caller\ncannot see never values their lead.", GREEN),
+         ("n3", "Rough by design: the month rule (GAP-542), several\nquotations count once (GAP-547), GST included and\nsubsidy ignored (GAP-548).", YELLOW)])
+
+
 if __name__ == "__main__":
     print("generating flows:")
     f_system(); f_request(); f_permissions(); f_lead()
@@ -2615,5 +2672,5 @@ if __name__ == "__main__":
     f_export_sample_orders(); f_ratings(); f_warranty()
     f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
     f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy(); f_live_checks()
-    f_partner_recruitment()
+    f_partner_recruitment(); f_report_exports(); f_email_notices(); f_forecast_insights()
     print(f"\nwrote to {OUT}")

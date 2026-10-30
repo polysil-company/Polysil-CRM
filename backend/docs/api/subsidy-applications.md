@@ -116,6 +116,7 @@ narrow the filters. An empty list gives a file with the header row only.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
 | `status` | query | `open` \| `full_fp_received` \| `cancelled` \| null |  |  |
 | `stage` | query | string \| null |  | A stage code. |
 | `q` | query | string \| null |  | Application number, registration number or farmer's name. |
@@ -125,12 +126,12 @@ narrow the filters. An empty list gives a file with the header row only.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The workbook, as an attachment. |
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
 | `400` | `ErrorResponse` | `idempotency_key_required`: a write sent without an Idempotency-Key. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | No subsidy permission: every dealer, and staff without the module. |
 | `404` | `ErrorResponse` | Not an application (or a lead) in your scope. |
-| `422` | `ErrorResponse` | A field needs correcting; see `fields`. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

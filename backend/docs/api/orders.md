@@ -147,6 +147,7 @@ narrow the filters. An empty list gives a file with the header row only.
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
 | `status` | query | string \| null |  | One status, or several separated by commas: submitted,approved,partially_dispatched. |
 | `order_type` | query | string \| null |  | One order type. |
 | `partner_id` | query | string \| null |  | Orders placed through this partner. |
@@ -164,11 +165,11 @@ narrow the filters. An empty list gives a file with the header row only.
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | - | The workbook, as an attachment. |
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
 | `401` | `ErrorResponse` | Not signed in. |
 | `403` | `ErrorResponse` | Not in your permissions, or not your step. |
 | `404` | `ErrorResponse` | Not in your scope. |
-| `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

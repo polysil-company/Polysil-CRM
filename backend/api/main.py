@@ -6,6 +6,7 @@ owns logic. Nothing here knows a business rule.
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -21,6 +22,7 @@ from api.db.session import engine
 from api.deps import assert_runtime_role
 from api.errors import (
     ApiError,
+    ValidationFailed,
     api_error_handler,
     internal_error_handler,
     validation_error_handler,
@@ -83,6 +85,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await engine.dispose()
 
 
+# ISS-229: JSON may carry a NUL as the escape \u0000; Postgres text refuses it.
+# An odd run of backslashes before "u0000" is the escape; an even run is a literal
+# backslash followed by the text "u0000", which is allowed.
+_JSON_NUL = re.compile(rb"(?<!\\)(?:\\\\)*\\u0000")
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     # FS-038 rule 2: uvicorn's access log writes the webhook path, secret and all
@@ -110,6 +118,23 @@ def create_app() -> FastAPI:
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        # Postgres refuses a NUL in text, so `?q=%00` reached the database and came
+        # back a 500 (Schemathesis, 27 Oct). One answer for every route instead.
+        query = request.scope.get("query_string", b"").lower()
+        raw_path = request.scope.get("raw_path", b"").lower()
+        nul = b"%00" in query or b"%00" in raw_path or "\x00" in request.url.path
+        # A webhook keeps whatever the provider sent and strips NULs itself
+        # (FS-038): refusing it there would make the provider retry for ever.
+        if not nul and request.method in ("POST", "PUT", "PATCH") and \
+                "/webhooks/" not in request.url.path and \
+                request.headers.get("content-type", "").startswith("application/json"):
+            # Starlette caches the body, so the route reads it again for free.
+            nul = _JSON_NUL.search(await request.body()) is not None
+        if nul:
+            err = ValidationFailed("A request may not contain a NUL character.",
+                                   code="invalid_character")
+            return JSONResponse(status_code=err.status_code, content=err.envelope(),
+                                headers={"X-Request-ID": request_id})
         structlog.contextvars.bind_contextvars(request_id=request_id,
                                                path=redact_path(request.url.path))
         try:
@@ -190,6 +215,7 @@ def create_app() -> FastAPI:
     # Base path is /api/v1. The version is in the path rather than a header so a
     # breaking change can run alongside its predecessor (ADR-028).
     app.include_router(auth.router, prefix=API_PREFIX)
+    app.include_router(auth.me_router, prefix=API_PREFIX)
     app.include_router(leads.router, prefix=API_PREFIX)
     app.include_router(leads.lookups, prefix=API_PREFIX)
     app.include_router(lead_qr.router, prefix=API_PREFIX)

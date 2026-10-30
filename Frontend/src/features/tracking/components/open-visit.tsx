@@ -246,7 +246,7 @@ export function CheckOutForm({
   const [outcome, setOutcome] = useState<VisitOutcome | null>(null);
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
-  const { state: fix, locate } = useBrowserFix();
+  const { state: fix, locate } = useBrowserFix({ autoWhenAllowed: true });
   const mutation = useCheckOut();
   const needsPhoto = photoRequired && visit.photoCount === 0;
 
@@ -345,7 +345,7 @@ export function CheckOutForm({
             }}
           />
         </Field>
-        <FixPanel state={fix} onLocate={locate} />
+        <FixPanel state={fix} onLocate={locate} action="check out" />
         {problem === null ? null : (
           <p role="alert" className="text-sm text-danger">
             {problem}

@@ -613,7 +613,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("step", nargs="?", default="deploy",
                         choices=["provision", "deploy", "sync", "build", "up", "migrate",
                                  "seed", "seed-prod", "load-states", "templates", "requeue-pdfs",
-                                 "status", "verify", "logs", "down", "frontend-prod",
+                                 "status", "verify", "load", "logs", "down", "frontend-prod",
                                  "frontend-provision", "frontend", "frontend-caddy"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
     parser.add_argument("--seed", action="store_true", help="deploy: run the seeds too")
@@ -623,6 +623,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="seed: the demo users only, not the workbooks")
     parser.add_argument("--read-only", action="store_true",
                         help="verify: skip the staging journey, which creates records")
+    parser.add_argument("--users", type=int, default=50, help="load: concurrent users")
+    parser.add_argument("--seconds", type=int, default=60, help="load: how long")
     parser.add_argument("--target", choices=["staging", "prod"], default="staging",
                         help="prod: the Hostinger box, infra/.env.prod and docker-compose.prod.yml")
     parser.add_argument("--source", type=Path, default=None,
@@ -650,6 +652,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.step == "verify":
         return 0 if verify(env, read_only=args.read_only) else 1
+    if args.step == "load":
+        if TARGET != "staging":
+            die("load is a staging step")
+        return live_verify.load(TARGET, env, Path(__file__).resolve().parents[1],
+                                users=args.users, seconds=args.seconds, ssh_argv=ssh_argv)
     if args.step == "provision":
         provision(env)
     elif args.step == "deploy":

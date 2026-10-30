@@ -18,7 +18,7 @@ from api.config import get_settings
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require, require_any
 from api.errors import ForbiddenError
 from api.idempotency import payload_digest, run_idempotent
-from api.routers.exporting import XLSX_RESPONSE, export, filters_of
+from api.routers.exporting import EXPORT_RESPONSE, ExportFormat, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
 from api.schemas.leads import UUID_RE, TimelinePage
 from api.schemas.orders import (
@@ -199,11 +199,12 @@ async def order_stats(
         waiting_on=waiting_on, territory_id=territory_id, owner_org_unit_id=owner_org_unit_id)
 
 
-@router.get("/export", response_class=Response, responses={**_ERRORS, **XLSX_RESPONSE},
+@router.get("/export", response_class=Response, responses={**_ERRORS, **EXPORT_RESPONSE},
             dependencies=[Depends(require("sales_orders", "view"))])
 async def export_orders(
     db: DbSession, caller: CallerDep,
     filters: Annotated[dict[str, Any], Depends(filters_of(list_orders))],
+    fmt: ExportFormat = "xlsx",
 ) -> Response:
     """Download the order list as an Excel file, with the same filters as the list.
 
@@ -212,7 +213,7 @@ async def export_orders(
     token, then save the blob. More than 5,000 rows is `422 export_too_large`:
     narrow the filters. An empty list gives a file with the header row only.
     """
-    return await export(list_orders, stem="orders", title="Orders", columns=exports.ORDERS,
+    return await export(list_orders, fmt=fmt, stem="orders", title="Orders", columns=exports.ORDERS,
                         user_id=caller.user_id, filters=filters, db=db, caller=caller)
 
 

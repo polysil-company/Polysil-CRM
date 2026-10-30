@@ -37,7 +37,7 @@ def _dsn() -> str:
     return re.sub(r"^postgresql\+\w+://", "postgresql://", str(get_settings().database_url))
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def states() -> AsyncIterator[None]:
     """Loaded once; removed after only when this module created them."""
     with psycopg.connect(_dsn()) as conn:
