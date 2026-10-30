@@ -50,6 +50,15 @@ SHEET = "Product Master"
 FIRST_ROW = 4
 EFFECTIVE_FROM = dt.date(2026, 4, 1)
 
+# The client's change list of 28 Oct 2026: sheet Delete retires products, sheet Add
+# adds them. Applied on top of the master on every run, so a rerun of seed-prod
+# never brings a retired product back. Its sixth column has no header and is not
+# loaded: the client said on 29 Oct to leave it out.
+CHANGES = ROOT / "data" / "masters" / "Product-Changes-2026-10-28.xlsx"
+# GAP-552: the 65 SPRINKLER COMPONENTS rows on the Add sheet give "Field" as the
+# unit. The products they replace were all NOS.
+UNIT_ASSUMED = {("SPRINKLER COMPONENTS", "Field"): "NOS."}
+
 # openpyxl's rendering of a carriage return stored inside a cell. It must come off
 # before the trim, or the trim leaves it behind and the value stays distinct.
 CARRIAGE = "_x000D_"
@@ -190,8 +199,78 @@ def read_products(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
             "hsn": hsn_for(description, category),
             "eligible": category not in NOT_SUBSIDY_ELIGIBLE,
             "rate": stand_in_rate(description, category),
+            "source_file": path.name,
         })
     return rows, collisions
+
+
+def read_changes(path: Path) -> tuple[list[str], list[dict[str, Any]]]:
+    """The descriptions to retire, and the products to add, as the client listed them."""
+    import openpyxl
+
+    book = openpyxl.load_workbook(path, data_only=True)
+    retire: list[str] = []
+    for row in book["Delete"].iter_rows(min_row=2, max_col=3, values_only=True):
+        if row[1] is not None and normalise(row[1]):
+            retire.append(normalise(row[1]))
+    adds: list[dict[str, Any]] = []
+    seen: dict[str, int] = {}
+    for r, row in enumerate(book["Add"].iter_rows(min_row=2, max_col=5, values_only=True), 2):
+        description = normalise(row[1]) if row[1] is not None else ""
+        if not description:
+            continue
+        if description.casefold() in seen:
+            raise SystemExit(f"{path.name} Add row {r} repeats row {seen[description.casefold()]}: "
+                             f"{description!r}")
+        seen[description.casefold()] = r
+        category = normalise(row[2])
+        unit = normalise(row[4])
+        unit = UNIT_ASSUMED.get((category, unit), unit)
+        adds.append({
+            "description": description,
+            "source_description": str(row[1]),
+            "source_row": r,
+            "category": category,
+            "quotation_category": normalise(row[3]).lower(),
+            "uom": unit,
+            "hsn": hsn_for(description, category),
+            "eligible": category not in NOT_SUBSIDY_ELIGIBLE,
+            "rate": stand_in_rate(description, category),
+            "source_file": path.name,
+        })
+    return retire, adds
+
+
+def apply_changes(master: list[dict[str, Any]], retire: list[str],
+                  adds: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], set[str], list[str]]:
+    """The catalogue after the change list: its rows, the keys to retire, and notes.
+
+    A product on both sheets stays as the master has it, with its history, rather
+    than being retired and recreated. A Delete entry the master does not hold is
+    reported, not fatal: a later master that already leaves the product out must
+    not stop every seed-prod. It is still retired if the database holds it.
+    """
+    master_keys = {r["description"].casefold() for r in master}
+    retire_keys = {d.casefold() for d in retire}
+    add_keys = {r["description"].casefold() for r in adds}
+    unknown = sorted(d for d in retire if d.casefold() not in master_keys)
+    relisted = sorted(r["description"] for r in master
+                      if r["description"].casefold() in retire_keys & add_keys)
+    in_master = sorted(r["description"] for r in adds
+                       if r["description"].casefold() in master_keys - retire_keys)
+    rows = [r for r in master if r["description"].casefold() not in retire_keys - add_keys]
+    rows += [r for r in adds if r["description"].casefold() not in master_keys]
+    notes = [f"changes: {len(retire_keys - add_keys)} to retire, "
+             f"{len(add_keys - master_keys)} to add"]
+    if relisted:
+        notes.append(f"changes: {len(relisted)} on both sheets, kept as the master has "
+                     f"them: {relisted}")
+    if unknown:
+        notes.append(f"changes: WARNING {len(unknown)} to retire are not in the master: {unknown}")
+    if in_master:
+        notes.append(f"changes: WARNING {len(in_master)} to add are already in the master, "
+                     f"kept as the master has them: {in_master}")
+    return rows, retire_keys - add_keys, notes
 
 
 class Loader:
@@ -231,12 +310,15 @@ class Loader:
     def products(self, rows: list[dict[str, Any]]) -> None:
         categories = dict(self._all("SELECT code::text, id FROM product_category"))
         uoms = dict(self._all("SELECT code::text, id FROM uom"))
-        live = {d.casefold(): (pid, list(pf or []), edited)
-                for d, pid, pf, edited in self._all(
-                    "SELECT description::text, id, provisional_fields, updated_by IS NOT NULL "
-                    "FROM product")}
+        # created_by marks a product an administrator made; the loader never sets it.
+        live = {d.casefold(): (pid, current, edited)
+                for d, pid, edited, *current in self._all(
+                    "SELECT description::text, id, "
+                    "updated_by IS NOT NULL OR created_by IS NOT NULL, "
+                    "product_category_id, quotation_category::text, uom_id, is_subsidy_eligible, "
+                    "source_row FROM product")}
 
-        written = updated = 0
+        written = updated = same = 0
         for row in rows:
             if row["category"] not in categories:
                 raise SystemExit(f"product_category {row['category']!r} is not seeded")
@@ -249,7 +331,8 @@ class Loader:
                     "source_file, product_category_id, quotation_category, uom_id, "
                     "is_subsidy_eligible, provisional_fields) "
                     "VALUES (%s, %s, %s, %s, %s, %s::quotation_category, %s, %s, %s)",
-                    (row["description"], row["source_description"], row["source_row"], BOOK.name,
+                    (row["description"], row["source_description"], row["source_row"],
+                     row.get("source_file", BOOK.name),
                      categories[row["category"]], row["quotation_category"], uoms[row["uom"]],
                      row["eligible"], PROVISIONAL))
                 written += 1
@@ -259,22 +342,68 @@ class Loader:
             # product an administrator has edited is theirs (release review B M-4).
             if existing[2]:
                 continue
+            wanted = [categories[row["category"]], row["quotation_category"], uoms[row["uom"]],
+                      row["eligible"], row["source_row"]]
+            if wanted == existing[1]:
+                # Unchanged: no write, so a rerun leaves no audit rows behind.
+                same += 1
+                continue
             self._write(
                 "UPDATE product SET product_category_id = %s, quotation_category = "
                 "%s::quotation_category, uom_id = %s, is_subsidy_eligible = %s, "
-                "source_row = %s WHERE id = %s",
-                (categories[row["category"]], row["quotation_category"], uoms[row["uom"]],
-                 row["eligible"], row["source_row"], existing[0]))
+                "source_row = %s WHERE id = %s", (*wanted, existing[0]))
             updated += 1
-        self.notes.append(f"product: {written} written, {updated} already present")
+        self.notes.append(f"product: {written} written, {updated} corrected, {same} unchanged")
+
+    def retire(self, keys: set[str]) -> None:
+        """Switch off what the change list retires. Never a delete: quotations and
+        orders keep pointing at these products.
+
+        The one product left on is one this loader switched off before and someone
+        has switched back on since: that is a deliberate choice, and a rerun must not
+        undo it. The audit log says so (a loader write has no actor). updated_by is
+        no signal here: confirming a GST rate stamps it on every product under the
+        code (api/services/pricing.py)."""
+        retired_before = {str(rid) for (rid,) in self._all(
+            "SELECT DISTINCT row_id FROM audit_log WHERE table_name = 'product' "
+            "AND action = 'UPDATE' AND actor_id IS NULL "
+            "AND (old_jsonb ->> 'is_active')::boolean "
+            "AND NOT (new_jsonb ->> 'is_active')::boolean")}
+        retired = already = 0
+        found: set[str] = set()
+        kept: list[str] = []
+        for pid, description, active in self._all(
+                "SELECT id, description::text, is_active FROM product"):
+            key = description.casefold()
+            if key not in keys:
+                continue
+            found.add(key)
+            if not active:
+                already += 1
+            elif str(pid) in retired_before:
+                kept.append(description)
+            else:
+                self._write("UPDATE product SET is_active = false WHERE id = %s", (pid,))
+                retired += 1
+        verb = "would be switched off" if self.dry_run else "switched off"
+        self.notes.append(f"retire: {retired} {verb}, {already} already off")
+        if kept:
+            self.notes.append(f"retire: WARNING {len(kept)} switched back on by someone since, "
+                              f"left on: {kept}")
+        absent = sorted(keys - found)
+        if absent:
+            # Expected on a database the retired products never reached; on one they
+            # did, a product was renamed and the list no longer finds it.
+            self.notes.append(f"retire: {len(absent)} not in the database: {absent[:10]}")
 
     def classifications(self, rows: list[dict[str, Any]]) -> None:
-        by_description = dict(self._all("SELECT description::text, id FROM product"))
+        by_description = {d.casefold(): pid for d, pid in
+                          self._all("SELECT description::text, id FROM product")}
         have = {pid for (pid,) in self._all(
             "SELECT product_id FROM product_hsn WHERE effective_to IS NULL")}
         written = already = unwritten = 0
         for row in rows:
-            pid = by_description.get(row["description"])
+            pid = by_description.get(row["description"].casefold())
             if pid is None:
                 # Only reachable on a dry run, where the product above was not
                 # actually written. Counted rather than silently folded into
@@ -299,7 +428,37 @@ class Loader:
         existing = self._one("SELECT id FROM price_list WHERE is_provisional AND "
                              "state_territory_id IS NULL AND channel_tier IS NULL")
         if existing is not None:
-            self.notes.append("price_list: the stand-in list already exists, left alone")
+            in_force = self._one(
+                "SELECT id FROM price_list WHERE id = %s AND status = 'published' AND is_active "
+                "AND effective_from <= current_date "
+                "AND (effective_to IS NULL OR effective_to > current_date)", (existing,))
+            if in_force is None:
+                self.notes.append("price_list: WARNING the stand-in list is closed or not "
+                                  "published; products added since have no rate until the "
+                                  "client's list carries them")
+                return
+            # Its rates stay as they are; a product added since gets a stand-in rate
+            # beside them, or it could not be quoted at all. Migration 010's insert
+            # policy allows items on a draft list only: this works because the loader
+            # connects as the table owner, which RLS does not bind (not forced).
+            have = {pid for (pid,) in self._all(
+                "SELECT product_id FROM price_list_item WHERE price_list_id = %s", (existing,))}
+            by_description = {d.casefold(): pid for d, pid in self._all(
+                "SELECT description::text, id FROM product WHERE is_active")}
+            missing = [(existing, by_description[r["description"].casefold()], r["rate"])
+                       for r in rows if r["description"].casefold() in by_description
+                       and by_description[r["description"].casefold()] not in have]
+            unmatched = sum(1 for r in rows if r["description"].casefold() not in by_description)
+            if missing and not self.dry_run:
+                with self.conn.cursor() as cur:
+                    cur.executemany("INSERT INTO price_list_item (price_list_id, product_id, rate) "
+                                    "VALUES (%s, %s, %s)", missing)
+            note = (f"price_list: the stand-in list exists; {len(missing)} stand-in rate(s) "
+                    f"{'would be ' if self.dry_run else ''}added for products it lacked")
+            if unmatched:
+                note += (f", {unmatched} not yet written (dry run)" if self.dry_run else
+                         f", WARNING {unmatched} catalogue products not found active")
+            self.notes.append(note)
             return
         if self.dry_run:
             self.notes.append(f"price_list: would write a stand-in list of {len(rows)} rates")
@@ -324,12 +483,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     parser.add_argument("--no-prices", action="store_true", help="the catalogue only")
     parser.add_argument("--book", type=Path, default=BOOK)
+    parser.add_argument("--changes", type=Path, default=CHANGES)
     args = parser.parse_args(argv)
 
     if not args.book.exists():
         raise SystemExit(f"{args.book} not found. The file is named, never globbed.")
 
-    rows, collisions = read_products(args.book)
+    if not args.changes.exists():
+        raise SystemExit(f"{args.changes} not found. The file is named, never globbed.")
+    master, collisions = read_products(args.book)
+    retire_list, adds = read_changes(args.changes)
+    rows, retire_keys, change_notes = apply_changes(master, retire_list, adds)
 
     import psycopg
 
@@ -339,12 +503,15 @@ def main(argv: list[str] | None = None) -> int:
     with psycopg.connect(dsn) as conn:
         loader = Loader(conn, dry_run=args.dry_run, with_prices=not args.no_prices)
         loader.states()
+        loader.notes.extend(change_notes)
         loader.products(rows)
+        loader.retire(retire_keys)
         loader.classifications(rows)
         loader.prices(rows)
         conn.rollback() if args.dry_run else conn.commit()
 
-    print(f"read {len(rows) + len(collisions)} rows, {len(rows)} distinct products")
+    print(f"read {len(master) + len(collisions)} rows, {len(master)} distinct products; "
+          f"{len(rows)} in the catalogue after {args.changes.name}")
     for note in loader.notes:
         print("  ", note)
     for collision in collisions:
