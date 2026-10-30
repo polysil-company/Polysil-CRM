@@ -93,6 +93,9 @@ strict = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# pytest-asyncio 1.4.1 warns when this is unset, and the warning filter below
+# turns that into a startup failure. Every async fixture is function-scoped.
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 # FS-065 rule 26: the live suite needs a deployed box and is run by
 # `deploy_staging.py verify`, never collected by `pytest .`
