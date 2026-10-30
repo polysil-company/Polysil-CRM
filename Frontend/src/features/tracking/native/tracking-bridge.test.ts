@@ -8,6 +8,7 @@ import {
   onNativeStatus,
   startNativeTracking,
   stopNativeTracking,
+  trackingStatusSchema,
 } from "./tracking-bridge";
 
 describe("[TRK-008] The native tracker in a browser", () => {
@@ -34,5 +35,34 @@ describe("[TRK-008] The native tracker in a browser", () => {
     });
     const handle = await onNativeStatus(() => undefined);
     await expect(handle.remove()).resolves.toBeUndefined();
+  });
+});
+
+describe("[TRK-008] The tracker's status as Android sends it", () => {
+  it("reads a field Android left out as empty: off duty, it sends no duty, time or error", () => {
+    // org.json drops a key whose value is null, so this is the whole answer off duty.
+    expect(trackingStatusSchema.parse({ onDuty: false, pendingPoints: 0 })).toEqual({
+      onDuty: false,
+      dutyId: null,
+      since: null,
+      lastUploadAt: null,
+      pendingPoints: 0,
+      lastError: null,
+    });
+  });
+
+  it("keeps the fields Android sends", () => {
+    expect(
+      trackingStatusSchema.parse({
+        onDuty: true,
+        dutyId: "duty-1",
+        since: "2026-10-30T09:02:00.000+05:30",
+        pendingPoints: 3,
+      }),
+    ).toMatchObject({
+      dutyId: "duty-1",
+      since: "2026-10-30T09:02:00.000+05:30",
+      lastUploadAt: null,
+    });
   });
 });
