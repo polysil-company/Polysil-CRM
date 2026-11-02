@@ -1540,6 +1540,20 @@ def f_admin() -> None:
               "   read from the outbox: nothing sends it, GAP-027)\n"
               "4 owner: backdate over 45 days, clamped to the FY,\n"
               "   audit triggers off for one transaction", w=520, colour=VIOLET)
+    e += note("nGreen2", 1240, 1000,
+              "WHO REPORTS TO WHOM  GET /users/org-chart (FS-080)\n\n"
+              "Worked out, not stored: walk up from the person's office;\n"
+              "the first office with an active line role above their\n"
+              "level wins, and everyone there at the lowest such level\n"
+              "manages. Vacancies are skipped. Functional roles manage\n"
+              "nobody. reporting_lines() (definer) shows a caller their\n"
+              "own line only; users.view global sees everyone.", w=420, colour=GREEN)
+    e += note("nYellow2", 0, 1120,
+              "ASSUMED, ASK THE CLIENT (37.1 to 37.3)\n\n"
+              "Two DMs in one district both manage its officers, and a\n"
+              "Regional Manager reports to Admin-Sales and the MD both\n"
+              "(GAP-553). Account, Dispatch, QC/QA and State\n"
+              "Co-ordinators sit outside the line (GAP-554).", w=520, colour=YELLOW)
     write("10-administration", e)
 
 

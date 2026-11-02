@@ -9,12 +9,13 @@ document the frontend track builds against. They say what the endpoint is *for*.
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from api.deps import CallerDep, Claims, DbSession, IdemKey, require
+from api.errors import ValidationFailed
 from api.idempotency import payload_digest, redacted_digest, run_idempotent
 from api.routers.exporting import EXPORT_RESPONSE, ExportFormat, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
@@ -22,6 +23,7 @@ from api.schemas.leads import UUID_RE
 from api.schemas.users import (
     HandoverRequest,
     HandoverResult,
+    OrgChart,
     PasswordSet,
     PasswordSetResult,
     RevokeResult,
@@ -33,6 +35,7 @@ from api.schemas.users import (
     UserPatch,
 )
 from api.services import exports
+from api.services import org_chart as org_chart_service
 from api.services import users as service
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -104,6 +107,44 @@ async def export_users(
     """
     return await export(list_users, fmt=fmt, stem="users", title="Users", columns=exports.USERS,
                         user_id=caller.user_id, filters=filters, db=db, caller=caller)
+
+
+@router.get("/org-chart", response_model=Envelope[OrgChart], responses={
+    **_ERRORS,
+    403: {"model": ErrorResponse,
+          "description": "`insufficient_permission`: a partner user, or `view=company` without "
+                         "`users.view` at global scope. `consumer_not_allowed`: a farmer's "
+                         "portal account."},
+    404: {"model": ErrorResponse,
+          "description": "`user_id` is not you or someone below you (and you are not a global "
+                         "`users.view` holder), or the person is deactivated or deleted. On "
+                         "a user's detail page, treat this as 'no reporting line to show'."},
+    422: {"model": ErrorResponse,
+          "description": "A bad `user_id`, an unknown `view`, or `view` sent with `user_id`."}})
+async def org_chart(
+    db: DbSession, caller: CallerDep,
+    user_id: Annotated[str | None, Query(
+        pattern=UUID_RE, description="Whose picture. Left out: yours.")] = None,
+    view: Annotated[Literal["company"] | None, Query(
+        description="`company`: everyone, for a `users.view` global holder. "
+                    "Not sent with `user_id`.")] = None,
+) -> Envelope[OrgChart]:
+    """Who reports to whom (FS-080). For any staff member, no permission needed.
+
+    By default this is your own picture: the chain of managers above you, nearest
+    first, and everyone below you, with counts by role. Pass `user_id` to see the
+    same for someone below you; a `users.view` global holder may pass anyone.
+    `view=company` gives the whole company, roots being the people with empty
+    `manager_ids`.
+
+    Managers are worked out from office and role: a person reports to the nearest
+    higher line role in their own office or the offices above it. Nothing is stored,
+    so the chart follows any change of office or role straight away.
+    """
+    if view is not None and user_id is not None:
+        raise ValidationFailed(fields={"view": "Send either view or user_id, not both."})
+    return Envelope(data=await org_chart_service.org_chart(
+        db, caller, user_id=user_id, company=view == "company"))
 
 
 @router.get("/{user_id}", response_model=Envelope[UserDetail],
