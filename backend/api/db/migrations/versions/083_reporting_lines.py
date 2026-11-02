@@ -34,7 +34,7 @@ _NOT_PEOPLE = f"'{SYSTEM_USER_ID}'::uuid, '{INTAKE_USER_ID}'::uuid"
 
 SIGNATURE = "reporting_lines()"
 
-FUNCTION = f"""CREATE FUNCTION reporting_lines()
+_PROLOGUE = f"""CREATE FUNCTION reporting_lines()
 RETURNS TABLE (id uuid, full_name text, role_code text, role_name text, level int,
                org_unit_id uuid, org_unit_name text, manager_ids uuid[], relation text)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
@@ -51,8 +51,9 @@ BEGIN
     END IF;
     -- EC-8: the view permission and global scope, once (CLAUDE.md 4.1 rule 8)
     v_global := app_has_permission('users', 'view') AND app_scope('users') = 'global';
+"""
 
-    RETURN QUERY
+_CTES = f"""
     WITH RECURSIVE staff AS (
         -- rule 1: active, non-deleted staff; never a portal role or a service account
         SELECT u.id, u.full_name, r.code::text AS role_code, r.name AS role_name, r.level,
@@ -62,26 +63,56 @@ BEGIN
          WHERE u.user_type = 'staff' AND u.is_active AND u.deleted_at IS NULL
            AND NOT r.is_portal AND u.id NOT IN ({_NOT_PEOPLE})
     ),
-    edge AS (
-        -- rule 2: the nearest office up the tree holding a line person above me,
-        -- then the lowest such level there; ties all manage (rule 4). One set-based
-        -- pass with hash joins, not a lookup per person (code review F-1).
-        SELECT c.person_id, c.manager_id
-          FROM (SELECT s.id AS person_id, m.id AS manager_id,
-                       rank() OVER (PARTITION BY s.id ORDER BY oc.depth, m.level) AS rk
-                  FROM staff s
-                  JOIN org_closure oc ON oc.descendant_id = s.org_unit_id
-                  JOIN staff m ON m.org_unit_id = oc.ancestor_id
-                 WHERE NOT s.unplaced AND m.line AND NOT m.unplaced AND m.level > s.level) c
+    boss AS (
+        -- the people who can manage anyone: line roles above the lowest level
+        SELECT s.id, s.full_name, s.level, s.org_unit_id
+          FROM staff s WHERE s.line AND NOT s.unplaced AND s.level > 1
+    ),
+    slot AS (
+        -- rule 2 is the same for everyone in one office at one level, so it is worked
+        -- out once per (office, level) pair, a few hundred, not once per person. Every
+        -- join here is small, so even a nested-loop plan on tables with no statistics
+        -- yet stays fast (CI's fresh database chose one: 4 s and 6 s at 3,000 staff)
+        SELECT c.org_unit_id, c.level, c.manager_id
+          FROM (SELECT p.org_unit_id, p.level, b.id AS manager_id,
+                       rank() OVER (PARTITION BY p.org_unit_id, p.level
+                                    ORDER BY oc.depth, b.level) AS rk
+                  FROM (SELECT DISTINCT s.org_unit_id, s.level FROM staff s WHERE NOT s.unplaced) p
+                  JOIN org_closure oc ON oc.descendant_id = p.org_unit_id
+                  JOIN boss b ON b.org_unit_id = oc.ancestor_id AND b.level > p.level) c
          WHERE c.rk = 1
     ),
-    mgr AS (
+    slot_ids AS (
         -- COLLATE "C" so the order is code point order, the same as Python's sort in
         -- api/domain/org_chart.py on any server (code review F-6)
-        SELECT e.person_id,
-               array_agg(e.manager_id ORDER BY m.full_name COLLATE "C", m.id) AS ids
-          FROM edge e JOIN staff m ON m.id = e.manager_id
-         GROUP BY e.person_id
+        SELECT sl.org_unit_id, sl.level,
+               array_agg(sl.manager_id ORDER BY b.full_name COLLATE "C", b.id) AS ids
+          FROM slot sl JOIN boss b ON b.id = sl.manager_id
+         GROUP BY sl.org_unit_id, sl.level
+    )"""
+
+# A global caller sees everyone, so its rows need no walk up or down: only self,
+# unplaced and other. The walks are what cost most on a large company (code review
+# of the CI run: 1.6 s each at 3,000 staff under nested loops), and a non-global
+# caller's walk covers only their own line.
+_GLOBAL = """
+    SELECT s.id, s.full_name, s.role_code, s.role_name, s.level, s.org_unit_id, o.name::text,
+           COALESCE(si.ids, '{}'::uuid[]),
+           CASE WHEN s.unplaced THEN 'unplaced' WHEN s.id = v_me THEN 'self' ELSE 'other' END
+      FROM staff s
+      JOIN org_unit o ON o.id = s.org_unit_id
+      LEFT JOIN slot_ids si ON NOT s.unplaced AND si.org_unit_id = s.org_unit_id
+                           AND si.level = s.level"""
+
+_LINE = """,
+    mgr AS (
+        SELECT s.id AS person_id, si.ids
+          FROM staff s
+          JOIN slot_ids si ON si.org_unit_id = s.org_unit_id AND si.level = s.level
+         WHERE NOT s.unplaced
+    ),
+    edge AS (
+        SELECT m.person_id, unnest(m.ids) AS manager_id FROM mgr m
     ),
     down AS (
         SELECT v_me AS id
@@ -110,14 +141,18 @@ BEGIN
     )
     SELECT rel.id, rel.full_name, rel.role_code, rel.role_name, rel.level,
            rel.org_unit_id, o.name::text,
-           COALESCE(mgr.ids, '{{}}'::uuid[]),
+           COALESCE(si.ids, '{}'::uuid[]),
            rel.relation
       FROM rel
       JOIN org_unit o ON o.id = rel.org_unit_id
-      LEFT JOIN mgr ON mgr.person_id = rel.id
-     WHERE v_global OR rel.id = v_me
-        OR rel.relation IN ('above', 'below', 'co_manager');
-END $fn$"""
+      LEFT JOIN slot_ids si ON NOT rel.unplaced AND si.org_unit_id = rel.org_unit_id
+                           AND si.level = rel.level
+     WHERE rel.id = v_me OR rel.relation IN ('above', 'below', 'co_manager')"""
+
+FUNCTION = (_PROLOGUE
+            + "    IF v_global THEN\n        RETURN QUERY" + _CTES + _GLOBAL + ";\n"
+            + "    ELSE\n        RETURN QUERY" + _CTES + _LINE + ";\n"
+            + "    END IF;\nEND $fn$")
 
 
 def upgrade() -> None:

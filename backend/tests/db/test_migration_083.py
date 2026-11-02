@@ -227,13 +227,27 @@ async def test_three_thousand_staff_answer_quickly(db: AsyncSession) -> None:
         SELECT 'staff', 't083_bulk_fo_' || d.id || '_' || g || '@polysil.in', 'FO ' || g, CAST(:fo AS uuid), d.id
           FROM d, generate_series(1, 9) g"""),
         {"t": w.tag, "hq": w.offices["hq"], "dm": w.roles["dm"], "fo": w.roles["fo"]})
+    # CI's fresh database has no statistics on these rows yet, and its planner chose
+    # nested loops: 4 s and 6 s there, under 1 s here. Forbid hash and merge joins so
+    # the function must be fast on the worst plan, not only the lucky one.
+    await db.execute(text("SET LOCAL enable_hashjoin = off"))
+    await db.execute(text("SET LOCAL enable_mergejoin = off"))
+    # a non-global Regional Manager over one bulk region: the biggest walk below
+    rm_bulk = str((await db.execute(text(
+        "INSERT INTO app_user (user_type, email, full_name, role_id, org_unit_id) "
+        "SELECT 'staff', :e, 'RM bulk', CAST(:r AS uuid), o.id FROM org_unit o "
+        "WHERE o.name = 't083 r1 ' || :t RETURNING id"),
+        {"e": f"t083_rm_bulk_{w.tag}@polysil.in", "r": w.roles["rm"], "t": w.tag})).scalar_one())
+    w.people["rm_bulk"] = rm_bulk
     timings = {}
-    for who in ("fo1", "admin"):
+    for who in ("fo1", "admin", "rm_bulk"):
         start = time.perf_counter()
         rows = await _lines(db, w.people[who])
         timings[who] = time.perf_counter() - start
         assert rows
-    assert timings["fo1"] < 1.0 and timings["admin"] < 2.0, timings
+    assert sum(r.relation == "below" for r in rows.values()) == 6 * 10 * 10, "the RM's region: 60 districts of 10"
+    # the worst plan, forced; was 3.5 s, 6 s and more before the per-office slots
+    assert timings["fo1"] < 1.5 and timings["admin"] < 2.0 and timings["rm_bulk"] < 2.5, timings
 
 
 @pytest.mark.parametrize("who", ["none", "inactive", "deleted", "system", "intake"])
