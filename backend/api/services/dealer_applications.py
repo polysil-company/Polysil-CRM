@@ -259,11 +259,11 @@ async def get(db: AsyncSession, caller: Caller, app_id: str, *, apply_url: str |
 
 
 async def list_(db: AsyncSession, caller: Caller, *, status: str | None, q: str | None,
-                partner_type: str | None = None) -> list[sch.DealerApplicationRow]:
+                partner_type: str | None = None, limit: int = 200) -> list[sch.DealerApplicationRow]:
     if caller.partner_id is not None:
         raise ForbiddenError("Dealer applications are for staff.")
     where: list[str] = ["TRUE"]
-    params: dict[str, Any] = {}
+    params: dict[str, Any] = {"lim": limit}
     if status:
         where.append("a.status = ANY(CAST(:s AS text[]))")
         params["s"] = [x.strip() for x in status.split(",") if x.strip()]
@@ -277,7 +277,7 @@ async def list_(db: AsyncSession, caller: Caller, *, status: str | None, q: str 
         "SELECT a.id, a.status, a.partner_type, dealer_application_deposit_status(a.id) AS deposit_status, "
         "a.firm_name, a.contact_name, t.name AS territory_name, a.created_at, a.submitted_at "
         "FROM dealer_application a JOIN territory t ON t.id = a.territory_id WHERE " + " AND ".join(where) +
-        " ORDER BY a.created_at DESC LIMIT 200"), params)).all()
+        " ORDER BY a.created_at DESC LIMIT :lim"), params)).all()
     return [sch.DealerApplicationRow(id=str(r.id), status=r.status, partner_type=r.partner_type,
                                      deposit_status=r.deposit_status, firm_name=r.firm_name, contact_name=r.contact_name,
                                territory_name=r.territory_name, created_at=r.created_at.isoformat(),

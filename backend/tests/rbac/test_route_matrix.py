@@ -66,6 +66,8 @@ UNGATED: dict[str, str] = {
     "GET /api/v1/approvals/thresholds": "staff only, checked in the handler",
     "GET /api/v1/campaigns": "every staff user reads the list for the lead form's picker; cost hidden without campaigns.view (FS-040, RBAC.md note)",
     "GET /api/v1/campaigns/{campaign_id}": "as the list (FS-040)",
+    "GET /api/v1/campaigns/export": "as the list: the handler refuses partners and hides cost without campaigns.view (FS-081)",
+    "GET /api/v1/holidays/export": "as the list, which everyone reads (FS-081)",
     "GET /api/v1/dashboard/overview": "each tile is null without its own module (FS-017)",
     "GET /api/v1/gstin/{gstin}": "any signed-in user; ISS-227",
     "GET /api/v1/holidays": "the company calendar, read by everyone (FS-028)",
@@ -136,6 +138,17 @@ def _why_ungated(r: Route) -> str | None:
 def test_every_route_is_gated_or_says_why_not() -> None:
     loose = [f"{r.method} {r.path}" for r in ROUTES if not r.gates and _why_ungated(r) is None]
     assert loose == [], "add a require() gate, or a reason to UNGATED:\n" + "\n".join(loose)
+
+
+def test_every_export_is_gated_exactly_as_its_list() -> None:
+    """FS-081 EC-3: an export is refused where its list is, no more and no less. The
+    handler-level refusals ride along because the export calls the list handler."""
+    gates = {(r.method, r.path): set(r.gates) for r in ROUTES}
+    differ = [path for (method, path), g in gates.items()
+              if method == "GET" and path.endswith("/export")
+              and ("GET", path.removesuffix("/export")) in gates
+              and g != gates[("GET", path.removesuffix("/export"))]]
+    assert differ == []
 
 
 def test_the_allowlist_holds_no_route_that_is_gated_or_gone() -> None:

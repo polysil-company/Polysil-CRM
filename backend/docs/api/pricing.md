@@ -113,6 +113,33 @@ and `channel_tier` null for the base list that applies everywhere.
 
 ---
 
+## `GET /api/v1/price-lists/export`
+
+**Export the price lists**
+
+Download the price lists as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `status` | query | `draft` \| `published` \| null |  | draft or published. |
+| `state_territory_id` | query | string \| null |  |  |
+| `channel_tier` | query | `distributor` \| `dealer` \| `sub_dealer` \| `farmer` \| null |  | distributor, dealer, sub_dealer or farmer. |
+| `sales_type` | query | `commercial` \| `industrial` \| `subsidised` \| `general` \| null |  | commercial, industrial or subsidised; general for the lists with no sale type. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
+
+---
+
 ## `GET /api/v1/price-lists/{list_id}`
 
 **Get Price List**
@@ -247,6 +274,32 @@ At most 2,000 items in one call.
 | `404` | `ErrorResponse` | No such price list. |
 | `409` | `ErrorResponse` | Published, unpriced, or overlapping another list. |
 | `422` | `ErrorResponse` | A field failed a rule; `fields` names it. |
+
+---
+
+## `GET /api/v1/price-lists/{list_id}/items/export`
+
+**Export one price list's rates**
+
+Download one price list's rates as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `list_id` | path | string | yes |  |
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `q` | query | string \| null |  |  |
+| `unpriced` | query | boolean |  | Only the active products this list has no rate for. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

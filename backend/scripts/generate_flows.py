@@ -2122,9 +2122,9 @@ def _columns(name: str, head: str, sub: str, status: str, steps: list, side: lis
 
 def f_exports() -> None:
     _columns(
-        "40-list-exports", "List exports: any list to Excel, through the list's own code",
-        "Eight lists, one /export each, the same filters, the same scope.",
-        "BUILT. FS-030: GET /<list>/export, no migration.",
+        "40-list-exports", "List exports: any list to Excel or CSV, through the list's own code",
+        "34 lists, one /export each, the same filters, the same scope, the same gate.",
+        "BUILT. FS-030, FS-077 (CSV), FS-081 (24 more lists): GET /<list>/export, no migration.",
         [("s1", "GET /leads/export?stage=new&territory_id=...\nfilters_of(list_leads): the list's own parameters", BLUE),
          ("s2", "the list endpoint itself, page by page\nthe caller's db and caller: service predicate + RLS", GREEN),
          ("s3", "more than 5,000 rows: 422 export_too_large\nnever a cut file", YELLOW),
@@ -2134,7 +2134,8 @@ def f_exports() -> None:
          ("d2", "credit terms stay blank without partners.edit\nthe same masking code as the screen", GREEN)],
         [("n1", "A TEXT CELL STARTING = IS A FORMULA\n\nopenpyxl stores it as one through cell() and\nappend() alike. The writer forces data_type 's'.\nThe PIMS sheet had the same hole (ISS-200).", RED),
          ("n2", "/export IS DECLARED BEFORE /{id}\n\nStarlette matches {id} first; declared after,\nthe export answers 422 forever.", RED),
-         ("n3", "Not yet: CSV, PDF, the client's layouts,\nlarge background exports (GAP-300 to GAP-303).", YELLOW)])
+         ("n3", "FS-081 REGISTERS EXPORTS FROM THEIR LISTS\n\nlist_exports.add_export copies the list route's gate,\nfilters and handler, and places /export right after it.\nLists without a real cursor are read in ONE call with\nlimit 5,001: a page loop drifts, a cap would cut.", GREEN),
+         ("n4", "Not yet: imports beyond partners, prices and lines;\ntargets and the org chart as files (GAP-555);\nthe client's layouts (GAP-302).", YELLOW)])
 
 
 def f_schemes() -> None:

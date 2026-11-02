@@ -136,6 +136,38 @@ never changed.
 
 ---
 
+## `GET /api/v1/ratings/export`
+
+**Export the ratings**
+
+Download the ratings as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `target` | query | `installation` \| `service` \| `product` \| null |  |  |
+| `partner_id` | query | string \| null |  |  |
+| `product_id` | query | string \| null |  |  |
+| `lead_id` | query | string \| null |  | Also matches leads merged into it. |
+| `sales_order_id` | query | string \| null |  |  |
+| `complaint_id` | query | string \| null |  |  |
+| `from` | query | date \| null |  |  |
+| `to` | query | date \| null |  |  |
+| `max_score` | query | integer \| null |  | 2 shows the low ones. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
+
+---
+
 ## `GET /api/v1/ratings/summary`
 
 **Summary**

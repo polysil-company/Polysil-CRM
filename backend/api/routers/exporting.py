@@ -21,7 +21,7 @@ from api.schemas.auth import ErrorResponse
 from api.services import exports, report_pdf
 
 # paging, and the dependencies the export resolves for itself
-_NOT_FILTERS = frozenset({"limit", "cursor", "include_total", "db", "caller", "claims"})
+_NOT_FILTERS = frozenset({"limit", "cursor", "page", "include_total", "db", "caller", "claims"})
 
 _BINARY: dict[str, Any] = {"schema": {"type": "string", "format": "binary"}}
 
@@ -64,7 +64,10 @@ def file_response(body: bytes, media_type: str, stem: str, ext: str) -> Response
 def filters_of(endpoint: Callable[..., Any]) -> Callable[..., dict[str, Any]]:
     """A dependency returning the list's filters as keyword arguments."""
     sig = inspect.signature(endpoint, eval_str=True)
-    params = [p for name, p in sig.parameters.items() if name not in _NOT_FILTERS]
+    # a `_` parameter is an unused claims dependency, never a filter (FS-081 EC-9);
+    # the export route passes it through as `_=claims`
+    params = [p for name, p in sig.parameters.items()
+              if name not in _NOT_FILTERS and not name.startswith("_")]
     # the export's own `format` would collide with a list filter of that name
     # (FS-077 plan review Q2)
     if any(p.name in ("format", "fmt") for p in params):
@@ -80,7 +83,8 @@ def filters_of(endpoint: Callable[..., Any]) -> Callable[..., dict[str, Any]]:
 
 async def export(endpoint: Callable[..., Awaitable[Any]], *, stem: str, title: str,
                  columns: Sequence[exports.Column], user_id: str, filters: dict[str, Any],
-                 fmt: str = "xlsx", allow_pdf: bool = False, **deps: Any) -> Response:
+                 fmt: str = "xlsx", allow_pdf: bool = False, once: bool = False,
+                 **deps: Any) -> Response:
     """Drain the list endpoint itself, called page by page with the filters and the
     caller's own `db` and `caller`, then answer with the file. The workbook is built in
     a thread, as the PIMS sheet is. `pdf` only where `allow_pdf` (the subsidy reports),
@@ -98,6 +102,22 @@ async def export(endpoint: Callable[..., Awaitable[Any]], *, stem: str, title: s
         result = await endpoint(**kwargs)
         return result.data, result.meta.next_cursor
 
+    async def whole() -> Sequence[BaseModel]:
+        # FS-081: one call for a list with no real cursor (page-number lists, stock
+        # balances, unpaged lists). Called as a function, so the route's `le` bound
+        # does not apply: 5,001 rows back means too many (EC-1, EC-2, plan review S-2)
+        paging = {"limit": exports.MAX_ROWS + 1, "page": 1, "cursor": None}
+        given = {**deps, **paging}
+        kwargs = {**filters, **{k: v for k, v in given.items() if k in accepted}}
+        result = await endpoint(**kwargs)
+        return result.data  # type: ignore[no-any-return]
+
+    if once:
+        # the PDF refusal above already ran: no one-call list allows PDF
+        rows = await exports.once(whole)
+        return await _file(rows, fmt=fmt, stem=stem, title=title, columns=columns,
+                           user_id=user_id, filters=filters)
+
     if fmt == "pdf":
         rows = await exports.drain(fetch, cap=PDF_MAX_ROWS, message=_PDF_TOO_LARGE)
         db = deps.get("db")
@@ -108,6 +128,13 @@ async def export(endpoint: Callable[..., Awaitable[Any]], *, stem: str, title: s
         exports.log_export(user_id, stem, filters, len(rows), fmt=fmt)
         return file_response(body, media, stem, ext)
     rows = await exports.drain(fetch)
+    return await _file(rows, fmt=fmt, stem=stem, title=title, columns=columns,
+                       user_id=user_id, filters=filters)
+
+
+async def _file(rows: list[dict[str, Any]], *, fmt: str, stem: str, title: str,
+                columns: Sequence[exports.Column], user_id: str,
+                filters: dict[str, Any]) -> Response:
     if fmt == "csv":
         body = await asyncio.to_thread(exports.csv_bytes, columns, rows)
         exports.log_export(user_id, stem, filters, len(rows), fmt=fmt)

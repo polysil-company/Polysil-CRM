@@ -206,7 +206,7 @@ def test_every_export_takes_every_filter_its_list_takes() -> None:
     paging and dependency names the export drops (code review F-3)."""
     from api.main import app
     paths = app.openapi()["paths"]
-    paging = {"limit", "cursor", "include_total"}
+    paging = {"limit", "cursor", "page", "include_total"}
     for path, ops in paths.items():
         if not path.endswith("/export"):
             continue
