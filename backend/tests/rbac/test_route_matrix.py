@@ -76,6 +76,7 @@ UNGATED: dict[str, str] = {
     "GET /api/v1/settings": "the admin switches the screens need; partners refused in the handler (FS-036)",
     "GET /api/v1/staff-directory": "staff only, for the chat picker (FS-019)",
     "GET /api/v1/tracking/policy": "the tracking policy a phone shows before consent (FS-021)",
+    "GET /api/v1/users/org-chart": "staff only, checked in the handler; rows from reporting_lines(), which shows the caller's own line unless users.view is global (FS-080)",
 }
 
 
