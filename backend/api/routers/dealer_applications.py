@@ -93,10 +93,13 @@ async def create(body: DealerApplicationCreate, db: DbSession, caller: CallerDep
 async def list_applications(db: DbSession, caller: CallerDep,
                             status: Annotated[str | None, Query(description="Comma-separated statuses.")] = None,
                             q: Annotated[str | None, Query(max_length=100)] = None,
-                            partner_type: PartnerType | None = None) -> Envelope[list[DealerApplicationRow]]:
+                            partner_type: PartnerType | None = None,
+                            limit: Annotated[int, Query(ge=1, le=200, description="At most this many, newest first.")] = 200,
+                            ) -> Envelope[list[DealerApplicationRow]]:
     """The applications in your partners scope, newest first (at most 200), with each
     one's type and deposit status."""
-    return Envelope(data=await service.list_(db, caller, status=status, q=q, partner_type=partner_type))
+    return Envelope(data=await service.list_(db, caller, status=status, q=q, partner_type=partner_type,
+                                             limit=limit))
 
 
 # before /{app_id}: Starlette matches the path first (FS-071 E-14)

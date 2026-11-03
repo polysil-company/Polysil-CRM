@@ -87,6 +87,30 @@ Add a gift.
 
 ---
 
+## `GET /api/v1/gifts/export`
+
+**Export the gift catalogue**
+
+Download the gift catalogue as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `active` | query | boolean \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
+
+---
+
 ## `PATCH /api/v1/gifts/{gift_id}`
 
 **Patch Gift**
@@ -253,6 +277,29 @@ backwards.
 | `404` | `ErrorResponse` | Not found in your scope. |
 | `409` | `ErrorResponse` | See `error.code`. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/reward-rules/export`
+
+**Export the reward rules**
+
+Download the reward rules as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 
@@ -510,6 +557,31 @@ held at once; a reject or a withdrawal gives them back.
 
 ---
 
+## `GET /api/v1/rewards/gift-redemptions/export`
+
+**Export the gift redemptions**
+
+Download the gift redemptions as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `status` | query | `pending` \| `applied` \| `fulfilled` \| `rejected` \| `withdrawn` \| `released` \| null |  |  |
+| `kind` | query | `order` \| `gift` \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
+
+---
+
 ## `POST /api/v1/rewards/gift-redemptions/{rid}/fulfil`
 
 **Fulfil**
@@ -642,6 +714,31 @@ released, reversed, expired, adjusted.
 | `404` | `ErrorResponse` | Not found in your scope. |
 | `409` | `ErrorResponse` | See `error.code`. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/rewards/ledger/export`
+
+**Export the reward points ledger**
+
+Download the reward points ledger as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `partner_id` | query | string \| null |  | Staff: a partner they can see. |
+| `user_id` | query | string \| null |  | `me`, or a user in your scope. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

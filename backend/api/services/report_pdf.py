@@ -213,7 +213,7 @@ def html(page: Page, made_by: str | None, now: dt.datetime | None = None) -> str
     stamp = when((now or dt.datetime.now(IST)).astimezone(IST))
     made = f"Made by {made_by} on {stamp}" if made_by else f"Made on {stamp}"
     headers = [{"text": c.header, "number": c.kind in NUMBER_KINDS} for c in page.columns]
-    rows = [[cell(_get(r, c.path), c.kind) for c in page.columns] for r in page.rows]
+    rows = [[cell(exports.raw(r, c), c.kind) for c in page.columns] for r in page.rows]
     total = ([cell(_get(page.total, c.path), c.kind) for c in page.columns]
              if page.total is not None else None)
     return env.get_template("report.html").render(

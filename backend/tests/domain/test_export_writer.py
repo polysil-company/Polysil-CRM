@@ -142,6 +142,15 @@ def test_every_column_path_names_a_field_of_its_list_item() -> None:
         for col in cols:
             assert fields_of(model, col.path), f"{model.__name__}: {col.path}"
 
+    # FS-081: the 24 lists registered by add_export, item model read from the route
+    from api.routers.list_exports import REGISTERED
+    assert len(REGISTERED) == 24
+    for route, cols in REGISTERED:
+        data = route.response_model.model_fields["data"].annotation
+        item = getattr(data, "__args__", (data,))[0]
+        for col in cols:
+            assert fields_of(item, col.path), f"{route.path} {item.__name__}: {col.path}"
+
 
 def test_the_pims_sheet_keeps_a_formula_looking_name_as_text() -> None:
     """ISS-200: the PIMS sheet predates the writer and appended raw strings."""

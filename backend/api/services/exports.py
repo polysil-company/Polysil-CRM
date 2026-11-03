@@ -65,6 +65,9 @@ class Column:
     header: str
     path: str
     kind: Kind = "text"
+    # FS-081: turns a list-valued field into one cell's text. Its output still goes
+    # through cell_value(), so the formula guard and cleaning apply (plan review S-5)
+    fmt: Callable[[Any], Any] | None = None
 
 
 Page = tuple[Sequence[BaseModel], str | None]
@@ -98,6 +101,26 @@ def _get(item: dict[str, Any], path: str) -> Any:
             return None
         value = value.get(part)
     return value
+
+
+def raw(item: dict[str, Any], col: Column) -> Any:
+    """The value a column reads from an item, before cell_value(). Every format reads
+    through here, so a column's `fmt` applies to Excel, CSV and PDF alike."""
+    value = _get(item, col.path)
+    return col.fmt(value) if col.fmt is not None else value
+
+
+async def once(fetch: Callable[[], Awaitable[Sequence[BaseModel]]], *,
+               cap: int | None = None) -> list[dict[str, Any]]:
+    """FS-081: the whole list in one call, for lists without a real cursor. One
+    statement is one snapshot and one "today" (EC-1, EC-4); more than `cap` rows back
+    is refused, never cut."""
+    cap = MAX_ROWS if cap is None else cap
+    items = await fetch()
+    if len(items) > cap:
+        raise ExportTooLargeError(
+            f"This list has more than {cap} rows. Narrow the filters and try again.")
+    return [i.model_dump(mode="json") for i in items]
 
 
 def clean_text(value: str) -> str:
@@ -172,7 +195,7 @@ def workbook(title: str, columns: Sequence[Column], rows: Sequence[dict[str, Any
         cell.data_type = "s"
     for r, item in enumerate(rows, start=2):
         for c, col in enumerate(columns, start=1):
-            value = cell_value(_get(item, col.path), col.kind)
+            value = cell_value(raw(item, col), col.kind)
             if value is None:
                 continue
             cell = ws.cell(row=r, column=c, value=value)
@@ -265,7 +288,7 @@ def csv_bytes(columns: Sequence[Column], rows: Sequence[dict[str, Any]]) -> byte
     writer = csv.writer(out, quoting=csv.QUOTE_NOTNULL, lineterminator="\r\n")
     writer.writerow([col.header for col in columns])
     for item in rows:
-        writer.writerow([csv_text(cell_value(_get(item, col.path), col.kind), col.kind)
+        writer.writerow([csv_text(cell_value(raw(item, col), col.kind), col.kind)
                          for col in columns])
     return ("﻿" + out.getvalue()).encode("utf-8")
 
@@ -417,4 +440,203 @@ SUBSIDY_SUPPLY: Final = (
     Column("Not supplied", "not_supplied", "int"),
     Column("Supplied cost", "supplied_cost", "money"),
     Column("Not supplied cost", "not_supplied_cost", "money"),
+)
+
+
+# ── FS-081: the other lists ──────────────────────────────────────────────────
+
+def _allocations(value: Any) -> str | None:
+    """`SO/…/00012: 1000.00; …`: which orders a payment went to (EC-5)."""
+    if not isinstance(value, list):
+        return None
+    parts = [f"{(a.get('sales_order') or {}).get('order_no') or ''}: {a.get('amount') or ''}"
+             for a in value if isinstance(a, dict)]
+    return "; ".join(parts) or None
+
+
+def _luts(value: Any) -> str | None:
+    if not isinstance(value, list):
+        return None
+    return "; ".join(f"{u.get('arn', '')} ({u.get('valid_from', '')} to {u.get('valid_to', '')})"
+                     for u in value if isinstance(u, dict)) or None
+
+
+def _targets(value: Any) -> str | None:
+    """An empty list is a scheme for everyone. A name the caller cannot see is marked,
+    not dropped, so a hidden target never reads as everyone (EC-6)."""
+    if not isinstance(value, list):
+        return None
+    if not value:
+        return "Everyone"
+    return "; ".join(f"{t.get('type', '')}: {t.get('name') or '(not visible)'}"
+                     for t in value if isinstance(t, dict))
+
+
+PRODUCTS: Final = (
+    Column("Item code", "item_code"), Column("Description", "description"),
+    Column("Category", "product_category"), Column("Quotation block", "quotation_category"),
+    Column("Unit", "uom"), Column("HSN", "hsn_code"), Column("GST slab", "gst_slab"),
+    Column("MRP", "mrp", "money"), Column("Pack multiple", "pack_multiple", "decimal"),
+    Column("Subsidy eligible", "is_subsidy_eligible", "bool"),
+    Column("Active", "is_active", "bool"), Column("Stand-in fields", "provisional_fields", "names"),
+)
+
+TAX_RATES: Final = (
+    Column("HSN", "hsn_code"), Column("GST rate", "rate", "decimal"),
+    Column("From", "effective_from", "date"), Column("To", "effective_to", "date"),
+    Column("Active", "is_active", "bool"),
+)
+
+PRICE_LISTS: Final = (
+    Column("Name", "name"), Column("State", "state_territory.name"),
+    Column("Channel tier", "channel_tier"), Column("Sale type", "sales_type"),
+    Column("Status", "status"), Column("Published", "published_at", "datetime"),
+    Column("From", "effective_from", "date"), Column("To", "effective_to", "date"),
+    Column("Active", "is_active", "bool"), Column("Stand-in", "is_provisional", "bool"),
+    Column("Items", "item_count", "int"), Column("Unpriced", "unpriced_count", "int"),
+)
+
+PRICE_LIST_ITEMS: Final = (
+    Column("Product", "description"), Column("Unit", "uom"), Column("Rate", "rate", "money"),
+    Column("Product active", "is_active", "bool"),
+)
+
+CUSTOMERS: Final = (
+    Column("Name", "name"), Column("Type", "customer_type"), Column("Mobile", "mobile"),
+    Column("Email", "email"), Column("Territory", "territory.name"), Column("Village", "village"),
+    Column("Address", "address"), Column("Survey no.", "survey_no"),
+    Column("Consent given", "consent_given_at", "datetime"),
+    Column("Consent channel", "consent_channel"), Column("Leads", "lead_count", "int"),
+    Column("Created", "created_at", "datetime"),
+)
+
+STOCK: Final = (
+    Column("Warehouse", "warehouse.name"), Column("Product code", "product.code"),
+    Column("Product", "product.name"), Column("Unit", "uom"),
+    Column("On hand", "on_hand", "decimal"), Column("Committed", "committed", "decimal"),
+    Column("Available", "available", "decimal"),
+)
+
+STOCK_MOVEMENTS: Final = (
+    Column("When", "created_at", "datetime"), Column("Warehouse", "warehouse.name"),
+    Column("Product code", "product.code"), Column("Product", "product.name"),
+    Column("Quantity", "qty", "decimal"), Column("Kind", "kind"),
+    Column("Reference", "reference"), Column("Dispatch", "dispatch_no"),
+    Column("Order", "order"), Column("Note", "note"), Column("By", "created_by.full_name"),
+)
+
+WAREHOUSES: Final = (
+    Column("Code", "code"), Column("Name", "name"), Column("Default", "is_default", "bool"),
+    Column("Active", "is_active", "bool"),
+)
+
+PAYMENTS: Final = (
+    Column("Received on", "received_on", "date"), Column("Partner", "partner.name"),
+    Column("Mode", "mode"), Column("Reference", "ref_no"), Column("Amount", "amount", "money"),
+    Column("Allocated", "allocated", "money"), Column("Unallocated", "unallocated", "money"),
+    Column("Short payment", "is_short_payment", "bool"),
+    Column("Allocations", "allocations", "text", _allocations), Column("Remark", "remark"),
+    Column("Entered by", "entered_by.full_name"), Column("Entered", "entered_at", "datetime"),
+    Column("Voided", "voided.at", "datetime"), Column("Void reason", "voided.reason"),
+)
+
+WARRANTY_TERMS: Final = (
+    Column("Product category", "product_category.name"), Column("Months", "months", "int"),
+    Column("From", "effective_from", "date"), Column("To", "effective_to", "date"),
+)
+
+ORG_UNITS: Final = (
+    Column("Name", "name"), Column("Level", "role_level", "int"), Column("Parent", "parent.name"),
+    Column("Territory", "territory.name"), Column("Open", "is_open", "bool"),
+    Column("Closed", "closed_at", "datetime"), Column("Active people", "active_users", "int"),
+    Column("Created", "created_at", "datetime"),
+)
+
+TERRITORIES: Final = (
+    Column("Name", "name"), Column("Level", "level"), Column("Code", "code"),
+    Column("Parent", "parent.name"), Column("Created", "created_at", "datetime"),
+)
+
+DEALER_APPLICATIONS: Final = (
+    Column("Firm", "firm_name"), Column("Contact", "contact_name"), Column("Type", "partner_type"),
+    Column("Territory", "territory_name"), Column("Status", "status"),
+    Column("Deposit", "deposit_status"), Column("Created", "created_at", "datetime"),
+    Column("Submitted", "submitted_at", "datetime"),
+)
+
+CAMPAIGNS: Final = (
+    Column("Name", "name"), Column("Type", "type"), Column("Territory", "territory.name"),
+    Column("Start", "start_date", "date"), Column("End", "end_date", "date"),
+    Column("Planned cost", "cost_planned", "money"), Column("Actual cost", "cost_actual", "money"),
+    Column("Active", "is_active", "bool"), Column("Leads", "lead_count", "int"),
+    Column("Won", "summary.won", "int"), Column("Sales value", "summary.sales_value", "money"),
+    Column("Description", "description"),
+)
+
+SCHEMES: Final = (
+    Column("Code", "code"), Column("Name", "name"), Column("Type", "scheme_type"),
+    Column("Metric", "condition.metric"), Column("Minimum", "condition.min", "decimal"),
+    Column("Maximum", "condition.max", "decimal"), Column("Benefit", "benefit.kind"),
+    Column("Value", "benefit.value", "decimal"), Column("Cap", "benefit.cap", "money"),
+    Column("Period", "period"), Column("From", "valid_from", "date"),
+    Column("To", "valid_to", "date"), Column("For", "targets", "text", _targets),
+    Column("Priority", "priority", "int"), Column("Stackable", "stackable", "bool"),
+    Column("Active", "is_active", "bool"),
+)
+
+SCHEME_ENTITLEMENTS: Final = (
+    Column("Scheme", "scheme.name"), Column("Partner", "partner.name"), Column("Kind", "kind"),
+    Column("Value", "value", "decimal"), Column("Cap", "cap", "money"), Column("Status", "status"),
+    Column("Earned", "earned_at", "datetime"), Column("Expires", "expires_at", "datetime"),
+    Column("From order", "source_order.order_no"),
+    Column("Used on order", "consumed_order.order_no"),
+)
+
+REWARD_LEDGER: Final = (
+    Column("When", "at", "datetime"), Column("Points", "points", "int"), Column("Kind", "kind"),
+    Column("Reason", "reason"), Column("Expires", "expires_at", "datetime"),
+)
+
+GIFT_REDEMPTIONS: Final = (
+    Column("Requested", "created_at", "datetime"), Column("Holder", "holder.name"),
+    Column("Holder type", "holder.type"), Column("Kind", "kind"), Column("Gift", "gift.name"),
+    Column("Points", "points", "int"), Column("Amount", "amount", "money"),
+    Column("Status", "status"), Column("Decided", "decided_at", "datetime"),
+    Column("Remark", "remark"),
+)
+
+REWARD_RULES: Final = (
+    Column("Code", "code"), Column("Name", "name"), Column("For", "holder"),
+    Column("Basis", "basis"), Column("Points", "points", "int"),
+    Column("Per amount", "per_amount", "money"), Column("From", "valid_from", "date"),
+    Column("To", "valid_to", "date"), Column("Expiry (days)", "expiry_days", "int"),
+    Column("Active", "is_active", "bool"),
+)
+
+GIFTS: Final = (
+    Column("Name", "name"), Column("Description", "description"),
+    Column("Points", "points_cost", "int"), Column("Active", "is_active", "bool"),
+)
+
+SUBSIDY_SCHEMES: Final = (
+    Column("Code", "code"), Column("Name", "name"), Column("State", "state.name"),
+    Column("Systems", "systems", "names"), Column("Ready", "ready", "bool"),
+    Column("Active", "is_active", "bool"), Column("Applications", "applications", "int"),
+)
+
+HOLIDAYS: Final = (Column("Date", "day", "date"), Column("Name", "name"))
+
+SELLER_GSTINS: Final = (
+    Column("GSTIN", "gstin"), Column("Legal name", "legal_name"),
+    Column("State code", "state_code"), Column("Default", "is_default", "bool"),
+    Column("Active", "is_active", "bool"), Column("LUTs", "luts", "text", _luts),
+)
+
+RATINGS: Final = (
+    Column("When", "created_at", "datetime"), Column("About", "target"),
+    Column("Score", "score", "int"), Column("Comment", "comment"), Column("Rated by", "rated_by"),
+    Column("Entered via", "entered_via"), Column("Entered by", "entered_by.full_name"),
+    Column("Partner", "partner.name"), Column("Lead", "lead.inquiry_no"),
+    Column("Order", "order.number"), Column("Complaint", "complaint.number"),
+    Column("Product", "product.description"),
 )

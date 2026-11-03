@@ -63,15 +63,16 @@ def _out(r: Any, caller: Caller, lead_count: int, summary: sch.CampaignSummary |
 
 
 async def list_campaigns(db: AsyncSession, caller: Caller, *, active: bool | None = None,
-                         type_: str | None = None, q: str | None = None) -> list[sch.Campaign]:
-    """Newest start first, then name; at most 500."""
+                         type_: str | None = None, q: str | None = None,
+                         limit: int = 500) -> list[sch.Campaign]:
+    """Newest start first, then name; at most `limit` (500 on the screen)."""
     _staff(caller)
     rows = (await db.execute(text(
         _SELECT + " WHERE (CAST(:a AS boolean) IS NULL OR c.is_active = CAST(:a AS boolean))"
         " AND (CAST(:ty AS text) IS NULL OR c.type = CAST(:ty AS text))"
         " AND (CAST(:q AS text) IS NULL OR strpos(lower(c.name::text), lower(CAST(:q AS text))) > 0)"
-        " ORDER BY c.start_date DESC, c.name LIMIT 500"),
-        {"a": active, "ty": type_, "q": q or None})).all()
+        " ORDER BY c.start_date DESC, c.name LIMIT :lim"),
+        {"a": active, "ty": type_, "q": q or None, "lim": limit})).all()
     counts = await _lead_counts(db, caller, [r.id for r in rows])
     return [_out(r, caller, counts.get(r.id, 0)) for r in rows]
 

@@ -41,12 +41,14 @@ async def list_campaigns(
         type_: Annotated[CampaignType | None, Query(alias="type",
                                                     description="One campaign type.")] = None,
         q: Annotated[str | None, Query(max_length=100, description="Name contains.")] = None,
+        limit: Annotated[int, Query(ge=1, le=500, description="At most this many.")] = 500,
 ) -> Envelope[list[Campaign]]:
     """The campaigns, newest start first, at most 500. For the Marketing screen, and
     for the campaign picker on a lead or QR code (`active=true`). Any staff user.
     The cost fields are null unless you have campaigns.view; `lead_count` counts the
     leads you can see."""
-    return Envelope(data=await service.list_campaigns(db, caller, active=active, type_=type_, q=q))
+    return Envelope(data=await service.list_campaigns(db, caller, active=active, type_=type_, q=q,
+                                                      limit=limit))
 
 
 @router.post("", status_code=201, response_model=Envelope[Campaign], responses=_ERRORS,

@@ -80,6 +80,32 @@ free per product. A warning only; it never blocks an order.
 
 ---
 
+## `GET /api/v1/stock/export`
+
+**Export stock balances**
+
+Download stock balances as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `warehouse_id` | query | string \| null |  |  |
+| `product_id` | query | string \| null |  |  |
+| `short_only` | query | boolean |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
+
+---
+
 ## `GET /api/v1/stock/movements`
 
 **List Movements**
@@ -149,6 +175,31 @@ themselves. `409 negative_stock`, `warehouse_inactive`, `product_inactive`;
 
 ---
 
+## `GET /api/v1/stock/movements/export`
+
+**Export stock movements**
+
+Download stock movements as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `warehouse_id` | query | string \| null |  |  |
+| `product_id` | query | string \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
+
+---
+
 ## `GET /api/v1/warehouses`
 
 **List Warehouses**
@@ -208,6 +259,30 @@ Add a warehouse. `is_default: true` moves the default here.
 | `404` | `ErrorResponse` | No such warehouse or product. |
 | `409` | `ErrorResponse` | See `code`: negative_stock, warehouse_inactive, product_inactive, default_warehouse, code_taken. |
 | `422` | `ErrorResponse` | A rule refused it; see `code` and `fields`. |
+
+---
+
+## `GET /api/v1/warehouses/export`
+
+**Export the warehouses**
+
+Download the warehouses as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `include_inactive` | query | boolean |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 
