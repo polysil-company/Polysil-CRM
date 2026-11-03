@@ -232,6 +232,9 @@ async def test_three_thousand_staff_answer_quickly(db: AsyncSession) -> None:
     # the function must be fast on the worst plan, not only the lucky one.
     await db.execute(text("SET LOCAL enable_hashjoin = off"))
     await db.execute(text("SET LOCAL enable_mergejoin = off"))
+    # and no Material node over a nested loop's inner side: CI's second run (no
+    # statistics) re-ran the admin's per-office managers once per person, 26 s
+    await db.execute(text("SET LOCAL enable_material = off"))
     # a non-global Regional Manager over one bulk region: the biggest walk below
     rm_bulk = str((await db.execute(text(
         "INSERT INTO app_user (user_type, email, full_name, role_id, org_unit_id) "
