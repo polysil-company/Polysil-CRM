@@ -82,9 +82,12 @@ _CTES = f"""
                   JOIN boss b ON b.org_unit_id = oc.ancestor_id AND b.level > p.level) c
          WHERE c.rk = 1
     ),
-    slot_ids AS (
+    slot_ids AS MATERIALIZED (
         -- COLLATE "C" so the order is code point order, the same as Python's sort in
-        -- api/domain/org_chart.py on any server (code review F-6)
+        -- api/domain/org_chart.py on any server (code review F-6).
+        -- MATERIALIZED: the global branch reads it once, so Postgres would inline it
+        -- as the inner side of a join. With no statistics (CI) it then re-ran the
+        -- whole grouping once per person: 26 s for an admin at 3,000 staff
         SELECT sl.org_unit_id, sl.level,
                array_agg(sl.manager_id ORDER BY b.full_name COLLATE "C", b.id) AS ids
           FROM slot sl JOIN boss b ON b.id = sl.manager_id

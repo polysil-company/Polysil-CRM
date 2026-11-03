@@ -58,14 +58,20 @@ async def test_every_new_export_answers_excel_and_csv(client: httpx.AsyncClient,
 
 async def test_a_page_number_list_comes_back_whole(client: httpx.AsyncClient, shop: Shop,
                                                    sessions: Sessions) -> None:
-    """EC-1, EC-4: products page by number; the file holds every matching row."""
+    """EC-1, EC-4: products page by number; the file holds every matching row. The
+    test makes its own 120 products, more than two screen pages of 50, so it does
+    not depend on the catalogue a database happens to hold (CI's has few)."""
+    tag = f"zz export whole {uuid.uuid4().hex[:8]}"
     s = sessions()
-    expected = (await s.execute(text("SELECT count(*) FROM product WHERE is_active AND deleted_at IS NULL"))).scalar_one()
+    await s.execute(text(
+        "INSERT INTO product (description, product_category_id, quotation_category, uom_id) "
+        "SELECT CAST(:d || ' ' || g AS citext), (SELECT id FROM product_category ORDER BY sort_order LIMIT 1), "
+        "'field', (SELECT id FROM uom WHERE decimals = 0 LIMIT 1) FROM generate_series(1, 120) g"), {"d": tag})
+    await s.commit()
     await s.close()
-    assert expected > 100, "needs more than one page to prove anything"
     h = await endpoints._as(client, shop, "admin_sales")
-    rows = base._rows(await client.get(f"{V1}/products/export", headers=h, params={"active": "true"}))
-    assert len(rows) == expected
+    rows = base._rows(await client.get(f"{V1}/products/export", headers=h, params={"q": tag}))
+    assert len(rows) == 120
 
 
 async def test_a_capped_list_is_asked_for_more_than_the_cap(client: httpx.AsyncClient, shop: Shop,
