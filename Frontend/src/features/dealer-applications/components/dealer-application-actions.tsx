@@ -174,7 +174,7 @@ function SubmitButton({ application }: { application: DealerApplication }): Reac
     onSuccess: () => {
       idempotency.reset();
       toast.success("Application submitted", {
-        description: "A State Manager or above decides it next.",
+        description: "The managers the company settings name decide it next.",
       });
     },
     onError: (error) => {
@@ -373,8 +373,9 @@ function WithdrawForm({
 }
 
 /**
- * Approve (under a distributor, or directly under Polysil, with a code or the next one),
- * return to the applicant, or reject. A remark is needed to return or reject.
+ * Approve (a dealer under a distributor or directly under Polysil; a distributor always
+ * directly under Polysil; with a code or the next one), return to the applicant, or reject. A
+ * remark is needed to return or reject.
  */
 function DecideForm({
   application,
@@ -392,6 +393,8 @@ function DecideForm({
   const [shown, setShown] = useState(false);
   const [server, setServer] = useState<Readonly<Record<string, string>>>({});
   const [refusal, setRefusal] = useState<Refusal | null>(null);
+  const distributor = application.partnerType === "distributor";
+  const kind = distributor ? "distributor" : "dealer";
   const remarkProblem =
     decision !== "approve" && remark.trim() === ""
       ? decision === "return"
@@ -405,7 +408,7 @@ function DecideForm({
       const body = {
         decision,
         remark: remark.trim() === "" ? null : remark.trim(),
-        parent_id: decision === "approve" ? (parent?.id ?? null) : null,
+        parent_id: decision === "approve" && !distributor ? (parent?.id ?? null) : null,
         code: decision === "approve" && code.trim() !== "" ? code.trim().toUpperCase() : null,
       };
       return mutation.mutateAsync({
@@ -421,7 +424,7 @@ function DecideForm({
       idempotency.reset();
       toast.success(
         decided.status === "approved"
-          ? "Approved: the dealer is added"
+          ? `Approved: the ${kind} is added`
           : decided.status === "returned"
             ? "Returned to the applicant"
             : "Rejected",
@@ -461,7 +464,7 @@ function DecideForm({
       <DialogHeader>
         <DialogTitle>Decide {application.firmName}&apos;s application</DialogTitle>
         <DialogDescription>
-          Approving adds the dealer and a login on {application.contactName}&apos;s mobile.
+          Approving adds the {kind} and a login on {application.contactName}&apos;s mobile.
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-4">
@@ -486,32 +489,38 @@ function DecideForm({
         </Field>
         {decision === "approve" ? (
           <>
-            <Field data-invalid={server.parent_id === undefined ? undefined : true}>
-              <FieldLabel htmlFor="dealer-app-parent">
-                Under a distributor
-                <span className="font-normal text-muted-foreground">(optional)</span>
-              </FieldLabel>
-              <ParentPicker
-                id="dealer-app-parent"
-                type="distributor"
-                value={parent}
-                onValueChange={setParent}
-                aria-invalid={server.parent_id === undefined ? undefined : true}
-                aria-describedby={
-                  server.parent_id === undefined
-                    ? "dealer-app-parent-hint"
-                    : "dealer-app-parent-error"
-                }
-              />
-              {server.parent_id === undefined ? (
-                <FieldDescription id="dealer-app-parent-hint">
-                  Empty: directly under Polysil.
-                </FieldDescription>
-              ) : null}
-              <FieldError id="dealer-app-parent-error">
-                {server.parent_id === undefined ? undefined : "Choose an active distributor."}
-              </FieldError>
-            </Field>
+            {distributor ? (
+              <p className="text-sm text-muted-foreground">
+                A distributor sits directly under Polysil.
+              </p>
+            ) : (
+              <Field data-invalid={server.parent_id === undefined ? undefined : true}>
+                <FieldLabel htmlFor="dealer-app-parent">
+                  Under a distributor
+                  <span className="font-normal text-muted-foreground">(optional)</span>
+                </FieldLabel>
+                <ParentPicker
+                  id="dealer-app-parent"
+                  type="distributor"
+                  value={parent}
+                  onValueChange={setParent}
+                  aria-invalid={server.parent_id === undefined ? undefined : true}
+                  aria-describedby={
+                    server.parent_id === undefined
+                      ? "dealer-app-parent-hint"
+                      : "dealer-app-parent-error"
+                  }
+                />
+                {server.parent_id === undefined ? (
+                  <FieldDescription id="dealer-app-parent-hint">
+                    Empty: directly under Polysil.
+                  </FieldDescription>
+                ) : null}
+                <FieldError id="dealer-app-parent-error">
+                  {server.parent_id === undefined ? undefined : "Choose an active distributor."}
+                </FieldError>
+              </Field>
+            )}
             <Field>
               <FieldLabel htmlFor="dealer-app-code">
                 Partner code
@@ -528,7 +537,7 @@ function DecideForm({
                 }}
               />
               <FieldDescription id="dealer-app-code-hint">
-                Empty: the next one, like DLR-GJ-0012.
+                Empty: the next one, like {distributor ? "DIST-GJ-0003" : "DLR-GJ-0012"}.
               </FieldDescription>
             </Field>
           </>

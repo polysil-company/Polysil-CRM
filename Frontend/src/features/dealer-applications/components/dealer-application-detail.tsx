@@ -22,17 +22,20 @@ import {
   DEALER_APPLICATION_STATUS_BADGE,
   DEALER_APPLICATION_STATUS_LABELS,
   FIRM_TYPE_LABELS,
+  PARTNER_TYPE_LABELS,
   missingLabel,
 } from "@/features/dealer-applications/lib/dealer-application-labels";
 import { RecordDocuments } from "@/features/documents/components/record-documents";
 import { isApiError } from "@/lib/api/errors";
 import { EMPTY_VALUE, formatFullDate, formatIndianPhone } from "@/lib/format";
 
+import { DataSheetFacts } from "./data-sheet-facts";
 import { DealerApplicationActions } from "./dealer-application-actions";
 
 /**
- * CHNL-007 · One dealer application: where it stands and what is still needed, every field
- * the applicant (or staff for them) filled in, its documents, and what the reader may do.
+ * CHNL-007 · One dealer or distributor application: where it stands and what is still needed,
+ * every field the applicant (or staff for them) filled in, the data sheet (FS-071), its
+ * documents, and what the reader may do.
  */
 export function DealerApplicationDetail({
   applicationId,
@@ -90,6 +93,7 @@ function DetailView({ application }: { application: DealerApplication }): React.
             <Badge variant={DEALER_APPLICATION_STATUS_BADGE[application.status]} dot>
               {label}
             </Badge>
+            <Badge variant="neutral">{PARTNER_TYPE_LABELS[application.partnerType]}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">
             {application.contactName} · {formatIndianPhone(application.mobile)} ·{" "}
@@ -177,6 +181,8 @@ function DetailView({ application }: { application: DealerApplication }): React.
         </Card>
       </div>
 
+      <DataSheetFacts sheet={application.dataSheet} />
+
       {application.notes === null ? null : (
         <Card>
           <CardHeader>
@@ -262,7 +268,9 @@ function ApplicationNotices({
   if (application.status === "approved") {
     notices.push(
       <Notice key="approved" tone="success">
-        <p className="font-medium">Approved: the dealer and its login are added</p>
+        <p className="font-medium">
+          Approved: the {application.partnerType} and its login are added
+        </p>
         <p>
           They sign in with a WhatsApp code on {formatIndianPhone(application.mobile)}.
           {application.partnerId === null ? null : (
@@ -272,7 +280,7 @@ function ApplicationNotices({
                 href={`/partners/${application.partnerId}`}
                 className="text-primary-text underline underline-offset-4"
               >
-                Open the dealer
+                Open the {application.partnerType}
               </Link>
             </>
           )}

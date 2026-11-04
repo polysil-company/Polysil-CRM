@@ -60,7 +60,7 @@ export function refusalOf(error: unknown): { refusal: Refusal; stale: boolean } 
       return {
         refusal: {
           title: "The mobile already signs someone in",
-          message: "A colleague or a partner uses this mobile, so it can't be the dealer's login.",
+          message: "A colleague or a partner uses this mobile, so it can't be the partner's login.",
         },
         stale: false,
       };

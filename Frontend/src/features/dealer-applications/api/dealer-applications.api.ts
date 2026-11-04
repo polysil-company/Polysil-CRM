@@ -7,7 +7,7 @@ import {
   dealerApplicationSchema,
   type CreateDealerApplicationRequest,
   type DealerApplication,
-  type DealerApplicationFieldsRequest,
+  type StaffApplicationFieldsRequest,
   type DealerApplicationListParams,
   type DealerApplicationRow,
   type DecisionRequest,
@@ -42,6 +42,7 @@ export function listDealerApplications(
     query: {
       status: params.status.length === 0 ? undefined : params.status.join(","),
       q: params.q.trim() === "" ? undefined : params.q.trim(),
+      partner_type: params.partnerType ?? undefined,
     },
     schema: dealerApplicationListSchema,
     signal,
@@ -91,7 +92,7 @@ export function patchDealerApplication({
   applicationId,
   body,
   idempotencyKey,
-}: WriteInput<DealerApplicationFieldsRequest>): Promise<DealerApplication> {
+}: WriteInput<StaffApplicationFieldsRequest>): Promise<DealerApplication> {
   return apiRequest({
     dataId: "CHNL-007",
     logger: log,

@@ -16,8 +16,14 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  PARTNER_TYPES,
+  type PartnerType,
+} from "@/features/dealer-applications/api/data-sheet.schemas";
 import { useCreateDealerApplication } from "@/features/dealer-applications/api/dealer-applications.mutations";
 import type { DealerApplication } from "@/features/dealer-applications/api/dealer-applications.schemas";
+import { PARTNER_TYPE_LABELS } from "@/features/dealer-applications/lib/dealer-application-labels";
 import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
 import { useAsyncAction } from "@/hooks/use-async-action";
@@ -38,12 +44,14 @@ const log = createLogger({
 type Field = "firm_name" | "contact_name" | "mobile" | "territory_id";
 
 /**
- * CHNL-007 · Start a dealer application: the firm, whom to ask for, the mobile that becomes
- * the dealer's login, and the area. Then the link to send them, shown only now.
+ * CHNL-007 · Start an application: a dealer or a distributor (FS-071), the firm, whom to ask
+ * for, the mobile that becomes its login, and the area. Then the link to send them, shown only
+ * now. The type's deposit is fixed when it starts.
  */
 export function StartDealerApplication({ onClose }: { onClose: () => void }): React.JSX.Element {
   const create = useCreateDealerApplication();
   const idempotency = useIdempotencyKey();
+  const [partnerType, setPartnerType] = useState<PartnerType>("dealer");
   const [firm, setFirm] = useState("");
   const [contact, setContact] = useState("");
   const [mobile, setMobile] = useState("");
@@ -69,6 +77,7 @@ export function StartDealerApplication({ onClose }: { onClose: () => void }): Re
         contact_name: contact.trim(),
         mobile: normalizeIndianMobile(mobile) ?? mobile.trim(),
         territory_id: territory?.id ?? "",
+        partner_type: partnerType,
       };
       return create.mutateAsync({ body, idempotencyKey: idempotency.keyFor(body) });
     },
@@ -140,7 +149,7 @@ export function StartDealerApplication({ onClose }: { onClose: () => void }): Re
   return (
     <form
       noValidate
-      aria-label="Start a dealer application"
+      aria-label="Start an application"
       className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault();
@@ -152,13 +161,29 @@ export function StartDealerApplication({ onClose }: { onClose: () => void }): Re
       }}
     >
       <DialogHeader>
-        <DialogTitle>Start a dealer application</DialogTitle>
+        <DialogTitle>Start an application</DialogTitle>
         <DialogDescription>
-          The applicant gets a link to fill in the rest. Their mobile becomes the dealer&apos;s
+          The applicant gets a link to fill in the rest. Their mobile becomes the partner&apos;s
           login once approved.
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-4">
+        <Field>
+          <FieldLabel id="dealer-app-type-label">For a new</FieldLabel>
+          <RadioGroup<PartnerType>
+            aria-labelledby="dealer-app-type-label"
+            value={partnerType}
+            onValueChange={setPartnerType}
+            className="flex-row flex-wrap gap-5"
+          >
+            {PARTNER_TYPES.map((type) => (
+              <label key={type} className="flex items-center gap-2 text-sm text-foreground">
+                <RadioGroupItem value={type} />
+                {PARTNER_TYPE_LABELS[type]}
+              </label>
+            ))}
+          </RadioGroup>
+        </Field>
         <TextInput
           id="dealer-app-firm"
           label="Firm"
@@ -182,7 +207,7 @@ export function StartDealerApplication({ onClose }: { onClose: () => void }): Re
           error={problems.mobile}
           autoComplete="tel"
           inputMode="tel"
-          description="The link goes here, and it becomes the dealer's login."
+          description="The link goes here, and it becomes the partner's login."
           onChange={(next) => {
             setMobile(next);
             setServer(({ mobile: _mobile, ...rest }) => rest);

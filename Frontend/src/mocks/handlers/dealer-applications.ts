@@ -2,6 +2,12 @@ import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
 import {
+  AREA_UNITS,
+  INSTALLATION_SCOPES,
+  PARTNER_TYPES,
+  type PartnerType,
+} from "@/features/dealer-applications/api/data-sheet.schemas";
+import {
   DEALER_APPLICATION_STATUSES,
   FIRM_TYPES,
   OPEN_STATUSES,
@@ -22,14 +28,18 @@ import { mockDb } from "@/mocks/db";
 
 import { addMockPartner, gstinLookup } from "./partners";
 import { applyScenario } from "./scenario";
+import { mockSettings } from "./settings";
 import { errorResponse, readMultipart } from "./shared";
 
 /**
  * CHNL-007 · Dealer applications for the mock backend, following `dealer_applications.py`:
  *  - staff who see partners start, read, fill, submit, withdraw and renew;
- *  - a State Manager or above (or Admin), never whoever started it, decides a submitted one;
+ *  - the roles the company settings name for the type, never whoever started it, decide a
+ *    submitted one;
  *  - `missing` names the fields and documents still needed; submitting needs none missing;
- *  - the link (`apply_url`) is in the answer only after creating it or renewing it.
+ *  - the link (`apply_url`) is in the answer only after creating it or renewing it;
+ *  - FS-071: an application makes a dealer or a distributor, carries the data sheet, and the
+ *    company settings name the extra fields each type must have.
  */
 
 const GSTIN_PATTERN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -37,7 +47,12 @@ const PAN_PATTERN = /^[A-Z]{5}\d{4}[A-Z]$/;
 const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const LINK_DAYS = 30;
 /** The roles that decide, besides Admin: State Manager or above (role level 3+). */
-const DECIDERS = new Set(["state_manager", "regional_manager", "admin"]);
+/** The mock's role as the backend's role code, for the settings that name roles. */
+const BACKEND_ROLE: Readonly<Record<string, string>> = {
+  admin: "admin_sales",
+  employee: "field_officer",
+  qa_manager: "qc_manager",
+};
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -94,9 +109,46 @@ function documentsOf(applicationId: string): Set<string> {
   );
 }
 
-/** The backend's `dealer_application_missing`: fields first, then the three documents. */
+/** FS-071 · The extra fields the company settings require of this type (`*_application_required`). */
+function requiredExtras(application: MockDealerApplication): string[] {
+  const key =
+    application.partner_type === "distributor"
+      ? "distributor_application_required"
+      : "dealer_application_required";
+  const value = mockSettings().find((setting) => setting.key === key)?.value;
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+/** Whether a required extra is filled in, as `dealer_application_missing` reads each. */
+function extraFilled(
+  application: MockDealerApplication,
+  extra: string,
+  docs: Set<string>,
+): boolean {
+  const filled = (value: unknown): boolean =>
+    value !== null &&
+    value !== undefined &&
+    value !== "" &&
+    !(Array.isArray(value) && value.length === 0);
+  switch (extra) {
+    case "vehicles":
+      return [application.two_wheelers, application.cars, application.other_vehicles].some(filled);
+    case "staff_counts":
+      return filled(application.sales_executives) && filled(application.technicians);
+    case "shop_photo":
+    case "shop_licence":
+      return docs.has(extra);
+    default:
+      return filled(Object.entries(application).find(([key]) => key === extra)?.[1]);
+  }
+}
+
+/** The backend's `dealer_application_missing`: fields first, then the documents. */
 export function missingOf(application: MockDealerApplication): string[] {
   const docs = documentsOf(application.id);
+  const extras = requiredExtras(application).filter(
+    (extra) => !extraFilled(application, extra, docs),
+  );
   const missing = [
     application.firm_type === null ? "firm_type" : null,
     application.gst_registered && application.gstin === null ? "gstin" : null,
@@ -109,14 +161,26 @@ export function missingOf(application: MockDealerApplication): string[] {
     application.gst_registered && !docs.has("gst_certificate") ? "gst_certificate" : null,
     docs.has("pan_card") ? null : "pan_card",
     docs.has("cancelled_cheque") ? null : "cancelled_cheque",
+    ...extras,
   ];
-  return missing.filter((item) => item !== null).sort();
+  return [...new Set(missing.filter((item) => item !== null))].sort();
+}
+
+/** FS-071 · Who decides this type: the company setting `*_application_deciders`. */
+function decidersOf(application: MockDealerApplication): readonly string[] {
+  const key =
+    application.partner_type === "distributor"
+      ? "distributor_application_deciders"
+      : "dealer_application_deciders";
+  const value = mockSettings().find((setting) => setting.key === key)?.value;
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
 }
 
 function mayDecide(application: MockDealerApplication): boolean {
+  const role = readMockRole();
   return (
     application.status === "submitted" &&
-    DECIDERS.has(readMockRole()) &&
+    decidersOf(application).includes(BACKEND_ROLE[role] ?? role) &&
     application.created_by?.id !== caller().id
   );
 }
@@ -154,11 +218,13 @@ function blankApplication(input: {
   by: { id: string; full_name: string } | null;
   createdAt: string;
   serial: number;
+  partnerType?: PartnerType;
 }): MockDealerApplication {
   return {
     id: mockUuid(MOCK_ID_SPACE.dealerApplication, input.serial),
     token: newToken(),
     status: "draft",
+    partner_type: input.partnerType ?? "dealer",
     firm_name: input.firm,
     contact_name: input.contact,
     mobile: input.mobile,
@@ -178,6 +244,7 @@ function blankApplication(input: {
     bank_account_name: null,
     bank_account_no: null,
     bank_ifsc: null,
+    ...EMPTY_DATA_SHEET,
     gst_lookup: null,
     gst_state_mismatch: false,
     partner_id: null,
@@ -191,6 +258,29 @@ function blankApplication(input: {
     submitted_at: null,
   };
 }
+
+/** FS-071 · A new application's data sheet: nothing filled in yet. */
+const EMPTY_DATA_SHEET = {
+  telephone: null,
+  established_on: null,
+  bank_name: null,
+  bank_branch: null,
+  bank_address: null,
+  working_capital: null,
+  other_sources_lakhs: null,
+  working_capital_total_lakhs: null,
+  two_wheelers: null,
+  cars: null,
+  other_vehicles: null,
+  office_area: null,
+  godown_area: null,
+  area_unit: "sq_ft",
+  manpower: null,
+  previous_installations: null,
+  sales_executives: null,
+  technicians: null,
+  appointment_place: null,
+} as const;
 
 /** Replays: the same Idempotency-Key and body answer the first response again. */
 const replays = new Map<string, { body: string; response: () => Response }>();
@@ -323,6 +413,7 @@ export function startMockDealerApplicationFor(input: {
   mobile: string;
   territory: { id: string; name: string };
   leadId: string | null;
+  partnerType?: PartnerType;
 }): { application: MockDealerApplication } | { refused: "mobile_in_use" | "application_open" } {
   const rows = mockDealerApplications();
   if (
@@ -361,7 +452,19 @@ const createSchema = z.object({
   mobile: text.min(1),
   territory_id: text.min(1),
   lead_id: z.string().nullish(),
+  partner_type: z.enum(PARTNER_TYPES).optional(),
 });
+
+/** The backend's decimal strings (`Lakhs`, `Area`): digits, at most two decimals. */
+const lakhs = z
+  .string()
+  .trim()
+  .regex(/^\d{1,5}(\.\d{1,2})?$/, "lakhs, at most two decimals");
+const areaText = z
+  .string()
+  .trim()
+  .regex(/^\d{1,7}(\.\d{1,2})?$/, "an area, at most two decimals");
+const thisYear = new Date().getFullYear();
 
 const fieldsSchema = z.object({
   firm_name: text.min(1).max(200).optional(),
@@ -380,6 +483,65 @@ const fieldsSchema = z.object({
   bank_account_name: nullableText.optional(),
   bank_account_no: nullableText.optional(),
   bank_ifsc: nullableText.optional(),
+  // FS-071 · the data sheet, with the backend's limits
+  telephone: nullableText.optional(),
+  established_on: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine((value) => value >= "1900-01-01" && value <= new Date().toISOString().slice(0, 10), {
+      message: "from 1900, not after today",
+    })
+    .nullable()
+    .optional(),
+  bank_name: nullableText.optional(),
+  bank_branch: nullableText.optional(),
+  bank_address: nullableText.optional(),
+  working_capital: z
+    .array(z.object({ facility: text.min(1).max(100), amount_lakhs: lakhs }))
+    .max(10)
+    .nullable()
+    .optional(),
+  other_sources_lakhs: lakhs.nullable().optional(),
+  two_wheelers: z.number().int().min(0).max(999).nullable().optional(),
+  cars: z.number().int().min(0).max(999).nullable().optional(),
+  other_vehicles: nullableText.optional(),
+  office_area: areaText.nullable().optional(),
+  godown_area: areaText.nullable().optional(),
+  area_unit: z.enum(AREA_UNITS).nullable().optional(),
+  manpower: z
+    .array(
+      z.object({
+        category: text.min(1).max(100),
+        qualification: z.string().trim().max(100).nullish(),
+        work_type: z.string().trim().max(100).nullish(),
+        experience_years: z.number().int().min(0).max(80).nullish(),
+        people: z.number().int().min(1).max(9999),
+      }),
+    )
+    .max(20)
+    .nullable()
+    .optional(),
+  previous_installations: z
+    .array(
+      z.object({
+        year: z.number().int().min(1950).max(thisYear),
+        customers: z.number().int().min(0).max(999999),
+        description: text.min(1).max(300),
+        scope: z.enum(INSTALLATION_SCOPES),
+        cost_lakhs: lakhs,
+      }),
+    )
+    .max(50)
+    .nullable()
+    .optional(),
+  sales_executives: z.number().int().min(0).max(9999).nullable().optional(),
+  technicians: z.number().int().min(0).max(9999).nullable().optional(),
+  appointment_place: nullableText.optional(),
+});
+
+/** Staff may also change the type, while draft or returned (no deposit yet in the mock). */
+const staffFieldsSchema = fieldsSchema.extend({
+  partner_type: z.enum(PARTNER_TYPES).optional(),
 });
 
 const decisionSchema = z.object({
@@ -432,12 +594,28 @@ function applyFields(
   }
   if (pan !== undefined) application.pan = pan;
   if (ifsc !== undefined) application.bank_ifsc = ifsc;
+  application.working_capital_total_lakhs = workingCapitalTotal(application);
   return null;
 }
 
-function nextDealerCode(): string {
-  const taken = mockDb.partners.filter((partner) => partner.code.startsWith("DLR-GJ-")).length;
-  return `DLR-GJ-${String(taken + 1).padStart(4, "0")}`;
+/** The rows plus other sources, in lakhs; null when neither is filled. */
+function workingCapitalTotal(application: MockDealerApplication): string | null {
+  const rows = application.working_capital ?? [];
+  const other = application.other_sources_lakhs ?? null;
+  if (rows.length === 0 && other === null) return null;
+  const paise = [
+    ...rows.map((row) => String(row.amount_lakhs)),
+    ...(other === null ? [] : [String(other)]),
+  ]
+    .map((amount) => Math.round(Number(amount) * 100))
+    .reduce((sum, value) => sum + value, 0);
+  return (paise / 100).toFixed(2);
+}
+
+function nextPartnerCode(type: PartnerType): string {
+  const prefix = type === "distributor" ? "DIST-GJ-" : "DLR-GJ-";
+  const taken = mockDb.partners.filter((partner) => partner.code.startsWith(prefix)).length;
+  return `${prefix}${String(taken + 1).padStart(4, "0")}`;
 }
 
 function replayOf(request: Request, raw: unknown): Response | null | "conflict" {
@@ -475,12 +653,17 @@ export const dealerApplicationHandlers = [
       return invalid({ status: "not a status" });
     }
     const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+    const type = url.searchParams.get("partner_type");
+    if (type !== null && !PARTNER_TYPES.some((item) => item === type)) {
+      return invalid({ partner_type: "dealer or distributor" });
+    }
     const rows =
       scenario === "empty"
         ? []
         : mockDealerApplications().filter(
             (row) =>
               (statuses.length === 0 || statuses.includes(row.status)) &&
+              (type === null || row.partner_type === type) &&
               (q === "" ||
                 row.firm_name.toLowerCase().includes(q) ||
                 row.contact_name.toLowerCase().includes(q) ||
@@ -490,6 +673,7 @@ export const dealerApplicationHandlers = [
       data: rows.slice(0, 200).map((row) => ({
         id: row.id,
         status: row.status,
+        partner_type: row.partner_type ?? "dealer",
         firm_name: row.firm_name,
         contact_name: row.contact_name,
         territory_name: row.territory.name,
@@ -525,6 +709,7 @@ export const dealerApplicationHandlers = [
       mobile,
       territory: { id: territory.id, name: territory.name },
       leadId: body.lead_id ?? null,
+      partnerType: body.partner_type ?? "dealer",
     });
     if ("refused" in started) {
       return started.refused === "mobile_in_use"
@@ -556,13 +741,18 @@ export const dealerApplicationHandlers = [
       return errorResponse(409, "idempotency_conflict", "Another request used that key.");
     if (replay !== null) return replay;
     if (!OPEN_STATUSES.some((status) => status === application.status)) return closed();
-    const parsed = fieldsSchema.safeParse(raw);
+    const parsed = staffFieldsSchema.safeParse(raw);
     if (!parsed.success) {
       const fields: Record<string, string> = {};
-      for (const issue of parsed.error.issues) fields[String(issue.path[0])] = issue.message;
+      for (const issue of parsed.error.issues) fields[issue.path.join(".")] = issue.message;
       return invalid(fields);
     }
-    const problems = applyFields(application, parsed.data);
+    const { partner_type: partnerType, ...fieldsOnly } = parsed.data;
+    if (partnerType !== undefined && partnerType !== application.partner_type) {
+      if (application.status === "submitted") return closed();
+      application.partner_type = partnerType;
+    }
+    const problems = applyFields(application, fieldsOnly);
     if (problems !== null) return invalid(problems);
     const wire = dealerApplicationWire(application);
     return remember(request, raw, () => HttpResponse.json({ data: wire }));
@@ -654,7 +844,7 @@ export const dealerApplicationHandlers = [
       return errorResponse(
         403,
         "insufficient_permission",
-        "Only a State Manager or above, other than whoever started it, decides.",
+        "Only the roles the company settings name, other than whoever started it, decide.",
       );
     }
     const remark = body.remark?.trim() || null;
@@ -674,15 +864,19 @@ export const dealerApplicationHandlers = [
       if (body.parent_id != null && (parent === undefined || parent === null)) {
         return invalid({ parent_id: "not an active distributor" });
       }
-      const code = body.code?.trim() ? body.code.trim().toUpperCase() : nextDealerCode();
+      const type: PartnerType = application.partner_type ?? "dealer";
+      if (type === "distributor" && body.parent_id != null) {
+        return invalid({ parent_id: "a distributor sits directly under Polysil" });
+      }
+      const code = body.code?.trim() ? body.code.trim().toUpperCase() : nextPartnerCode(type);
       if (mockDb.partners.some((partner) => partner.code === code)) {
         return errorResponse(409, "code_in_use", "That partner code is taken.");
       }
       application.partner_id = addMockPartner({
         code,
         name: application.firm_name,
-        partner_type: "dealer",
-        price_tier: "dealer",
+        partner_type: type,
+        price_tier: type,
         parent:
           parent == null ? null : { id: parent.id, name: parent.name, partner_type: "distributor" },
         parent_id: parent?.id ?? null,
@@ -789,6 +983,26 @@ function applicantView(application: MockDealerApplication, withSession: boolean)
     bank_account_name: application.bank_account_name,
     bank_account_no: application.bank_account_no,
     bank_ifsc: application.bank_ifsc,
+    partner_type: application.partner_type,
+    telephone: application.telephone,
+    established_on: application.established_on,
+    bank_name: application.bank_name,
+    bank_branch: application.bank_branch,
+    bank_address: application.bank_address,
+    working_capital: application.working_capital,
+    other_sources_lakhs: application.other_sources_lakhs,
+    working_capital_total_lakhs: application.working_capital_total_lakhs,
+    two_wheelers: application.two_wheelers,
+    cars: application.cars,
+    other_vehicles: application.other_vehicles,
+    office_area: application.office_area,
+    godown_area: application.godown_area,
+    area_unit: application.area_unit,
+    manpower: application.manpower,
+    previous_installations: application.previous_installations,
+    sales_executives: application.sales_executives,
+    technicians: application.technicians,
+    appointment_place: application.appointment_place,
     documents: applicantDocuments(application).map((document) => ({
       id: document.id,
       doc_type: document.doc_type,
@@ -853,7 +1067,7 @@ function applicantHandlers(): ReturnType<typeof http.get>[] {
       const parsed = fieldsSchema.safeParse(await bodyOf(request));
       if (!parsed.success) {
         const fields: Record<string, string> = {};
-        for (const issue of parsed.error.issues) fields[String(issue.path[0])] = issue.message;
+        for (const issue of parsed.error.issues) fields[issue.path.join(".")] = issue.message;
         return invalid(fields);
       }
       const problems = applyFields(application, parsed.data);
