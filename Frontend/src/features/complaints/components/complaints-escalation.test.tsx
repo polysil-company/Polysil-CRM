@@ -15,6 +15,7 @@ import { buildApiUrl } from "@/lib/api/url";
 import type { Role } from "@/lib/auth/roles";
 import { writeMockRole } from "@/lib/dev/mock-settings";
 import { shiftCalendarDay, todayInIndia } from "@/lib/format";
+import { seedHolidays } from "@/mocks/data/holidays";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
@@ -47,9 +48,13 @@ async function codeOf(call: Promise<unknown>): Promise<string | null> {
 }
 
 /** The next day after today that isn't a Sunday, with an offset to keep tests apart. */
+/** A day ahead that is neither a Sunday nor a holiday the mock already has, whatever today is. */
 function aheadWeekday(offset: number): string {
+  const taken = new Set(seedHolidays().map((holiday) => holiday.day));
   let day = shiftCalendarDay(todayInIndia(), offset);
-  while (new Date(`${day}T00:00:00Z`).getUTCDay() === 0) day = shiftCalendarDay(day, 1);
+  while (new Date(`${day}T00:00:00Z`).getUTCDay() === 0 || taken.has(day)) {
+    day = shiftCalendarDay(day, 1);
+  }
   return day;
 }
 

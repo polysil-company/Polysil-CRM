@@ -38,6 +38,9 @@ breaking: false
 - **Why read-only rather than an error for an unknown kind.** The first build chose the error state over guessing an editor. Showing the value as text still guesses nothing, and a missing editor for one setting costs far less than a blank page for all of them.
 - **A set is saved in the backend's order,** whatever order the boxes were ticked in. Nothing here is a chain, so the order means nothing, and saving the same choice always sends the same list.
 - **The deposits are `int` settings,** so they already worked. They only needed titles and a section.
+- **Three tests broke with the calendar, not the code** (failing on `integration` too, from 4 Nov):
+  - The holiday tests picked "a weekday three days ahead". From 4 Nov that is 9 Nov, a holiday the mock already has, so the add was refused as a repeat. The helper now also skips the seeded holidays.
+  - The price-list test expected a list starting on 1 Nov to read "Published, starts later". It now expects "In force" once that day has passed.
 - **Who may be ticked as a decider:** the staff roles from `GET /lookups/roles`, as for the other role settings. The backend refuses `system` and any partner role, and checks that the roles exist.
 
 ## Files changed
@@ -48,6 +51,7 @@ breaking: false
 - `src/mocks/handlers/settings.ts` — the seven settings of migration 078 and their checks.
 - `Docs/plan-13oct-2026.md` — Tier 5: every backend change from 23 Oct to 3 Nov the frontend still has to pick up, items 40 to 49; BE-023 to BE-025 ticked; BE-039 to BE-041 under Waiting.
 - `Docs/Tested-Features.md`, `Docs/screenshots/settings/` — the story and its screens.
+- `src/features/complaints/components/complaints-escalation.test.tsx`, `src/features/products/components/products-ui.test.tsx` — date-proof: no seeded holiday as "a day ahead", and the right phase for a list that has started.
 
 ## Tests
 
