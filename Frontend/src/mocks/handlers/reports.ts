@@ -623,11 +623,210 @@ function complaintsReport(filters: Filters, groupBy: string): ReportWire<"compla
   };
 }
 
+// ── FS-079 · sales forecast and insights ───────────────────────────────────────
+
+const OPEN_STAGES = ["new", "contacted", "qualified", "quoted", "negotiation"];
+
+/** The mock's own rates: the overall win rate, scaled by how far a stage is along. */
+const STAGE_WEIGHT: Readonly<Record<string, number>> = {
+  new: 0.4,
+  contacted: 0.6,
+  qualified: 0.9,
+  quoted: 1.2,
+  negotiation: 1.5,
+};
+
+function forecastMonths(): string[] {
+  const today = todayInIndia();
+  let year = Number(today.slice(0, 4));
+  let month = Number(today.slice(5, 7));
+  const out: string[] = [];
+  for (let step = 0; step < 3; step += 1) {
+    out.push(`${String(year)}-${String(month).padStart(2, "0")}`);
+    [year, month] = month === 12 ? [year + 1, 1] : [year, month + 1];
+  }
+  return out;
+}
+
+/** RPT-004 · As `forecast.sales_forecast()`, with the mock's simple rates and months by stage. */
+function salesForecast(params: URLSearchParams, groupBy: string): ReportWire<"sales-forecast"> {
+  const territories = (params.get("territory_id") ?? "").split(",").filter(Boolean);
+  const owner = params.get("owner_id");
+  const scope = mockDb.leads.filter((lead) => lead.stage !== "merged");
+  const won = scope.filter((lead) => lead.stage === "won").length;
+  const lost = scope.filter((lead) => lead.stage === "lost").length;
+  const thin = won + lost < 5;
+  const overall = thin ? 0 : won / (won + lost);
+  const months = forecastMonths();
+  const keys = [...months, "later"];
+  const monthOf = (stage: string): string =>
+    stage === "negotiation"
+      ? (months[0] ?? "later")
+      : stage === "quoted"
+        ? (months[1] ?? "later")
+        : stage === "qualified"
+          ? (months[2] ?? "later")
+          : "later";
+  const sources = new Map(mockLookupRows("lead-sources").map((row) => [row.code, row]));
+  const groups = new Map<
+    string,
+    {
+      key: { id: string | null; label: string };
+      open: number;
+      withValue: number;
+      pipeline: number;
+      weighted: number;
+      byMonth: Map<string, number>;
+    }
+  >();
+  for (const lead of scope) {
+    if (!OPEN_STAGES.includes(lead.stage)) continue;
+    if (territories.length > 0 && !territories.includes(lead.territory.id)) continue;
+    if (owner !== null && lead.owner?.id !== owner) continue;
+    const key =
+      groupBy === "territory"
+        ? { id: lead.territory.id, label: lead.territory.name }
+        : groupBy === "source"
+          ? {
+              id: sources.get(lead.source)?.id ?? lead.source,
+              label: sources.get(lead.source)?.name ?? lead.source,
+            }
+          : { id: lead.owner?.id ?? null, label: lead.owner?.full_name ?? "Unassigned" };
+    const group = groups.get(key.id ?? "") ?? {
+      key,
+      open: 0,
+      withValue: 0,
+      pipeline: 0,
+      weighted: 0,
+      byMonth: new Map<string, number>(),
+    };
+    const value = lead.estimated_value === null ? 0 : Number(lead.estimated_value);
+    const weighted = value * Math.min(0.95, overall * (STAGE_WEIGHT[lead.stage] ?? 1));
+    group.open += 1;
+    group.withValue += lead.estimated_value === null ? 0 : 1;
+    group.pipeline += value;
+    group.weighted += weighted;
+    const month = monthOf(lead.stage);
+    group.byMonth.set(month, (group.byMonth.get(month) ?? 0) + weighted);
+    groups.set(key.id ?? "", group);
+  }
+  const figures = (g: {
+    open: number;
+    withValue: number;
+    pipeline: number;
+    weighted: number;
+    byMonth: Map<string, number>;
+  }): ReportWire<"sales-forecast">["totals"] => ({
+    open: g.open,
+    with_value: g.withValue,
+    pipeline_value: money(g.pipeline),
+    weighted_value: thin ? null : money(g.weighted),
+    by_month: Object.fromEntries(
+      keys.map((month) => [month, thin ? null : money(g.byMonth.get(month) ?? 0)]),
+    ),
+    valued_by: { quotation: 0, estimate: g.withValue },
+  });
+  const rows = [...groups.values()].sort((a, b) => b.weighted - a.weighted || b.open - a.open);
+  const all = rows.reduce(
+    (sum, g) => {
+      for (const [month, value] of g.byMonth)
+        sum.byMonth.set(month, (sum.byMonth.get(month) ?? 0) + value);
+      return {
+        ...sum,
+        open: sum.open + g.open,
+        withValue: sum.withValue + g.withValue,
+        pipeline: sum.pipeline + g.pipeline,
+        weighted: sum.weighted + g.weighted,
+      };
+    },
+    { open: 0, withValue: 0, pipeline: 0, weighted: 0, byMonth: new Map<string, number>() },
+  );
+  return {
+    group_by: groupBy,
+    months,
+    rows: rows.map((g) => ({ key: g.key, ...figures(g) })),
+    truncated: false,
+    rates: thin
+      ? []
+      : OPEN_STAGES.map((stage) => ({
+          stage,
+          win_rate_pct: (Math.min(0.95, overall * (STAGE_WEIGHT[stage] ?? 1)) * 100).toFixed(1),
+          closed: won + lost,
+          low_confidence: stage === "negotiation",
+        })),
+    median_days_to_win: thin ? null : 38,
+    reason: thin ? "not_enough_history" : null,
+    filters: { history_days: 180, as_of: todayInIndia() },
+    totals: figures(all),
+  };
+}
+
+/** RPT-005 · A few of `forecast.insights()`'s sentences, worked out from the mock's leads. */
+function insights(filters: Filters): ReportWire<"insights"> {
+  const span = leads(filters);
+  const now = span.filter((lead) => inWindow(filters, lead.created_at));
+  const lost = now.filter((lead) => lead.stage === "lost");
+  const reasons = new Map<string, number>();
+  for (const lead of lost) {
+    const name = lead.lost_reason?.name;
+    if (name !== undefined) reasons.set(name, (reasons.get(name) ?? 0) + 1);
+  }
+  const top = [...reasons.entries()].sort((a, b) => b[1] - a[1])[0];
+  const quoted = now.filter((lead) => reached(lead, "quoted")).length;
+  const answered = now.filter(
+    (lead) => lead.stage === "won" || lead.stage === "lost" || lead.stage === "negotiation",
+  ).length;
+  const rows: ReportWire<"insights">["rows"] = [];
+  if (top !== undefined && lost.length >= 3) {
+    rows.push({
+      code: "lost_reason_rising",
+      title: `“${top[0]}” is the reason growing fastest among lost leads.`,
+      figure: pct(top[1], lost.length),
+      previous: pct(Math.max(0, top[1] - 1), lost.length),
+      unit: "pct",
+      link: { report: "lost-leads", group_by: "reason" },
+    });
+  }
+  if (quoted >= 3) {
+    rows.push({
+      code: "quotation_answers",
+      title: "Of the quotations sent, this share had an answer from the customer.",
+      figure: pct(answered, quoted),
+      previous: null,
+      unit: "pct",
+      link: null,
+    });
+  }
+  if (now.length > 0) {
+    rows.push({
+      code: "first_contact_speed",
+      title: "New leads were first contacted in about this long, half of them sooner.",
+      figure: "6",
+      previous: null,
+      unit: "hours",
+      link: { report: "follow-ups" },
+    });
+  }
+  const days =
+    (Date.parse(`${filters.to}T00:00:00Z`) - Date.parse(`${filters.from}T00:00:00Z`)) / DAY_MS + 1;
+  return {
+    rows,
+    truncated: false,
+    filters: {
+      from: filters.from,
+      to: filters.to,
+      previous_from: shiftCalendarDay(filters.from, -days),
+      previous_to: shiftCalendarDay(filters.from, -1),
+    },
+  };
+}
+
 const GROUPS: Partial<Readonly<Record<ReportName, readonly string[]>>> = {
   "lead-conversion": ["source", "owner", "territory"],
   "lost-leads": ["reason", "owner"],
   complaints: ["type", "status", "severity"],
   "territory-performance": ["district", "taluka"],
+  "sales-forecast": ["owner", "territory", "source"],
 };
 
 /** The report's data, a refusal, or a 422. */
@@ -656,6 +855,10 @@ function run(name: ReportName, params: URLSearchParams): Response | { rows: read
       return refusal(name, "leads") ?? territoryPerformance(filters, groupBy);
     case "complaints":
       return refusal(name, "complaints") ?? complaintsReport(filters, groupBy);
+    case "sales-forecast":
+      return refusal(name, "leads") ?? salesForecast(params, groupBy);
+    case "insights":
+      return refusal(name, "leads") ?? insights(filters);
   }
 }
 

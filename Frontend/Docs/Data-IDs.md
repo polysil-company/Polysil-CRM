@@ -173,6 +173,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
 | RPT-002 | Reports — conversion, people, lost leads, follow-ups, dealers, campaigns, areas, complaints (`GET /reports/*`) | shared | in-progress |
 | RPT-003 | A lead's 360° view (`GET /leads/{id}/360`) | shared | in-progress |
+| RPT-004 | Sales forecast — the open pipeline weighted by each stage's win rate, by month (`GET /reports/sales-forecast`) | shared | in-progress |
+| RPT-005 | Insights — plain sentences about the period against the one before (`GET /reports/insights`) | shared | in-progress |
 | TGT-001 | Targets — the month's achievement, yours and your team's (`GET /targets/achievement`) | shared | in-progress |
 | TGT-002 | Set a person's monthly targets, with their history (`GET /targets`, `PUT /targets`) | shared | in-progress |
 | TRK-001 | The team map: where each person on duty was last seen (`GET /tracking/team/latest`) | shared | in-progress |

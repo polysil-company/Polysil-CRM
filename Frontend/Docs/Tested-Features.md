@@ -735,7 +735,13 @@ Admin → **Masters** (`/masters`), for staff who see masters (`backend/docs/api
 
 Admin → **Reports** (`/reports`), on the backend's contract (handover `reports-contract.md` and `when-a-sale-counts.md`, read against `api/services/reports.py`), PR #149. Walked through in the mock as Admin and as a State Manager, on a desktop in light mode and a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
 
-- **RPT-002 · Reports home:** a card for each of the eight reports the user may open, with its figure over the last 30 days ("16.2% converted", "16 overdue", "₹2.48 L"…). A report that answers 403 is left out; with none left, "No reports for your role". Screens: [desktop](screenshots/reports/reports-home-desktop-light.jpg), [phone, dark](screenshots/reports/reports-home-phone-dark.jpg). 🧪 👀
+- **RPT-002 · Reports home:** a card for each of the ten reports (eight, then the forecast and insights below) the user may open, with its figure over the last 30 days ("16.2% converted", "16 overdue", "₹2.48 L"…). A report that answers 403 is left out; with none left, "No reports for your role". Screens: [desktop](screenshots/reports/reports-home-desktop-light.jpg), [phone, dark](screenshots/reports/reports-home-phone-dark.jpg). 🧪 👀
+- **RPT-004 · Sales forecast** (`/reports/sales-forecast`, FS-079, `feature/RPT-004-forecast-insights`; screens: [desktop](screenshots/reports/forecast-desktop-light.jpg), [phone, dark](screenshots/reports/forecast-phone-dark.jpg)).
+  - **What it shows:** each open lead's value (its newest live quotation, else its estimate) weighted by its stage's win rate, as "Likely", by person, territory or source, and by this month, the next two and later.
+  - **Beside it:** the open pipeline, open leads (with a value), the typical time to win, and the win rates used. A borrowed rate is marked.
+  - **Too little history:** it says so and shows dashes, never ₹0.
+  - Filters: area and person, in the URL, with the same Excel file. 🧪 👀
+- **RPT-005 · Insights** (`/reports/insights`). Plain sentences about the window against the same number of days before it, each with its figure, what it was, and **See the report** for the report behind it. Nothing to say means too little happened, and it says so. 🧪
 - **RPT-002 · A report** (`/reports/{name}`):
   - Its filters are in the URL: From and to (the last 30 days when empty), Area, Person, and By (source, person or territory; reason or person; type, status or severity; district or taluka), each only where the report takes it. Follow-ups is as of now, with no window.
   - A table with a Total line where the backend sends totals, the window the figures used, and "Sales counted at: approval" on the reports that count sales. A figure the role may not see is a dash, read out as "Not available to you", with a line saying so.

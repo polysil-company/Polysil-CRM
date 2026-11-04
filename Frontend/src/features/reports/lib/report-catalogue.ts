@@ -114,6 +114,29 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     ],
     sales: false,
   },
+  "sales-forecast": {
+    title: "Sales forecast",
+    description:
+      "What the open pipeline is likely to bring in, and roughly when, weighted by each stage's win rate.",
+    dates: false,
+    territory: true,
+    owner: true,
+    groups: [
+      { value: "owner", label: "Person" },
+      { value: "territory", label: "Territory" },
+      { value: "source", label: "Source" },
+    ],
+    sales: false,
+  },
+  insights: {
+    title: "Insights",
+    description: "Plain sentences about the window against the same number of days before it.",
+    dates: true,
+    territory: true,
+    owner: true,
+    groups: [],
+    sales: false,
+  },
 };
 
 /** "Sales counted at: approval", as the handover words it (`when-a-sale-counts.md`). */

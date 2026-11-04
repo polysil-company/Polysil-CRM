@@ -1289,6 +1289,22 @@ export const DATA_IDS = {
     endpoints: ["GET /leads/{id}/360"],
     notes: "Needs leads.view and reports.view. The timeline below it is LEAD-005's.",
   },
+  "RPT-004": {
+    domain: "RPT",
+    title: "Sales forecast — the open pipeline weighted by each stage's win rate, by month",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /reports/sales-forecast"],
+    notes: "FS-079. Staff only. With too little history the weighted figures are null, never 0.",
+  },
+  "RPT-005": {
+    domain: "RPT",
+    title: "Insights — plain sentences about the period against the one before",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /reports/insights"],
+    notes: "FS-079. Staff only. A missing row means too little data, not a problem.",
+  },
   "SUBS-001": {
     domain: "SUBS",
     title: "Subsidy forms and case status",

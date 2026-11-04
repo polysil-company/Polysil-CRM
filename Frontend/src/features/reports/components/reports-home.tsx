@@ -94,6 +94,20 @@ const HEADLINES: { readonly [N in ReportName]: (data: ReportData<N>) => Figure }
     value: plural(data.totals.count, "complaint", "complaints"),
     note: `${formatNumber(data.totals.resolved)} resolved`,
   }),
+  "sales-forecast": (data) => ({
+    value:
+      data.totals.weighted === null
+        ? formatInrCompact(data.totals.pipeline)
+        : `${formatInrCompact(data.totals.weighted)} likely`,
+    note:
+      data.totals.weighted === null
+        ? `open, across ${plural(data.totals.open, "lead", "leads")}: too little history to weigh it`
+        : `of ${formatInrCompact(data.totals.pipeline)} open, across ${plural(data.totals.open, "lead", "leads")}`,
+  }),
+  insights: (data) => ({
+    value: plural(data.rows.length, "insight", "insights"),
+    note: data.rows[0]?.title ?? "Too little happened to say anything",
+  }),
 };
 
 /**
