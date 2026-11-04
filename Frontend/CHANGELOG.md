@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-121 changes, newest first. Each title opens its entry.
+122 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-11-05 | [A restore in the lead's history, and an owner who has left](changelog/entries/2026-11-05--feature--LEAD-020--a-restore-in-the-lead-s-history-and-an-owner-who-has-left.md) | `feature` | `LEAD-020` |
 | 2026-11-05 | [Company settings read the application settings and any kind added later](changelog/entries/2026-11-05--fix--ADMN-007--company-settings-read-the-application-settings-and-any-kind.md) | `fix` | `ADMN-007` |
 | 2026-10-30 | [Visits take the location by themselves once allowed](changelog/entries/2026-10-30--feature--TRK-003--visits-take-the-location-by-themselves-once-allowed.md) | `feature` | `TRK-003` `TRK-004` |
 | 2026-10-30 | [Duty on Android, and the map under the menu](changelog/entries/2026-10-30--fix--TRK-008--duty-on-android-and-the-map-under-the-menu.md) | `fix` | `TRK-008` `TRK-001` |
@@ -134,6 +135,41 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
 
 ## 5 November 2026
+
+### A restore in the lead's history, and an owner who has left
+
+`feature` · `LEAD-020` · Claude · [entry](changelog/entries/2026-11-05--feature--LEAD-020--a-restore-in-the-lead-s-history-and-an-owner-who-has-left.md)
+
+#### Before
+
+Restoring a deleted lead (LEAD-020, PR #210) left two gaps against `leads.md`:
+
+- **The history:** the backend adds `lead.restored` to a lead's history, with `duplicates_reopened`. The history had no line of its own for it, so it showed a generic "Lead restored" label and dropped the reopened pairs.
+- **An owner who has left:** the restore keeps the owner, even one who has since left, and the backend says to "offer Assign when `owner` is inactive". A lead's `owner` carries no active flag, so the screen couldn't tell.
+
+#### Now
+
+- **The history** reads "<name> restored the lead", with ", and its possible duplicate is open again" or ", and its 2 possible duplicates are open again" when the restore reopened them. It has an undo icon in the success tone.
+- **The restore's toast**, when the lead's owner has left, adds "Its owner, Hiren Mehta, has left: open it and assign it to someone." beside the link to the lead.
+- **BE-042** asks the backend for `is_active` on a lead's `owner`. Until it comes, the lead is restored as before and nothing more is said.
+
+#### Discussion
+
+- **Why not work out "has left" on the frontend.** `GET /leads/assignees` lists only the people the caller may assign to. An owner missing from it may simply be in another area, so "has left" would sometimes be wrong. Asking the backend for the flag gives the right answer every time, and the frontend reads it as soon as it arrives.
+- **Assign isn't opened from the toast.** Assign is a dialog on the lead's page, with no address of its own. The toast links to the lead and says to assign it.
+
+#### Files changed
+
+- `src/features/leads/lib/timeline-entries.ts`, `src/features/leads/components/lead-timeline.tsx`: the `restored` entry, its sentence and icon.
+- `src/features/leads/api/leads.schemas.ts`: the owner's `is_active`, read when sent.
+- `src/features/leads/components/restore-lead-button.tsx`: the toast for an owner who has left.
+- `docs/Backend-Tasks.md`: BE-042.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`: records.
+
+#### Tests
+
+- `[LEAD-005] toTimelineEntry › [LEAD-020] reads a restore`: with the reopened count, and without it.
+- `[LEAD-019]` Deleted leads: a restored lead whose owner has left gets the toast's line.
 
 ### Company settings read the application settings and any kind added later
 
