@@ -169,7 +169,7 @@ Measured against `integration` at `33901f8` (#225). Every backend commit since 2
 - [x] **41. Dealer and distributor applications: the type and the data sheet** (FS-071). PR #228, 4 Nov (`feature/CHNL-007-partner-type-data-sheet`). CHNL-007, CHNL-008. `backend/docs/api/dealer-applications.md`.
   - `partner_type` (`dealer` or `distributor`) when starting, on edit while draft or returned, and as a list filter. A distributor is approved with no parent and gets a `DIST-` code.
   - The data sheet's new fields, staff and applicant forms alike: telephone, established on, bank name, branch and address, working capital rows, other sources (lakhs), two-wheelers, cars, other vehicles, office and godown area with their unit, manpower rows, previous installations, sales executives, technicians, appointment place.
-- [ ] **42. Dealer and distributor applications: the deposit** (FS-071). CHNL-007.
+- [~] **42. Dealer and distributor applications: the deposit** (FS-071). `feature/CHNL-007-deposit`. CHNL-007.
   - The deposit card: amount due, status (`paid`, `waived`, `pending`, `not_required`) and history.
   - **Record the deposit** (`POST …/deposit`): amount, date paid, reference, and the pay slip uploaded first as a `deposit_slip` document.
   - **Lower or waive it** (`POST …/deposit/relaxation`): the new amount and why, only for the roles in `deposit_relaxation_roles`, never whoever started the application.

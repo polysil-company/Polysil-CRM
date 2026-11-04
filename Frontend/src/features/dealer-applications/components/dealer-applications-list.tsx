@@ -27,6 +27,7 @@ import {
 import {
   DEALER_APPLICATION_STATUS_BADGE,
   DEALER_APPLICATION_STATUS_LABELS,
+  DEPOSIT_STATUS_LABELS,
   PARTNER_TYPE_LABELS,
 } from "@/features/dealer-applications/lib/dealer-application-labels";
 import { useCan } from "@/features/session/hooks/use-session";
@@ -206,6 +207,9 @@ function ApplicationRow({ row }: { row: DealerApplicationRow }): React.JSX.Eleme
           <Badge variant={DEALER_APPLICATION_STATUS_BADGE[row.status]} dot>
             {label}
           </Badge>
+          {row.depositStatus === "pending" ? (
+            <Badge variant="warning">{DEPOSIT_STATUS_LABELS.pending}</Badge>
+          ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
           {PARTNER_TYPE_LABELS[row.partnerType]} · {row.contactName} · {row.territoryName} ·{" "}

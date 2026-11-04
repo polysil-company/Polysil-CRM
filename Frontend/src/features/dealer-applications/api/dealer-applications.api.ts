@@ -11,6 +11,8 @@ import {
   type DealerApplicationListParams,
   type DealerApplicationRow,
   type DecisionRequest,
+  type DepositRecordRequest,
+  type DepositRelaxationRequest,
   type RemarkRequest,
 } from "./dealer-applications.schemas";
 
@@ -171,6 +173,51 @@ export function decideDealerApplication({
     fn: "decideDealerApplication",
     method: "POST",
     path: applicationPath(applicationId, "/decision"),
+    body,
+    idempotencyKey,
+    schema: dealerApplicationSchema,
+    sensitive: true,
+  });
+}
+
+/**
+ * CHNL-007 · POST /dealer-applications/{id}/deposit (FS-071): the deposit paid, with the pay
+ * slip already uploaded as a `deposit_slip` document. The latest payment counts.
+ */
+export function recordDealerApplicationDeposit({
+  applicationId,
+  body,
+  idempotencyKey,
+}: WriteInput<DepositRecordRequest>): Promise<DealerApplication> {
+  return apiRequest({
+    dataId: "CHNL-007",
+    logger: log,
+    fn: "recordDealerApplicationDeposit",
+    method: "POST",
+    path: applicationPath(applicationId, "/deposit"),
+    body,
+    idempotencyKey,
+    schema: dealerApplicationSchema,
+    sensitive: true,
+  });
+}
+
+/**
+ * CHNL-007 · POST /dealer-applications/{id}/deposit/relaxation (FS-071): a lower amount due,
+ * or 0 to waive it, with why. Only the roles `deposit_relaxation_roles` names, never whoever
+ * started the application, and not after a payment.
+ */
+export function relaxDealerApplicationDeposit({
+  applicationId,
+  body,
+  idempotencyKey,
+}: WriteInput<DepositRelaxationRequest>): Promise<DealerApplication> {
+  return apiRequest({
+    dataId: "CHNL-007",
+    logger: log,
+    fn: "relaxDealerApplicationDeposit",
+    method: "POST",
+    path: applicationPath(applicationId, "/deposit/relaxation"),
     body,
     idempotencyKey,
     schema: dealerApplicationSchema,
