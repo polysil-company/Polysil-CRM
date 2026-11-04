@@ -18,7 +18,7 @@ import { errorResponse } from "./shared";
  * ADMN-007 · Company settings for the mock backend (FS-036): staff read them; those who may
  * edit masters change them, each value checked against its kind, and the answer is the full
  * list. The keys, values and descriptions are the backend's seeds (`app_setting`, migrations
- * 041 to 060).
+ * 041 to 078).
  */
 
 const SEEDED_AT = "2026-10-01T04:30:00.000Z";
@@ -84,6 +84,53 @@ function slabs(key: string, value: string[], description: string): SettingWire {
     updated_at: SEEDED_AT,
   };
 }
+
+function set(key: string, allowed: string[], description: string): SettingWire {
+  return {
+    key,
+    kind: "set",
+    value: [],
+    allowed,
+    min: null,
+    max: null,
+    description,
+    updated_at: SEEDED_AT,
+  };
+}
+
+function staffRoles(key: string, value: string[], description: string): SettingWire {
+  return {
+    key,
+    kind: "staff_roles",
+    value,
+    allowed: null,
+    min: null,
+    max: null,
+    description,
+    updated_at: SEEDED_AT,
+  };
+}
+
+/** FS-071 (migration 078): what a dealer or distributor application may be made to require. */
+export const APPLICATION_REQUIRED_CHOICES = [
+  "email",
+  "godown_address",
+  "telephone",
+  "established_on",
+  "bank_name",
+  "bank_branch",
+  "bank_address",
+  "working_capital",
+  "vehicles",
+  "office_area",
+  "godown_area",
+  "manpower",
+  "previous_installations",
+  "staff_counts",
+  "appointment_place",
+  "shop_photo",
+  "shop_licence",
+];
 
 /** The mock's settings, seeded on first read; other handlers read their values through it. */
 export function mockSettings(): SettingWire[] {
@@ -198,6 +245,46 @@ export function mockSettings(): SettingWire[] {
       ["0", "5", "18", "40"],
       "The GST slabs a commercial or industrial line, and freight, may be set to.",
     ),
+    // FS-071 (migration 078)
+    int(
+      "dealer_deposit_amount",
+      0,
+      0,
+      10000000,
+      "The deposit, in rupees, a new dealer pays before approval. 0: no deposit.",
+    ),
+    int(
+      "distributor_deposit_amount",
+      0,
+      0,
+      10000000,
+      "The deposit, in rupees, a new distributor pays before approval. 0: no deposit.",
+    ),
+    staffRoles(
+      "deposit_relaxation_roles",
+      ["regional_manager", "md_ceo"],
+      "Who may lower or waive a deposit on a partner application.",
+    ),
+    staffRoles(
+      "dealer_application_deciders",
+      ["state_manager", "regional_manager", "md_ceo", "admin_sales"],
+      "Who approves, returns or rejects a dealer application.",
+    ),
+    staffRoles(
+      "distributor_application_deciders",
+      ["regional_manager", "md_ceo", "admin_sales"],
+      "Who approves, returns or rejects a distributor application.",
+    ),
+    set(
+      "dealer_application_required",
+      APPLICATION_REQUIRED_CHOICES,
+      "Extra fields a dealer application must have before it is submitted.",
+    ),
+    set(
+      "distributor_application_required",
+      APPLICATION_REQUIRED_CHOICES,
+      "Extra fields a distributor application must have before it is submitted.",
+    ),
   ];
   return mockDb.settings;
 }
@@ -253,6 +340,21 @@ function problemOf(setting: SettingWire, value: unknown): string | null {
         new Set(value.map(Number)).size === value.length
         ? null
         : "GST slabs in force, at least one, none twice";
+    case "set":
+      return Array.isArray(value) &&
+        value.every((item) => typeof item === "string" && (setting.allowed ?? []).includes(item)) &&
+        new Set(value).size === value.length
+        ? null
+        : `some of ${(setting.allowed ?? []).join(", ")}, none twice`;
+    case "staff_roles":
+      return Array.isArray(value) &&
+        value.length > 0 &&
+        value.every((code) => MOCK_ROLES.some((role) => role.code === code && !role.is_portal)) &&
+        new Set(value).size === value.length
+        ? null
+        : "at least one staff role, none twice";
+    default:
+      return "this setting can't be changed";
   }
 }
 

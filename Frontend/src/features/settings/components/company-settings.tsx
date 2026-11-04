@@ -35,7 +35,7 @@ const log = createLogger({
 });
 
 /**
- * Each setting the backend seeds today (`app_setting`, migrations 041 to 060): its title, the
+ * Each setting the backend seeds today (`app_setting`, migrations 041 to 078): its title, the
  * section it sits in, its choices in words, and a note where the handover asks for one. A key
  * not listed here still renders from its kind, titled from its own name, under "Other".
  */
@@ -52,6 +52,7 @@ const SECTIONS = [
   { id: "orders", title: "Orders" },
   { id: "complaints", title: "Complaints" },
   { id: "dealers", title: "Dealers" },
+  { id: "applications", title: "Dealer and distributor applications" },
   { id: "customers", title: "Customers" },
   { id: "other", title: "Other" },
 ] as const;
@@ -59,6 +60,27 @@ const SECTIONS = [
 type SectionId = (typeof SECTIONS)[number]["id"];
 
 const OFF_ON: Readonly<Record<string, string>> = { off: "Off", on: "On" };
+
+/** FS-071 · The extra fields an application can be made to need before it is submitted. */
+const APPLICATION_FIELDS: Readonly<Record<string, string>> = {
+  email: "Email",
+  godown_address: "Godown address",
+  telephone: "Telephone",
+  established_on: "Established on",
+  bank_name: "Bank name",
+  bank_branch: "Bank branch",
+  bank_address: "Bank address",
+  working_capital: "Working capital",
+  vehicles: "Vehicles",
+  office_area: "Office area",
+  godown_area: "Godown area",
+  manpower: "Manpower",
+  previous_installations: "Previous installations",
+  staff_counts: "Sales executives and technicians",
+  appointment_place: "Place of appointment",
+  shop_photo: "Shop photo",
+  shop_licence: "Shop licence",
+};
 
 const COPY: Readonly<Record<string, SettingCopy>> = {
   order_amend_reapproval: {
@@ -136,6 +158,30 @@ const COPY: Readonly<Record<string, SettingCopy>> = {
     title: "Sign-in codes to customers in an hour",
     section: "customers",
   },
+  dealer_deposit_amount: { title: "A new dealer's deposit, in rupees", section: "applications" },
+  distributor_deposit_amount: {
+    title: "A new distributor's deposit, in rupees",
+    section: "applications",
+  },
+  deposit_relaxation_roles: { title: "Who may lower or waive a deposit", section: "applications" },
+  dealer_application_deciders: {
+    title: "Who decides a dealer application",
+    section: "applications",
+  },
+  distributor_application_deciders: {
+    title: "Who decides a distributor application",
+    section: "applications",
+  },
+  dealer_application_required: {
+    title: "What a dealer application must have",
+    section: "applications",
+    choices: APPLICATION_FIELDS,
+  },
+  distributor_application_required: {
+    title: "What a distributor application must have",
+    section: "applications",
+    choices: APPLICATION_FIELDS,
+  },
 };
 
 function humanize(code: string): string {
@@ -169,6 +215,12 @@ function draftOf(setting: Setting): string | readonly string[] {
     case "bands":
       return setting.value.map(String);
     case "slabs":
+      return setting.value;
+    case "set":
+      return setting.value;
+    case "staff_roles":
+      return setting.value;
+    case "unknown":
       return setting.value;
   }
 }
@@ -204,6 +256,9 @@ function problemOf(setting: Setting, draft: string | readonly string[]): string 
   if (setting.kind === "slabs" && (!Array.isArray(draft) || draft.length === 0)) {
     return "Choose at least one slab.";
   }
+  if (setting.kind === "staff_roles" && (!Array.isArray(draft) || draft.length === 0)) {
+    return "Choose at least one role.";
+  }
   return null;
 }
 
@@ -221,7 +276,15 @@ function requestValueOf(
       return Array.isArray(draft) ? draft : [];
     case "slabs":
       return [...(Array.isArray(draft) ? draft : [])].sort((a, b) => Number(a) - Number(b));
+    case "set": {
+      const picked = Array.isArray(draft) ? draft : [];
+      // In the backend's own order, so the same choice always reads the same.
+      return setting.allowed.filter((option) => picked.includes(option));
+    }
+    case "staff_roles":
+      return Array.isArray(draft) ? draft : [];
     case "choice":
+    case "unknown":
       return typeof draft === "string" ? draft : "";
   }
 }
@@ -229,8 +292,9 @@ function requestValueOf(
 /**
  * ADMN-007 · Admin → Company settings (FS-036): rules for orders, complaints, dealers and the
  * farmers' portal, in sections; more arrive with other features. Each setting is drawn from its
- * kind (a choice, a number in a range, roles, four rising bands, or GST slabs). Staff read them; those who
- * may edit masters change them and save them together.
+ * kind (a choice, a number in a range, roles, four rising bands, GST slabs, some of a list, or
+ * staff roles). A kind the screen doesn't know yet is shown as text, never edited. Staff read
+ * them; those who may edit masters change them and save them together.
  */
 export function CompanySettings(): React.JSX.Element {
   const query = useQuery(settingsQueryOptions());
@@ -408,7 +472,7 @@ function SettingCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <Field data-invalid={error === undefined ? undefined : true}>
-          {canEdit ? (
+          {canEdit && setting.kind !== "unknown" ? (
             <SettingEditor
               id={id}
               setting={setting}
@@ -435,7 +499,12 @@ function SettingCard({
 }
 
 function ReadOnlyValue({ setting }: { setting: Setting }): React.JSX.Element {
-  const roles = useQuery({ ...roleListQueryOptions(), enabled: setting.kind === "roles" });
+  const roles = useQuery({
+    ...roleListQueryOptions(),
+    enabled: setting.kind === "roles" || setting.kind === "staff_roles",
+  });
+  const roleName = (code: string): string =>
+    roles.data?.find((role) => role.code === code)?.name ?? humanize(code);
   switch (setting.kind) {
     case "choice":
       return <>{choiceLabel(setting.key, setting.value)}</>;
@@ -446,17 +515,26 @@ function ReadOnlyValue({ setting }: { setting: Setting }): React.JSX.Element {
     case "slabs":
       return <>{slabsInOrder(setting.value).map(formatRate).join(", ")}</>;
     case "roles":
+    case "staff_roles":
       return (
         <>
           {setting.value.length === 0
             ? "No one"
             : setting.value
-                .map(
-                  (code) => roles.data?.find((role) => role.code === code)?.name ?? humanize(code),
-                )
+                .map(roleName)
                 .join(COPY[setting.key]?.ordered === true ? ", then " : ", ")}
         </>
       );
+    case "set":
+      return (
+        <>
+          {setting.value.length === 0
+            ? "None"
+            : setting.value.map((option) => choiceLabel(setting.key, option)).join(", ")}
+        </>
+      );
+    case "unknown":
+      return <>{setting.value === "" ? "Not set" : setting.value}</>;
   }
 }
 
@@ -523,7 +601,30 @@ function SettingEditor({
       </>
     );
   }
-  if (setting.kind === "roles") {
+  if (setting.kind === "set") {
+    const picked = Array.isArray(value) ? value : [];
+    return (
+      <div
+        role="group"
+        aria-label={title}
+        aria-describedby={error === undefined ? undefined : describedBy}
+        className="grid gap-2 sm:grid-cols-2"
+      >
+        {setting.allowed.map((option) => (
+          <label key={option} className="flex min-h-9 items-center gap-2 text-sm text-foreground">
+            <Checkbox
+              checked={picked.includes(option)}
+              onCheckedChange={(checked) => {
+                onChange(checked ? [...picked, option] : picked.filter((item) => item !== option));
+              }}
+            />
+            {choiceLabel(setting.key, option)}
+          </label>
+        ))}
+      </div>
+    );
+  }
+  if (setting.kind === "roles" || setting.kind === "staff_roles") {
     return (
       <RolesEditor
         id={id}
