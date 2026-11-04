@@ -162,7 +162,7 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 
 Measured against `integration` at `33901f8` (#225). Every backend commit since 22 Oct, checked against the frontend source. Item 40 is first because it breaks a screen once the backend deploys migration 078.
 
-- [~] **40. Company settings: the `set` and `staff_roles` kinds.** `feature/ADMN-007-setting-kinds`. ADMN-007. Migration 078 seeds five settings of these kinds (deposit relaxation roles, who decides dealer and distributor applications, what each application type requires). `settings.schemas.ts` accepts only `choice | int | roles | bands | slabs`, so one of them fails the whole page with "We received data we couldn't read".
+- [x] **40. Company settings: the `set` and `staff_roles` kinds.** PR #227, 4 Nov (`feature/ADMN-007-setting-kinds`). ADMN-007. Migration 078 seeds five settings of these kinds (deposit relaxation roles, who decides dealer and distributor applications, what each application type requires). `settings.schemas.ts` accepts only `choice | int | roles | bands | slabs`, so one of them fails the whole page with "We received data we couldn't read".
   - `set`: some of `allowed`, none twice, as checkboxes. `staff_roles`: at least one staff role code, as checkboxes.
   - A kind the screen doesn't know is shown read-only, not a contract error, so the next new kind can't take the page down.
   - Contract: `backend/docs/api/settings.md`.
