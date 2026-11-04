@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import type * as React from "react";
 
+import { DownloadFileButton } from "@/components/patterns/download-file-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { Notice } from "@/components/patterns/notice";
 import { QueryView } from "@/components/patterns/query-view";
@@ -13,6 +14,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { downloadDealerApplicationPdf } from "@/features/dealer-applications/api/dealer-applications.api";
 import { dealerApplicationQueryOptions } from "@/features/dealer-applications/api/dealer-applications.queries";
 import {
   OPEN_STATUSES,
@@ -28,10 +30,16 @@ import {
 import { RecordDocuments } from "@/features/documents/components/record-documents";
 import { isApiError } from "@/lib/api/errors";
 import { EMPTY_VALUE, formatFullDate, formatIndianPhone } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
 
 import { DataSheetFacts } from "./data-sheet-facts";
 import { DealerApplicationActions } from "./dealer-application-actions";
 import { DepositCard } from "./deposit-card";
+
+const log = createLogger({
+  file: "features/dealer-applications/components/dealer-application-detail.tsx",
+  dataId: "CHNL-007",
+});
 
 /**
  * CHNL-007 · One dealer or distributor application: where it stands and what is still needed,
@@ -101,7 +109,17 @@ function DetailView({ application }: { application: DealerApplication }): React.
             {application.territory.name}
           </p>
         </div>
-        <DealerApplicationActions application={application} />
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadFileButton
+            download={() => downloadDealerApplicationPdf(application.id)}
+            fallbackName="application.pdf"
+            logger={log}
+            dataId="CHNL-007"
+          >
+            Download PDF
+          </DownloadFileButton>
+          <DealerApplicationActions application={application} />
+        </div>
       </div>
 
       <ApplicationNotices application={application} open={open} />

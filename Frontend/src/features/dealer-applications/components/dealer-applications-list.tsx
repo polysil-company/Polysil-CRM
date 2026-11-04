@@ -1,12 +1,13 @@
 "use client";
 
-import { Add01Icon, UserAdd01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Download04Icon, UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 
+import { toastDownloadError } from "@/components/patterns/download-file-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
@@ -15,9 +16,19 @@ import { SearchField } from "@/components/patterns/search-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PARTNER_TYPES } from "@/features/dealer-applications/api/data-sheet.schemas";
+import {
+  PARTNER_TYPES,
+  type PartnerType,
+} from "@/features/dealer-applications/api/data-sheet.schemas";
+import { downloadBlankApplicationForm } from "@/features/dealer-applications/api/dealer-applications.api";
 import { dealerApplicationListQueryOptions } from "@/features/dealer-applications/api/dealer-applications.queries";
 import {
   DEALER_APPLICATION_STATUSES,
@@ -31,8 +42,16 @@ import {
   PARTNER_TYPE_LABELS,
 } from "@/features/dealer-applications/lib/dealer-application-labels";
 import { useCan } from "@/features/session/hooks/use-session";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { saveFile } from "@/lib/api/save-file";
+import { createLogger } from "@/lib/logger";
 
 import { StartDealerApplication } from "./start-dealer-application";
+
+const log = createLogger({
+  file: "features/dealer-applications/components/dealer-applications-list.tsx",
+  dataId: "CHNL-007",
+});
 
 const SKELETON_ROWS = 4;
 
@@ -105,14 +124,17 @@ export function DealerApplicationsList(): React.JSX.Element {
           managers the company settings name approve it. Approving adds the partner and its login.
         </p>
         {canView ? (
-          <Button
-            onClick={() => {
-              setStarting(true);
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            Start an application
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <BlankFormMenu />
+            <Button
+              onClick={() => {
+                setStarting(true);
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              Start an application
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -189,6 +211,53 @@ export function DealerApplicationsList(): React.JSX.Element {
         </DialogContent>
       </Dialog>
     </section>
+  );
+}
+
+/**
+ * FS-071 · The blank data sheet for a dealer or a distributor, to print and fill in by hand
+ * (`GET /dealer-applications/form.pdf`).
+ */
+function BlankFormMenu(): React.JSX.Element {
+  const run = useAsyncAction({
+    action: (type: PartnerType) => downloadBlankApplicationForm(type),
+    logger: log,
+    fn: "handleDownloadBlankForm",
+    dataId: "CHNL-007",
+    onSuccess: (file) => {
+      saveFile(file, "application-form.pdf");
+    },
+    onError: toastDownloadError,
+  });
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="outline"
+            state={run.state}
+            loadingLabel="Preparing…"
+            successLabel="Downloaded"
+            errorLabel="Not downloaded"
+          />
+        }
+      >
+        <Icon icon={Download04Icon} />
+        Blank form
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {PARTNER_TYPES.map((item) => (
+          <DropdownMenuItem
+            key={item}
+            onClick={() => {
+              void run.run(item);
+            }}
+          >
+            For a new {PARTNER_TYPE_LABELS[item].toLowerCase()}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
