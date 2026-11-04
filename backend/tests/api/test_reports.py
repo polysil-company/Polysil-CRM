@@ -67,15 +67,18 @@ async def test_a_figure_without_its_module_is_null_never_zero(client: httpx.Asyn
     assert r.status_code == 200, r.text
     assert r.json()["data"]["rows"], "a row to check: the officer's lead (code review)"
     for row in r.json()["data"]["rows"]:
-        assert row["tasks_done"] is None and row["visits"] is None
-        assert row["orders"] is not None
+        assert row["visits"] is None and row["orders"] is not None
+        # tasks at own scope: the caller's own figure is real, and the FS-082 roster lists them
+        if row["user"]["id"] != shop.ids["account_manager"]:
+            assert row["tasks_done"] is None
     x = await client.get(f"{V1}/reports/salesperson-performance", headers=accounts,
                          params={"territory_id": shop.district, "format": "xlsx"})
     assert x.status_code == 200, x.text
     sheet = [tuple(c.value for c in row) for row in load_workbook(io.BytesIO(x.content)).active.iter_rows()]
     visits, tasks = sheet[0].index("Visits"), sheet[0].index("Tasks done")
     assert len(sheet) > 2, "data rows besides the header and the Total line"
-    assert all(row[visits] is None and row[tasks] is None for row in sheet[1:]), \
+    assert all(row[visits] is None and (row[tasks] is None or row[0] == "Account Manager")
+               for row in sheet[1:]), \
         "a figure the caller may not see is a blank cell in Excel too, never 0"
     # the positive control: a district manager's task scope reaches the officer
     dm = await endpoints._as(client, shop, "district_manager")

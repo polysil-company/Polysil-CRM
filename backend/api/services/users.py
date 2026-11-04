@@ -379,6 +379,25 @@ async def _open_office(db: AsyncSession, org_unit_id: str) -> None:
         raise ValidationFailed(fields={"org_unit_id": "not found or closed"})
 
 
+async def _office_has_area(db: AsyncSession, role_id: str, org_unit_id: str, field: str) -> None:
+    """FS-082 rule 4: a role in AREA_ROLES sits in an office that covers an area.
+    Elsewhere they see no dealers, and a manager there reads everything under the
+    office (ISS-233). GAP-556: which roles is unconfirmed (question 37.4)."""
+    row = (await db.execute(text(
+        "SELECT lower(r.code::text) AS code, r.name AS role_name, o.name AS office, "
+        "       t.id AS territory_id "
+        "  FROM role r CROSS JOIN org_unit o "
+        "  LEFT JOIN territory t ON t.id = o.territory_id AND t.deleted_at IS NULL "
+        " WHERE r.id = CAST(:r AS uuid) AND o.id = CAST(:o AS uuid)"),
+        {"r": role_id, "o": org_unit_id})).one_or_none()
+    if row is None or row.code not in identity.AREA_ROLES or row.territory_id is not None:
+        return
+    raise ValidationFailed(
+        f"A {row.role_name} must be in an office that covers an area. {row.office} covers none.",
+        code="office_has_no_area",
+        fields={field: f"a {row.role_name} needs an office that covers an area"})
+
+
 async def _territories_exist(db: AsyncSession, ids: list[str]) -> None:
     if not ids:
         return
@@ -479,6 +498,7 @@ async def create_user(db: AsyncSession, caller: Caller, body: UserCreate) -> Use
             raise ValidationFailed(fields={"password": problem})
         role_id = await _role_for_staff(db, body.role)
         await _open_office(db, body.org_unit_id)
+        await _office_has_area(db, role_id, body.org_unit_id, "org_unit_id")
         await _territories_exist(db, body.territory_ids)
         if not body.territory_ids and await _role_needs_territory(db, role_id):
             raise ValidationFailed(
@@ -671,6 +691,14 @@ async def patch_user(db: AsyncSession, caller: Caller, user_id: str,
                 "INSERT INTO user_territory (user_id, territory_id) "
                 "VALUES (CAST(:u AS uuid), CAST(:t AS uuid))"), {"u": user_id, "t": tid})
         changed["territory_ids"] = ids
+
+    # FS-082 rule 4, on a change only (S-4): fixing a misplaced person's name still works
+    office_now = body.org_unit_id if "org_unit_id" in fields else (
+        str(row.org_unit_id) if row.org_unit_id else None)
+    office_changed = office_now != (str(row.org_unit_id) if row.org_unit_id else None)
+    if staff and role_id and office_now and (role_changed or office_changed):
+        await _office_has_area(db, role_id, office_now,
+                               "org_unit_id" if office_changed else "role")
 
     if (role_changed and "territory_ids" not in fields and staff and role_id
             and await _role_needs_territory(db, role_id)):
