@@ -574,7 +574,7 @@ export const leadHandlers = [
   }),
 
   /** LEAD-009 · The list as a file. Before /leads/:leadId. */
-  http.get(buildApiUrl("/leads/export"), async () => {
+  http.get(buildApiUrl("/leads/export"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     return mockWorkbook(
@@ -587,6 +587,7 @@ export const leadHandlers = [
         lead.stage,
         lead.territory.name,
       ]),
+      request,
     );
   }),
 

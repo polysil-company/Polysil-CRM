@@ -100,7 +100,7 @@ export function CommissionsList(): React.JSX.Element {
           ))}
         </ToggleGroup>
         <DownloadExcelButton
-          download={() => exportCommissions(params)}
+          download={(format) => exportCommissions(params, format)}
           fallbackName="dealer-commissions.xlsx"
           what="commissions"
           logger={log}

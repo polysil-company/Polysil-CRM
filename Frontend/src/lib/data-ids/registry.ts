@@ -145,6 +145,15 @@ export const DATA_IDS = {
     notes:
       "From the logo on the quotation PDFs (backend/worker/templates/assets/polysil-logo.png); mobile/scripts/make-brand-assets.mjs redraws every size.",
   },
+  "APP-011": {
+    domain: "APP",
+    title: "Downloads as Excel, CSV or PDF — every list's file in CSV too, and a report as PDF",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /…/export?format=", "GET /reports/{name}?format="],
+    notes:
+      "FS-077. A list asked for PDF is 422 format_not_available; a busy PDF maker is 503 busy.",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",

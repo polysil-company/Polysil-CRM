@@ -168,7 +168,7 @@ export function LeadsToolbar(): React.JSX.Element {
             </Link>
           ) : null}
           <DownloadExcelButton
-            download={() => exportLeads(params)}
+            download={(format) => exportLeads(params, format)}
             fallbackName="leads.xlsx"
             what={deletedView ? "deleted leads" : "leads"}
             logger={log}

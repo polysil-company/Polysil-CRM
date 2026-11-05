@@ -908,6 +908,7 @@ export const orderHandlers = [
         order.party.name,
         order.totals.total,
       ]),
+      request,
     );
   }),
 

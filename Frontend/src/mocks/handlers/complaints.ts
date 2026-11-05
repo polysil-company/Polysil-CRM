@@ -46,7 +46,7 @@ import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
 import { mockSettings } from "./settings";
-import { decodeCursor, encodeCursor, errorResponse } from "./shared";
+import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
 import { complaintLineWarranty } from "./warranty";
 
 const DEFAULT_LIMIT = 25;
@@ -716,27 +716,21 @@ export const complaintHandlers = [
   }),
 
   /** CMPL-009 · The list as a file, with the same filters. Before /complaints/:id. */
-  http.get(buildApiUrl("/complaints/export"), async () => {
+  http.get(buildApiUrl("/complaints/export"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
-    const lines = [
-      "Number\tStatus\tSeverity\tContact\tType",
-      ...mockDb.complaints.map((item) =>
-        [
-          item.complaint_no ?? "Draft",
-          item.status,
-          item.severity,
-          item.contact_name,
-          item.complaint_type.name,
-        ].join("\t"),
-      ),
-    ];
-    return new HttpResponse(lines.join("\n"), {
-      headers: {
-        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "content-disposition": `attachment; filename="complaints-${todayInIndia()}.xlsx"`,
-      },
-    });
+    return mockWorkbook(
+      "complaints",
+      ["Number", "Status", "Severity", "Contact", "Type"],
+      mockDb.complaints.map((item) => [
+        item.complaint_no ?? "Draft",
+        item.status,
+        item.severity,
+        item.contact_name,
+        item.complaint_type.name,
+      ]),
+      request,
+    );
   }),
 
   http.get(complaintPath(), async ({ params }) => {

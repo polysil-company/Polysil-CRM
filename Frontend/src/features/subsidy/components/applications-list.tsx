@@ -105,7 +105,7 @@ export function ApplicationsList(): React.JSX.Element {
           every payment is in.
         </p>
         <DownloadExcelButton
-          download={() => exportApplications(params)}
+          download={(format) => exportApplications(params, format)}
           fallbackName="subsidy-applications.xlsx"
           what="applications"
           logger={log}

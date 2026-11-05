@@ -61,7 +61,7 @@ export function UsersList(): React.JSX.Element {
         />
         <div className="flex flex-wrap items-center gap-2">
           <DownloadExcelButton
-            download={() => exportUsers({ ...params, cursor: null })}
+            download={(format) => exportUsers({ ...params, cursor: null }, format)}
             fallbackName="users.xlsx"
             what="people"
             logger={log}

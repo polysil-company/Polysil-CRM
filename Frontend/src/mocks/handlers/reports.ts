@@ -660,7 +660,7 @@ function run(name: ReportName, params: URLSearchParams): Response | { rows: read
 }
 
 /** The stand-in workbook: each row's top-level figures under their keys. */
-function workbookOf(name: ReportName, rows: readonly object[]): Response {
+function workbookOf(name: ReportName, rows: readonly object[], request: Request): Response {
   const first = rows[0];
   const headers = first === undefined ? [] : Object.keys(first);
   return mockWorkbook(
@@ -671,6 +671,7 @@ function workbookOf(name: ReportName, rows: readonly object[]): Response {
         value === null ? "" : typeof value === "object" ? JSON.stringify(value) : String(value),
       ),
     ),
+    request,
   );
 }
 
@@ -739,7 +740,11 @@ export const reportHandlers = [
     const query = new URL(request.url).searchParams;
     const answer = run(name, query);
     if (answer instanceof Response) return answer;
-    if (query.get("format") === "xlsx") return workbookOf(name, answer.rows);
+    // FS-077 · reports come as Excel, CSV or PDF
+    const format = query.get("format");
+    if (format === "xlsx" || format === "csv" || format === "pdf") {
+      return workbookOf(name, answer.rows, request);
+    }
     return HttpResponse.json({ data: answer });
   }),
 

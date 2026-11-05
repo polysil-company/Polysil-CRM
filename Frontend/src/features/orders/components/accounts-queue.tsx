@@ -48,7 +48,7 @@ export function AccountsQueue(): React.JSX.Element {
               : `${String(total)} ${total === 1 ? "order waits" : "orders wait"} on Accounts' payment check.`}
         </p>
         <DownloadExcelButton
-          download={() => exportOrders(ACCOUNTS_QUEUE)}
+          download={(format) => exportOrders(ACCOUNTS_QUEUE, format)}
           fallbackName="accounts-queue.xlsx"
           what="orders"
           logger={log}
