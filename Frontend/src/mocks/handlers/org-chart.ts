@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import type { OrgChartWire } from "@/features/org-chart/api/org-chart.schemas";
 import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
-import { isPartnerRole } from "@/lib/auth/roles";
+import { isPartnerRole, type Role } from "@/lib/auth/roles";
 import { readMockRole } from "@/lib/dev/mock-settings";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { mockMeFor } from "@/mocks/data/sessions";
@@ -178,7 +178,7 @@ const BACKEND_ROLE: Readonly<Record<string, string>> = {
  * person seeded with the signed-in role (a field officer's own line, a district manager's
  * team), and the session's id when there is none.
  */
-function meFor(role: string): string {
+function meFor(role: Role): string {
   const code = BACKEND_ROLE[role] ?? role;
   const seeded = mockDb.users.find(
     (user) => user.deleted_at === null && user.is_active && user.role?.code === code,
