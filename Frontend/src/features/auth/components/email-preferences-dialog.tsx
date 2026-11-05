@@ -100,7 +100,7 @@ export function EmailPreferencesDialogContent({
           </DialogClose>
           <Button
             type="submit"
-            disabled={unchanged ? run.state === "idle" : null}
+            disabled={unchanged ? run.state === "idle" : false}
             state={run.state}
             loadingLabel="Saving…"
             successLabel="Saved"
