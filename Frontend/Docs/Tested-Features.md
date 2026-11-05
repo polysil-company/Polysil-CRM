@@ -497,6 +497,13 @@ On the backend's contract (`backend/docs/api/users.md`, handover `administration
   - **The application settings** (FS-071, migration 078), under **Dealer and distributor applications**: each type's deposit; who may lower or waive one; who decides each type; what each type must have before it is submitted. Two kinds came with them: **some of a list** (`set`), checkboxes saved in the list's order, and **staff roles** (`staff_roles`), at least one ("Choose at least one role."). A kind the page doesn't know yet shows as text, and the rest of the page still works, so a new kind can't blank it. Walked through in the mock as Admin at desktop light and phone dark. Screens: [desktop](screenshots/settings/settings-applications-desktop-light.jpg), [ticking a field](screenshots/settings/settings-applications-ticked-desktop-light.jpg), [phone, dark](screenshots/settings/settings-applications-phone-dark.jpg). 🧪 👀
 
 ---
+- **ADMN-009 · The setup check** (FS-082, `feature/ADMN-009-setup-check`; screens: [the dashboard card](screenshots/users/setup-check-desktop-light.jpg), [phone, dark](screenshots/users/setup-check-phone-dark.jpg)). On the dashboard, for those who may change people (Admin-Sales, MD/CEO):
+  - **What it shows:** each check with something to fix, with its count, why it matters, and the first five people or partners, each linked to their page; **Show all** shows the rest of the backend's first 100.
+  - **The five checks:** field staff in an office with no area; area roles with no area; staff with no manager one level above them; staff on the System office; partners with no area.
+  - **When nothing needs fixing:** one line says so.
+  - **Who sees nothing:** anyone without the permission, or with it for only part of the company (`403`).
+  - **In the mock:** Junagadh and Amreli have no District Manager, so their field officers skip a level. 🧪 👀
+- **ADMN-003, ADMN-004 · An office that covers no area** (FS-082): a Field Officer or District Manager put in an office that covers no area is refused (`422 office_has_no_area`). The refusal shows on **Office**, or on **Role** when the role is what changed. It applies only when the role or office changes, so fixing a misplaced person's name still works. 🧪
 
 ## Dashboard, notifications, messages
 

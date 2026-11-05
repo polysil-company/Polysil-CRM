@@ -227,6 +227,27 @@ function openOffice(officeId: string): { id: string; name: string } | null {
   return office === undefined ? null : { id: office.id, name: office.name };
 }
 
+/** FS-082 rule 4 · The roles that must sit in an office covering an area (GAP-556: unconfirmed). */
+const AREA_ROLES: ReadonlySet<string> = new Set(["field_officer", "district_manager"]);
+
+/** FS-082 · `422 office_has_no_area` when an area role lands in an office that covers none. */
+function officeHasNoArea(
+  roleCode: string | undefined,
+  officeId: string | undefined,
+  field: "org_unit_id" | "role",
+): Response | null {
+  if (roleCode === undefined || officeId === undefined || !AREA_ROLES.has(roleCode)) return null;
+  const office = mockDb.offices.find((item) => item.id === officeId);
+  if (office === undefined || office.territory !== null) return null;
+  const role = MOCK_ROLES.find((item) => item.code === roleCode)?.name ?? roleCode;
+  return errorResponse(
+    422,
+    "office_has_no_area",
+    `A ${role} must be in an office that covers an area. ${office.name} covers none.`,
+    { [field]: `a ${role} needs an office that covers an area` },
+  );
+}
+
 function territoryRefs(
   ids: readonly string[],
 ): { id: string; name: string; level: string }[] | null {
@@ -294,6 +315,88 @@ export const userHandlers = [
     const { failure } = await applyScenario();
     if (failure) return failure;
     return HttpResponse.json({ data: MOCK_ROLES });
+  }),
+
+  /**
+   * ADMN-009 · GET /users/setup-check (FS-082). The mock runs the five checks on its seeds:
+   * Junagadh and Amreli have no District Manager, so their field officers skip a level.
+   */
+  http.get(buildApiUrl("/users/setup-check"), async () => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!allowed("edit")) return forbidden();
+    const staff = mockDb.users
+      .filter((user) => user.user_type === "staff" && user.is_active && user.deleted_at === null)
+      .sort((left, right) => left.full_name.localeCompare(right.full_name));
+    const detail = (user: (typeof staff)[number]): string =>
+      [user.role?.name, user.org_unit?.name ?? "no office"].filter(Boolean).join(" · ");
+    const item = (user: (typeof staff)[number]): { id: string; name: string; detail: string } => ({
+      id: user.id,
+      name: user.full_name,
+      detail: detail(user),
+    });
+    const officeOf = (id: string | undefined): (typeof mockDb.offices)[number] | undefined =>
+      mockDb.offices.find((office) => office.id === id);
+    const managedOffices = new Set(
+      staff
+        .filter((user) => user.role?.code === "district_manager")
+        .map((user) => user.org_unit?.id),
+    );
+    const groups: readonly [string, string, string, readonly (typeof staff)[number][]][] = [
+      [
+        "staff_without_area",
+        "Field staff in an office that covers no area",
+        "They see no dealers, and their manager reads everything under the office.",
+        staff.filter(
+          (user) =>
+            AREA_ROLES.has(user.role?.code ?? "") &&
+            user.org_unit !== null &&
+            officeOf(user.org_unit.id)?.territory === null,
+        ),
+      ],
+      [
+        "staff_without_territories",
+        "Staff whose role works by area, with no area",
+        "Their leads and reports come out empty until they have one.",
+        staff.filter(
+          (user) =>
+            MOCK_TERRITORY_ROLES.has(user.role?.code ?? "") && user.territories.length === 0,
+        ),
+      ],
+      [
+        "staff_skipping_a_level",
+        "Staff with no manager one level above them",
+        "Their approvals and escalations jump straight to someone two levels up.",
+        staff.filter(
+          (user) =>
+            user.role?.code === "field_officer" &&
+            user.org_unit !== null &&
+            !managedOffices.has(user.org_unit.id),
+        ),
+      ],
+      [
+        "unplaced_staff",
+        "Staff on the System office",
+        "They sit outside every team, so nobody manages them.",
+        staff.filter((user) => user.org_unit === null),
+      ],
+      [
+        "partners_without_area",
+        "Partners with no area",
+        "Their leads and orders fall outside every territory report.",
+        [],
+      ],
+    ];
+    const checks = groups.map(([code, title, why, people]) => ({
+      code,
+      title,
+      why,
+      count: people.length,
+      items: people.slice(0, 100).map(item),
+    }));
+    return HttpResponse.json({
+      data: { ok: checks.every((check) => check.count === 0), checks },
+    });
   }),
 
   http.get(buildApiUrl("/org-units"), async ({ request }) => {
@@ -513,6 +616,8 @@ export const userHandlers = [
       ) {
         return invalid(fields);
       }
+      const noArea = officeHasNoArea(role.code, office.id, "org_unit_id");
+      if (noArea !== null) return noArea;
       person = {
         id: newUserId(),
         user_type: "staff",
@@ -655,6 +760,15 @@ export const userHandlers = [
       fields.is_active = "their office is closed: choose an open one";
     }
     if (Object.keys(fields).length > 0) return invalid(fields);
+    // On a change of role or office only, as the backend: fixing a misplaced person's name works.
+    if (staff && (role !== null || office !== null)) {
+      const noArea = officeHasNoArea(
+        (role ?? user.role)?.code,
+        (office ?? user.org_unit)?.id,
+        office !== null ? "org_unit_id" : "role",
+      );
+      if (noArea !== null) return noArea;
+    }
 
     user.full_name = body.full_name ?? user.full_name;
     user.email = email;

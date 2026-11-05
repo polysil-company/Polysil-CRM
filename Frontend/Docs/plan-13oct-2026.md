@@ -185,7 +185,7 @@ Measured against `integration` at `33901f8` (#225). Every backend commit since 2
 ### From the backend on 5 Nov (FS-082, backend #226)
 
 - [x] **50. Team and role filters on the reports** (FS-082). PR #237, 5 Nov (`feature/RPT-006-team-filters`), stacked on #232. RPT-006. `team_of` (a person and everyone below them on the org chart) and `roles` on every report that takes a person, plus the forecast, insights and territory performance; salesperson performance gives every team member a row with role and office, zeros included. `404 not_in_your_line` outside the caller's line; never with `owner_id`. `backend/docs/api/reports.md`.
-- [ ] **51. The setup check, and an office that covers no area** (FS-082). ADMN-009. `GET /users/setup-check` on the admin dashboard: field staff in an office with no area, area roles with no territories, staff with no manager one level up, staff on the System office, partners with no area, each with its count and the first 100 to fix. And the user form's new refusal `422 office_has_no_area` (a Field Officer or District Manager in an office that covers no area), on the office or the role. `backend/docs/api/users.md`.
+- [~] **51. The setup check, and an office that covers no area** (FS-082). `feature/ADMN-009-setup-check`, stacked on item 50. ADMN-009. `GET /users/setup-check` on the admin dashboard: field staff in an office with no area, area roles with no territories, staff with no manager one level up, staff on the System office, partners with no area, each with its count and the first 100 to fix. And the user form's new refusal `422 office_has_no_area` (a Field Officer or District Manager in an office that covers no area), on the office or the role. `backend/docs/api/users.md`.
 
 ## Waiting on someone else
 

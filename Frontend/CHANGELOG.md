@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-123 changes, newest first. Each title opens its entry.
+124 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-11-06 | [The setup check, and an office that covers no area](changelog/entries/2026-11-06--feature--ADMN-009--the-setup-check-and-an-office-that-covers-no-area.md) | `feature` | `ADMN-009` |
 | 2026-11-05 | [Sales forecast and insights](changelog/entries/2026-11-05--feature--RPT-004--sales-forecast-and-insights.md) | `feature` | `RPT-004` `RPT-005` |
 | 2026-11-05 | [Team and role filters on the reports](changelog/entries/2026-11-05--feature--RPT-006--team-and-role-filters-on-the-reports.md) | `feature` | `RPT-006` |
 | 2026-11-05 | [Company settings read the application settings and any kind added later](changelog/entries/2026-11-05--fix--ADMN-007--company-settings-read-the-application-settings-and-any-kind.md) | `fix` | `ADMN-007` |
@@ -134,6 +135,54 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 6 November 2026
+
+### The setup check, and an office that covers no area
+
+`feature` · `ADMN-009` · Claude · [entry](changelog/entries/2026-11-06--feature--ADMN-009--the-setup-check-and-an-office-that-covers-no-area.md)
+
+#### Before
+
+- The backend's FS-082 (backend #226) added:
+  - `GET /users/setup-check`, which reports what is set up wrong. Each of five checks comes with its count, a title, why it matters, and the first 100 people or partners to fix. It needs `users.edit` at global scope; anyone else gets `403`.
+  - A new refusal on `POST /users` and `PATCH /users/{id}`: a Field Officer or District Manager put in an office that covers no area gets `422 office_has_no_area`, on `org_unit_id` or `role`.
+- Neither had a place in the app.
+
+#### Now
+
+- **The setup check on the dashboard**, for those who may change people:
+  - **A card for anything to fix:** each check with something to fix gets its count, why it matters, and the first five people or partners. Each name links to their page (a person's to `/users/{id}`, a partner's to `/partners/{id}`). **Show all** shows the rest of the backend's first 100.
+  - **When nothing needs fixing,** one line says so.
+  - **Hidden** for anyone without the permission, or with it for only part of the company.
+- **The person form** already places a refusal's fields on its own fields, so `office_has_no_area` shows on **Office**, or on **Role**, with the backend's words.
+- **The mock:**
+  - runs the five checks on its seeds. Junagadh and Amreli have no District Manager, so their field officers skip a level;
+  - refuses an area role in an office with no area, on a change of role or office only, as the backend does.
+
+#### Discussion
+
+- **On the dashboard, above the figures.** The backend calls it "for the admin dashboard". The administrators who can fix these things land there first, and the card takes no room when there is nothing to fix.
+- **A 403 shows nothing.** A user may hold `users.edit` for one area only, and the check needs global scope. An error card there would only say what they can't see.
+- **Which roles need an area is still open** on the backend (GAP-556, client question 37.4). The mock follows the backend's current set: Field Officer and District Manager.
+
+#### Files changed
+
+- `src/features/users/api/users.schemas.ts`, `users.api.ts`, `users.queries.ts`: the setup report and its call.
+- `src/features/users/components/setup-check-card.tsx`: the card and its skeleton.
+- `src/features/dashboard/components/dashboard-overview.tsx`: the card above the figures.
+- `src/mocks/handlers/users.ts`: the setup check, and `office_has_no_area`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: ADMN-009.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`: records.
+
+#### Tests
+
+- `[ADMN-009] The setup check (FS-082)`:
+  - every check comes back in order, and a field officer is refused;
+  - the card lists a check with people linked to their pages;
+  - the one line when nothing needs fixing;
+  - nothing for someone without the permission, or on a 403.
+- `[ADMN-009] An office that covers no area`: moving a Field Officer to an office with no area is refused on `org_unit_id`.
 
 ## 5 November 2026
 

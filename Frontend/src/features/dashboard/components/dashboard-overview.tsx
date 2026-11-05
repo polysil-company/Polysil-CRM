@@ -34,6 +34,7 @@ import {
   TargetsCard,
 } from "@/features/dashboard/components/dashboard-charts";
 import { LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
+import { SetupCheckCard } from "@/features/users/components/setup-check-card";
 import { EMPTY_VALUE, formatInrCompact, formatNumber, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -42,21 +43,25 @@ export function DashboardOverview(): React.JSX.Element {
   const query = useQuery(dashboardOverviewQueryOptions());
 
   return (
-    <QueryView
-      query={query}
-      pending={<DashboardOverviewSkeleton />}
-      isEmpty={(data) => data.pipeline.every((stage) => stage.count === 0)}
-      empty={
-        <EmptyState
-          icon={DashboardSquare02Icon}
-          title="Nothing to report yet"
-          description="The dashboard fills in as leads are captured in your territory."
-          className="rounded-xl border border-dashed border-border"
-        />
-      }
-    >
-      {(data) => <DashboardContent data={data} />}
-    </QueryView>
+    <div className="flex flex-col gap-4">
+      {/* ADMN-009 · For administrators only: what is set up wrong (FS-082). */}
+      <SetupCheckCard />
+      <QueryView
+        query={query}
+        pending={<DashboardOverviewSkeleton />}
+        isEmpty={(data) => data.pipeline.every((stage) => stage.count === 0)}
+        empty={
+          <EmptyState
+            icon={DashboardSquare02Icon}
+            title="Nothing to report yet"
+            description="The dashboard fills in as leads are captured in your territory."
+            className="rounded-xl border border-dashed border-border"
+          />
+        }
+      >
+        {(data) => <DashboardContent data={data} />}
+      </QueryView>
+    </div>
   );
 }
 

@@ -1629,6 +1629,15 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /settings", "PATCH /settings"],
   },
+  "ADMN-009": {
+    domain: "ADMN",
+    title: "Setup check — people and partners set up so that leads, dealers or approvals go astray",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /users/setup-check"],
+    notes:
+      "FS-082. users.edit at global scope, else 403. Also the user form's 422 office_has_no_area (ADMN-002, ADMN-003).",
+  },
   "SITE-001": {
     domain: "SITE",
     title: "Public website — information, Product Master, phone-number entry",
