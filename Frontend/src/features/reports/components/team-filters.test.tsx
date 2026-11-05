@@ -48,17 +48,17 @@ describe("[RPT-006] Team and role filters on the reports (FS-082)", () => {
 
   it("sends the team and the roles, and lists every team member with role and office", async () => {
     signInAs("admin");
-    let asked: URLSearchParams | null = null;
+    const asked: { params: URLSearchParams | null } = { params: null };
     server.events.on("request:start", ({ request }) => {
       if (request.url.includes("/reports/salesperson-performance")) {
-        asked = new URL(request.url).searchParams;
+        asked.params = new URL(request.url).searchParams;
       }
     });
     const head = seeded("district_manager");
 
     const team = await getReport("salesperson-performance", { ...DEFAULTS, teamOf: head.id });
-    expect(asked?.get("team_of")).toBe(head.id);
-    expect(asked?.has("owner_id")).toBe(false);
+    expect(asked.params?.get("team_of")).toBe(head.id);
+    expect(asked.params?.has("owner_id")).toBe(false);
     const named = team.rows.find((row) => row.user.id === head.id);
     expect(named).toMatchObject({ role: "District Manager" });
     expect(named?.office).not.toBeNull();
@@ -67,7 +67,7 @@ describe("[RPT-006] Team and role filters on the reports (FS-082)", () => {
       ...DEFAULTS,
       roles: ["field_officer", "district_manager"],
     });
-    expect(asked?.get("roles")).toBe("field_officer,district_manager");
+    expect(asked.params?.get("roles")).toBe("field_officer,district_manager");
     expect(officers.rows.length).toBeGreaterThan(0);
     for (const row of officers.rows) {
       expect(["Field Officer", "District Manager"]).toContain(row.role);
