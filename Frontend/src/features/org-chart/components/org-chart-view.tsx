@@ -208,11 +208,12 @@ function Chart({
             <CardTitle level={2}>
               {company ? "The whole company" : mine ? "Your team" : "Their team"}
             </CardTitle>
-            <CardDescription>
-              {chart.total === 0
-                ? "Nobody reports here."
-                : `${formatNumber(chart.total)} ${chart.total === 1 ? "person" : "people"}${company ? "" : " below"}.`}
-            </CardDescription>
+            {/* An empty team says so once, in the card's body. */}
+            {chart.total === 0 ? null : (
+              <CardDescription>
+                {`${formatNumber(chart.total)} ${chart.total === 1 ? "person" : "people"}${company ? "" : " below"}.`}
+              </CardDescription>
+            )}
             {chart.byRole.length === 0 ? null : (
               <ul aria-label="By role" className="flex flex-wrap gap-1.5">
                 {chart.byRole.map((item) => (
