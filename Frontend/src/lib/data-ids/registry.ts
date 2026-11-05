@@ -159,7 +159,7 @@ export const DATA_IDS = {
     title: "Downloads on 24 more lists — masters, stock, payments, schemes, rewards and the rest",
     owner: "shared",
     status: "in-progress",
-    endpoints: ["GET /products/export", "GET /stock/export", "GET /…/export (24 lists)"],
+    endpoints: ["GET /products/export", "GET /stock/export", "GET /{list}/export"],
     notes:
       "FS-081. The same Download Excel button and filters as the list; more than 5,000 rows is 422 export_too_large.",
   },
