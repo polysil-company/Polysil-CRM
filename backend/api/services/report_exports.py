@@ -44,7 +44,8 @@ def columns(report: str, data: dict[str, Any]) -> tuple[Column, ...]:
                 Column("Average days to loss", "avg_days_to_loss", "decimal"),
                 *(Column(f"Lost from {s}", f"by_stage.{s}", "int") for s in _LOST_FROM))
     if report == "salesperson-performance":
-        return (Column("Person", "user.full_name"), Column("Leads created", "leads_created", "int"),
+        return (Column("Person", "user.full_name"), Column("Role", "role.name"),
+                Column("Office", "office.name"), Column("Leads created", "leads_created", "int"),
                 Column("Leads won", "leads_won", "int"),
                 Column("Quotations sent", "quotations_sent", "int"),
                 Column("Orders", "orders", "int"), Column("Order value", "order_value", "money"),
