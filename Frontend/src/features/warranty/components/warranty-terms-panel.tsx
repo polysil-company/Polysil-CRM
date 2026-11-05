@@ -6,6 +6,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { productCategoriesQueryOptions } from "@/features/products/api/products.queries";
 import { formatBusinessDay } from "@/features/subsidy/lib/application-labels";
+import { exportWarrantyTerms } from "@/features/warranty/api/warranty.api";
 import { useSetWarrantyTerm } from "@/features/warranty/api/warranty.mutations";
 import { warrantyTermsQueryOptions } from "@/features/warranty/api/warranty.queries";
 import {
@@ -122,18 +124,27 @@ export function WarrantyTermsPanel({ canEdit }: { canEdit: boolean }): React.JSX
             How long goods stay in warranty from the day they leave, by product category.
           </CardDescription>
         </div>
-        {canEdit ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSetting(true);
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            Set a period
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadExcelButton
+            download={(format) => exportWarrantyTerms(format)}
+            fallbackName="warranty-terms.xlsx"
+            what="warranty periods"
+            logger={log}
+            dataId="MSTR-017"
+          />
+          {canEdit ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSetting(true);
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              Set a period
+            </Button>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {query.status === "pending" ? (

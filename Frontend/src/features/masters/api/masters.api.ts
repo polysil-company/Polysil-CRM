@@ -1,5 +1,5 @@
 import type { LookupItem, LookupList } from "@/features/lookups/api/lookups.schemas";
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import type { CursorPage } from "@/lib/api/pagination";
 import { createLogger } from "@/lib/logger";
 
@@ -198,5 +198,42 @@ export function patchTerritory(
     path: `/territories/${encodeURIComponent(territoryId)}`,
     body,
     schema: territoryResponseSchema,
+  });
+}
+
+/** MSTR-011 · GET /org-units/export (FS-081) — the offices as Excel or CSV, with the filters. */
+export function exportOffices(
+  params: Omit<OfficeListParams, "cursor">,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-011",
+    logger: log,
+    fn: "exportOffices",
+    path: "/org-units/export",
+    query: {
+      q: params.q.trim() === "" ? undefined : params.q.trim(),
+      is_open: params.state === "all" ? undefined : params.state === "open",
+      format,
+    },
+  });
+}
+
+/** MSTR-012 · GET /territories/export (FS-081) — the territories, with the filters. */
+export function exportTerritories(
+  params: Omit<TerritoryListParams, "cursor">,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-012",
+    logger: log,
+    fn: "exportTerritories",
+    path: "/territories/export",
+    query: {
+      level: params.level ?? undefined,
+      parent_id: params.parentId ?? undefined,
+      q: params.q.trim() === "" ? undefined : params.q.trim(),
+      format,
+    },
   });
 }

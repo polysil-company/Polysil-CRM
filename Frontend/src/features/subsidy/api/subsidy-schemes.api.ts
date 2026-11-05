@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -116,5 +116,16 @@ export async function renameStage({
     body: { name },
     idempotencyKey,
     schema: stageRenamedSchema,
+  });
+}
+
+/** SUBS-014 · GET /subsidy-schemes/export (FS-081) — the subsidy schemes as Excel or CSV. */
+export function exportSchemes(format: ExportFormat = "xlsx"): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "SUBS-014",
+    logger: log,
+    fn: "exportSchemes",
+    path: "/subsidy-schemes/export",
+    query: { format },
   });
 }

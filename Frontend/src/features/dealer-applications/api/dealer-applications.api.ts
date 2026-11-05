@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
@@ -174,5 +174,23 @@ export function decideDealerApplication({
     idempotencyKey,
     schema: dealerApplicationSchema,
     sensitive: true,
+  });
+}
+
+/** CHNL-007 · GET /dealer-applications/export (FS-081) — the applications, with the filters. */
+export function exportDealerApplications(
+  params: DealerApplicationListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "CHNL-007",
+    logger: log,
+    fn: "exportDealerApplications",
+    path: "/dealer-applications/export",
+    query: {
+      status: params.status.length === 0 ? undefined : params.status.join(","),
+      q: params.q.trim() === "" ? undefined : params.q.trim(),
+      format,
+    },
   });
 }

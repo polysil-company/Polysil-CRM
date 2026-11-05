@@ -9,6 +9,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { QueryView } from "@/components/patterns/query-view";
@@ -32,7 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ImportDialog } from "@/features/imports/components/import-dialog";
-import { RATE_SHEET_PAGE_SIZE } from "@/features/products/api/products.api";
+import { RATE_SHEET_PAGE_SIZE, exportPriceListItems } from "@/features/products/api/products.api";
 import {
   useClosePriceList,
   usePublishPriceList,
@@ -313,6 +314,13 @@ function SheetView({ list }: { list: PriceList }): React.JSX.Element {
             Without a rate only
           </Label>
         </div>
+        <DownloadExcelButton
+          download={(format) => exportPriceListItems({ listId: list.id, q, unpriced }, format)}
+          fallbackName="price-list-items.xlsx"
+          what="rates"
+          logger={log}
+          dataId="MSTR-006"
+        />
         {editable ? (
           <div className="flex items-center gap-3 md:ml-auto">
             <p aria-live="polite" className="text-sm text-muted-foreground">

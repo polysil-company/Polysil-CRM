@@ -134,6 +134,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | APP-009 | Fixes from the live test of 22–23 Oct: the frontend's share of `Live-Test-Report.md` | frontend | in-progress |
 | APP-010 | Polysil's logo everywhere: sign-in, sidebar, portal, public pages, browser tab, Android icon and splash | frontend | in-progress |
 | APP-011 | Downloads as Excel, CSV or PDF — every list's file in CSV too, and a report as PDF (`format` on every export and report) | shared | in-progress |
+| APP-012 | Downloads on 24 more lists — masters, stock, payments, schemes, rewards and the rest (`GET <list>/export`, FS-081) | shared | in-progress |
 | OBS-001 | Logger utility with runtime log level | frontend | in-progress |
 | OBS-002 | API client — request IDs, error normalisation, response contract validation | shared | in-progress |
 | DS-001 | Design tokens and component library | frontend | in-progress |

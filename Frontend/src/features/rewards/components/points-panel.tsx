@@ -6,6 +6,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { RelativeDate } from "@/components/patterns/relative-date";
@@ -27,6 +28,7 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { exportLedger } from "@/features/rewards/api/rewards.api";
 import { useAdjustPoints } from "@/features/rewards/api/rewards.mutations";
 import { balanceQueryOptions, ledgerQueryOptions } from "@/features/rewards/api/rewards.queries";
 import type { Balance, HolderQuery, LedgerRow } from "@/features/rewards/api/rewards.schemas";
@@ -204,9 +206,18 @@ function History({
 
   return (
     <Card className={className}>
-      <CardHeader>
-        <CardTitle>History</CardTitle>
-        <CardDescription>Every change to the balance, newest first.</CardDescription>
+      <CardHeader className="flex-row flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <CardTitle>History</CardTitle>
+          <CardDescription>Every change to the balance, newest first.</CardDescription>
+        </div>
+        <DownloadExcelButton
+          download={(format) => exportLedger(holder, format)}
+          fallbackName="reward-points.xlsx"
+          what="entries"
+          logger={log}
+          dataId="RWD-001"
+        />
       </CardHeader>
       <CardContent>
         {query.status === "pending" ? (

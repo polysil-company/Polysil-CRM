@@ -6,6 +6,7 @@ import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -21,8 +22,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CommissionRatesPanel } from "@/features/commission/components/commission-rates-panel";
 import { useCan } from "@/features/session/hooks/use-session";
+import { exportSchemes } from "@/features/subsidy/api/subsidy-schemes.api";
 import { schemeListQueryOptions } from "@/features/subsidy/api/subsidy-schemes.queries";
 import { todayInIndia } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
 
 import { DocumentChecklistPanel } from "./document-checklist-panel";
 import {
@@ -34,6 +37,11 @@ import {
 import { MasterPanel } from "./master-panel";
 import { MatrixPanel } from "./matrix-panel";
 import { NewSchemeForm, SchemeOverview } from "./scheme-overview";
+
+const log = createLogger({
+  file: "features/subsidy/components/subsidy-masters.tsx",
+  dataId: "SUBS-014",
+});
 
 const TABLES = [
   "overview",
@@ -162,19 +170,27 @@ export function SubsidyMasters(): React.JSX.Element {
             {on === null ? "Today's figures." : "Earlier or later figures, as they apply that day."}
           </FieldDescription>
         </Field>
-        {canEdit ? (
-          <Button
-            variant="outline"
-            className="sm:mb-6 sm:ml-auto"
-            disabled={unlinked !== null || schemes.data === undefined}
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            New scheme
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2 sm:mb-6 sm:ml-auto">
+          <DownloadExcelButton
+            download={(format) => exportSchemes(format)}
+            fallbackName="subsidy-schemes.xlsx"
+            what="schemes"
+            logger={log}
+            dataId="SUBS-014"
+          />
+          {canEdit ? (
+            <Button
+              variant="outline"
+              disabled={unlinked !== null || schemes.data === undefined}
+              onClick={() => {
+                setCreating(true);
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              New scheme
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <Tabs

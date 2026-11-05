@@ -7,6 +7,7 @@ import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportDealerApplications } from "@/features/dealer-applications/api/dealer-applications.api";
 import { dealerApplicationListQueryOptions } from "@/features/dealer-applications/api/dealer-applications.queries";
 import {
   DEALER_APPLICATION_STATUSES,
@@ -28,8 +30,14 @@ import {
   DEALER_APPLICATION_STATUS_LABELS,
 } from "@/features/dealer-applications/lib/dealer-application-labels";
 import { useCan } from "@/features/session/hooks/use-session";
+import { createLogger } from "@/lib/logger";
 
 import { StartDealerApplication } from "./start-dealer-application";
+
+const log = createLogger({
+  file: "features/dealer-applications/components/dealer-applications-list.tsx",
+  dataId: "CHNL-007",
+});
 
 const SKELETON_ROWS = 4;
 
@@ -117,6 +125,15 @@ export function DealerApplicationsList(): React.JSX.Element {
               Reset filters
             </Button>
           ) : null}
+        </div>
+        <div className="md:ml-auto">
+          <DownloadExcelButton
+            download={(format) => exportDealerApplications(params, format)}
+            fallbackName="dealer-applications.xlsx"
+            what="applications"
+            logger={log}
+            dataId="CHNL-007"
+          />
         </div>
       </div>
 

@@ -14,6 +14,7 @@ import { holidayHandlers } from "./holidays";
 import { importHandlers } from "./imports";
 import { leadCaptureHandlers } from "./lead-capture";
 import { leadHandlers } from "./leads";
+import { listExportHandlers } from "./list-exports";
 import { lookupHandlers } from "./lookups";
 import { marketingHandlers } from "./marketing";
 import { messageHandlers } from "./messages";
@@ -60,6 +61,7 @@ export const unbuiltHandlers: readonly HttpHandler[] = [];
  */
 export const handlers: readonly HttpHandler[] = [
   ...consumerFenceHandlers,
+  ...listExportHandlers,
   ...authHandlers,
   ...portalHandlers,
   ...approvalHandlers,

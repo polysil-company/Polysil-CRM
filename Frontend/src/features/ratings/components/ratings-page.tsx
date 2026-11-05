@@ -4,6 +4,7 @@ import { StarIcon } from "@hugeicons/core-free-icons";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { StarRating } from "@/components/patterns/star-rating";
@@ -12,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { exportRatings } from "@/features/ratings/api/ratings.api";
 import {
   ratingListQueryOptions,
   ratingSummaryQueryOptions,
@@ -34,8 +36,14 @@ import {
 } from "@/features/ratings/lib/rating-labels";
 import { useIsStaff } from "@/features/session/hooks/use-session";
 import { formatNumber } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
 
 import { RatingRow } from "./record-ratings";
+
+const log = createLogger({
+  file: "features/ratings/components/ratings-page.tsx",
+  dataId: "RATE-002",
+});
 
 /**
  * RATE-002, RATE-003 · Every rating the user can see, newest first, with the low ones (1 or 2
@@ -114,6 +122,26 @@ function RatingsList(): React.JSX.Element {
           <ToggleGroupItem value="all">Any stars</ToggleGroupItem>
           <ToggleGroupItem value="low">1 or 2 stars</ToggleGroupItem>
         </ToggleGroup>
+        <div className="sm:ml-auto">
+          <DownloadExcelButton
+            download={(format) =>
+              exportRatings(
+                {
+                  target,
+                  salesOrderId: null,
+                  complaintId: null,
+                  partnerId: null,
+                  maxScore: low ? LOW_RATING_MAX : null,
+                },
+                format,
+              )
+            }
+            fallbackName="ratings.xlsx"
+            what="ratings"
+            logger={log}
+            dataId="RATE-002"
+          />
+        </div>
       </div>
 
       {query.status === "pending" ? (
