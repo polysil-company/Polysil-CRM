@@ -249,16 +249,11 @@ export type OfficeChoice = z.output<typeof officePageSchema>["items"][number];
 
 // ── the setup check (ADMN-009, FS-082) ──────────────────────────────────────────
 
-/** The checks the backend runs, in its order; an unknown one is kept and shown by its title. */
-export const SETUP_CHECK_CODES = [
-  "staff_without_area",
-  "staff_without_territories",
-  "staff_skipping_a_level",
-  "unplaced_staff",
-  "partners_without_area",
-] as const;
-
-/** The partner check names partners; every other check names people. */
+/**
+ * The partner check names partners; every other check names people. The backend runs five,
+ * in a fixed order (`staff_without_area`, `staff_without_territories`, `staff_skipping_a_level`,
+ * `unplaced_staff`, `partners_without_area`); one added later is shown by its own title.
+ */
 const PARTNER_CHECKS: ReadonlySet<string> = new Set(["partners_without_area"]);
 
 const setupItemSchema = z.object({ id, name: z.string(), detail: z.string() });
