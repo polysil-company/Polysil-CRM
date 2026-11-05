@@ -742,6 +742,11 @@ Admin → **Reports** (`/reports`), on the backend's contract (handover `reports
   - **Too little history:** it says so and shows dashes, never ₹0.
   - Filters: area and person, in the URL, with the same Excel file. 🧪 👀
 - **RPT-005 · Insights** (`/reports/insights`; [screen](screenshots/reports/insights-desktop-light.jpg)). Plain sentences about the window against the same number of days before it, each with its figure, what it was, and **See the report** for the report behind it. Nothing to say means too little happened, and it says so. 🧪
+- **RPT-006 · Team and role filters** (FS-082, `feature/RPT-006-team-filters`; screens: [salesperson performance for a team](screenshots/reports/team-filter-desktop-light.jpg), [phone, dark](screenshots/reports/team-filter-phone-dark.jpg)). Every report that takes a person, and the forecast, insights and territory performance, also take:
+  - **Team:** one person and everyone below them on the org chart. Choosing a team drops the one person, and choosing a person drops the team, since the backend takes one or the other. Someone outside the caller's line is refused (`404 not_in_your_line`).
+  - **Roles:** only people holding one of the chosen staff roles now, up to 10. Partner roles aren't offered.
+  - **Salesperson performance:** every team member gets a row, zeros included, with their role and office under the name.
+  - Both filters are in the URL, are cleared by Reset, and reach the Excel file. In the mock, a team is the person and every active staff member at a lower level. 🧪 👀
 - **RPT-002 · A report** (`/reports/{name}`):
   - Its filters are in the URL: From and to (the last 30 days when empty), Area, Person, and By (source, person or territory; reason or person; type, status or severity; district or taluka), each only where the report takes it. Follow-ups is as of now, with no window.
   - A table with a Total line where the backend sends totals, the window the figures used, and "Sales counted at: approval" on the reports that count sales. A figure the role may not see is a dash, read out as "Not available to you", with a line saying so.

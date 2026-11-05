@@ -19,6 +19,8 @@ const DEFAULTS: ReportParams = {
   to: null,
   territories: [],
   owner: null,
+  teamOf: null,
+  roles: [],
   groupBy: null,
 };
 

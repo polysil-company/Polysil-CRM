@@ -21,6 +21,8 @@ function reportQuery(name: ReportName, params: ReportParams): Record<string, str
     to: params.to ?? undefined,
     territory_id: params.territories.length === 0 ? undefined : params.territories.join(","),
     owner_id: params.owner ?? undefined,
+    team_of: params.teamOf ?? undefined,
+    roles: params.roles.length === 0 ? undefined : params.roles.join(","),
     [name === "territory-performance" ? "level" : "group_by"]: params.groupBy ?? undefined,
   };
 }

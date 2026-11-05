@@ -15,6 +15,8 @@ interface ReportEntry {
   readonly territory: boolean;
   /** Takes one person (`owner_id`). */
   readonly owner: boolean;
+  /** FS-082 · Takes a team (`team_of`) and roles (`roles`). */
+  readonly team: boolean;
   /** Its `group_by` (or `level`) choices, the default first; empty when it has none. */
   readonly groups: readonly GroupOption[];
   /** Its figures follow the company's setting for when an order counts as a sale. */
@@ -32,6 +34,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: true,
     territory: true,
     owner: true,
+    team: true,
     groups: [
       { value: "source", label: "Source" },
       { value: "owner", label: "Person" },
@@ -45,6 +48,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: true,
     territory: true,
     owner: true,
+    team: true,
     groups: [],
     sales: true,
   },
@@ -54,6 +58,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: true,
     territory: true,
     owner: true,
+    team: true,
     groups: [
       { value: "reason", label: "Reason" },
       { value: "owner", label: "Person" },
@@ -66,6 +71,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: false,
     territory: false,
     owner: true,
+    team: true,
     groups: [],
     sales: false,
   },
@@ -76,6 +82,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: true,
     territory: true,
     owner: false,
+    team: false,
     groups: [],
     sales: true,
   },
@@ -85,6 +92,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: true,
     territory: true,
     owner: true,
+    team: true,
     groups: [],
     sales: true,
   },
@@ -94,6 +102,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: true,
     territory: true,
     owner: false,
+    team: true,
     groups: [
       { value: "district", label: "District" },
       { value: "taluka", label: "Taluka" },
@@ -107,6 +116,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: true,
     territory: true,
     owner: true,
+    team: false,
     groups: [
       { value: "type", label: "Type" },
       { value: "status", label: "Status" },
@@ -121,6 +131,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: false,
     territory: true,
     owner: true,
+    team: true,
     groups: [
       { value: "owner", label: "Person" },
       { value: "territory", label: "Territory" },
@@ -134,6 +145,7 @@ export const REPORTS: Readonly<Record<ReportName, ReportEntry>> = {
     dates: true,
     territory: true,
     owner: true,
+    team: true,
     groups: [],
     sales: false,
   },

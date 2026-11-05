@@ -1305,6 +1305,15 @@ export const DATA_IDS = {
     endpoints: ["GET /reports/insights"],
     notes: "FS-079. Staff only. A missing row means too little data, not a problem.",
   },
+  "RPT-006": {
+    domain: "RPT",
+    title: "Team and role filters on the reports, and every team member on salesperson performance",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /reports/{name}"],
+    notes:
+      "FS-082. team_of is a person and everyone below them; 404 not_in_your_line outside the caller's line. Not with owner_id.",
+  },
   "SUBS-001": {
     domain: "SUBS",
     title: "Subsidy forms and case status",
