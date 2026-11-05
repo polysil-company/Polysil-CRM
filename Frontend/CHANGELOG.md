@@ -152,6 +152,7 @@ Restoring a deleted lead (LEAD-020, PR #210) left two gaps against `leads.md`:
 - **The history** reads "<name> restored the lead", with ", and its possible duplicate is open again" or ", and its 2 possible duplicates are open again" when the restore reopened them. It has an undo icon in the success tone.
 - **The restore's toast**, when the lead's owner has left, adds "Its owner, Hiren Mehta, has left: open it and assign it to someone." beside the link to the lead.
 - **BE-042** asks the backend for `is_active` on a lead's `owner`. Until it comes, the lead is restored as before and nothing more is said.
+- **The mock** records `lead.restored` on a restore. Its second deleted lead belongs to Vijay Chaudhary, a field officer who has left, so restoring it shows the toast's line.
 
 #### Discussion
 
@@ -163,6 +164,7 @@ Restoring a deleted lead (LEAD-020, PR #210) left two gaps against `leads.md`:
 - `src/features/leads/lib/timeline-entries.ts`, `src/features/leads/components/lead-timeline.tsx`: the `restored` entry, its sentence and icon.
 - `src/features/leads/api/leads.schemas.ts`: the owner's `is_active`, read when sent.
 - `src/features/leads/components/restore-lead-button.tsx`: the toast for an owner who has left.
+- `src/mocks/data/leads.ts`, `src/mocks/handlers/leads.ts`: the leaver's deleted lead, and the restore in the history.
 - `docs/Backend-Tasks.md`: BE-042.
 - `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`: records.
 
@@ -170,6 +172,8 @@ Restoring a deleted lead (LEAD-020, PR #210) left two gaps against `leads.md`:
 
 - `[LEAD-005] toTimelineEntry › [LEAD-020] reads a restore`: with the reopened count, and without it.
 - `[LEAD-019]` Deleted leads: a restored lead whose owner has left gets the toast's line.
+- `[LEAD-020] restoreLead in the mock`: the leaver's lead comes back with `active: false`, and its history starts with `lead.restored`.
+- `[LEAD-008] assignment`: the owner is matched on id and name, since it now also carries `active`.
 
 ### Company settings read the application settings and any kind added later
 

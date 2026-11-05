@@ -1110,6 +1110,8 @@ export const leadHandlers = [
     const restored: LeadWire = { ...deleted, deleted_at: null, deleted_by: null };
     mockDb.deletedLeads = mockDb.deletedLeads.filter((item) => item.id !== leadId);
     mockDb.leads = [restored, ...mockDb.leads];
+    // LEAD-020 · The restore in the lead's history; the mock's deletes close no duplicate pairs.
+    recordLeadEvent(restored, "lead.restored", { duplicates_reopened: 0 });
     return HttpResponse.json({ data: restored });
   }),
 
