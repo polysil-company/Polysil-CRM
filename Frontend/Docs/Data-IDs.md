@@ -143,6 +143,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | AUTH-005 | Sign out (`POST /auth/logout`) | shared | mocked |
 | AUTH-006 | Signed-in routing — sign-in redirects, return path and session end | frontend | in-progress |
 | AUTH-007 | Change your own password — forced while a temporary password is in force (`POST /auth/password`) | shared | in-progress |
+| AUTH-008 | Email preferences — unseen updates and the morning summary by email (`PUT /me/email-preferences`) | shared | in-progress |
 | FARM-001 | The farmers' portal: their details, enquiries, quotations, orders and complaints (`GET /portal/me` and the four lists) | shared | in-progress |
 | FARM-002 | A farmer records or withdraws their own consent (`PATCH /portal/me`) | shared | in-progress |
 | FARM-003 | A farmer rates an installation or a service (`GET /portal/ratings`, `POST /portal/ratings`) | shared | in-progress |

@@ -5,8 +5,10 @@ import { tokenResponseSchema, type SessionTokens } from "@/lib/auth/tokens";
 import { createLogger } from "@/lib/logger";
 
 import {
+  emailPreferencesSchema,
   otpChallengeResponseSchema,
   type ChangePasswordRequest,
+  type EmailPreferencesRequest,
   type OtpChallengeResponse,
   type OtpVerifyRequest,
   type StaffSignInRequest,
@@ -99,5 +101,25 @@ export function changeOwnPassword({
     idempotencyKey,
     schema: z.undefined(),
     sensitive: true,
+  });
+}
+
+/** AUTH-008 · PUT /me/email-preferences (FS-078): your own two email switches. */
+export function putEmailPreferences({
+  body,
+  idempotencyKey,
+}: {
+  body: EmailPreferencesRequest;
+  idempotencyKey: string;
+}): Promise<z.output<typeof emailPreferencesSchema>> {
+  return apiRequest({
+    dataId: "AUTH-008",
+    logger: log,
+    fn: "putEmailPreferences",
+    method: "PUT",
+    path: "/me/email-preferences",
+    body,
+    idempotencyKey,
+    schema: emailPreferencesSchema,
   });
 }
