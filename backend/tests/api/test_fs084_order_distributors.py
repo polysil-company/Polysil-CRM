@@ -51,7 +51,7 @@ async def world(shop: Shop, area: Area, sessions: Callable[[], AsyncSession]) ->
             "VALUES (CAST(:p AS uuid), CAST(:ty AS partner_type), :c, :n, :m, CAST(:t AS uuid), CAST(:tier AS channel_tier), :a) RETURNING id"),
             {"p": parent, "ty": ty, "c": f"{name[:3]}{tag}{len(made)}", "n": f"{name} {tag}",
              "m": "9195" + f"{random.randint(0, 10**8 - 1):08d}", "t": territory,
-             "tier": "distributor" if ty == "distributor" else "dealer", "a": active})).scalar_one())
+             "tier": ty, "a": active})).scalar_one())
         made.insert(0, pid)
         return pid
 
