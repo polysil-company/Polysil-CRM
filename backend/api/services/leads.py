@@ -63,6 +63,7 @@ from api.schemas.leads import (
     LookupUpdate,
     MergedRef,
     OrgUnitRef,
+    OwnerRef,
     PageMeta,
     PartnerPick,
     PartnerRef,
@@ -499,7 +500,11 @@ async def get_lead(db: AsyncSession, caller: Caller, lead_id: str) -> Lead:
         text("SELECT kind, id, name, detail FROM lead_people(:id)"), {"id": lead_id})).all()
     for p in people:
         if p.kind == "owner":
-            lead.owner = UserRef(id=str(p.id), full_name=p.name)
+            # BE-042: 086 says whether the owner still works here. Staff only: who
+            # has left Polysil is not a dealer's business (code review F-5)
+            active = (p.detail == "active" if p.detail else None
+                      ) if caller.partner_id is None else None
+            lead.owner = OwnerRef(id=str(p.id), full_name=p.name, is_active=active)
         elif p.kind == "created_by":
             lead.created_by = UserRef(id=str(p.id), full_name=p.name)
         elif p.kind == "assigned_partner":
@@ -619,7 +624,7 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
         territory=TerritoryRef(id=str(row.territory_id), name=row.territory_name,
                                level=row.territory_level),
         village=row.village,
-        owner=names.user(row.owner_user_id, row.owner_name),
+        owner=_as_owner(names.user(row.owner_user_id, row.owner_name)),
         owner_org_unit=OrgUnitRef(id=str(row.owner_org_unit_id),
                                   name=row.owner_org_unit_name),
         assigned_partner=names.partner(row.assigned_partner_id, row.partner_name,
@@ -643,6 +648,11 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
         deleted_at=_iso(row.deleted_at),
         deleted_by=_deleted_by(row.deleted_by_json),
         duplicates=duplicates)
+
+
+def _as_owner(user: UserRef | None) -> OwnerRef | None:
+    """The list leaves is_active null; get_lead() sets it from lead_people() (BE-042)."""
+    return OwnerRef(**user.model_dump()) if user else None
 
 
 def _deleted_by(raw: Any) -> UserRef | None:

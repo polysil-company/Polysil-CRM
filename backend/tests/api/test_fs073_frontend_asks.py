@@ -197,3 +197,42 @@ async def test_a_pair_whose_leads_were_both_deleted_reopens_when_both_are_back(
     events = (await client.get(f"{V1}/leads/{x}/timeline", headers=h)).json()["data"]
     restored = next(e for e in events if e["kind"] == "lead.restored")
     assert restored["payload"]["duplicates_reopened"][0]["lead_id"] == y
+
+
+async def test_a_restored_lead_says_its_owner_has_left(
+        client: httpx.AsyncClient, staff: Staff, env: Env, sessions: Sessions) -> None:
+    """BE-042: `owner.is_active` on the restore and on GET /leads/{id}, so the screen
+    can offer Assign when the owner has gone (GAP-524)."""
+    await _grant_delete(sessions, staff)
+    h = await le._auth(client, staff)
+    lid = await le._make(client, h, env)
+    got = (await client.get(f"{V1}/leads/{lid}", headers=h)).json()["data"]
+    assert got["owner"]["id"] == staff.id and got["owner"]["is_active"] is True
+
+    s = sessions()
+    leaver = str((await s.execute(text(
+        "INSERT INTO app_user (user_type, email, password_hash, full_name, role_id, org_unit_id) "
+        "VALUES ('staff', :e, 'x', 'Owner Who Left', :r, :o) RETURNING id"),
+        {"e": f"left-{le._mobile()}@example.test", "r": staff.role_id, "o": staff.org_unit_id})).scalar_one())
+    await s.execute(text("UPDATE lead SET owner_user_id = :u WHERE id = :l"), {"u": leaver, "l": lid})
+    await s.commit()
+    try:
+        await _delete(client, h, lid)
+        for gone in ("is_active = false, deleted_at = NULL", "is_active = true, deleted_at = now()"):
+            await s.execute(text(f"UPDATE app_user SET {gone} WHERE id = :u"), {"u": leaver})
+            await s.commit()
+            r = await _restore(client, h, lid)
+            assert r.status_code == 200, r.text
+            owner = r.json()["data"]["owner"]
+            assert owner == {"id": leaver, "full_name": "Owner Who Left", "is_active": False}, (gone, owner)
+            assert (await client.get(f"{V1}/leads/{lid}", headers=h)).json()["data"]["owner"]["is_active"] is False
+            await _delete(client, h, lid)
+        # people other than the owner carry no flag
+        created_by = (await client.get(f"{V1}/leads/{lid}", headers=h)).json()["data"]["created_by"]
+        assert "is_active" not in created_by
+    finally:
+        await s.rollback()
+        await s.execute(text("UPDATE lead SET owner_user_id = :me WHERE id = :l"), {"me": staff.id, "l": lid})
+        await s.execute(text("DELETE FROM app_user WHERE id = :u"), {"u": leaver})
+        await s.commit()
+        await s.close()
