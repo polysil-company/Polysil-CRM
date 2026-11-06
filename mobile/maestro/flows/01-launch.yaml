@@ -1,0 +1,12 @@
+# Smoke · The app opens on the client's site, with the real logo and the sign-in form.
+appId: com.polysil.crm
+tags: [smoke]
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Sign in"
+    timeout: 45000
+- assertVisible: "CRM & DMS"
+- assertVisible: "Polysil Irrigation" # the logo's alternative text
+- takeScreenshot: 01-launch

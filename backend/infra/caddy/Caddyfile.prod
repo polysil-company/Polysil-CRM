@@ -1,0 +1,22 @@
+# Production: one domain. The frontend at /, the API at /api/v1 (the same split as
+# staging's polysil-app.caddy). Caddy obtains and renews the certificate itself once
+# the domain's A record points at this box.
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	request_body /api/v1/* {
+		max_size 12MB
+	}
+
+	handle /api/v1/* {
+		reverse_proxy polysil-api:8000
+	}
+
+	handle /health {
+		reverse_proxy polysil-api:8000
+	}
+
+	handle {
+		reverse_proxy polysil-frontend:3000
+	}
+}

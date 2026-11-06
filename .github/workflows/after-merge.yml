@@ -1,0 +1,83 @@
+# Runs when commits reach integration, staging or main.
+#
+# 1. Confirms they arrived through a merged pull request, not a direct push.
+# 2. Runs the checks again on the merged result: two passing pull requests can still
+#    break each other once they're combined.
+# 3. Keeps one issue open while the branch is failing, and closes it once it passes.
+#
+# Our GitHub plan can't block direct pushes or failing merges, so this workflow makes
+# them visible instead. Deploy jobs belong here once hosting is chosen, each with
+# `needs: checks`, so a failing commit never deploys. See docs/CI-CD.md.
+
+name: After merge
+
+on:
+  push:
+    branches: [integration, staging, main]
+
+concurrency:
+  # Runs for the same branch wait for each other instead of cancelling.
+  group: after-merge-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  arrived-through-pull-request:
+    name: Arrived through a pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Find the merged pull request for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # GitHub can take a moment to link a merge commit to its pull request, so retry for about a minute.
+          for attempt in 1 2 3 4 5; do
+            merged=$(gh api "repos/$REPOSITORY/commits/$SHA/pulls" \
+              --jq '[.[] | select(.merged_at != null and .base.ref == env.BRANCH)] | length' 2>/dev/null || echo 0)
+            if [ "$merged" -gt 0 ]; then
+              echo "$SHA reached $BRANCH through a merged pull request."
+              exit 0
+            fi
+            echo "Attempt $attempt: no merged pull request found yet."
+            sleep 15
+          done
+          echo "::error::$SHA reached $BRANCH without a merged pull request. Changes to $BRANCH go through pull requests."
+          exit 1
+
+  checks:
+    name: Checks
+    uses: ./.github/workflows/checks.yml
+    with:
+      scope: changed
+      slow-suites: true
+
+  alert:
+    name: Alert while the branch is failing
+    needs: [arrived-through-pull-request, checks]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+
+      - uses: ./.github/actions/alert
+        with:
+          title: "CI: ${{ github.ref_name }} is failing"
+          result: ${{ contains(needs.*.result, 'failure') && 'failure' || (contains(needs.*.result, 'cancelled') && 'cancelled' || 'success') }}
+          summary: >-
+            A commit reached `${{ github.ref_name }}` without a merged pull request,
+            or its checks failed after merging.

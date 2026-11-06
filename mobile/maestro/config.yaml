@@ -1,0 +1,6 @@
+# Maestro workspace for the Polysil Android app (TRK-008). Flows run in file-name order.
+# Run: maestro test mobile/maestro/flows -e STAFF_EMAIL=… -e STAFF_PASSWORD=…
+flows:
+  - "flows/*"
+executionOrder:
+  continueOnFailure: true

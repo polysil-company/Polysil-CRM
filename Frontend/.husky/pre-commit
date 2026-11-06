@@ -1,0 +1,8 @@
+# Windows runs npm tools through cmd.exe, which rejects command lines over 8,191 characters.
+# lint-staged sizes each batch of file paths to exactly that limit, without counting the quotes
+# and the node path added when the command runs, so a large commit overflows it. A 7,000 budget
+# leaves room on every platform; commits with fewer files still run in a single batch.
+npx lint-staged --max-arg-length 7000
+npm run changelog:check -- --staged
+npm run --silent changelog:build
+git add CHANGELOG.md
