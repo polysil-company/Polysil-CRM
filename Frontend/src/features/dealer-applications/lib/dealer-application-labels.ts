@@ -7,6 +7,7 @@ import type {
 import type {
   DealerApplicationStatus,
   Decision,
+  DepositStatus,
   FirmType,
 } from "@/features/dealer-applications/api/dealer-applications.schemas";
 
@@ -31,6 +32,21 @@ export const DECISION_LABELS: Readonly<Record<Decision, string>> = {
   approve: "Approve",
   return: "Return to the applicant",
   reject: "Reject",
+};
+
+/** FS-071 · Where the deposit stands. */
+export const DEPOSIT_STATUS_LABELS: Readonly<Record<DepositStatus, string>> = {
+  pending: "Deposit due",
+  paid: "Deposit paid",
+  waived: "Deposit waived",
+  not_required: "No deposit",
+};
+
+export const DEPOSIT_STATUS_BADGE: Readonly<Record<DepositStatus, BadgeVariant>> = {
+  pending: "warning",
+  paid: "success",
+  waived: "neutral",
+  not_required: "neutral",
 };
 
 /** FS-071 · What the application makes: a dealer, or a distributor. */
@@ -113,5 +129,6 @@ export const APPLICANT_DOCUMENT_LABELS: Readonly<Record<string, string>> = {
   cancelled_cheque: "Cancelled cheque",
   shop_photo: "Shop photo",
   shop_licence: "Shop licence",
+  deposit_slip: "Deposit pay slip",
   other: "Other",
 };

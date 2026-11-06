@@ -31,6 +31,7 @@ import { EMPTY_VALUE, formatFullDate, formatIndianPhone } from "@/lib/format";
 
 import { DataSheetFacts } from "./data-sheet-facts";
 import { DealerApplicationActions } from "./dealer-application-actions";
+import { DepositCard } from "./deposit-card";
 
 /**
  * CHNL-007 · One dealer or distributor application: where it stands and what is still needed,
@@ -104,6 +105,8 @@ function DetailView({ application }: { application: DealerApplication }): React.
       </div>
 
       <ApplicationNotices application={application} open={open} />
+
+      <DepositCard application={application} />
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         <Card>
@@ -285,6 +288,14 @@ function ApplicationNotices({
             </>
           )}
         </p>
+      </Notice>,
+    );
+  }
+  if (application.status === "submitted" && application.deposit?.status === "pending") {
+    notices.push(
+      <Notice key="deposit" tone="warning">
+        <p className="font-medium">Approval waits for the deposit</p>
+        <p>Record it below, or have it lowered or waived.</p>
       </Notice>,
     );
   }

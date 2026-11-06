@@ -17,7 +17,7 @@ import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
 import { isPartnerRole } from "@/lib/auth/roles";
 import { MOCK_OTP_CODE, readMockRole } from "@/lib/dev/mock-settings";
-import { normalizeIndianMobile } from "@/lib/format";
+import { normalizeIndianMobile, todayInIndia } from "@/lib/format";
 import type { MockDealerApplication } from "@/mocks/data/dealer-applications";
 import type { MockDocument } from "@/mocks/data/documents";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
@@ -39,7 +39,9 @@ import { errorResponse, readMultipart } from "./shared";
  *  - `missing` names the fields and documents still needed; submitting needs none missing;
  *  - the link (`apply_url`) is in the answer only after creating it or renewing it;
  *  - FS-071: an application makes a dealer or a distributor, carries the data sheet, and the
- *    company settings name the extra fields each type must have.
+ *    company settings name the extra fields each type must have;
+ *  - FS-071: the type's deposit is copied from its setting at the start; it is recorded with
+ *    a pay slip, or lowered by the roles the settings name; approval waits until it is paid.
  */
 
 const GSTIN_PATTERN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -176,6 +178,55 @@ function decidersOf(application: MockDealerApplication): readonly string[] {
   return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
 }
 
+type MockDeposit = NonNullable<MockDealerApplication["deposit"]>;
+
+/** FS-071 · The type's deposit, from its company setting, in rupees with two decimals. */
+function depositFor(type: PartnerType): string {
+  const value = mockSettings().find((setting) => setting.key === `${type}_deposit_amount`)?.value;
+  return (typeof value === "number" ? value : 0).toFixed(2);
+}
+
+function newDeposit(amount: string): MockDeposit {
+  return {
+    status: Number(amount) > 0 ? "pending" : "not_required",
+    amount_set: amount,
+    amount_due: amount,
+    paid_amount: null,
+    paid_on: null,
+    reference: null,
+    slip_id: null,
+    history: [],
+  };
+}
+
+/** `dealer_application_deposit_status()`: paid, waived, pending or not required. */
+function depositStatusOf(deposit: MockDeposit): MockDeposit["status"] {
+  const due = Number(deposit.amount_due);
+  if (deposit.paid_amount != null && Number(deposit.paid_amount) >= due) return "paid";
+  if (due === 0 && deposit.history.some((entry) => entry.kind === "relaxation")) return "waived";
+  return due > 0 ? "pending" : "not_required";
+}
+
+function depositOf(application: MockDealerApplication): MockDeposit {
+  const deposit = application.deposit ?? newDeposit("0.00");
+  application.deposit = deposit;
+  return deposit;
+}
+
+function mayRelax(application: MockDealerApplication): boolean {
+  const deposit = depositOf(application);
+  const role = readMockRole();
+  const roles = mockSettings().find((setting) => setting.key === "deposit_relaxation_roles")?.value;
+  return (
+    OPEN_STATUSES.some((status) => status === application.status) &&
+    application.created_by?.id !== caller().id &&
+    !deposit.history.some((entry) => entry.kind === "payment") &&
+    Number(deposit.amount_due) > 0 &&
+    Array.isArray(roles) &&
+    roles.includes(BACKEND_ROLE[role] ?? role)
+  );
+}
+
 function mayDecide(application: MockDealerApplication): boolean {
   const role = readMockRole();
   return (
@@ -205,6 +256,8 @@ export function dealerApplicationWire(
       decide,
       withdraw: open,
       renew: application.status === "draft" || application.status === "returned",
+      record_deposit: open && Number(depositOf(application).amount_due) > 0,
+      relax_deposit: mayRelax(application),
     },
   };
 }
@@ -225,6 +278,7 @@ function blankApplication(input: {
     token: newToken(),
     status: "draft",
     partner_type: input.partnerType ?? "dealer",
+    deposit: newDeposit(depositFor(input.partnerType ?? "dealer")),
     firm_name: input.firm,
     contact_name: input.contact,
     mobile: input.mobile,
@@ -368,6 +422,9 @@ export function mockDealerApplications(): MockDealerApplication[] {
       decision_remark: "The cancelled cheque is unreadable. Upload a clearer photo.",
     },
   ];
+  // the first was started while a dealer's deposit was set at 50,000: it still owes it
+  const first = rows[0];
+  if (first !== undefined) first.deposit = newDeposit("50000.00");
   // fixed links for the seeds, so a demo can open /dealer-apply/apply-demo-1 after a reload
   rows.forEach((row, index) => {
     row.token = `apply-demo-${String(index + 1)}`;
@@ -488,7 +545,7 @@ const fieldsSchema = z.object({
   established_on: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .refine((value) => value >= "1900-01-01" && value <= new Date().toISOString().slice(0, 10), {
+    .refine((value) => value >= "1900-01-01" && value <= todayInIndia(), {
       message: "from 1900, not after today",
     })
     .nullable()
@@ -539,7 +596,25 @@ const fieldsSchema = z.object({
   appointment_place: nullableText.optional(),
 });
 
-/** Staff may also change the type, while draft or returned (no deposit yet in the mock). */
+/** The backend's `Money`: rupees, digits with at most two decimals. */
+const money = z
+  .string()
+  .trim()
+  .regex(/^\d{1,8}(\.\d{1,2})?$/, "rupees, at most two decimals");
+
+const depositRecordSchema = z.object({
+  amount: money.refine((value) => Number(value) > 0, { message: "above 0" }),
+  paid_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "a date"),
+  reference: z.string().trim().max(100).nullish(),
+  slip_id: z.string().min(1, "required"),
+});
+
+const depositRelaxationSchema = z.object({
+  amount_due: money,
+  reason: z.string().trim().min(1, "required").max(1000),
+});
+
+/** Staff may also change the type, while draft or returned and before any deposit entry. */
 const staffFieldsSchema = fieldsSchema.extend({
   partner_type: z.enum(PARTNER_TYPES).optional(),
 });
@@ -674,6 +749,7 @@ export const dealerApplicationHandlers = [
         id: row.id,
         status: row.status,
         partner_type: row.partner_type ?? "dealer",
+        deposit_status: depositOf(row).status,
         firm_name: row.firm_name,
         contact_name: row.contact_name,
         territory_name: row.territory.name,
@@ -750,7 +826,15 @@ export const dealerApplicationHandlers = [
     const { partner_type: partnerType, ...fieldsOnly } = parsed.data;
     if (partnerType !== undefined && partnerType !== application.partner_type) {
       if (application.status === "submitted") return closed();
+      if (depositOf(application).history.length > 0) {
+        return errorResponse(
+          409,
+          "deposit_recorded",
+          "A deposit is recorded, so the type cannot change.",
+        );
+      }
       application.partner_type = partnerType;
+      application.deposit = newDeposit(depositFor(partnerType));
     }
     const problems = applyFields(application, fieldsOnly);
     if (problems !== null) return invalid(problems);
@@ -852,6 +936,9 @@ export const dealerApplicationHandlers = [
       return invalid({ remark: "required to reject or return" });
     }
     if (body.decision === "approve") {
+      if (depositOf(application).status === "pending") {
+        return errorResponse(409, "deposit_pending", "The deposit is not paid or relaxed yet.");
+      }
       const parent =
         body.parent_id == null
           ? null
@@ -899,6 +986,123 @@ export const dealerApplicationHandlers = [
     application.decision_remark = remark;
     application.decided_by = caller();
     application.decided_at = new Date().toISOString();
+    const wire = dealerApplicationWire(application);
+    return remember(request, raw, () => HttpResponse.json({ data: wire }));
+  }),
+
+  http.post(base("/:applicationId/deposit"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!seesPartners()) return forbidden();
+    const application = find(params.applicationId);
+    if (application === undefined) return notFound();
+    const raw = await bodyOf(request);
+    const replay = replayOf(request, raw);
+    if (replay === "conflict")
+      return errorResponse(409, "idempotency_conflict", "Another request used that key.");
+    if (replay !== null) return replay;
+    if (!OPEN_STATUSES.some((status) => status === application.status)) return closed();
+    const deposit = depositOf(application);
+    if (Number(deposit.amount_due) <= 0) {
+      return errorResponse(409, "deposit_not_due", "No deposit is due on this application.");
+    }
+    const parsed = depositRecordSchema.safeParse(raw);
+    if (!parsed.success) {
+      const fields: Record<string, string> = {};
+      for (const issue of parsed.error.issues) fields[issue.path.join(".")] = issue.message;
+      return invalid(fields);
+    }
+    const body = parsed.data;
+    if (body.paid_on > todayInIndia()) {
+      return invalid({ paid_on: "not after today" });
+    }
+    if (Number(body.amount) > Number(deposit.amount_set)) {
+      return invalid({ amount: "above 0 and not above the amount set" });
+    }
+    if (Number(body.amount) < Number(deposit.amount_due)) {
+      return invalid({ amount: "below the amount due" }, "deposit_short");
+    }
+    const slip = mockDb.documents.find(
+      (document) =>
+        document.id === body.slip_id &&
+        !document.removed &&
+        document.record_type === "dealer_application" &&
+        document.record_id === application.id &&
+        document.doc_type === "deposit_slip",
+    );
+    if (slip === undefined) {
+      return invalid({ slip_id: "upload the pay slip as a deposit_slip document first" });
+    }
+    const at = new Date().toISOString();
+    deposit.history.push({
+      kind: "payment",
+      amount: Number(body.amount).toFixed(2),
+      paid_on: body.paid_on,
+      reference: body.reference ?? null,
+      slip_id: body.slip_id,
+      by: caller(),
+      at,
+    });
+    deposit.paid_amount = Number(body.amount).toFixed(2);
+    deposit.paid_on = body.paid_on;
+    deposit.reference = body.reference ?? null;
+    deposit.slip_id = body.slip_id;
+    deposit.status = depositStatusOf(deposit);
+    const wire = dealerApplicationWire(application);
+    return remember(request, raw, () => HttpResponse.json({ data: wire }));
+  }),
+
+  http.post(base("/:applicationId/deposit/relaxation"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!seesPartners()) return forbidden();
+    const application = find(params.applicationId);
+    if (application === undefined) return notFound();
+    const raw = await bodyOf(request);
+    const replay = replayOf(request, raw);
+    if (replay === "conflict")
+      return errorResponse(409, "idempotency_conflict", "Another request used that key.");
+    if (replay !== null) return replay;
+    if (!OPEN_STATUSES.some((status) => status === application.status)) return closed();
+    const deposit = depositOf(application);
+    if (deposit.history.some((entry) => entry.kind === "payment")) {
+      return errorResponse(
+        409,
+        "deposit_paid",
+        "A payment is recorded, so the deposit cannot be relaxed.",
+      );
+    }
+    if (Number(deposit.amount_due) <= 0) {
+      return errorResponse(409, "deposit_not_due", "No deposit is due on this application.");
+    }
+    if (!mayRelax(application)) {
+      return errorResponse(
+        403,
+        "not_your_relaxation",
+        "Only a role the settings name relaxes a deposit, never whoever started it.",
+      );
+    }
+    const parsed = depositRelaxationSchema.safeParse(raw);
+    if (!parsed.success) {
+      const fields: Record<string, string> = {};
+      for (const issue of parsed.error.issues) fields[issue.path.join(".")] = issue.message;
+      return invalid(fields);
+    }
+    const body = parsed.data;
+    if (Number(body.amount_due) >= Number(deposit.amount_due)) {
+      return invalid({ amount_due: "lower than the amount due" }, "not_lower");
+    }
+    const to = Number(body.amount_due).toFixed(2);
+    deposit.history.push({
+      kind: "relaxation",
+      from_due: deposit.amount_due,
+      to,
+      reason: body.reason,
+      by: caller(),
+      at: new Date().toISOString(),
+    });
+    deposit.amount_due = to;
+    deposit.status = depositStatusOf(deposit);
     const wire = dealerApplicationWire(application);
     return remember(request, raw, () => HttpResponse.json({ data: wire }));
   }),

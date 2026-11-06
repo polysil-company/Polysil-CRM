@@ -64,13 +64,63 @@ export function refusalOf(error: unknown): { refusal: Refusal; stale: boolean } 
         },
         stale: false,
       };
+    // FS-071 · the deposit
+    case "deposit_pending":
+      return {
+        refusal: {
+          title: "The deposit isn't paid yet",
+          message: "Record the deposit, or have it lowered or waived, before approving.",
+        },
+        stale: false,
+      };
+    case "deposit_slip_missing":
+      return {
+        refusal: {
+          title: "The deposit's pay slip is missing",
+          message: "It was removed from the documents. Record the deposit again with its slip.",
+        },
+        stale: false,
+      };
+    case "deposit_not_due":
+      return {
+        refusal: {
+          title: "No deposit is due",
+          message: "None is set for this type, or it was waived. The page now shows which.",
+        },
+        stale: true,
+      };
+    case "deposit_paid":
+      return {
+        refusal: {
+          title: "The deposit is already paid",
+          message: "A paid deposit can't be lowered.",
+        },
+        stale: true,
+      };
+    case "deposit_recorded":
+      return {
+        refusal: {
+          title: "A deposit is recorded",
+          message: "The type can't change once a deposit is recorded.",
+        },
+        stale: false,
+      };
+    case "not_your_relaxation":
+      return {
+        refusal: {
+          title: "You can't lower this deposit",
+          message:
+            "Only the roles the company settings name lower or waive a deposit, and never whoever started the application.",
+        },
+        stale: false,
+      };
     default: {
       if (error.status === 403) {
         return {
           refusal: {
             title: "You can't decide this one",
             message:
-              "A State Manager or above decides an application, and never whoever started it.",
+              "Only the roles the company settings name decide an application, and never whoever started it.",
           },
           stale: false,
         };

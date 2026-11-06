@@ -36,6 +36,86 @@ export type FirmType = (typeof FIRM_TYPES)[number];
 
 const userRef = z.object({ id, full_name: z.string() });
 
+/** FS-071 · Where an application's deposit stands. */
+export const DEPOSIT_STATUSES = ["pending", "paid", "waived", "not_required"] as const;
+export type DepositStatus = (typeof DEPOSIT_STATUSES)[number];
+
+/** Rupees as the backend sends them: a decimal string (a number is read as one too). */
+const rupees = z.union([z.string(), z.number()]).transform(String);
+
+const depositEntrySchema = z.object({
+  kind: z.enum(["payment", "relaxation"]),
+  amount: rupees.nullish(),
+  paid_on: z.string().nullish(),
+  reference: z.string().nullish(),
+  slip_id: z.string().nullish(),
+  /** A relaxation's old amount due, and its new one. */
+  from_due: rupees.nullish(),
+  to: rupees.nullish(),
+  reason: z.string().nullish(),
+  by: userRef.nullish(),
+  at: z.string().min(1),
+});
+
+const depositSchema = z.object({
+  status: z.enum(DEPOSIT_STATUSES),
+  /** Copied from the type's setting when the application was made. */
+  amount_set: rupees,
+  /** After any relaxation. */
+  amount_due: rupees,
+  paid_amount: rupees.nullish(),
+  paid_on: z.string().nullish(),
+  reference: z.string().nullish(),
+  slip_id: z.string().nullish(),
+  history: z.array(depositEntrySchema),
+});
+
+export interface DepositEntry {
+  readonly kind: "payment" | "relaxation";
+  readonly amount: string | null;
+  readonly paidOn: string | null;
+  readonly reference: string | null;
+  readonly fromDue: string | null;
+  readonly to: string | null;
+  readonly reason: string | null;
+  readonly by: string | null;
+  readonly at: string;
+}
+
+export interface Deposit {
+  readonly status: DepositStatus;
+  readonly amountSet: string;
+  readonly amountDue: string;
+  readonly paidAmount: string | null;
+  readonly paidOn: string | null;
+  readonly reference: string | null;
+  readonly slipId: string | null;
+  readonly history: readonly DepositEntry[];
+}
+
+function toDeposit(wire: z.output<typeof depositSchema>): Deposit {
+  return {
+    status: wire.status,
+    amountSet: wire.amount_set,
+    amountDue: wire.amount_due,
+    paidAmount: wire.paid_amount ?? null,
+    paidOn: wire.paid_on?.slice(0, 10) ?? null,
+    reference: wire.reference ?? null,
+    slipId: wire.slip_id ?? null,
+    history: wire.history.map((entry) => ({
+      kind: entry.kind,
+      amount: entry.amount ?? null,
+      paidOn: entry.paid_on?.slice(0, 10) ?? null,
+      reference: entry.reference ?? null,
+      fromDue: entry.from_due ?? null,
+      to: entry.to ?? null,
+      reason: entry.reason ?? null,
+      by: entry.by?.full_name ?? null,
+      at: entry.at,
+    })),
+  };
+}
+
 /** A backend before migration 078 sends no type: every application was a dealer's. */
 const partnerTypeSchema = z
   .enum(PARTNER_TYPES)
@@ -46,6 +126,8 @@ const rowWireSchema = z.object({
   id,
   status: z.enum(DEALER_APPLICATION_STATUSES),
   partner_type: partnerTypeSchema,
+  /** FS-071. A backend before 078 sends none. */
+  deposit_status: z.enum(DEPOSIT_STATUSES).nullish(),
   firm_name: z.string(),
   contact_name: z.string(),
   territory_name: z.string(),
@@ -60,6 +142,7 @@ export const dealerApplicationListSchema = z
       id: row.id,
       status: row.status,
       partnerType: row.partner_type,
+      depositStatus: row.deposit_status ?? null,
       firmName: row.firm_name,
       contactName: row.contact_name,
       territoryName: row.territory_name,
@@ -102,6 +185,8 @@ export const dealerApplicationWireSchema = z.object({
   bank_account_no: z.string().nullable(),
   bank_ifsc: z.string().nullable(),
   ...dataSheetWireShape,
+  /** FS-071. A backend before 078 sends none: no deposit step. */
+  deposit: depositSchema.nullish(),
   gst_lookup: gstLookupSchema.nullable(),
   /** The GSTIN's state isn't the territory's. */
   gst_state_mismatch: z.boolean(),
@@ -122,6 +207,9 @@ export const dealerApplicationWireSchema = z.object({
     decide: z.boolean(),
     withdraw: z.boolean(),
     renew: z.boolean(),
+    // FS-071 · the deposit; a backend before 078 sends neither
+    record_deposit: z.boolean().default(false),
+    relax_deposit: z.boolean().default(false),
   }),
 });
 
@@ -157,6 +245,7 @@ export const dealerApplicationSchema = z
     bankAccountNo: data.bank_account_no,
     bankIfsc: data.bank_ifsc,
     dataSheet: toDataSheet(data),
+    deposit: data.deposit == null ? null : toDeposit(data.deposit),
     gstNames:
       data.gst_lookup === null
         ? null
@@ -174,7 +263,14 @@ export const dealerApplicationSchema = z
     applyUrl: data.apply_url ?? null,
     createdBy: data.created_by === null ? null : { name: data.created_by.full_name },
     createdAt: data.created_at,
-    can: data.can,
+    can: {
+      edit: data.can.edit,
+      decide: data.can.decide,
+      withdraw: data.can.withdraw,
+      renew: data.can.renew,
+      recordDeposit: data.can.record_deposit,
+      relaxDeposit: data.can.relax_deposit,
+    },
   }));
 
 export type DealerApplication = z.output<typeof dealerApplicationSchema>;
@@ -239,6 +335,22 @@ export interface DecisionRequest {
   readonly parent_id: string | null;
   /** The partner code; null: the next DLR-<state>-0001, or DIST-<state>-0001 for a distributor. */
   readonly code: string | null;
+}
+
+/** POST /dealer-applications/{id}/deposit. Upload the pay slip first, as `deposit_slip`. */
+export interface DepositRecordRequest {
+  /** Rupees, above 0 and at least the amount due. */
+  readonly amount: string;
+  /** Not after today, nor more than a year before the application. */
+  readonly paid_on: string;
+  readonly reference: string | null;
+  readonly slip_id: string;
+}
+
+/** POST /dealer-applications/{id}/deposit/relaxation. 0 waives it. */
+export interface DepositRelaxationRequest {
+  readonly amount_due: string;
+  readonly reason: string;
 }
 
 export interface RemarkRequest {
