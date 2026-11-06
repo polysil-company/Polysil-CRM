@@ -150,6 +150,11 @@ async def resolve_scope(db: AsyncSession, *, partner_id: str | None,
             found = (await db.execute(text("SELECT document_partner_tier(CAST(:p AS uuid))"),
                                       {"p": partner_id})).scalar_one_or_none()
         if found is None:
+            # FS-084: a distributor above a dealer in the caller's area, which the
+            # order picker offers. Only the tier comes back (087)
+            found = (await db.execute(text("SELECT supplier_partner_tier(CAST(:p AS uuid))"),
+                                      {"p": partner_id})).scalar_one_or_none()
+        if found is None:
             # A partner outside the caller's scope is invisible to the policy, so
             # this is both "does not exist" and "not yours" - one answer on
             # purpose, as everywhere else in this system.

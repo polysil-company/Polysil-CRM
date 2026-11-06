@@ -74,8 +74,9 @@ SPECS: dict[str, ScopeSpec] = {
         parents={"lead_id": "lead", "territory_id": "territory",
                  "owner_org_unit_id": "org_unit", "partner_id": "channel_partner"},
         # FS-020: the dealer on a lead or quotation the writer can see, though the
-        # dealer's own row is outside their area
-        parent_fallback={"partner_id": "partner_on_visible_document"},
+        # dealer's own row is outside their area; FS-084: or a distributor above a
+        # dealer in their area (087)
+        parent_fallback={"partner_id": "partner_orderable"},
     ),
     # FS-011: the quotation's shape. An order's scope is set at create (from its
     # quotations, else the raiser or the portal routing) and follows nothing after
@@ -91,8 +92,9 @@ SPECS: dict[str, ScopeSpec] = {
         parents={"lead_id": "lead", "territory_id": "territory",
                  "owner_org_unit_id": "org_unit", "partner_id": "channel_partner"},
         # FS-020: the dealer on a lead or quotation the writer can see, though the
-        # dealer's own row is outside their area
-        parent_fallback={"partner_id": "partner_on_visible_document"},
+        # dealer's own row is outside their area; FS-084: or a distributor above a
+        # dealer in their area (087)
+        parent_fallback={"partner_id": "partner_orderable"},
     ),
     # FS-014: a task is its assignee's (own) and sits under the assignee's office
     # (org_subtree), which is where a manager and the assigner read it (ADR-034

@@ -293,6 +293,10 @@ class PartnerPick(BaseModel):
     name: str
     partner_type: str = Field(description="distributor, dealer or sub_dealer.")
     territory: TerritoryParent | None = None
+    supplies_your_area: bool = Field(
+        default=False,
+        description="With for=order: true on a distributor listed only because it "
+        "supplies a partner in your area (FS-084). False otherwise.")
 
 
 class LeadArea(BaseModel):

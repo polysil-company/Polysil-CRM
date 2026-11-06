@@ -143,8 +143,8 @@ def test_the_document_fallback_reaches_the_partner_check_and_its_guard() -> None
         spec = SPECS[module]
         ins = next(s for s in policies_for(spec)
                    if s.startswith(f"CREATE POLICY {spec.table}_ins "))
-        assert "OR partner_on_visible_document(partner_id))" in ins
-        assert "AND NOT partner_on_visible_document(NEW.partner_id)" in parent_guard_ddl(spec)[0]
+        assert "OR partner_orderable(partner_id))" in ins
+        assert "AND NOT partner_orderable(NEW.partner_id)" in parent_guard_ddl(spec)[0]
     assert "partner_on_visible_document" not in "\n".join(policies_for(SPECS["leads"]))
 
 

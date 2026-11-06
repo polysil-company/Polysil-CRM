@@ -136,7 +136,7 @@ in the same shape. Never renumber or reuse a number.
 
 **From the client's report of 6 Nov** — a field officer couldn't choose the distributor on a new sales order
 
-- [ ] **BE-043** · Which distributors a field officer can find when ordering · SO-012, SO-013 · high · **a decision**
+- [x] **BE-043** · Which distributors a field officer can find when ordering · SO-012, SO-013 · high · **a decision**
 
 ---
 
@@ -879,7 +879,7 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-043 · Which distributors a field officer can find when ordering
 
-- **Status:** ⬜ Open · **a decision**
+- **Status:** ✅ Done
 - **Asked:** 6 Nov 2026 · SO-012, SO-013 · the client reported that a field officer couldn't choose a distributor on a new sales order
 - **What:**
   - The order screens search `GET /lookups/partners`, which lists only the partners in the caller's own scope (`channel_partner`'s row policies; RBAC.md §6.1 gives a field officer `partners V:org`).
@@ -892,5 +892,16 @@ in the same shape. Never renumber or reuse a number.
   - Then make `/lookups/partners`, or a variant for orders such as `?for=order`, return them.
 - **Why:** a field officer selling to a farmer must be able to route the order through the distributor who will supply it.
 - **Done when:** a field officer can find the distributors the rule allows, and the rule is in `lookups.md`.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** branch `fix/fs-084-order-distributors` (FS-084, migration 087), stacked on BE-042
+- **Backend notes:**
+  - **Decided:** option 2, the distributors above the dealers in your area.
+  - **Most of the 6 Nov report is ISS-233, not this.** On prod every field officer is in "Polysil HQ", which covers no area, so they see no partners at all. The office loader (FS-085) fixes that.
+  - A distributor registered **above** the officer's office, for example at state level, was already in the list.
+  - **Call `GET /lookups/partners?for=order`** on the order and quotation screens. It returns your area's partners plus the distributors above any dealer or sub-dealer under your area. Each row has `supplies_your_area`: `true` on those added distributors, so give them a quiet label such as "Supplies your area".
+  - **Without `for`,** the list is the same as before. Keep it for lead assignment.
+  - **Permission:** `for=order` needs `sales_orders.create` or `quotations.create`. A dealer login gets `403`.
+  - **Pricing and saving:** a quotation or order with one of these distributors prices at its tier and saves. Its name shows on the document as usual.
+  - **What doesn't work:**
+    - A consolidated order (several leads) through such a distributor is refused, `partner_not_readable`, as before.
+    - A distributor whose only dealers are registered for a whole state is not added (GAP-568, client question 38.1).
+  - Field names are in `backend/docs/api/lookups.md`.
