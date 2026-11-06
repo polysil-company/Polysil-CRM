@@ -45,6 +45,7 @@ import { createLogger } from "@/lib/logger";
 import {
   changedFields,
   DealerFieldsEditor,
+  problemsFromServer,
   draftOf,
   fieldProblems,
   type DealerFieldProblems,
@@ -126,9 +127,7 @@ export function DealerApplyForm({
       }
       const fieldErrors = readFieldErrors(error);
       if (fieldErrors !== null) {
-        const mapped: Record<string, string> = { ...fieldErrors };
-        const next: DealerFieldProblems = mapped;
-        setServer(next);
+        setServer(problemsFromServer(fieldErrors));
         return;
       }
       const { refusal } = refusalOf(error);
@@ -206,6 +205,7 @@ export function DealerApplyForm({
             setServer({});
           }}
           problems={problems}
+          workingCapitalTotal={fields?.dataSheet.workingCapitalTotalLakhs ?? null}
           gstinCheck={(gstin) => (
             <ApplicantGstinCheck token={token} session={session} gstin={gstin} />
           )}
