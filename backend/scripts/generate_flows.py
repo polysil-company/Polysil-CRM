@@ -2169,7 +2169,7 @@ def f_exports() -> None:
         [("n1", "A TEXT CELL STARTING = IS A FORMULA\n\nopenpyxl stores it as one through cell() and\nappend() alike. The writer forces data_type 's'.\nThe PIMS sheet had the same hole (ISS-200).", RED),
          ("n2", "/export IS DECLARED BEFORE /{id}\n\nStarlette matches {id} first; declared after,\nthe export answers 422 forever.", RED),
          ("n3", "FS-081 REGISTERS EXPORTS FROM THEIR LISTS\n\nlist_exports.add_export copies the list route's gate,\nfilters and handler, and places /export right after it.\nLists without a real cursor are read in ONE call with\nlimit 5,001: a page loop drifts, a cap would cut.", GREEN),
-         ("n4", "Not yet: imports beyond partners, prices and lines;\ntargets and the org chart as files (GAP-555);\nthe client's layouts (GAP-302).", YELLOW)])
+         ("n4", "Not yet: imports beyond partners, prices, lines and\nproducts; targets and the org chart as files (GAP-555);\nthe client's layouts (GAP-302).", YELLOW)])
 
 
 def f_schemes() -> None:
@@ -2586,8 +2586,8 @@ def f_price_lists_by_sale_type() -> None:
 def f_excel_import() -> None:
     _columns(
         "69-excel-import", "Excel import with column matching",
-        "Partners, a draft list's rates, or order lines. Nothing is saved before the check.",
-        "BUILT. FS-062: migration 074, /imports. FS-067: matching fixes. FS-068: template.",
+        "Partners, a draft list's rates, order lines, or products. Nothing is saved before the check.",
+        "BUILT. FS-062: migration 074, /imports. FS-067: matching fixes. FS-068: template. FS-083: products (085).",
         [("i1", "POST /imports (multipart): kind, file, target_id?\n.xlsx or .csv, 10 MB, 5,000 rows", BLUE),
          ("i2", "read: caps checked BEFORE openpyxl; header = the row\nwith the most known names (2+); rows stored as text", GREEN),
          ("i3", "answer: headers (labels from above: Price (GJ), UP),\nsuggested_mapping: last SAVED, never the rate, no empty\ncolumn, never another field's own name", GREY),
@@ -2600,12 +2600,16 @@ def f_excel_import() -> None:
          ("d4", "purge after 7 days: import_batch_purge(),\nsystem principal only", GREY),
          ("d5", "products: names cleaned as the loader did (_x000D_,\nspaces); unknown code + known name: by name if uncoded", GREEN),
          ("d6", "discard: rows gone; the check kept with cell values\ntaken out (partners: counts only)", GREY),
-         ("d7", "GET /imports/template?kind=: our names in row 1, no\nrows, codes as text; uploaded blank it is refused", GREEN)],
+         ("d7", "GET /imports/template?kind=: our names in row 1, no\nrows, codes as text; uploaded blank it is refused", GREEN),
+         ("d8", "FS-083 kind=products: code, then uncoded name; nothing\nfound = new. Blank = no change. Counts: new, update,\nrenamed, switched off; renames shown first", BLUE),
+         ("d9", "products commit: advisory lock (5); a changed\nfingerprint = 409 check again; HSN starts on the re-check's day", GREEN)],
         [("n1", "NO LOGIN IS CREATED\n\nEvery dealer can be a record. Portal access is a\nseparate POST /users per dealer.", RED),
          ("n2", "FLOATS ARE NOT MONEY\n\nrepr -> Decimal, 9 places, no exponent. A % cell is read\nas shown. More than 2 decimals on a rate is refused.", RED),
          ("n3", "A CHILD OF A BAD ROW IS A BAD ROW\n\nSkipping a distributor strands its dealers; the check\nsays so before commit (EC-12).", RED),
          ("n4", "Not yet: updating partners, fuzzy match, codes from\na sheet, a template under the wrong kind (GAP-471, 473,\n476, 503 to 507).", YELLOW),
-         ("n5", "LOOK AT THE FILE FIRST\n\n16 Oct: names under Item Code, no rates. Every row\nnow says: match this column to Description.", RED)])
+         ("n5", "LOOK AT THE FILE FIRST\n\n16 Oct: names under Item Code, no rates. Every row\nnow says: match this column to Description.", RED),
+         ("n6", "THE CLIENT'S SHEET HAS NO ITEM CODES\n\nA spelling fix arrives as a NEW product. The check\nflags names 0.8 similar (near). Only a code renames.", RED),
+         ("n7", "SEED-PROD STILL TOUCHES IMPORTED PRODUCTS\n\nclassifications() and prices() ignore created_by\n(ISS-234). Push fix/product-renamed-on-prod first.", RED)])
 
 
 def f_live_checks() -> None:

@@ -11,6 +11,7 @@ in one statement. The router owns the transaction (CLAUDE.md 4.1 rule 3).
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 import uuid
@@ -26,8 +27,9 @@ from starlette.concurrency import run_in_threadpool
 
 from api.authz.predicate import Caller
 from api.domain.imports import fields as import_fields
+from api.domain.imports import products as product_rows
 from api.domain.imports import template as import_template
-from api.domain.imports.cells import key, redact
+from api.domain.imports.cells import key, name_key, redact
 from api.domain.imports.reader import ImportUnreadableError, SheetRow, read_upload
 from api.domain.imports.rows import (
     TYPE_ORDER,
@@ -43,6 +45,7 @@ from api.domain.imports.rows import (
 )
 from api.errors import ConflictError, ForbiddenError, NotFoundError, ValidationFailed
 from api.schemas import imports as sch
+from api.services.clock import today_ist
 from api.services.pricing import PUBLISHED_LIST, _raw_list
 from api.services.users import _pg_text, _sqlstate
 
@@ -50,7 +53,7 @@ MAX_ERROR_ROWS = 500
 PREVIEW_ROWS = 20
 SAMPLE_ROWS = 5
 MAX_LINES = 200
-STAFF_ONLY = ("partners", "price_list_items")
+STAFF_ONLY = ("partners", "price_list_items", "products")
 
 
 # ── reading and writing the batch ────────────────────────────────────────────
@@ -93,6 +96,8 @@ PERMISSIONS: dict[str, tuple[tuple[str, str], ...]] = {
     "partners": (("partners", "create"),),
     "price_list_items": (("pricing", "edit"),),
     "lines": (("sales_orders", "create"), ("quotations", "create")),
+    # FS-083: the same permission as POST and PATCH /products
+    "products": (("products", "edit"),),
 }
 
 
@@ -188,6 +193,9 @@ async def get(db: AsyncSession, batch_id: str) -> sch.ImportBatch:
 class Evaluation:
     results: list[RowResult]
     column_warnings: dict[str, str]
+    # FS-083 EC-12: the day this evaluation read. At commit it is the commit's own
+    # re-check, so the HSN rows open on the day whose rates and guards were checked
+    today: dt.date | None = None
 
 
 def _empty_columns(rows: Sequence[SheetRow], width: int) -> set[int]:
@@ -279,8 +287,143 @@ async def _product_lookups(db: AsyncSession) -> ProductLookups:
         for r in found)
 
 
+async def _catalogue_lookups(db: AsyncSession) -> product_rows.CatalogueLookups:
+    """FS-083: the whole catalogue as it stands today, with each product's HSN in
+    force, its start, and whether a later one is queued. Deleted products are read
+    only for their description and code, which the unique indexes still hold."""
+    today = today_ist()
+    found = (await db.execute(text("""
+SELECT p.id::text, p.description::text, p.item_code::text, p.is_active, u.code::text, u.decimals,
+       p.pack_multiple, p.deleted_at IS NOT NULL AS deleted, c.id::text, c.code::text,
+       p.quotation_category::text, u.id::text, p.mrp, p.is_subsidy_eligible,
+       h.hsn_code, h.effective_from, p.provisional_fields,
+       -- deleted rows too: ex_product_hsn covers them (plan review N-9)
+       EXISTS (SELECT 1 FROM product_hsn l WHERE l.product_id = p.id
+               AND l.effective_from > CAST(:d AS date)) AS later
+FROM product p
+JOIN uom u ON u.id = p.uom_id
+JOIN product_category c ON c.id = p.product_category_id
+LEFT JOIN product_hsn h ON h.product_id = p.id AND h.deleted_at IS NULL
+     AND daterange(h.effective_from, h.effective_to, '[)') @> CAST(:d AS date)"""),
+        {"d": today})).all()
+    refs = []
+    current: dict[str, product_rows.Current] = {}
+    descriptions: dict[str, str] = {}
+    codes: dict[str, str] = {}
+    deleted: set[str] = set()
+    for r in found:
+        # EC-1: by name_key, which is stricter than the citext unique index
+        descriptions[name_key(r[1])] = r[0]
+        if r[2]:
+            codes[name_key(r[2])] = r[0]
+        if r[7]:
+            deleted.add(r[0])
+            continue
+        ref = ProductRef(id=r[0], description=r[1], item_code=r[2], is_active=r[3],
+                         uom_code=r[4], uom_decimals=int(r[5]),
+                         pack_multiple=Decimal(r[6]) if r[6] is not None else None)
+        refs.append(ref)
+        current[r[0]] = product_rows.Current(
+            ref=ref, category=product_rows.Master(r[8], r[9]), quotation_category=r[10],
+            uom=product_rows.Master(r[11], r[4]),
+            mrp=Decimal(r[12]) if r[12] is not None else None,
+            pack_multiple=ref.pack_multiple, is_subsidy_eligible=r[13], hsn_code=r[14],
+            hsn_from=r[15], hsn_later=r[17], provisional=frozenset(r[16] or []))
+    masters: dict[str, dict[str, product_rows.Master]] = {}
+    for table in ("product_category", "uom"):
+        found_masters = (await db.execute(text(
+            f"SELECT id::text, code::text, name FROM {table} "
+            "WHERE deleted_at IS NULL AND is_active ORDER BY code"))).all()
+        named: dict[str, product_rows.Master] = {}
+        # a code wins over another master's name
+        for r in found_masters:
+            named.setdefault(key(r[1]), product_rows.Master(r[0], r[1]))
+        for r in found_masters:
+            named.setdefault(key(r[2]), product_rows.Master(r[0], r[1]))
+        masters[table] = named
+    hsn_rows: Sequence[Any] = (await db.execute(text(
+        "SELECT DISTINCT hsn_code FROM gst_rate WHERE is_active AND deleted_at IS NULL "
+        "AND daterange(effective_from, effective_to, '[)') @> CAST(:d AS date)"),
+        {"d": today})).scalars().all()
+    rated = frozenset(str(h) for h in hsn_rows)
+    return product_rows.CatalogueLookups(
+        products=ProductLookups.build(refs), current=current,
+        categories=masters["product_category"], uoms=masters["uom"], rated_hsn=rated,
+        today=today, descriptions=descriptions, codes=codes, deleted=frozenset(deleted))
+
+
+# EC-5: the client's sheet has no item codes, so a corrected spelling arrives as a
+# new product. pg_trgm similarity; 0.8 catches one or two letters in a long name.
+NEAR = 0.8
+
+
+async def _near_names(db: AsyncSession, results: list[RowResult]) -> None:
+    """A new row whose description is close to an existing product's gets a note
+    naming it. It still imports: only the admin knows whether it is a new product
+    or a spelling fix (GAP-561)."""
+    new = {r.row: r.values["product"] for r in results
+           if r.ok and r.values.get("action") == "new"}
+    if not new:
+        return
+    found = (await db.execute(text("""
+SELECT x.row, n.description
+FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS x(row int, d text)
+CROSS JOIN LATERAL (
+    SELECT p.description::text AS description FROM product p
+    WHERE p.deleted_at IS NULL AND similarity(p.description::text, x.d) >= :near
+    ORDER BY similarity(p.description::text, x.d) DESC, p.description LIMIT 1) n"""),
+        {"rows": json.dumps([{"row": k, "d": v} for k, v in new.items()]),
+         "near": NEAR})).all()
+    by_row = {r.row: r for r in results}
+    for row, description in found:
+        by_row[int(row)].values["near"] = description
+        by_row[int(row)].notes["description"] = f"close to {description!r}"
+
+
+def _product_warnings(results: list[RowResult]) -> dict[str, str]:
+    """FS-083 rule 12: a new product cannot be quoted until it has an HSN code and a
+    rate. Said once for the column, not on every row. Open drafts using a product
+    switched off are not counted yet (GAP-563)."""
+    new = [r for r in results if r.ok and r.values.get("action") == "new"]
+    out = {}
+    near = sum(1 for r in new if r.values.get("near"))
+    still_off = sum(1 for r in results if r.ok and r.notes.get("is_active"))
+    untaxed = sum(1 for r in new if not r.values["write"]["hsn_code"])
+    if untaxed:
+        out["hsn_code"] = (f"{untaxed} new product{'s have' if untaxed > 1 else ' has'} no HSN "
+                           f"code. {'They' if untaxed > 1 else 'It'} cannot be quoted until "
+                           f"one is set on the product page.")
+    msgs = []
+    if near:
+        msgs.append(f"{near} new product{'s are' if near > 1 else ' is'} close to an existing "
+                    f"name. If {'they are' if near > 1 else 'it is'} a spelling fix, give the "
+                    f"item code or change the name on the product page instead.")
+    if new:
+        msgs.append(f"{len(new)} new product{'s have' if len(new) > 1 else ' has'} no rate "
+                    f"yet. Add {'them' if len(new) > 1 else 'it'} to a price list with a price "
+                    f"import before quoting.")
+    if msgs:
+        out["description"] = " ".join(msgs)
+    if still_off:
+        # EC-9
+        out["is_active"] = (f"{still_off} row{'s match' if still_off > 1 else ' matches'} a "
+                            f"switched-off product. Set Active to yes to sell "
+                            f"{'them' if still_off > 1 else 'it'} again.")
+    return out
+
+
 async def _evaluate(db: AsyncSession, kind: str, rows: list[SheetRow],
-                    mapping: dict[str, int]) -> Evaluation:
+                    mapping: dict[str, int], *, at_commit: bool = False) -> Evaluation:
+    if kind == "products":
+        lk = await _catalogue_lookups(db)
+        results = product_rows.parse_products(rows, mapping, lk)
+        if not at_commit:
+            # a note for the person; commit does not need it (plan review N-8)
+            await _near_names(db, results)
+        warnings = _column_warnings(rows, mapping)
+        for k, msg in _product_warnings(results).items():
+            warnings.setdefault(k, msg)
+        return Evaluation(results, warnings, today=lk.today)
     if kind == "partners":
         results = await _evaluate_partners(db, rows, mapping)
     elif kind == "price_list_items":
@@ -300,6 +443,8 @@ async def _evaluate(db: AsyncSession, kind: str, rows: list[SheetRow],
 
 
 def _preview_values(kind: str, values: dict[str, Any]) -> dict[str, object]:
+    if kind == "products":
+        return {k: v for k, v in values.items() if k != "write"}
     hidden = {"territory_id", "territory_field", "parent_row", "parent_id"}
     return {k: v for k, v in values.items() if k not in hidden and v is not None} \
         if kind == "partners" else dict(values)
@@ -308,6 +453,15 @@ def _preview_values(kind: str, values: dict[str, Any]) -> dict[str, object]:
 def _summary(kind: str, ev: Evaluation) -> sch.ImportCheck:
     bad = [r for r in ev.results if not r.ok]
     good = [r for r in ev.results if r.ok]
+    counts = None
+    shown = good
+    if kind == "products":
+        counts = sch.ProductImportCounts(**product_rows.change_counts(ev.results),
+                                         fingerprint=product_rows.fingerprint(ev.results))
+        # FS-083: the preview is the rows that change something, renames and
+        # switch-offs first (EC-7)
+        shown = sorted((r for r in good if r.values["action"] != "unchanged"),
+                       key=product_rows.preview_order)
     lines = None
     if kind == "lines":
         lines = [sch.ImportLine(row=r.row, **{k: r.values[k] for k in (
@@ -317,8 +471,8 @@ def _summary(kind: str, ev: Evaluation) -> sch.ImportCheck:
         total=len(ev.results), ok=len(good), errors=len(bad),
         error_rows=[sch.ImportRowError(row=r.row, errors=r.errors) for r in bad[:MAX_ERROR_ROWS]],
         preview=[sch.ImportPreviewRow(row=r.row, values=_preview_values(kind, r.values))
-                 for r in good[:PREVIEW_ROWS]],
-        column_warnings=ev.column_warnings, lines=lines)
+                 for r in shown[:PREVIEW_ROWS]],
+        column_warnings=ev.column_warnings, lines=lines, products=counts)
 
 
 def _open(row: Any) -> None:
@@ -401,7 +555,14 @@ async def commit(db: AsyncSession, caller: Caller, batch_id: str,
     if row.kind == "price_list_items" and (
             await _raw_list(db, row.target_id, for_update=True)).status != "draft":
         raise PUBLISHED_LIST
-    ev = await _evaluate(db, row.kind, _sheet_rows(row), mapping)
+    if row.kind == "products":
+        # EC-11: one product import commits at a time. Transaction-scoped, so it
+        # holds behind PgBouncer
+        # namespace 5, the singleton masters (019, 053; plan review N-1)
+        await db.execute(text("SELECT pg_advisory_xact_lock(5, hashtext('product_import'))"))
+    ev = await _evaluate(db, row.kind, _sheet_rows(row), mapping, at_commit=True)
+    if row.kind == "products":
+        _same_as_checked(row.check_result, ev)
     good = [r for r in ev.results if r.ok]
     bad = len(ev.results) - len(good)
     if bad and not body.skip_invalid:
@@ -415,8 +576,12 @@ async def commit(db: AsyncSession, caller: Caller, batch_id: str,
         raise ValidationFailed("No row can be imported.", code="import_has_errors",
                                fields={"rows": "none are good"})
 
+    updated = unchanged = 0
     if row.kind == "partners":
         created = await _commit_partners(db, caller, good)
+        target = None
+    elif row.kind == "products":
+        created, updated, unchanged = await _commit_products(db, good, ev.today or today_ist())
         target = None
     else:
         options = dict(row.options or {})
@@ -431,7 +596,7 @@ async def commit(db: AsyncSession, caller: Caller, batch_id: str,
         "  check_result = CAST(:c AS jsonb) WHERE id = CAST(:id AS uuid)"),
         {"id": batch_id, "c": stored.model_dump_json()})
     return sch.ImportCommitResult(status="committed", created=created, skipped=bad,
-                                  price_list_id=target)
+                                  price_list_id=target, updated=updated, unchanged=unchanged)
 
 
 async def _commit_partners(db: AsyncSession, caller: Caller, good: list[RowResult]) -> int:
@@ -538,3 +703,100 @@ async def _commit_rates(db: AsyncSession, list_id: str, good: list[RowResult], *
             raise PUBLISHED_LIST from exc
         raise
     return len(items)
+
+
+def _same_as_checked(stored: Any, ev: Evaluation) -> None:
+    """EC-11: the catalogue changed between check and commit, say by an edit on the
+    product page. Saving now would write what nobody looked at, or undo that edit,
+    so the person checks again. Compared by a fingerprint of every row's action
+    and changes, not the counts: two edits can cancel out (plan review N-2)."""
+    if not stored:
+        return
+    before = sch.ImportCheck.model_validate(stored)
+    if before.products is None or before.products.fingerprint != product_rows.fingerprint(
+            ev.results):
+        raise ConflictError("The catalogue changed since the check. Check again.",
+                            code="import_wrong_state", fields={"status": "check again"})
+
+
+async def _commit_products(db: AsyncSession, good: list[RowResult],
+                           today: dt.date) -> tuple[int, int, int]:
+    """FS-083: new products in one INSERT, changed ones in one UPDATE, then the HSN
+    rows. An update sends only its changed columns; null keeps the catalogue's
+    value. Setting MRP, pack multiple or HSN clears that provisional mark (rules 9,
+    10). Audit rows come from `audit_row()`; products have no activity_event (FS-010
+    rule 15)."""
+    new = []
+    hsn: list[dict[str, str]] = []
+    for r in good:
+        if r.values["action"] != "new":
+            continue
+        w = dict(r.values["write"])
+        w["id"] = str(uuid.uuid4())
+        new.append(w)
+        if w["hsn_code"]:
+            hsn.append({"p": w["id"], "h": w["hsn_code"]})
+    changed = [dict(r.values["write"]) for r in good if r.values["action"] == "update"]
+    for w in changed:
+        w["cleared"] = [c for c in ("mrp", "pack_multiple") if c in w] + (
+            ["hsn_code", "gst_slab"] if "hsn_code" in w else []) + w.pop("confirm", [])
+        if "hsn_code" in w:
+            hsn.append({"p": w["id"], "h": w["hsn_code"]})
+    try:
+        async with db.begin_nested():
+            if new:
+                await db.execute(text("""
+INSERT INTO product (id, description, item_code, product_category_id, quotation_category, uom_id,
+    mrp, pack_multiple, is_subsidy_eligible, is_active, created_by)
+SELECT x.id, CAST(x.description AS citext), CAST(x.item_code AS citext), x.category_id,
+       CAST(x.quotation_category AS quotation_category), x.uom_id, x.mrp, x.pack_multiple,
+       x.is_subsidy_eligible, x.is_active, app_current_user_id()
+FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS x(id uuid, description text, item_code text,
+    category_id uuid, quotation_category text, uom_id uuid, mrp numeric, pack_multiple numeric,
+    is_subsidy_eligible boolean, is_active boolean)"""), {"rows": json.dumps(new)})
+            if changed:
+                await db.execute(text("""
+UPDATE product p SET
+    description = COALESCE(CAST(x.description AS citext), p.description),
+    item_code = COALESCE(CAST(x.item_code AS citext), p.item_code),
+    product_category_id = COALESCE(x.category_id, p.product_category_id),
+    quotation_category = COALESCE(CAST(x.quotation_category AS quotation_category),
+                                  p.quotation_category),
+    uom_id = COALESCE(x.uom_id, p.uom_id),
+    mrp = COALESCE(x.mrp, p.mrp),
+    pack_multiple = COALESCE(x.pack_multiple, p.pack_multiple),
+    is_subsidy_eligible = COALESCE(x.is_subsidy_eligible, p.is_subsidy_eligible),
+    is_active = COALESCE(x.is_active, p.is_active),
+    -- untouched unless something is cleared: EXCEPT reorders the array, and the
+    -- audit row would show a change that did not happen (plan review N-3)
+    provisional_fields = CASE WHEN cardinality(x.cleared) = 0 THEN p.provisional_fields
+        ELSE ARRAY(SELECT unnest(p.provisional_fields) EXCEPT SELECT unnest(x.cleared)) END,
+    updated_by = app_current_user_id()
+FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS x(id uuid, description text, item_code text,
+    category_id uuid, quotation_category text, uom_id uuid, mrp numeric, pack_multiple numeric,
+    is_subsidy_eligible boolean, is_active boolean, hsn_code text, cleared text[])
+WHERE p.id = x.id AND p.deleted_at IS NULL"""), {"rows": json.dumps(changed)})
+            if hsn:
+                # rule 9: the row in force closes today and the new one starts today.
+                # The check refused a product whose row started today or that has a
+                # later one.
+                await db.execute(text("""
+UPDATE product_hsn h SET effective_to = CAST(:d AS date), updated_by = app_current_user_id()
+FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS x(p uuid, h text)
+WHERE h.product_id = x.p AND h.deleted_at IS NULL AND h.effective_from < CAST(:d AS date)
+  AND (h.effective_to IS NULL OR h.effective_to > CAST(:d AS date))"""),
+                    {"rows": json.dumps(hsn), "d": today})
+                await db.execute(text("""
+INSERT INTO product_hsn (product_id, hsn_code, effective_from, created_by)
+SELECT x.p, x.h, CAST(:d AS date), app_current_user_id()
+FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS x(p uuid, h text)"""),
+                    {"rows": json.dumps(hsn), "d": today})
+    except DBAPIError as exc:
+        if _sqlstate(exc) in ("23505", "23P01"):
+            raise ValidationFailed("A product changed since the check. Check again.",
+                                   code="import_has_errors",
+                                   fields={"rows": "a product changed since the check"}
+                                   ) from exc
+        raise
+    unchanged = sum(1 for r in good if r.values["action"] == "unchanged")
+    return len(new), len(changed), unchanged
