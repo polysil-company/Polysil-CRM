@@ -66,19 +66,36 @@ async def world(shop: Shop, area: Area, sessions: Callable[[], AsyncSession]) ->
     await partner("dealer", "State Wide Dealer", shop.state, state_only)
     dead_link = await partner("distributor", "Dead Link Distributor", area.far_district)
     await partner("dealer", "Closed Taluka Dealer", area.taluka, dead_link, active=False)
+    # the shop prices farmers and dealers only; a supplier prices at its own tier
+    price_list = str((await s.execute(text(
+        "INSERT INTO price_list (name, state_territory_id, channel_tier, status, published_at, "
+        "effective_from, effective_to) VALUES (:n, CAST(:s AS uuid), 'distributor', 'published', now(), "
+        "DATE '2020-01-01', DATE '2021-01-01') RETURNING id"), {"n": f"distributor list {tag}", "s": shop.state})).scalar_one())
+    await s.execute(text("INSERT INTO price_list_item (price_list_id, product_id, rate) "
+                         "VALUES (CAST(:l AS uuid), CAST(:p AS uuid), 80)"), {"l": price_list, "p": shop.product})
     await s.commit()
     await s.close()
     try:
         yield World(tag, supplier, via_sub, lone, state_only, dead_link, made)
     finally:
         c = sessions()
+        # the quotations priced from the distributor list hold its rows
+        quotes = ("(SELECT id FROM quotation WHERE price_list_id = CAST(:pl AS uuid) "
+                  "OR partner_id = ANY(CAST(:cp AS uuid[])))")
         for stmt in (
             "ALTER TABLE quotation DISABLE TRIGGER trg_quotation_refuse_sent_edit",
-            "UPDATE quotation SET partner_id = NULL WHERE partner_id = ANY(CAST(:cp AS uuid[]))",
+            f"DELETE FROM approval_step WHERE request_id IN (SELECT id FROM approval_request WHERE entity_id IN {quotes})",
+            f"DELETE FROM approval_request WHERE entity_id IN {quotes}",
+            f"DELETE FROM activity_event WHERE entity_id IN {quotes}",
+            f"DELETE FROM quotation_line WHERE quotation_id IN {quotes}",
+            f"UPDATE quotation SET supersedes_id = NULL, superseded_by_id = NULL WHERE id IN {quotes}",
+            f"DELETE FROM quotation WHERE id IN {quotes}",
             "ALTER TABLE quotation ENABLE TRIGGER trg_quotation_refuse_sent_edit",
             "UPDATE lead SET assigned_partner_id = NULL WHERE assigned_partner_id = ANY(CAST(:cp AS uuid[]))",
+            "DELETE FROM price_list_item WHERE price_list_id = CAST(:pl AS uuid)",
+            "DELETE FROM price_list WHERE id = CAST(:pl AS uuid)",
         ):
-            await c.execute(text(stmt), {"cp": made})
+            await c.execute(text(stmt), {"cp": made, "pl": price_list})
         for pid in made:  # children first
             await c.execute(text("DELETE FROM channel_partner WHERE id = CAST(:p AS uuid)"), {"p": pid})
         await c.commit()
@@ -142,6 +159,7 @@ async def test_an_officer_prices_and_quotes_through_a_supplier(
 
     r = await client.post(f"{V1}/pricing/quote-lines", headers=ho, json=preview(world.supplier))
     assert r.status_code == 200, r.text
+    assert r.json()["data"]["lines"][0]["rate"] == "80.00", "priced at the distributor's tier"
     r = await client.post(f"{V1}/pricing/quote-lines", headers=ho, json=preview(world.lone))
     assert r.status_code == 422 and "partner_id" in r.json()["error"]["fields"], r.text
 
