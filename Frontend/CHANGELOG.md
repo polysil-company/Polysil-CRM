@@ -7,11 +7,14 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-122 changes, newest first. Each title opens its entry.
+125 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
 | 2026-11-05 | [The org chart](changelog/entries/2026-11-05--feature--ADMN-008--the-org-chart.md) | `feature` | `ADMN-008` |
+| 2026-11-05 | [Distributor applications and the data sheet](changelog/entries/2026-11-05--feature--CHNL-007--distributor-applications-and-the-data-sheet.md) | `feature` | `CHNL-007` `CHNL-008` |
+| 2026-11-05 | [The deposit on dealer and distributor applications](changelog/entries/2026-11-05--feature--CHNL-007--the-deposit-on-dealer-and-distributor-applications.md) | `feature` | `CHNL-007` |
+| 2026-11-05 | [The printed data sheets: blank, filled and the applicant's](changelog/entries/2026-11-05--feature--CHNL-007--the-printed-data-sheets-blank-filled-and-the-applicant-s.md) | `feature` | `CHNL-007` `CHNL-008` |
 | 2026-11-05 | [Company settings read the application settings and any kind added later](changelog/entries/2026-11-05--fix--ADMN-007--company-settings-read-the-application-settings-and-any-kind.md) | `fix` | `ADMN-007` |
 | 2026-10-30 | [Visits take the location by themselves once allowed](changelog/entries/2026-10-30--feature--TRK-003--visits-take-the-location-by-themselves-once-allowed.md) | `feature` | `TRK-003` `TRK-004` |
 | 2026-10-30 | [Duty on Android, and the map under the menu](changelog/entries/2026-10-30--fix--TRK-008--duty-on-android-and-the-map-under-the-menu.md) | `fix` | `TRK-008` `TRK-001` |
@@ -200,6 +203,211 @@ How to write an entry: [changelog/README.md](changelog/README.md).
   - a field officer's line with "Nobody reports to you";
   - "No reporting line to show";
   - the whole company as Admin.
+
+### Distributor applications and the data sheet
+
+`feature` · `CHNL-007` `CHNL-008` · Claude · [entry](changelog/entries/2026-11-05--feature--CHNL-007--distributor-applications-and-the-data-sheet.md)
+
+#### Before
+
+- The backend's FS-071 (migration 078) turned dealer applications into **dealer and distributor** applications. It added Polysil's printed data sheet: telephone, when the firm was set up, the bank's name and branch, working capital, premises and vehicles, people, previous installations and the place of appointment.
+- The company settings now name who decides each type, and which extra fields each type must have.
+- The frontend knew only dealers and the firm, tax and bank fields:
+  - none of the new fields could be seen or filled in;
+  - a distributor couldn't be started;
+  - Decide always offered a parent distributor, which a distributor application refuses.
+
+#### Now
+
+- **Start an application** asks first whether it is for a new **Dealer** or **Distributor**. The type's deposit is fixed then (item 42 shows it).
+- **The list** has a **Type** filter (`?type=` in the address), and each row says Dealer or Distributor.
+- **An application's page:**
+  - a Dealer or Distributor badge beside the status;
+  - a **Data sheet** card with:
+    - the business facts;
+    - working capital, its rows with the backend's total;
+    - premises and vehicles, with areas in the chosen unit;
+    - people: the counts and each group, "3 × Plumbers · Drip laying · 4 years' experience";
+    - installations done before. A part with nothing filled in says so in one line.
+- **Edit details** (staff) and **the applicant's own page** share one form, so both gain the data sheet:
+  - **Firm and tax:** telephone, established on (a date picker, from 1900 to today), and the place of appointment.
+  - **Bank:** bank, branch and branch address, beside the account.
+  - **Working capital:** one box per facility, up to 10, with its amount in lakhs; other sources; the saved total.
+  - **Premises and vehicles:** areas in square feet or metres, office and godown area, two-wheelers, cars, other vehicles.
+  - **People:** sales executives and technicians; groups of people, up to 20, each with a category, how many, qualification, type of work and experience.
+  - **Installations done before:** up to 50, each with the year, customers, what was done, the scope and the cost in lakhs.
+  - Each row has a remove button. A row left empty is dropped rather than refused, and a table at its limit says so.
+  - The checks are the backend's own: lakhs and areas with at most two decimals, counts in range, years from 1950 to this year. A table's problem names its row ("Row 1: the amount in lakhs…"). A refusal for a row's field lands on its table.
+- **Staff can change the type** in Edit details while the application is with the applicant or returned. The backend refuses it once a deposit is recorded, and the refusal shows.
+- **Decide** on a distributor's application:
+  - it says "A distributor sits directly under Polysil" and offers no distributor to pick;
+  - the code example reads DIST-GJ-0003;
+  - approving says "the distributor and its login are added".
+- **"Still needed"** names the extra fields an administrator can require, such as Telephone, People (manpower) or Shop photo (document).
+- **Wording:** the list and the toasts say "partner" or the type, not "dealer", where either is meant. A submitted application is decided by "the managers the company settings name", not "a State Manager or above".
+
+#### Discussion
+
+- **Every new field is read leniently.** The test box doesn't run 078 yet, so an application without them must still open. A missing type is a dealer, which is all the backend made before 078. A missing data sheet is empty, in square feet.
+- **The checks copy `api/schemas/dealer_applications.py`:**
+  - `Lakhs` and `Area` patterns;
+  - 10, 20 and 50 rows;
+  - experience up to 80 years, people 1 to 9,999;
+  - a year from 1950 to this year.
+    The backend still checks everything.
+- **Rows have no ids,** so a row's place is its key while typing. The tables are boxes, not a grid, because five inputs don't fit across a 360 px phone.
+- **The total is the backend's** (`working_capital_total_lakhs`), shown "as saved". The form doesn't add rows up itself, to avoid a second rule.
+- **The mock** now:
+  - keeps the type and the data sheet;
+  - checks the same rules;
+  - works out the total;
+  - asks for the extras the settings require;
+  - lets the roles in `*_application_deciders` decide;
+  - gives a distributor no parent and a `DIST-` code.
+- **Not here:** the deposit (item 42) and the printed sheets (item 43).
+
+#### Files changed
+
+- `src/features/dealer-applications/api/data-sheet.schemas.ts` — new: the data sheet's contract, read leniently, and its request shape.
+- `src/features/dealer-applications/lib/data-sheet-draft.ts` — new: the form's draft, the backend's checks and the changed-fields body.
+- `src/features/dealer-applications/components/data-sheet-editor.tsx` — new: the sheet's parts of the form, and the row tables.
+- `src/features/dealer-applications/components/data-sheet-facts.tsx` — new: the sheet on an application's page.
+- `src/features/dealer-applications/components/application-inputs.tsx` — new: the form's labelled inputs, moved out of `dealer-application-fields.tsx` so both files share them.
+- `src/features/dealer-applications/api/dealer-applications.schemas.ts`, `dealer-apply.schemas.ts`, `dealer-applications.api.ts` — the type, the sheet, the list's type filter and staff's type change.
+- `src/features/dealer-applications/components/dealer-application-fields.tsx`, `edit-dealer-application.tsx`, `dealer-apply-form.tsx` — the sheet in the shared form; row errors from the backend land on their table.
+- `src/features/dealer-applications/components/start-dealer-application.tsx`, `dealer-applications-list.tsx`, `dealer-application-detail.tsx`, `dealer-application-actions.tsx`, `dealer-application-refusals.tsx` — the type when starting, the filter, the badge and card, and Decide for a distributor.
+- `src/features/dealer-applications/lib/dealer-application-labels.ts` — the type, unit, scope and extra-field words.
+- `src/mocks/handlers/dealer-applications.ts` — the type, the sheet with its checks and total, the required extras and the deciders from the settings, and a distributor's approval.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`, `Docs/screenshots/partners/` — records and screens.
+
+#### Tests
+
+- `[CHNL-007] Distributor applications (FS-071), through the API`:
+  - a distributor's application starts, and the list filters by type;
+  - the data sheet saves with its tables and total, and an amount with three decimals is refused;
+  - a required extra (Telephone) appears in "still needed" once the setting asks for it.
+- `[CHNL-007] The data sheet and the type on the screens`:
+  - starting a distributor's application from the list;
+  - filling in a facility and a group of people, with "Row 1" named at fault first, then the sheet shown once saved;
+  - approving a distributor with no distributor to pick, and the DIST- example.
+- `[CHNL-007] The data sheet's checks and changes`:
+  - an old backend reads as an empty sheet;
+  - the backend's checks on dates, lakhs, areas, counts and years;
+  - an empty row is dropped;
+  - only changes are sent, and an emptied table as null.
+- The existing application tests pass, with the row's name now including its type.
+
+### The deposit on dealer and distributor applications
+
+`feature` · `CHNL-007` · Claude · [entry](changelog/entries/2026-11-05--feature--CHNL-007--the-deposit-on-dealer-and-distributor-applications.md)
+
+#### Before
+
+- FS-071 (migration 078) added a deposit step to dealer and distributor applications:
+  - Each type's deposit is a company setting, copied onto an application when it starts.
+  - It is recorded with a pay slip, or lowered or waived by the roles a setting names.
+  - **An application can't be approved while it is unpaid** (`409 deposit_pending`).
+- The frontend showed none of it. A manager pressing Approve on an unpaid application got a generic refusal, and nobody could record the deposit or waive it.
+
+#### Now
+
+- **A Deposit card** on an application's page, when the backend sends one:
+  - the status: Deposit due, Deposit paid, Deposit waived or No deposit;
+  - the amount set for the type, the amount due now, and what was paid, when, and its reference;
+  - every payment and relaxation in order, with who and why ("Due lowered from ₹50,000 to ₹0 · Ravi Joshi · Took over a business").
+- **Record the deposit** (for staff the backend allows, while something is due):
+  - the amount, filled in with what is due;
+  - the day it was paid (a date picker, not after today);
+  - a reference (UTR, cheque or receipt number);
+  - the **pay slip**, uploaded first as a "Deposit pay slip" document, then named by the record;
+  - a slip uploaded on a failed try is reused, not uploaded twice;
+  - less than what is due, no slip, or a date after today are each named on their field.
+- **Lower or waive it** (only the roles in `deposit_relaxation_roles`, never whoever started the application, and not after a payment): the new amount due, where 0 waives it, and why. The button reads "Waive it" for 0.
+- **A submitted, unpaid application** says "Approval waits for the deposit". The list marks it **Deposit due**.
+- **The deposit's refusals in words:**
+  - **`deposit_pending`:** record it, or have it lowered or waived, before approving.
+  - **`deposit_slip_missing`:** the recorded payment's slip was removed.
+  - **`deposit_not_due` and `deposit_paid`:** the page refreshes to show where the deposit stands.
+  - **`deposit_recorded`:** the type can't change any more.
+  - **`not_your_relaxation`:** only the roles the settings name lower a deposit.
+- **A refused decision** (a 403) now says it comes from the company settings, not "a State Manager or above".
+- **Documents:** a dealer application offers a "Deposit pay slip" type, as the backend does.
+
+#### Discussion
+
+- **Uploading the slip inside the dialog.** The backend wants the slip as a document first, then its id on the record. Asking staff to upload it under Documents and come back would be two steps for one job. The dialog does both, in order. If the record is then refused, the slip stays on the application's documents (where the backend keeps it) and is reused on the next try.
+- **The amount starts at what is due.** The backend refuses less than due, and more than the amount set.
+- **Who sees the buttons** comes only from the backend's `can.record_deposit` and `can.relax_deposit`. A backend before 078 sends neither, and no deposit, so the card doesn't show.
+- **The mock:**
+  - copies each type's deposit from its setting (0 by default, as the backend seeds);
+  - the first seeded draft owes ₹50,000, so the card can be seen;
+  - checks the slip, the amount and the date as the backend does;
+  - works out paid, waived, pending or not required as `dealer_application_deposit_status()` does;
+  - refuses approval while unpaid, and refuses a type change after a deposit entry.
+- **India's date.** The mock now uses India's date for "not after today", here and for "established on" (item 41). After midnight in India, a check against UTC refused today.
+
+#### Files changed
+
+- `src/features/dealer-applications/api/dealer-applications.schemas.ts`, `.api.ts`, `.mutations.ts`: the deposit, the list's deposit status, the two `can` flags, and the record and relaxation calls.
+- `src/features/dealer-applications/components/deposit-card.tsx` (new): the card and its two dialogs.
+- `src/features/dealer-applications/components/dealer-application-detail.tsx`, `dealer-applications-list.tsx`, `dealer-application-refusals.tsx`: the card, the notice, the list's badge, and the refusals.
+- `src/features/dealer-applications/lib/dealer-application-labels.ts`: the deposit's words.
+- `src/mocks/handlers/dealer-applications.ts`, `src/mocks/data/documents.ts`: the deposit and the pay-slip type.
+- `src/features/documents/api/documents.test.ts`: a dealer application's types include the pay slip.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`, `Docs/screenshots/partners/`: records and screens.
+
+#### Tests
+
+- **`[CHNL-007] The deposit (FS-071), through the API`:**
+  - due and listed as such;
+  - refused without a slip, refused below what is due, then recorded as paid;
+  - only a named role lowers it, never higher, then waived;
+  - approval refused with `deposit_pending`.
+- **`[CHNL-007] The deposit on an application's page`:**
+  - recording it with a pay slip (refused first without one), and the history after;
+  - waiving it as a Regional Manager, refused first without a reason.
+- The application, document and lead tests pass (216).
+
+### The printed data sheets: blank, filled and the applicant's
+
+`feature` · `CHNL-007` `CHNL-008` · Claude · [entry](changelog/entries/2026-11-05--feature--CHNL-007--the-printed-data-sheets-blank-filled-and-the-applicant-s.md)
+
+#### Before
+
+- FS-071 gave the backend three printed versions of the application's data sheet, as the client's paper form:
+  - **blank**, to fill in by hand (`GET /dealer-applications/form.pdf?partner_type=`);
+  - **filled from an application**, for staff (`GET /dealer-applications/{id}/pdf`, with the bank account masked for everyone);
+  - **the applicant's own as filled so far**, to print and sign (`GET /public/dealer-apply/{token}/pdf`, with the applicant's session).
+- The frontend offered none of them.
+
+#### Now
+
+- **The applications list** has a **Blank form** menu: "For a new dealer" or "For a new distributor" saves that type's blank sheet.
+- **An application's page** has **Download PDF**, beside its other actions, for the sheet filled from the application.
+- **The applicant's page** has **Download to print and sign**, above Submit. It says the sheet holds what is saved so far, so unsaved typing should be saved first.
+- **Each is saved under the backend's own file name.**
+- **When the backend's PDF maker is at its limit** (`503 busy`), the toast says "The PDF maker is busy. Other PDFs are being made. Try again in a moment." `pdf_unavailable` says PDFs can't be made just now. Anything else shows its own reason.
+- **A new pattern, `DownloadFileButton`,** for any file the backend makes when asked. It has its states (Preparing…, Downloaded, Not downloaded), the busy and unavailable messages, and stories. The CSV and PDF downloads (item 46) build on it.
+
+#### Discussion
+
+- **The PDFs come back as the file itself, not a link.** They are fetched with the session through the API client and saved, like Download Excel. That way a sheet with someone's details never sits behind a bare URL.
+- **The applicant's download carries their session** (`X-Apply-Session`), as every applicant call does. Without one, the backend says to verify the mobile again.
+- **Where the buttons sit.** The blank form goes with "Start an application", since both are about a new partner. The filled sheet goes on the application. The applicant's goes by Submit, where they finish.
+- **The mock** answers each with a stand-in PDF named as the backend names them. Its blank-form route comes before `/:applicationId`, so `form.pdf` isn't read as an id.
+
+#### Files changed
+
+- `src/components/patterns/download-file-button.tsx` (new), with stories: the button and `toastDownloadError`.
+- `src/features/dealer-applications/api/dealer-applications.api.ts`, `dealer-apply.api.ts`: the three downloads.
+- `src/features/dealer-applications/components/dealer-applications-list.tsx`, `dealer-application-detail.tsx`, `dealer-apply-form.tsx`: Blank form, Download PDF, and Download to print and sign.
+- `src/mocks/handlers/dealer-applications.ts`: the three PDFs.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`: records.
+
+#### Tests
+
+- **`[CHNL-007] The printed sheets (FS-071), through the API`:** the blank form for each type and an application's own, by name. The applicant's only once their mobile is verified (`no_session` before).
+- **`[CHNL-007] The printed sheets on the screens`:** Download PDF saves the application's sheet, then a busy PDF maker is said in words; Blank form → "For a new distributor" saves that type's form.
 
 ### Company settings read the application settings and any kind added later
 
