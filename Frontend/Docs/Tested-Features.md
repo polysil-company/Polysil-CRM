@@ -498,6 +498,18 @@ On the backend's contract (`backend/docs/api/users.md`, handover `administration
 
 ---
 
+## Org chart
+
+- **ADMN-008 · The org chart** (Overview → Org chart, `/org-chart`, FS-080, `feature/ADMN-008-org-chart`; screens: [a manager's team](screenshots/org-chart/team-desktop-light.jpg), [a field officer's line, phone dark](screenshots/org-chart/line-phone-dark.jpg), [the whole company](screenshots/org-chart/company-desktop-light.jpg)).
+  - **Who sees it:** every staff member, with their own line above them, nearest first.
+  - **Your team:** everyone below them, as a tree with counts by role. "Also reports to" names a second manager.
+  - **Someone below:** a name opens their picture.
+  - **Whole company:** for whoever sees every user, with staff who can't be placed named.
+  - **Refusals:** someone not below says "No reporting line to show".
+  - Walked through in the mock as a State Manager, a field officer and Admin, desktop light and phone dark. 🧪 👀
+
+---
+
 ## Dashboard, notifications, messages
 
 The dashboard reads the backend's real shape since the demo-walk fixes ([changelog](../changelog/entries/2026-10-02--fix--RPT-001--demo-walk-fixes.md)). The bell and messages follow the backend's contracts (BE-009, BE-010) since PR #43 ([changelog](../changelog/entries/2026-10-02--api-integration--NOTIF-001--notifications-and-messages-on-the-backend.md)). None of the three has been checked on the dev API by hand yet. Details and tests: [dashboard (foundation)](../changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md), [notifications and messages](../changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md).
