@@ -26,6 +26,7 @@ import {
   NO_PARTNER,
   PartnerSearchField,
 } from "@/features/leads/components/choice-picker";
+import { partnerTypeLabel } from "@/features/leads/lib/lead-labels";
 import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
 import { useCreateOrder, useSaveOrderDraft } from "@/features/orders/api/orders.mutations";
@@ -307,23 +308,33 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
   // MSTR-008 · The order's type picks its sale type's price list first, as the save will.
   const orderType = useWatch({ control: form.control, name: "orderType" });
   // SO-012 · Staff typing in an order for a dealer or distributor name them here: the order is
-  // priced at their rates (partner_id) and their details fill in the party. A lead brings its own
-  // partner; a draft keeps the one it was saved with.
-  const picksBuyer = source.mode === "create" && source.lead === null && staff;
+  // priced at their rates (partner_id) and their details fill in the party. A draft keeps the
+  // partner it was saved with.
+  // SO-013 · On an order from a lead the field starts at the lead's channel partner and can be
+  // changed: the farmer stays the party, and the order goes through the one picked.
+  const fromLead = source.mode === "create" && source.lead !== null;
+  const picksBuyer = source.mode === "create" && staff;
   const dealerSale = orderType === "commercial" || orderType === "industrial";
-  const [buyer, setBuyer] = useState<Choice>(NO_PARTNER);
+  const [buyer, setBuyer] = useState<Choice>(() => {
+    const partner = source.mode === "create" ? source.lead?.channelPartner : undefined;
+    return partner === undefined || partner === null
+      ? NO_PARTNER
+      : { id: partner.id, name: partner.name, detail: partnerTypeLabel(partner.partnerType) };
+  });
   const [buyerError, setBuyerError] = useState<string | null>(null);
   const latestBuyer = useRef("");
   const partnerId =
     source.mode === "create"
-      ? (source.lead?.channelPartner?.id ??
-        (picksBuyer && dealerSale && buyer.id !== "" ? buyer.id : null))
+      ? buyer.id !== "" && (fromLead || dealerSale)
+        ? buyer.id
+        : null
       : (source.order.partner?.id ?? null);
   const chooseBuyer = (next: Choice): void => {
     setBuyer(next);
     setBuyerError(null);
     latestBuyer.current = next.id;
-    if (next.id === "") return;
+    // From a lead, the farmer is the party: only the rates follow the partner.
+    if (next.id === "" || fromLead) return;
     queryClient.fetchQuery(partnerDetailQueryOptions(next.id)).then(
       (partner) => {
         // A later pick wins over a slower answer for an earlier one.
@@ -743,8 +754,14 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
                 {picksBuyer && dealerSale ? (
                   <PartnerSearchField
                     id="order-partner"
-                    label="For a dealer or distributor"
-                    description="Optional. Picking one prices the order at their rates and fills in their details below."
+                    label={
+                      fromLead ? "Through a dealer or distributor" : "For a dealer or distributor"
+                    }
+                    description={
+                      fromLead
+                        ? "The dealer or distributor this farmer's order goes through, priced at their rates. It starts as the lead's channel partner. Only partners in your area are listed."
+                        : "Optional. Picking one prices the order at their rates and fills in their details below. Only partners in your area are listed."
+                    }
                     value={buyer}
                     error={buyerError}
                     onChange={chooseBuyer}
