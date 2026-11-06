@@ -103,6 +103,10 @@ class TerritoryCreate(BaseModel):
         default=None, min_length=1, max_length=12,
         description="Unique per level. Stored upper-case. A state needs one before leads "
         "can be numbered under it.")]
+    lgd_code: Annotated[str | None, Field(
+        default=None, min_length=1, max_length=12, pattern=r"^[0-9A-Za-z-]+$",
+        description="Optional. The official Local Government Directory code, stored as "
+        "given. The district loader sets it; a form may leave it out.")]
 
 
 class TerritoryPatch(BaseModel):

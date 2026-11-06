@@ -7,7 +7,8 @@ switch through the real dependency, assert it does not leak across the pool, and
 assert the grants are exactly the ones the spec lists.
 
 Mutation-checked: change the `true` in `enter_role` to `false` and the leak test
-fails; delete the `enter_role` call from `get_db` and the whoami test fails.
+fails; delete the `enter_role` call from `act_as` (which `get_db` calls) and the
+whoami test fails.
 
 **After running the `false` mutation, restart PgBouncer** (`docker restart
 polysil-pgbouncer-1`). A session-level role stays on every backend the mutated

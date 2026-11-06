@@ -15,8 +15,11 @@ in the same transaction (rule 18); a close is recorded by the cascade's own
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import re
+import uuid
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
@@ -28,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.authz.modules import SPECS
 from api.authz.predicate import Caller, scope_predicate
+from api.config import get_settings
 from api.domain import identity
 from api.errors import ForbiddenError, NotFoundError, ValidationFailed
 from api.schemas.leads import PageMeta, TerritoryRef
@@ -219,25 +223,72 @@ async def _ou_rows(db: AsyncSession, ids: list[str]) -> list[OrgUnit]:
     return [_ou(by_id[i], counts.get(i, 0)) for i in ids if i in by_id]
 
 
+# FS-085 section 4: an office is inside area T when its territory is at or under T,
+# or when it has no territory and every open territory-bearing office below it is
+# at or under T (an area office). Polysil HQ is excluded by id: on a database whose
+# only offices are in one state it would otherwise qualify.
+_INSIDE = """(o.territory_id IN (SELECT descendant_id FROM territory_closure
+                               WHERE ancestor_id = CAST(:t AS uuid))
+     OR (o.territory_id IS NULL AND o.id <> CAST(:root AS uuid)
+         AND EXISTS (SELECT 1 FROM org_closure oc JOIN org_unit d ON d.id = oc.descendant_id
+                      WHERE oc.ancestor_id = o.id AND oc.depth > 0 AND d.deleted_at IS NULL
+                        AND d.territory_id IS NOT NULL)
+         AND NOT EXISTS (SELECT 1 FROM org_closure oc JOIN org_unit d ON d.id = oc.descendant_id
+                          WHERE oc.ancestor_id = o.id AND oc.depth > 0 AND d.deleted_at IS NULL
+                            AND d.territory_id IS NOT NULL
+                            AND d.territory_id NOT IN (SELECT descendant_id FROM territory_closure
+                                                        WHERE ancestor_id = CAST(:t AS uuid)))))"""
+
+
+def _encode_name_cursor(name: str, ou_id: str) -> str:
+    return base64.urlsafe_b64encode(json.dumps([name, ou_id]).encode()).decode()
+
+
+def _decode_name_cursor(cursor: str) -> tuple[str, str]:
+    try:
+        name, ou_id = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
+        return str(name), str(uuid.UUID(str(ou_id)))   # a forged id is a 422, not a 500
+    except (ValueError, TypeError, binascii.Error) as exc:
+        raise ValidationFailed(fields={"cursor": "malformed cursor"}) from exc
+
+
 async def list_org_units(db: AsyncSession, *, q: str | None = None, parent_id: str | None = None,
                          is_open: bool | None = None, limit: int = 50,
-                         cursor: str | None = None) -> OrgUnitPage:
+                         cursor: str | None = None, sort: str = "created",
+                         territory_id: str | None = None) -> OrgUnitPage:
+    """`sort=name` and `territory_id` are FS-085's additions for the office picker."""
     limit = max(1, min(limit, _MAX_LIMIT))
-    c_ts, c_id = _decode_cursor(cursor) if cursor else (None, None)
-    rows = (await db.execute(text("""
-        SELECT id, created_at FROM org_unit
-         WHERE id <> CAST(:system AS uuid)
-           AND (CAST(:like AS text) IS NULL OR name ILIKE CAST(:like AS text))
-           AND (CAST(:parent AS uuid) IS NULL OR parent_id = CAST(:parent AS uuid))
+    by_name = sort == "name"
+    params: dict[str, Any] = {
+        "like": _contains(q) if q else None, "parent": parent_id, "open": is_open,
+        "lim": limit + 1, "system": identity.SYSTEM_ORG_UNIT_ID, "t": territory_id,
+        "root": get_settings().root_org_unit_id or identity.SYSTEM_ORG_UNIT_ID}
+    if by_name:
+        params["c_name"], params["c_id"] = _decode_name_cursor(cursor) if cursor else (None, None)
+        after = ("(CAST(:c_name AS text) IS NULL OR (lower(o.name), o.id) > "
+                 "(CAST(:c_name AS text), CAST(:c_id AS uuid)))")
+        order = "lower(o.name), o.id"
+    else:
+        params["c_ts"], params["c_id"] = _decode_cursor(cursor) if cursor else (None, None)
+        after = ("(CAST(:c_ts AS timestamptz) IS NULL OR (o.created_at, o.id) < "
+                 "(CAST(:c_ts AS timestamptz), CAST(:c_id AS uuid)))")
+        order = "o.created_at DESC, o.id DESC"
+    rows = (await db.execute(text(f"""
+        SELECT o.id, o.created_at, lower(o.name) AS key FROM org_unit o
+         WHERE o.id <> CAST(:system AS uuid)
+           AND (CAST(:like AS text) IS NULL OR o.name ILIKE CAST(:like AS text))
+           AND (CAST(:parent AS uuid) IS NULL OR o.parent_id = CAST(:parent AS uuid))
            AND (CAST(:open AS boolean) IS NULL
-                OR (deleted_at IS NULL) = CAST(:open AS boolean))
-           AND (CAST(:c_ts AS timestamptz) IS NULL
-                OR (created_at, id) < (CAST(:c_ts AS timestamptz), CAST(:c_id AS uuid)))
-         ORDER BY created_at DESC, id DESC LIMIT :lim"""),
-        {"like": _contains(q) if q else None, "parent": parent_id, "open": is_open,
-         "c_ts": c_ts, "c_id": c_id, "lim": limit + 1,
-         "system": identity.SYSTEM_ORG_UNIT_ID})).all()
-    rows, next_cursor = _page(rows, limit)
+                OR (o.deleted_at IS NULL) = CAST(:open AS boolean))
+           AND (CAST(:t AS uuid) IS NULL OR {_INSIDE})
+           AND {after}
+         ORDER BY {order} LIMIT :lim"""), params)).all()
+    if by_name:
+        next_cursor = (_encode_name_cursor(rows[limit - 1].key, str(rows[limit - 1].id))
+                       if len(rows) > limit else None)
+        rows = list(rows[:limit])
+    else:
+        rows, next_cursor = _page(rows, limit)
     data = await _ou_rows(db, [str(r.id) for r in rows])
     return OrgUnitPage(data=data, meta=PageMeta(limit=limit, next_cursor=next_cursor))
 
@@ -441,14 +492,14 @@ async def create_territory(db: AsyncSession, caller: Caller, body: TerritoryCrea
         if parent_level != expected:
             raise ValidationFailed(fields={"parent_id": f"a {body.level} sits under a {expected}"})
     new_id = str((await _execute_mapped(db, text(
-        "INSERT INTO territory (name, level, parent_id, code, created_by) "
+        "INSERT INTO territory (name, level, parent_id, code, lgd_code, created_by) "
         "VALUES (:n, CAST(:l AS territory_level), CAST(:p AS uuid), CAST(:c AS citext), "
-        "CAST(:me AS uuid)) RETURNING id"),
+        ":lgd, CAST(:me AS uuid)) RETURNING id"),
         {"n": body.name, "l": body.level, "p": body.parent_id, "c": _code(body.code),
-         "me": caller.user_id})).scalar_one())
+         "lgd": body.lgd_code, "me": caller.user_id})).scalar_one())
     await _emit(db, entity_type="territory", entity_id=new_id, kind="territory.created",
                 actor_id=caller.user_id, name=body.name, level=body.level,
-                parent_id=body.parent_id, code=_code(body.code))
+                parent_id=body.parent_id, code=_code(body.code), lgd_code=body.lgd_code)
     return await get_territory(db, new_id)
 
 

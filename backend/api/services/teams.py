@@ -16,8 +16,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.authz.predicate import Caller
+from api.domain import identity
 from api.domain import org_chart as chart
 from api.errors import NotFoundError, ValidationFailed
+from api.services.users import area_office_sql
 
 MAX_ROLES = 10
 # FS-080 rule 8: the relations a caller may name without users.view global
@@ -110,8 +112,9 @@ async def roster(db: AsyncSession, caller: Caller, *, rows: list[chart.Person] |
     if territories and people:
         # EC-8: a person's areas are their office's territory and their own
         # territories; one matches when it is in, under or above a filter territory
-        # (the closure holds each territory as its own ancestor)
-        hit = {str(r[0]) for r in (await db.execute(text("""
+        # (the closure holds each territory as its own ancestor). FS-085 rule 10: a
+        # District Manager in an area office has the areas of the offices under it.
+        hit = {str(r[0]) for r in (await db.execute(text(f"""
             WITH mine AS (
                 SELECT ou.id AS person_id, o.territory_id
                   FROM unnest(CAST(:ids AS uuid[])) AS ou(id)
@@ -119,12 +122,24 @@ async def roster(db: AsyncSession, caller: Caller, *, rows: list[chart.Person] |
                   JOIN org_unit o ON o.id = au.org_unit_id
                  WHERE o.territory_id IS NOT NULL
                 UNION
+                SELECT au.id, d.territory_id
+                  FROM app_user au
+                  JOIN role r ON r.id = au.role_id
+                  JOIN org_unit o ON o.id = au.org_unit_id
+                  JOIN org_closure oc ON oc.ancestor_id = o.id AND oc.depth > 0
+                  JOIN org_unit d ON d.id = oc.descendant_id AND d.deleted_at IS NULL
+                 WHERE au.id = ANY(CAST(:ids AS uuid[])) AND o.territory_id IS NULL
+                   AND d.territory_id IS NOT NULL
+                   AND lower(r.code::text) = ANY(CAST(:area_roles AS text[]))
+                   AND {area_office_sql('o')}
+                UNION
                 SELECT ut.user_id, ut.territory_id FROM user_territory ut
                  WHERE ut.user_id = ANY(CAST(:ids AS uuid[])) AND ut.deleted_at IS NULL)
             SELECT DISTINCT m.person_id FROM mine m
               JOIN territory_closure tc
                 ON (tc.ancestor_id = ANY(CAST(:t AS uuid[])) AND tc.descendant_id = m.territory_id)
                 OR (tc.descendant_id = ANY(CAST(:t AS uuid[])) AND tc.ancestor_id = m.territory_id)"""),
-            {"ids": [p.id for p in people], "t": territories})).all()}
+            {"ids": [p.id for p in people], "t": territories,
+             "area_roles": sorted(identity.AREA_OFFICE_ROLES)})).all()}
         people = [p for p in people if p.id in hit]
     return people

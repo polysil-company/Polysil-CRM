@@ -42,7 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.authz.predicate import Caller
 from api.config import Settings, get_settings
-from api.db.session import async_session_factory, enter_role
+from api.db.session import act_as, async_session_factory, enter_role
 from api.domain.auth import (
     AccessClaims,
     decode_access_token,
@@ -202,14 +202,12 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
         # app.current_role; nothing read it and ADR-038 forbids it, because a
         # second claim policies could be written against is a second source of
         # truth for a role that must only ever come from app_user.role_id.
-        await session.execute(
-            text("SELECT set_config('app.current_user_id', :uid, true)"),
-            {"uid": claims.sub},
-        )
-        # After the claim, before the yield. Everything the service runs from here
-        # is policy-filtered. Forgetting this line makes every policy decorative;
-        # tests/db/test_role_switch.py asserts current_user inside the request.
-        await enter_role(session, settings.db_app_role)
+        #
+        # Then the role switch, after the claim and before the yield. Everything the
+        # service runs from here is policy-filtered. Forgetting it makes every policy
+        # decorative; tests/db/test_role_switch.py asserts current_user inside the
+        # request. Both statements live in act_as (api/db/session.py).
+        await act_as(session, claims.sub, settings.db_app_role)
         request.state.claims = claims
         yield session
 
@@ -412,13 +410,20 @@ _PERMS_QUERY = text(
 
 
 async def get_caller(db: DbSession, claims: Claims) -> Caller:
+    return await caller_for(db, claims.sub)
+
+
+async def caller_for(db: AsyncSession, user_id: str) -> Caller:
+    """The Caller for `user_id`, read in a transaction whose claim is already that
+    user (`act_as`). `get_caller` for a request; a script acting as a named person
+    calls it directly (FS-085 rule 23)."""
     anchor = (await db.execute(_ANCHOR_QUERY)).one()
     rows = (await db.execute(_PERMS_QUERY)).all()
     holds_tasks = any(r.module == "tasks" for r in rows)
     if anchor.partner_id is not None and holds_tasks and await _dealer_tasks_off(db):
         rows = [r for r in rows if r.module != "tasks"]
     return Caller(
-        user_id=claims.sub,
+        user_id=user_id,
         org_unit_id=str(anchor.org_unit_id) if anchor.org_unit_id is not None else None,
         partner_id=str(anchor.partner_id) if anchor.partner_id is not None else None,
         scopes={r.module: r.scope for r in rows if r.action == "view"},

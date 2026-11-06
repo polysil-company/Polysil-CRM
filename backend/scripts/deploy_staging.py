@@ -477,6 +477,49 @@ def seed_prod(env: dict[str, str]) -> None:
                             "--csv", "/app/data/masters/districts.csv", profile="tools"))
 
 
+def staff_facts(env: dict[str, str], out: Path) -> None:
+    """FS-085: where each staff member's work sits, read only, as CSV into `out`.
+
+    The query is scripts/sql/staff_area_facts.sql from this checkout. It runs as the
+    Postgres superuser (it must read every row, past RLS) inside BEGIN READ ONLY with
+    default_transaction_read_only on as well, and is wrapped in COPY ... TO STDOUT.
+    Nothing but the CSV comes back; no env value is printed."""
+    sql = (ROOT / "scripts" / "sql" / "staff_area_facts.sql").read_text(encoding="utf-8")
+    query = "\n".join(ln for ln in sql.splitlines() if not ln.lstrip().startswith("--"))
+    script = ("\\set ON_ERROR_STOP on\nBEGIN TRANSACTION READ ONLY;\nCOPY (\n"
+              + query.strip().rstrip(";") + "\n) TO STDOUT WITH CSV HEADER;\nROLLBACK;\n")
+    cmd = ("docker exec -i -e PGOPTIONS='-c default_transaction_read_only=on' "
+           + shlex.quote(env["PG_CONTAINER"]) + " psql -X -q -U " + shlex.quote(env["PG_SUPERUSER"])
+           + " -d " + shlex.quote(env["DB_NAME"]))
+    got = run_remote(env, cmd, stdin=script.encode(), check=False, capture=True)
+    if got.returncode != 0:
+        die("the facts query failed", got.stderr.decode(errors="replace")[-1500:])
+    out.write_bytes(got.stdout)
+    print(f"  facts    {max(len(got.stdout.splitlines()) - 1, 0)} rows -> {out}")
+
+
+def district_offices(env: dict[str, str], *, sheet: Path | None, dry_run: bool,
+                     actor: str | None, all_districts: bool) -> None:
+    """FS-085: `load_district_offices.py apply` in the tools container. The marked
+    workbook goes in on stdin, so the client's sheet is never written to the box.
+    Acts as ADMIN_EMAIL unless --as names someone else."""
+    guard(env)
+    args = ["run", "--rm", "-T", "tools", "python", "scripts/load_district_offices.py", "apply",
+            "--csv", "/app/data/masters/districts.csv"]
+    if sheet is not None:
+        args += ["--sheet", "-"]
+    if actor:
+        args += ["--as", actor]
+    if all_districts:
+        args.append("--all-districts")
+    if dry_run:
+        args.append("--dry-run")
+    got = run_remote(env, compose(env, *args, profile="tools"),
+                     stdin=sheet.read_bytes() if sheet is not None else b"", check=False)
+    if got.returncode != 0:
+        sys.exit(got.returncode)
+
+
 def health(env: dict[str, str], *, attempts: int = 30) -> bool:
     """Ask the box, not the container: this is the path an SSH tunnel takes."""
     port = env["API_HOST_PORT"]
@@ -614,6 +657,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("step", nargs="?", default="deploy",
                         choices=["provision", "deploy", "sync", "build", "up", "migrate",
                                  "seed", "seed-prod", "load-states", "templates", "requeue-pdfs",
+                                 "staff-facts", "district-offices",
                                  "status", "verify", "load", "logs", "down", "frontend-prod",
                                  "frontend-provision", "frontend", "frontend-caddy"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
@@ -626,6 +670,14 @@ def main(argv: list[str] | None = None) -> int:
                         help="verify: skip the staging journey, which creates records")
     parser.add_argument("--users", type=int, default=50, help="load: concurrent users")
     parser.add_argument("--seconds", type=int, default=60, help="load: how long")
+    parser.add_argument("--out", type=Path, help="staff-facts: the CSV to write")
+    parser.add_argument("--sheet", type=Path, help="district-offices: the marked workbook")
+    parser.add_argument("--as", dest="actor", help="district-offices: the administrator "
+                                                     "(default ADMIN_EMAIL on the box)")
+    parser.add_argument("--all-districts", action="store_true",
+                        help="district-offices: an office for every district")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="district-offices: do it all, report, roll back")
     parser.add_argument("--target", choices=["staging", "prod"], default="staging",
                         help="prod: the Hostinger box, infra/.env.prod and docker-compose.prod.yml")
     parser.add_argument("--source", type=Path, default=None,
@@ -676,6 +728,15 @@ def main(argv: list[str] | None = None) -> int:
         seed(env, masters=not args.no_masters, showcase=not args.no_showcase)
     elif args.step == "load-states":
         load_states(env)
+    elif args.step == "staff-facts":
+        if args.out is None:
+            die("staff-facts needs --out FILE")
+        staff_facts(env, args.out)
+    elif args.step == "district-offices":
+        if args.sheet is not None and not args.sheet.exists():
+            die(f"{args.sheet} not found")
+        district_offices(env, sheet=args.sheet, dry_run=args.dry_run, actor=args.actor,
+                         all_districts=args.all_districts)
     elif args.step == "templates":
         sync_templates(env)
     elif args.step == "requeue-pdfs":

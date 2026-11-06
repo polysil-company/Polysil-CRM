@@ -379,19 +379,46 @@ async def _open_office(db: AsyncSession, org_unit_id: str) -> None:
         raise ValidationFailed(fields={"org_unit_id": "not found or closed"})
 
 
+def area_office_sql(office: str) -> str:
+    """FS-085 rule 10, the area-office half, as a boolean on the org_unit alias
+    `office`: an office at district level or below (`role_level` 2 or lower) with an
+    open office under it that has a territory, and none under it with a state-level
+    one. So Polysil HQ, a region, and a level-2 office put over a state office never
+    qualify (EC-7). The office's own territory is the caller's concern.
+
+    One fragment for the user form, the setup check and the team reports' area
+    filter, so the three cannot disagree (plan review S-5)."""
+    below = (f"FROM org_closure oc JOIN org_unit d ON d.id = oc.descendant_id "
+             f"JOIN territory dt ON dt.id = d.territory_id AND dt.deleted_at IS NULL "
+             f"WHERE oc.ancestor_id = {office}.id AND oc.depth > 0 AND d.deleted_at IS NULL")
+    return (f"({office}.role_level <= 2 AND EXISTS (SELECT 1 {below}) "
+            f"AND NOT EXISTS (SELECT 1 {below} AND dt.level = 'state'))")
+
+
 async def _office_has_area(db: AsyncSession, role_id: str, org_unit_id: str, field: str) -> None:
     """FS-082 rule 4: a role in AREA_ROLES sits in an office that covers an area.
     Elsewhere they see no dealers, and a manager there reads everything under the
-    office (ISS-233). GAP-556: which roles is unconfirmed (question 37.4)."""
+    office (ISS-233). GAP-556: which roles is unconfirmed (question 37.4).
+
+    FS-085 rule 10: a District Manager may also sit in an area office, which covers
+    the districts of the offices under it. A Field Officer may not (GAP-580)."""
     row = (await db.execute(text(
         "SELECT lower(r.code::text) AS code, r.name AS role_name, o.name AS office, "
-        "       t.id AS territory_id "
+        f"       t.id AS territory_id, {area_office_sql('o')} AS area_office "
         "  FROM role r CROSS JOIN org_unit o "
         "  LEFT JOIN territory t ON t.id = o.territory_id AND t.deleted_at IS NULL "
         " WHERE r.id = CAST(:r AS uuid) AND o.id = CAST(:o AS uuid)"),
         {"r": role_id, "o": org_unit_id})).one_or_none()
     if row is None or row.code not in identity.AREA_ROLES or row.territory_id is not None:
         return
+    if row.area_office:
+        if row.code in identity.AREA_OFFICE_ROLES:
+            return
+        raise ValidationFailed(
+            f"A {row.role_name} must be in an office with its own area. {row.office} is an "
+            "area office: choose one of the district offices under it.",
+            code="office_has_no_area",
+            fields={field: f"a {row.role_name} needs a district office, not an area office"})
     raise ValidationFailed(
         f"A {row.role_name} must be in an office that covers an area. {row.office} covers none.",
         code="office_has_no_area",
