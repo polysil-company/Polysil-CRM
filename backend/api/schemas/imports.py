@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ImportKind = Literal["partners", "price_list_items", "lines"]
+ImportKind = Literal["partners", "price_list_items", "lines", "products"]
 ImportStatus = Literal["uploaded", "checked", "committed", "discarded"]
 
 
@@ -42,6 +42,24 @@ class ImportLine(BaseModel):
     discount3_pct: str
 
 
+class ProductImportCounts(BaseModel):
+    """A product import's good rows, by what saving them does (FS-083)."""
+
+    new: int = Field(description="Products the import adds.")
+    update: int = Field(description="Products it changes.")
+    unchanged: int = Field(description="Rows that match the catalogue already. Nothing is "
+                                       "written for them, and they are not in the preview.")
+    renamed: int = Field(description="Updates that rename a product. Show it beside the "
+                                     "counts: the preview holds only 20 rows.")
+    switched_off: int = Field(description="Updates that switch a product off.")
+    switched_on: int = Field(description="Updates that switch a product back on.")
+    hsn_changed: int = Field(description="Updates that start a new HSN code today.")
+    still_off: int = Field(description="Rows that match a switched-off product and leave it "
+                                       "off.")
+    fingerprint: str = Field(description="Opaque. Commit compares it with a fresh check, and "
+                                         "answers 409 when the catalogue changed meanwhile.")
+
+
 class ImportCheck(BaseModel):
     total: int
     ok: int
@@ -54,6 +72,14 @@ class ImportCheck(BaseModel):
                     "formulas with no saved result. Show it beside the dropdown.")
     lines: list[ImportLine] | None = Field(
         description="`lines` imports only: every good row, for the line editor.")
+    products: ProductImportCounts | None = Field(
+        default=None,
+        description="`products` imports only. The preview then holds the first 20 rows "
+                    "that change something, renames and switch-offs first. Each has "
+                    "`action` (new or update), `product`, `item_code`, `changes` (field to "
+                    "`{from, to}`, plus `confirmed: true` when the row only confirms a "
+                    "stand-in value) and, on a new row, `near`: an existing product with a "
+                    "close name.")
 
 
 class ImportBatch(BaseModel):
@@ -115,6 +141,9 @@ class ImportCommitRequest(BaseModel):
 
 class ImportCommitResult(BaseModel):
     status: ImportStatus
-    created: int = Field(description="Partners created, or rates written.")
+    created: int = Field(description="Partners or products created, or rates written.")
     skipped: int
+    updated: int = Field(default=0, description="Products changed. 0 for other kinds.")
+    unchanged: int = Field(default=0, description="Product rows that matched the catalogue "
+                                                  "already. 0 for other kinds.")
     price_list_id: str | None = None

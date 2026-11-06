@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from api.domain.imports.cells import key
 
-KINDS = ("partners", "price_list_items", "lines")
+KINDS = ("partners", "price_list_items", "lines", "products")
 
 
 @dataclass(frozen=True)
@@ -25,6 +25,8 @@ class FieldSpec:
     example: str = ""
     # FS-068 rule 5: a code column, text-formatted in the template
     text: bool = False
+    # the template's "Needed" cell when it is not Yes, No or a one-of group
+    needed: str = ""
 
 
 _PRODUCT = (
@@ -103,6 +105,44 @@ FIELDS: dict[str, tuple[FieldSpec, ...]] = {
         FieldSpec("discount3_pct", "Discount 3 %", False, "0 to 100.",
                   ("discount3", "disc3", "discount3pct"), example="0"),
     ),
+
+    # FS-083. A blank cell changes nothing (rule 3, GAP-567).
+    "products": (
+        FieldSpec("item_code", "Item code", False,
+                  "Finds the product. On a new product, its code. Give this or the "
+                  "description.", _PRODUCT[0].aliases, example="EXAMPLE-1", text=True),
+        FieldSpec("description", "Description", False,
+                  "Finds the product when the item code does not. Needed for a new product. "
+                  "With a matching item code, it renames the product.",
+                  _PRODUCT[1].aliases, example="EXAMPLE PIPE 16 MM"),
+        FieldSpec("product_category", "Category", False,
+                  "A category's code or name. Needed for a new product.",
+                  ("category", "productcategory", "categoryname", "group", "productgroup"),
+                  example="DRIP COMPONENTS", needed="For a new product"),
+        FieldSpec("quotation_category", "Quotation category", False,
+                  "Head, Field or Both. Needed for a new product.",
+                  ("quotationcategory", "quotcategory", "quotationtype", "block"),
+                  example="Field", needed="For a new product"),
+        FieldSpec("uom", "Unit", False, "A unit's code or name. Needed for a new product.",
+                  ("unit", "uom", "unitofmeasure", "measure", "unitname"), example="NOS.",
+                  needed="For a new product"),
+        FieldSpec("hsn_code", "HSN code", False,
+                  "4 to 8 digits, with a GST rate in force today. A change starts today.",
+                  ("hsn", "hsncode", "hsnsac", "hsnno", "hsnnumber", "sac"), example="3917",
+                  text=True),
+        FieldSpec("mrp", "MRP", False, "Rupees, more than 0, at most two decimals.",
+                  ("mrp", "maxretailprice", "maximumretailprice"), example="120.00"),
+        FieldSpec("pack_multiple", "Pack multiple", False,
+                  "Sold only in multiples of this, more than 0.",
+                  ("packmultiple", "pack", "packsize", "multiple", "moq"), example="1"),
+        FieldSpec("is_subsidy_eligible", "Subsidy eligible", False,
+                  "Yes or no. A new product without it is eligible, except in Marketing.",
+                  ("subsidyeligible", "subsidy", "eligible", "issubsidyeligible"),
+                  example="Yes"),
+        FieldSpec("is_active", "Active", False,
+                  "Yes or no. No switches the product off; it stays on past documents.",
+                  ("active", "isactive", "status", "sold"), example="Yes"),
+    ),
 }
 
 # At least one of each group must be mapped.
@@ -110,6 +150,7 @@ ONE_OF: dict[str, tuple[tuple[str, ...], ...]] = {
     "partners": (),
     "price_list_items": (("item_code", "description"),),
     "lines": (("item_code", "description"),),
+    "products": (("item_code", "description"),),
 }
 
 
@@ -128,7 +169,8 @@ def header_score(kind: str) -> Callable[[Sequence[str]], int]:
 
 
 # FS-067 rule 4a: a remembered rate column is the wrong state's prices on the next list
-NEVER_REMEMBERED = frozenset({"rate"})
+# FS-083 EC-3: nor is an MRP column, beside the client's state price columns
+NEVER_REMEMBERED = frozenset({"rate", "mrp"})
 
 
 def suggest(kind: str, headers: list[str], remembered: dict[str, str] | None = None, *,

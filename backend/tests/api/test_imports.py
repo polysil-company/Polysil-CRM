@@ -164,7 +164,7 @@ async def test_partners_upload_check_and_commit_without_any_login(
     r = await _commit(client, h, batch["id"])
     assert r.status_code == 200, r.text
     assert r.json()["data"] == {"status": "committed", "created": 3, "skipped": 0,
-                                "price_list_id": None}
+                                "price_list_id": None, "updated": 0, "unchanged": 0}
 
     s = sessions()
     made = {row[0]: row for row in (await s.execute(text(

@@ -34,6 +34,7 @@ Step 1: upload an `.xlsx` or `.csv` (up to 10 MB and 5,000 rows).
 The answer has the column headers, five sample rows, this kind's fields and a
 suggested match for each. Nothing is saved to partners, prices or documents
 until commit. `target_id` is the draft price list, for `price_list_items` only.
+`products` adds and updates catalogue products (FS-083).
 Choose `sheet` and `header_row` when the guess is wrong. The defaults are the
 first visible sheet, and the row among the first ten that names the most of this
 kind's fields. A header with no rows under it is refused: the blank template
@@ -52,9 +53,9 @@ comes back as `import_unreadable` on `file`.
 | `201` | `Envelope_ImportBatch_` | Successful Response |
 | `400` | `ErrorResponse` | `idempotency_key_required` on a write. |
 | `401` | `ErrorResponse` | Not signed in. |
-| `403` | `ErrorResponse` | No permission for this kind of import. Partner and price imports are staff only. |
+| `403` | `ErrorResponse` | No permission for this kind of import. Partner, price and product imports are staff only. |
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
-| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
+| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, a lines import at commit, or a product import whose catalogue changed since the check); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
 | `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
@@ -70,15 +71,15 @@ to fill", says what goes in each column, with an example. A filled sheet 1
 uploads with every column matched by name.
 
 The same permission as upload. Fetch it with the bearer token as a blob, and
-save it as `partner-import-template.xlsx`, `price-list-template.xlsx` or
-`order-lines-template.xlsx`: `Content-Disposition` is not readable from another
-origin.
+save it as `partner-import-template.xlsx`, `price-list-template.xlsx`,
+`order-lines-template.xlsx` or `product-import-template.xlsx`:
+`Content-Disposition` is not readable from another origin.
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
-| `kind` | query | `partners` \| `price_list_items` \| `lines` | yes |  |
+| `kind` | query | `partners` \| `price_list_items` \| `lines` \| `products` | yes |  |
 
 **Responses**
 
@@ -111,9 +112,9 @@ Discard an uncommitted import. Its rows are removed at once.
 | `204` | - | Successful Response |
 | `400` | `ErrorResponse` | `idempotency_key_required` on a write. |
 | `401` | `ErrorResponse` | Not signed in. |
-| `403` | `ErrorResponse` | No permission for this kind of import. Partner and price imports are staff only. |
+| `403` | `ErrorResponse` | No permission for this kind of import. Partner, price and product imports are staff only. |
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
-| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
+| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, a lines import at commit, or a product import whose catalogue changed since the check); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
 | `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
@@ -139,9 +140,9 @@ and `check`. Batches are purged seven days after upload.
 | `200` | `Envelope_ImportBatch_` | Successful Response |
 | `400` | `ErrorResponse` | `idempotency_key_required` on a write. |
 | `401` | `ErrorResponse` | Not signed in. |
-| `403` | `ErrorResponse` | No permission for this kind of import. Partner and price imports are staff only. |
+| `403` | `ErrorResponse` | No permission for this kind of import. Partner, price and product imports are staff only. |
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
-| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
+| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, a lines import at commit, or a product import whose catalogue changed since the check); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
 | `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
@@ -182,9 +183,9 @@ suggests it.
 | `200` | `Envelope_ImportCheck_` | Successful Response |
 | `400` | `ErrorResponse` | `idempotency_key_required` on a write. |
 | `401` | `ErrorResponse` | Not signed in. |
-| `403` | `ErrorResponse` | No permission for this kind of import. Partner and price imports are staff only. |
+| `403` | `ErrorResponse` | No permission for this kind of import. Partner, price and product imports are staff only. |
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
-| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
+| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, a lines import at commit, or a product import whose catalogue changed since the check); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
 | `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
@@ -194,11 +195,16 @@ suggests it.
 
 **Commit Import**
 
-Step 3: save a checked partner or price import. Every row is checked again
+Step 3: save a checked partner, price or product import. Every row is checked again
 first, because masters may have changed. All or nothing: with any bad row and
 `skip_invalid` false, nothing is saved (`import_has_errors`, the rows in
 `fields` as `rows[<sheet row>].<field>`). A partner import never creates a
 login. A `lines` import has no commit: the form saves the lines.
+
+A product import also returns `updated` and `unchanged`. It answers `409
+import_wrong_state` when the catalogue changed since the check, and `422
+import_has_errors` with `fields.rows` (not a sheet row) when a name or an HSN
+row clashed at the moment of saving: check again.
 
 **Parameters**
 
@@ -222,9 +228,9 @@ login. A `lines` import has no commit: the form saves the lines.
 | `200` | `Envelope_ImportCommitResult_` | Successful Response |
 | `400` | `ErrorResponse` | `idempotency_key_required` on a write. |
 | `401` | `ErrorResponse` | Not signed in. |
-| `403` | `ErrorResponse` | No permission for this kind of import. Partner and price imports are staff only. |
+| `403` | `ErrorResponse` | No permission for this kind of import. Partner, price and product imports are staff only. |
 | `404` | `ErrorResponse` | No such import, one uploaded by someone else, or one purged after seven days. |
-| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, or a lines import at commit); `price_list_published`. |
+| `409` | `ErrorResponse` | `import_wrong_state` (committed, discarded, not checked, a lines import at commit, or a product import whose catalogue changed since the check); `price_list_published`. |
 | `413` | `ErrorResponse` | `attachment_too_large`: over 10 MB. |
 | `422` | `ErrorResponse` | `import_unreadable` on `fields.file` (also a header with no rows under it), `import_too_many_rows`, `import_has_errors`, or `validation_error` on `fields.sheet`, `fields.header_row` or `fields.mapping.<key>`. |
 
@@ -269,7 +275,7 @@ login. A `lines` import has no commit: the form saves the lines.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes |  |
-| `kind` | `partners` \| `price_list_items` \| `lines` | yes |  |
+| `kind` | `partners` \| `price_list_items` \| `lines` \| `products` | yes |  |
 | `status` | `uploaded` \| `checked` \| `committed` \| `discarded` | yes |  |
 | `target_id` | string \| null | yes | The draft price list, for price_list_items. |
 | `file_name` | string | yes |  |
@@ -296,6 +302,7 @@ login. A `lines` import has no commit: the form saves the lines.
 | `preview` | ImportPreviewRow[] | yes | The first 20 good rows. |
 | `column_warnings` | object | yes | Field key to a message about the whole column: empty on every row, or formulas with no saved result. Show it beside the dropdown. |
 | `lines` | ImportLine[] \| null | yes | `lines` imports only: every good row, for the line editor. |
+| `products` | ProductImportCounts \| null |  | `products` imports only. The preview then holds the first 20 rows that change something, renames and switch-offs first. Each has `action` (new or update), `product`, `item_code`, `changes` (field to `{from, to}`, plus `confirmed: true` when the row only confirms a stand-in value) and, on a new row, `near`: an existing product with a close name. |
 
 **`ImportCheckRequest`**
 
@@ -315,8 +322,10 @@ login. A `lines` import has no commit: the form saves the lines.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `status` | `uploaded` \| `checked` \| `committed` \| `discarded` | yes |  |
-| `created` | integer | yes | Partners created, or rates written. |
+| `created` | integer | yes | Partners or products created, or rates written. |
 | `skipped` | integer | yes |  |
+| `updated` | integer |  | Products changed. 0 for other kinds. Default `0`. |
+| `unchanged` | integer |  | Product rows that matched the catalogue already. 0 for other kinds. Default `0`. |
 | `price_list_id` | string \| null |  |  |
 
 **`ImportField`**
@@ -359,3 +368,17 @@ login. A `lines` import has no commit: the form saves the lines.
 |---|---|---|---|
 | `row` | integer | yes | The row number in the person's sheet. |
 | `errors` | object | yes | Field key to the reason. |
+
+**`ProductImportCounts`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `new` | integer | yes | Products the import adds. |
+| `update` | integer | yes | Products it changes. |
+| `unchanged` | integer | yes | Rows that match the catalogue already. Nothing is written for them, and they are not in the preview. |
+| `renamed` | integer | yes | Updates that rename a product. Show it beside the counts: the preview holds only 20 rows. |
+| `switched_off` | integer | yes | Updates that switch a product off. |
+| `switched_on` | integer | yes | Updates that switch a product back on. |
+| `hsn_changed` | integer | yes | Updates that start a new HSN code today. |
+| `still_off` | integer | yes | Rows that match a switched-off product and leave it off. |
+| `fingerprint` | string | yes | Opaque. Commit compares it with a fresh check, and answers 409 when the catalogue changed meanwhile. |
