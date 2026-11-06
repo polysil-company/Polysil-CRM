@@ -28,6 +28,7 @@ export const MOCK_DOCUMENT_TYPES: readonly DocumentTypeWire[] = [
   ["cancelled_cheque", "Cancelled cheque"],
   ["shop_photo", "Shop photo"],
   ["shop_licence", "Shop licence"],
+  ["deposit_slip", "Deposit pay slip"],
 ].map(([code = "", label = ""]) => ({ code, label, needs_name: code === "other" }));
 
 export function mockDocumentTypeLabel(code: string): string | undefined {

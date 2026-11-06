@@ -19,6 +19,7 @@ import { marketingHandlers } from "./marketing";
 import { messageHandlers } from "./messages";
 import { notificationHandlers } from "./notifications";
 import { orderHandlers } from "./orders";
+import { orgChartHandlers } from "./org-chart";
 import { partnerHandlers } from "./partners";
 import { paymentHandlers } from "./payments";
 import { policyHandlers } from "./policy";
@@ -78,6 +79,7 @@ export const handlers: readonly HttpHandler[] = [
   ...taskHandlers,
   ...targetHandlers,
   ...complaintHandlers,
+  ...orgChartHandlers,
   ...userHandlers,
   ...partnerHandlers,
   ...dealerApplicationHandlers,

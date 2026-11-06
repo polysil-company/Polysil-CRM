@@ -7,7 +7,7 @@ import { createParser, parseAsArrayOf, useQueryStates } from "nuqs";
 import type * as React from "react";
 
 import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
-import { SingleFilterPill } from "@/components/patterns/filter-pill";
+import { FilterPill, SingleFilterPill } from "@/components/patterns/filter-pill";
 import { Notice } from "@/components/patterns/notice";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -16,12 +16,14 @@ import { LeadAreaFilter } from "@/features/leads/components/lead-area-filter";
 import { downloadReport } from "@/features/reports/api/reports.api";
 import {
   REPORT_MAX_DAYS,
+  REPORT_MAX_ROLES,
   REPORT_MAX_TERRITORIES,
   type ReportName,
   type ReportParams,
 } from "@/features/reports/api/reports.schemas";
 import { REPORTS } from "@/features/reports/lib/report-catalogue";
 import { staffAssigneesQueryOptions } from "@/features/tasks/api/tasks.queries";
+import { roleListQueryOptions } from "@/features/users/api/users.queries";
 import { createLogger } from "@/lib/logger";
 
 import { ReportBody } from "./report-bodies";
@@ -44,6 +46,11 @@ const parseAsId = createParser({
   serialize: (value: string) => value,
 });
 
+const parseAsRole = createParser({
+  parse: (value: string) => (/^[a-z_]{1,40}$/.test(value) ? value : null),
+  serialize: (value: string) => value,
+});
+
 const parseAsGroup = createParser({
   parse: (value: string) => (/^[a-z_]{1,32}$/.test(value) ? value : null),
   serialize: (value: string) => value,
@@ -55,6 +62,9 @@ const reportSearchParams = {
   to: parseAsDay,
   area: parseAsArrayOf(parseAsId).withDefault([]),
   owner: parseAsId,
+  /** FS-082 · One person's team; never with `owner`. */
+  team: parseAsId,
+  roles: parseAsArrayOf(parseAsRole).withDefault([]),
   by: parseAsGroup,
 };
 
@@ -83,6 +93,9 @@ export function ReportView({ name }: { name: ReportName }): React.JSX.Element {
     to: entry.dates ? values.to : null,
     territories: entry.territory ? [...new Set(values.area)].slice(0, REPORT_MAX_TERRITORIES) : [],
     owner: entry.owner ? values.owner : null,
+    // The backend refuses a person and a team together; the person wins.
+    teamOf: entry.team && (values.owner === null || !entry.owner) ? values.team : null,
+    roles: entry.team ? [...new Set(values.roles)].slice(0, REPORT_MAX_ROLES) : [],
     groupBy,
   };
   const problem = windowProblem(params.from, params.to);
@@ -91,6 +104,8 @@ export function ReportView({ name }: { name: ReportName }): React.JSX.Element {
     params.to !== null ||
     params.territories.length > 0 ||
     params.owner !== null ||
+    params.teamOf !== null ||
+    params.roles.length > 0 ||
     params.groupBy !== null;
 
   return (
@@ -142,9 +157,26 @@ export function ReportView({ name }: { name: ReportName }): React.JSX.Element {
           <PersonFilter
             selected={params.owner}
             onChange={(owner) => {
-              void setValues({ owner });
+              void setValues(owner === null ? { owner } : { owner, team: null });
             }}
           />
+        ) : null}
+        {entry.team ? (
+          <>
+            <PersonFilter
+              label="Team"
+              selected={params.teamOf}
+              onChange={(team) => {
+                void setValues(team === null ? { team } : { team, owner: null });
+              }}
+            />
+            <RolesFilter
+              selected={params.roles}
+              onChange={(roles) => {
+                void setValues({ roles: roles.length === 0 ? null : roles });
+              }}
+            />
+          </>
         ) : null}
         {groups.length > 0 ? (
           <SingleFilterPill
@@ -161,7 +193,15 @@ export function ReportView({ name }: { name: ReportName }): React.JSX.Element {
             variant="ghost"
             size="sm"
             onClick={() => {
-              void setValues({ from: null, to: null, area: null, owner: null, by: null });
+              void setValues({
+                from: null,
+                to: null,
+                area: null,
+                owner: null,
+                team: null,
+                roles: null,
+                by: null,
+              });
             }}
           >
             Reset filters
@@ -220,22 +260,51 @@ function DayRange({
   );
 }
 
-/** One person: you, then the staff below you (GET /tasks/assignees). */
+/**
+ * One person: you, then the staff below you (GET /tasks/assignees). As "Team" (FS-082), that
+ * person and everyone below them on the org chart.
+ */
 function PersonFilter({
+  label = "Person",
   selected,
   onChange,
 }: {
+  label?: string;
   selected: string | null;
   onChange: (owner: string | null) => void;
 }): React.JSX.Element {
   const people = useQuery(staffAssigneesQueryOptions());
   return (
     <SingleFilterPill
-      label="Person"
+      label={label}
       options={(people.data ?? []).map((person) => ({ value: person.id, label: person.name }))}
       selected={selected}
       emptyMessage={people.isPending ? "Loading people…" : "The people couldn't be loaded."}
       onChange={onChange}
+    />
+  );
+}
+
+/** FS-082 · Only people holding one of these roles now: the staff roles (GET /lookups/roles). */
+function RolesFilter({
+  selected,
+  onChange,
+}: {
+  selected: readonly string[];
+  onChange: (roles: string[]) => void;
+}): React.JSX.Element {
+  const roles = useQuery(roleListQueryOptions());
+  return (
+    <FilterPill
+      label="Roles"
+      options={(roles.data ?? [])
+        .filter((role) => !role.portal)
+        .map((role) => ({ value: role.code, label: role.name }))}
+      selected={selected}
+      emptyMessage={roles.isPending ? "Loading roles…" : "The roles couldn't be loaded."}
+      onChange={(next) => {
+        onChange(next.slice(0, REPORT_MAX_ROLES));
+      }}
     />
   );
 }

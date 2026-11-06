@@ -21,6 +21,8 @@ function reportQuery(name: ReportName, params: ReportParams): Record<string, str
     to: params.to ?? undefined,
     territory_id: params.territories.length === 0 ? undefined : params.territories.join(","),
     owner_id: params.owner ?? undefined,
+    team_of: params.teamOf ?? undefined,
+    roles: params.roles.length === 0 ? undefined : params.roles.join(","),
     [name === "territory-performance" ? "level" : "group_by"]: params.groupBy ?? undefined,
   };
 }
@@ -87,6 +89,12 @@ const FETCHERS: { readonly [N in ReportName]: ReportFetcher<N> } = {
     ).then(({ data }) => data),
   complaints: (params, signal) =>
     fetchReport("complaints", REPORT_SCHEMAS.complaints, params, signal).then(({ data }) => data),
+  "sales-forecast": (params, signal) =>
+    fetchReport("sales-forecast", REPORT_SCHEMAS["sales-forecast"], params, signal).then(
+      ({ data }) => data,
+    ),
+  insights: (params, signal) =>
+    fetchReport("insights", REPORT_SCHEMAS.insights, params, signal).then(({ data }) => data),
 };
 
 /** RPT-002 · GET /reports/{name}: its rows, totals and the filters the figures used. */
