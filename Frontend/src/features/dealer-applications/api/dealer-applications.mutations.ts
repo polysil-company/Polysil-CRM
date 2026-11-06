@@ -8,6 +8,8 @@ import {
   createDealerApplication,
   decideDealerApplication,
   patchDealerApplication,
+  recordDealerApplicationDeposit,
+  relaxDealerApplicationDeposit,
   renewDealerApplicationLink,
   submitDealerApplication,
   withdrawDealerApplication,
@@ -102,5 +104,27 @@ export function useDecideDealerApplication(): Mutation<typeof decideDealerApplic
       apply(application);
       void queryClient.invalidateQueries({ queryKey: partnerKeys.all });
     },
+  });
+}
+
+/** CHNL-007 · Record the deposit paid (FS-071). The pay slip is a document, so those refresh too. */
+export function useRecordDeposit(): Mutation<typeof recordDealerApplicationDeposit> {
+  const apply = useApply();
+  return useMutation({
+    mutationKey: [...dealerApplicationKeys.all, "deposit"],
+    mutationFn: recordDealerApplicationDeposit,
+    meta: { dataId: "CHNL-007" },
+    onSuccess: apply,
+  });
+}
+
+/** CHNL-007 · Lower or waive the deposit (FS-071). */
+export function useRelaxDeposit(): Mutation<typeof relaxDealerApplicationDeposit> {
+  const apply = useApply();
+  return useMutation({
+    mutationKey: [...dealerApplicationKeys.all, "relax-deposit"],
+    mutationFn: relaxDealerApplicationDeposit,
+    meta: { dataId: "CHNL-007" },
+    onSuccess: apply,
   });
 }

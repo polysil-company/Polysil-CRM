@@ -21,7 +21,8 @@ const log = createLogger({
 /**
  * LEAD-020 · Restore, on a row of Deleted leads (BE-033). Shown only to people who may both
  * delete and edit leads, as the backend requires. The lead goes back to the leads list with its
- * owner; the toast links to it.
+ * owner; the toast links to it. An owner who has since left keeps it, so the toast says to
+ * assign it (once the backend says who has left, BE-042).
  */
 export function RestoreLeadButton({ lead }: { lead: Lead }): React.JSX.Element | null {
   const mayDelete = useCan("leads", "delete");
@@ -37,6 +38,9 @@ export function RestoreLeadButton({ lead }: { lead: Lead }): React.JSX.Element |
         description: (
           <>
             {restored.customerName} is back in the leads list.{" "}
+            {restored.owner?.active === false
+              ? `Its owner, ${restored.owner.name}, has left: open it and assign it to someone. `
+              : null}
             <Link
               href={`/leads/${restored.id}`}
               className="font-medium text-primary underline underline-offset-4"

@@ -13,8 +13,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  PARTNER_TYPES,
+  type PartnerType,
+} from "@/features/dealer-applications/api/data-sheet.schemas";
 import { usePatchDealerApplication } from "@/features/dealer-applications/api/dealer-applications.mutations";
-import type { DealerApplication } from "@/features/dealer-applications/api/dealer-applications.schemas";
+import type {
+  DealerApplication,
+  StaffApplicationFieldsRequest,
+} from "@/features/dealer-applications/api/dealer-applications.schemas";
+import { PARTNER_TYPE_LABELS } from "@/features/dealer-applications/lib/dealer-application-labels";
 import { GstinDetails } from "@/features/partners/components/gstin-details";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
@@ -27,6 +37,7 @@ import {
   draftOf,
   fieldProblems,
   isMaskedAccount,
+  problemsFromServer,
   type DealerFieldProblems,
   type DealerFieldsDraft,
 } from "./dealer-application-fields";
@@ -39,7 +50,9 @@ const log = createLogger({
 
 /**
  * CHNL-007 · Staff fill or correct the applicant's fields (while draft, returned or submitted).
- * Only what changed is sent; under a GSTIN, the GST record offers its names.
+ * Only what changed is sent; under a GSTIN, the GST record offers its names. While draft or
+ * returned, staff may also change the type (FS-071); the backend refuses it once a deposit is
+ * recorded, and says so.
  */
 export function EditDealerApplication({
   application,
@@ -55,9 +68,14 @@ export function EditDealerApplication({
   const [shown, setShown] = useState(false);
   const [server, setServer] = useState<DealerFieldProblems>({});
   const [refusal, setRefusal] = useState<Refusal | null>(null);
+  const [partnerType, setPartnerType] = useState<PartnerType>(application.partnerType);
+  const typeOpen = application.status === "draft" || application.status === "returned";
   const local = fieldProblems(draft);
   const problems: DealerFieldProblems = { ...(shown ? local : {}), ...server };
-  const body = changedFields(draft, initial);
+  const body: StaffApplicationFieldsRequest = {
+    ...changedFields(draft, initial),
+    ...(partnerType === application.partnerType ? {} : { partner_type: partnerType }),
+  };
   const unchanged = Object.keys(body).length === 0;
 
   const save = useAsyncAction({
@@ -78,10 +96,7 @@ export function EditDealerApplication({
     onError: (error) => {
       const fields = readFieldErrors(error);
       if (fields !== null) {
-        const mapped: Record<string, string> = {};
-        for (const [key, message] of Object.entries(fields)) mapped[key] = message;
-        const next: DealerFieldProblems = mapped;
-        setServer(next);
+        setServer(problemsFromServer(fields));
         return;
       }
       const { refusal: next, stale } = refusalOf(error);
@@ -115,6 +130,24 @@ export function EditDealerApplication({
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-4">
+        {typeOpen ? (
+          <Field>
+            <FieldLabel id="edit-dealer-app-type-label">The application makes a</FieldLabel>
+            <RadioGroup<PartnerType>
+              aria-labelledby="edit-dealer-app-type-label"
+              value={partnerType}
+              onValueChange={setPartnerType}
+              className="flex-row flex-wrap gap-5"
+            >
+              {PARTNER_TYPES.map((type) => (
+                <label key={type} className="flex items-center gap-2 text-sm text-foreground">
+                  <RadioGroupItem value={type} />
+                  {PARTNER_TYPE_LABELS[type]}
+                </label>
+              ))}
+            </RadioGroup>
+          </Field>
+        ) : null}
         <DealerFieldsEditor
           idPrefix="edit-dealer-app"
           draft={draft}
@@ -126,6 +159,7 @@ export function EditDealerApplication({
           maskedAccount={
             isMaskedAccount(application.bankAccountNo) ? application.bankAccountNo : null
           }
+          workingCapitalTotal={application.dataSheet.workingCapitalTotalLakhs}
           gstinCheck={(gstin) => (
             <GstinDetails
               gstin={gstin}

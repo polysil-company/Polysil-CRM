@@ -77,7 +77,7 @@ const DOWNLOADS: readonly (readonly [string, string, Download])[] = [
   [
     "dealer-applications",
     "Firm",
-    (format) => exportDealerApplications({ status: [], q: "" }, format),
+    (format) => exportDealerApplications({ status: [], q: "", partnerType: null }, format),
   ],
   ["campaigns", "Name", (format) => exportCampaigns({ active: null, type: null, q: "" }, format)],
   ["schemes", "Code", (format) => exportSchemes({ status: null, type: null, q: "" }, format)],
@@ -148,6 +148,33 @@ describe("[APP-012] Downloads on 24 more lists (FS-081)", () => {
       product_id: "p-9",
       short_only: "true",
       format: "csv",
+    });
+  });
+
+  it("sends the dealer or distributor filter on the applications download (CHNL-007)", async () => {
+    writeMockRole("admin");
+    let asked: URLSearchParams | null = null;
+    server.use(
+      http.get(buildApiUrl("/dealer-applications/export"), ({ request }) => {
+        asked = new URL(request.url).searchParams;
+        return new HttpResponse("x", {
+          headers: {
+            "content-disposition": 'attachment; filename="dealer-applications-2026-11-06.xlsx"',
+          },
+        });
+      }),
+    );
+
+    await exportDealerApplications(
+      { status: ["submitted"], q: " Kisan ", partnerType: "distributor" },
+      "xlsx",
+    );
+
+    expect(Object.fromEntries(asked ?? new URLSearchParams())).toEqual({
+      status: "submitted",
+      q: "Kisan",
+      partner_type: "distributor",
+      format: "xlsx",
     });
   });
 

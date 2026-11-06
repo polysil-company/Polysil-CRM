@@ -34,17 +34,17 @@ SALES = {"rows": [{"user": {"id": "u1", "full_name": "Ravi Patel"}, "leads_creat
 def test_a_figure_the_caller_may_not_see_is_a_blank_cell_never_zero() -> None:
     """ADR-047: null in JSON stays empty in Excel."""
     rows = _sheet("salesperson-performance", SALES)
-    assert rows[0][0] == "Person" and rows[0][6] == "Visits"
+    assert rows[0][0] == "Person" and rows[0][1:3] == ("Role", "Office") and rows[0][8] == "Visits"
     ravi = rows[1]
     assert ravi[0] == "Ravi Patel"
-    assert isinstance(ravi[5], (int, float)) and Decimal(str(ravi[5])) == Decimal("1050"), "money is a number"
-    assert ravi[6] is None and ravi[7] is None and ravi[8] is None
+    assert isinstance(ravi[7], (int, float)) and Decimal(str(ravi[7])) == Decimal("1050"), "money is a number"
+    assert ravi[8] is None and ravi[9] is None and ravi[10] is None
 
 
 def test_the_total_line_carries_only_what_the_report_totals() -> None:
     total = _sheet("salesperson-performance", SALES)[2]
-    assert total[0] == "Total" and total[1] == 3 and total[2] == 1
-    assert all(v is None for v in total[3:]), "no invented totals for untotalled columns"
+    assert total[0] == "Total" and total[3] == 3 and total[4] == 1
+    assert all(v is None for v in (*total[1:3], *total[5:])), "no invented totals for untotalled columns"
 
 
 def test_a_truncated_report_says_so_below_the_rows() -> None:

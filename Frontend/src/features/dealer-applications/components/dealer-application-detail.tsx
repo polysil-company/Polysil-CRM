@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import type * as React from "react";
 
+import { DownloadFileButton } from "@/components/patterns/download-file-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { Notice } from "@/components/patterns/notice";
 import { QueryView } from "@/components/patterns/query-view";
@@ -13,6 +14,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { downloadDealerApplicationPdf } from "@/features/dealer-applications/api/dealer-applications.api";
 import { dealerApplicationQueryOptions } from "@/features/dealer-applications/api/dealer-applications.queries";
 import {
   OPEN_STATUSES,
@@ -22,17 +24,27 @@ import {
   DEALER_APPLICATION_STATUS_BADGE,
   DEALER_APPLICATION_STATUS_LABELS,
   FIRM_TYPE_LABELS,
+  PARTNER_TYPE_LABELS,
   missingLabel,
 } from "@/features/dealer-applications/lib/dealer-application-labels";
 import { RecordDocuments } from "@/features/documents/components/record-documents";
 import { isApiError } from "@/lib/api/errors";
 import { EMPTY_VALUE, formatFullDate, formatIndianPhone } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
 
+import { DataSheetFacts } from "./data-sheet-facts";
 import { DealerApplicationActions } from "./dealer-application-actions";
+import { DepositCard } from "./deposit-card";
+
+const log = createLogger({
+  file: "features/dealer-applications/components/dealer-application-detail.tsx",
+  dataId: "CHNL-007",
+});
 
 /**
- * CHNL-007 · One dealer application: where it stands and what is still needed, every field
- * the applicant (or staff for them) filled in, its documents, and what the reader may do.
+ * CHNL-007 · One dealer or distributor application: where it stands and what is still needed,
+ * every field the applicant (or staff for them) filled in, the data sheet (FS-071), its
+ * documents, and what the reader may do.
  */
 export function DealerApplicationDetail({
   applicationId,
@@ -90,16 +102,29 @@ function DetailView({ application }: { application: DealerApplication }): React.
             <Badge variant={DEALER_APPLICATION_STATUS_BADGE[application.status]} dot>
               {label}
             </Badge>
+            <Badge variant="neutral">{PARTNER_TYPE_LABELS[application.partnerType]}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">
             {application.contactName} · {formatIndianPhone(application.mobile)} ·{" "}
             {application.territory.name}
           </p>
         </div>
-        <DealerApplicationActions application={application} />
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadFileButton
+            download={() => downloadDealerApplicationPdf(application.id)}
+            fallbackName="application.pdf"
+            logger={log}
+            dataId="CHNL-007"
+          >
+            Download PDF
+          </DownloadFileButton>
+          <DealerApplicationActions application={application} />
+        </div>
       </div>
 
       <ApplicationNotices application={application} open={open} />
+
+      <DepositCard application={application} />
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         <Card>
@@ -176,6 +201,8 @@ function DetailView({ application }: { application: DealerApplication }): React.
           </CardContent>
         </Card>
       </div>
+
+      <DataSheetFacts sheet={application.dataSheet} />
 
       {application.notes === null ? null : (
         <Card>
@@ -262,7 +289,9 @@ function ApplicationNotices({
   if (application.status === "approved") {
     notices.push(
       <Notice key="approved" tone="success">
-        <p className="font-medium">Approved: the dealer and its login are added</p>
+        <p className="font-medium">
+          Approved: the {application.partnerType} and its login are added
+        </p>
         <p>
           They sign in with a WhatsApp code on {formatIndianPhone(application.mobile)}.
           {application.partnerId === null ? null : (
@@ -272,11 +301,19 @@ function ApplicationNotices({
                 href={`/partners/${application.partnerId}`}
                 className="text-primary-text underline underline-offset-4"
               >
-                Open the dealer
+                Open the {application.partnerType}
               </Link>
             </>
           )}
         </p>
+      </Notice>,
+    );
+  }
+  if (application.status === "submitted" && application.deposit?.status === "pending") {
+    notices.push(
+      <Notice key="deposit" tone="warning">
+        <p className="font-medium">Approval waits for the deposit</p>
+        <p>Record it below, or have it lowered or waived.</p>
       </Notice>,
     );
   }

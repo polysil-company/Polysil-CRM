@@ -6,6 +6,7 @@ import {
   FlaskConicalIcon,
   LockPasswordIcon,
   Logout03Icon,
+  Mail01Icon,
   UserMultiple02Icon,
 } from "@hugeicons/core-free-icons";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,6 +33,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChangePasswordDialogContent } from "@/features/auth/components/change-password-dialog";
+import { EmailPreferencesDialogContent } from "@/features/auth/components/email-preferences-dialog";
 import { useSignOut } from "@/features/auth/hooks/use-sign-out";
 import type { Session } from "@/features/session/api/session.schemas";
 import { useSession } from "@/features/session/hooks/use-session";
@@ -67,6 +69,7 @@ export function UserMenu(): React.JSX.Element {
   const session = useSession();
   const { signOut, isSigningOut } = useSignOut();
   const [changingPassword, setChangingPassword] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
 
   if (session.status === "pending") {
     return <Skeleton className="size-8 rounded-full" />;
@@ -87,7 +90,7 @@ export function UserMenu(): React.JSX.Element {
     );
   }
 
-  const { user, userType } = session.data;
+  const { user, userType, email } = session.data;
 
   return (
     <>
@@ -138,6 +141,17 @@ export function UserMenu(): React.JSX.Element {
               Change password
             </DropdownMenuItem>
           ) : null}
+          {/* AUTH-008 · Only while the backend can send email to this person (FS-078). */}
+          {email.available ? (
+            <DropdownMenuItem
+              onClick={() => {
+                setEditingEmail(true);
+              }}
+            >
+              <Icon icon={Mail01Icon} />
+              Email
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem
             disabled={isSigningOut}
             onClick={() => {
@@ -151,6 +165,17 @@ export function UserMenu(): React.JSX.Element {
       </DropdownMenu>
       <Dialog open={changingPassword} onOpenChange={setChangingPassword}>
         {changingPassword ? <ChangePasswordDialogContent /> : null}
+      </Dialog>
+      <Dialog open={editingEmail} onOpenChange={setEditingEmail}>
+        {editingEmail ? (
+          <EmailPreferencesDialogContent
+            notices={email.notices}
+            morningSummary={email.morningSummary}
+            onDone={() => {
+              setEditingEmail(false);
+            }}
+          />
+        ) : null}
       </Dialog>
     </>
   );

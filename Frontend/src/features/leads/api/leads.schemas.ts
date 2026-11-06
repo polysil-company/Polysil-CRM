@@ -64,8 +64,11 @@ export const leadWireSchema = z.object({
   email: z.string().nullable(),
   territory: refSchema.extend({ level: z.string().min(1) }),
   village: z.string().nullable(),
-  /** The staff owner; null while the lead waits in the unassigned list. */
-  owner: userRefSchema.nullable(),
+  /**
+   * The staff owner; null while the lead waits in the unassigned list. `is_active` is asked
+   * of the backend (BE-042), so a restored lead whose owner has left can offer Assign.
+   */
+  owner: userRefSchema.extend({ is_active: z.boolean().nullish() }).nullable(),
   owner_org_unit: refSchema,
   assigned_partner: refSchema.extend({ partner_type: z.string().min(1) }).nullable(),
   /** Decimal string; null before the lead is scored. */
@@ -143,7 +146,9 @@ export const leadSchema = leadWireSchema.transform((wire) => ({
   email: wire.email,
   territory: wire.territory,
   village: wire.village,
-  owner: wire.owner ? { id: wire.owner.id, name: wire.owner.full_name } : null,
+  owner: wire.owner
+    ? { id: wire.owner.id, name: wire.owner.full_name, active: wire.owner.is_active ?? null }
+    : null,
   ownerOrgUnit: wire.owner_org_unit,
   channelPartner: wire.assigned_partner
     ? {

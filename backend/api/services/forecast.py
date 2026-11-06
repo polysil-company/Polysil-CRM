@@ -32,6 +32,7 @@ from api.errors import ValidationFailed
 from api.services import reports as rep
 from api.services.clock import today_ist
 from api.services.leads import _id_list, _under
+from api.services.teams import Team
 
 _UUID = sa.Uuid
 _TS = sa.DateTime(timezone=True)
@@ -127,7 +128,8 @@ def _month_expr(created: Any, median: int | None, today: dt.date) -> Any:
 
 
 async def sales_forecast(db: AsyncSession, caller: Caller, *, group_by: str, territory_id: str | None,
-                         owner_id: str | None, history_days: int, level: str) -> dict[str, Any]:
+                         owner_id: str | None, history_days: int, level: str,
+                         team: Team | None = None) -> dict[str, Any]:
     rep._need(caller, "sales-forecast", "leads")
     if group_by not in GROUPS:
         raise ValidationFailed(fields={"group_by": "owner, territory or source"})
@@ -136,6 +138,8 @@ async def sales_forecast(db: AsyncSession, caller: Caller, *, group_by: str, ter
     if level not in ("district", "taluka"):
         raise ValidationFailed(fields={"level": "district or taluka"})
     territories = _id_list(territory_id, "territory_id") if territory_id else []
+    # FS-082 S-2: the team narrows the open leads only; the rates stay whole-scope
+    owners = rep.Filters(start=None, end=None, territory_id=None, owner_id=owner_id, team=team)
     today = today_ist()
     hi = dt.datetime.combine(today + dt.timedelta(days=1), dt.time(0), tzinfo=domain.IST)
     lo = hi - dt.timedelta(days=history_days)
@@ -175,7 +179,7 @@ async def sales_forecast(db: AsyncSession, caller: Caller, *, group_by: str, ter
                        estimate.label("est"), created_d.label("created"))
              .select_from(source)
              .where(*_lead_scope(caller), _is(_OPEN_SQL), *_area(territories),
-                    *([L.c.owner_user_id == owner_id] if owner_id else []))
+                    *owners.owner(L.c.owner_user_id))
              .subquery())
     base = sa.select(
         leads.c.k, leads.c.stage, leads.c.created,
@@ -245,6 +249,7 @@ async def sales_forecast(db: AsyncSession, caller: Caller, *, group_by: str, ter
         "median_days_to_win": median,
         "reason": "not_enough_history" if thin else None,
         "filters": {"history_days": history_days, "territory_id": territories or None, "owner_id": owner_id,
+                    **owners.team_out(),
                     "level": level if group_by == "territory" else None, "as_of": today.isoformat(),
                     "rates_from": "your_whole_scope"},
         "totals": totals,
@@ -261,7 +266,7 @@ async def insights(db: AsyncSession, caller: Caller, f: rep.Filters) -> dict[str
     plo, _ = domain.instants(prev_start, prev_end)
     lo, hi = f.lo, f.hi
     lead_where = [*_lead_scope(caller), *_area(f.territories),
-                  *([L.c.owner_user_id == f.owner_id] if f.owner_id else [])]
+                  *f.owner(L.c.owner_user_id)]
     now_p = L.c.lost_at >= lo
     rows_out: list[dict[str, Any]] = []
 
@@ -304,7 +309,7 @@ async def insights(db: AsyncSession, caller: Caller, f: rep.Filters) -> dict[str
         q_where = [scope_predicate(SPECS["quotations"], caller, Q), Q.c.deleted_at.is_(None),
                    Q.c.superseded_by_id.is_(None),
                    *([Q.c.territory_id.in_(_under("territory_closure", *f.territories))] if f.territories else []),
-                   *([Q.c.owner_user_id == f.owner_id] if f.owner_id else [])]
+                   *f.owner(Q.c.owner_user_id)]
         acc_now, acc_prev = Q.c.accepted_at >= lo, Q.c.accepted_at < lo
         rej_now, rej_prev = Q.c.rejected_at >= lo, Q.c.rejected_at < lo
         decided = sa.or_(sa.and_(Q.c.accepted_at >= plo, Q.c.accepted_at < hi),

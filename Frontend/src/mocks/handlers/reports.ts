@@ -18,6 +18,7 @@ import { calendarDayOf, shiftCalendarDay, todayInIndia } from "@/lib/format";
 import { mockLookupRows } from "@/mocks/data/lookups";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { mockTerritoryLineage } from "@/mocks/data/territories";
+import { MOCK_ROLES } from "@/mocks/data/users";
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
@@ -101,6 +102,60 @@ interface Filters {
   readonly to: string;
   readonly territories: readonly string[];
   readonly owner: string | null;
+  /** FS-082 · The people a team or role filter keeps; null when there is neither. */
+  readonly owners: readonly string[] | null;
+  readonly teamOf: string | null;
+  readonly roles: readonly string[] | null;
+}
+
+function levelOf(code: string | undefined): number {
+  return MOCK_ROLES.find((role) => role.code === code)?.level ?? 0;
+}
+
+/**
+ * FS-082 · `team_of` and `roles` as people. The mock's team is the person and every active
+ * staff member at a lower level (the seeds sit in one state); the backend reads the org chart.
+ */
+function teamOf(params: URLSearchParams): Pick<Filters, "owners" | "teamOf" | "roles"> | Response {
+  const team = params.get("team_of");
+  const roles = (params.get("roles") ?? "")
+    .split(",")
+    .map((code) => code.trim())
+    .filter((code) => code !== "");
+  if (team !== null && params.get("owner_id") !== null) {
+    return errorResponse(422, "validation_error", "Not with owner_id.", {
+      team_of: "choose a team or one person, not both",
+    });
+  }
+  if (roles.length > 10) {
+    return errorResponse(422, "validation_error", "Too many roles.", { roles: "at most 10" });
+  }
+  const staff = mockDb.users.filter(
+    (user) => user.user_type === "staff" && user.is_active && user.deleted_at === null,
+  );
+  let people: typeof staff | null = null;
+  if (team !== null) {
+    const head = staff.find((user) => user.id === team);
+    if (head === undefined) {
+      return errorResponse(404, "not_in_your_line", "That person isn't in your line.");
+    }
+    const level = levelOf(head.role?.code);
+    people = staff.filter((user) => user.id === team || levelOf(user.role?.code) < level);
+  }
+  if (roles.length > 0) {
+    people = (people ?? staff).filter((user) => roles.includes(user.role?.code ?? ""));
+  }
+  return {
+    owners: people === null ? null : people.map((user) => user.id),
+    teamOf: team,
+    roles: roles.length === 0 ? null : roles,
+  };
+}
+
+/** One person, a team, or nobody in particular. */
+function ownerMatches(filters: Filters, ownerId: string | undefined): boolean {
+  if (filters.owner !== null && ownerId !== filters.owner) return false;
+  return filters.owners === null || (ownerId !== undefined && filters.owners.includes(ownerId));
 }
 
 function filtersOf(params: URLSearchParams): Filters | Response {
@@ -116,7 +171,9 @@ function filtersOf(params: URLSearchParams): Filters | Response {
     .split(",")
     .map((id) => id.trim())
     .filter((id) => id !== "");
-  return { from, to, territories, owner: params.get("owner_id") };
+  const team = teamOf(params);
+  if (team instanceof Response) return team;
+  return { from, to, territories, owner: params.get("owner_id"), ...team };
 }
 
 function inWindow(filters: Filters, at: string | null): boolean {
@@ -138,6 +195,8 @@ function filtersOut(filters: Filters): ReportWire<"lead-conversion">["filters"] 
     to: filters.to,
     territory_id: filters.territories.length === 0 ? null : [...filters.territories],
     owner_id: filters.owner,
+    team_of: filters.teamOf,
+    roles: filters.roles === null ? null : [...filters.roles],
     sale_counted_at: "approval",
   };
 }
@@ -148,7 +207,7 @@ function leads(filters: Filters): LeadWire[] {
     (lead) =>
       lead.stage !== "merged" &&
       inArea(filters, lead.territory.id) &&
-      (filters.owner === null || lead.owner?.id === filters.owner),
+      ownerMatches(filters, lead.owner?.id),
   );
 }
 
@@ -161,7 +220,7 @@ function sales(filters: Filters, ownerFilter = true): OrderWire[] {
       order.status !== "cancelled" &&
       inWindow(filters, order.approved_at) &&
       inArea(filters, order.territory.id) &&
-      (!ownerFilter || filters.owner === null || order.owner?.id === filters.owner),
+      (!ownerFilter || ownerMatches(filters, order.owner?.id)),
   );
 }
 
@@ -247,13 +306,21 @@ function salespersonPerformance(filters: Filters): ReportWire<"salesperson-perfo
       person(lead.owner?.id ?? null, lead.owner?.full_name ?? "Unassigned").won += 1;
     }
   }
+  // FS-082 · Everyone in the team (or the roles asked for) gets a row, zeros included.
+  for (const id of filters.owners ?? []) {
+    const user = mockDb.users.find((item) => item.id === id);
+    if (user !== undefined) person(id, user.full_name);
+  }
   const orders = sales(filters);
   const rows = [...people.entries()]
     .map(([id, entry]) => {
+      const user = mockDb.users.find((item) => item.id === id);
       const mine = orders.filter((order) => (order.owner?.id ?? "") === id);
       const tasks = mockDb.tasks.filter((task) => (task.assigned_to?.id ?? "") === id);
       return {
         user: { id: id === "" ? null : id, full_name: entry.name },
+        role: user?.role ?? null,
+        office: user?.org_unit ?? null,
         leads_created: entry.created,
         leads_won: entry.won,
         quotations_sent: has("quotations")
@@ -323,7 +390,10 @@ function lostLeads(filters: Filters, groupBy: string): ReportWire<"lost-leads"> 
   return { ...capped(rows), totals: { lost: total }, filters: filtersOut(filters) };
 }
 
-function followUps(owner: string | null): ReportWire<"follow-ups"> {
+function followUps(
+  owner: string | null,
+  team: Pick<Filters, "owners" | "teamOf" | "roles">,
+): ReportWire<"follow-ups"> {
   const today = todayInIndia();
   const people = new Map<
     string,
@@ -332,6 +402,7 @@ function followUps(owner: string | null): ReportWire<"follow-ups"> {
   for (const task of mockDb.tasks) {
     if (task.status !== "open" || task.assigned_to === null) continue;
     if (owner !== null && task.assigned_to.id !== owner) continue;
+    if (team.owners !== null && !team.owners.includes(task.assigned_to.id)) continue;
     const due = calendarDayOf(task.due_at);
     if (due > today) continue;
     const late = Math.round(
@@ -369,7 +440,12 @@ function followUps(owner: string | null): ReportWire<"follow-ups"> {
       overdue_8_30: sum((row) => row.overdue_8_30),
       overdue_31_plus: sum((row) => row.overdue_31_plus),
     },
-    filters: { as_of: new Date().toISOString(), owner_id: owner },
+    filters: {
+      as_of: new Date().toISOString(),
+      owner_id: owner,
+      team_of: team.teamOf,
+      roles: team.roles === null ? null : [...team.roles],
+    },
   };
 }
 
@@ -564,7 +640,7 @@ function complaintsReport(filters: Filters, groupBy: string): ReportWire<"compla
       complaint.status !== "cancelled" &&
       complaint.sla !== null &&
       inArea(filters, complaint.territory.id) &&
-      (filters.owner === null || complaint.owner?.id === filters.owner),
+      ownerMatches(filters, complaint.owner?.id),
   );
   const groups = new Map<string, { label: string; items: typeof counted }>();
   for (const complaint of counted) {
@@ -623,11 +699,220 @@ function complaintsReport(filters: Filters, groupBy: string): ReportWire<"compla
   };
 }
 
+// ── FS-079 · sales forecast and insights ───────────────────────────────────────
+
+const OPEN_STAGES = ["new", "contacted", "qualified", "quoted", "negotiation"];
+
+/** The mock's own rates: the overall win rate, scaled by how far a stage is along. */
+const STAGE_WEIGHT: Readonly<Record<string, number>> = {
+  new: 0.4,
+  contacted: 0.6,
+  qualified: 0.9,
+  quoted: 1.2,
+  negotiation: 1.5,
+};
+
+function forecastMonths(): string[] {
+  const today = todayInIndia();
+  let year = Number(today.slice(0, 4));
+  let month = Number(today.slice(5, 7));
+  const out: string[] = [];
+  for (let step = 0; step < 3; step += 1) {
+    out.push(`${String(year)}-${String(month).padStart(2, "0")}`);
+    [year, month] = month === 12 ? [year + 1, 1] : [year, month + 1];
+  }
+  return out;
+}
+
+/** RPT-004 · As `forecast.sales_forecast()`, with the mock's simple rates and months by stage. */
+function salesForecast(
+  params: URLSearchParams,
+  groupBy: string,
+  team: Pick<Filters, "owners" | "teamOf" | "roles">,
+): ReportWire<"sales-forecast"> {
+  const territories = (params.get("territory_id") ?? "").split(",").filter(Boolean);
+  const owner = params.get("owner_id");
+  const scope = mockDb.leads.filter((lead) => lead.stage !== "merged");
+  const won = scope.filter((lead) => lead.stage === "won").length;
+  const lost = scope.filter((lead) => lead.stage === "lost").length;
+  const thin = won + lost < 5;
+  const overall = thin ? 0 : won / (won + lost);
+  const months = forecastMonths();
+  const keys = [...months, "later"];
+  const monthOf = (stage: string): string =>
+    stage === "negotiation"
+      ? (months[0] ?? "later")
+      : stage === "quoted"
+        ? (months[1] ?? "later")
+        : stage === "qualified"
+          ? (months[2] ?? "later")
+          : "later";
+  const sources = new Map(mockLookupRows("lead-sources").map((row) => [row.code, row]));
+  const groups = new Map<
+    string,
+    {
+      key: { id: string | null; label: string };
+      open: number;
+      withValue: number;
+      pipeline: number;
+      weighted: number;
+      byMonth: Map<string, number>;
+    }
+  >();
+  for (const lead of scope) {
+    if (!OPEN_STAGES.includes(lead.stage)) continue;
+    if (territories.length > 0 && !territories.includes(lead.territory.id)) continue;
+    if (owner !== null && lead.owner?.id !== owner) continue;
+    if (team.owners !== null && !team.owners.includes(lead.owner?.id ?? "")) continue;
+    const key =
+      groupBy === "territory"
+        ? { id: lead.territory.id, label: lead.territory.name }
+        : groupBy === "source"
+          ? {
+              id: sources.get(lead.source)?.id ?? lead.source,
+              label: sources.get(lead.source)?.name ?? lead.source,
+            }
+          : { id: lead.owner?.id ?? null, label: lead.owner?.full_name ?? "Unassigned" };
+    const group = groups.get(key.id ?? "") ?? {
+      key,
+      open: 0,
+      withValue: 0,
+      pipeline: 0,
+      weighted: 0,
+      byMonth: new Map<string, number>(),
+    };
+    const value = lead.estimated_value === null ? 0 : Number(lead.estimated_value);
+    const weighted = value * Math.min(0.95, overall * (STAGE_WEIGHT[lead.stage] ?? 1));
+    group.open += 1;
+    group.withValue += lead.estimated_value === null ? 0 : 1;
+    group.pipeline += value;
+    group.weighted += weighted;
+    const month = monthOf(lead.stage);
+    group.byMonth.set(month, (group.byMonth.get(month) ?? 0) + weighted);
+    groups.set(key.id ?? "", group);
+  }
+  const figures = (g: {
+    open: number;
+    withValue: number;
+    pipeline: number;
+    weighted: number;
+    byMonth: Map<string, number>;
+  }): ReportWire<"sales-forecast">["totals"] => ({
+    open: g.open,
+    with_value: g.withValue,
+    pipeline_value: money(g.pipeline),
+    weighted_value: thin ? null : money(g.weighted),
+    by_month: Object.fromEntries(
+      keys.map((month) => [month, thin ? null : money(g.byMonth.get(month) ?? 0)]),
+    ),
+    valued_by: { quotation: 0, estimate: g.withValue },
+  });
+  const rows = [...groups.values()].sort((a, b) => b.weighted - a.weighted || b.open - a.open);
+  const all = rows.reduce(
+    (sum, g) => {
+      for (const [month, value] of g.byMonth)
+        sum.byMonth.set(month, (sum.byMonth.get(month) ?? 0) + value);
+      return {
+        ...sum,
+        open: sum.open + g.open,
+        withValue: sum.withValue + g.withValue,
+        pipeline: sum.pipeline + g.pipeline,
+        weighted: sum.weighted + g.weighted,
+      };
+    },
+    { open: 0, withValue: 0, pipeline: 0, weighted: 0, byMonth: new Map<string, number>() },
+  );
+  return {
+    group_by: groupBy,
+    months,
+    rows: rows.map((g) => ({ key: g.key, ...figures(g) })),
+    truncated: false,
+    rates: thin
+      ? []
+      : OPEN_STAGES.map((stage) => ({
+          stage,
+          win_rate_pct: (Math.min(0.95, overall * (STAGE_WEIGHT[stage] ?? 1)) * 100).toFixed(1),
+          closed: won + lost,
+          low_confidence: stage === "negotiation",
+        })),
+    median_days_to_win: thin ? null : 38,
+    reason: thin ? "not_enough_history" : null,
+    filters: {
+      history_days: 180,
+      as_of: todayInIndia(),
+      team_of: team.teamOf,
+      roles: team.roles === null ? null : [...team.roles],
+    },
+    totals: figures(all),
+  };
+}
+
+/** RPT-005 · A few of `forecast.insights()`'s sentences, worked out from the mock's leads. */
+function insights(filters: Filters): ReportWire<"insights"> {
+  const span = leads(filters);
+  const now = span.filter((lead) => inWindow(filters, lead.created_at));
+  const lost = now.filter((lead) => lead.stage === "lost");
+  const reasons = new Map<string, number>();
+  for (const lead of lost) {
+    const name = lead.lost_reason?.name;
+    if (name !== undefined) reasons.set(name, (reasons.get(name) ?? 0) + 1);
+  }
+  const top = [...reasons.entries()].sort((a, b) => b[1] - a[1])[0];
+  const quoted = now.filter((lead) => reached(lead, "quoted")).length;
+  const answered = now.filter(
+    (lead) => lead.stage === "won" || lead.stage === "lost" || lead.stage === "negotiation",
+  ).length;
+  const rows: ReportWire<"insights">["rows"] = [];
+  if (top !== undefined && lost.length >= 3) {
+    rows.push({
+      code: "lost_reason_rising",
+      title: `“${top[0]}” is the reason growing fastest among lost leads.`,
+      figure: pct(top[1], lost.length),
+      previous: pct(Math.max(0, top[1] - 1), lost.length),
+      unit: "pct",
+      link: { report: "lost-leads", group_by: "reason" },
+    });
+  }
+  if (quoted >= 3) {
+    rows.push({
+      code: "quotation_answers",
+      title: "Of the quotations sent, this share had an answer from the customer.",
+      figure: pct(answered, quoted),
+      previous: null,
+      unit: "pct",
+      link: null,
+    });
+  }
+  if (now.length > 0) {
+    rows.push({
+      code: "first_contact_speed",
+      title: "New leads were first contacted in about this long, half of them sooner.",
+      figure: "6",
+      previous: null,
+      unit: "hours",
+      link: { report: "follow-ups" },
+    });
+  }
+  const days =
+    (Date.parse(`${filters.to}T00:00:00Z`) - Date.parse(`${filters.from}T00:00:00Z`)) / DAY_MS + 1;
+  return {
+    rows,
+    truncated: false,
+    filters: {
+      from: filters.from,
+      to: filters.to,
+      previous_from: shiftCalendarDay(filters.from, -days),
+      previous_to: shiftCalendarDay(filters.from, -1),
+    },
+  };
+}
+
 const GROUPS: Partial<Readonly<Record<ReportName, readonly string[]>>> = {
   "lead-conversion": ["source", "owner", "territory"],
   "lost-leads": ["reason", "owner"],
   complaints: ["type", "status", "severity"],
   "territory-performance": ["district", "taluka"],
+  "sales-forecast": ["owner", "territory", "source"],
 };
 
 /** The report's data, a refusal, or a 422. */
@@ -638,7 +923,11 @@ function run(name: ReportName, params: URLSearchParams): Response | { rows: read
   if (groups !== undefined && !groups.includes(groupBy)) {
     return errorResponse(422, "validation_error", "Bad grouping.", { [param]: groups.join(", ") });
   }
-  if (name === "follow-ups") return refusal(name, "tasks") ?? followUps(params.get("owner_id"));
+  if (name === "follow-ups") {
+    const team = teamOf(params);
+    if (team instanceof Response) return team;
+    return refusal(name, "tasks") ?? followUps(params.get("owner_id"), team);
+  }
   const filters = filtersOf(params);
   if (filters instanceof Response) return filters;
   switch (name) {
@@ -656,6 +945,10 @@ function run(name: ReportName, params: URLSearchParams): Response | { rows: read
       return refusal(name, "leads") ?? territoryPerformance(filters, groupBy);
     case "complaints":
       return refusal(name, "complaints") ?? complaintsReport(filters, groupBy);
+    case "sales-forecast":
+      return refusal(name, "leads") ?? salesForecast(params, groupBy, filters);
+    case "insights":
+      return refusal(name, "leads") ?? insights(filters);
   }
 }
 

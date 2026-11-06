@@ -20,7 +20,7 @@ from api.deps import CallerDep, DbSession, require
 from api.routers.exporting import REPORT_EXPORT_RESPONSE, file_response
 from api.schemas.auth import ErrorResponse
 from api.schemas.leads import UUID_RE
-from api.services import exports, report_exports, report_pdf
+from api.services import exports, report_exports, report_pdf, teams
 from api.services import forecast as forecast_service
 from api.services import reports as service
 
@@ -41,6 +41,8 @@ From = Annotated[dt.date | None, Query(alias="from", description="IST date, incl
 To = Annotated[dt.date | None, Query(description="IST date, inclusive. Default: today.")]
 Territory = Annotated[str | None, Query(description="Up to 20 territory ids, comma-separated; in or under any.")]
 Owner = Annotated[str | None, Query(pattern=UUID_RE, description="One person.")]
+TeamOf = Annotated[str | None, Query(pattern=UUID_RE, description="FS-082: this person and everyone below them on the org chart. You, someone below you, or anyone with users.view at global scope; `404 not_in_your_line` otherwise. Not with `owner_id`. Leads with no owner, or an owner who has left, are outside every team.")]
+Roles = Annotated[str | None, Query(max_length=400, description="FS-082: up to 10 role codes, comma-separated (`field_officer,district_manager`). Only people holding one of these roles now. Staff only.")]
 def _format(fmt: Annotated[Literal["json", "xlsx", "csv", "pdf"], Query(alias="format", description="`xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case.")] = "json") -> str:
     """A PDF that cannot be made is refused before the report's queries run
     (FS-077 EC-9, plan review S-2). Best effort: the render thread decides."""
@@ -53,9 +55,13 @@ Format = Annotated[str, Depends(_format)]
 
 
 async def _filters(db: DbSession, start: dt.date | None, end: dt.date | None, territory_id: str | None,
-                   owner_id: str | None) -> service.Filters:
-    return await service.Filters(start=start, end=end, territory_id=territory_id,
-                                 owner_id=owner_id).load_sale_mode(db)
+                   owner_id: str | None, caller: Caller | None = None, team_of: str | None = None,
+                   roles: str | None = None) -> service.Filters:
+    team, rows = (await teams.resolve(db, caller, team_of=team_of, roles=roles, owner_id=owner_id)
+                  if caller is not None else (None, None))
+    f = service.Filters(start=start, end=end, territory_id=territory_id, owner_id=owner_id, team=team)
+    f.lines = rows
+    return await f.load_sale_mode(db)
 
 
 async def _answer(data: dict[str, Any], fmt: str, report: str, caller: Caller,
@@ -84,35 +90,36 @@ async def _answer(data: dict[str, Any], fmt: str, report: str, caller: Caller,
 
 @router.get("/lead-conversion", responses=_ERRORS)
 async def lead_conversion(db: DbSession, caller: CallerDep, from_: From = None, to: To = None,
-                          territory_id: Territory = None, owner_id: Owner = None, fmt: Format = "json",
+                          territory_id: Territory = None, owner_id: Owner = None, team_of: TeamOf = None, roles: Roles = None, fmt: Format = "json",
                           group_by: Literal["source", "owner", "territory"] = "source") -> Response:
     """Leads created in the window, per source, owner or territory: how many reached
     each stage, won, lost and are open, and the conversion rate."""
-    return await _answer(await service.lead_conversion(db, caller, await _filters(db, from_, to, territory_id, owner_id), group_by), fmt, "lead-conversion", caller, db)
+    return await _answer(await service.lead_conversion(db, caller, await _filters(db, from_, to, territory_id, owner_id, caller, team_of, roles), group_by), fmt, "lead-conversion", caller, db)
 
 
 @router.get("/salesperson-performance", responses=_ERRORS)
 async def salesperson_performance(db: DbSession, caller: CallerDep, from_: From = None, to: To = None,
-                                  territory_id: Territory = None, owner_id: Owner = None,
+                                  territory_id: Territory = None, owner_id: Owner = None, team_of: TeamOf = None, roles: Roles = None,
                                   fmt: Format = "json") -> Response:
     """Per person: leads created and won, quotations sent, orders, visits, tasks done
     and overdue. A figure you may not see is null. Staff only."""
-    return await _answer(await service.salesperson_performance(db, caller, await _filters(db, from_, to, territory_id, owner_id)), fmt, "salesperson-performance", caller, db)
+    return await _answer(await service.salesperson_performance(db, caller, await _filters(db, from_, to, territory_id, owner_id, caller, team_of, roles)), fmt, "salesperson-performance", caller, db)
 
 
 @router.get("/lost-leads", responses=_ERRORS)
 async def lost_leads(db: DbSession, caller: CallerDep, from_: From = None, to: To = None,
-                     territory_id: Territory = None, owner_id: Owner = None, fmt: Format = "json",
+                     territory_id: Territory = None, owner_id: Owner = None, team_of: TeamOf = None, roles: Roles = None, fmt: Format = "json",
                      group_by: Literal["reason", "owner"] = "reason") -> Response:
     """Leads lost in the window, per reason or owner, with the days to loss and the
     stage they dropped off at."""
-    return await _answer(await service.lost_leads(db, caller, await _filters(db, from_, to, territory_id, owner_id), group_by), fmt, "lost-leads", caller, db)
+    return await _answer(await service.lost_leads(db, caller, await _filters(db, from_, to, territory_id, owner_id, caller, team_of, roles), group_by), fmt, "lost-leads", caller, db)
 
 
 @router.get("/follow-ups", responses=_ERRORS)
-async def follow_ups(db: DbSession, caller: CallerDep, owner_id: Owner = None, fmt: Format = "json") -> Response:
+async def follow_ups(db: DbSession, caller: CallerDep, owner_id: Owner = None, team_of: TeamOf = None,
+                     roles: Roles = None, fmt: Format = "json") -> Response:
     """Open tasks per person, as of now: due today and overdue by age. Staff only."""
-    return await _answer(await service.follow_ups(db, caller, await _filters(db, None, None, None, owner_id)), fmt, "follow-ups", caller, db)
+    return await _answer(await service.follow_ups(db, caller, await _filters(db, None, None, None, owner_id, caller, team_of, roles)), fmt, "follow-ups", caller, db)
 
 
 @router.get("/dealer-performance", responses=_ERRORS)
@@ -125,18 +132,19 @@ async def dealer_performance(db: DbSession, caller: CallerDep, from_: From = Non
 
 @router.get("/campaign-performance", responses=_ERRORS)
 async def campaign_performance(db: DbSession, caller: CallerDep, from_: From = None, to: To = None,
-                               territory_id: Territory = None, owner_id: Owner = None,
+                               territory_id: Territory = None, owner_id: Owner = None, team_of: TeamOf = None, roles: Roles = None,
                                fmt: Format = "json") -> Response:
     """Per campaign: the leads you can see created in the window that name it, how far
     they got, their sales (whenever sold, under the company's sale setting), and cost
     per lead and per win. A campaign whose dates overlap the window shows with zeros
     (no end date is one day); with `owner_id`, only campaigns with leads show.
     Cost figures need campaigns.view; sales need sales_orders. Staff only."""
-    return await _answer(await service.campaign_performance(db, caller, await _filters(db, from_, to, territory_id, owner_id)), fmt, "campaign-performance", caller, db)
+    return await _answer(await service.campaign_performance(db, caller, await _filters(db, from_, to, territory_id, owner_id, caller, team_of, roles)), fmt, "campaign-performance", caller, db)
 
 
 @router.get("/sales-forecast", responses=_ERRORS)
 async def sales_forecast(db: DbSession, caller: CallerDep, territory_id: Territory = None, owner_id: Owner = None,
+                         team_of: TeamOf = None, roles: Roles = None,
                          group_by: Literal["owner", "territory", "source"] = "owner",
                          level: Annotated[Literal["district", "taluka"], Query(description="With `group_by=territory`: the level rows roll up to.")] = "district",
                          history_days: Annotated[int, Query(ge=90, le=365, description="How far back the win rates look: leads won or lost in these days.")] = 180,
@@ -152,29 +160,31 @@ async def sales_forecast(db: DbSession, caller: CallerDep, territory_id: Territo
     With too little history, every weighted figure is null and `reason` is
     `not_enough_history`; never 0. `by_month` is this month, the next two, and
     `later`. Staff only."""
+    team, _ = await teams.resolve(db, caller, team_of=team_of, roles=roles, owner_id=owner_id)
     return await _answer(await forecast_service.sales_forecast(
         db, caller, group_by=group_by, territory_id=territory_id, owner_id=owner_id,
-        history_days=history_days, level=level), fmt, "sales-forecast", caller, db)
+        history_days=history_days, level=level, team=team), fmt, "sales-forecast", caller, db)
 
 
 @router.get("/insights", responses=_ERRORS)
 async def insights(db: DbSession, caller: CallerDep, from_: From = None, to: To = None,
-                   territory_id: Territory = None, owner_id: Owner = None, fmt: Format = "json") -> Response:
+                   territory_id: Territory = None, owner_id: Owner = None, team_of: TeamOf = None, roles: Roles = None, fmt: Format = "json") -> Response:
     """Plain sentences about the period against the same number of days before it
     (FS-079): the lost reason that is growing, the stage most losses come from, the
     best and worst lead sources, how quotations are answered, how fast new leads are
     contacted. Rows come in a fixed order; a missing row means its data was too thin,
     not that something is wrong. `link` names the report behind a row. Staff only."""
     return await _answer(await forecast_service.insights(
-        db, caller, await _filters(db, from_, to, territory_id, owner_id)), fmt, "insights", caller, db)
+        db, caller, await _filters(db, from_, to, territory_id, owner_id, caller, team_of, roles)), fmt, "insights", caller, db)
 
 
 @router.get("/territory-performance", responses=_ERRORS)
 async def territory_performance(db: DbSession, caller: CallerDep, from_: From = None, to: To = None,
                                 territory_id: Territory = None, fmt: Format = "json",
-                                level: Literal["district", "taluka"] = "district") -> Response:
+                                level: Literal["district", "taluka"] = "district",
+                                team_of: TeamOf = None, roles: Roles = None) -> Response:
     """Per district or taluka: leads, won, conversion, orders and value. Staff only."""
-    return await _answer(await service.territory_performance(db, caller, await _filters(db, from_, to, territory_id, None), level), fmt, "territory-performance", caller, db)
+    return await _answer(await service.territory_performance(db, caller, await _filters(db, from_, to, territory_id, None, caller, team_of, roles), level), fmt, "territory-performance", caller, db)
 
 
 @router.get("/complaints", responses=_ERRORS)

@@ -177,7 +177,7 @@ describe("[CHNL-007] Dealer applications, through the API", () => {
 
   it("filters by status", async () => {
     signInAs("admin");
-    const rows = await listDealerApplications({ status: ["returned"], q: "" });
+    const rows = await listDealerApplications({ status: ["returned"], q: "", partnerType: null });
     expect(rows.map((row) => row.status)).toEqual(["returned"]);
   });
 });
@@ -192,11 +192,11 @@ describe("[CHNL-007] DealerApplicationsList", () => {
 
     const list = await screen.findByRole("list", { name: "Dealer applications" });
     expect(
-      within(list).getByRole("link", { name: /^Patel Agro, Jignesh Patel, Submitted/ }),
+      within(list).getByRole("link", { name: /^Patel Agro, Dealer, Jignesh Patel, Submitted/ }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Start an application" }));
-    const form = await screen.findByRole("form", { name: "Start a dealer application" });
+    const form = await screen.findByRole("form", { name: "Start an application" });
     await user.click(within(form).getByRole("button", { name: "Start the application" }));
     expect(await within(form).findByText("Enter the firm's name.")).toBeInTheDocument();
 

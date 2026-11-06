@@ -29,7 +29,7 @@ breaking: false
 
 - **One call per list, beside the list's own call,** reusing its filter mapping, so the file and the screen can't drift apart.
 - **Where the button sits:** in the toolbar beside the list's main action, or in the card's header. On the dealer applications list it sits with the filters, leaving the header row to the blank-form menu that item 43 adds.
-- **Dealer applications:** the type filter (`partner_type`) comes with PR #228. Once both are in, the export should send it too.
+- **Dealer applications:** the download also sends the dealer or distributor filter (`partner_type`, from PR #228), so the file matches the list. Added when this pull request was brought up to date with `integration`, 6 Nov.
 - **The points history** downloads the ledger the card shows: the user's own, or the partner's or person's being looked at.
 
 ## Files changed
@@ -45,5 +45,6 @@ breaking: false
 - **`[APP-012] Downloads on 24 more lists`** (`src/mocks/handlers/list-exports.test.ts`):
   - all 24 calls download Excel and CSV under the backend's file name, with the first column heading;
   - the stock export sends only its filters and `format`;
+  - the dealer applications download sends the dealer or distributor filter;
   - `export_too_large` is refused.
 - **`[APP-012] Downloads on the stock screens`:** the stock list saves Excel; the ledger saves CSV from Other formats.

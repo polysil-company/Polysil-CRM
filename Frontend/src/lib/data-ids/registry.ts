@@ -231,6 +231,14 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["POST /auth/password"],
   },
+  "AUTH-008": {
+    domain: "AUTH",
+    title: "Email preferences — unseen updates and the morning summary by email",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["PUT /me/email-preferences"],
+    notes: "FS-078. Shown only while `email_available` on GET /auth/me is true.",
+  },
   "LEAD-001": {
     domain: "LEAD",
     title: "List leads with filters, sorting and pagination",
@@ -1307,6 +1315,31 @@ export const DATA_IDS = {
     endpoints: ["GET /leads/{id}/360"],
     notes: "Needs leads.view and reports.view. The timeline below it is LEAD-005's.",
   },
+  "RPT-004": {
+    domain: "RPT",
+    title: "Sales forecast — the open pipeline weighted by each stage's win rate, by month",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /reports/sales-forecast"],
+    notes: "FS-079. Staff only. With too little history the weighted figures are null, never 0.",
+  },
+  "RPT-005": {
+    domain: "RPT",
+    title: "Insights — plain sentences about the period against the one before",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /reports/insights"],
+    notes: "FS-079. Staff only. A missing row means too little data, not a problem.",
+  },
+  "RPT-006": {
+    domain: "RPT",
+    title: "Team and role filters on the reports, and every team member on salesperson performance",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /reports/{name}"],
+    notes:
+      "FS-082. team_of is a person and everyone below them; 404 not_in_your_line outside the caller's line. Not with owner_id.",
+  },
   "SUBS-001": {
     domain: "SUBS",
     title: "Subsidy forms and case status",
@@ -1621,6 +1654,22 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     endpoints: ["GET /settings", "PATCH /settings"],
+  },
+  "ADMN-008": {
+    domain: "ADMN",
+    title: "Org chart — who reports to whom, my team, or the whole company",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /users/org-chart"],
+  },
+  "ADMN-009": {
+    domain: "ADMN",
+    title: "Setup check — people and partners set up so that leads, dealers or approvals go astray",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /users/setup-check"],
+    notes:
+      "FS-082. users.edit at global scope, else 403. Also the user form's 422 office_has_no_area (ADMN-002, ADMN-003).",
   },
   "SITE-001": {
     domain: "SITE",

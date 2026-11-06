@@ -246,3 +246,39 @@ export const officePageSchema = cursorPageSchema(
 );
 
 export type OfficeChoice = z.output<typeof officePageSchema>["items"][number];
+
+// ── the setup check (ADMN-009, FS-082) ──────────────────────────────────────────
+
+/**
+ * The partner check names partners; every other check names people. The backend runs five,
+ * in a fixed order (`staff_without_area`, `staff_without_territories`, `staff_skipping_a_level`,
+ * `unplaced_staff`, `partners_without_area`); one added later is shown by its own title.
+ */
+const PARTNER_CHECKS: ReadonlySet<string> = new Set(["partners_without_area"]);
+
+const setupItemSchema = z.object({ id, name: z.string(), detail: z.string() });
+
+const setupCheckSchema = z
+  .object({
+    code: z.string().min(1),
+    title: z.string(),
+    why: z.string(),
+    count: z.number().int().nonnegative(),
+    items: z.array(setupItemSchema),
+  })
+  .transform((wire) => ({
+    code: wire.code,
+    title: wire.title,
+    why: wire.why,
+    count: wire.count,
+    /** Who to fix: a person's page, or a partner's. */
+    kind: PARTNER_CHECKS.has(wire.code) ? ("partner" as const) : ("person" as const),
+    items: wire.items,
+  }));
+
+export const setupReportSchema = z
+  .object({ data: z.object({ ok: z.boolean(), checks: z.array(setupCheckSchema) }) })
+  .transform(({ data }) => data);
+
+export type SetupReport = z.output<typeof setupReportSchema>;
+export type SetupCheck = SetupReport["checks"][number];

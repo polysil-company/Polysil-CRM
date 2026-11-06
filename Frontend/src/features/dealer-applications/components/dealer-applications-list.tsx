@@ -1,6 +1,6 @@
 "use client";
 
-import { Add01Icon, UserAdd01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Download04Icon, UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
@@ -8,6 +8,7 @@ import { useState } from "react";
 import type * as React from "react";
 
 import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
+import { toastDownloadError } from "@/components/patterns/download-file-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
@@ -16,9 +17,22 @@ import { SearchField } from "@/components/patterns/search-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
-import { exportDealerApplications } from "@/features/dealer-applications/api/dealer-applications.api";
+import {
+  PARTNER_TYPES,
+  type PartnerType,
+} from "@/features/dealer-applications/api/data-sheet.schemas";
+import {
+  downloadBlankApplicationForm,
+  exportDealerApplications,
+} from "@/features/dealer-applications/api/dealer-applications.api";
 import { dealerApplicationListQueryOptions } from "@/features/dealer-applications/api/dealer-applications.queries";
 import {
   DEALER_APPLICATION_STATUSES,
@@ -28,8 +42,12 @@ import {
 import {
   DEALER_APPLICATION_STATUS_BADGE,
   DEALER_APPLICATION_STATUS_LABELS,
+  DEPOSIT_STATUS_LABELS,
+  PARTNER_TYPE_LABELS,
 } from "@/features/dealer-applications/lib/dealer-application-labels";
 import { useCan } from "@/features/session/hooks/use-session";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { saveFile } from "@/lib/api/save-file";
 import { createLogger } from "@/lib/logger";
 
 import { StartDealerApplication } from "./start-dealer-application";
@@ -46,43 +64,58 @@ const STATUS_OPTIONS = DEALER_APPLICATION_STATUSES.map((value) => ({
   label: DEALER_APPLICATION_STATUS_LABELS[value],
 }));
 
-/** CHNL-007 · The list's filters, in the URL: one status and a search. */
+const TYPE_OPTIONS = PARTNER_TYPES.map((value) => ({ value, label: PARTNER_TYPE_LABELS[value] }));
+
+/** CHNL-007 · The list's filters, in the URL: one status, one type and a search. */
 function useListParams(): {
   params: DealerApplicationListParams;
   status: (typeof DEALER_APPLICATION_STATUSES)[number] | null;
+  partnerType: (typeof PARTNER_TYPES)[number] | null;
   filtered: boolean;
   setStatus: (status: (typeof DEALER_APPLICATION_STATUSES)[number] | null) => void;
+  setPartnerType: (partnerType: (typeof PARTNER_TYPES)[number] | null) => void;
   setQ: (q: string) => void;
   reset: () => void;
 } {
   const [values, setValues] = useQueryStates({
     q: parseAsString.withDefault(""),
     status: parseAsStringLiteral(DEALER_APPLICATION_STATUSES),
+    type: parseAsStringLiteral(PARTNER_TYPES),
   });
   const q = values.q.trim();
   return {
-    params: { q, status: values.status === null ? [] : [values.status] },
+    params: {
+      q,
+      status: values.status === null ? [] : [values.status],
+      partnerType: values.type,
+    },
     status: values.status,
-    filtered: q !== "" || values.status !== null,
+    partnerType: values.type,
+    filtered: q !== "" || values.status !== null || values.type !== null,
     setStatus: (status) => {
       void setValues({ status });
+    },
+    setPartnerType: (type) => {
+      void setValues({ type });
     },
     setQ: (next) => {
       void setValues({ q: next === "" ? null : next });
     },
     reset: () => {
-      void setValues({ q: null, status: null });
+      void setValues({ q: null, status: null, type: null });
     },
   };
 }
 
 /**
- * CHNL-007 · Dealer applications (FS-053): newest first, with the firm, whom to ask for, the
- * area and where each stands; filtered by status and a search on firm, contact or mobile.
+ * CHNL-007 · Dealer and distributor applications (FS-053, FS-071): newest first, with the firm,
+ * its type, whom to ask for, the area and where each stands; filtered by status, type and a
+ * search on firm, contact or mobile.
  * Staff who see partners start one, and send the applicant its link.
  */
 export function DealerApplicationsList(): React.JSX.Element {
-  const { params, status, filtered, setStatus, setQ, reset } = useListParams();
+  const { params, status, partnerType, filtered, setStatus, setPartnerType, setQ, reset } =
+    useListParams();
   const canView = useCan("partners", "view");
   const [starting, setStarting] = useState(false);
   const query = useQuery(dealerApplicationListQueryOptions(params));
@@ -91,18 +124,21 @@ export function DealerApplicationsList(): React.JSX.Element {
     <section aria-label="Dealer applications" className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <p className="max-w-prose text-sm text-muted-foreground">
-          A prospective dealer fills in the firm&apos;s details from a link, and a State Manager or
-          above approves it. Approving adds the dealer and its login.
+          A prospective dealer or distributor fills in the firm&apos;s details from a link, and the
+          managers the company settings name approve it. Approving adds the partner and its login.
         </p>
         {canView ? (
-          <Button
-            onClick={() => {
-              setStarting(true);
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            Start an application
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <BlankFormMenu />
+            <Button
+              onClick={() => {
+                setStarting(true);
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              Start an application
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -119,6 +155,12 @@ export function DealerApplicationsList(): React.JSX.Element {
             options={STATUS_OPTIONS}
             selected={status}
             onChange={setStatus}
+          />
+          <SingleFilterPill
+            label="Type"
+            options={TYPE_OPTIONS}
+            selected={partnerType}
+            onChange={setPartnerType}
           />
           {filtered ? (
             <Button variant="ghost" size="sm" onClick={reset}>
@@ -144,7 +186,7 @@ export function DealerApplicationsList(): React.JSX.Element {
         empty={
           <EmptyState
             icon={UserAdd01Icon}
-            title={filtered ? "No application matches these filters" : "No dealer applications yet"}
+            title={filtered ? "No application matches these filters" : "No applications yet"}
             description={
               filtered
                 ? "Change or reset the filters to see more."
@@ -185,6 +227,53 @@ export function DealerApplicationsList(): React.JSX.Element {
   );
 }
 
+/**
+ * FS-071 · The blank data sheet for a dealer or a distributor, to print and fill in by hand
+ * (`GET /dealer-applications/form.pdf`).
+ */
+function BlankFormMenu(): React.JSX.Element {
+  const run = useAsyncAction({
+    action: (type: PartnerType) => downloadBlankApplicationForm(type),
+    logger: log,
+    fn: "handleDownloadBlankForm",
+    dataId: "CHNL-007",
+    onSuccess: (file) => {
+      saveFile(file, "application-form.pdf");
+    },
+    onError: toastDownloadError,
+  });
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="outline"
+            state={run.state}
+            loadingLabel="Preparing…"
+            successLabel="Downloaded"
+            errorLabel="Not downloaded"
+          />
+        }
+      >
+        <Icon icon={Download04Icon} />
+        Blank form
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {PARTNER_TYPES.map((item) => (
+          <DropdownMenuItem
+            key={item}
+            onClick={() => {
+              void run.run(item);
+            }}
+          >
+            For a new {PARTNER_TYPE_LABELS[item].toLowerCase()}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function ApplicationRow({ row }: { row: DealerApplicationRow }): React.JSX.Element {
   const label = DEALER_APPLICATION_STATUS_LABELS[row.status];
   return (
@@ -192,7 +281,7 @@ function ApplicationRow({ row }: { row: DealerApplicationRow }): React.JSX.Eleme
       <Link
         href={`/partners/applications/${row.id}`}
         transitionTypes={["nav-forward"]}
-        aria-label={`${row.firmName}, ${row.contactName}, ${label}`}
+        aria-label={`${row.firmName}, ${PARTNER_TYPE_LABELS[row.partnerType]}, ${row.contactName}, ${label}`}
         className="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-3 transition-colors duration-fast hover:bg-accent sm:p-4"
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -200,9 +289,12 @@ function ApplicationRow({ row }: { row: DealerApplicationRow }): React.JSX.Eleme
           <Badge variant={DEALER_APPLICATION_STATUS_BADGE[row.status]} dot>
             {label}
           </Badge>
+          {row.depositStatus === "pending" ? (
+            <Badge variant="warning">{DEPOSIT_STATUS_LABELS.pending}</Badge>
+          ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
-          {row.contactName} · {row.territoryName} ·{" "}
+          {PARTNER_TYPE_LABELS[row.partnerType]} · {row.contactName} · {row.territoryName} ·{" "}
           {row.submittedAt === null ? (
             <>
               started <RelativeDate value={row.createdAt} />
