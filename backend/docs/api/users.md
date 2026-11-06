@@ -182,6 +182,31 @@ so the chart follows any change of office or role straight away.
 
 ---
 
+## `GET /api/v1/users/setup-check`
+
+**Setup Check**
+
+What is set up wrong, for the admin dashboard (FS-082).
+
+Each check has a count, a one-line title, why it matters, and the first 100
+people or partners to fix, sorted by name. Every check is always listed, with
+`count` 0 when clean; `ok` is true when all are 0. Read-only.
+
+The checks: field staff in an office that covers no area; staff whose role
+works by area but who have none; staff with no manager one level above them;
+staff on the System office; partners with no area.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_SetupReport_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | `insufficient_permission`: you need `users.edit` at global scope (Admin-Sales, MD/CEO). |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `DELETE /api/v1/users/{user_id}`
 
 **Delete User**
@@ -446,6 +471,12 @@ failed attempts stay on record. A partner user has nothing to unlock
 |---|---|---|---|
 | `data` | RevokeResult | yes |  |
 
+**`Envelope_SetupReport_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | SetupReport | yes |  |
+
 **`Envelope_UnlockResult_`**
 
 | Field | Type | Required | Notes |
@@ -579,6 +610,31 @@ failed attempts stay on record. A partner user has nothing to unlock
 |---|---|---|---|
 | `code` | string | yes | Stable identifier, e.g. district_manager. |
 | `name` | string | yes | Display name. |
+
+**`SetupCheck`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | staff_without_area, staff_without_territories, staff_skipping_a_level, unplaced_staff or partners_without_area. |
+| `title` | string | yes | One line for the card. |
+| `why` | string | yes | What goes wrong while this stays unfixed, in plain words. |
+| `count` | integer | yes |  |
+| `items` | SetupItem[] | yes | The first 100, sorted by name. |
+
+**`SetupItem`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes | The person's or partner's id, to link to their page. |
+| `name` | string | yes |  |
+| `detail` | string | yes | Role and office for a person, area or type for a partner. |
+
+**`SetupReport`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `ok` | boolean | yes | True when every check's count is 0. |
+| `checks` | SetupCheck[] | yes | Every check, always, in a fixed order. `partners_without_area` is left out when you do not hold partners.view at global scope. |
 
 **`TerritoryRef`**
 
