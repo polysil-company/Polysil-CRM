@@ -10,6 +10,7 @@ import {
   passwordSetResultSchema,
   revokeResultSchema,
   roleListSchema,
+  setupReportSchema,
   unlockResultSchema,
   userDetailSchema,
   userPageSchema,
@@ -22,6 +23,7 @@ import {
   type UserDetail,
   type UserListParams,
   type UserPage,
+  type SetupReport,
 } from "./users.schemas";
 
 const log = createLogger({ file: "features/users/api/users.api.ts", dataId: "ADMN-001" });
@@ -271,4 +273,20 @@ export async function searchOpenOffices(q: string, signal?: AbortSignal): Promis
     signal,
   });
   return [...page.items];
+}
+
+/**
+ * ADMN-009 · GET /users/setup-check (FS-082): what is set up wrong, each check with its count,
+ * why it matters and the first 100 to fix. Read-only; `403 insufficient_permission` without
+ * users.edit at global scope (Admin-Sales, MD/CEO).
+ */
+export function getSetupCheck(signal?: AbortSignal): Promise<SetupReport> {
+  return apiRequest({
+    dataId: "ADMN-009",
+    logger: log,
+    fn: "getSetupCheck",
+    path: "/users/setup-check",
+    schema: setupReportSchema,
+    signal,
+  });
 }

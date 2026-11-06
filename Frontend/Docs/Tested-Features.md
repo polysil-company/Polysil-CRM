@@ -74,6 +74,7 @@ Details and tests: [changelog entry](../changelog/entries/2026-09-15--feature--A
 - **AUTH-001 · A channel partner signs in with a one-time code** sent to their mobile, typed any common way. The screen never claims a code was sent to an unknown number. 🧪 🌐
 - **AUTH-004 · Staying signed in.** The session renews itself before it expires, when the tab comes back and when the connection returns; a reload keeps you signed in. 🧪 🌐
 - **AUTH-005, AUTH-006 · Signing out, or a session the backend ends,** clears everything and opens sign-in in every tab; after an expiry you return to the page you were on. A signed-out visitor sent to a page lands back on it after signing in. 🧪 🌐
+- **AUTH-008 · Email preferences** (account menu → **Email**, FS-078, `feature/AUTH-008-email-preferences`; screens: [desktop](screenshots/account/email-preferences-desktop-light.jpg), [phone, dark](screenshots/account/email-preferences-phone-dark.jpg)). Two switches: **Updates I haven't seen** (a notification still unread after 10 minutes is emailed, several in one email) and **Morning summary** (8 am, Monday to Saturday, when tasks are due or overdue). The item shows only while the backend can send email to the person (`email_available`); until a mail account is set up it stays hidden. Save is off until something changes. 🧪 👀
 - **AUTH-007 · Change your password** (PR #89; [changelog](../changelog/entries/2026-10-10--feature--AUTH-007--change-your-password-and-the-forced-change-after-a.md); screens: [dialog](screenshots/auth/change-password-dialog-desktop-light.jpg), [forced](screenshots/auth/forced-change-desktop-light.jpg), [wrong temporary password](screenshots/auth/forced-change-wrong-desktop-light.jpg), [signed out after](screenshots/auth/signed-out-after-change-desktop-light.jpg), [phone, dark](screenshots/auth/forced-change-phone-dark.jpg)):
   - Staff open **Change password** from the account menu: current password, then the new one twice (12 to 128 characters). Partners don't see it.
   - While a temporary password is in force, only **Choose your own password** shows, before anything else loads. Any `403 password_change_required` switches to it.
@@ -499,6 +500,25 @@ On the backend's contract (`backend/docs/api/users.md`, handover `administration
   - **The application settings** (FS-071, migration 078), under **Dealer and distributor applications**: each type's deposit; who may lower or waive one; who decides each type; what each type must have before it is submitted. Two kinds came with them: **some of a list** (`set`), checkboxes saved in the list's order, and **staff roles** (`staff_roles`), at least one ("Choose at least one role."). A kind the page doesn't know yet shows as text, and the rest of the page still works, so a new kind can't blank it. Walked through in the mock as Admin at desktop light and phone dark. Screens: [desktop](screenshots/settings/settings-applications-desktop-light.jpg), [ticking a field](screenshots/settings/settings-applications-ticked-desktop-light.jpg), [phone, dark](screenshots/settings/settings-applications-phone-dark.jpg). 🧪 👀
 
 ---
+- **ADMN-009 · The setup check** (FS-082, `feature/ADMN-009-setup-check`; screens: [the dashboard card](screenshots/users/setup-check-desktop-light.jpg), [phone, dark](screenshots/users/setup-check-phone-dark.jpg)). On the dashboard, for those who may change people (Admin-Sales, MD/CEO):
+  - **What it shows:** each check with something to fix, with its count, why it matters, and the first five people or partners, each linked to their page; **Show all** shows the rest of the backend's first 100.
+  - **The five checks:** field staff in an office with no area; area roles with no area; staff with no manager one level above them; staff on the System office; partners with no area.
+  - **When nothing needs fixing:** one line says so.
+  - **Who sees nothing:** anyone without the permission, or with it for only part of the company (`403`).
+  - **In the mock:** Junagadh and Amreli have no District Manager, so their field officers skip a level. 🧪 👀
+- **ADMN-003, ADMN-004 · An office that covers no area** (FS-082): a Field Officer or District Manager put in an office that covers no area is refused (`422 office_has_no_area`). The refusal shows on **Office**, or on **Role** when the role is what changed. It applies only when the role or office changes, so fixing a misplaced person's name still works. 🧪
+
+## Org chart
+
+- **ADMN-008 · The org chart** (Overview → Org chart, `/org-chart`, FS-080, `feature/ADMN-008-org-chart`; screens: [a manager's team](screenshots/org-chart/team-desktop-light.jpg), [a field officer's line, phone dark](screenshots/org-chart/line-phone-dark.jpg), [the whole company](screenshots/org-chart/company-desktop-light.jpg)).
+  - **Who sees it:** every staff member, with their own line above them, nearest first.
+  - **Your team:** everyone below them, as a tree with counts by role. "Also reports to" names a second manager.
+  - **Someone below:** a name opens their picture.
+  - **Whole company:** for whoever sees every user, with staff who can't be placed named.
+  - **Refusals:** someone not below says "No reporting line to show".
+  - Walked through in the mock as a State Manager, a field officer and Admin, desktop light and phone dark. 🧪 👀
+
+---
 
 ## Dashboard, notifications, messages
 
@@ -622,6 +642,30 @@ Screens:
   - **Import good rows only** adds the rest, parents first. 🧪 👀
 - **CHNL-006 · GSTIN details (FS-053).** Staff only. Once a GSTIN is complete, the form checks it with the GST record (`GET /gstin/{gstin}`), PR #132.
 - **CHNL-007 · Dealer applications, for staff** (PR #145; FS-053, `dealer-recruitment-and-small-changes.md`; screens: [the list](screenshots/partners/dealer-apps-list-desktop-light.jpg), [started, with its link](screenshots/partners/dealer-apps-started-desktop-light.jpg), [a draft and what it lacks](screenshots/partners/dealer-app-draft-desktop-light.jpg), [editing](screenshots/partners/dealer-app-edit-desktop-light.jpg), [deciding](screenshots/partners/dealer-app-decide-desktop-light.jpg), [approved](screenshots/partners/dealer-app-approved-desktop-light.jpg), [phone, dark](screenshots/partners/dealer-apps-list-phone-dark.jpg)). Channel partners → **Dealer applications**, for staff who see partners: newest first, filtered by status and a search on firm, contact or mobile. **Start an application** asks for the firm, contact, mobile (the dealer's login) and area, then shows the link once with Copy and Share on WhatsApp ("Open the application"). Starting one for a mobile a colleague or partner signs in with, or one already applying, says so on the mobile. An application shows what is still needed to submit (fields and the GST certificate, PAN card and cancelled cheque), when the link expires, the manager's remark on a returned one, and the GST record's name. **Edit details** fills or corrects every field (only changes are sent, the PAN checked against the GSTIN, the GST record offered under a GSTIN), documents attach as on any record, **Submit for them** once nothing is missing, **New link** (the old one stops), **Withdraw** with a reason. **Decide**, for a State Manager or above who didn't start it: approve (under a distributor or directly under Polysil, with a code or the next one), return with what to fix, or reject with why; approving links the new dealer. The lead-win dialog (LEAD-015) shares the link panel, and in the mock starts a real application. Walked through in the mock as Admin at desktop light and phone dark; axe found nothing. 🧪 👀
+- **CHNL-007, CHNL-008 · Distributor applications and the data sheet** (FS-071, migration 078, `feature/CHNL-007-partner-type-data-sheet`; screens: [the list with types](screenshots/partners/applications-types-desktop-light.jpg), [the data sheet](screenshots/partners/application-data-sheet-desktop-light.jpg), [filling in the tables](screenshots/partners/application-tables-desktop-light.jpg), [the tables, phone dark](screenshots/partners/application-tables-phone-dark.jpg)).
+  - **The type.** Start an application for a new Dealer or Distributor. The list filters by type, and each row and page says which. Staff change the type while the application is with the applicant or returned.
+  - **The data sheet.** Staff's Edit details and the applicant's page share one form, with:
+    - telephone, established on and the place of appointment;
+    - the bank's name, branch and address;
+    - working capital by facility (up to 10), other sources and the saved total;
+    - areas in square feet or metres, and vehicles;
+    - sales executives, technicians, and groups of people (up to 20);
+    - installations done before (up to 50).
+  - **Checks.** The backend's own (two decimals, counts in range, years from 1950), with the row named ("Row 1: …"). An empty row is dropped. The page shows the sheet in its own card.
+  - **Decide.** A distributor goes directly under Polysil, so there is no distributor to pick, and its code reads DIST-. Who decides each type, and which extra fields each must have, come from the company settings. "Still needed" names those extras.
+  - A backend before 078 reads as dealers with empty sheets. Walked through in the mock as a District Manager, desktop light and phone dark; axe found nothing. Deciding a distributor is covered by a unit test, as the mock can't put a distributor's application in front of a decider from the browser. 🧪 👀
+- **CHNL-007 · The deposit** (FS-071, migration 078, `feature/CHNL-007-deposit`; screens: [the card](screenshots/partners/application-deposit-desktop-light.jpg), [recording it](screenshots/partners/application-deposit-record-desktop-light.jpg), [paid, phone dark](screenshots/partners/application-deposit-paid-phone-dark.jpg)).
+  - Each type's deposit comes from its company setting.
+  - **The card:** the amount set, the amount due and what was paid, with every payment and relaxation in order.
+  - **Record the deposit:** the amount (what is due to start with), the day paid, a reference, and the pay slip, uploaded first as a document.
+  - **Lower or waive it:** only the roles the settings name, never whoever started it, and not after a payment.
+  - **Approval waits until it is paid:** the page says so, the list marks it "Deposit due", and Approve's refusal says why.
+  - Walked through in the mock as a District Manager, desktop light and phone dark. 🧪 👀
+- **CHNL-007, CHNL-008 · The printed data sheets** (FS-071, `feature/CHNL-007-printed-sheets`). The client's paper form, as the backend makes it:
+  - **Blank form** on the applications list, for a new dealer or a distributor;
+  - **Download PDF** on an application, filled from it, with the bank account masked;
+  - **Download to print and sign** on the applicant's page, with what they have saved so far.
+  - Each is saved under the backend's name. A busy PDF maker says to try again in a moment. 🧪
 - **CHNL-008 · The dealer applicant's own page** (PR #146; `/dealer-apply/<token>`, no sign-in, phone first; screens: [verify the mobile](screenshots/public/dealer-apply-verify-phone-light.jpg), [the form, a GSTIN checked](screenshots/public/dealer-apply-form-phone-light.jpg), [documents](screenshots/public/dealer-apply-documents-phone-dark.jpg), [submitted](screenshots/public/dealer-apply-submitted-phone-light.jpg)). The link shows the firm and "Verify your mobile": a WhatsApp code to the masked mobile (a wrong code, or one asked for too soon, said in words). Verified, the applicant fills in the firm's details in the same form staff use, with **Check GSTIN** (valid, its PAN, and the GST record's name when there is one), saves as they go, uploads the GST certificate, PAN card, cancelled cheque, shop photo or licence (or "Other" with a name) and removes their own uploads, and **Submit the application** once nothing is missing ("Save your changes first" otherwise). A returned one shows Polysil's remark; a submitted one says "Submitted, we will be in touch"; an expired or replaced link says it doesn't work any more. A session that ends asks to verify again. The session lives in the page only. Walked through in the mock (seeded links `apply-demo-1` to `-3`, code from the mock sign-in) on a phone, light and dark; axe found nothing. 🧪 👀
   - Found: the legal name, trade name and status, and **Use these details**, which fills the business name (the trade name, else the legal name), PAN and address and ticks GST-registered. Every field stays editable.
   - Not found, or the backend has no GST data provider yet ("GST details can't be fetched yet"): the names are typed by hand, as before.
@@ -737,7 +781,18 @@ Admin → **Masters** (`/masters`), for staff who see masters (`backend/docs/api
 
 Admin → **Reports** (`/reports`), on the backend's contract (handover `reports-contract.md` and `when-a-sale-counts.md`, read against `api/services/reports.py`), PR #149. Walked through in the mock as Admin and as a State Manager, on a desktop in light mode and a 360 px phone in dark mode; axe found nothing. Not yet checked on the dev API.
 
-- **RPT-002 · Reports home:** a card for each of the eight reports the user may open, with its figure over the last 30 days ("16.2% converted", "16 overdue", "₹2.48 L"…). A report that answers 403 is left out; with none left, "No reports for your role". Screens: [desktop](screenshots/reports/reports-home-desktop-light.jpg), [phone, dark](screenshots/reports/reports-home-phone-dark.jpg). 🧪 👀
+- **RPT-002 · Reports home:** a card for each of the ten reports (eight, then the forecast and insights below) the user may open, with its figure over the last 30 days ("16.2% converted", "16 overdue", "₹2.48 L"…). A report that answers 403 is left out; with none left, "No reports for your role". Screens: [desktop](screenshots/reports/reports-home-desktop-light.jpg), [phone, dark](screenshots/reports/reports-home-phone-dark.jpg). 🧪 👀
+- **RPT-004 · Sales forecast** (`/reports/sales-forecast`, FS-079, `feature/RPT-004-forecast-insights`; screens: [desktop](screenshots/reports/forecast-desktop-light.jpg), [phone, dark](screenshots/reports/forecast-phone-dark.jpg)).
+  - **What it shows:** each open lead's value (its newest live quotation, else its estimate) weighted by its stage's win rate, as "Likely", by person, territory or source, and by this month, the next two and later.
+  - **Beside it:** the open pipeline, open leads (with a value), the typical time to win, and the win rates used. A borrowed rate is marked.
+  - **Too little history:** it says so and shows dashes, never ₹0.
+  - Filters: area and person, in the URL, with the same Excel file. 🧪 👀
+- **RPT-005 · Insights** (`/reports/insights`; [screen](screenshots/reports/insights-desktop-light.jpg)). Plain sentences about the window against the same number of days before it, each with its figure, what it was, and **See the report** for the report behind it. Nothing to say means too little happened, and it says so. 🧪
+- **RPT-006 · Team and role filters** (FS-082, `feature/RPT-006-team-filters`; screens: [salesperson performance for a team](screenshots/reports/team-filter-desktop-light.jpg), [phone, dark](screenshots/reports/team-filter-phone-dark.jpg)). Every report that takes a person, and the forecast, insights and territory performance, also take:
+  - **Team:** one person and everyone below them on the org chart. Choosing a team drops the one person, and choosing a person drops the team, since the backend takes one or the other. Someone outside the caller's line is refused (`404 not_in_your_line`).
+  - **Roles:** only people holding one of the chosen staff roles now, up to 10. Partner roles aren't offered.
+  - **Salesperson performance:** every team member gets a row, zeros included, with their role and office under the name.
+  - Both filters are in the URL, are cleared by Reset, and reach the Excel file. In the mock, a team is the person and every active staff member at a lower level. 🧪 👀
 - **RPT-002 · A report** (`/reports/{name}`):
   - Its filters are in the URL: From and to (the last 30 days when empty), Area, Person, and By (source, person or territory; reason or person; type, status or severity; district or taluka), each only where the report takes it. Follow-ups is as of now, with no window.
   - A table with a Total line where the backend sends totals, the window the figures used, and "Sales counted at: approval" on the reports that count sales. A figure the role may not see is a dash, read out as "Not available to you", with a line saying so.

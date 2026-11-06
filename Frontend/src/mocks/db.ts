@@ -207,6 +207,8 @@ export interface MockDb {
   dealerApplications: MockDealerApplication[] | null;
   /** MSTR-012 · The territory tree as Masters edits it, copied from the seed on first use. */
   territories: MockAdminTerritory[] | null;
+  /** AUTH-008 · The signed-in person's two email switches (FS-078); both on, as the backend seeds. */
+  emailPreferences: { notices: boolean; morning_summary: boolean };
   /** ADMN-007 · Company settings, seeded on first use (`handlers/settings.ts`). */
   settings: SettingWire[] | null;
   /** Each application's stage history, oldest first (SUBS-006). */
@@ -372,6 +374,7 @@ function createMockDb(): MockDb {
     subsidyApplications: null,
     dealerApplications: null,
     territories: null,
+    emailPreferences: { notices: true, morning_summary: true },
     settings: null,
     subsidyEntries: new Map(),
     subsidyCalculations: new Map(),

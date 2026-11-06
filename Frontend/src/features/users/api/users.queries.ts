@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import { getUser, listRoles, listUsers, searchOpenOffices } from "./users.api";
+import { getSetupCheck, getUser, listRoles, listUsers, searchOpenOffices } from "./users.api";
 import type { UserListParams } from "./users.schemas";
 
 /**
@@ -13,6 +13,7 @@ export const userKeys = {
   detail: (userId: string) => [...userKeys.all, "detail", userId] as const,
   roles: () => [...userKeys.all, "roles"] as const,
   offices: (q: string) => [...userKeys.all, "offices", q] as const,
+  setupCheck: () => [...userKeys.all, "setup-check"] as const,
 };
 
 const FIRST_PAGE: string | null = null;
@@ -54,5 +55,15 @@ export function officeSearchQueryOptions(q: string) {
     queryFn: ({ signal }) => searchOpenOffices(q, signal),
     staleTime: 5 * 60_000,
     meta: { dataId: "ADMN-003" },
+  });
+}
+
+/** ADMN-009 · What is set up wrong (FS-082), for the admin dashboard. */
+export function setupCheckQueryOptions() {
+  return queryOptions({
+    queryKey: userKeys.setupCheck(),
+    queryFn: ({ signal }) => getSetupCheck(signal),
+    staleTime: 60_000,
+    meta: { dataId: "ADMN-009" },
   });
 }

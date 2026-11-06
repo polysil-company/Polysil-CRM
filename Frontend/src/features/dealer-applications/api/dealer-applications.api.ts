@@ -1,16 +1,19 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
+import type { PartnerType } from "./data-sheet.schemas";
 import {
   dealerApplicationListSchema,
   dealerApplicationSchema,
   type CreateDealerApplicationRequest,
   type DealerApplication,
-  type DealerApplicationFieldsRequest,
+  type StaffApplicationFieldsRequest,
   type DealerApplicationListParams,
   type DealerApplicationRow,
   type DecisionRequest,
+  type DepositRecordRequest,
+  type DepositRelaxationRequest,
   type RemarkRequest,
 } from "./dealer-applications.schemas";
 
@@ -42,6 +45,7 @@ export function listDealerApplications(
     query: {
       status: params.status.length === 0 ? undefined : params.status.join(","),
       q: params.q.trim() === "" ? undefined : params.q.trim(),
+      partner_type: params.partnerType ?? undefined,
     },
     schema: dealerApplicationListSchema,
     signal,
@@ -91,7 +95,7 @@ export function patchDealerApplication({
   applicationId,
   body,
   idempotencyKey,
-}: WriteInput<DealerApplicationFieldsRequest>): Promise<DealerApplication> {
+}: WriteInput<StaffApplicationFieldsRequest>): Promise<DealerApplication> {
   return apiRequest({
     dataId: "CHNL-007",
     logger: log,
@@ -174,5 +178,77 @@ export function decideDealerApplication({
     idempotencyKey,
     schema: dealerApplicationSchema,
     sensitive: true,
+  });
+}
+
+/**
+ * CHNL-007 · POST /dealer-applications/{id}/deposit (FS-071): the deposit paid, with the pay
+ * slip already uploaded as a `deposit_slip` document. The latest payment counts.
+ */
+export function recordDealerApplicationDeposit({
+  applicationId,
+  body,
+  idempotencyKey,
+}: WriteInput<DepositRecordRequest>): Promise<DealerApplication> {
+  return apiRequest({
+    dataId: "CHNL-007",
+    logger: log,
+    fn: "recordDealerApplicationDeposit",
+    method: "POST",
+    path: applicationPath(applicationId, "/deposit"),
+    body,
+    idempotencyKey,
+    schema: dealerApplicationSchema,
+    sensitive: true,
+  });
+}
+
+/**
+ * CHNL-007 · POST /dealer-applications/{id}/deposit/relaxation (FS-071): a lower amount due,
+ * or 0 to waive it, with why. Only the roles `deposit_relaxation_roles` names, never whoever
+ * started the application, and not after a payment.
+ */
+export function relaxDealerApplicationDeposit({
+  applicationId,
+  body,
+  idempotencyKey,
+}: WriteInput<DepositRelaxationRequest>): Promise<DealerApplication> {
+  return apiRequest({
+    dataId: "CHNL-007",
+    logger: log,
+    fn: "relaxDealerApplicationDeposit",
+    method: "POST",
+    path: applicationPath(applicationId, "/deposit/relaxation"),
+    body,
+    idempotencyKey,
+    schema: dealerApplicationSchema,
+    sensitive: true,
+  });
+}
+
+/**
+ * CHNL-007 · GET /dealer-applications/form.pdf (FS-071): the blank data sheet for a dealer or
+ * a distributor, to print and fill in by hand.
+ */
+export function downloadBlankApplicationForm(partnerType: PartnerType): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "CHNL-007",
+    logger: log,
+    fn: "downloadBlankApplicationForm",
+    path: "/dealer-applications/form.pdf",
+    query: { partner_type: partnerType },
+  });
+}
+
+/**
+ * CHNL-007 · GET /dealer-applications/{id}/pdf (FS-071): the data sheet filled from the
+ * application, as the client's paper form. The bank account is masked for everyone.
+ */
+export function downloadDealerApplicationPdf(applicationId: string): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "CHNL-007",
+    logger: log,
+    fn: "downloadDealerApplicationPdf",
+    path: applicationPath(applicationId, "/pdf"),
   });
 }
