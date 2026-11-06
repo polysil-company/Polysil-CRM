@@ -16,6 +16,7 @@ from api.domain.imports.products import (
     Current,
     Master,
     change_counts,
+    fingerprint,
     parse_products,
     preview_order,
 )
@@ -330,3 +331,15 @@ def test_the_template_says_which_columns_a_new_product_needs() -> None:
     assert needed("products", "uom") == "For a new product"
     assert needed("products", "description") == "Item code or Description"
     assert needed("products", "mrp") == "No"
+
+
+def test_the_fingerprint_changes_when_a_new_rows_category_resolves_elsewhere() -> None:
+    """Code review F-4: a category added between check and commit, whose code
+    matches the sheet's name, takes the new product with it. Commit must see it."""
+    cells = {"description": "LATERAL END CAP 16MM", "product_category": "DRIP COMPONENTS",
+             "quotation_category": "field", "uom": "NOS."}
+    other = _lookups(*CATALOGUE.current.values())
+    other.categories["dripcomponents"] = Master("cat-new", "DRIP COMPONENTS")
+    before, after = _one(**cells), _one(other, **cells)
+    assert before.ok and after.ok and before.values["changes"] == after.values["changes"]
+    assert fingerprint([before]) != fingerprint([after])

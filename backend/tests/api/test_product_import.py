@@ -327,3 +327,65 @@ async def test_a_role_with_products_view_only_may_not_import(client: httpx.Async
     assert r.status_code == 403, r.text
     r = await client.get(f"{V1}/imports/template", headers=sm, params={"kind": "products"})
     assert r.status_code == 403
+
+
+async def test_a_clear_that_misses_leaves_the_stand_in_marks_as_they_were(
+        client: httpx.AsyncClient, catalogue: Cat, sessions: Callable[[], AsyncSession]) -> None:
+    """Code review F-3: MRP set on a product whose MRP is not a stand-in leaves its
+    other marks alone, in their order, so the audit row shows no change to them."""
+    cat = catalogue
+    s = sessions()
+    await s.execute(text("UPDATE product SET provisional_fields = '{hsn_code,gst_slab,pack_multiple}' "
+                         "WHERE id = CAST(:p AS uuid)"), {"p": cat.shop.product})
+    await s.commit()
+    try:
+        h = await endpoints._as(client, cat.shop, "admin_sales")
+        batch, _ = await _checked(client, h, _sheet(["", cat.product, "", "", "", "", "17", ""]))
+        assert (await _commit(client, h, batch)).status_code == 200
+        marks = (await s.execute(text("SELECT provisional_fields FROM product WHERE id = CAST(:p AS uuid)"),
+                                 {"p": cat.shop.product})).scalar_one()
+        assert list(marks) == ["hsn_code", "gst_slab", "pack_multiple"]
+    finally:
+        await s.execute(text("UPDATE product SET provisional_fields = '{}' WHERE id = CAST(:p AS uuid)"),
+                        {"p": cat.shop.product})
+        await s.commit()
+        await s.close()
+
+
+async def test_the_commit_and_the_product_page_wait_for_the_catalogue_lock(
+        client: httpx.AsyncClient, catalogue: Cat, sessions: Callable[[], AsyncSession]) -> None:
+    """Code review F-1 and F-2: the commit, PATCH /products/{id} and the loader take
+    one lock (api/db/locks.py), so a commit never writes over an edit it did not read."""
+    import asyncio
+    import inspect
+
+    from api.db import locks
+    from scripts.load_product_master import Loader
+
+    assert "locks.PRODUCT_CATALOGUE" in inspect.getsource(Loader.lock), "the loader takes the same key"
+    cat = catalogue
+    h = await endpoints._as(client, cat.shop, "admin_sales")
+    batch, _ = await _checked(client, h, _sheet(["", cat.product, "", "", "", "", "19", ""]))
+    holder = sessions()
+    await holder.execute(text(locks.PRODUCT_CATALOGUE))
+    try:
+        commit = asyncio.ensure_future(_commit(client, h, batch))
+        patch = asyncio.ensure_future(client.patch(
+            f"{V1}/products/{cat.shop.product}", json={"mrp": "21.00"},
+            headers={**h, "Idempotency-Key": str(uuid.uuid4())}))
+        done, _ = await asyncio.wait({commit, patch}, timeout=1.5)
+        assert not done, "a commit or an edit ran while the catalogue lock was held"
+    finally:
+        await holder.rollback()
+        await holder.close()
+    assert (await patch).status_code == 200
+    # Either order is safe. The edit first: the commit sees a changed catalogue and
+    # asks for a fresh check. The commit first: the edit lands after it. The edit
+    # is never written over.
+    saved = await commit
+    assert saved.status_code == 200 or saved.json()["error"]["code"] == "import_wrong_state", saved.text
+    s = sessions()
+    mrp = (await s.execute(text("SELECT mrp FROM product WHERE id = CAST(:p AS uuid)"),
+                           {"p": cat.shop.product})).scalar_one()
+    await s.close()
+    assert str(mrp) == "21.00", "the product page's edit was lost"

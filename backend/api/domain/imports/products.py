@@ -378,8 +378,12 @@ def preview_order(res: RowResult) -> int:
 
 
 def fingerprint(results: Sequence[RowResult]) -> str:
-    """What saving would do, row by row, and which rows fail (plan review N-2)."""
-    good = sorted((r.row, r.values["action"], r.values["product_id"], r.values["changes"])
+    """What saving would do, row by row, and which rows fail (plan review N-2).
+    The write itself goes in too, without the id: a new row's category and unit
+    come from lookups that can change, and a confirmation names its marks only
+    there (code review F-4)."""
+    good = sorted((r.row, r.values["action"], r.values["product_id"], r.values["changes"],
+                   {k: v for k, v in (r.values.get("write") or {}).items() if k != "id"})
                   for r in results if r.ok)
     bad = sorted(r.row for r in results if not r.ok)
     blob = json.dumps([good, bad], sort_keys=True, default=str)
