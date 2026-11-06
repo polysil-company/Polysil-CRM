@@ -36,6 +36,16 @@ OFFICE_TERRITORIES = ("SELECT ou.territory_id FROM org_unit ou "
                       "WHERE ou.id IN (SELECT descendant_id FROM org_closure "
                       f"WHERE ancestor_id = {ORG})")
 
+# FS-086: a person's area is their offices' territories and the districts assigned
+# to them (user_territory), never a state (rule 7). Guarded on the office, as the
+# Python arm is (plan review C-1). Only org_subtree_via (the partners spec) uses it.
+AREA_TERRITORIES = (f"{OFFICE_TERRITORIES} UNION "
+                    "SELECT ut.territory_id FROM user_territory ut "
+                    "JOIN territory t ON t.id = ut.territory_id "
+                    f"WHERE ut.user_id = {USER} AND ut.deleted_at IS NULL "
+                    f"AND {ORG} IS NOT NULL "
+                    "AND t.deleted_at IS NULL AND t.level <> 'state'")
+
 
 def branch_predicate(spec: ScopeSpec, scope: str, *, write: bool = False) -> str:
     """The row test for one scope branch, without the scope guard. `write` narrows
@@ -50,11 +60,11 @@ def branch_predicate(spec: ScopeSpec, scope: str, *, write: bool = False) -> str
         return f"{col} = {USER}"
     if scope == "org_subtree" and spec.org_subtree_via:
         under = (f"{col} IN (SELECT tc.descendant_id FROM territory_closure tc "
-                 f"WHERE tc.ancestor_id IN ({OFFICE_TERRITORIES}))")
+                 f"WHERE tc.ancestor_id IN ({AREA_TERRITORIES}))")
         if write:
             return under
         above = (f"{col} IN (SELECT tc.ancestor_id FROM territory_closure tc "
-                 f"WHERE tc.descendant_id IN ({OFFICE_TERRITORIES}))")
+                 f"WHERE tc.descendant_id IN ({AREA_TERRITORIES}))")
         return f"({under}\n    OR {above})"
     if scope == "org_subtree":
         return f"{col} IN (SELECT descendant_id FROM org_closure WHERE ancestor_id = {ORG})"

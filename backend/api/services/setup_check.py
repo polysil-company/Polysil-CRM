@@ -59,8 +59,9 @@ async def setup_check(db: AsyncSession, caller: Caller) -> sch.SetupReport:
          "area_roles": sorted(identity.AREA_OFFICE_ROLES)})).all()
     checks.append(_check(
         "staff_without_area", "Field staff in an office that covers no area",
-        "They see no dealers, so they cannot assign one to a lead or pick one on an order. "
-        "A manager there sees everything under that office, not just their area.",
+        "They see dealers only in the districts assigned to them on the user form, and none "
+        "if they have none, so they may not be able to assign one to a lead or pick one on an "
+        "order. A manager there sees everything under that office, not just their area.",
         _people(rows)))
 
     # the same rule as the user form (users._role_needs_territory)

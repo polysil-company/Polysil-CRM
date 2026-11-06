@@ -56,7 +56,8 @@ class UserDetail(UserRow):
     holders, the lockout state and the live session count."""
 
     territories: list[TerritoryRef] = Field(
-        description="The territories a staff member reads at territory scope.")
+        description="The districts this person works. They add to their office's area for "
+        "dealers and automatic leads; a state adds nothing (FS-086).")
     locked_until: str | None = Field(
         default=None,
         description="Staff only, and only when you hold users.edit: the end of a live "
@@ -104,8 +105,9 @@ class UserCreate(BaseModel):
         default=None, pattern=UUID_RE, description="Partner users only: an active partner.")]
     territory_ids: Annotated[list[Annotated[str, Field(pattern=UUID_RE)]], Field(
         default_factory=list, max_length=200,
-        description="Staff only. A role that reads any module at territory scope needs "
-        "at least one, or the person sees nothing there.")]
+        description="Staff only. The districts this person works: they add to their "
+        "office's area for dealers and automatic leads (FS-086). A state adds nothing; put "
+        "the person in the state office instead.")]
     password: Annotated[str | None, Field(
         default=None, max_length=128,
         description="Staff only. A temporary password of at least 12 characters, told "
@@ -133,7 +135,8 @@ class UserPatch(BaseModel):
         description="Partner users only: an active partner. Never your own.")]
     territory_ids: Annotated[list[Annotated[str, Field(pattern=UUID_RE)]] | None, Field(
         default=None, max_length=200,
-        description="Staff only. Replaces the whole set. Never your own.")]
+        description="Staff only. The districts this person works (FS-086). Replaces the "
+        "whole set. Never your own.")]
     is_active: Annotated[bool | None, Field(
         default=None,
         description="false deactivates (every session is signed out first), true "

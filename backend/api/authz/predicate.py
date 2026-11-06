@@ -29,7 +29,9 @@ partner_closure = sa.table("partner_closure", sa.column("ancestor_id", _ID),
 territory_closure = sa.table("territory_closure", sa.column("ancestor_id", _ID),
                              sa.column("descendant_id", _ID))
 user_territory = sa.table("user_territory", sa.column("user_id", _ID),
-                          sa.column("territory_id", _ID))
+                          sa.column("territory_id", _ID), sa.column("deleted_at"))
+territory = sa.table("territory", sa.column("id", _ID), sa.column("level"),
+                     sa.column("deleted_at"))
 org_unit = sa.table("org_unit", sa.column("id", _ID), sa.column("territory_id", _ID))
 
 
@@ -98,7 +100,16 @@ def _scope_clause(spec: ScopeSpec, caller: Caller,
             org_closure.c.ancestor_id == caller.org_unit_id)
         if spec.org_subtree_via:
             # at, under or above the offices' territories (FS-020), as the policy
-            offices = sa.select(org_unit.c.territory_id).where(org_unit.c.id.in_(subtree))
+            # FS-086: and the districts assigned to the caller, never a state; the
+            # enum is compared as text, or asyncpg refuses it (plan review C-2)
+            held = (sa.select(user_territory.c.territory_id)
+                    .join(territory, territory.c.id == user_territory.c.territory_id)
+                    .where(user_territory.c.user_id == caller.user_id,
+                           user_territory.c.deleted_at.is_(None),
+                           territory.c.deleted_at.is_(None),
+                           sa.cast(territory.c.level, sa.Text) != "state"))
+            offices = sa.union(
+                sa.select(org_unit.c.territory_id).where(org_unit.c.id.in_(subtree)), held)
             return sa.or_(
                 col.in_(sa.select(territory_closure.c.descendant_id).where(
                     territory_closure.c.ancestor_id.in_(offices))),

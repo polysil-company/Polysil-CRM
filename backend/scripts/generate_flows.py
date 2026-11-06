@@ -367,6 +367,8 @@ def f_permissions() -> None:
               "via partner_on_visible_document(). Tier and name only.\n"
               "FS-084: so does a distributor above a dealer UNDER your\n"
               "area (partner_orderable(), the order picker's for=order).\n"
+              "FS-086: your AREA is your offices plus the districts on\n"
+              "your user form (never a state).\n"
               "Credit terms only with partners.edit.",
               w=560, colour=GREEN)
     e += note("sc7", 620, 1140,
