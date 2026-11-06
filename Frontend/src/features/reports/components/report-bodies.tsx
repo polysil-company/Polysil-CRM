@@ -17,10 +17,12 @@ import {
 import { LEAD_STAGE_LABELS } from "@/features/leads/lib/lead-labels";
 import { reportQueryOptions } from "@/features/reports/api/reports.queries";
 import {
+  FORECAST_LATER,
   REPORT_ROW_CAP,
   type ReportData,
   type ReportName,
   type ReportParams,
+  type TableReportName,
 } from "@/features/reports/api/reports.schemas";
 import { REPORTS, saleModeLabel } from "@/features/reports/lib/report-catalogue";
 import { isApiError } from "@/lib/api/errors";
@@ -29,6 +31,8 @@ import {
   formatDate,
   formatDateTime,
   formatInr,
+  formatInrCompact,
+  formatMonth,
   formatNumber,
 } from "@/lib/format";
 
@@ -45,7 +49,7 @@ import {
  * RPT-002 · One report's figures: the window and sale setting they used, a notice when only
  * the first 1,000 rows came back, then its table. A report the user may not run (403) says so.
  */
-function ReportFrame<N extends ReportName>({
+function ReportFrame<N extends TableReportName>({
   name,
   params,
   hidden,
@@ -653,5 +657,256 @@ export function ReportBody({
       return <TerritoryReport params={params} />;
     case "complaints":
       return <ComplaintsReport params={params} />;
+    case "sales-forecast":
+      return <ForecastReport params={params} />;
+    case "insights":
+      return <InsightsReport params={params} />;
   }
+}
+
+/** The forecast and insights: their own shapes, the same loading, empty and refusal states. */
+function OwnFrame<N extends "sales-forecast" | "insights">({
+  name,
+  params,
+  isEmpty,
+  emptyText,
+  children,
+}: {
+  name: N;
+  params: ReportParams;
+  isEmpty: (data: ReportData<N>) => boolean;
+  emptyText: string;
+  children: (data: ReportData<N>) => React.ReactNode;
+}): React.JSX.Element {
+  const query = useQuery(reportQueryOptions(name, params));
+  const entry = REPORTS[name];
+  return (
+    <QueryView
+      query={query}
+      pending={<ReportTableSkeleton label={`Loading ${entry.title.toLowerCase()}`} />}
+      isEmpty={isEmpty}
+      empty={
+        <EmptyState
+          icon={Analytics01Icon}
+          title="Nothing to report"
+          description={emptyText}
+          className="rounded-xl border border-dashed border-border"
+        />
+      }
+      renderError={(error, retry) =>
+        isApiError(error) && error.status === 403 ? (
+          <EmptyState
+            icon={SquareLock02Icon}
+            title="You can't run this report"
+            description="It needs access your role doesn't have. Ask an administrator if you need it."
+            className="rounded-xl border border-dashed border-border"
+          />
+        ) : (
+          <ErrorState error={error} onRetry={retry} />
+        )
+      }
+    >
+      {children}
+    </QueryView>
+  );
+}
+
+// ── sales forecast (RPT-004, FS-079) ──────────────────────────────────────────────
+
+const FORECAST_GROUP: Readonly<Record<string, string>> = {
+  owner: "Person",
+  territory: "Territory",
+  source: "Source",
+};
+
+function monthLabel(key: string): string {
+  return key === FORECAST_LATER ? "Later" : formatMonth(key);
+}
+
+/** Null is "not enough history to weigh it", never 0. */
+function likelyCell(value: string | null): React.ReactNode {
+  return value === null ? <span className="text-muted-foreground">—</span> : formatInr(value);
+}
+
+/**
+ * RPT-004 · Each open lead's value (its newest live quotation, else its estimate) weighted by
+ * the win rate of its stage, by month. The rates are shown, so the figure can be explained.
+ */
+function ForecastReport({ params }: { params: ReportParams }): React.JSX.Element {
+  const header = FORECAST_GROUP[params.groupBy ?? "owner"] ?? "Group";
+  return (
+    <OwnFrame
+      name="sales-forecast"
+      params={params}
+      isEmpty={(data) => data.rows.length === 0}
+      emptyText="No open leads to forecast. Try fewer filters."
+    >
+      {(data) => (
+        <div className="flex flex-col gap-4">
+          {data.notEnoughHistory ? (
+            <Notice tone="info">
+              <p className="font-medium">Not enough won or lost leads to weigh the pipeline yet</p>
+              <p>
+                The win rates look at leads closed in the last {formatNumber(data.historyDays)}{" "}
+                days. Until there are enough, only the open pipeline is shown.
+              </p>
+            </Notice>
+          ) : null}
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <ForecastFact label="Likely">
+              {data.totals.weighted === null ? "—" : formatInrCompact(data.totals.weighted)}
+            </ForecastFact>
+            <ForecastFact label="Open pipeline">
+              {formatInrCompact(data.totals.pipeline)}
+            </ForecastFact>
+            <ForecastFact label="Open leads">
+              {formatNumber(data.totals.open)}
+              <span className="block text-xs font-normal text-muted-foreground">
+                {formatNumber(data.totals.withValue)} with a value
+              </span>
+            </ForecastFact>
+            <ForecastFact label="Typical time to win">
+              {data.medianDaysToWin === null ? "—" : `${formatNumber(data.medianDaysToWin)} days`}
+            </ForecastFact>
+          </dl>
+          <ReportTable
+            caption={`Sales forecast by ${header.toLowerCase()}`}
+            rowHeader={{ id: "key", header, cell: (row) => row.key.label }}
+            columns={[
+              {
+                id: "open",
+                header: "Open leads",
+                cell: (row) => formatNumber(row.open),
+                total: formatNumber(data.totals.open),
+              },
+              {
+                id: "pipeline",
+                header: "Pipeline",
+                cell: (row) => formatInr(row.pipeline),
+                total: formatInr(data.totals.pipeline),
+                wide: true,
+              },
+              {
+                id: "likely",
+                header: "Likely",
+                cell: (row) => likelyCell(row.weighted),
+                total: likelyCell(data.totals.weighted),
+              },
+              ...[...data.months, FORECAST_LATER].map((month) => ({
+                id: month,
+                header: monthLabel(month),
+                cell: (row: (typeof data.rows)[number]) => likelyCell(row.byMonth[month] ?? null),
+                total: likelyCell(data.totals.byMonth[month] ?? null),
+                wide: true,
+              })),
+            ]}
+            rows={data.rows}
+            rowKey={(row, index) => row.key.id ?? `none-${String(index)}`}
+          />
+          {data.rates.length === 0 ? null : (
+            <section aria-labelledby="forecast-rates" className="flex flex-col gap-2">
+              <h3 id="forecast-rates" className="text-sm font-semibold text-foreground">
+                Win rates used
+              </h3>
+              <ul className="flex flex-wrap gap-2">
+                {data.rates.map((rate) => (
+                  <li key={rate.stage}>
+                    <Badge variant={rate.lowConfidence ? "warning" : "neutral"}>
+                      {stageLabel(rate.stage)}: {formatPct(rate.winRatePct)}
+                      {rate.lowConfidence ? " (borrowed)" : ""}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                From leads won or lost in the last {formatNumber(data.historyDays)} days, across
+                everything you may see; the filters choose the rows, not the rates.
+                &quot;Borrowed&quot;: too few leads closed from that stage, so an earlier
+                stage&apos;s rate stands in.
+              </p>
+            </section>
+          )}
+        </div>
+      )}
+    </OwnFrame>
+  );
+}
+
+function ForecastFact({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-xl border border-border p-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="text-lg font-semibold text-foreground tabular-nums">{children}</dd>
+    </div>
+  );
+}
+
+// ── insights (RPT-005, FS-079) ────────────────────────────────────────────────────
+
+/** "12.5%", "6 hours": the figure in its unit; an unknown unit is shown as sent. */
+function insightFigure(value: string, unit: string): string {
+  if (unit === "pct") return formatPct(value);
+  const figure = Number(value);
+  return `${formatNumber(figure, Number.isInteger(figure) ? 0 : 1)} ${unit}`;
+}
+
+/**
+ * RPT-005 · Plain sentences about the window against the one before: each with its figure,
+ * what it was, and the report behind it. A missing sentence means too little data, not a
+ * problem, so an empty answer says that.
+ */
+function InsightsReport({ params }: { params: ReportParams }): React.JSX.Element {
+  return (
+    <OwnFrame
+      name="insights"
+      params={params}
+      isEmpty={(data) => data.rows.length === 0}
+      emptyText="Too little happened in this window to say anything. Try a longer window."
+    >
+      {(data) => (
+        <div className="flex flex-col gap-3">
+          {data.from !== null && data.to !== null ? (
+            <p className="text-xs text-muted-foreground">
+              {formatCalendarDay(data.from)} to {formatCalendarDay(data.to)}
+              {data.previousFrom !== null && data.previousTo !== null
+                ? `, against ${formatCalendarDay(data.previousFrom)} to ${formatCalendarDay(data.previousTo)}.`
+                : "."}
+            </p>
+          ) : null}
+          <ul aria-label="Insights" className="flex flex-col gap-2">
+            {data.rows.map((row) => (
+              <li
+                key={row.code}
+                className="flex flex-col gap-1 rounded-xl border border-border bg-card p-4"
+              >
+                <p className="text-sm font-medium text-foreground">{row.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground tabular-nums">
+                    {insightFigure(row.figure, row.unit)}
+                  </span>
+                  {row.previous === null
+                    ? null
+                    : ` · was ${insightFigure(row.previous, row.unit)} before`}
+                </p>
+                {row.link === null ? null : (
+                  <Link
+                    href={`/reports/${row.link.report}${row.link.group_by === undefined ? "" : `?by=${row.link.group_by}`}`}
+                    className="w-fit text-xs text-primary-text underline underline-offset-4"
+                  >
+                    See the report
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </OwnFrame>
+  );
 }
