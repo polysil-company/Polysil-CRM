@@ -18,6 +18,7 @@ import { calendarDayOf, shiftCalendarDay, todayInIndia } from "@/lib/format";
 import { mockLookupRows } from "@/mocks/data/lookups";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
 import { mockTerritoryLineage } from "@/mocks/data/territories";
+import { MOCK_ROLES } from "@/mocks/data/users";
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
@@ -101,6 +102,60 @@ interface Filters {
   readonly to: string;
   readonly territories: readonly string[];
   readonly owner: string | null;
+  /** FS-082 · The people a team or role filter keeps; null when there is neither. */
+  readonly owners: readonly string[] | null;
+  readonly teamOf: string | null;
+  readonly roles: readonly string[] | null;
+}
+
+function levelOf(code: string | undefined): number {
+  return MOCK_ROLES.find((role) => role.code === code)?.level ?? 0;
+}
+
+/**
+ * FS-082 · `team_of` and `roles` as people. The mock's team is the person and every active
+ * staff member at a lower level (the seeds sit in one state); the backend reads the org chart.
+ */
+function teamOf(params: URLSearchParams): Pick<Filters, "owners" | "teamOf" | "roles"> | Response {
+  const team = params.get("team_of");
+  const roles = (params.get("roles") ?? "")
+    .split(",")
+    .map((code) => code.trim())
+    .filter((code) => code !== "");
+  if (team !== null && params.get("owner_id") !== null) {
+    return errorResponse(422, "validation_error", "Not with owner_id.", {
+      team_of: "choose a team or one person, not both",
+    });
+  }
+  if (roles.length > 10) {
+    return errorResponse(422, "validation_error", "Too many roles.", { roles: "at most 10" });
+  }
+  const staff = mockDb.users.filter(
+    (user) => user.user_type === "staff" && user.is_active && user.deleted_at === null,
+  );
+  let people: typeof staff | null = null;
+  if (team !== null) {
+    const head = staff.find((user) => user.id === team);
+    if (head === undefined) {
+      return errorResponse(404, "not_in_your_line", "That person isn't in your line.");
+    }
+    const level = levelOf(head.role?.code);
+    people = staff.filter((user) => user.id === team || levelOf(user.role?.code) < level);
+  }
+  if (roles.length > 0) {
+    people = (people ?? staff).filter((user) => roles.includes(user.role?.code ?? ""));
+  }
+  return {
+    owners: people === null ? null : people.map((user) => user.id),
+    teamOf: team,
+    roles: roles.length === 0 ? null : roles,
+  };
+}
+
+/** One person, a team, or nobody in particular. */
+function ownerMatches(filters: Filters, ownerId: string | undefined): boolean {
+  if (filters.owner !== null && ownerId !== filters.owner) return false;
+  return filters.owners === null || (ownerId !== undefined && filters.owners.includes(ownerId));
 }
 
 function filtersOf(params: URLSearchParams): Filters | Response {
@@ -116,7 +171,9 @@ function filtersOf(params: URLSearchParams): Filters | Response {
     .split(",")
     .map((id) => id.trim())
     .filter((id) => id !== "");
-  return { from, to, territories, owner: params.get("owner_id") };
+  const team = teamOf(params);
+  if (team instanceof Response) return team;
+  return { from, to, territories, owner: params.get("owner_id"), ...team };
 }
 
 function inWindow(filters: Filters, at: string | null): boolean {
@@ -138,6 +195,8 @@ function filtersOut(filters: Filters): ReportWire<"lead-conversion">["filters"] 
     to: filters.to,
     territory_id: filters.territories.length === 0 ? null : [...filters.territories],
     owner_id: filters.owner,
+    team_of: filters.teamOf,
+    roles: filters.roles === null ? null : [...filters.roles],
     sale_counted_at: "approval",
   };
 }
@@ -148,7 +207,7 @@ function leads(filters: Filters): LeadWire[] {
     (lead) =>
       lead.stage !== "merged" &&
       inArea(filters, lead.territory.id) &&
-      (filters.owner === null || lead.owner?.id === filters.owner),
+      ownerMatches(filters, lead.owner?.id),
   );
 }
 
@@ -161,7 +220,7 @@ function sales(filters: Filters, ownerFilter = true): OrderWire[] {
       order.status !== "cancelled" &&
       inWindow(filters, order.approved_at) &&
       inArea(filters, order.territory.id) &&
-      (!ownerFilter || filters.owner === null || order.owner?.id === filters.owner),
+      (!ownerFilter || ownerMatches(filters, order.owner?.id)),
   );
 }
 
@@ -247,13 +306,21 @@ function salespersonPerformance(filters: Filters): ReportWire<"salesperson-perfo
       person(lead.owner?.id ?? null, lead.owner?.full_name ?? "Unassigned").won += 1;
     }
   }
+  // FS-082 · Everyone in the team (or the roles asked for) gets a row, zeros included.
+  for (const id of filters.owners ?? []) {
+    const user = mockDb.users.find((item) => item.id === id);
+    if (user !== undefined) person(id, user.full_name);
+  }
   const orders = sales(filters);
   const rows = [...people.entries()]
     .map(([id, entry]) => {
+      const user = mockDb.users.find((item) => item.id === id);
       const mine = orders.filter((order) => (order.owner?.id ?? "") === id);
       const tasks = mockDb.tasks.filter((task) => (task.assigned_to?.id ?? "") === id);
       return {
         user: { id: id === "" ? null : id, full_name: entry.name },
+        role: user?.role ?? null,
+        office: user?.org_unit ?? null,
         leads_created: entry.created,
         leads_won: entry.won,
         quotations_sent: has("quotations")
@@ -323,7 +390,10 @@ function lostLeads(filters: Filters, groupBy: string): ReportWire<"lost-leads"> 
   return { ...capped(rows), totals: { lost: total }, filters: filtersOut(filters) };
 }
 
-function followUps(owner: string | null): ReportWire<"follow-ups"> {
+function followUps(
+  owner: string | null,
+  team: Pick<Filters, "owners" | "teamOf" | "roles">,
+): ReportWire<"follow-ups"> {
   const today = todayInIndia();
   const people = new Map<
     string,
@@ -332,6 +402,7 @@ function followUps(owner: string | null): ReportWire<"follow-ups"> {
   for (const task of mockDb.tasks) {
     if (task.status !== "open" || task.assigned_to === null) continue;
     if (owner !== null && task.assigned_to.id !== owner) continue;
+    if (team.owners !== null && !team.owners.includes(task.assigned_to.id)) continue;
     const due = calendarDayOf(task.due_at);
     if (due > today) continue;
     const late = Math.round(
@@ -369,7 +440,12 @@ function followUps(owner: string | null): ReportWire<"follow-ups"> {
       overdue_8_30: sum((row) => row.overdue_8_30),
       overdue_31_plus: sum((row) => row.overdue_31_plus),
     },
-    filters: { as_of: new Date().toISOString(), owner_id: owner },
+    filters: {
+      as_of: new Date().toISOString(),
+      owner_id: owner,
+      team_of: team.teamOf,
+      roles: team.roles === null ? null : [...team.roles],
+    },
   };
 }
 
@@ -564,7 +640,7 @@ function complaintsReport(filters: Filters, groupBy: string): ReportWire<"compla
       complaint.status !== "cancelled" &&
       complaint.sla !== null &&
       inArea(filters, complaint.territory.id) &&
-      (filters.owner === null || complaint.owner?.id === filters.owner),
+      ownerMatches(filters, complaint.owner?.id),
   );
   const groups = new Map<string, { label: string; items: typeof counted }>();
   for (const complaint of counted) {
@@ -649,7 +725,11 @@ function forecastMonths(): string[] {
 }
 
 /** RPT-004 · As `forecast.sales_forecast()`, with the mock's simple rates and months by stage. */
-function salesForecast(params: URLSearchParams, groupBy: string): ReportWire<"sales-forecast"> {
+function salesForecast(
+  params: URLSearchParams,
+  groupBy: string,
+  team: Pick<Filters, "owners" | "teamOf" | "roles">,
+): ReportWire<"sales-forecast"> {
   const territories = (params.get("territory_id") ?? "").split(",").filter(Boolean);
   const owner = params.get("owner_id");
   const scope = mockDb.leads.filter((lead) => lead.stage !== "merged");
@@ -683,6 +763,7 @@ function salesForecast(params: URLSearchParams, groupBy: string): ReportWire<"sa
     if (!OPEN_STAGES.includes(lead.stage)) continue;
     if (territories.length > 0 && !territories.includes(lead.territory.id)) continue;
     if (owner !== null && lead.owner?.id !== owner) continue;
+    if (team.owners !== null && !team.owners.includes(lead.owner?.id ?? "")) continue;
     const key =
       groupBy === "territory"
         ? { id: lead.territory.id, label: lead.territory.name }
@@ -756,7 +837,12 @@ function salesForecast(params: URLSearchParams, groupBy: string): ReportWire<"sa
         })),
     median_days_to_win: thin ? null : 38,
     reason: thin ? "not_enough_history" : null,
-    filters: { history_days: 180, as_of: todayInIndia() },
+    filters: {
+      history_days: 180,
+      as_of: todayInIndia(),
+      team_of: team.teamOf,
+      roles: team.roles === null ? null : [...team.roles],
+    },
     totals: figures(all),
   };
 }
@@ -837,7 +923,11 @@ function run(name: ReportName, params: URLSearchParams): Response | { rows: read
   if (groups !== undefined && !groups.includes(groupBy)) {
     return errorResponse(422, "validation_error", "Bad grouping.", { [param]: groups.join(", ") });
   }
-  if (name === "follow-ups") return refusal(name, "tasks") ?? followUps(params.get("owner_id"));
+  if (name === "follow-ups") {
+    const team = teamOf(params);
+    if (team instanceof Response) return team;
+    return refusal(name, "tasks") ?? followUps(params.get("owner_id"), team);
+  }
   const filters = filtersOf(params);
   if (filters instanceof Response) return filters;
   switch (name) {
@@ -856,7 +946,7 @@ function run(name: ReportName, params: URLSearchParams): Response | { rows: read
     case "complaints":
       return refusal(name, "complaints") ?? complaintsReport(filters, groupBy);
     case "sales-forecast":
-      return refusal(name, "leads") ?? salesForecast(params, groupBy);
+      return refusal(name, "leads") ?? salesForecast(params, groupBy, filters);
     case "insights":
       return refusal(name, "leads") ?? insights(filters);
   }

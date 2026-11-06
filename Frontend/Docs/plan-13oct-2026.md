@@ -182,6 +182,11 @@ Measured against `integration` at `33901f8` (#225). Every backend commit since 2
 - [ ] **48. Email preferences** (FS-078). On the user's own menu: "Email me updates I haven't seen" and "Morning summary", shown only while `email_available` on `/auth/me` is true; `PUT /me/email-preferences`. Email stays off on the backend until a mail account is set up. `backend/docs/api/auth.md`.
 - [ ] **49. Restore lead: the small gaps** (LEAD-020). Offer **Assign** after a restore when the owner has left, as `leads.md` says; give `lead.restored` its own line in the history ("restored the lead", with the duplicate pairs it reopened).
 
+### From the backend on 5 Nov (FS-082, backend #226)
+
+- [x] **50. Team and role filters on the reports** (FS-082). PR #237, 5 Nov (`feature/RPT-006-team-filters`), stacked on #232. RPT-006. `team_of` (a person and everyone below them on the org chart) and `roles` on every report that takes a person, plus the forecast, insights and territory performance; salesperson performance gives every team member a row with role and office, zeros included. `404 not_in_your_line` outside the caller's line; never with `owner_id`. `backend/docs/api/reports.md`.
+- [ ] **51. The setup check, and an office that covers no area** (FS-082). ADMN-009. `GET /users/setup-check` on the admin dashboard: field staff in an office with no area, area roles with no territories, staff with no manager one level up, staff on the System office, partners with no area, each with its count and the first 100 to fix. And the user form's new refusal `422 office_has_no_area` (a Field Officer or District Manager in an office that covers no area), on the office or the role. `backend/docs/api/users.md`.
+
 ## Waiting on someone else
 
 - [x] **BE-023:** a `lead_id` filter on `GET /subsidy-applications`, for the subsidy card on a lead. Done on the backend; picked up in PR #193, 22 Oct.

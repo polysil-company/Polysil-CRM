@@ -204,7 +204,21 @@ function SalespersonReport({ params }: { params: ReportParams }): React.JSX.Elem
           caption="Salesperson performance"
           rows={data.rows}
           rowKey={(row, index) => row.user.id ?? `none-${String(index)}`}
-          rowHeader={{ id: "user", header: "Person", cell: (row) => row.user.name }}
+          rowHeader={{
+            id: "user",
+            header: "Person",
+            // FS-082 · Each team member's role and office, so a row of zeros still says who.
+            cell: (row) => (
+              <span className="flex flex-col">
+                <span>{row.user.name}</span>
+                {row.role === null && row.office === null ? null : (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {[row.role, row.office].filter((part) => part !== null).join(" · ")}
+                  </span>
+                )}
+              </span>
+            ),
+          }}
           columns={[
             {
               id: "created",
