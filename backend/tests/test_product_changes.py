@@ -201,3 +201,97 @@ def test_the_load_retires_adds_prices_and_reruns_without_writing(parts: tuple) -
                 "a rerun wrote to product"
         finally:
             conn.rollback()
+
+
+@pytest.mark.db
+def test_a_product_renamed_or_deleted_on_the_database_is_neither_added_back_nor_a_warning(parts: tuple) -> None:
+    """Production, 29 Oct: products renamed by hand came back under their old names
+    beside the new ones, and products deleted by hand read as a pricing WARNING."""
+    import psycopg
+
+    from api.config import get_settings
+
+    master, retire, adds = parts
+    rows, retire_keys, _ = apply_changes(master, retire, adds)
+    dsn = re.sub(r"^postgresql\+\w+://", "postgresql://", str(get_settings().database_url))
+    with psycopg.connect(dsn, prepare_threshold=None) as conn:
+        try:
+            _as(conn, "")
+            _run(conn, rows, retire_keys)
+            renamed, deleted = rows[0]["description"], rows[1]["description"]
+            conn.execute("UPDATE product SET description = 'RENAMED BY HAND ' || description "
+                         "WHERE description = %s", (renamed,))
+            # deleted only: is_active stays true, so the filter on deleted_at is what counts
+            conn.execute("UPDATE product SET deleted_at = now() WHERE description = %s", (deleted,))
+            # its rate removed, so a rerun that priced it would show
+            conn.execute("DELETE FROM price_list_item WHERE product_id = "
+                         "(SELECT id FROM product WHERE description = %s)", (deleted,))
+
+            notes = _run(conn, rows, retire_keys)
+            assert not any("WARNING" in n for n in notes), notes
+            assert any(n.startswith("product: 0 written") and "1 left out" in n and renamed in n
+                       for n in notes), notes
+            assert any(n.startswith("product_hsn: 0 classified") and "awaiting" not in n for n in notes), notes
+            assert any("1 switched off or deleted on the database, not priced" in n
+                       and "1 renamed on the database" in n for n in notes), notes
+            assert _count(conn, "SELECT count(*) FROM product WHERE description = %s", (renamed,)) == 0, \
+                "the old name came back"
+            assert _count(conn, "SELECT count(*) FROM product WHERE description = %s AND deleted_at IS NULL",
+                          (deleted,)) == 0, "the deleted product came back"
+            assert _count(conn, "SELECT count(*) FROM price_list_item i JOIN product p ON p.id = i.product_id "
+                                "WHERE p.description = %s", (deleted,)) == 0, "the deleted product was priced"
+
+            # Deleting the renamed product frees its master row: the master's name is loaded again.
+            conn.execute("UPDATE product SET deleted_at = now() WHERE description = %s",
+                         ("RENAMED BY HAND " + renamed,))
+            again = _run(conn, rows, retire_keys)
+            assert any(n.startswith("product: 1 written") and "left out" not in n for n in again), again
+        finally:
+            conn.rollback()
+
+
+@pytest.mark.db
+def test_a_product_staff_made_is_neither_classified_priced_nor_retired(parts: tuple) -> None:
+    """ISS-234: an imported product the master also lists keeps the person's tax, rate
+    and state. Only the loader's own products get a guessed HSN or a stand-in rate."""
+    import psycopg
+
+    from api.config import get_settings
+
+    master, retire, adds = parts
+    rows, retire_keys, _ = apply_changes(master, retire, adds)
+    dsn = re.sub(r"^postgresql\+\w+://", "postgresql://", str(get_settings().database_url))
+    with psycopg.connect(dsn, prepare_threshold=None) as conn:
+        try:
+            _as(conn, "")
+            admin = str(conn.execute("SELECT id FROM app_user ORDER BY created_at LIMIT 1").fetchone()[0])
+            listed = rows[2]["description"]
+            retired = next(r["description"] for r in master if r["description"].casefold() in retire_keys)
+            for description in (listed, retired):
+                conn.execute("DELETE FROM price_list_item WHERE product_id IN "
+                             "(SELECT id FROM product WHERE description = %s)", (description,))
+                conn.execute("DELETE FROM product_hsn WHERE product_id IN "
+                             "(SELECT id FROM product WHERE description = %s)", (description,))
+                conn.execute("UPDATE product SET is_active = true, created_by = %s "
+                             "WHERE description = %s", (admin, description))
+                conn.execute(
+                    "INSERT INTO product (description, product_category_id, quotation_category, uom_id, created_by) "
+                    "SELECT %s, (SELECT id FROM product_category LIMIT 1), (enum_range(NULL::quotation_category))[1], (SELECT id FROM uom LIMIT 1), %s "
+                    "WHERE NOT EXISTS (SELECT 1 FROM product WHERE description = %s)",
+                    (description, admin, description))
+
+            notes = _run(conn, rows, retire_keys)
+            for description in (listed, retired):
+                assert _count(conn, "SELECT count(*) FROM product WHERE description = %s", (description,)) == 1
+                assert _count(conn, "SELECT count(*) FROM product_hsn h JOIN product p ON p.id = h.product_id "
+                                    "WHERE p.description = %s", (description,)) == 0, "given a guessed HSN"
+                assert _count(conn, "SELECT count(*) FROM price_list_item i JOIN product p ON p.id = i.product_id "
+                                    "WHERE p.description = %s", (description,)) == 0, "given a stand-in rate"
+            assert _count(conn, "SELECT count(*) FROM product WHERE description = %s AND is_active",
+                          (retired,)) == 1, "the change list switched off a product staff made"
+            assert any(n.startswith("product_hsn:") and "1 made by staff" in n for n in notes), notes
+            assert any("made by staff, left as they are" in n and retired in n for n in notes), notes
+            assert any(n.startswith("price_list:") and "made by staff" in n for n in notes) or \
+                any(n.startswith("price_list: a stand-in list") for n in notes), notes
+        finally:
+            conn.rollback()

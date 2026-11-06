@@ -279,6 +279,9 @@ class Loader:
         self.dry_run = dry_run
         self.with_prices = with_prices
         self.notes: list[str] = []
+        # descriptions (casefolded) left out because the database holds the same
+        # master row under another name: renamed there, not ours to add back
+        self.renamed: set[str] = set()
 
     def _all(self, sql: str, args: tuple[Any, ...] = ()) -> list[tuple[Any, ...]]:
         with self.conn.cursor() as cur:
@@ -294,6 +297,21 @@ class Loader:
             return
         with self.conn.cursor() as cur:
             cur.execute(sql, args)
+
+    def lock(self) -> None:
+        """Wait for a product import that is saving (FS-083 rule 13), and keep it out
+        until this transaction ends. Namespace 5, the singleton masters. ISS-234."""
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_xact_lock(5, hashtext('product_import'))")
+
+    def _staff_made(self) -> set[str]:
+        """Descriptions (casefolded) of products staff created, by hand or by import.
+        The passes that only add or switch things leave these alone: their tax, rate
+        and state are the person's, not a guess from the master (ISS-234). created_by
+        rather than updated_by: confirming a GST rate stamps updated_by on every
+        product under the code (api/services/pricing.py)."""
+        return {d.casefold() for (d,) in self._all(
+            "SELECT description::text FROM product WHERE created_by IS NOT NULL")}
 
     def states(self) -> None:
         """The client prices per state, and only Gujarat exists."""
@@ -317,14 +335,30 @@ class Loader:
                     "updated_by IS NOT NULL OR created_by IS NOT NULL, "
                     "product_category_id, quotation_category::text, uom_id, is_subsidy_eligible, "
                     "source_row FROM product")}
+        # A product renamed on the database keeps source_description, the master's
+        # own text. Matching only by description would add the old name back beside
+        # it (44 such copies on production, 29 Oct). Not keyed by source_row: rows
+        # shift when the client revises the master. Compared after normalise(), so a
+        # cell whose spaces were tidied on load is not mistaken for a rename. A deleted
+        # product frees its master row (review of 6cb17b8, findings 1 and 3).
+        renamed_from = {normalise(s).casefold() for s, d in self._all(
+            "SELECT source_description, description::text FROM product "
+            "WHERE source_description IS NOT NULL AND deleted_at IS NULL")
+            if normalise(s).casefold() != d.casefold()}
 
         written = updated = same = 0
+        left_out: list[str] = []
         for row in rows:
             if row["category"] not in categories:
                 raise SystemExit(f"product_category {row['category']!r} is not seeded")
             if row["uom"] not in uoms:
                 raise SystemExit(f"uom {row['uom']!r} is not seeded")
-            existing = live.get(row["description"].casefold())
+            key = row["description"].casefold()
+            existing = live.get(key)
+            if existing is None and key in renamed_from:
+                self.renamed.add(key)
+                left_out.append(row["description"])
+                continue
             if existing is None:
                 self._write(
                     "INSERT INTO product (description, source_description, source_row, "
@@ -353,7 +387,12 @@ class Loader:
                 "%s::quotation_category, uom_id = %s, is_subsidy_eligible = %s, "
                 "source_row = %s WHERE id = %s", (*wanted, existing[0]))
             updated += 1
-        self.notes.append(f"product: {written} written, {updated} corrected, {same} unchanged")
+        note = f"product: {written} written, {updated} corrected, {same} unchanged"
+        if left_out:
+            names = sorted(left_out)
+            note += (f", {len(names)} left out: their master row is on the database under "
+                     f"another name: {names[:10]}{' and more' if len(names) > 10 else ''}")
+        self.notes.append(note)
 
     def retire(self, keys: set[str]) -> None:
         """Switch off what the change list retires. Never a delete: quotations and
@@ -372,13 +411,16 @@ class Loader:
         retired = already = 0
         found: set[str] = set()
         kept: list[str] = []
-        for pid, description, active in self._all(
-                "SELECT id, description::text, is_active FROM product"):
+        staff: list[str] = []
+        for pid, description, active, made_by_staff in self._all(
+                "SELECT id, description::text, is_active, created_by IS NOT NULL FROM product"):
             key = description.casefold()
             if key not in keys:
                 continue
             found.add(key)
-            if not active:
+            if made_by_staff:
+                staff.append(description)
+            elif not active:
                 already += 1
             elif str(pid) in retired_before:
                 kept.append(description)
@@ -390,6 +432,9 @@ class Loader:
         if kept:
             self.notes.append(f"retire: WARNING {len(kept)} switched back on by someone since, "
                               f"left on: {kept}")
+        if staff:
+            self.notes.append(f"retire: WARNING {len(staff)} made by staff, left as they are: "
+                              f"{sorted(staff)[:10]}")
         absent = sorted(keys - found)
         if absent:
             # Expected on a database the retired products never reached; on one they
@@ -397,12 +442,18 @@ class Loader:
             self.notes.append(f"retire: {len(absent)} not in the database: {absent[:10]}")
 
     def classifications(self, rows: list[dict[str, Any]]) -> None:
-        by_description = {d.casefold(): pid for d, pid in
-                          self._all("SELECT description::text, id FROM product")}
+        by_description = {d.casefold(): pid for d, pid in self._all(
+            "SELECT description::text, id FROM product WHERE created_by IS NULL")}
+        staff = self._staff_made()
         have = {pid for (pid,) in self._all(
             "SELECT product_id FROM product_hsn WHERE effective_to IS NULL")}
-        written = already = unwritten = 0
+        written = already = unwritten = theirs = 0
         for row in rows:
+            if row["description"].casefold() in self.renamed:
+                continue  # classified under its new name, if at all
+            if row["description"].casefold() in staff:
+                theirs += 1  # its tax code is the person's (ISS-234)
+                continue
             pid = by_description.get(row["description"].casefold())
             if pid is None:
                 # Only reachable on a dry run, where the product above was not
@@ -419,6 +470,8 @@ class Loader:
         note = f"product_hsn: {written} classified, {already} already classified"
         if unwritten:
             note += f", {unwritten} awaiting the product rows this dry run did not write"
+        if theirs:
+            note += f", {theirs} made by staff, left to them"
         self.notes.append(note)
 
     def prices(self, rows: list[dict[str, Any]]) -> None:
@@ -443,18 +496,37 @@ class Loader:
             # connects as the table owner, which RLS does not bind (not forced).
             have = {pid for (pid,) in self._all(
                 "SELECT product_id FROM price_list_item WHERE price_list_id = %s", (existing,))}
+            # a product staff made is priced by their own list, never a stand-in (ISS-234)
             by_description = {d.casefold(): pid for d, pid in self._all(
-                "SELECT description::text, id FROM product WHERE is_active")}
+                "SELECT description::text, id FROM product WHERE is_active AND deleted_at IS NULL "
+                "AND created_by IS NULL")}
+            staff = self._staff_made()
+            # Switched off or deleted on the database, by the change list or by hand:
+            # a deliberate state, so not priced and not a warning.
+            off = {d.casefold() for (d,) in self._all(
+                "SELECT description::text FROM product "
+                "WHERE NOT is_active OR deleted_at IS NOT NULL")}
             missing = [(existing, by_description[r["description"].casefold()], r["rate"])
                        for r in rows if r["description"].casefold() in by_description
                        and by_description[r["description"].casefold()] not in have]
-            unmatched = sum(1 for r in rows if r["description"].casefold() not in by_description)
+            left = [r["description"].casefold() for r in rows
+                    if r["description"].casefold() not in by_description]
+            theirs = sum(1 for k in left if k in staff)
+            switched_off = sum(1 for k in left if k not in staff and k in off)
+            renamed = sum(1 for k in left if k not in staff and k not in off and k in self.renamed)
+            unmatched = len(left) - theirs - switched_off - renamed
             if missing and not self.dry_run:
                 with self.conn.cursor() as cur:
                     cur.executemany("INSERT INTO price_list_item (price_list_id, product_id, rate) "
                                     "VALUES (%s, %s, %s)", missing)
             note = (f"price_list: the stand-in list exists; {len(missing)} stand-in rate(s) "
                     f"{'would be ' if self.dry_run else ''}added for products it lacked")
+            if switched_off:
+                note += f", {switched_off} switched off or deleted on the database, not priced"
+            if renamed:
+                note += f", {renamed} renamed on the database, priced under the new name if at all"
+            if theirs:
+                note += f", {theirs} made by staff, not given a stand-in rate"
             if unmatched:
                 note += (f", {unmatched} not yet written (dry run)" if self.dry_run else
                          f", WARNING {unmatched} catalogue products not found active")
@@ -469,7 +541,9 @@ class Loader:
             ("Stand-in base rates", EFFECTIVE_FROM,
              "Invented by scripts/load_product_master.py. Every rate is a stand-in of the "
              "right order of magnitude; the client's own rates supersede it as a new list."))
-        by_description = dict(self._all("SELECT description::text, id FROM product"))
+        by_description = dict(self._all("SELECT description::text, id FROM product "
+                                        "WHERE is_active AND deleted_at IS NULL "
+                                        "AND created_by IS NULL"))
         with self.conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO price_list_item (price_list_id, product_id, rate) VALUES (%s, %s, %s)",
@@ -502,6 +576,7 @@ def main(argv: list[str] | None = None) -> int:
     dsn = re.sub(r"^postgresql\+\w+://", "postgresql://", str(get_settings().database_url))
     with psycopg.connect(dsn) as conn:
         loader = Loader(conn, dry_run=args.dry_run, with_prices=not args.no_prices)
+        loader.lock()
         loader.states()
         loader.notes.extend(change_notes)
         loader.products(rows)
