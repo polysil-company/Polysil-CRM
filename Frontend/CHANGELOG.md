@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-133 changes, newest first. Each title opens its entry.
+134 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-11-06 | [The client's menu adds Org chart, Reports, Company settings and Tracking settings](changelog/entries/2026-11-06--chore--APP-007--the-client-s-menu-adds-org-chart-reports-company-settings.md) | `chore` | `APP-007` `ADMN-008` `RPT-002` `ADMN-007` `TRK-006` |
 | 2026-11-06 | [The setup check, and an office that covers no area](changelog/entries/2026-11-06--feature--ADMN-009--the-setup-check-and-an-office-that-covers-no-area.md) | `feature` | `ADMN-009` |
 | 2026-11-06 | [A field officer picks the distributor on an order from a lead](changelog/entries/2026-11-06--fix--SO-013--a-field-officer-picks-the-distributor-on-an-order-from-a.md) | `fix` | `SO-013` `SO-012` |
 | 2026-11-05 | [The org chart](changelog/entries/2026-11-05--feature--ADMN-008--the-org-chart.md) | `feature` | `ADMN-008` |
@@ -146,6 +147,41 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
 
 ## 6 November 2026
+
+### The client's menu adds Org chart, Reports, Company settings and Tracking settings
+
+`chore` · `APP-007` `ADMN-008` `RPT-002` `ADMN-007` `TRK-006` · Nakul Srivastava · [entry](changelog/entries/2026-11-06--chore--APP-007--the-client-s-menu-adds-org-chart-reports-company-settings.md)
+
+#### Before
+
+The client's site (`crm.polysilirrigation.com`) showed only the released screens in `RELEASED_NAV`. Org chart, Reports, Company settings and Tracking settings were built and on `integration`, but hidden from the client. Production's roles didn't hold the `reports` module either, so the reports would have answered 403 there.
+
+#### Now
+
+- **The client's menu** (`RELEASED_NAV` in `backend/scripts/deploy_staging.py`) adds `org-chart`, `reports`, `company-settings` and `tracking-settings`.
+- **The backend scope** (`RELEASED` in `backend/scripts/seed_prod.py`) adds `reports`, so the roles that hold reports in the permission matrix get them on production. Org chart needs no module; both settings screens use `masters` and the tracking screens use `tracking`, which were already released.
+- **The live check** (`backend/live/inventory.json`): the ten report endpoints are no longer expected to answer 403 on production.
+- Each screen still shows only to the roles whose permissions allow it.
+- **Two tests that failed on a busy CI runner** now wait for the screen instead of reading it too early: the sign-in's **Send a new code** button (AUTH-001), which appears on the countdown's next tick, and the marketing order's dialog (MKT), which opens on "Loading…". `integration` was red on the first after #239 merged; this pull request's first run failed on the second.
+
+#### Discussion
+
+- The client asked for these four screens on 6 Nov.
+- The menu only appears on the client's site after the release steps: `deploy_staging.py --target prod deploy`, then `seed-prod` (it grants the new `reports` module), then `frontend-prod` (it rebuilds the menu).
+
+#### Files changed
+
+- `../backend/scripts/deploy_staging.py`: four nav ids added to `RELEASED_NAV`.
+- `../backend/scripts/seed_prod.py`: `reports` added to `RELEASED`.
+- `../backend/live/inventory.json`: the report endpoints' `forbidden` lists emptied.
+- `src/features/auth/components/mobile-sign-in.test.tsx`, `src/features/marketing/components/marketing.test.tsx`: wait for the button and the dialog's content.
+
+#### Tests
+
+- `backend/tests/api/test_live_inventory.py`: "forbidden on production follows the release scope" passes with the new scope (the two tests that need a database weren't run here).
+- `backend/tests/test_seed_prod_roles.py` and `tests/test_live_verify.py` pass.
+- Both fixed test files passed three runs in a row locally.
+- By hand, after the release: sign in on the client's site as an administrator and check that the four screens are in the menu and open.
 
 ### The setup check, and an office that covers no area
 
