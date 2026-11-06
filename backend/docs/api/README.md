@@ -50,7 +50,7 @@ any endpoint change, so it is always current rather than a snapshot.
 | Tasks | 14 | [`tasks.md`](tasks.md) |
 | Territories | 5 | [`territories.md`](territories.md) |
 | Tracking | 17 | [`tracking.md`](tracking.md) |
-| Users | 11 | [`users.md`](users.md) |
+| Users | 12 | [`users.md`](users.md) |
 | Warranty | 4 | [`warranty.md`](warranty.md) |
 
 ---

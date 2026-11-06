@@ -245,3 +245,25 @@ class OrgChart(BaseModel):
     unplaced: list[OrgChartPerson] = Field(
         description="Company view only: active staff on the System office, who cannot be "
         "placed. Not in `people` or `totals`. Give them a real office.")
+
+
+class SetupItem(BaseModel):
+    id: str = Field(description="The person's or partner's id, to link to their page.")
+    name: str
+    detail: str = Field(description="Role and office for a person, area or type for a partner.")
+
+
+class SetupCheck(BaseModel):
+    code: str = Field(description="staff_without_area, staff_without_territories, "
+                      "staff_skipping_a_level, unplaced_staff or partners_without_area.")
+    title: str = Field(description="One line for the card.")
+    why: str = Field(description="What goes wrong while this stays unfixed, in plain words.")
+    count: int
+    items: list[SetupItem] = Field(description="The first 100, sorted by name.")
+
+
+class SetupReport(BaseModel):
+    ok: bool = Field(description="True when every check's count is 0.")
+    checks: list[SetupCheck] = Field(
+        description="Every check, always, in a fixed order. `partners_without_area` is left "
+                    "out when you do not hold partners.view at global scope.")
