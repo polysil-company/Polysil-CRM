@@ -7,12 +7,13 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-123 changes, newest first. Each title opens its entry.
+124 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
 | 2026-11-05 | [Distributor applications and the data sheet](changelog/entries/2026-11-05--feature--CHNL-007--distributor-applications-and-the-data-sheet.md) | `feature` | `CHNL-007` `CHNL-008` |
 | 2026-11-05 | [The deposit on dealer and distributor applications](changelog/entries/2026-11-05--feature--CHNL-007--the-deposit-on-dealer-and-distributor-applications.md) | `feature` | `CHNL-007` |
+| 2026-11-05 | [The printed data sheets: blank, filled and the applicant's](changelog/entries/2026-11-05--feature--CHNL-007--the-printed-data-sheets-blank-filled-and-the-applicant-s.md) | `feature` | `CHNL-007` `CHNL-008` |
 | 2026-11-05 | [Company settings read the application settings and any kind added later](changelog/entries/2026-11-05--fix--ADMN-007--company-settings-read-the-application-settings-and-any-kind.md) | `fix` | `ADMN-007` |
 | 2026-10-30 | [Visits take the location by themselves once allowed](changelog/entries/2026-10-30--feature--TRK-003--visits-take-the-location-by-themselves-once-allowed.md) | `feature` | `TRK-003` `TRK-004` |
 | 2026-10-30 | [Duty on Android, and the map under the menu](changelog/entries/2026-10-30--fix--TRK-008--duty-on-android-and-the-map-under-the-menu.md) | `fix` | `TRK-008` `TRK-001` |
@@ -300,6 +301,47 @@ How to write an entry: [changelog/README.md](changelog/README.md).
   - recording it with a pay slip (refused first without one), and the history after;
   - waiving it as a Regional Manager, refused first without a reason.
 - The application, document and lead tests pass (216).
+
+### The printed data sheets: blank, filled and the applicant's
+
+`feature` · `CHNL-007` `CHNL-008` · Claude · [entry](changelog/entries/2026-11-05--feature--CHNL-007--the-printed-data-sheets-blank-filled-and-the-applicant-s.md)
+
+#### Before
+
+- FS-071 gave the backend three printed versions of the application's data sheet, as the client's paper form:
+  - **blank**, to fill in by hand (`GET /dealer-applications/form.pdf?partner_type=`);
+  - **filled from an application**, for staff (`GET /dealer-applications/{id}/pdf`, with the bank account masked for everyone);
+  - **the applicant's own as filled so far**, to print and sign (`GET /public/dealer-apply/{token}/pdf`, with the applicant's session).
+- The frontend offered none of them.
+
+#### Now
+
+- **The applications list** has a **Blank form** menu: "For a new dealer" or "For a new distributor" saves that type's blank sheet.
+- **An application's page** has **Download PDF**, beside its other actions, for the sheet filled from the application.
+- **The applicant's page** has **Download to print and sign**, above Submit. It says the sheet holds what is saved so far, so unsaved typing should be saved first.
+- **Each is saved under the backend's own file name.**
+- **When the backend's PDF maker is at its limit** (`503 busy`), the toast says "The PDF maker is busy. Other PDFs are being made. Try again in a moment." `pdf_unavailable` says PDFs can't be made just now. Anything else shows its own reason.
+- **A new pattern, `DownloadFileButton`,** for any file the backend makes when asked. It has its states (Preparing…, Downloaded, Not downloaded), the busy and unavailable messages, and stories. The CSV and PDF downloads (item 46) build on it.
+
+#### Discussion
+
+- **The PDFs come back as the file itself, not a link.** They are fetched with the session through the API client and saved, like Download Excel. That way a sheet with someone's details never sits behind a bare URL.
+- **The applicant's download carries their session** (`X-Apply-Session`), as every applicant call does. Without one, the backend says to verify the mobile again.
+- **Where the buttons sit.** The blank form goes with "Start an application", since both are about a new partner. The filled sheet goes on the application. The applicant's goes by Submit, where they finish.
+- **The mock** answers each with a stand-in PDF named as the backend names them. Its blank-form route comes before `/:applicationId`, so `form.pdf` isn't read as an id.
+
+#### Files changed
+
+- `src/components/patterns/download-file-button.tsx` (new), with stories: the button and `toastDownloadError`.
+- `src/features/dealer-applications/api/dealer-applications.api.ts`, `dealer-apply.api.ts`: the three downloads.
+- `src/features/dealer-applications/components/dealer-applications-list.tsx`, `dealer-application-detail.tsx`, `dealer-apply-form.tsx`: Blank form, Download PDF, and Download to print and sign.
+- `src/mocks/handlers/dealer-applications.ts`: the three PDFs.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`: records.
+
+#### Tests
+
+- **`[CHNL-007] The printed sheets (FS-071), through the API`:** the blank form for each type and an application's own, by name. The applicant's only once their mobile is verified (`no_session` before).
+- **`[CHNL-007] The printed sheets on the screens`:** Download PDF saves the application's sheet, then a busy PDF maker is said in words; Blank form → "For a new distributor" saves that type's form.
 
 ### Company settings read the application settings and any kind added later
 

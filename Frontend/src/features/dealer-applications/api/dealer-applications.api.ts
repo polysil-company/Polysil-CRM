@@ -1,7 +1,8 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
+import type { PartnerType } from "./data-sheet.schemas";
 import {
   dealerApplicationListSchema,
   dealerApplicationSchema,
@@ -222,5 +223,32 @@ export function relaxDealerApplicationDeposit({
     idempotencyKey,
     schema: dealerApplicationSchema,
     sensitive: true,
+  });
+}
+
+/**
+ * CHNL-007 · GET /dealer-applications/form.pdf (FS-071): the blank data sheet for a dealer or
+ * a distributor, to print and fill in by hand.
+ */
+export function downloadBlankApplicationForm(partnerType: PartnerType): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "CHNL-007",
+    logger: log,
+    fn: "downloadBlankApplicationForm",
+    path: "/dealer-applications/form.pdf",
+    query: { partner_type: partnerType },
+  });
+}
+
+/**
+ * CHNL-007 · GET /dealer-applications/{id}/pdf (FS-071): the data sheet filled from the
+ * application, as the client's paper form. The bank account is masked for everyone.
+ */
+export function downloadDealerApplicationPdf(applicationId: string): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "CHNL-007",
+    logger: log,
+    fn: "downloadDealerApplicationPdf",
+    path: applicationPath(applicationId, "/pdf"),
   });
 }

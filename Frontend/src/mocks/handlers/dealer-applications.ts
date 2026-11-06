@@ -336,6 +336,16 @@ const EMPTY_DATA_SHEET = {
   appointment_place: null,
 } as const;
 
+/** FS-071 · A stand-in for a printed sheet: a PDF header and the name the backend would give. */
+function mockPdf(filename: string): Response {
+  return new HttpResponse("%PDF-1.4\n% Polysil mock data sheet\n", {
+    headers: {
+      "content-type": "application/pdf",
+      "content-disposition": `attachment; filename="${filename}"`,
+    },
+  });
+}
+
 /** Replays: the same Idempotency-Key and body answer the first response again. */
 const replays = new Map<string, { body: string; response: () => Response }>();
 
@@ -794,6 +804,27 @@ export const dealerApplicationHandlers = [
     }
     const wire = dealerApplicationWire(started.application, true);
     return remember(request, raw, () => HttpResponse.json({ data: wire }, { status: 201 }));
+  }),
+
+  // FS-071 · the blank form, before "/:applicationId" so "form.pdf" isn't read as an id
+  http.get(base("/form.pdf"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!seesPartners()) return forbidden();
+    const type = new URL(request.url).searchParams.get("partner_type") ?? "dealer";
+    if (!PARTNER_TYPES.some((item) => item === type)) {
+      return invalid({ partner_type: "dealer or distributor" });
+    }
+    return mockPdf(`${type}-application-form.pdf`);
+  }),
+
+  http.get(base("/:applicationId/pdf"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!seesPartners()) return forbidden();
+    const application = find(params.applicationId);
+    if (application === undefined) return notFound();
+    return mockPdf(`application-${application.firm_name.toLowerCase().replace(/\W+/g, "-")}.pdf`);
   }),
 
   http.get(base("/:applicationId"), async ({ params }) => {
@@ -1277,6 +1308,15 @@ function applicantHandlers(): ReturnType<typeof http.get>[] {
       const problems = applyFields(application, parsed.data);
       if (problems !== null) return invalid(problems);
       return HttpResponse.json({ data: applicantView(application, true) });
+    }),
+
+    http.get(apply("/pdf"), async ({ params, request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      const application = byToken(params.token);
+      if (application === undefined) return linkGone();
+      if (!verified(application, request)) return noSession();
+      return mockPdf("my-application.pdf");
     }),
 
     http.get(apply("/gstin/:gstin"), async ({ params }) => {
