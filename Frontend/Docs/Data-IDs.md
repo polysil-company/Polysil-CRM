@@ -317,6 +317,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | ADMN-006 | A leaver — hand over their open leads and tasks, then deactivate or delete (`POST /users/{id}/handover`, `DELETE /users/{id}`) | shared | in-progress |
 | ADMN-007 | Company settings — how amended orders are re-approved, and complaint reopening (`GET /settings`, `PATCH /settings`) | shared | in-progress |
 | ADMN-008 | Org chart — who reports to whom, my team, or the whole company (`GET /users/org-chart`) | shared | in-progress |
+| ADMN-009 | Setup check — people and partners set up so that leads, dealers or approvals go astray (`GET /users/setup-check`, FS-082) | shared | in-progress |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |
 | NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | in-progress |
 | NOTIF-002 | Mark notifications as read — one or all | shared | in-progress |
