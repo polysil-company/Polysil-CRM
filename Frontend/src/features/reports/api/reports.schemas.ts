@@ -22,9 +22,15 @@ export const REPORT_NAMES = [
   "campaign-performance",
   "territory-performance",
   "complaints",
+  // FS-079
+  "sales-forecast",
+  "insights",
 ] as const;
 
 export type ReportName = (typeof REPORT_NAMES)[number];
+
+/** The reports that answer rows, totals and filters in one shape; the FS-079 two have their own. */
+export type TableReportName = Exclude<ReportName, "sales-forecast" | "insights">;
 
 /** The most rows a report returns; past it `truncated` is true and the totals still count all. */
 export const REPORT_ROW_CAP = 1000;
@@ -35,6 +41,9 @@ export const REPORT_MAX_DAYS = 366;
 /** Up to 20 territories, as on the lists. */
 export const REPORT_MAX_TERRITORIES = 20;
 
+/** FS-082 · Up to 10 roles on a report's role filter. */
+export const REPORT_MAX_ROLES = 10;
+
 const filtersSchema = z
   .object({
     from: isoDate.optional(),
@@ -43,6 +52,9 @@ const filtersSchema = z
     as_of: isoDateTime.optional(),
     territory_id: z.array(id).nullish(),
     owner_id: id.nullish(),
+    /** FS-082 · The team and roles asked for, echoed. */
+    team_of: id.nullish(),
+    roles: z.array(z.string()).nullish(),
     /** Unknown modes are kept and shown as sent. */
     sale_counted_at: z.string().min(1).optional(),
   })
@@ -111,6 +123,9 @@ const conversionTotalsSchema = z
 const salespersonRowSchema = z
   .object({
     user: personSchema,
+    /** FS-082 · The person's role and office now; every team member gets a row, zeros too. */
+    role: z.object({ code: z.string(), name: z.string() }).nullish(),
+    office: z.object({ id, name: z.string() }).nullish(),
     leads_created: count,
     leads_won: count,
     quotations_sent: count.nullable(),
@@ -122,6 +137,8 @@ const salespersonRowSchema = z
   })
   .transform((wire) => ({
     user: wire.user,
+    role: wire.role?.name ?? null,
+    office: wire.office?.name ?? null,
     leadsCreated: wire.leads_created,
     leadsWon: wire.leads_won,
     quotationsSent: wire.quotations_sent,
@@ -333,6 +350,131 @@ const complaintTotalsSchema = z.object({
   refunds: z.object({ count, amount: decimal }),
 });
 
+// ── sales forecast (RPT-004, FS-079) ──────────────────────────────────────────────
+
+/** `later`: anything past the three months shown. */
+export const FORECAST_LATER = "later";
+
+const moneyOrNull = decimal.nullable();
+
+const forecastFiguresShape = {
+  open: count,
+  with_value: count,
+  pipeline_value: decimal,
+  /** Null when there's too little history to weigh it; never 0 for that. */
+  weighted_value: moneyOrNull,
+  /** `YYYY-MM` for this month and the next two, then `later`. */
+  by_month: z.record(z.string(), moneyOrNull),
+  valued_by: z.object({ quotation: count, estimate: count }),
+};
+
+function toForecastFigures(wire: z.output<z.ZodObject<typeof forecastFiguresShape>>): {
+  open: number;
+  withValue: number;
+  pipeline: string;
+  weighted: string | null;
+  byMonth: Readonly<Record<string, string | null>>;
+  byQuotation: number;
+  byEstimate: number;
+} {
+  return {
+    open: wire.open,
+    withValue: wire.with_value,
+    pipeline: wire.pipeline_value,
+    weighted: wire.weighted_value,
+    byMonth: wire.by_month,
+    byQuotation: wire.valued_by.quotation,
+    byEstimate: wire.valued_by.estimate,
+  };
+}
+
+const forecastSchema = z.object({
+  data: z
+    .object({
+      group_by: z.string().nullable(),
+      months: z.array(z.string()),
+      rows: z.array(z.object({ key: keySchema, ...forecastFiguresShape })),
+      truncated: z.boolean(),
+      rates: z.array(
+        z.object({
+          stage: z.string(),
+          win_rate_pct: decimal,
+          closed: count,
+          /** Borrowed an earlier stage's rate: too few leads closed from this one. */
+          low_confidence: z.boolean(),
+        }),
+      ),
+      median_days_to_win: z.number().nullable(),
+      /** `not_enough_history` when no rate could be worked out. */
+      reason: z.string().nullable(),
+      filters: z.object({
+        history_days: count,
+        as_of: isoDate.optional(),
+        team_of: id.nullish(),
+        roles: z.array(z.string()).nullish(),
+      }),
+      totals: z.object(forecastFiguresShape),
+    })
+    .transform((wire) => ({
+      months: wire.months,
+      rows: wire.rows.map((row) => ({ key: row.key, ...toForecastFigures(row) })),
+      truncated: wire.truncated,
+      rates: wire.rates.map((rate) => ({
+        stage: rate.stage,
+        winRatePct: rate.win_rate_pct,
+        closed: rate.closed,
+        lowConfidence: rate.low_confidence,
+      })),
+      medianDaysToWin: wire.median_days_to_win,
+      notEnoughHistory: wire.reason === "not_enough_history",
+      historyDays: wire.filters.history_days,
+      asOf: wire.filters.as_of ?? null,
+      totals: toForecastFigures(wire.totals),
+    })),
+});
+
+// ── insights (RPT-005, FS-079) ────────────────────────────────────────────────────
+
+const insightsSchema = z.object({
+  data: z
+    .object({
+      rows: z.array(
+        z.object({
+          code: z.string().min(1),
+          /** A plain sentence, the backend's own. */
+          title: z.string(),
+          figure: decimal,
+          previous: decimal.nullable(),
+          /** `pct`, `hour` or `hours`; another unit is shown as sent. */
+          unit: z.string(),
+          /** The report behind it, with its grouping. */
+          link: z.object({ report: z.string(), group_by: z.string().optional() }).nullable(),
+        }),
+      ),
+      truncated: z.boolean(),
+      filters: z.object({
+        from: isoDate.optional(),
+        to: isoDate.optional(),
+        previous_from: isoDate.optional(),
+        previous_to: isoDate.optional(),
+      }),
+    })
+    .transform((wire) => ({
+      rows: wire.rows.map((row) => ({
+        code: row.code,
+        title: row.title,
+        figure: row.figure,
+        previous: row.previous,
+        unit: row.unit,
+        link: row.link,
+      })),
+      from: wire.filters.from ?? null,
+      to: wire.filters.to ?? null,
+      previousFrom: wire.filters.previous_from ?? null,
+      previousTo: wire.filters.previous_to ?? null,
+    })),
+});
+
 /** Each report's answer, by name. */
 export const REPORT_SCHEMAS = {
   "lead-conversion": reportSchema(conversionRowSchema, conversionTotalsSchema),
@@ -343,6 +485,8 @@ export const REPORT_SCHEMAS = {
   "campaign-performance": reportSchema(campaignRowSchema, campaignTotalsSchema),
   "territory-performance": reportSchema(territoryRowSchema, territoryTotalsSchema),
   complaints: reportSchema(complaintRowSchema, complaintTotalsSchema),
+  "sales-forecast": forecastSchema,
+  insights: insightsSchema,
 } as const;
 
 export type ReportData<N extends ReportName> = z.output<(typeof REPORT_SCHEMAS)[N]>["data"];
@@ -356,6 +500,10 @@ export interface ReportParams {
   readonly to: string | null;
   readonly territories: readonly string[];
   readonly owner: string | null;
+  /** FS-082 · One person and everyone below them on the org chart; never with `owner`. */
+  readonly teamOf: string | null;
+  /** FS-082 · Only people holding one of these roles now (up to 10 codes). */
+  readonly roles: readonly string[];
   /** `group_by`, or `level` on the territory report; null for the report's default. */
   readonly groupBy: string | null;
 }

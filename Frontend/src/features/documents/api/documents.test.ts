@@ -83,6 +83,7 @@ describe("[DOC-001] Documents on a record", () => {
       "cancelled_cheque",
       "shop_photo",
       "shop_licence",
+      "deposit_slip",
       "other",
     ]);
   });

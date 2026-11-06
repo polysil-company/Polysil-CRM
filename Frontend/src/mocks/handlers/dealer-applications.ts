@@ -2,6 +2,12 @@ import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
 import {
+  AREA_UNITS,
+  INSTALLATION_SCOPES,
+  PARTNER_TYPES,
+  type PartnerType,
+} from "@/features/dealer-applications/api/data-sheet.schemas";
+import {
   DEALER_APPLICATION_STATUSES,
   FIRM_TYPES,
   OPEN_STATUSES,
@@ -11,7 +17,7 @@ import { buildApiUrl } from "@/lib/api/url";
 import { can } from "@/lib/auth/permissions";
 import { isPartnerRole } from "@/lib/auth/roles";
 import { MOCK_OTP_CODE, readMockRole } from "@/lib/dev/mock-settings";
-import { normalizeIndianMobile } from "@/lib/format";
+import { normalizeIndianMobile, todayInIndia } from "@/lib/format";
 import type { MockDealerApplication } from "@/mocks/data/dealer-applications";
 import type { MockDocument } from "@/mocks/data/documents";
 import { mockPermissionsFor } from "@/mocks/data/permissions";
@@ -22,14 +28,20 @@ import { mockDb } from "@/mocks/db";
 
 import { addMockPartner, gstinLookup } from "./partners";
 import { applyScenario } from "./scenario";
+import { mockSettings } from "./settings";
 import { errorResponse, readMultipart } from "./shared";
 
 /**
  * CHNL-007 · Dealer applications for the mock backend, following `dealer_applications.py`:
  *  - staff who see partners start, read, fill, submit, withdraw and renew;
- *  - a State Manager or above (or Admin), never whoever started it, decides a submitted one;
+ *  - the roles the company settings name for the type, never whoever started it, decide a
+ *    submitted one;
  *  - `missing` names the fields and documents still needed; submitting needs none missing;
- *  - the link (`apply_url`) is in the answer only after creating it or renewing it.
+ *  - the link (`apply_url`) is in the answer only after creating it or renewing it;
+ *  - FS-071: an application makes a dealer or a distributor, carries the data sheet, and the
+ *    company settings name the extra fields each type must have;
+ *  - FS-071: the type's deposit is copied from its setting at the start; it is recorded with
+ *    a pay slip, or lowered by the roles the settings name; approval waits until it is paid.
  */
 
 const GSTIN_PATTERN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -37,7 +49,12 @@ const PAN_PATTERN = /^[A-Z]{5}\d{4}[A-Z]$/;
 const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const LINK_DAYS = 30;
 /** The roles that decide, besides Admin: State Manager or above (role level 3+). */
-const DECIDERS = new Set(["state_manager", "regional_manager", "admin"]);
+/** The mock's role as the backend's role code, for the settings that name roles. */
+const BACKEND_ROLE: Readonly<Record<string, string>> = {
+  admin: "admin_sales",
+  employee: "field_officer",
+  qa_manager: "qc_manager",
+};
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -94,9 +111,46 @@ function documentsOf(applicationId: string): Set<string> {
   );
 }
 
-/** The backend's `dealer_application_missing`: fields first, then the three documents. */
+/** FS-071 · The extra fields the company settings require of this type (`*_application_required`). */
+function requiredExtras(application: MockDealerApplication): string[] {
+  const key =
+    application.partner_type === "distributor"
+      ? "distributor_application_required"
+      : "dealer_application_required";
+  const value = mockSettings().find((setting) => setting.key === key)?.value;
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+/** Whether a required extra is filled in, as `dealer_application_missing` reads each. */
+function extraFilled(
+  application: MockDealerApplication,
+  extra: string,
+  docs: Set<string>,
+): boolean {
+  const filled = (value: unknown): boolean =>
+    value !== null &&
+    value !== undefined &&
+    value !== "" &&
+    !(Array.isArray(value) && value.length === 0);
+  switch (extra) {
+    case "vehicles":
+      return [application.two_wheelers, application.cars, application.other_vehicles].some(filled);
+    case "staff_counts":
+      return filled(application.sales_executives) && filled(application.technicians);
+    case "shop_photo":
+    case "shop_licence":
+      return docs.has(extra);
+    default:
+      return filled(Object.entries(application).find(([key]) => key === extra)?.[1]);
+  }
+}
+
+/** The backend's `dealer_application_missing`: fields first, then the documents. */
 export function missingOf(application: MockDealerApplication): string[] {
   const docs = documentsOf(application.id);
+  const extras = requiredExtras(application).filter(
+    (extra) => !extraFilled(application, extra, docs),
+  );
   const missing = [
     application.firm_type === null ? "firm_type" : null,
     application.gst_registered && application.gstin === null ? "gstin" : null,
@@ -109,14 +163,75 @@ export function missingOf(application: MockDealerApplication): string[] {
     application.gst_registered && !docs.has("gst_certificate") ? "gst_certificate" : null,
     docs.has("pan_card") ? null : "pan_card",
     docs.has("cancelled_cheque") ? null : "cancelled_cheque",
+    ...extras,
   ];
-  return missing.filter((item) => item !== null).sort();
+  return [...new Set(missing.filter((item) => item !== null))].sort();
+}
+
+/** FS-071 · Who decides this type: the company setting `*_application_deciders`. */
+function decidersOf(application: MockDealerApplication): readonly string[] {
+  const key =
+    application.partner_type === "distributor"
+      ? "distributor_application_deciders"
+      : "dealer_application_deciders";
+  const value = mockSettings().find((setting) => setting.key === key)?.value;
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+type MockDeposit = NonNullable<MockDealerApplication["deposit"]>;
+
+/** FS-071 · The type's deposit, from its company setting, in rupees with two decimals. */
+function depositFor(type: PartnerType): string {
+  const value = mockSettings().find((setting) => setting.key === `${type}_deposit_amount`)?.value;
+  return (typeof value === "number" ? value : 0).toFixed(2);
+}
+
+function newDeposit(amount: string): MockDeposit {
+  return {
+    status: Number(amount) > 0 ? "pending" : "not_required",
+    amount_set: amount,
+    amount_due: amount,
+    paid_amount: null,
+    paid_on: null,
+    reference: null,
+    slip_id: null,
+    history: [],
+  };
+}
+
+/** `dealer_application_deposit_status()`: paid, waived, pending or not required. */
+function depositStatusOf(deposit: MockDeposit): MockDeposit["status"] {
+  const due = Number(deposit.amount_due);
+  if (deposit.paid_amount != null && Number(deposit.paid_amount) >= due) return "paid";
+  if (due === 0 && deposit.history.some((entry) => entry.kind === "relaxation")) return "waived";
+  return due > 0 ? "pending" : "not_required";
+}
+
+function depositOf(application: MockDealerApplication): MockDeposit {
+  const deposit = application.deposit ?? newDeposit("0.00");
+  application.deposit = deposit;
+  return deposit;
+}
+
+function mayRelax(application: MockDealerApplication): boolean {
+  const deposit = depositOf(application);
+  const role = readMockRole();
+  const roles = mockSettings().find((setting) => setting.key === "deposit_relaxation_roles")?.value;
+  return (
+    OPEN_STATUSES.some((status) => status === application.status) &&
+    application.created_by?.id !== caller().id &&
+    !deposit.history.some((entry) => entry.kind === "payment") &&
+    Number(deposit.amount_due) > 0 &&
+    Array.isArray(roles) &&
+    roles.includes(BACKEND_ROLE[role] ?? role)
+  );
 }
 
 function mayDecide(application: MockDealerApplication): boolean {
+  const role = readMockRole();
   return (
     application.status === "submitted" &&
-    DECIDERS.has(readMockRole()) &&
+    decidersOf(application).includes(BACKEND_ROLE[role] ?? role) &&
     application.created_by?.id !== caller().id
   );
 }
@@ -141,6 +256,8 @@ export function dealerApplicationWire(
       decide,
       withdraw: open,
       renew: application.status === "draft" || application.status === "returned",
+      record_deposit: open && Number(depositOf(application).amount_due) > 0,
+      relax_deposit: mayRelax(application),
     },
   };
 }
@@ -154,11 +271,14 @@ function blankApplication(input: {
   by: { id: string; full_name: string } | null;
   createdAt: string;
   serial: number;
+  partnerType?: PartnerType;
 }): MockDealerApplication {
   return {
     id: mockUuid(MOCK_ID_SPACE.dealerApplication, input.serial),
     token: newToken(),
     status: "draft",
+    partner_type: input.partnerType ?? "dealer",
+    deposit: newDeposit(depositFor(input.partnerType ?? "dealer")),
     firm_name: input.firm,
     contact_name: input.contact,
     mobile: input.mobile,
@@ -178,6 +298,7 @@ function blankApplication(input: {
     bank_account_name: null,
     bank_account_no: null,
     bank_ifsc: null,
+    ...EMPTY_DATA_SHEET,
     gst_lookup: null,
     gst_state_mismatch: false,
     partner_id: null,
@@ -190,6 +311,39 @@ function blankApplication(input: {
     created_at: input.createdAt,
     submitted_at: null,
   };
+}
+
+/** FS-071 · A new application's data sheet: nothing filled in yet. */
+const EMPTY_DATA_SHEET = {
+  telephone: null,
+  established_on: null,
+  bank_name: null,
+  bank_branch: null,
+  bank_address: null,
+  working_capital: null,
+  other_sources_lakhs: null,
+  working_capital_total_lakhs: null,
+  two_wheelers: null,
+  cars: null,
+  other_vehicles: null,
+  office_area: null,
+  godown_area: null,
+  area_unit: "sq_ft",
+  manpower: null,
+  previous_installations: null,
+  sales_executives: null,
+  technicians: null,
+  appointment_place: null,
+} as const;
+
+/** FS-071 · A stand-in for a printed sheet: a PDF header and the name the backend would give. */
+function mockPdf(filename: string): Response {
+  return new HttpResponse("%PDF-1.4\n% Polysil mock data sheet\n", {
+    headers: {
+      "content-type": "application/pdf",
+      "content-disposition": `attachment; filename="${filename}"`,
+    },
+  });
 }
 
 /** Replays: the same Idempotency-Key and body answer the first response again. */
@@ -278,6 +432,9 @@ export function mockDealerApplications(): MockDealerApplication[] {
       decision_remark: "The cancelled cheque is unreadable. Upload a clearer photo.",
     },
   ];
+  // the first was started while a dealer's deposit was set at 50,000: it still owes it
+  const first = rows[0];
+  if (first !== undefined) first.deposit = newDeposit("50000.00");
   // fixed links for the seeds, so a demo can open /dealer-apply/apply-demo-1 after a reload
   rows.forEach((row, index) => {
     row.token = `apply-demo-${String(index + 1)}`;
@@ -323,6 +480,7 @@ export function startMockDealerApplicationFor(input: {
   mobile: string;
   territory: { id: string; name: string };
   leadId: string | null;
+  partnerType?: PartnerType;
 }): { application: MockDealerApplication } | { refused: "mobile_in_use" | "application_open" } {
   const rows = mockDealerApplications();
   if (
@@ -361,7 +519,19 @@ const createSchema = z.object({
   mobile: text.min(1),
   territory_id: text.min(1),
   lead_id: z.string().nullish(),
+  partner_type: z.enum(PARTNER_TYPES).optional(),
 });
+
+/** The backend's decimal strings (`Lakhs`, `Area`): digits, at most two decimals. */
+const lakhs = z
+  .string()
+  .trim()
+  .regex(/^\d{1,5}(\.\d{1,2})?$/, "lakhs, at most two decimals");
+const areaText = z
+  .string()
+  .trim()
+  .regex(/^\d{1,7}(\.\d{1,2})?$/, "an area, at most two decimals");
+const thisYear = new Date().getFullYear();
 
 const fieldsSchema = z.object({
   firm_name: text.min(1).max(200).optional(),
@@ -380,6 +550,83 @@ const fieldsSchema = z.object({
   bank_account_name: nullableText.optional(),
   bank_account_no: nullableText.optional(),
   bank_ifsc: nullableText.optional(),
+  // FS-071 · the data sheet, with the backend's limits
+  telephone: nullableText.optional(),
+  established_on: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine((value) => value >= "1900-01-01" && value <= todayInIndia(), {
+      message: "from 1900, not after today",
+    })
+    .nullable()
+    .optional(),
+  bank_name: nullableText.optional(),
+  bank_branch: nullableText.optional(),
+  bank_address: nullableText.optional(),
+  working_capital: z
+    .array(z.object({ facility: text.min(1).max(100), amount_lakhs: lakhs }))
+    .max(10)
+    .nullable()
+    .optional(),
+  other_sources_lakhs: lakhs.nullable().optional(),
+  two_wheelers: z.number().int().min(0).max(999).nullable().optional(),
+  cars: z.number().int().min(0).max(999).nullable().optional(),
+  other_vehicles: nullableText.optional(),
+  office_area: areaText.nullable().optional(),
+  godown_area: areaText.nullable().optional(),
+  area_unit: z.enum(AREA_UNITS).nullable().optional(),
+  manpower: z
+    .array(
+      z.object({
+        category: text.min(1).max(100),
+        qualification: z.string().trim().max(100).nullish(),
+        work_type: z.string().trim().max(100).nullish(),
+        experience_years: z.number().int().min(0).max(80).nullish(),
+        people: z.number().int().min(1).max(9999),
+      }),
+    )
+    .max(20)
+    .nullable()
+    .optional(),
+  previous_installations: z
+    .array(
+      z.object({
+        year: z.number().int().min(1950).max(thisYear),
+        customers: z.number().int().min(0).max(999999),
+        description: text.min(1).max(300),
+        scope: z.enum(INSTALLATION_SCOPES),
+        cost_lakhs: lakhs,
+      }),
+    )
+    .max(50)
+    .nullable()
+    .optional(),
+  sales_executives: z.number().int().min(0).max(9999).nullable().optional(),
+  technicians: z.number().int().min(0).max(9999).nullable().optional(),
+  appointment_place: nullableText.optional(),
+});
+
+/** The backend's `Money`: rupees, digits with at most two decimals. */
+const money = z
+  .string()
+  .trim()
+  .regex(/^\d{1,8}(\.\d{1,2})?$/, "rupees, at most two decimals");
+
+const depositRecordSchema = z.object({
+  amount: money.refine((value) => Number(value) > 0, { message: "above 0" }),
+  paid_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "a date"),
+  reference: z.string().trim().max(100).nullish(),
+  slip_id: z.string().min(1, "required"),
+});
+
+const depositRelaxationSchema = z.object({
+  amount_due: money,
+  reason: z.string().trim().min(1, "required").max(1000),
+});
+
+/** Staff may also change the type, while draft or returned and before any deposit entry. */
+const staffFieldsSchema = fieldsSchema.extend({
+  partner_type: z.enum(PARTNER_TYPES).optional(),
 });
 
 const decisionSchema = z.object({
@@ -432,12 +679,28 @@ function applyFields(
   }
   if (pan !== undefined) application.pan = pan;
   if (ifsc !== undefined) application.bank_ifsc = ifsc;
+  application.working_capital_total_lakhs = workingCapitalTotal(application);
   return null;
 }
 
-function nextDealerCode(): string {
-  const taken = mockDb.partners.filter((partner) => partner.code.startsWith("DLR-GJ-")).length;
-  return `DLR-GJ-${String(taken + 1).padStart(4, "0")}`;
+/** The rows plus other sources, in lakhs; null when neither is filled. */
+function workingCapitalTotal(application: MockDealerApplication): string | null {
+  const rows = application.working_capital ?? [];
+  const other = application.other_sources_lakhs ?? null;
+  if (rows.length === 0 && other === null) return null;
+  const paise = [
+    ...rows.map((row) => String(row.amount_lakhs)),
+    ...(other === null ? [] : [String(other)]),
+  ]
+    .map((amount) => Math.round(Number(amount) * 100))
+    .reduce((sum, value) => sum + value, 0);
+  return (paise / 100).toFixed(2);
+}
+
+function nextPartnerCode(type: PartnerType): string {
+  const prefix = type === "distributor" ? "DIST-GJ-" : "DLR-GJ-";
+  const taken = mockDb.partners.filter((partner) => partner.code.startsWith(prefix)).length;
+  return `${prefix}${String(taken + 1).padStart(4, "0")}`;
 }
 
 function replayOf(request: Request, raw: unknown): Response | null | "conflict" {
@@ -475,12 +738,17 @@ export const dealerApplicationHandlers = [
       return invalid({ status: "not a status" });
     }
     const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+    const type = url.searchParams.get("partner_type");
+    if (type !== null && !PARTNER_TYPES.some((item) => item === type)) {
+      return invalid({ partner_type: "dealer or distributor" });
+    }
     const rows =
       scenario === "empty"
         ? []
         : mockDealerApplications().filter(
             (row) =>
               (statuses.length === 0 || statuses.includes(row.status)) &&
+              (type === null || row.partner_type === type) &&
               (q === "" ||
                 row.firm_name.toLowerCase().includes(q) ||
                 row.contact_name.toLowerCase().includes(q) ||
@@ -490,6 +758,8 @@ export const dealerApplicationHandlers = [
       data: rows.slice(0, 200).map((row) => ({
         id: row.id,
         status: row.status,
+        partner_type: row.partner_type ?? "dealer",
+        deposit_status: depositOf(row).status,
         firm_name: row.firm_name,
         contact_name: row.contact_name,
         territory_name: row.territory.name,
@@ -525,6 +795,7 @@ export const dealerApplicationHandlers = [
       mobile,
       territory: { id: territory.id, name: territory.name },
       leadId: body.lead_id ?? null,
+      partnerType: body.partner_type ?? "dealer",
     });
     if ("refused" in started) {
       return started.refused === "mobile_in_use"
@@ -533,6 +804,27 @@ export const dealerApplicationHandlers = [
     }
     const wire = dealerApplicationWire(started.application, true);
     return remember(request, raw, () => HttpResponse.json({ data: wire }, { status: 201 }));
+  }),
+
+  // FS-071 · the blank form, before "/:applicationId" so "form.pdf" isn't read as an id
+  http.get(base("/form.pdf"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!seesPartners()) return forbidden();
+    const type = new URL(request.url).searchParams.get("partner_type") ?? "dealer";
+    if (!PARTNER_TYPES.some((item) => item === type)) {
+      return invalid({ partner_type: "dealer or distributor" });
+    }
+    return mockPdf(`${type}-application-form.pdf`);
+  }),
+
+  http.get(base("/:applicationId/pdf"), async ({ params }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!seesPartners()) return forbidden();
+    const application = find(params.applicationId);
+    if (application === undefined) return notFound();
+    return mockPdf(`application-${application.firm_name.toLowerCase().replace(/\W+/g, "-")}.pdf`);
   }),
 
   http.get(base("/:applicationId"), async ({ params }) => {
@@ -556,13 +848,26 @@ export const dealerApplicationHandlers = [
       return errorResponse(409, "idempotency_conflict", "Another request used that key.");
     if (replay !== null) return replay;
     if (!OPEN_STATUSES.some((status) => status === application.status)) return closed();
-    const parsed = fieldsSchema.safeParse(raw);
+    const parsed = staffFieldsSchema.safeParse(raw);
     if (!parsed.success) {
       const fields: Record<string, string> = {};
-      for (const issue of parsed.error.issues) fields[String(issue.path[0])] = issue.message;
+      for (const issue of parsed.error.issues) fields[issue.path.join(".")] = issue.message;
       return invalid(fields);
     }
-    const problems = applyFields(application, parsed.data);
+    const { partner_type: partnerType, ...fieldsOnly } = parsed.data;
+    if (partnerType !== undefined && partnerType !== application.partner_type) {
+      if (application.status === "submitted") return closed();
+      if (depositOf(application).history.length > 0) {
+        return errorResponse(
+          409,
+          "deposit_recorded",
+          "A deposit is recorded, so the type cannot change.",
+        );
+      }
+      application.partner_type = partnerType;
+      application.deposit = newDeposit(depositFor(partnerType));
+    }
+    const problems = applyFields(application, fieldsOnly);
     if (problems !== null) return invalid(problems);
     const wire = dealerApplicationWire(application);
     return remember(request, raw, () => HttpResponse.json({ data: wire }));
@@ -654,7 +959,7 @@ export const dealerApplicationHandlers = [
       return errorResponse(
         403,
         "insufficient_permission",
-        "Only a State Manager or above, other than whoever started it, decides.",
+        "Only the roles the company settings name, other than whoever started it, decide.",
       );
     }
     const remark = body.remark?.trim() || null;
@@ -662,6 +967,9 @@ export const dealerApplicationHandlers = [
       return invalid({ remark: "required to reject or return" });
     }
     if (body.decision === "approve") {
+      if (depositOf(application).status === "pending") {
+        return errorResponse(409, "deposit_pending", "The deposit is not paid or relaxed yet.");
+      }
       const parent =
         body.parent_id == null
           ? null
@@ -674,15 +982,19 @@ export const dealerApplicationHandlers = [
       if (body.parent_id != null && (parent === undefined || parent === null)) {
         return invalid({ parent_id: "not an active distributor" });
       }
-      const code = body.code?.trim() ? body.code.trim().toUpperCase() : nextDealerCode();
+      const type: PartnerType = application.partner_type ?? "dealer";
+      if (type === "distributor" && body.parent_id != null) {
+        return invalid({ parent_id: "a distributor sits directly under Polysil" });
+      }
+      const code = body.code?.trim() ? body.code.trim().toUpperCase() : nextPartnerCode(type);
       if (mockDb.partners.some((partner) => partner.code === code)) {
         return errorResponse(409, "code_in_use", "That partner code is taken.");
       }
       application.partner_id = addMockPartner({
         code,
         name: application.firm_name,
-        partner_type: "dealer",
-        price_tier: "dealer",
+        partner_type: type,
+        price_tier: type,
         parent:
           parent == null ? null : { id: parent.id, name: parent.name, partner_type: "distributor" },
         parent_id: parent?.id ?? null,
@@ -705,6 +1017,123 @@ export const dealerApplicationHandlers = [
     application.decision_remark = remark;
     application.decided_by = caller();
     application.decided_at = new Date().toISOString();
+    const wire = dealerApplicationWire(application);
+    return remember(request, raw, () => HttpResponse.json({ data: wire }));
+  }),
+
+  http.post(base("/:applicationId/deposit"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!seesPartners()) return forbidden();
+    const application = find(params.applicationId);
+    if (application === undefined) return notFound();
+    const raw = await bodyOf(request);
+    const replay = replayOf(request, raw);
+    if (replay === "conflict")
+      return errorResponse(409, "idempotency_conflict", "Another request used that key.");
+    if (replay !== null) return replay;
+    if (!OPEN_STATUSES.some((status) => status === application.status)) return closed();
+    const deposit = depositOf(application);
+    if (Number(deposit.amount_due) <= 0) {
+      return errorResponse(409, "deposit_not_due", "No deposit is due on this application.");
+    }
+    const parsed = depositRecordSchema.safeParse(raw);
+    if (!parsed.success) {
+      const fields: Record<string, string> = {};
+      for (const issue of parsed.error.issues) fields[issue.path.join(".")] = issue.message;
+      return invalid(fields);
+    }
+    const body = parsed.data;
+    if (body.paid_on > todayInIndia()) {
+      return invalid({ paid_on: "not after today" });
+    }
+    if (Number(body.amount) > Number(deposit.amount_set)) {
+      return invalid({ amount: "above 0 and not above the amount set" });
+    }
+    if (Number(body.amount) < Number(deposit.amount_due)) {
+      return invalid({ amount: "below the amount due" }, "deposit_short");
+    }
+    const slip = mockDb.documents.find(
+      (document) =>
+        document.id === body.slip_id &&
+        !document.removed &&
+        document.record_type === "dealer_application" &&
+        document.record_id === application.id &&
+        document.doc_type === "deposit_slip",
+    );
+    if (slip === undefined) {
+      return invalid({ slip_id: "upload the pay slip as a deposit_slip document first" });
+    }
+    const at = new Date().toISOString();
+    deposit.history.push({
+      kind: "payment",
+      amount: Number(body.amount).toFixed(2),
+      paid_on: body.paid_on,
+      reference: body.reference ?? null,
+      slip_id: body.slip_id,
+      by: caller(),
+      at,
+    });
+    deposit.paid_amount = Number(body.amount).toFixed(2);
+    deposit.paid_on = body.paid_on;
+    deposit.reference = body.reference ?? null;
+    deposit.slip_id = body.slip_id;
+    deposit.status = depositStatusOf(deposit);
+    const wire = dealerApplicationWire(application);
+    return remember(request, raw, () => HttpResponse.json({ data: wire }));
+  }),
+
+  http.post(base("/:applicationId/deposit/relaxation"), async ({ params, request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (!seesPartners()) return forbidden();
+    const application = find(params.applicationId);
+    if (application === undefined) return notFound();
+    const raw = await bodyOf(request);
+    const replay = replayOf(request, raw);
+    if (replay === "conflict")
+      return errorResponse(409, "idempotency_conflict", "Another request used that key.");
+    if (replay !== null) return replay;
+    if (!OPEN_STATUSES.some((status) => status === application.status)) return closed();
+    const deposit = depositOf(application);
+    if (deposit.history.some((entry) => entry.kind === "payment")) {
+      return errorResponse(
+        409,
+        "deposit_paid",
+        "A payment is recorded, so the deposit cannot be relaxed.",
+      );
+    }
+    if (Number(deposit.amount_due) <= 0) {
+      return errorResponse(409, "deposit_not_due", "No deposit is due on this application.");
+    }
+    if (!mayRelax(application)) {
+      return errorResponse(
+        403,
+        "not_your_relaxation",
+        "Only a role the settings name relaxes a deposit, never whoever started it.",
+      );
+    }
+    const parsed = depositRelaxationSchema.safeParse(raw);
+    if (!parsed.success) {
+      const fields: Record<string, string> = {};
+      for (const issue of parsed.error.issues) fields[issue.path.join(".")] = issue.message;
+      return invalid(fields);
+    }
+    const body = parsed.data;
+    if (Number(body.amount_due) >= Number(deposit.amount_due)) {
+      return invalid({ amount_due: "lower than the amount due" }, "not_lower");
+    }
+    const to = Number(body.amount_due).toFixed(2);
+    deposit.history.push({
+      kind: "relaxation",
+      from_due: deposit.amount_due,
+      to,
+      reason: body.reason,
+      by: caller(),
+      at: new Date().toISOString(),
+    });
+    deposit.amount_due = to;
+    deposit.status = depositStatusOf(deposit);
     const wire = dealerApplicationWire(application);
     return remember(request, raw, () => HttpResponse.json({ data: wire }));
   }),
@@ -789,6 +1218,26 @@ function applicantView(application: MockDealerApplication, withSession: boolean)
     bank_account_name: application.bank_account_name,
     bank_account_no: application.bank_account_no,
     bank_ifsc: application.bank_ifsc,
+    partner_type: application.partner_type,
+    telephone: application.telephone,
+    established_on: application.established_on,
+    bank_name: application.bank_name,
+    bank_branch: application.bank_branch,
+    bank_address: application.bank_address,
+    working_capital: application.working_capital,
+    other_sources_lakhs: application.other_sources_lakhs,
+    working_capital_total_lakhs: application.working_capital_total_lakhs,
+    two_wheelers: application.two_wheelers,
+    cars: application.cars,
+    other_vehicles: application.other_vehicles,
+    office_area: application.office_area,
+    godown_area: application.godown_area,
+    area_unit: application.area_unit,
+    manpower: application.manpower,
+    previous_installations: application.previous_installations,
+    sales_executives: application.sales_executives,
+    technicians: application.technicians,
+    appointment_place: application.appointment_place,
     documents: applicantDocuments(application).map((document) => ({
       id: document.id,
       doc_type: document.doc_type,
@@ -853,12 +1302,21 @@ function applicantHandlers(): ReturnType<typeof http.get>[] {
       const parsed = fieldsSchema.safeParse(await bodyOf(request));
       if (!parsed.success) {
         const fields: Record<string, string> = {};
-        for (const issue of parsed.error.issues) fields[String(issue.path[0])] = issue.message;
+        for (const issue of parsed.error.issues) fields[issue.path.join(".")] = issue.message;
         return invalid(fields);
       }
       const problems = applyFields(application, parsed.data);
       if (problems !== null) return invalid(problems);
       return HttpResponse.json({ data: applicantView(application, true) });
+    }),
+
+    http.get(apply("/pdf"), async ({ params, request }) => {
+      const { failure } = await applyScenario();
+      if (failure) return failure;
+      const application = byToken(params.token);
+      if (application === undefined) return linkGone();
+      if (!verified(application, request)) return noSession();
+      return mockPdf("my-application.pdf");
     }),
 
     http.get(apply("/gstin/:gstin"), async ({ params }) => {
