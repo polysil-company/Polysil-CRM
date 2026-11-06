@@ -44,6 +44,7 @@ async def test_a_district_manager_sees_the_owner_and_a_dealer_creator_on_the_lea
     r = await client.get(f"{V1}/leads", headers=h, params={"q": "Named Farmer"})
     assert r.status_code == 200, r.text
     row = next(x for x in r.json()["data"] if x["id"] == lead)
-    assert row["owner"] == {"id": shop.ids["field_officer"], "full_name": "Field Officer"}
+    # BE-042: the list leaves is_active null; only the one-lead read fills it
+    assert row["owner"] == {"id": shop.ids["field_officer"], "full_name": "Field Officer", "is_active": None}
     assert row["created_by"] == {"id": shop.ids["dealer"], "full_name": "Bhavesh Shah"}
     assert row["assigned_partner"]["name"] == "Shah Irrigation"
