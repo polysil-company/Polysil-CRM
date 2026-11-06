@@ -123,6 +123,12 @@ def name_key(text: str) -> str:
     return _RUNS.sub(" ", _ESCAPES.sub("", text)).strip().casefold()
 
 
+def tidy_name(text: str) -> str:
+    """A product name or code as it is stored (FS-083): `name_key` without the
+    casefold. The catalogue's trimmed checks refuse anything else."""
+    return _RUNS.sub(" ", _ESCAPES.sub("", text)).strip()
+
+
 # a Python repr: '...' or "...", with backslash escapes inside
 _QUOTED = re.compile(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"")
 _DIGITS = re.compile(r"\d{6,}")

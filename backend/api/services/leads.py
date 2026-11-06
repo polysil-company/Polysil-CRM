@@ -63,6 +63,7 @@ from api.schemas.leads import (
     LookupUpdate,
     MergedRef,
     OrgUnitRef,
+    OwnerRef,
     PageMeta,
     PartnerPick,
     PartnerRef,
@@ -499,7 +500,11 @@ async def get_lead(db: AsyncSession, caller: Caller, lead_id: str) -> Lead:
         text("SELECT kind, id, name, detail FROM lead_people(:id)"), {"id": lead_id})).all()
     for p in people:
         if p.kind == "owner":
-            lead.owner = UserRef(id=str(p.id), full_name=p.name)
+            # BE-042: 086 says whether the owner still works here. Staff only: who
+            # has left Polysil is not a dealer's business (code review F-5)
+            active = (p.detail == "active" if p.detail else None
+                      ) if caller.partner_id is None else None
+            lead.owner = OwnerRef(id=str(p.id), full_name=p.name, is_active=active)
         elif p.kind == "created_by":
             lead.created_by = UserRef(id=str(p.id), full_name=p.name)
         elif p.kind == "assigned_partner":
@@ -619,7 +624,7 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
         territory=TerritoryRef(id=str(row.territory_id), name=row.territory_name,
                                level=row.territory_level),
         village=row.village,
-        owner=names.user(row.owner_user_id, row.owner_name),
+        owner=_as_owner(names.user(row.owner_user_id, row.owner_name)),
         owner_org_unit=OrgUnitRef(id=str(row.owner_org_unit_id),
                                   name=row.owner_org_unit_name),
         assigned_partner=names.partner(row.assigned_partner_id, row.partner_name,
@@ -643,6 +648,11 @@ def _row_to_lead(row: Any, *, duplicates: list[DuplicateRef],
         deleted_at=_iso(row.deleted_at),
         deleted_by=_deleted_by(row.deleted_by_json),
         duplicates=duplicates)
+
+
+def _as_owner(user: UserRef | None) -> OwnerRef | None:
+    """The list leaves is_active null; get_lead() sets it from lead_people() (BE-042)."""
+    return OwnerRef(**user.model_dump()) if user else None
 
 
 def _deleted_by(raw: Any) -> UserRef | None:
@@ -2091,29 +2101,40 @@ async def list_lost_reasons(db: AsyncSession) -> list[LookupItem]:
 
 
 async def list_partners(db: AsyncSession, *, q: str | None = None,
-                        limit: int = 50) -> list[PartnerPick]:
+                        limit: int = 50, for_order: bool = False) -> list[PartnerPick]:
     """The partner picker for assignment (FS-003 4). channel_partner's own policies
     scope it: a dealer sees its subtree, a manager the partners in its territories,
     an admin all. q matches the name, the code, the contact person or one of the
     partner's users, since staff know a dealer by its owner as often as by its firm
     (walk F-9). The user match is a definer function returning ids only; the join
-    stays under channel_partner's policies, so it widens nothing (056)."""
+    stays under channel_partner's policies, so it widens nothing (056).
+
+    `for_order` (FS-084) adds the distributors above a partner under the caller's
+    area, from the definer order_suppliers() (087). One statement, so the database
+    orders and cuts both kinds of row by one collation (plan review C-3)."""
     limit = max(1, min(limit, _MAX_LIMIT))
     like = _contains(q) if q else None
-    rows = (await db.execute(text("""
-        SELECT cp.id, cp.code, cp.name, cp.partner_type::text AS ptype,
-               t.id AS tid, t.name AS tname, t.level::text AS tlevel
+    area = """
+        SELECT cp.id, cp.code::text AS code, cp.name, cp.partner_type::text AS ptype,
+               t.id AS tid, t.name::text AS tname, t.level::text AS tlevel, false AS supplier
           FROM channel_partner cp
           LEFT JOIN territory t ON t.id = cp.territory_id
          WHERE cp.is_active AND cp.deleted_at IS NULL
            AND (CAST(:like AS text) IS NULL
                 OR cp.name ILIKE CAST(:like AS text) OR cp.code ILIKE CAST(:like AS text)
                 OR cp.contact_name ILIKE CAST(:like AS text)
-                OR cp.id IN (SELECT partner_ids_by_user_name(CAST(:like AS text))))
-         ORDER BY cp.name LIMIT :lim"""), {"like": like, "lim": limit})).all()
+                OR cp.id IN (SELECT partner_ids_by_user_name(CAST(:like AS text))))"""
+    suppliers = """
+        UNION ALL
+        SELECT s.id, s.code, s.name, 'distributor', s.territory_id, s.territory_name,
+               s.territory_level, true
+          FROM order_suppliers(CAST(:like AS text), :lim) s"""
+    sql = f"SELECT * FROM ({area}{suppliers if for_order else ''}) x ORDER BY name, id LIMIT :lim"
+    rows = (await db.execute(text(sql), {"like": like, "lim": limit})).all()
     return [PartnerPick(
         id=str(r.id), code=r.code, name=r.name, partner_type=r.ptype,
-        territory=TerritoryParent(id=str(r.tid), name=r.tname, level=r.tlevel) if r.tid else None)
+        territory=TerritoryParent(id=str(r.tid), name=r.tname, level=r.tlevel) if r.tid else None,
+        supplies_your_area=r.supplier)
         for r in rows]
 
 

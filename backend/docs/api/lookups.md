@@ -576,9 +576,16 @@ Switch a system on or off.
 
 **Partners**
 
-The partner picker for assigning a lead to a channel partner. You see only
-the partners in your own scope: a dealer its subtree, a district manager the
-partners in its territories, an admin all of them.
+The partner picker. You see only the partners in your own scope: a dealer
+its subtree, a district manager the partners in its territories, an admin all
+of them. Without `for` it is the picker for assigning a lead, and needs
+`leads.view`.
+
+With `for=order` it is the picker on an order or a quotation. It also lists the
+distributors that supply a dealer or sub-dealer under your area, though their
+own area is elsewhere, so you can route the order through them. Those rows
+have `supplies_your_area: true` and show display fields only. Needs
+`sales_orders.create` or `quotations.create`; a dealer's own login gets `403`.
 
 **Parameters**
 
@@ -586,6 +593,7 @@ partners in its territories, an admin all of them.
 |---|---|---|---|---|
 | `q` | query | string \| null |  | Name, code, contact person or partner user name substring. |
 | `limit` | query | integer |  |  |
+| `for` | query | string \| null |  | order: the picker on an order or quotation (FS-084). Adds the distributors above a partner in your area, flagged supplies_your_area. Staff with sales_orders.create or quotations.create. |
 
 **Responses**
 
@@ -841,6 +849,7 @@ many decimals a quantity in it takes. Switched-off units are included with
 | `name` | string | yes |  |
 | `partner_type` | string | yes | distributor, dealer or sub_dealer. |
 | `territory` | TerritoryParent \| null |  |  |
+| `supplies_your_area` | boolean |  | With for=order: true on a distributor listed only because it supplies a partner in your area (FS-084). False otherwise. Default `False`. |
 
 **`ProductCategoryItem`**
 

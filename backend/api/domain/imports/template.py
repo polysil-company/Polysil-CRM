@@ -12,10 +12,11 @@ import io
 from api.domain.imports.fields import FIELDS, ONE_OF
 
 SHEET_TITLES = {"partners": "Partners", "price_list_items": "Price list",
-                "lines": "Order lines"}
+                "lines": "Order lines", "products": "Products"}
 FILE_NAMES = {"partners": "partner-import-template.xlsx",
               "price_list_items": "price-list-template.xlsx",
-              "lines": "order-lines-template.xlsx"}
+              "lines": "order-lines-template.xlsx",
+              "products": "product-import-template.xlsx"}
 HOW_TO = "How to fill"
 INSTRUCTION = ("Fill the first sheet. Keep its header row as it is, in row 1. Do not add rows "
                "above it. One row per item. Delete columns you do not use.")
@@ -27,6 +28,8 @@ def needed(kind: str, field_key: str) -> str:
     specs = {f.key: f for f in FIELDS[kind]}
     if specs[field_key].required:
         return "Yes"
+    if specs[field_key].needed:
+        return specs[field_key].needed
     for group in ONE_OF[kind]:
         if field_key in group:
             return " or ".join(specs[k].label for k in group)

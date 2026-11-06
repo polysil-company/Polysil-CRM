@@ -86,3 +86,16 @@ async def enter_role(session: AsyncSession, role: str | None) -> None:
     """
     if role:
         await session.execute(text("SELECT set_config('role', :r, true)"), {"r": role})
+
+
+async def act_as(session: AsyncSession, user_id: str, role: str | None) -> None:
+    """Set the one claim, then switch into the app role: the two statements that
+    make every policy evaluate as `user_id`. Both transaction-local (`true`); a plain
+    SET leaks the identity onto the next borrower of a pooled connection.
+
+    `api/deps.py` `get_db` calls this for every request. A script that must act as
+    a named person through the services (FS-085 `load_district_offices.py`) calls it
+    too, so the claim is set in exactly one way (FS-085 rule 23)."""
+    await session.execute(text("SELECT set_config('app.current_user_id', :uid, true)"),
+                          {"uid": user_id})
+    await enter_role(session, role)

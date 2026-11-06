@@ -8,7 +8,8 @@ changing `api/deps.py` to `false` leaves every one of them passing. The test tha
 was supposed to justify the whole spec could not detect the bug it exists for.
 
 This one drives the real `get_db` and `get_db_anon` over a pooled connection. It
-fails if the `true` in `deps.py` becomes `false` — which is the only property worth
+fails if the claim's `true` (in `act_as`, `api/db/session.py`, which `get_db` calls)
+becomes `false` — which is the only property worth
 asserting here, and it has been mutation-checked.
 
 `get_db_anon` is what makes it detectable. It sets **no** claim at all, so whatever
@@ -118,7 +119,8 @@ async def test_the_claim_never_leaks_into_the_next_request(
     connection it reads it back. Under `set_config(..., true)` it must see nothing,
     every single time.
 
-    Mutation-checked: changing the `true` in `get_db` to `false` makes this fail.
+    Mutation-checked: changing the claim's `true` in `act_as` (which `get_db` calls)
+    to `false` makes this fail.
     """
     token = await _token(staff, sessions)
     leaked: list[str] = []

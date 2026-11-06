@@ -32,13 +32,14 @@ Id = Annotated[str, Path(pattern=UUID_RE)]
 _ERRORS: dict[int | str, dict[str, object]] = {
     400: {"model": ErrorResponse, "description": "`idempotency_key_required` on a write."},
     401: {"model": ErrorResponse, "description": "Not signed in."},
-    403: {"model": ErrorResponse, "description": "No permission for this kind of import. Partner "
-                                                 "and price imports are staff only."},
+    403: {"model": ErrorResponse, "description": "No permission for this kind of import. Partner, "
+                                                 "price and product imports are staff only."},
     404: {"model": ErrorResponse, "description": "No such import, one uploaded by someone else, "
                                                  "or one purged after seven days."},
     409: {"model": ErrorResponse, "description": "`import_wrong_state` (committed, discarded, not "
-                                                 "checked, or a lines import at commit); "
-                                                 "`price_list_published`."},
+                                                 "checked, a lines import at commit, or a product "
+                                                 "import whose catalogue changed since the "
+                                                 "check); `price_list_published`."},
     413: {"model": ErrorResponse, "description": "`attachment_too_large`: over 10 MB."},
     422: {"model": ErrorResponse, "description": "`import_unreadable` on `fields.file` (also a "
                                                  "header with no rows under it), "
@@ -60,6 +61,7 @@ async def upload(db: DbSession, caller: CallerDep, claims: Claims, idem: IdemKey
     The answer has the column headers, five sample rows, this kind's fields and a
     suggested match for each. Nothing is saved to partners, prices or documents
     until commit. `target_id` is the draft price list, for `price_list_items` only.
+    `products` adds and updates catalogue products (FS-083).
     Choose `sheet` and `header_row` when the guess is wrong. The defaults are the
     first visible sheet, and the row among the first ten that names the most of this
     kind's fields. A header with no rows under it is refused: the blank template
@@ -99,9 +101,9 @@ async def download_template(kind: Annotated[ImportKind, Query()], db: DbSession,
     uploads with every column matched by name.
 
     The same permission as upload. Fetch it with the bearer token as a blob, and
-    save it as `partner-import-template.xlsx`, `price-list-template.xlsx` or
-    `order-lines-template.xlsx`: `Content-Disposition` is not readable from another
-    origin."""
+    save it as `partner-import-template.xlsx`, `price-list-template.xlsx`,
+    `order-lines-template.xlsx` or `product-import-template.xlsx`:
+    `Content-Disposition` is not readable from another origin."""
     data = await service.template(db, caller, kind)
     return Response(content=data, media_type=XLSX,
                     headers={"Content-Disposition": f'attachment; filename="{FILE_NAMES[kind]}"'})
@@ -139,11 +141,16 @@ async def check_import(batch_id: Id, body: ImportCheckRequest, db: DbSession, ca
              responses=_ERRORS)
 async def commit_import(batch_id: Id, body: ImportCommitRequest, db: DbSession,
                         caller: CallerDep, claims: Claims, idem: IdemKey) -> Response:
-    """Step 3: save a checked partner or price import. Every row is checked again
+    """Step 3: save a checked partner, price or product import. Every row is checked again
     first, because masters may have changed. All or nothing: with any bad row and
     `skip_invalid` false, nothing is saved (`import_has_errors`, the rows in
     `fields` as `rows[<sheet row>].<field>`). A partner import never creates a
-    login. A `lines` import has no commit: the form saves the lines."""
+    login. A `lines` import has no commit: the form saves the lines.
+
+    A product import also returns `updated` and `unchanged`. It answers `409
+    import_wrong_state` when the catalogue changed since the check, and `422
+    import_has_errors` with `fields.rows` (not a sheet row) when a name or an HSN
+    row clashed at the moment of saving: check again."""
 
     async def run() -> tuple[int, dict[str, Any]]:
         result = await service.commit(db, caller, batch_id, body)

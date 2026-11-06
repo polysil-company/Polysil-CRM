@@ -365,6 +365,8 @@ def f_permissions() -> None:
               "Safety net: a dealer on a lead, quotation or order you\n"
               "can see prices and writes onto a quotation or order,\n"
               "via partner_on_visible_document(). Tier and name only.\n"
+              "FS-084: so does a distributor above a dealer UNDER your\n"
+              "area (partner_orderable(), the order picker's for=order).\n"
               "Credit terms only with partners.edit.",
               w=560, colour=GREEN)
     e += note("sc7", 620, 1140,
@@ -1560,7 +1562,10 @@ def f_admin() -> None:
               "territory: 422 office_has_no_area, on create and on a\n"
               "role or office change. Prod had all 30 in HQ (ISS-233):\n"
               "no dealers visible, a DM there read the whole company.\n"
-              "Which roles is assumed (37.4, GAP-556).", w=520, colour=RED)
+              "Which roles is assumed (37.4, GAP-556). FS-085: a DM may\n"
+              "also sit in an AREA office (level 2, no territory, over\n"
+              "district offices). Never an FO: 056 and 084 read only\n"
+              "the office's own territory (GAP-580).", w=520, colour=RED)
     e += note("nGreen3", 620, 1260,
               "SETUP CHECK  GET /users/setup-check\n\n"
               "users.edit global (Admin-Sales, MD). Read-only. Field\n"
@@ -2169,7 +2174,7 @@ def f_exports() -> None:
         [("n1", "A TEXT CELL STARTING = IS A FORMULA\n\nopenpyxl stores it as one through cell() and\nappend() alike. The writer forces data_type 's'.\nThe PIMS sheet had the same hole (ISS-200).", RED),
          ("n2", "/export IS DECLARED BEFORE /{id}\n\nStarlette matches {id} first; declared after,\nthe export answers 422 forever.", RED),
          ("n3", "FS-081 REGISTERS EXPORTS FROM THEIR LISTS\n\nlist_exports.add_export copies the list route's gate,\nfilters and handler, and places /export right after it.\nLists without a real cursor are read in ONE call with\nlimit 5,001: a page loop drifts, a cap would cut.", GREEN),
-         ("n4", "Not yet: imports beyond partners, prices and lines;\ntargets and the org chart as files (GAP-555);\nthe client's layouts (GAP-302).", YELLOW)])
+         ("n4", "Not yet: imports beyond partners, prices, lines and\nproducts; targets and the org chart as files (GAP-555);\nthe client's layouts (GAP-302).", YELLOW)])
 
 
 def f_schemes() -> None:
@@ -2586,8 +2591,8 @@ def f_price_lists_by_sale_type() -> None:
 def f_excel_import() -> None:
     _columns(
         "69-excel-import", "Excel import with column matching",
-        "Partners, a draft list's rates, or order lines. Nothing is saved before the check.",
-        "BUILT. FS-062: migration 074, /imports. FS-067: matching fixes. FS-068: template.",
+        "Partners, a draft list's rates, order lines, or products. Nothing is saved before the check.",
+        "BUILT. FS-062: migration 074, /imports. FS-067: matching fixes. FS-068: template. FS-083: products (085).",
         [("i1", "POST /imports (multipart): kind, file, target_id?\n.xlsx or .csv, 10 MB, 5,000 rows", BLUE),
          ("i2", "read: caps checked BEFORE openpyxl; header = the row\nwith the most known names (2+); rows stored as text", GREEN),
          ("i3", "answer: headers (labels from above: Price (GJ), UP),\nsuggested_mapping: last SAVED, never the rate, no empty\ncolumn, never another field's own name", GREY),
@@ -2600,12 +2605,16 @@ def f_excel_import() -> None:
          ("d4", "purge after 7 days: import_batch_purge(),\nsystem principal only", GREY),
          ("d5", "products: names cleaned as the loader did (_x000D_,\nspaces); unknown code + known name: by name if uncoded", GREEN),
          ("d6", "discard: rows gone; the check kept with cell values\ntaken out (partners: counts only)", GREY),
-         ("d7", "GET /imports/template?kind=: our names in row 1, no\nrows, codes as text; uploaded blank it is refused", GREEN)],
+         ("d7", "GET /imports/template?kind=: our names in row 1, no\nrows, codes as text; uploaded blank it is refused", GREEN),
+         ("d8", "FS-083 kind=products: code, then uncoded name; nothing\nfound = new. Blank = no change. Counts: new, update,\nrenamed, switched off; renames shown first", BLUE),
+         ("d9", "products commit: advisory lock (5); a changed\nfingerprint = 409 check again; HSN starts on the re-check's day", GREEN)],
         [("n1", "NO LOGIN IS CREATED\n\nEvery dealer can be a record. Portal access is a\nseparate POST /users per dealer.", RED),
          ("n2", "FLOATS ARE NOT MONEY\n\nrepr -> Decimal, 9 places, no exponent. A % cell is read\nas shown. More than 2 decimals on a rate is refused.", RED),
          ("n3", "A CHILD OF A BAD ROW IS A BAD ROW\n\nSkipping a distributor strands its dealers; the check\nsays so before commit (EC-12).", RED),
          ("n4", "Not yet: updating partners, fuzzy match, codes from\na sheet, a template under the wrong kind (GAP-471, 473,\n476, 503 to 507).", YELLOW),
-         ("n5", "LOOK AT THE FILE FIRST\n\n16 Oct: names under Item Code, no rates. Every row\nnow says: match this column to Description.", RED)])
+         ("n5", "LOOK AT THE FILE FIRST\n\n16 Oct: names under Item Code, no rates. Every row\nnow says: match this column to Description.", RED),
+         ("n6", "THE CLIENT'S SHEET HAS NO ITEM CODES\n\nA spelling fix arrives as a NEW product. The check\nflags names 0.8 similar (near). Only a code renames.", RED),
+         ("n7", "SEED-PROD STILL TOUCHES IMPORTED PRODUCTS\n\nclassifications() and prices() ignore created_by\n(ISS-234). Push fix/product-renamed-on-prod first.", RED)])
 
 
 def f_live_checks() -> None:
@@ -2689,6 +2698,26 @@ def f_email_notices() -> None:
          ("n4", "Not yet: an account (GAP-536), bounces (GAP-539),\nlinks beyond five record types (GAP-551),\nwhat may leave by email (GAP-549, Q 36.3).", YELLOW)])
 
 
+def f_district_offices() -> None:
+    _columns(
+        "85-district-offices", "District offices: placing field staff out of Polysil HQ",
+        "A workbook the client marks, then one transaction: districts, offices, moves.",
+        "BUILT. FS-085: scripts/load_district_offices.py sheet | apply; no migration.",
+        [("s1", "deploy_staging.py --target prod staff-facts --out facts.csv\nread only, as the superuser, COPY ... TO STDOUT", BLUE),
+         ("s2", "load_district_offices.py sheet: People + Groups tabs\nheld areas first, work as a cross-check; unsure rows on top", VIOLET),
+         ("s3", "the client marks Decision: OK, another office, or blank\nGroups: Yes for each area or region", YELLOW),
+         ("s4", "district-offices --sheet marked.xlsx --dry-run\neverything done, every guard run, rolled back", GREEN),
+         ("s5", "district-offices --sheet marked.xlsx\none transaction, as ADMIN_EMAIL, through the services", GREEN)],
+        [("d1", "check first: matching, duplicates, groups, every row\nany problem: nothing written", GREEN),
+         ("d2", "districts > state offices > regions > areas\n> district offices only where needed", BLUE),
+         ("d3", "patch_user per person, one savepoint each\n084 moves their open leads", BLUE),
+         ("d4", "unowned open leads at HQ > covering office\nlead.rehomed each (rule 24)", BLUE)],
+        [("n1", "AN EMPTY DISTRICT OFFICE TAKES NEW LEADS\n\n_covering_org_unit files a lead under the nearest\noffice on its district. So district offices are made\nonly where someone sits or an approved area needs one,\nand in the same run as the moves.", RED),
+         ("n2", "AN FO NEVER SITS IN AN AREA OFFICE\n\nlead_auto_owner (056) and the 084 move read the office's\nown territory. A multi-district FO sits in the district\nwith most dealers; the rest are not visible (GAP-585).", RED),
+         ("n3", "RERUNS ARE SAFE, AND RESPECT THE ADMIN\n\nAn office moves into an area or region only from its\ndefault place. A renamed or rearranged group is left\nalone. People already placed get no suggestion.", GREEN),
+         ("n4", "PROD IS ON 082: apply --sheet REFUSES\n\nNo trg_app_user_lead_office means leads would stay\nbehind. Deploy 084 and FS-085's code first. Leads of a\nDM moved into an area stay put (GAP-582).", YELLOW)])
+
+
 def f_forecast_insights() -> None:
     _columns(
         "74-forecast-insights", "Sales forecast and insights",
@@ -2722,4 +2751,5 @@ if __name__ == "__main__":
     f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
     f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy(); f_live_checks()
     f_partner_recruitment(); f_report_exports(); f_email_notices(); f_forecast_insights()
+    f_district_offices()
     print(f"\nwrote to {OUT}")

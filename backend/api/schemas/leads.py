@@ -91,6 +91,14 @@ class UserRef(BaseModel):
     full_name: str
 
 
+class OwnerRef(UserRef):
+    is_active: bool | None = Field(
+        default=None,
+        description="False when the owner has left (switched off or deleted): offer Assign. "
+        "Set by GET /leads/{id} and the restore, for staff; null on the list and for a "
+        "dealer (BE-042).")
+
+
 class TerritoryRef(BaseModel):
     id: str
     name: str
@@ -157,7 +165,7 @@ class Lead(BaseModel):
     email: str | None
     territory: TerritoryRef
     village: str | None
-    owner: UserRef | None = Field(description="The staff owner, or null if unassigned.")
+    owner: OwnerRef | None = Field(description="The staff owner, or null if unassigned.")
     owner_org_unit: OrgUnitRef
     assigned_partner: PartnerRef | None
     score: str | None = Field(description="Decimal string, or null before scoring.")
@@ -285,6 +293,10 @@ class PartnerPick(BaseModel):
     name: str
     partner_type: str = Field(description="distributor, dealer or sub_dealer.")
     territory: TerritoryParent | None = None
+    supplies_your_area: bool = Field(
+        default=False,
+        description="With for=order: true on a distributor listed only because it "
+        "supplies a partner in your area (FS-084). False otherwise.")
 
 
 class LeadArea(BaseModel):

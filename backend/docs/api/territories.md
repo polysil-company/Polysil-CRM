@@ -77,6 +77,7 @@ without a code cannot number leads. **`Idempotency-Key` is required.**
 | `level` | `state` \| `district` \| `taluka` \| `village` | yes |  |
 | `parent_id` | string \| null |  | The territory one level up: a district under a state, a taluka under a district, a village under a taluka. Null for a state. |
 | `code` | string \| null |  | Unique per level. Stored upper-case. A state needs one before leads can be numbered under it. |
+| `lgd_code` | string \| null |  | Optional. The official Local Government Directory code, stored as given. The district loader sets it; a form may leave it out. |
 
 **Responses**
 
@@ -231,6 +232,7 @@ already carry it.
 | `level` | `state` \| `district` \| `taluka` \| `village` | yes |  |
 | `parent_id` | string \| null |  | The territory one level up: a district under a state, a taluka under a district, a village under a taluka. Null for a state. |
 | `code` | string \| null |  | Unique per level. Stored upper-case. A state needs one before leads can be numbered under it. |
+| `lgd_code` | string \| null |  | Optional. The official Local Government Directory code, stored as given. The district loader sets it; a form may leave it out. |
 
 **`TerritoryPage`**
 

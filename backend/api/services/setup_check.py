@@ -20,6 +20,7 @@ from api.domain import identity
 from api.errors import ForbiddenError
 from api.schemas import users as sch
 from api.services import teams
+from api.services.users import area_office_sql
 
 ITEMS = 100
 TOP_LEVEL = 5   # Admin-Sales and MD/CEO; nobody above them to report to
@@ -51,8 +52,11 @@ async def setup_check(db: AsyncSession, caller: Caller) -> sch.SetupReport:
           FROM app_user u JOIN role r ON r.id = u.role_id JOIN org_unit o ON o.id = u.org_unit_id
           LEFT JOIN territory t ON t.id = o.territory_id AND t.deleted_at IS NULL
          WHERE {staff_where} AND lower(r.code::text) = ANY(CAST(:roles AS text[]))
-           AND t.id IS NULL AND o.id <> CAST(:sys AS uuid)"""),
-        {"np": np, "roles": sorted(identity.AREA_ROLES), "sys": identity.SYSTEM_ORG_UNIT_ID})).all()
+           AND t.id IS NULL AND o.id <> CAST(:sys AS uuid)
+           -- FS-085 rule 10: a District Manager in an area office is placed
+           AND NOT (lower(r.code::text) = ANY(CAST(:area_roles AS text[])) AND {area_office_sql('o')})"""),
+        {"np": np, "roles": sorted(identity.AREA_ROLES), "sys": identity.SYSTEM_ORG_UNIT_ID,
+         "area_roles": sorted(identity.AREA_OFFICE_ROLES)})).all()
     checks.append(_check(
         "staff_without_area", "Field staff in an office that covers no area",
         "They see no dealers, so they cannot assign one to a lead or pick one on an order. "

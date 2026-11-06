@@ -14,7 +14,8 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
 
-from api.deps import CallerDep, Claims, DbSession, IdemKey, require
+from api.deps import CallerDep, Claims, DbSession, IdemKey, require, require_any
+from api.errors import ForbiddenError
 from api.idempotency import payload_digest, run_idempotent
 from api.routers.exporting import EXPORT_RESPONSE, ExportFormat, export, filters_of
 from api.schemas.auth import Envelope, ErrorResponse
@@ -452,7 +453,7 @@ async def restore(
     """Bring a deleted lead back (FS-073). Needs `leads.delete` and `leads.edit`. The
     duplicate pairs a delete closed are reopened, and the duplicate check runs again. A lead that
     is not deleted comes back unchanged. The owner is kept, even one who has since
-    left: offer Assign when `owner` is inactive. `404` out of scope."""
+    left: offer Assign when `owner.is_active` is false. `404` out of scope."""
     async def work() -> tuple[int, dict]:
         lead = await service.restore_lead(db, caller, lead_id)
         return status.HTTP_200_OK, {"data": lead.model_dump(mode="json")}
@@ -571,20 +572,38 @@ async def territories(
         db, level=level, levels=levels, parent_id=parent_id, q=q, limit=limit))
 
 
-@lookups.get("/partners", response_model=Envelope[list[PartnerPick]], responses=_ERRORS,
-             dependencies=[Depends(require("leads", "view"))])
+@lookups.get("/partners", response_model=Envelope[list[PartnerPick]], responses=_ERRORS)
 async def partners(
     db: DbSession,
-    _: Claims,
+    caller: CallerDep,
     q: Annotated[str | None, Query(
         description="Name, code, contact person or partner user name substring.")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    for_: Annotated[Literal["order"] | None, Query(
+        alias="for",
+        description="order: the picker on an order or quotation (FS-084). Adds the "
+        "distributors above a partner in your area, flagged supplies_your_area. Staff "
+        "with sales_orders.create or quotations.create.")] = None,
 ) -> Envelope[list[PartnerPick]]:
-    """The partner picker for assigning a lead to a channel partner. You see only
-    the partners in your own scope: a dealer its subtree, a district manager the
-    partners in its territories, an admin all of them.
+    """The partner picker. You see only the partners in your own scope: a dealer
+    its subtree, a district manager the partners in its territories, an admin all
+    of them. Without `for` it is the picker for assigning a lead, and needs
+    `leads.view`.
+
+    With `for=order` it is the picker on an order or a quotation. It also lists the
+    distributors that supply a dealer or sub-dealer under your area, though their
+    own area is elsewhere, so you can route the order through them. Those rows
+    have `supplies_your_area: true` and show display fields only. Needs
+    `sales_orders.create` or `quotations.create`; a dealer's own login gets `403`.
     """
-    return Envelope(data=await service.list_partners(db, q=q, limit=limit))
+    if for_ == "order":
+        if caller.partner_id is not None:
+            raise ForbiddenError()  # a dealer orders as itself (FS-084 rule 4)
+        await require_any(("sales_orders", "create"), ("quotations", "create"))(db)
+    else:
+        await require("leads", "view")(db)
+    return Envelope(data=await service.list_partners(db, q=q, limit=limit,
+                                                     for_order=for_ == "order"))
 
 
 # ── maintaining the lists (masters.edit) ─────────────────────────────────────
