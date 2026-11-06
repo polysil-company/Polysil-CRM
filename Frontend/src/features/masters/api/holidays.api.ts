@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -64,5 +64,19 @@ export function removeHoliday({
     path: `/holidays/${encodeURIComponent(day)}`,
     idempotencyKey,
     schema: z.undefined(),
+  });
+}
+
+/** MSTR-019 · GET /holidays/export (FS-081) — one year's holidays as Excel or CSV. */
+export function exportHolidays(
+  year: number,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-019",
+    logger: log,
+    fn: "exportHolidays",
+    path: "/holidays/export",
+    query: { year, format },
   });
 }

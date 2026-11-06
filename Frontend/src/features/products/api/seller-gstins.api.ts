@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -29,6 +29,17 @@ export function listSellerGstins(signal?: AbortSignal): Promise<SellerGstin[]> {
     path: "/seller-gstins",
     schema: sellerGstinsSchema,
     signal,
+  });
+}
+
+/** MSTR-018 · GET /seller-gstins/export (FS-081) — our registrations as Excel or CSV. */
+export function exportSellerGstins(format: ExportFormat = "xlsx"): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-018",
+    logger: log,
+    fn: "exportSellerGstins",
+    path: "/seller-gstins/export",
+    query: { format },
   });
 }
 

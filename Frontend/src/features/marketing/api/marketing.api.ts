@@ -1,4 +1,4 @@
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -102,13 +102,16 @@ export function listMarketingOrders(
 }
 
 /** MKT-003 · The same list as an Excel file. */
-export function exportMarketingOrders(params: MarketingOrderListParams): Promise<DownloadedFile> {
+export function exportMarketingOrders(
+  params: MarketingOrderListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "MKT-003",
     logger: log,
     fn: "exportMarketingOrders",
     path: "/marketing-orders/export",
-    query: viewQuery(params),
+    query: { ...viewQuery(params), format },
   });
 }
 

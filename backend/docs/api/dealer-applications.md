@@ -39,6 +39,7 @@ one's type and deposit status.
 | `status` | query | string \| null |  | Comma-separated statuses. |
 | `q` | query | string \| null |  |  |
 | `partner_type` | query | `dealer` \| `distributor` \| null |  |  |
+| `limit` | query | integer |  | At most this many, newest first. |
 
 **Responses**
 
@@ -90,6 +91,32 @@ mobile already signs in staff or a partner user.
 | `404` | `ErrorResponse` | No such application in your scope. |
 | `409` | `ErrorResponse` | `mobile_in_use`, `application_open`, `application_closed`, `already_decided`, `code_in_use`, `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`. |
 | `422` | `ErrorResponse` | A field; `application_incomplete` lists what is missing; `deposit_short`, `not_lower`. |
+
+---
+
+## `GET /api/v1/dealer-applications/export`
+
+**Export the dealer applications**
+
+Download the dealer applications as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `status` | query | string \| null |  | Comma-separated statuses. |
+| `q` | query | string \| null |  |  |
+| `partner_type` | query | `dealer` \| `distributor` \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

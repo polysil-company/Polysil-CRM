@@ -161,6 +161,10 @@ def report_filter_line(report: str, data: dict[str, Any]) -> str:
         parts.append("1 territory" if n == 1 else f"{n} territories")
     if f.get("owner_id"):
         parts.append("one person")
+    if f.get("team_of"):
+        parts.append("one team")
+    if f.get("roles"):
+        parts.append("roles: " + ", ".join(str(r).replace("_", " ") for r in f["roles"]))
     if report in _SALE_MODE and f.get("sale_counted_at") in _MODE_TEXT:
         parts.append(_MODE_TEXT[str(f["sale_counted_at"])])
     if data.get("group_by"):
@@ -213,7 +217,7 @@ def html(page: Page, made_by: str | None, now: dt.datetime | None = None) -> str
     stamp = when((now or dt.datetime.now(IST)).astimezone(IST))
     made = f"Made by {made_by} on {stamp}" if made_by else f"Made on {stamp}"
     headers = [{"text": c.header, "number": c.kind in NUMBER_KINDS} for c in page.columns]
-    rows = [[cell(_get(r, c.path), c.kind) for c in page.columns] for r in page.rows]
+    rows = [[cell(exports.raw(r, c), c.kind) for c in page.columns] for r in page.rows]
     total = ([cell(_get(page.total, c.path), c.kind) for c in page.columns]
              if page.total is not None else None)
     return env.get_template("report.html").render(

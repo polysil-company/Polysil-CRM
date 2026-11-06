@@ -361,6 +361,7 @@ export const commissionHandlers = [
         row.total,
         row.paid_on ?? "",
       ]),
+      request,
     );
   }),
 

@@ -30,9 +30,10 @@ from api.domain import leads as lead_domain
 from api.domain import reports as domain
 from api.domain import sales as sales_domain
 from api.errors import ForbiddenError, NotFoundError, ValidationFailed
-from api.services import people
+from api.services import people, teams
 from api.services.clock import today_ist
 from api.services.leads import _id_list, _under
+from api.services.teams import Team
 
 _UUID = sa.Uuid
 _TS = sa.DateTime(timezone=True)
@@ -90,7 +91,7 @@ def _need(caller: Caller, report: str, *modules: str) -> None:
 
 class Filters:
     def __init__(self, *, start: dt.date | None, end: dt.date | None, territory_id: str | None,
-                 owner_id: str | None) -> None:
+                 owner_id: str | None, team: Team | None = None) -> None:
         try:
             self.start, self.end = domain.window(start, end, today_ist())
         except ValueError as exc:
@@ -98,6 +99,20 @@ class Filters:
         self.lo, self.hi = domain.instants(self.start, self.end)
         self.territories = _id_list(territory_id, "territory_id") if territory_id else []
         self.owner_id = owner_id
+        # FS-082: the team filters, resolved to owner ids. None is no filter; an
+        # empty list is an empty report, never "everyone" (plan review S-1)
+        self.team = team
+        # the reporting_lines() rows the team was worked out from, reused by the roster
+        self.lines: list[Any] | None = None
+        # owner_id and roles narrow together (code review F-2); team_of with owner_id
+        # is refused in teams.resolve
+        self.owners: list[str] | None
+        if owner_id and team is not None:
+            self.owners = [owner_id] if owner_id in team.owners else []
+        elif owner_id:
+            self.owners = [owner_id]
+        else:
+            self.owners = team.owners if team is not None else None
         self.sale_mode: sales_domain.Mode = sales_domain.DEFAULT
 
     async def load_sale_mode(self, db: AsyncSession) -> Filters:
@@ -110,7 +125,14 @@ class Filters:
         return [column.in_(_under("territory_closure", *self.territories))] if self.territories else []
 
     def owner(self, column: Any) -> list[Any]:
-        return [column == self.owner_id] if self.owner_id else []
+        if self.owners is None:
+            return []
+        return [column == sa.any_(sa.literal(self.owners, type_=sa.ARRAY(_UUID)))]
+
+    @property
+    def narrowed(self) -> bool:
+        """An owner filter is set: one person, or a team."""
+        return self.owners is not None
 
     def window(self, column: Any) -> list[Any]:
         return [column >= self.lo, column < self.hi]
@@ -118,7 +140,11 @@ class Filters:
     def out(self) -> dict[str, Any]:
         return {"from": self.start.isoformat(), "to": self.end.isoformat(),
                 "territory_id": self.territories or None, "owner_id": self.owner_id,
-                "sale_counted_at": self.sale_mode}
+                **self.team_out(), "sale_counted_at": self.sale_mode}
+
+    def team_out(self) -> dict[str, Any]:
+        return {"team_of": self.team.team_of if self.team else None,
+                "roles": self.team.roles if self.team else None}
 
 
 def _leads(caller: Caller, f: Filters) -> list[Any]:
@@ -316,8 +342,13 @@ async def salesperson_performance(db: AsyncSession, caller: Caller, f: Filters) 
         # GAP-227: a visit has no territory, so the territory filter does not reach it
         put((await db.execute(text(
             "SELECT user_id AS k, count(*) AS n FROM visit WHERE checkin_at >= :lo AND checkin_at < :hi "
-            "AND (CAST(:o AS uuid) IS NULL OR user_id = CAST(:o AS uuid)) GROUP BY user_id"),
-            {"lo": f.lo, "hi": f.hi, "o": f.owner_id})).all(), visits="n")
+            "AND (CAST(:narrowed AS boolean) IS FALSE OR user_id = ANY(CAST(:o AS uuid[]))) GROUP BY user_id"),
+            {"lo": f.lo, "hi": f.hi, "narrowed": f.narrowed, "o": f.owners or []})).all(), visits="n")
+    # FS-082 B: everyone in the caller's team gets a row, zeros included
+    people = {p.id: p for p in await teams.roster(db, caller, rows=f.lines, owners=f.owners,
+                                                   territories=f.territories)}
+    for pid in people:
+        per.setdefault(pid, {})
     names = await _user_names(db, [k for k in per if k])
     out = []
     def sees(module: str, person: str) -> bool:
@@ -327,7 +358,10 @@ async def salesperson_performance(db: AsyncSession, caller: Caller, f: Filters) 
         return scope is not None and (scope != "own" or person == caller.user_id)
 
     for k, v in sorted(per.items(), key=lambda kv: (-(kv[1].get("leads_created") or 0), names.get(kv[0], ""))):
-        out.append({"user": {"id": k or None, "full_name": names.get(k, "Unassigned" if not k else "")},
+        who = people.get(k)
+        out.append({"user": {"id": k or None, "full_name": names.get(k) or (who.full_name if who else ("Unassigned" if not k else ""))},
+                    "role": {"code": who.role_code, "name": who.role_name} if who and who.role_code else None,
+                    "office": {"id": who.org_unit_id, "name": who.org_unit_name} if who and who.org_unit_id else None,
                     "leads_created": v.get("leads_created", 0), "leads_won": v.get("leads_won", 0),
                     "quotations_sent": v.get("quotations_sent", 0) if has_q else None,
                     "orders": v.get("orders", 0) if has_o else None,
@@ -366,7 +400,7 @@ async def follow_ups(db: AsyncSession, caller: Caller, f: Filters) -> dict[str, 
             "oldest_due_at": g["oldest_due_at"].isoformat() if g["oldest_due_at"] else None}
            for k, g in sorted(per.items(), key=lambda kv: kv[1]["oldest_due_at"] or now)]
     page, cut = _page(out)
-    return {"rows": page, "truncated": cut, "row_count": len(out), "filters": {"as_of": now.isoformat(), "owner_id": f.owner_id},
+    return {"rows": page, "truncated": cut, "row_count": len(out), "filters": {"as_of": now.isoformat(), "owner_id": f.owner_id, **f.team_out()},
             "totals": {b: sum(r[b] for r in out) for b in buckets}}
 
 
@@ -490,7 +524,7 @@ async def campaign_performance(db: AsyncSession, caller: Caller, f: Filters) -> 
     # nothing is visible. No end date is a one-day campaign (edge case 4). Under an area
     # filter: campaigns over it, under it or with no area (edge case 11). An owner filter
     # is about leads, so it shows only campaigns with some.
-    overlap = "" if f.owner_id else (
+    overlap = "" if f.narrowed else (
         " OR (c.start_date <= :hi AND coalesce(c.end_date, c.start_date) >= :lo"
         + (" AND (c.territory_id IS NULL OR EXISTS (SELECT 1 FROM territory_closure tc "
            "WHERE tc.ancestor_id = ANY(CAST(:t AS uuid[])) AND tc.descendant_id = c.territory_id "

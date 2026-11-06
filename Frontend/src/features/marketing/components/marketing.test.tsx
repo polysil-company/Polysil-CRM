@@ -263,7 +263,9 @@ describe("[MKT-003] MarketingPage", () => {
     expect(costs).toHaveTextContent("Company pays₹120.00");
     await user.click(screen.getByRole("button", { name: "Place order" }));
     expect(await screen.findByText(/Order MM\/GJ\/2026-27\/\d+ placed/)).toBeInTheDocument();
-    expect(await screen.findByRole("dialog")).toHaveTextContent("Waiting for approval");
+    // The order's dialog opens on "Loading…" and fills in once the order loads.
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/Waiting for approval/)).toBeInTheDocument();
   });
 
   it("shows the District Manager the orders to approve, and approves one", async () => {

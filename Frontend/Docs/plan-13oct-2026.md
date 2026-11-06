@@ -158,11 +158,43 @@ In the handover's order of value to the client (§10, P2). Each has a contract i
 - [x] **37. A consolidated order** from several quotations of one dealer: `POST /orders` with several `quotation_ids` (`orders-api-contract.md`). SO-011, in Place order; BE-029 asks for an `orderable` filter. PR #177, 18 Oct (`feature/SO-011-consolidated-order`).
 - [x] **38. The dealer portal walk:** sign in as `dealer`, `distributor` and `sub_dealer`, walk every screen, and fix what leaks or breaks. APP-008: the mock now scopes leads, orders, complaints and the dashboard to the partner's own; two heading fixes and the 404 page's heading; BE-030 asks for the dealer-tasks switch on `/auth/me`. PR #178, 18 Oct (`feature/APP-008-partner-walk`).
 
+## Tier 5: backend changes from 23 Oct to 3 Nov (added 4 Nov)
+
+Measured against `integration` at `33901f8` (#225). Every backend commit since 22 Oct, checked against the frontend source. Item 40 is first because it breaks a screen once the backend deploys migration 078.
+
+- [x] **40. Company settings: the `set` and `staff_roles` kinds.** PR #227, 4 Nov (`feature/ADMN-007-setting-kinds`). ADMN-007. Migration 078 seeds five settings of these kinds (deposit relaxation roles, who decides dealer and distributor applications, what each application type requires). `settings.schemas.ts` accepts only `choice | int | roles | bands | slabs`, so one of them fails the whole page with "We received data we couldn't read".
+  - `set`: some of `allowed`, none twice, as checkboxes. `staff_roles`: at least one staff role code, as checkboxes.
+  - A kind the screen doesn't know is shown read-only, not a contract error, so the next new kind can't take the page down.
+  - Contract: `backend/docs/api/settings.md`.
+- [x] **41. Dealer and distributor applications: the type and the data sheet** (FS-071). PR #228, 4 Nov (`feature/CHNL-007-partner-type-data-sheet`). CHNL-007, CHNL-008. `backend/docs/api/dealer-applications.md`.
+  - `partner_type` (`dealer` or `distributor`) when starting, on edit while draft or returned, and as a list filter. A distributor is approved with no parent and gets a `DIST-` code.
+  - The data sheet's new fields, staff and applicant forms alike: telephone, established on, bank name, branch and address, working capital rows, other sources (lakhs), two-wheelers, cars, other vehicles, office and godown area with their unit, manpower rows, previous installations, sales executives, technicians, appointment place.
+- [x] **42. Dealer and distributor applications: the deposit** (FS-071). PR #229, 5 Nov (`feature/CHNL-007-deposit`). CHNL-007.
+  - The deposit card: amount due, status (`paid`, `waived`, `pending`, `not_required`) and history.
+  - **Record the deposit** (`POST …/deposit`): amount, date paid, reference, and the pay slip uploaded first as a `deposit_slip` document.
+  - **Lower or waive it** (`POST …/deposit/relaxation`): the new amount and why, only for the roles in `deposit_relaxation_roles`, never whoever started the application.
+  - Approve waits for the deposit. The new refusals in words: `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`, `deposit_short`, `not_lower`, `not_your_relaxation`.
+- [x] **43. Dealer and distributor applications: the printed sheets** (FS-071). PR #230, 5 Nov (`feature/CHNL-007-printed-sheets`). CHNL-007, CHNL-008. The blank form (`GET /dealer-applications/form.pdf?partner_type=`), an application's PDF for staff (`GET /dealer-applications/{id}/pdf`) and for the applicant (`GET /public/dealer-apply/{token}/pdf`).
+- [x] **44. The org chart** (FS-080). PR #231, 5 Nov (`feature/ADMN-008-org-chart`). ADMN-008. `GET /users/org-chart`: my managers, nearest first, and everyone below me with counts by role; someone below me with `user_id`; the whole company with `view=company` for a `users.view` global holder. Register a new `ADMN-` Data ID. `backend/docs/api/users.md`.
+- [x] **45. Sales forecast and insights** (FS-079). PR #232, 5 Nov (`feature/RPT-004-forecast-insights`). RPT-004, RPT-005. `GET /reports/sales-forecast` and `GET /reports/insights` (plain sentences about the period against the one before, each linking its report). New `RPT-` Data IDs. `backend/docs/api/reports.md`.
+- [x] **46. CSV and PDF downloads** (FS-077). PR #235, 5 Nov (`feature/APP-011-csv-pdf-downloads`). APP-011. Every list's download takes `format=csv` as well as Excel; reports also take `format=pdf` (`503 busy`: try again in a moment). Extend `DownloadExcelButton` with the choice, rather than a button per format.
+- [x] **47. Downloads on 24 more lists** (FS-081). PR #236, 5 Nov (`feature/APP-012-list-downloads`), stacked on #235. APP-012. With the same button: products, price lists and a list's rates, tax rates, seller GSTINs, territories, offices, warehouses, stock, stock movements, customers, ratings, payments, schemes, scheme entitlements, subsidy schemes, campaigns, holidays, warranty terms, reward rules, the rewards ledger, gifts, gift redemptions, dealer applications.
+- [x] **48. Email preferences** (FS-078). PR #233, 5 Nov (`feature/AUTH-008-email-preferences`). AUTH-008. On the user's own menu: "Email me updates I haven't seen" and "Morning summary", shown only while `email_available` on `/auth/me` is true; `PUT /me/email-preferences`. Email stays off on the backend until a mail account is set up. `backend/docs/api/auth.md`.
+- [x] **49. Restore lead: the small gaps** (LEAD-020). PR #234, 5 Nov (`feature/LEAD-020-restore-gaps`); the owner's flag waits on BE-042. Offer **Assign** after a restore when the owner has left, as `leads.md` says; give `lead.restored` its own line in the history ("restored the lead", with the duplicate pairs it reopened).
+
+### From the backend on 5 Nov (FS-082, backend #226)
+
+- [x] **50. Team and role filters on the reports** (FS-082). PR #237, 5 Nov (`feature/RPT-006-team-filters`), stacked on #232. RPT-006. `team_of` (a person and everyone below them on the org chart) and `roles` on every report that takes a person, plus the forecast, insights and territory performance; salesperson performance gives every team member a row with role and office, zeros included. `404 not_in_your_line` outside the caller's line; never with `owner_id`. `backend/docs/api/reports.md`.
+- [x] **51. The setup check, and an office that covers no area** (FS-082). PR #238, 6 Nov (`feature/ADMN-009-setup-check`), stacked on #237. ADMN-009. `GET /users/setup-check` on the admin dashboard: field staff in an office with no area, area roles with no territories, staff with no manager one level up, staff on the System office, partners with no area, each with its count and the first 100 to fix. And the user form's new refusal `422 office_has_no_area` (a Field Officer or District Manager in an office that covers no area), on the office or the role. `backend/docs/api/users.md`.
+
 ## Waiting on someone else
 
-- [-] **BE-023:** a `lead_id` filter on `GET /subsidy-applications`, for the subsidy card on a lead. Open on the backend.
-- [-] **BE-024:** `GET /lookups/product-categories` and `/lookups/uoms` for the product form. Open on the backend.
-- [-] **BE-025:** `record_type` on `GET /documents/types`, so a lead isn't offered the dealer-application types. Open on the backend.
+- [x] **BE-023:** a `lead_id` filter on `GET /subsidy-applications`, for the subsidy card on a lead. Done on the backend; picked up in PR #193, 22 Oct.
+- [x] **BE-024:** `GET /lookups/product-categories` and `/lookups/uoms` for the product form. Done on the backend; picked up in PR #193, 22 Oct.
+- [x] **BE-025:** `record_type` on `GET /documents/types`, so a lead isn't offered the dealer-application types. Done on the backend; picked up in PR #193, 22 Oct.
+- [-] **BE-039:** a quotation for a dealer or distributor with no farmer's lead. Open on the backend (can start now). The frontend then adds "New quotation for a dealer", reusing SO-012's dealer picker.
+- [-] **BE-040:** the employees who look after a dealer. Open on the backend; what it grants waits on the client. The frontend then adds the field to the partner form and "My dealers".
+- [-] **BE-041:** a leaver's leads go to their dealer. Waits on the client.
 - [x] **CHNL-002, the client:** yes (20 Oct), dealers add their own sub-dealers. Built: Channel partners opens to a distributor or dealer, which adds the next type down under itself. PR #186, 21 Oct (`feature/CHNL-002-portal-sub-dealers`).
 - [x] **F-12, the user:** yes (20 Oct), files stay locked after the QC verdict, with a **Download PDF** on the complaint like a quotation or an order. Built against the shape asked in BE-031 (CMPL-013), shown once the backend sends `pdf_state`. PR #187, 21 Oct (`feature/CMPL-013-complaint-pdf`).
 

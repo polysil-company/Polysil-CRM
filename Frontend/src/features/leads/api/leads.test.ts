@@ -23,6 +23,7 @@ import {
   listLeadAreas,
   listLeads,
   reopenLead,
+  restoreLead,
   searchPartners,
   transitionLead,
 } from "./leads.api";
@@ -900,7 +901,7 @@ describe("[LEAD-008] assignment", () => {
       idempotencyKey: "a-1",
     });
 
-    expect(assigned.owner).toEqual({ id: person?.id, name: person?.full_name });
+    expect(assigned.owner).toMatchObject({ id: person?.id, name: person?.full_name });
     expect(assigned.channelPartner?.name).toBe(partner?.name);
     const page = await getLeadTimeline({ leadId: lead.id, cursor: null });
     expect(page.items[0]).toMatchObject({
@@ -948,5 +949,24 @@ describe("[LEAD-008] assignment", () => {
         idempotencyKey: "a-4",
       }),
     ).rejects.toMatchObject({ status: 422, code: "stage_terminal" });
+  });
+});
+
+describe("[LEAD-020] restoreLead in the mock", () => {
+  afterEach(() => {
+    resetMockDb();
+    writeMockRole("admin");
+  });
+
+  it("puts the restore in the lead's history, and says when its owner has left", async () => {
+    writeMockRole("admin");
+    const leaver = mockDb.deletedLeads[1];
+    if (leaver === undefined) throw new Error("No second seeded deleted lead.");
+
+    const restored = await restoreLead({ leadId: leaver.id, idempotencyKey: "r-1" });
+    expect(restored.owner).toMatchObject({ name: "Vijay Chaudhary", active: false });
+
+    const page = await getLeadTimeline({ leadId: leaver.id, cursor: null });
+    expect(page.items[0]).toMatchObject({ kind: "lead.restored" });
   });
 });

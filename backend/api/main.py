@@ -36,6 +36,7 @@ from api.routers import (
     dashboard,
     lead_qr,
     leads,
+    list_exports,  # noqa: F401  (FS-081: registers the exports before inclusion)
     marketing,
     masters,
     messages,

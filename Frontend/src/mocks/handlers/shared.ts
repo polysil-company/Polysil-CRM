@@ -34,14 +34,36 @@ export function decodeCursor(cursor: string): number | null {
 }
 
 /**
- * A stand-in for an export's workbook: one tab-separated line per row under the real file's
- * headers, named as the backend names it (`orders-2026-10-04.xlsx`).
+ * A stand-in for an export's file: one tab-separated line per row under the real file's
+ * headers, named as the backend names it (`orders-2026-10-04.xlsx`). FS-077: with
+ * `format=csv` it is comma-separated (`.csv`); `format=pdf` (reports only) a stand-in PDF.
  */
 export function mockWorkbook(
   name: string,
   headers: readonly string[],
   rows: readonly (readonly string[])[],
+  request?: Request,
 ): Response {
+  const format = request === undefined ? null : new URL(request.url).searchParams.get("format");
+  if (format === "csv") {
+    const quote = (value: string): string =>
+      /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+    const lines = [headers, ...rows].map((row) => row.map(quote).join(","));
+    return new HttpResponse(lines.join("\n"), {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="${name}-${todayInIndia()}.csv"`,
+      },
+    });
+  }
+  if (format === "pdf") {
+    return new HttpResponse("%PDF-1.4\n% Polysil mock report\n", {
+      headers: {
+        "content-type": "application/pdf",
+        "content-disposition": `attachment; filename="${name}-${todayInIndia()}.pdf"`,
+      },
+    });
+  }
   const lines = [headers.join("\t"), ...rows.map((row) => row.join("\t"))];
   return new HttpResponse(lines.join("\n"), {
     headers: {

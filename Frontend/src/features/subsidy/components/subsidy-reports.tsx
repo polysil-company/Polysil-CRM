@@ -206,7 +206,7 @@ function StageReport({
           }}
         />
         <DownloadExcelButton
-          download={() => exportStageReport(status)}
+          download={(format) => exportStageReport(status, format)}
           fallbackName="subsidy-stages.xlsx"
           what="the stage report"
           logger={log}
@@ -314,7 +314,7 @@ function SupplyReport({
           onChange={onStatus}
         />
         <DownloadExcelButton
-          download={() => exportSupplyReport(status)}
+          download={(format) => exportSupplyReport(status, format)}
           fallbackName="subsidy-supply.xlsx"
           what="the supply report"
           logger={log}
@@ -422,7 +422,7 @@ function AgeingReport({
     <section aria-label="Ageing" className="flex flex-col gap-4">
       <ReportHeader description="How long each step took, in days. A step with no end yet counts to today and says so; a dash means its start isn't recorded.">
         <DownloadExcelButton
-          download={() => exportAgeing(params)}
+          download={(format) => exportAgeing(params, format)}
           fallbackName="subsidy-ageing.xlsx"
           what="the ageing report"
           logger={log}

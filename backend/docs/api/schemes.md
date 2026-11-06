@@ -55,6 +55,31 @@ bigger order.
 
 ---
 
+## `GET /api/v1/scheme-entitlements/export`
+
+**Export the scheme entitlements**
+
+Download the scheme entitlements as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `partner_id` | query | string \| null |  |  |
+| `status` | query | `available` \| `consumed` \| `expired` \| `reversed` \| null |  |  |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
+
+---
+
 ## `GET /api/v1/schemes`
 
 **List Schemes**
@@ -138,6 +163,32 @@ dealer owes (`payable` on the order); it never changes the invoice.
 | `404` | `ErrorResponse` | No such scheme in your scope. |
 | `409` | `ErrorResponse` | `code_taken`, `scheme_in_use`, or the key was used for a different body. |
 | `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
+## `GET /api/v1/schemes/export`
+
+**Export the dealer schemes**
+
+Download the dealer schemes as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `status` | query | `active` \| `inactive` \| `current` \| null |  | `current` is active and today within its dates. |
+| `scheme_type` | query | string \| null |  | One scheme type. |
+| `q` | query | string \| null |  | Code or name. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

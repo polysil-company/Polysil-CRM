@@ -192,3 +192,78 @@ class RoleItem(BaseModel):
     is_portal: bool = Field(
         description="A partner user's role. Filter these out of the staff form; the "
         "server refuses one on a staff member regardless.")
+
+
+# ── FS-080: the org chart ────────────────────────────────────────────────────
+
+class OrgChartPerson(BaseModel):
+    """Someone on the chart. Name, role and office only: no contact details."""
+
+    id: str
+    full_name: str
+    role: RoleRef
+    level: int = Field(description="The role's level: 1 field officer up to 5 head office.")
+    org_unit: OrgUnitRef = Field(description="The office they sit in. Never null for staff.")
+
+
+class OrgChartNode(OrgChartPerson):
+    manager_ids: list[str] = Field(
+        description="Who this person reports to, sorted by name then id: the tree's edges. "
+        "Draw the person under the first and show the rest as 'also reports to'. Every id "
+        "is the subject, someone in `managers`, `people` or `co_managers`. Empty for a "
+        "root of the company view.")
+    direct_reports: int = Field(description="People whose `manager_ids` include this person.")
+    team_size: int = Field(
+        description="Everyone below this person at any depth, each counted once even when "
+        "two managers share them.")
+
+
+class RoleCount(BaseModel):
+    role: RoleRef
+    count: int
+
+
+class OrgChartTotals(BaseModel):
+    people: int = Field(description="The number of entries in `people`.")
+    by_role: list[RoleCount] = Field(description="`people` counted by role, highest level first.")
+
+
+class OrgChart(BaseModel):
+    subject: OrgChartPerson | None = Field(
+        description="Whose picture this is. Null in the company view.")
+    managers: list[list[OrgChartPerson]] = Field(
+        description="The chain above the subject, nearest first. A step holds more than "
+        "one person when two people at the same level in one office both manage, sorted "
+        "by name then id. Empty in the company view and for someone at the top.")
+    people: list[OrgChartNode] = Field(
+        description="Everyone below the subject at any depth, or the whole company. Sorted "
+        "by level (highest first), then name, then id. Build the tree from `manager_ids`.")
+    co_managers: list[OrgChartPerson] = Field(
+        description="People named in some `manager_ids` who appear nowhere else: for "
+        "example a second District Manager who shares one of your reports.")
+    totals: OrgChartTotals
+    unplaced: list[OrgChartPerson] = Field(
+        description="Company view only: active staff on the System office, who cannot be "
+        "placed. Not in `people` or `totals`. Give them a real office.")
+
+
+class SetupItem(BaseModel):
+    id: str = Field(description="The person's or partner's id, to link to their page.")
+    name: str
+    detail: str = Field(description="Role and office for a person, area or type for a partner.")
+
+
+class SetupCheck(BaseModel):
+    code: str = Field(description="staff_without_area, staff_without_territories, "
+                      "staff_skipping_a_level, unplaced_staff or partners_without_area.")
+    title: str = Field(description="One line for the card.")
+    why: str = Field(description="What goes wrong while this stays unfixed, in plain words.")
+    count: int
+    items: list[SetupItem] = Field(description="The first 100, sorted by name.")
+
+
+class SetupReport(BaseModel):
+    ok: bool = Field(description="True when every check's count is 0.")
+    checks: list[SetupCheck] = Field(
+        description="Every check, always, in a fixed order. `partners_without_area` is left "
+                    "out when you do not hold partners.view at global scope.")

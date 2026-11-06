@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { buildApiUrl } from "@/lib/api/url";
 import type { Role } from "@/lib/auth/roles";
 import { writeMockRole } from "@/lib/dev/mock-settings";
+import { todayInIndia } from "@/lib/format";
 import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb, resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
@@ -362,7 +363,13 @@ describe("[MSTR-006] Price lists", () => {
     await user.click(confirm);
 
     expect(await screen.findByText("Gujarat dealers, November published")).toBeInTheDocument();
-    expect(await screen.findByText("Published, starts later")).toBeInTheDocument();
+    // The seeded list starts on 1 Nov 2026: later than today until then, in force after.
+    const startsOn =
+      mockDb.priceLists.find((list) => list.name === "Gujarat dealers, November")?.effective_from ??
+      "";
+    expect(
+      await screen.findByText(startsOn > todayInIndia() ? "Published, starts later" : "In force"),
+    ).toBeInTheDocument();
   });
 
   it("shows a published list read-only, with no way to change its rates", async () => {

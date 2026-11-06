@@ -6,6 +6,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { Notice } from "@/components/patterns/notice";
@@ -26,6 +27,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportSellerGstins } from "@/features/products/api/seller-gstins.api";
 import { useAddLut, useDeleteLut } from "@/features/products/api/seller-gstins.mutations";
 import { sellerGstinsQueryOptions } from "@/features/products/api/seller-gstins.queries";
 import {
@@ -75,12 +77,21 @@ export function SellerGstinsPanel({ canEdit }: { canEdit: boolean }): React.JSX.
 
   return (
     <Card>
-      <CardHeader className="flex-col gap-0.5">
-        <CardTitle>Seller GSTINs</CardTitle>
-        <CardDescription>
-          Our GST registrations. An export under a LUT needs one covering its date on the
-          registration that sells.
-        </CardDescription>
+      <CardHeader className="flex-row flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <CardTitle>Seller GSTINs</CardTitle>
+          <CardDescription>
+            Our GST registrations. An export under a LUT needs one covering its date on the
+            registration that sells.
+          </CardDescription>
+        </div>
+        <DownloadExcelButton
+          download={(format) => exportSellerGstins(format)}
+          fallbackName="seller-gstins.xlsx"
+          what="registrations"
+          logger={log}
+          dataId="MSTR-018"
+        />
       </CardHeader>
       <CardContent>
         {query.status === "pending" ? (

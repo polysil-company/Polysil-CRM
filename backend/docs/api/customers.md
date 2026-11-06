@@ -54,6 +54,31 @@ leads.
 
 ---
 
+## `GET /api/v1/customers/export`
+
+**Export the customers**
+
+Download the customers as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `q` | query | string \| null |  | Name or mobile, at least 3 characters. |
+| `territory_id` | query | string \| null |  | Customers with a lead you can see in or under these territories, up to 20 ids comma-separated. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
+
+---
+
 ## `GET /api/v1/customers/{customer_id}`
 
 **Get Customer**

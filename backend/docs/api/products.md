@@ -116,6 +116,34 @@ client's own, which is exactly what `provisional_fields` marks the absence of.
 
 ---
 
+## `GET /api/v1/products/export`
+
+**Export the product catalogue**
+
+Download the product catalogue as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `q` | query | string \| null |  | Matches anywhere in the description, ignoring case. |
+| `category` | query | string \| null |  | A product category code. |
+| `quotation_category` | query | `head` \| `field` \| `both` \| null |  | head, field or both. Filter the picker to the block being filled. |
+| `active` | query | boolean \| null |  | true for products on sale, false for switched-off ones. Leave unset to list both. A picker sends true. |
+| `as_of` | query | date \| null |  | Resolve the classification and slab as they were on this date. Today in India by default. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
+
+---
+
 ## `GET /api/v1/products/{product_id}`
 
 **Get Product**
@@ -286,6 +314,31 @@ change is one write rather than 1,092.
 | `200` | `TaxRatePage` | Successful Response |
 | `403` | `ErrorResponse` | No products.view. |
 | `422` | `HTTPValidationError` | Validation Error |
+
+---
+
+## `GET /api/v1/tax-rates/export`
+
+**Export the GST rates by HSN**
+
+Download the GST rates by HSN as Excel (`format=xlsx`, the default) or CSV, with the same filters as the list. The file holds exactly the rows the list would show for these filters, across every page, and nothing outside your scope; a value the list hides from you is a blank cell. Refused exactly where the list is refused. More than 5,000 rows is `422 export_too_large`: narrow the filters. Call it with `fetch` and the bearer token, then save the blob.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `format` | query | `xlsx` \| `csv` \| `pdf` |  | `xlsx` (default) or `csv`. `pdf` only on reports; on a list it answers `422 format_not_available`. Lower case. |
+| `hsn_code` | query | string \| null |  |  |
+| `in_force` | query | boolean |  | Only the rate applying today. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | - | The file, as an attachment: Excel (`format=xlsx`, the default) or CSV. |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | Refused exactly as the list is refused. |
+| `422` | `ErrorResponse` | `format_not_available` (`pdf` on a list); `export_too_large`; a bad filter. |
 
 ---
 

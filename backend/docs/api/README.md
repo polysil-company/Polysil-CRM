@@ -10,15 +10,15 @@ any endpoint change, so it is always current rather than a snapshot.
 | Approvals | 5 | [`approvals.md`](approvals.md) |
 | Assistant | 2 | [`assistant.md`](assistant.md) |
 | Auth | 8 | [`auth.md`](auth.md) |
-| Campaigns | 5 | [`campaigns.md`](campaigns.md) |
+| Campaigns | 6 | [`campaigns.md`](campaigns.md) |
 | Complaints | 23 | [`complaints.md`](complaints.md) |
-| Customers | 4 | [`customers.md`](customers.md) |
+| Customers | 5 | [`customers.md`](customers.md) |
 | Dashboard | 1 | [`dashboard.md`](dashboard.md) |
-| Dealer Applications | 22 | [`dealer-applications.md`](dealer-applications.md) |
+| Dealer Applications | 23 | [`dealer-applications.md`](dealer-applications.md) |
 | Dealer Commission | 12 | [`dealer-commission.md`](dealer-commission.md) |
 | Dispatch | 2 | [`dispatch.md`](dispatch.md) |
 | Documents | 6 | [`documents.md`](documents.md) |
-| Holidays | 3 | [`holidays.md`](holidays.md) |
+| Holidays | 4 | [`holidays.md`](holidays.md) |
 | Imports | 6 | [`imports.md`](imports.md) |
 | Leads | 21 | [`leads.md`](leads.md) |
 | Lookups | 25 | [`lookups.md`](lookups.md) |
@@ -26,32 +26,32 @@ any endpoint change, so it is always current rather than a snapshot.
 | Messages | 12 | [`messages.md`](messages.md) |
 | Notifications | 2 | [`notifications.md`](notifications.md) |
 | Orders | 18 | [`orders.md`](orders.md) |
-| Org Units | 6 | [`org-units.md`](org-units.md) |
+| Org Units | 7 | [`org-units.md`](org-units.md) |
 | Partners | 7 | [`partners.md`](partners.md) |
-| Payments | 8 | [`payments.md`](payments.md) |
+| Payments | 9 | [`payments.md`](payments.md) |
 | Portal | 8 | [`portal.md`](portal.md) |
-| Pricing | 9 | [`pricing.md`](pricing.md) |
-| Products | 8 | [`products.md`](products.md) |
+| Pricing | 11 | [`pricing.md`](pricing.md) |
+| Products | 10 | [`products.md`](products.md) |
 | Public | 6 | [`public.md`](public.md) |
 | Quotations | 16 | [`quotations.md`](quotations.md) |
-| Ratings | 4 | [`ratings.md`](ratings.md) |
+| Ratings | 5 | [`ratings.md`](ratings.md) |
 | Reports | 11 | [`reports.md`](reports.md) |
-| Rewards | 19 | [`rewards.md`](rewards.md) |
-| Schemes | 6 | [`schemes.md`](schemes.md) |
-| Seller Gstins | 3 | [`seller-gstins.md`](seller-gstins.md) |
+| Rewards | 23 | [`rewards.md`](rewards.md) |
+| Schemes | 8 | [`schemes.md`](schemes.md) |
+| Seller Gstins | 4 | [`seller-gstins.md`](seller-gstins.md) |
 | Settings | 2 | [`settings.md`](settings.md) |
-| Stock | 7 | [`stock.md`](stock.md) |
+| Stock | 10 | [`stock.md`](stock.md) |
 | Subsidy | 4 | [`subsidy.md`](subsidy.md) |
 | Subsidy Applications | 15 | [`subsidy-applications.md`](subsidy-applications.md) |
 | Subsidy Masters | 4 | [`subsidy-masters.md`](subsidy-masters.md) |
 | Subsidy Reports | 6 | [`subsidy-reports.md`](subsidy-reports.md) |
-| Subsidy Schemes | 6 | [`subsidy-schemes.md`](subsidy-schemes.md) |
+| Subsidy Schemes | 7 | [`subsidy-schemes.md`](subsidy-schemes.md) |
 | Targets | 3 | [`targets.md`](targets.md) |
 | Tasks | 14 | [`tasks.md`](tasks.md) |
-| Territories | 4 | [`territories.md`](territories.md) |
+| Territories | 5 | [`territories.md`](territories.md) |
 | Tracking | 17 | [`tracking.md`](tracking.md) |
-| Users | 10 | [`users.md`](users.md) |
-| Warranty | 3 | [`warranty.md`](warranty.md) |
+| Users | 12 | [`users.md`](users.md) |
+| Warranty | 4 | [`warranty.md`](warranty.md) |
 
 ---
 

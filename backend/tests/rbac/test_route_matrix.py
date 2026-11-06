@@ -66,6 +66,8 @@ UNGATED: dict[str, str] = {
     "GET /api/v1/approvals/thresholds": "staff only, checked in the handler",
     "GET /api/v1/campaigns": "every staff user reads the list for the lead form's picker; cost hidden without campaigns.view (FS-040, RBAC.md note)",
     "GET /api/v1/campaigns/{campaign_id}": "as the list (FS-040)",
+    "GET /api/v1/campaigns/export": "as the list: the handler refuses partners and hides cost without campaigns.view (FS-081)",
+    "GET /api/v1/holidays/export": "as the list, which everyone reads (FS-081)",
     "GET /api/v1/dashboard/overview": "each tile is null without its own module (FS-017)",
     "GET /api/v1/gstin/{gstin}": "any signed-in user; ISS-227",
     "GET /api/v1/holidays": "the company calendar, read by everyone (FS-028)",
@@ -76,6 +78,7 @@ UNGATED: dict[str, str] = {
     "GET /api/v1/settings": "the admin switches the screens need; partners refused in the handler (FS-036)",
     "GET /api/v1/staff-directory": "staff only, for the chat picker (FS-019)",
     "GET /api/v1/tracking/policy": "the tracking policy a phone shows before consent (FS-021)",
+    "GET /api/v1/users/org-chart": "staff only, checked in the handler; rows from reporting_lines(), which shows the caller's own line unless users.view is global (FS-080)",
 }
 
 
@@ -137,6 +140,17 @@ def test_every_route_is_gated_or_says_why_not() -> None:
     assert loose == [], "add a require() gate, or a reason to UNGATED:\n" + "\n".join(loose)
 
 
+def test_every_export_is_gated_exactly_as_its_list() -> None:
+    """FS-081 EC-3: an export is refused where its list is, no more and no less. The
+    handler-level refusals ride along because the export calls the list handler."""
+    gates = {(r.method, r.path): set(r.gates) for r in ROUTES}
+    differ = [path for (method, path), g in gates.items()
+              if method == "GET" and path.endswith("/export")
+              and ("GET", path.removesuffix("/export")) in gates
+              and g != gates[("GET", path.removesuffix("/export"))]]
+    assert differ == []
+
+
 def test_the_allowlist_holds_no_route_that_is_gated_or_gone() -> None:
     """An entry outliving its route, or a route that gained a gate, is stale."""
     keys = {f"{r.method} {r.path}": r for r in ROUTES}
@@ -191,6 +205,9 @@ def _team_view(role: str) -> bool:
 
 BEYOND_THE_MATRIX: dict[str, tuple[Any, str]] = {
     "GET /api/v1/planner/team": (_team_view, "the team view is for managers (FS-014)"),
+    "GET /api/v1/users/setup-check": (
+        lambda role: VIEW_SCOPE.get((role, "users")) == "global" and (role, "users", "edit") in GRANTED,
+        "the setup check needs users.edit at global scope (FS-082)"),
     **{f"GET /api/v1/reports/{name}": (
         lambda role, mods=mods: all((role, m) in VIEW_SCOPE for m in mods),
         f"the report also needs view on {', '.join(mods)}") for name, mods in REPORT_NEEDS.items()},

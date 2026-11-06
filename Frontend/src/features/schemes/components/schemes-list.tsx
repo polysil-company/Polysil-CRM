@@ -6,6 +6,7 @@ import Link from "next/link";
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
@@ -16,6 +17,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportSchemes } from "@/features/schemes/api/schemes.api";
 import { schemeListQueryOptions } from "@/features/schemes/api/schemes.queries";
 import {
   SCHEME_STATUSES,
@@ -33,6 +35,12 @@ import {
   type SchemeState,
 } from "@/features/schemes/lib/scheme-labels";
 import { useCan, useIsStaff } from "@/features/session/hooks/use-session";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({
+  file: "features/schemes/components/schemes-list.tsx",
+  dataId: "SCHM-001",
+});
 
 const STATUS_OPTIONS = [
   {
@@ -124,12 +132,21 @@ export function SchemesList(): React.JSX.Element {
             </Button>
           ) : null}
         </div>
-        {canCreate ? (
-          <Link href="/schemes/new" className={buttonVariants({ className: "md:ml-auto" })}>
-            <Icon icon={Add01Icon} />
-            New scheme
-          </Link>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+          <DownloadExcelButton
+            download={(format) => exportSchemes(params, format)}
+            fallbackName="schemes.xlsx"
+            what="schemes"
+            logger={log}
+            dataId="SCHM-001"
+          />
+          {canCreate ? (
+            <Link href="/schemes/new" className={buttonVariants()}>
+              <Icon icon={Add01Icon} />
+              New scheme
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <QueryView

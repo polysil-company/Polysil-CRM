@@ -147,6 +147,66 @@ narrow the filters. An empty list gives a file with the header row only.
 
 ---
 
+## `GET /api/v1/users/org-chart`
+
+**Org Chart**
+
+Who reports to whom (FS-080). For any staff member, no permission needed.
+
+By default this is your own picture: the chain of managers above you, nearest
+first, and everyone below you, with counts by role. Pass `user_id` to see the
+same for someone below you; a `users.view` global holder may pass anyone.
+`view=company` gives the whole company, roots being the people with empty
+`manager_ids`.
+
+Managers are worked out from office and role: a person reports to the nearest
+higher line role in their own office or the offices above it. Nothing is stored,
+so the chart follows any change of office or role straight away.
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `user_id` | query | string \| null |  | Whose picture. Left out: yours. |
+| `view` | query | string \| null |  | `company`: everyone, for a `users.view` global holder. Not sent with `user_id`. |
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_OrgChart_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | `insufficient_permission`: a partner user, or `view=company` without `users.view` at global scope. `consumer_not_allowed`: a farmer's portal account. |
+| `404` | `ErrorResponse` | `user_id` is not you or someone below you (and you are not a global `users.view` holder), or the person is deactivated or deleted. On a user's detail page, treat this as 'no reporting line to show'. |
+| `422` | `ErrorResponse` | A bad `user_id`, an unknown `view`, or `view` sent with `user_id`. |
+
+---
+
+## `GET /api/v1/users/setup-check`
+
+**Setup Check**
+
+What is set up wrong, for the admin dashboard (FS-082).
+
+Each check has a count, a one-line title, why it matters, and the first 100
+people or partners to fix, sorted by name. Every check is always listed, with
+`count` 0 when clean; `ok` is true when all are 0. Read-only.
+
+The checks: field staff in an office that covers no area; staff whose role
+works by area but who have none; staff with no manager one level above them;
+staff on the System office; partners with no area.
+
+**Responses**
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `Envelope_SetupReport_` | Successful Response |
+| `401` | `ErrorResponse` | Not signed in. |
+| `403` | `ErrorResponse` | `insufficient_permission`: you need `users.edit` at global scope (Admin-Sales, MD/CEO). |
+| `422` | `ErrorResponse` | A field failed validation; see `fields`. |
+
+---
+
 ## `DELETE /api/v1/users/{user_id}`
 
 **Delete User**
@@ -393,6 +453,12 @@ failed attempts stay on record. A partner user has nothing to unlock
 |---|---|---|---|
 | `data` | HandoverResult | yes |  |
 
+**`Envelope_OrgChart_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | OrgChart | yes |  |
+
 **`Envelope_PasswordSetResult_`**
 
 | Field | Type | Required | Notes |
@@ -404,6 +470,12 @@ failed attempts stay on record. A partner user has nothing to unlock
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `data` | RevokeResult | yes |  |
+
+**`Envelope_SetupReport_`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `data` | SetupReport | yes |  |
 
 **`Envelope_UnlockResult_`**
 
@@ -447,6 +519,47 @@ failed attempts stay on record. A partner user has nothing to unlock
 | `tasks_moved` | integer |  | Open tasks moved. All of them go on every call. Default `0`. |
 | `deactivated` | boolean | yes |  |
 
+**`OrgChart`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `subject` | OrgChartPerson \| null | yes | Whose picture this is. Null in the company view. |
+| `managers` | OrgChartPerson[][] | yes | The chain above the subject, nearest first. A step holds more than one person when two people at the same level in one office both manage, sorted by name then id. Empty in the company view and for someone at the top. |
+| `people` | OrgChartNode[] | yes | Everyone below the subject at any depth, or the whole company. Sorted by level (highest first), then name, then id. Build the tree from `manager_ids`. |
+| `co_managers` | OrgChartPerson[] | yes | People named in some `manager_ids` who appear nowhere else: for example a second District Manager who shares one of your reports. |
+| `totals` | OrgChartTotals | yes |  |
+| `unplaced` | OrgChartPerson[] | yes | Company view only: active staff on the System office, who cannot be placed. Not in `people` or `totals`. Give them a real office. |
+
+**`OrgChartNode`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+| `role` | RoleRef | yes |  |
+| `level` | integer | yes | The role's level: 1 field officer up to 5 head office. |
+| `org_unit` | OrgUnitRef | yes | The office they sit in. Never null for staff. |
+| `manager_ids` | string[] | yes | Who this person reports to, sorted by name then id: the tree's edges. Draw the person under the first and show the rest as 'also reports to'. Every id is the subject, someone in `managers`, `people` or `co_managers`. Empty for a root of the company view. |
+| `direct_reports` | integer | yes | People whose `manager_ids` include this person. |
+| `team_size` | integer | yes | Everyone below this person at any depth, each counted once even when two managers share them. |
+
+**`OrgChartPerson`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+| `role` | RoleRef | yes |  |
+| `level` | integer | yes | The role's level: 1 field officer up to 5 head office. |
+| `org_unit` | OrgUnitRef | yes | The office they sit in. Never null for staff. |
+
+**`OrgChartTotals`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `people` | integer | yes | The number of entries in `people`. |
+| `by_role` | RoleCount[] | yes | `people` counted by role, highest level first. |
+
 **`OrgUnitRef`**
 
 | Field | Type | Required | Notes |
@@ -484,12 +597,44 @@ failed attempts stay on record. A partner user has nothing to unlock
 | `id` | string | yes |  |
 | `sessions_revoked` | integer | yes | Sessions that were live and are now signed out. |
 
+**`RoleCount`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `role` | RoleRef | yes |  |
+| `count` | integer | yes |  |
+
 **`RoleRef`**
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `code` | string | yes | Stable identifier, e.g. district_manager. |
 | `name` | string | yes | Display name. |
+
+**`SetupCheck`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | yes | staff_without_area, staff_without_territories, staff_skipping_a_level, unplaced_staff or partners_without_area. |
+| `title` | string | yes | One line for the card. |
+| `why` | string | yes | What goes wrong while this stays unfixed, in plain words. |
+| `count` | integer | yes |  |
+| `items` | SetupItem[] | yes | The first 100, sorted by name. |
+
+**`SetupItem`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes | The person's or partner's id, to link to their page. |
+| `name` | string | yes |  |
+| `detail` | string | yes | Role and office for a person, area or type for a partner. |
+
+**`SetupReport`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `ok` | boolean | yes | True when every check's count is 0. |
+| `checks` | SetupCheck[] | yes | Every check, always, in a fixed order. `partners_without_area` is left out when you do not hold partners.view at global scope. |
 
 **`TerritoryRef`**
 

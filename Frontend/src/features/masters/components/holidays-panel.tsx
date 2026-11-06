@@ -12,6 +12,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportHolidays } from "@/features/masters/api/holidays.api";
 import { useAddHoliday, useRemoveHoliday } from "@/features/masters/api/holidays.mutations";
 import { holidaysQueryOptions } from "@/features/masters/api/holidays.queries";
 import {
@@ -117,18 +119,27 @@ export function HolidaysPanel({ canEdit }: { canEdit: boolean }): React.JSX.Elem
             counts like a Sunday.
           </CardDescription>
         </div>
-        {canEdit ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setAdding(true);
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            Add holiday
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadExcelButton
+            download={(format) => exportHolidays(year, format)}
+            fallbackName="holidays.xlsx"
+            what="holidays"
+            logger={log}
+            dataId="MSTR-019"
+          />
+          {canEdit ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setAdding(true);
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              Add holiday
+            </Button>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-center gap-1" role="group" aria-label="Year">

@@ -272,9 +272,19 @@ export function generateLeads(
  * LEAD-019 · Two soft-deleted leads for the Deleted leads list: copies of the two oldest seeded
  * leads under their own ids and numbers, so no other seeded count moves.
  */
+/** LEAD-020 · A field officer who has left (seeded inactive in the users mock). */
+const LEAVER = { id: mockUuid(MOCK_ID_SPACE.staff, 23), full_name: "Vijay Chaudhary" };
+
 export function seedDeletedLeads(leads: readonly LeadWire[]): LeadWire[] {
   return leads.slice(-2).map((lead, index) => ({
     ...lead,
+    // The second one's owner has left since, so restoring it says to assign it (BE-042).
+    owner:
+      index === 1
+        ? { ...LEAVER, is_active: false }
+        : lead.owner === null
+          ? null
+          : { ...lead.owner, is_active: true },
     id: mockUuid(MOCK_ID_SPACE.lead, 9001 + index),
     inquiry_no: `POL/GJ/2026-27/${String(9001 + index).padStart(5, "0")}`,
     duplicates: [],

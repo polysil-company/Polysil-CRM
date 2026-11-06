@@ -1654,7 +1654,7 @@ export const quotationHandlers = [
   }),
 
   /** QUOT-013 · The list as a file. Before /quotations/:quotationId. */
-  http.get(buildApiUrl("/quotations/export"), async () => {
+  http.get(buildApiUrl("/quotations/export"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     return mockWorkbook(
@@ -1667,6 +1667,7 @@ export const quotationHandlers = [
         quotation.party.name,
         quotation.totals.total,
       ]),
+      request,
     );
   }),
 

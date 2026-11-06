@@ -89,7 +89,7 @@ export function MarketingOrders({
           <span />
         )}
         <DownloadExcelButton
-          download={() => exportMarketingOrders({ view })}
+          download={(format) => exportMarketingOrders({ view }, format)}
           fallbackName="marketing-orders.xlsx"
           what="marketing orders"
           logger={log}

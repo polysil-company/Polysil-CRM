@@ -7,6 +7,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { RelativeDate } from "@/components/patterns/relative-date";
@@ -28,6 +29,7 @@ import { Icon } from "@/components/ui/icon";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { exportPayments } from "@/features/payments/api/payments.api";
 import { useAllocatePayment, useVoidPayment } from "@/features/payments/api/payments.mutations";
 import { paymentListQueryOptions } from "@/features/payments/api/payments.queries";
 import type { Payment } from "@/features/payments/api/payments.schemas";
@@ -123,16 +125,30 @@ export function ReceiptsList(): React.JSX.Element {
             <Label htmlFor="receipts-voided">Show voided</Label>
           </div>
         </div>
-        {canRecord ? (
-          <Button
-            onClick={() => {
-              setOpened({ kind: "record" });
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            Record payment
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadExcelButton
+            download={(format) =>
+              exportPayments(
+                { partnerId: partner?.id ?? null, orderId: null, includeVoided: withVoided },
+                format,
+              )
+            }
+            fallbackName="payments.xlsx"
+            what="receipts"
+            logger={log}
+            dataId="ACCT-003"
+          />
+          {canRecord ? (
+            <Button
+              onClick={() => {
+                setOpened({ kind: "record" });
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              Record payment
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {query.status === "pending" ? (

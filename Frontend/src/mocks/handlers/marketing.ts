@@ -19,7 +19,7 @@ import { mockMeFor } from "@/mocks/data/sessions";
 import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
-import { errorResponse } from "./shared";
+import { errorResponse, mockWorkbook } from "./shared";
 
 /**
  * MKT-002 … MKT-004 · Marketing material (FS-034, `docs/api/marketing-material.md`). Each call
@@ -267,25 +267,19 @@ export const marketingHandlers = [
     const { failure } = await applyScenario();
     if (failure) return failure;
     if (!allowed("view")) return forbidden();
-    const lines = [
-      ["Order", "Status", "Dealer", "Value", "Company share", "Dealer share"].join("\t"),
-      ...filtered(new URL(request.url)).map((order) =>
-        [
-          order.order_no,
-          order.status,
-          order.partner?.name ?? "Office use",
-          order.totals.value,
-          order.totals.company_share,
-          order.totals.dealer_share,
-        ].join("\t"),
-      ),
-    ];
-    return new HttpResponse(lines.join("\n"), {
-      headers: {
-        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "content-disposition": `attachment; filename="marketing-orders-${todayInIndia()}.xlsx"`,
-      },
-    });
+    return mockWorkbook(
+      "marketing-orders",
+      ["Order", "Status", "Dealer", "Value", "Company share", "Dealer share"],
+      filtered(new URL(request.url)).map((order) => [
+        order.order_no,
+        order.status,
+        order.partner?.name ?? "Office use",
+        order.totals.value,
+        order.totals.company_share,
+        order.totals.dealer_share,
+      ]),
+      request,
+    );
   }),
 
   http.get(buildApiUrl("/marketing-orders/:orderId"), async ({ params }) => {

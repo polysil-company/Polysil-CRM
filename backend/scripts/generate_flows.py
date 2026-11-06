@@ -1540,6 +1540,33 @@ def f_admin() -> None:
               "   read from the outbox: nothing sends it, GAP-027)\n"
               "4 owner: backdate over 45 days, clamped to the FY,\n"
               "   audit triggers off for one transaction", w=520, colour=VIOLET)
+    e += note("nGreen2", 1240, 1000,
+              "WHO REPORTS TO WHOM  GET /users/org-chart (FS-080)\n\n"
+              "Worked out, not stored: walk up from the person's office;\n"
+              "the first office with an active line role above their\n"
+              "level wins, and everyone there at the lowest such level\n"
+              "manages. Vacancies are skipped. Functional roles manage\n"
+              "nobody. reporting_lines() (definer) shows a caller their\n"
+              "own line only; users.view global sees everyone.", w=420, colour=GREEN)
+    e += note("nYellow2", 0, 1120,
+              "ASSUMED, ASK THE CLIENT (37.1 to 37.3)\n\n"
+              "Two DMs in one district both manage its officers, and a\n"
+              "Regional Manager reports to Admin-Sales and the MD both\n"
+              "(GAP-553). Account, Dispatch, QC/QA and State\n"
+              "Co-ordinators sit outside the line (GAP-554).", w=520, colour=YELLOW)
+    e += note("nRed082", 0, 1260,
+              "FIELD STAFF NEED AN OFFICE WITH AN AREA (FS-082)\n\n"
+              "Field Officer or District Manager into an office with no\n"
+              "territory: 422 office_has_no_area, on create and on a\n"
+              "role or office change. Prod had all 30 in HQ (ISS-233):\n"
+              "no dealers visible, a DM there read the whole company.\n"
+              "Which roles is assumed (37.4, GAP-556).", w=520, colour=RED)
+    e += note("nGreen3", 620, 1260,
+              "SETUP CHECK  GET /users/setup-check\n\n"
+              "users.edit global (Admin-Sales, MD). Read-only. Field\n"
+              "staff with no area; area roles with no territory; staff\n"
+              "with no manager one level up (GAP-559); staff on the\n"
+              "System office; partners with no area. Count + first 100.", w=420, colour=GREEN)
     write("10-administration", e)
 
 
@@ -2059,6 +2086,27 @@ def f_reports() -> None:
               "Paid day = earliest receipt day whose running total of live\n"
               "allocations covers payable; a day, not an amount.\n"
               "Ordered value counts, not shipped (GAP-234 to GAP-239).", w=420, colour=YELLOW)
+    e += note("nGreen1", 0, 760,
+              "TEAM FILTERS (FS-082)  ?team_of=<person>&roles=a,b\n\n"
+              "team_of: that person and everyone below them on the org\n"
+              "chart. You, someone below you, or anyone for users.view\n"
+              "global; else 404 not_in_your_line. Not with owner_id.\n"
+              "roles: people holding those roles now. Both become one\n"
+              "owner set; an empty set is an empty report, never all.\n"
+              "Not on complaints: its owner is the handler (GAP-558).", w=520, colour=GREEN)
+    e += note("nGreen2", 620, 760,
+              "THE ROSTER  salesperson-performance\n\n"
+              "Everyone in your team gets a row, zeros included, with\n"
+              "role and office: yourself (own scope), the people below\n"
+              "you (org_subtree), everyone (leads and users global).\n"
+              "Territory-scoped callers get activity rows only: their\n"
+              "leads are found by area, so a zero could be false.", w=520, colour=GREEN)
+    e += note("nRed3", 1240, 760,
+              "A ZERO CAN STILL BE WRONG AFTER A MOVE\n\n"
+              "084 moves a person's open leads (and their quotations)\n"
+              "with them to a new office. Won and lost leads stay where\n"
+              "they closed, and orders stay too (GAP-557). So a moved\n"
+              "person's past wins can read 0 to their new manager.", w=420, colour=RED)
     write("32-reports", e)
 
 
@@ -2108,9 +2156,9 @@ def _columns(name: str, head: str, sub: str, status: str, steps: list, side: lis
 
 def f_exports() -> None:
     _columns(
-        "40-list-exports", "List exports: any list to Excel, through the list's own code",
-        "Eight lists, one /export each, the same filters, the same scope.",
-        "BUILT. FS-030: GET /<list>/export, no migration.",
+        "40-list-exports", "List exports: any list to Excel or CSV, through the list's own code",
+        "34 lists, one /export each, the same filters, the same scope, the same gate.",
+        "BUILT. FS-030, FS-077 (CSV), FS-081 (24 more lists): GET /<list>/export, no migration.",
         [("s1", "GET /leads/export?stage=new&territory_id=...\nfilters_of(list_leads): the list's own parameters", BLUE),
          ("s2", "the list endpoint itself, page by page\nthe caller's db and caller: service predicate + RLS", GREEN),
          ("s3", "more than 5,000 rows: 422 export_too_large\nnever a cut file", YELLOW),
@@ -2120,7 +2168,8 @@ def f_exports() -> None:
          ("d2", "credit terms stay blank without partners.edit\nthe same masking code as the screen", GREEN)],
         [("n1", "A TEXT CELL STARTING = IS A FORMULA\n\nopenpyxl stores it as one through cell() and\nappend() alike. The writer forces data_type 's'.\nThe PIMS sheet had the same hole (ISS-200).", RED),
          ("n2", "/export IS DECLARED BEFORE /{id}\n\nStarlette matches {id} first; declared after,\nthe export answers 422 forever.", RED),
-         ("n3", "Not yet: CSV, PDF, the client's layouts,\nlarge background exports (GAP-300 to GAP-303).", YELLOW)])
+         ("n3", "FS-081 REGISTERS EXPORTS FROM THEIR LISTS\n\nlist_exports.add_export copies the list route's gate,\nfilters and handler, and places /export right after it.\nLists without a real cursor are read in ONE call with\nlimit 5,001: a page loop drifts, a cap would cut.", GREEN),
+         ("n4", "Not yet: imports beyond partners, prices and lines;\ntargets and the org chart as files (GAP-555);\nthe client's layouts (GAP-302).", YELLOW)])
 
 
 def f_schemes() -> None:

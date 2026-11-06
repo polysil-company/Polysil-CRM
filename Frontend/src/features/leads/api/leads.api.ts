@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -84,13 +84,17 @@ export async function listLeads(params: LeadListParams, signal?: AbortSignal): P
 }
 
 /** LEAD-009 · GET /leads/export — the list as an Excel file, with the list's filters and sort. */
-export function exportLeads(params: LeadListParams): Promise<DownloadedFile> {
+export function exportLeads(
+  params: LeadListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "LEAD-009",
     logger: log,
     fn: "exportLeads",
     path: "/leads/export",
     query: {
+      format,
       q: params.q,
       stage: params.stage.join(","),
       source: params.source,

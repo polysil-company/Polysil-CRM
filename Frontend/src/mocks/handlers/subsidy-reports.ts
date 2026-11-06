@@ -189,6 +189,7 @@ export const subsidyReportHandlers = [
           ...AGEING_FIGURES.map((key) => String(age[key].days ?? "")),
         ];
       }),
+      request,
     );
   }),
 
@@ -229,6 +230,7 @@ export const subsidyReportHandlers = [
         row.farmer_share,
         String(row.oldest_days_in_stage ?? ""),
       ]),
+      request,
     );
   }),
 
@@ -261,6 +263,7 @@ export const subsidyReportHandlers = [
         row.supplied_cost,
         row.not_supplied_cost,
       ]),
+      request,
     );
   }),
 

@@ -94,7 +94,8 @@ describe("[AUTH-001] MobileSignIn", () => {
     const { user, requestCode } = renderSignIn();
     await requestCode();
 
-    await user.click(screen.getByRole("button", { name: "Send a new code" }));
+    // The countdown swaps in the button on its next tick, so wait for it.
+    await user.click(await screen.findByRole("button", { name: "Send a new code" }));
 
     expect(await screen.findByText("A new code is on its way.")).toBeInTheDocument();
   });

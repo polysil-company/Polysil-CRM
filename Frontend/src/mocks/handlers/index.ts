@@ -14,11 +14,13 @@ import { holidayHandlers } from "./holidays";
 import { importHandlers } from "./imports";
 import { leadCaptureHandlers } from "./lead-capture";
 import { leadHandlers } from "./leads";
+import { listExportHandlers } from "./list-exports";
 import { lookupHandlers } from "./lookups";
 import { marketingHandlers } from "./marketing";
 import { messageHandlers } from "./messages";
 import { notificationHandlers } from "./notifications";
 import { orderHandlers } from "./orders";
+import { orgChartHandlers } from "./org-chart";
 import { partnerHandlers } from "./partners";
 import { paymentHandlers } from "./payments";
 import { policyHandlers } from "./policy";
@@ -60,6 +62,7 @@ export const unbuiltHandlers: readonly HttpHandler[] = [];
  */
 export const handlers: readonly HttpHandler[] = [
   ...consumerFenceHandlers,
+  ...listExportHandlers,
   ...authHandlers,
   ...portalHandlers,
   ...approvalHandlers,
@@ -78,6 +81,7 @@ export const handlers: readonly HttpHandler[] = [
   ...taskHandlers,
   ...targetHandlers,
   ...complaintHandlers,
+  ...orgChartHandlers,
   ...userHandlers,
   ...partnerHandlers,
   ...dealerApplicationHandlers,

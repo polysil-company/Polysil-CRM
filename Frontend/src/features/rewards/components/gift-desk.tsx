@@ -5,6 +5,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { RelativeDate } from "@/components/patterns/relative-date";
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { RedemptionDecision } from "@/features/rewards/api/rewards.api";
+import { exportRedemptions, type RedemptionDecision } from "@/features/rewards/api/rewards.api";
 import { redemptionsQueryOptions } from "@/features/rewards/api/rewards.queries";
 import type { Redemption } from "@/features/rewards/api/rewards.schemas";
 import {
@@ -22,8 +23,11 @@ import {
   pointsText,
 } from "@/features/rewards/lib/reward-labels";
 import { formatCount } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
 
 import { RedemptionDecisionForm } from "./reward-dialogs";
+
+const log = createLogger({ file: "features/rewards/components/gift-desk.tsx", dataId: "RWD-002" });
 
 const VIEWS = ["waiting", "all"] as const;
 type View = (typeof VIEWS)[number];
@@ -45,17 +49,31 @@ export function GiftDesk(): React.JSX.Element {
 
   return (
     <div className="flex flex-col gap-4">
-      <ToggleGroup
-        aria-label="Which requests"
-        value={[view]}
-        onValueChange={(next) => {
-          const chosen = VIEWS.find((value) => value === next[0]);
-          if (chosen !== undefined) setView(chosen);
-        }}
-      >
-        <ToggleGroupItem value="waiting">Waiting</ToggleGroupItem>
-        <ToggleGroupItem value="all">All</ToggleGroupItem>
-      </ToggleGroup>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <ToggleGroup
+          aria-label="Which requests"
+          value={[view]}
+          onValueChange={(next) => {
+            const chosen = VIEWS.find((value) => value === next[0]);
+            if (chosen !== undefined) setView(chosen);
+          }}
+        >
+          <ToggleGroupItem value="waiting">Waiting</ToggleGroupItem>
+          <ToggleGroupItem value="all">All</ToggleGroupItem>
+        </ToggleGroup>
+        <DownloadExcelButton
+          download={(format) =>
+            exportRedemptions(
+              { status: view === "waiting" ? "pending" : null, kind: "gift" },
+              format,
+            )
+          }
+          fallbackName="gift-redemptions.xlsx"
+          what="requests"
+          logger={log}
+          dataId="RWD-002"
+        />
+      </div>
 
       {query.status === "pending" ? (
         <div aria-busy="true" aria-label="Loading requests" className="flex flex-col gap-2">

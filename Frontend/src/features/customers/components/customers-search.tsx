@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { SearchField } from "@/components/patterns/search-field";
@@ -13,12 +14,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportCustomers } from "@/features/customers/api/customers.api";
 import { customerListQueryOptions } from "@/features/customers/api/customers.queries";
 import { CUSTOMER_SEARCH_MIN_LENGTH } from "@/features/customers/api/customers.schemas";
 import { CUSTOMER_TYPE_LABELS } from "@/features/customers/lib/customer-labels";
 import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
 import { formatIndianPhone } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({
+  file: "features/customers/components/customers-search.tsx",
+  dataId: "LEAD-016",
+});
 
 /**
  * LEAD-016 · Find a customer by name or mobile (three characters or more), in an area, newest
@@ -64,6 +72,17 @@ export function CustomersSearch(): React.JSX.Element {
             onValueChange={setArea}
           />
         </Field>
+      </div>
+      <div className="flex justify-end">
+        <DownloadExcelButton
+          download={(format) =>
+            exportCustomers({ q: tooShort ? "" : typed, territoryId: area?.id ?? null }, format)
+          }
+          fallbackName="customers.xlsx"
+          what="customers"
+          logger={log}
+          dataId="LEAD-016"
+        />
       </div>
 
       {query.status === "pending" ? (

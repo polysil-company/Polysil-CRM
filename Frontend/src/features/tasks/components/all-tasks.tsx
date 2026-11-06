@@ -126,7 +126,7 @@ export function AllTasks({
           ) : null}
         </div>
         <DownloadExcelButton
-          download={() => exportTasks(params)}
+          download={(format) => exportTasks(params, format)}
           fallbackName="tasks.xlsx"
           what="tasks"
           logger={log}

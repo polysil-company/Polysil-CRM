@@ -7,10 +7,24 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-120 changes, newest first. Each title opens its entry.
+134 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-11-06 | [The client's menu adds Org chart, Reports, Company settings and Tracking settings](changelog/entries/2026-11-06--chore--APP-007--the-client-s-menu-adds-org-chart-reports-company-settings.md) | `chore` | `APP-007` `ADMN-008` `RPT-002` `ADMN-007` `TRK-006` |
+| 2026-11-06 | [The setup check, and an office that covers no area](changelog/entries/2026-11-06--feature--ADMN-009--the-setup-check-and-an-office-that-covers-no-area.md) | `feature` | `ADMN-009` |
+| 2026-11-06 | [A field officer picks the distributor on an order from a lead](changelog/entries/2026-11-06--fix--SO-013--a-field-officer-picks-the-distributor-on-an-order-from-a.md) | `fix` | `SO-013` `SO-012` |
+| 2026-11-05 | [The org chart](changelog/entries/2026-11-05--feature--ADMN-008--the-org-chart.md) | `feature` | `ADMN-008` |
+| 2026-11-05 | [Downloads as CSV, and reports as PDF](changelog/entries/2026-11-05--feature--APP-011--downloads-as-csv-and-reports-as-pdf.md) | `feature` | `APP-011` |
+| 2026-11-05 | [Downloads on 24 more lists](changelog/entries/2026-11-05--feature--APP-012--downloads-on-24-more-lists.md) | `feature` | `APP-012` |
+| 2026-11-05 | [Email preferences](changelog/entries/2026-11-05--feature--AUTH-008--email-preferences.md) | `feature` | `AUTH-008` |
+| 2026-11-05 | [Distributor applications and the data sheet](changelog/entries/2026-11-05--feature--CHNL-007--distributor-applications-and-the-data-sheet.md) | `feature` | `CHNL-007` `CHNL-008` |
+| 2026-11-05 | [The deposit on dealer and distributor applications](changelog/entries/2026-11-05--feature--CHNL-007--the-deposit-on-dealer-and-distributor-applications.md) | `feature` | `CHNL-007` |
+| 2026-11-05 | [The printed data sheets: blank, filled and the applicant's](changelog/entries/2026-11-05--feature--CHNL-007--the-printed-data-sheets-blank-filled-and-the-applicant-s.md) | `feature` | `CHNL-007` `CHNL-008` |
+| 2026-11-05 | [A restore in the lead's history, and an owner who has left](changelog/entries/2026-11-05--feature--LEAD-020--a-restore-in-the-lead-s-history-and-an-owner-who-has-left.md) | `feature` | `LEAD-020` |
+| 2026-11-05 | [Sales forecast and insights](changelog/entries/2026-11-05--feature--RPT-004--sales-forecast-and-insights.md) | `feature` | `RPT-004` `RPT-005` |
+| 2026-11-05 | [Team and role filters on the reports](changelog/entries/2026-11-05--feature--RPT-006--team-and-role-filters-on-the-reports.md) | `feature` | `RPT-006` |
+| 2026-11-05 | [Company settings read the application settings and any kind added later](changelog/entries/2026-11-05--fix--ADMN-007--company-settings-read-the-application-settings-and-any-kind.md) | `fix` | `ADMN-007` |
 | 2026-10-30 | [Visits take the location by themselves once allowed](changelog/entries/2026-10-30--feature--TRK-003--visits-take-the-location-by-themselves-once-allowed.md) | `feature` | `TRK-003` `TRK-004` |
 | 2026-10-30 | [Duty on Android, and the map under the menu](changelog/entries/2026-10-30--fix--TRK-008--duty-on-android-and-the-map-under-the-menu.md) | `fix` | `TRK-008` `TRK-001` |
 | 2026-10-28 | [The APK on the Releases page](changelog/entries/2026-10-28--chore--TRK-008--the-apk-on-the-releases-page.md) | `chore` | `TRK-008` |
@@ -131,6 +145,730 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 6 November 2026
+
+### The client's menu adds Org chart, Reports, Company settings and Tracking settings
+
+`chore` · `APP-007` `ADMN-008` `RPT-002` `ADMN-007` `TRK-006` · Nakul Srivastava · [entry](changelog/entries/2026-11-06--chore--APP-007--the-client-s-menu-adds-org-chart-reports-company-settings.md)
+
+#### Before
+
+The client's site (`crm.polysilirrigation.com`) showed only the released screens in `RELEASED_NAV`. Org chart, Reports, Company settings and Tracking settings were built and on `integration`, but hidden from the client. Production's roles didn't hold the `reports` module either, so the reports would have answered 403 there.
+
+#### Now
+
+- **The client's menu** (`RELEASED_NAV` in `backend/scripts/deploy_staging.py`) adds `org-chart`, `reports`, `company-settings` and `tracking-settings`.
+- **The backend scope** (`RELEASED` in `backend/scripts/seed_prod.py`) adds `reports`, so the roles that hold reports in the permission matrix get them on production. Org chart needs no module; both settings screens use `masters` and the tracking screens use `tracking`, which were already released.
+- **The live check** (`backend/live/inventory.json`): the ten report endpoints are no longer expected to answer 403 on production.
+- Each screen still shows only to the roles whose permissions allow it.
+- **Two tests that failed on a busy CI runner** now wait for the screen instead of reading it too early: the sign-in's **Send a new code** button (AUTH-001), which appears on the countdown's next tick, and the marketing order's dialog (MKT), which opens on "Loading…". `integration` was red on the first after #239 merged; this pull request's first run failed on the second.
+
+#### Discussion
+
+- The client asked for these four screens on 6 Nov.
+- The menu only appears on the client's site after the release steps: `deploy_staging.py --target prod deploy`, then `seed-prod` (it grants the new `reports` module), then `frontend-prod` (it rebuilds the menu).
+
+#### Files changed
+
+- `../backend/scripts/deploy_staging.py`: four nav ids added to `RELEASED_NAV`.
+- `../backend/scripts/seed_prod.py`: `reports` added to `RELEASED`.
+- `../backend/live/inventory.json`: the report endpoints' `forbidden` lists emptied.
+- `src/features/auth/components/mobile-sign-in.test.tsx`, `src/features/marketing/components/marketing.test.tsx`: wait for the button and the dialog's content.
+
+#### Tests
+
+- `backend/tests/api/test_live_inventory.py`: "forbidden on production follows the release scope" passes with the new scope (the two tests that need a database weren't run here).
+- `backend/tests/test_seed_prod_roles.py` and `tests/test_live_verify.py` pass.
+- Both fixed test files passed three runs in a row locally.
+- By hand, after the release: sign in on the client's site as an administrator and check that the four screens are in the menu and open.
+
+### The setup check, and an office that covers no area
+
+`feature` · `ADMN-009` · Claude · [entry](changelog/entries/2026-11-06--feature--ADMN-009--the-setup-check-and-an-office-that-covers-no-area.md)
+
+#### Before
+
+- The backend's FS-082 (backend #226) added:
+  - `GET /users/setup-check`, which reports what is set up wrong. Each of five checks comes with its count, a title, why it matters, and the first 100 people or partners to fix. It needs `users.edit` at global scope; anyone else gets `403`.
+  - A new refusal on `POST /users` and `PATCH /users/{id}`: a Field Officer or District Manager put in an office that covers no area gets `422 office_has_no_area`, on `org_unit_id` or `role`.
+- Neither had a place in the app.
+
+#### Now
+
+- **The setup check on the dashboard**, for those who may change people:
+  - **A card for anything to fix:** each check with something to fix gets its count, why it matters, and the first five people or partners. Each name links to their page (a person's to `/users/{id}`, a partner's to `/partners/{id}`). **Show all** shows the rest of the backend's first 100.
+  - **When nothing needs fixing,** one line says so.
+  - **Hidden** for anyone without the permission, or with it for only part of the company.
+- **The person form** already places a refusal's fields on its own fields, so `office_has_no_area` shows on **Office**, or on **Role**, with the backend's words.
+- **The mock:**
+  - runs the five checks on its seeds. Junagadh and Amreli have no District Manager, so their field officers skip a level;
+  - refuses an area role in an office with no area, on a change of role or office only, as the backend does.
+
+#### Discussion
+
+- **On the dashboard, above the figures.** The backend calls it "for the admin dashboard". The administrators who can fix these things land there first, and the card takes no room when there is nothing to fix.
+- **A 403 shows nothing.** A user may hold `users.edit` for one area only, and the check needs global scope. An error card there would only say what they can't see.
+- **Which roles need an area is still open** on the backend (GAP-556, client question 37.4). The mock follows the backend's current set: Field Officer and District Manager.
+
+#### Files changed
+
+- `src/features/users/api/users.schemas.ts`, `users.api.ts`, `users.queries.ts`: the setup report and its call.
+- `src/features/users/components/setup-check-card.tsx`: the card and its skeleton.
+- `src/features/dashboard/components/dashboard-overview.tsx`: the card above the figures.
+- `src/mocks/handlers/users.ts`: the setup check, and `office_has_no_area`.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: ADMN-009.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md`: records.
+
+#### Tests
+
+- `[ADMN-009] The setup check (FS-082)`:
+  - every check comes back in order, and a field officer is refused;
+  - the card lists a check with people linked to their pages;
+  - the one line when nothing needs fixing;
+  - nothing for someone without the permission, or on a 403.
+- `[ADMN-009] An office that covers no area`: moving a Field Officer to an office with no area is refused on `org_unit_id`.
+
+### A field officer picks the distributor on an order from a lead
+
+`fix` · `SO-013` `SO-012` · Nakul Srivastava · [entry](changelog/entries/2026-11-06--fix--SO-013--a-field-officer-picks-the-distributor-on-an-order-from-a.md)
+
+#### Before
+
+A field officer starting a sales order from a lead couldn't choose the distributor. The order builder showed no dealer or distributor field on an order from a lead, and silently sent the lead's own channel partner, or none.
+
+#### Now
+
+- **From a lead:** staff get **Through a dealer or distributor**, set to the lead's channel partner. They can pick another dealer or distributor, or clear it.
+- **The farmer stays the party:** picking a partner only changes the rates; the farmer's name and details stay. `partner_id` is sent with `lead_id`.
+- **Help text:** both partner fields now say only partners in your area are listed, so a missing distributor isn't a mystery.
+- Dealer users and edits are unchanged.
+
+#### Discussion
+
+- The client reported that a field officer couldn't choose a distributor on a new sales order (6 Nov). The frontend gap was the order from a lead; it is fixed here.
+- The search only lists partners in the officer's own area (`GET /lookups/partners` row scope), so a distributor serving a wider area may still not show. That rule is the backend's and the client's to decide: **BE-043**.
+
+#### Files changed
+
+- `src/features/orders/components/order-builder.tsx` — the partner field on orders from a lead, starting at the lead's partner; the farmer stays the party.
+- `src/features/orders/components/order-builder.test.tsx` — two SO-013 tests.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`, `Docs/Tested-Features.md` — SO-013.
+- `../docs/Backend-Tasks.md` — BE-043.
+
+#### Tests
+
+- `order-builder.test.tsx`: "[SO-013] on an order from a lead, picks the distributor it goes through, keeping the farmer as the party" and "[SO-013] starts an order from a lead at the lead's own channel partner".
+- By hand: sign in as a field officer, open a lead, **Create sales order**, pick a distributor, save, and check the order shows the farmer as the party and the distributor's rates.
+
+## 5 November 2026
+
+### The org chart
+
+`feature` · `ADMN-008` · Claude · [entry](changelog/entries/2026-11-05--feature--ADMN-008--the-org-chart.md)
+
+#### Before
+
+- The backend's FS-080 added `GET /users/org-chart`:
+  - who reports to whom, worked out from office and role (migration 083), with nothing stored, so it follows any change at once;
+  - any staff member sees their own line and everyone below them;
+  - someone who sees every user sees the whole company.
+- The frontend had no org chart. "Whom do I report to?" and "who is in my team?" had no answer on screen.
+
+#### Now
+
+- **Overview → Org chart** (`/org-chart`), for all staff; partner users don't see it.
+- **Your line:**
+  - the managers above you, nearest first;
+  - a step can hold two people ("Nirav Shah and Mehul Patel") when two at the same level in one office both manage;
+  - at the top, "Nobody above: the top of the line".
+- **Your team:**
+  - everyone below you, counted by role ("District Manager: 1", "Field Officer: 3");
+  - a tree drawn from each person's first manager;
+  - each person with their role, office, and how many report to them directly and in all;
+  - someone with two managers says "Also reports to …";
+  - the first level is open, and deeper teams fold open and closed.
+- **A person's name opens their own picture** (`?user=`), with "Back to my team". Someone who isn't below you, or has left, says "No reporting line to show".
+- **Whole company** (`?view=company`):
+  - for someone who sees every user (`users.view`), from the tabs at the top;
+  - its roots are the people nobody manages;
+  - staff the backend can't place (on the System office) are named in a warning, to be given a real office;
+  - anyone else who opens it is told it isn't theirs to see.
+- **States:** a skeleton while loading, and the error box with a reference on failure.
+
+#### Discussion
+
+- **The tree is drawn under each person's first manager.** The backend sorts the managers by name and says to do exactly that, showing the rest as "also reports to". Nobody appears twice.
+- **The whole-company tab shows for anyone with `users.view`.** The endpoint wants it at global scope, which the permission summary on `/auth/me` doesn't say. A scoped holder who opens it gets the backend's 403, shown in words. That's better than hiding it from someone who may.
+- **No search or zoom yet.** The mock's company is a handful of people. The client's is about 3,000, so a search box or a collapsed company view may be wanted once it is seen on real data.
+- **The mock** works out managers as `reporting_lines()` does:
+  - the nearest higher line role, not a functional one, in the person's own office or the offices above;
+  - every mock role shares one session, so "me" is the first person seeded with the signed-in role (Ravi the field officer, Nirav the district manager, Asha the state manager);
+  - its route sits before `/users/:userId`, so "org-chart" isn't read as an id.
+
+#### Files changed
+
+- `src/features/org-chart/` (new): the contract, the call and query, the page and tests.
+- `src/app/(app)/org-chart/page.tsx` (new): the route.
+- `src/components/layout/navigation.ts`: Org chart under Overview, for staff.
+- `src/mocks/handlers/org-chart.ts` (new), and `index.ts`: the chart worked out from the mock's people and offices.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: ADMN-008.
+- `Docs/Plan.md` §9.1, `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`, `Docs/screenshots/org-chart/`: records and screens.
+
+#### Tests
+
+- **`[ADMN-008] The org chart, through the API`:**
+  - a field officer's line, nearest first;
+  - a manager's team counted by role, and the picture of someone below;
+  - nobody above may be opened (404);
+  - the whole company only for `users.view` (403 otherwise).
+- **`[ADMN-008] OrgChartView`:**
+  - the team as a tree, a team folding away, and each name linking to its picture;
+  - a field officer's line with "Nobody reports to you";
+  - "No reporting line to show";
+  - the whole company as Admin.
+
+### Downloads as CSV, and reports as PDF
+
+`feature` · `APP-011` · Claude · [entry](changelog/entries/2026-11-05--feature--APP-011--downloads-as-csv-and-reports-as-pdf.md)
+
+#### Before
+
+- The backend's FS-077 gave every download a `format`:
+  - a list comes as Excel (the default) or CSV;
+  - a report also comes as PDF;
+  - a list asked for PDF answers `422 format_not_available`;
+  - a PDF maker at its limit answers `503 busy`.
+- Every download button in the app asked for Excel only.
+
+#### Now
+
+- **Every Download Excel button** has a small **Other formats** menu beside it with **Download CSV**:
+  - leads, quotations, sales orders and the Accounts queue;
+  - tasks, complaints, users, channel partners;
+  - dealer commission, marketing orders, subsidy applications, and the three subsidy reports.
+- **Reports** offer **Download CSV** and **Download PDF**.
+- **File names:** each file is saved under the backend's name. Without one, the name ends in the format's extension (`orders.csv`).
+- **Refusals:** more than 5,000 rows says to narrow the filters, as before. A busy PDF maker says to try again in a moment.
+- **The mock** answers `format=csv` with a comma-separated file and `format=pdf` with a stand-in PDF, through the one `mockWorkbook` every export uses. The three exports that built their own file (complaints, marketing orders, tasks) now use it too.
+
+#### Discussion
+
+- **A menu beside the button, not a new button per format.** "Download Excel" stays where people know it, and the other formats sit one click away without crowding a toolbar on a phone.
+- **Every export call takes a `format`, Excel by default,** and every button passes the format chosen. The query now always says `format=xlsx` for Excel, which is the backend's default anyway.
+- **PDF only on reports**, as the backend allows. Lists don't offer it, so nobody meets `format_not_available`.
+
+#### Files changed
+
+- `src/components/patterns/download-excel-button.tsx`: the Other formats menu, the format passed to `download`, and the busy message.
+- `src/lib/api/client.ts`: `ExportFormat`.
+- `src/features/*/api/*.api.ts`: a `format` on every export call (fourteen).
+- `src/features/*/components/*.tsx`: every button passes the format; reports offer PDF.
+- `src/mocks/handlers/shared.ts` and the export handlers: CSV and PDF.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: APP-011.
+- `Docs/plan-13oct-2026.md`: record.
+
+#### Tests
+
+- **`[APP-011] DownloadExcelButton`:**
+  - Excel, then CSV from Other formats, saved as `.csv`;
+  - PDF offered where the caller allows it;
+  - the mock answers CSV with a `.csv` file.
+- **The feature tests with a download pass:** 715 of 716 in the batch. The one failure was `lead-assign`, under heavy load; it passes on its own (6 of 6) and has nothing to do with downloads.
+
+### Downloads on 24 more lists
+
+`feature` · `APP-012` · Claude · [entry](changelog/entries/2026-11-05--feature--APP-012--downloads-on-24-more-lists.md)
+
+#### Before
+
+- The backend's FS-081 added `GET <list>/export` beside every list that lacked one: 24 lists, Excel or CSV, with the list's own filters and every page. More than 5,000 rows is `422 export_too_large`.
+- In the app, only leads, quotations, orders, tasks, complaints, users, partners, commissions, marketing orders and subsidy applications had a download.
+
+#### Now
+
+- **Download Excel**, with **Other formats → Download CSV** beside it, on:
+  - **Products:** the catalogue, tax rates, price lists, one list's rate sheet, and seller GSTINs;
+  - **Stock:** the stock list, the stock ledger, and warehouses (switched-off ones too);
+  - **Sales and accounts:** customers, receipts, ratings, and dealer applications;
+  - **Masters:** offices, territories, the year's holidays, warranty periods, and subsidy schemes;
+  - **Schemes and rewards:** schemes, scheme credits, a points history, gifts, the gift desk's requests, and earning rules;
+  - **Campaigns.**
+- **Each download sends the filters on screen**, never a page or cursor, so the file holds what the list shows across every page.
+- **The mock** answers all 24 with the backend's column headings and one sample row, as Excel or CSV. Its handlers come first, so `/products/export` isn't read as a product id.
+
+#### Discussion
+
+- **One call per list, beside the list's own call,** reusing its filter mapping, so the file and the screen can't drift apart.
+- **Where the button sits:** in the toolbar beside the list's main action, or in the card's header. On the dealer applications list it sits with the filters, leaving the header row to the blank-form menu that item 43 adds.
+- **Dealer applications:** the download also sends the dealer or distributor filter (`partner_type`, from PR #228), so the file matches the list. Added when this pull request was brought up to date with `integration`, 6 Nov.
+- **The points history** downloads the ledger the card shows: the user's own, or the partner's or person's being looked at.
+
+#### Files changed
+
+- `src/features/*/api/*.api.ts`: 24 export calls (products, tax rates, price lists and items, seller GSTINs, customers, warehouses, stock, movements, payments, warranty terms, offices, territories, holidays, dealer applications, campaigns, schemes, entitlements, subsidy schemes, ratings, ledger, gifts, redemptions, rules).
+- `src/features/*/components/*.tsx`: the button on 23 screens (the points card covers the ledger).
+- `src/mocks/handlers/list-exports.ts`, `index.ts`: the 24 mock exports, registered first.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: APP-012.
+- `Docs/Tested-Features.md`, `Docs/Plan.md` §9.1, `Docs/plan-13oct-2026.md`: records.
+
+#### Tests
+
+- **`[APP-012] Downloads on 24 more lists`** (`src/mocks/handlers/list-exports.test.ts`):
+  - all 24 calls download Excel and CSV under the backend's file name, with the first column heading;
+  - the stock export sends only its filters and `format`;
+  - the dealer applications download sends the dealer or distributor filter;
+  - `export_too_large` is refused.
+- **`[APP-012] Downloads on the stock screens`:** the stock list saves Excel; the ledger saves CSV from Other formats.
+
+### Email preferences
+
+`feature` · `AUTH-008` · Claude · [entry](changelog/entries/2026-11-05--feature--AUTH-008--email-preferences.md)
+
+#### Before
+
+- The backend's FS-078 (migration 082) can email two things:
+  - notifications still unread 10 minutes after they arrive, several in one email;
+  - a morning summary at 08:00 IST, Monday to Saturday, of the day's due and overdue tasks.
+- **The switches:** each person turns them on or off with `PUT /me/email-preferences`. `GET /auth/me` says where they stand (`email_preferences`) and whether email can reach the person at all (`email_available`).
+- The frontend had no way to set them.
+
+#### Now
+
+- **An Email item in the account menu**, only while `email_available` is true. That is false until the CRM has a mail account, and for anyone without a usable address, so today it stays hidden.
+- **It opens two switches,** as they stand: **Updates I haven't seen** and **Morning summary**, each saying what it sends and when.
+- **Save** is off until something changes, and sends both, as the backend requires. "Email preferences saved", then the session reads them again.
+- **A backend before 082** sends neither field: email reads as unavailable, with both switches on (the backend's defaults).
+
+#### Discussion
+
+- **Hidden rather than greyed out.** The backend says to hide the switches while email is unavailable. A greyed-out item would promise a feature that can't work yet.
+- **Checkboxes, not toggles.** The design system has no switch component, and a checkbox with its line of explanation reads the same. A switch can replace them if one is added to the design system later.
+- **The mock** says email is available, so the switches can be tried. It keeps them per session, both on to start, as the backend seeds, and refuses a farmer's portal account.
+
+#### Files changed
+
+- `src/features/session/api/session.schemas.ts`: `email` on the session (available, notices, morning summary).
+- `src/features/auth/api/auth.schemas.ts`, `auth.api.ts`, `auth.mutations.ts` (new): the call and its mutation.
+- `src/features/auth/components/email-preferences-dialog.tsx` (new): the switches.
+- `src/components/layout/user-menu.tsx`: the Email item.
+- `src/mocks/handlers/auth.ts`, `src/mocks/db.ts`: the fields on `/auth/me`, and the PUT.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: AUTH-008.
+- `Docs/Plan.md` §9.1, `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`: records.
+
+#### Tests
+
+- **`[AUTH-008] Email preferences in the account menu`:** no item while email is unavailable; the switches open as they are, with Save off.
+- **`[AUTH-008] EmailPreferencesDialogContent`:** turning the morning summary off saves both switches.
+- **`[AUTH-002]`:** the session contract test now expects the email defaults from a backend before 082.
+
+### Distributor applications and the data sheet
+
+`feature` · `CHNL-007` `CHNL-008` · Claude · [entry](changelog/entries/2026-11-05--feature--CHNL-007--distributor-applications-and-the-data-sheet.md)
+
+#### Before
+
+- The backend's FS-071 (migration 078) turned dealer applications into **dealer and distributor** applications. It added Polysil's printed data sheet: telephone, when the firm was set up, the bank's name and branch, working capital, premises and vehicles, people, previous installations and the place of appointment.
+- The company settings now name who decides each type, and which extra fields each type must have.
+- The frontend knew only dealers and the firm, tax and bank fields:
+  - none of the new fields could be seen or filled in;
+  - a distributor couldn't be started;
+  - Decide always offered a parent distributor, which a distributor application refuses.
+
+#### Now
+
+- **Start an application** asks first whether it is for a new **Dealer** or **Distributor**. The type's deposit is fixed then (item 42 shows it).
+- **The list** has a **Type** filter (`?type=` in the address), and each row says Dealer or Distributor.
+- **An application's page:**
+  - a Dealer or Distributor badge beside the status;
+  - a **Data sheet** card with:
+    - the business facts;
+    - working capital, its rows with the backend's total;
+    - premises and vehicles, with areas in the chosen unit;
+    - people: the counts and each group, "3 × Plumbers · Drip laying · 4 years' experience";
+    - installations done before. A part with nothing filled in says so in one line.
+- **Edit details** (staff) and **the applicant's own page** share one form, so both gain the data sheet:
+  - **Firm and tax:** telephone, established on (a date picker, from 1900 to today), and the place of appointment.
+  - **Bank:** bank, branch and branch address, beside the account.
+  - **Working capital:** one box per facility, up to 10, with its amount in lakhs; other sources; the saved total.
+  - **Premises and vehicles:** areas in square feet or metres, office and godown area, two-wheelers, cars, other vehicles.
+  - **People:** sales executives and technicians; groups of people, up to 20, each with a category, how many, qualification, type of work and experience.
+  - **Installations done before:** up to 50, each with the year, customers, what was done, the scope and the cost in lakhs.
+  - Each row has a remove button. A row left empty is dropped rather than refused, and a table at its limit says so.
+  - The checks are the backend's own: lakhs and areas with at most two decimals, counts in range, years from 1950 to this year. A table's problem names its row ("Row 1: the amount in lakhs…"). A refusal for a row's field lands on its table.
+- **Staff can change the type** in Edit details while the application is with the applicant or returned. The backend refuses it once a deposit is recorded, and the refusal shows.
+- **Decide** on a distributor's application:
+  - it says "A distributor sits directly under Polysil" and offers no distributor to pick;
+  - the code example reads DIST-GJ-0003;
+  - approving says "the distributor and its login are added".
+- **"Still needed"** names the extra fields an administrator can require, such as Telephone, People (manpower) or Shop photo (document).
+- **Wording:** the list and the toasts say "partner" or the type, not "dealer", where either is meant. A submitted application is decided by "the managers the company settings name", not "a State Manager or above".
+
+#### Discussion
+
+- **Every new field is read leniently.** The test box doesn't run 078 yet, so an application without them must still open. A missing type is a dealer, which is all the backend made before 078. A missing data sheet is empty, in square feet.
+- **The checks copy `api/schemas/dealer_applications.py`:**
+  - `Lakhs` and `Area` patterns;
+  - 10, 20 and 50 rows;
+  - experience up to 80 years, people 1 to 9,999;
+  - a year from 1950 to this year.
+    The backend still checks everything.
+- **Rows have no ids,** so a row's place is its key while typing. The tables are boxes, not a grid, because five inputs don't fit across a 360 px phone.
+- **The total is the backend's** (`working_capital_total_lakhs`), shown "as saved". The form doesn't add rows up itself, to avoid a second rule.
+- **The mock** now:
+  - keeps the type and the data sheet;
+  - checks the same rules;
+  - works out the total;
+  - asks for the extras the settings require;
+  - lets the roles in `*_application_deciders` decide;
+  - gives a distributor no parent and a `DIST-` code.
+- **Not here:** the deposit (item 42) and the printed sheets (item 43).
+
+#### Files changed
+
+- `src/features/dealer-applications/api/data-sheet.schemas.ts` — new: the data sheet's contract, read leniently, and its request shape.
+- `src/features/dealer-applications/lib/data-sheet-draft.ts` — new: the form's draft, the backend's checks and the changed-fields body.
+- `src/features/dealer-applications/components/data-sheet-editor.tsx` — new: the sheet's parts of the form, and the row tables.
+- `src/features/dealer-applications/components/data-sheet-facts.tsx` — new: the sheet on an application's page.
+- `src/features/dealer-applications/components/application-inputs.tsx` — new: the form's labelled inputs, moved out of `dealer-application-fields.tsx` so both files share them.
+- `src/features/dealer-applications/api/dealer-applications.schemas.ts`, `dealer-apply.schemas.ts`, `dealer-applications.api.ts` — the type, the sheet, the list's type filter and staff's type change.
+- `src/features/dealer-applications/components/dealer-application-fields.tsx`, `edit-dealer-application.tsx`, `dealer-apply-form.tsx` — the sheet in the shared form; row errors from the backend land on their table.
+- `src/features/dealer-applications/components/start-dealer-application.tsx`, `dealer-applications-list.tsx`, `dealer-application-detail.tsx`, `dealer-application-actions.tsx`, `dealer-application-refusals.tsx` — the type when starting, the filter, the badge and card, and Decide for a distributor.
+- `src/features/dealer-applications/lib/dealer-application-labels.ts` — the type, unit, scope and extra-field words.
+- `src/mocks/handlers/dealer-applications.ts` — the type, the sheet with its checks and total, the required extras and the deciders from the settings, and a distributor's approval.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`, `Docs/screenshots/partners/` — records and screens.
+
+#### Tests
+
+- `[CHNL-007] Distributor applications (FS-071), through the API`:
+  - a distributor's application starts, and the list filters by type;
+  - the data sheet saves with its tables and total, and an amount with three decimals is refused;
+  - a required extra (Telephone) appears in "still needed" once the setting asks for it.
+- `[CHNL-007] The data sheet and the type on the screens`:
+  - starting a distributor's application from the list;
+  - filling in a facility and a group of people, with "Row 1" named at fault first, then the sheet shown once saved;
+  - approving a distributor with no distributor to pick, and the DIST- example.
+- `[CHNL-007] The data sheet's checks and changes`:
+  - an old backend reads as an empty sheet;
+  - the backend's checks on dates, lakhs, areas, counts and years;
+  - an empty row is dropped;
+  - only changes are sent, and an emptied table as null.
+- The existing application tests pass, with the row's name now including its type.
+
+### The deposit on dealer and distributor applications
+
+`feature` · `CHNL-007` · Claude · [entry](changelog/entries/2026-11-05--feature--CHNL-007--the-deposit-on-dealer-and-distributor-applications.md)
+
+#### Before
+
+- FS-071 (migration 078) added a deposit step to dealer and distributor applications:
+  - Each type's deposit is a company setting, copied onto an application when it starts.
+  - It is recorded with a pay slip, or lowered or waived by the roles a setting names.
+  - **An application can't be approved while it is unpaid** (`409 deposit_pending`).
+- The frontend showed none of it. A manager pressing Approve on an unpaid application got a generic refusal, and nobody could record the deposit or waive it.
+
+#### Now
+
+- **A Deposit card** on an application's page, when the backend sends one:
+  - the status: Deposit due, Deposit paid, Deposit waived or No deposit;
+  - the amount set for the type, the amount due now, and what was paid, when, and its reference;
+  - every payment and relaxation in order, with who and why ("Due lowered from ₹50,000 to ₹0 · Ravi Joshi · Took over a business").
+- **Record the deposit** (for staff the backend allows, while something is due):
+  - the amount, filled in with what is due;
+  - the day it was paid (a date picker, not after today);
+  - a reference (UTR, cheque or receipt number);
+  - the **pay slip**, uploaded first as a "Deposit pay slip" document, then named by the record;
+  - a slip uploaded on a failed try is reused, not uploaded twice;
+  - less than what is due, no slip, or a date after today are each named on their field.
+- **Lower or waive it** (only the roles in `deposit_relaxation_roles`, never whoever started the application, and not after a payment): the new amount due, where 0 waives it, and why. The button reads "Waive it" for 0.
+- **A submitted, unpaid application** says "Approval waits for the deposit". The list marks it **Deposit due**.
+- **The deposit's refusals in words:**
+  - **`deposit_pending`:** record it, or have it lowered or waived, before approving.
+  - **`deposit_slip_missing`:** the recorded payment's slip was removed.
+  - **`deposit_not_due` and `deposit_paid`:** the page refreshes to show where the deposit stands.
+  - **`deposit_recorded`:** the type can't change any more.
+  - **`not_your_relaxation`:** only the roles the settings name lower a deposit.
+- **A refused decision** (a 403) now says it comes from the company settings, not "a State Manager or above".
+- **Documents:** a dealer application offers a "Deposit pay slip" type, as the backend does.
+
+#### Discussion
+
+- **Uploading the slip inside the dialog.** The backend wants the slip as a document first, then its id on the record. Asking staff to upload it under Documents and come back would be two steps for one job. The dialog does both, in order. If the record is then refused, the slip stays on the application's documents (where the backend keeps it) and is reused on the next try.
+- **The amount starts at what is due.** The backend refuses less than due, and more than the amount set.
+- **Who sees the buttons** comes only from the backend's `can.record_deposit` and `can.relax_deposit`. A backend before 078 sends neither, and no deposit, so the card doesn't show.
+- **The mock:**
+  - copies each type's deposit from its setting (0 by default, as the backend seeds);
+  - the first seeded draft owes ₹50,000, so the card can be seen;
+  - checks the slip, the amount and the date as the backend does;
+  - works out paid, waived, pending or not required as `dealer_application_deposit_status()` does;
+  - refuses approval while unpaid, and refuses a type change after a deposit entry.
+- **India's date.** The mock now uses India's date for "not after today", here and for "established on" (item 41). After midnight in India, a check against UTC refused today.
+
+#### Files changed
+
+- `src/features/dealer-applications/api/dealer-applications.schemas.ts`, `.api.ts`, `.mutations.ts`: the deposit, the list's deposit status, the two `can` flags, and the record and relaxation calls.
+- `src/features/dealer-applications/components/deposit-card.tsx` (new): the card and its two dialogs.
+- `src/features/dealer-applications/components/dealer-application-detail.tsx`, `dealer-applications-list.tsx`, `dealer-application-refusals.tsx`: the card, the notice, the list's badge, and the refusals.
+- `src/features/dealer-applications/lib/dealer-application-labels.ts`: the deposit's words.
+- `src/mocks/handlers/dealer-applications.ts`, `src/mocks/data/documents.ts`: the deposit and the pay-slip type.
+- `src/features/documents/api/documents.test.ts`: a dealer application's types include the pay slip.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`, `Docs/screenshots/partners/`: records and screens.
+
+#### Tests
+
+- **`[CHNL-007] The deposit (FS-071), through the API`:**
+  - due and listed as such;
+  - refused without a slip, refused below what is due, then recorded as paid;
+  - only a named role lowers it, never higher, then waived;
+  - approval refused with `deposit_pending`.
+- **`[CHNL-007] The deposit on an application's page`:**
+  - recording it with a pay slip (refused first without one), and the history after;
+  - waiving it as a Regional Manager, refused first without a reason.
+- The application, document and lead tests pass (216).
+
+### The printed data sheets: blank, filled and the applicant's
+
+`feature` · `CHNL-007` `CHNL-008` · Claude · [entry](changelog/entries/2026-11-05--feature--CHNL-007--the-printed-data-sheets-blank-filled-and-the-applicant-s.md)
+
+#### Before
+
+- FS-071 gave the backend three printed versions of the application's data sheet, as the client's paper form:
+  - **blank**, to fill in by hand (`GET /dealer-applications/form.pdf?partner_type=`);
+  - **filled from an application**, for staff (`GET /dealer-applications/{id}/pdf`, with the bank account masked for everyone);
+  - **the applicant's own as filled so far**, to print and sign (`GET /public/dealer-apply/{token}/pdf`, with the applicant's session).
+- The frontend offered none of them.
+
+#### Now
+
+- **The applications list** has a **Blank form** menu: "For a new dealer" or "For a new distributor" saves that type's blank sheet.
+- **An application's page** has **Download PDF**, beside its other actions, for the sheet filled from the application.
+- **The applicant's page** has **Download to print and sign**, above Submit. It says the sheet holds what is saved so far, so unsaved typing should be saved first.
+- **Each is saved under the backend's own file name.**
+- **When the backend's PDF maker is at its limit** (`503 busy`), the toast says "The PDF maker is busy. Other PDFs are being made. Try again in a moment." `pdf_unavailable` says PDFs can't be made just now. Anything else shows its own reason.
+- **A new pattern, `DownloadFileButton`,** for any file the backend makes when asked. It has its states (Preparing…, Downloaded, Not downloaded), the busy and unavailable messages, and stories. The CSV and PDF downloads (item 46) build on it.
+
+#### Discussion
+
+- **The PDFs come back as the file itself, not a link.** They are fetched with the session through the API client and saved, like Download Excel. That way a sheet with someone's details never sits behind a bare URL.
+- **The applicant's download carries their session** (`X-Apply-Session`), as every applicant call does. Without one, the backend says to verify the mobile again.
+- **Where the buttons sit.** The blank form goes with "Start an application", since both are about a new partner. The filled sheet goes on the application. The applicant's goes by Submit, where they finish.
+- **The mock** answers each with a stand-in PDF named as the backend names them. Its blank-form route comes before `/:applicationId`, so `form.pdf` isn't read as an id.
+
+#### Files changed
+
+- `src/components/patterns/download-file-button.tsx` (new), with stories: the button and `toastDownloadError`.
+- `src/features/dealer-applications/api/dealer-applications.api.ts`, `dealer-apply.api.ts`: the three downloads.
+- `src/features/dealer-applications/components/dealer-applications-list.tsx`, `dealer-application-detail.tsx`, `dealer-apply-form.tsx`: Blank form, Download PDF, and Download to print and sign.
+- `src/mocks/handlers/dealer-applications.ts`: the three PDFs.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`: records.
+
+#### Tests
+
+- **`[CHNL-007] The printed sheets (FS-071), through the API`:** the blank form for each type and an application's own, by name. The applicant's only once their mobile is verified (`no_session` before).
+- **`[CHNL-007] The printed sheets on the screens`:** Download PDF saves the application's sheet, then a busy PDF maker is said in words; Blank form → "For a new distributor" saves that type's form.
+
+### A restore in the lead's history, and an owner who has left
+
+`feature` · `LEAD-020` · Claude · [entry](changelog/entries/2026-11-05--feature--LEAD-020--a-restore-in-the-lead-s-history-and-an-owner-who-has-left.md)
+
+#### Before
+
+Restoring a deleted lead (LEAD-020, PR #210) left two gaps against `leads.md`:
+
+- **The history:** the backend adds `lead.restored` to a lead's history, with `duplicates_reopened`. The history had no line of its own for it, so it showed a generic "Lead restored" label and dropped the reopened pairs.
+- **An owner who has left:** the restore keeps the owner, even one who has since left, and the backend says to "offer Assign when `owner` is inactive". A lead's `owner` carries no active flag, so the screen couldn't tell.
+
+#### Now
+
+- **The history** reads "<name> restored the lead", with ", and its possible duplicate is open again" or ", and its 2 possible duplicates are open again" when the restore reopened them. It has an undo icon in the success tone.
+- **The restore's toast**, when the lead's owner has left, adds "Its owner, Hiren Mehta, has left: open it and assign it to someone." beside the link to the lead.
+- **BE-042** asks the backend for `is_active` on a lead's `owner`. Until it comes, the lead is restored as before and nothing more is said.
+- **The mock** records `lead.restored` on a restore. Its second deleted lead belongs to Vijay Chaudhary, a field officer who has left, so restoring it shows the toast's line.
+
+#### Discussion
+
+- **Why not work out "has left" on the frontend.** `GET /leads/assignees` lists only the people the caller may assign to. An owner missing from it may simply be in another area, so "has left" would sometimes be wrong. Asking the backend for the flag gives the right answer every time, and the frontend reads it as soon as it arrives.
+- **Assign isn't opened from the toast.** Assign is a dialog on the lead's page, with no address of its own. The toast links to the lead and says to assign it.
+
+#### Files changed
+
+- `src/features/leads/lib/timeline-entries.ts`, `src/features/leads/components/lead-timeline.tsx`: the `restored` entry, its sentence and icon.
+- `src/features/leads/api/leads.schemas.ts`: the owner's `is_active`, read when sent.
+- `src/features/leads/components/restore-lead-button.tsx`: the toast for an owner who has left.
+- `src/mocks/data/leads.ts`, `src/mocks/handlers/leads.ts`: the leaver's deleted lead, and the restore in the history.
+- `docs/Backend-Tasks.md`: BE-042.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`: records.
+
+#### Tests
+
+- `[LEAD-005] toTimelineEntry › [LEAD-020] reads a restore`: with the reopened count, and without it.
+- `[LEAD-019]` Deleted leads: a restored lead whose owner has left gets the toast's line.
+- `[LEAD-020] restoreLead in the mock`: the leaver's lead comes back with `active: false`, and its history starts with `lead.restored`.
+- `[LEAD-008] assignment`: the owner is matched on id and name, since it now also carries `active`.
+
+### Sales forecast and insights
+
+`feature` · `RPT-004` `RPT-005` · Claude · [entry](changelog/entries/2026-11-05--feature--RPT-004--sales-forecast-and-insights.md)
+
+#### Before
+
+- The backend's FS-079 added two reports:
+  - `GET /reports/sales-forecast`: what the open pipeline is likely to bring in, and roughly when, from each stage's win rate;
+  - `GET /reports/insights`: plain sentences about the period against the one before.
+- The frontend's reports listed only the eight from PR #149.
+
+#### Now
+
+- **Two more reports**, with cards on the reports home and pages of their own.
+- **Sales forecast** (`/reports/sales-forecast`):
+  - **"Likely"** is the open pipeline weighted by each stage's win rate, beside the open pipeline, open leads (and how many have a value), and the typical time to win.
+  - **A table** by person (the backend's default), territory or source: open leads, pipeline, likely, and likely by this month, the next two, and later.
+  - **"Win rates used"** lists each stage's rate. A stage that borrowed an earlier stage's rate is marked "(borrowed)" and explained. The rates come from everything the user may see, while the filters only choose the rows, as the backend says.
+  - **With too little history**, a notice says the pipeline can't be weighed yet, and every likely figure is a dash. Never ₹0.
+  - **Filters:** area and person, in the address, and the same Excel file as every report.
+- **Insights** (`/reports/insights`):
+  - each sentence with its figure ("42.5%", "6 hours") and what it was before;
+  - **See the report** opens the report behind it, with its grouping ("Lost leads, by reason");
+  - the window and the one it is compared with;
+  - nothing to say reads "Too little happened in this window to say anything", because a missing sentence means thin data, not a problem.
+- **The home cards:**
+  - the forecast's is "₹4.2 L likely, of ₹9.8 L open, across 23 leads" (or the open pipeline alone, with too little history);
+  - the insights card is how many there are, with the first sentence under it.
+
+#### Discussion
+
+- **Their own shapes.** Neither answers rows, totals and filters like the other eight: the forecast's filters carry a date, not a moment, and insights have no totals. So they keep the reports' list, page, filters and refusals, but each has its own frame. The shared frame is now typed to the eight table reports only.
+- **The months** are the backend's (`months`, then `later`), shown as "Nov 2026", "Dec 2026", "Jan 2027", "Later". On a phone the month and pipeline columns are left out, so the table fits; the likely figure stays.
+- **`history_days`** (90 to 365, 180 by default) isn't offered yet; the page says which period the rates used.
+- **The mock:**
+  - the forecast takes its own simple rates (the overall win rate, scaled along the stages) and months by stage;
+  - insights gives up to three sentences from the mock's leads.
+  - The backend's arithmetic (`api/domain/forecast.py`, `insights.py`) is the real one.
+
+#### Files changed
+
+- `src/features/reports/api/reports.schemas.ts`, `reports.api.ts`: the two reports, and `TableReportName`.
+- `src/features/reports/components/report-bodies.tsx`: their frame and bodies.
+- `src/features/reports/components/reports-home.tsx`: their home cards.
+- `src/features/reports/lib/report-catalogue.ts`: their titles, descriptions and filters.
+- `src/mocks/handlers/reports.ts`: both reports.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: RPT-004 and RPT-005.
+- `Docs/Plan.md` §9.1, `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`, `Docs/screenshots/reports/`: records and screens.
+
+#### Tests
+
+- **`[RPT-004] The sales forecast`:**
+  - the pipeline by month with its rates, the same total by territory;
+  - the table, the likely total and the win rates on the page;
+  - too little history shows the notice and dashes, not ₹0.
+- **`[RPT-005] Insights`:** each sentence with its figure, what it was, and its report's link; the empty answer said in words.
+- The existing report tests pass.
+
+### Team and role filters on the reports
+
+`feature` · `RPT-006` · Claude · [entry](changelog/entries/2026-11-05--feature--RPT-006--team-and-role-filters-on-the-reports.md)
+
+#### Before
+
+- The backend's FS-082 (backend #226, 5 Nov) added two filters to every report that takes a person, and to the forecast, insights and territory performance:
+  - `team_of`: a person and everyone below them on the org chart, refused with `404 not_in_your_line` outside the caller's line, and never with `owner_id`;
+  - `roles`: up to 10 role codes, only people holding one of them now.
+- Salesperson performance now gives every team member a row, zeros included, with `role` and `office`.
+- The reports offered only one person.
+
+#### Now
+
+- **Team** and **Roles** filters on those reports, beside Person:
+  - **Team** picks from the same people as Person (you, then the staff below you). Choosing a team drops the person, and choosing a person drops the team.
+  - **Roles** offers the staff roles from `GET /lookups/roles`, never the partners', up to 10.
+  - Both live in the URL (`?team=`, `?roles=`), are cleared by **Reset filters**, and go into the Excel, CSV and PDF files.
+- **Salesperson performance** shows each person's role and office under the name, so a row of zeros still says who it is.
+- **The mock** reads `team_of` and `roles`: a team is the person and every active staff member at a lower level, since the seeds sit in one state. It refuses someone unknown with `404 not_in_your_line`, and both filters with `owner_id`.
+
+#### Discussion
+
+- **The same people list for Team as for Person.** `GET /tasks/assignees` is already "you and the staff below you", which is exactly who the backend lets a team be built around. An admin with `users.view` at global scope could pick anyone, but that list already holds everyone for them.
+- **The person wins over the team.** The backend refuses both together, so an address carrying both drops the team rather than showing a refusal.
+- **Dealer performance and complaints** don't take the filters, as on the backend.
+
+#### Files changed
+
+- `src/features/reports/api/reports.schemas.ts`: `teamOf` and `roles` on the params; the echoed filters; `role` and `office` on a salesperson row.
+- `src/features/reports/api/reports.api.ts`: `team_of` and `roles` in the query.
+- `src/features/reports/lib/report-catalogue.ts`: which reports take a team.
+- `src/features/reports/components/report-view.tsx`: the Team and Roles filters.
+- `src/features/reports/components/report-bodies.tsx`: role and office under the person.
+- `src/mocks/handlers/reports.ts`: teams, roles and every team member's row.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`: RPT-006.
+- `Docs/Plan.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md` (items 50 and 51): records.
+
+#### Tests
+
+- `[RPT-006] Team and role filters on the reports (FS-082)`:
+  - the query carries `team_of` and `roles`, and every row has a role and office;
+  - `not_in_your_line` comes back as a 404;
+  - picking a team drops the person and shows role and office;
+  - only staff roles are offered.
+- The existing report and forecast tests pass with the new params.
+
+### Company settings read the application settings and any kind added later
+
+`fix` · `ADMN-007` · Claude · [entry](changelog/entries/2026-11-05--fix--ADMN-007--company-settings-read-the-application-settings-and-any-kind.md)
+
+#### Before
+
+- The backend's migration 078 (FS-071, dealer and distributor applications) seeds seven new settings:
+  - the dealer's and the distributor's deposit;
+  - who may lower or waive a deposit;
+  - who decides a dealer application, and who decides a distributor one;
+  - what each type of application must have before it is submitted.
+- Five of them use two new kinds:
+  - `set`: some of a list, none twice;
+  - `staff_roles`: at least one staff role.
+- The page read only `choice`, `int`, `roles`, `bands` and `slabs`. A single setting of any other kind broke the whole list, so once 078 is deployed, **Company settings** would show "We received data we couldn't read" instead of any setting.
+
+#### Now
+
+- **The two new kinds:**
+  - **`set`:** checkboxes of the backend's list, saved in the list's own order.
+  - **`staff_roles`:** checkboxes of the staff roles, as for complaints. Saving none is refused on the card: "Choose at least one role."
+- **A kind the page doesn't know yet** is shown read-only, as text, titled from its key. The rest of the page loads and saves as before, so a kind added later can't take the page down.
+- **A new section, "Dealer and distributor applications"**, with titles for the seven settings:
+  - "A new dealer's deposit, in rupees" and "A new distributor's deposit, in rupees";
+  - "Who may lower or waive a deposit";
+  - "Who decides a dealer application" and "Who decides a distributor application";
+  - "What a dealer application must have" and "What a distributor application must have". Each choice is named in words: Telephone, Bank branch, Shop photo, "Sales executives and technicians"…
+- **The mock** seeds the same seven settings, values and descriptions as 078. It checks a `set` against its list and `staff_roles` for at least one staff role, as the backend does.
+
+#### Discussion
+
+- **Why read-only rather than an error for an unknown kind.** The first build chose the error state over guessing an editor. Showing the value as text still guesses nothing, and a missing editor for one setting costs far less than a blank page for all of them.
+- **A set is saved in the backend's order,** whatever order the boxes were ticked in. Nothing here is a chain, so the order means nothing, and saving the same choice always sends the same list.
+- **The deposits are `int` settings,** so they already worked. They only needed titles and a section.
+- **Three tests broke with the calendar, not the code** (failing on `integration` too, from 4 Nov):
+  - The holiday tests picked "a weekday three days ahead". From 4 Nov that is 9 Nov, a holiday the mock already has, so the add was refused as a repeat. The helper now also skips the seeded holidays.
+  - The price-list test expected a list starting on 1 Nov to read "Published, starts later". It now expects "In force" once that day has passed.
+- **Who may be ticked as a decider:** the staff roles from `GET /lookups/roles`, as for the other role settings. The backend refuses `system` and any partner role, and checks that the roles exist.
+
+#### Files changed
+
+- `src/features/settings/api/settings.schemas.ts` — `set`, `staff_roles` and the read-only unknown kind; the value is read for each kind instead of matched against a union.
+- `src/features/settings/components/company-settings.tsx` — the editors, checks and read-only text for the new kinds; the applications section and its titles.
+- `src/features/settings/components/company-settings.test.tsx` — four new tests.
+- `src/mocks/handlers/settings.ts` — the seven settings of migration 078 and their checks.
+- `Docs/plan-13oct-2026.md` — Tier 5: every backend change from 23 Oct to 3 Nov the frontend still has to pick up, items 40 to 49; BE-023 to BE-025 ticked; BE-039 to BE-041 under Waiting.
+- `Docs/Tested-Features.md`, `Docs/screenshots/settings/` — the story and its screens.
+- `src/features/complaints/components/complaints-escalation.test.tsx`, `src/features/products/components/products-ui.test.tsx` — date-proof: no seeded holiday as "a day ahead", and the right phase for a list that has started.
+
+#### Tests
+
+- `[ADMN-007] The application settings (FS-071)`:
+  - the API checks a set against its list, and staff roles for at least one staff role;
+  - the page ticks the required fields and the deciders under their own section, and saves the set in the list's order;
+  - saving no role is refused on the card;
+  - an unknown kind shows as text, while a number beside it still edits.
+- The existing settings tests pass unchanged.
+- Walked through in the mock as Admin, on a desktop in light mode and a phone in dark mode.
 
 ## 30 October 2026
 

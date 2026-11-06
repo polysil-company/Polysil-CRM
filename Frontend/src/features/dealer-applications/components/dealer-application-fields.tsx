@@ -3,17 +3,30 @@
 import type * as React from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
 import {
   FIRM_TYPES,
   type DealerApplication,
   type DealerApplicationFieldsRequest,
   type FirmType,
 } from "@/features/dealer-applications/api/dealer-applications.schemas";
+import {
+  changedDataSheet,
+  dataSheetDraftOf,
+  dataSheetProblems,
+  type DataSheetDraft,
+  type DataSheetProblemKey,
+} from "@/features/dealer-applications/lib/data-sheet-draft";
 import { FIRM_TYPE_LABELS } from "@/features/dealer-applications/lib/dealer-application-labels";
+import { todayInIndia } from "@/lib/format";
+
+import { TextArea, TextField } from "./application-inputs";
+import {
+  DataSheetBankFields,
+  DataSheetBusinessFields,
+  DataSheetSections,
+} from "./data-sheet-editor";
 
 /**
  * CHNL-007 · The application's fields as a form keeps them: text for each, as typed. Shared by
@@ -37,10 +50,12 @@ export interface DealerFieldsDraft {
   /** Empty when the stored number is masked: typing one replaces it. */
   readonly bankAccountNo: string;
   readonly bankIfsc: string;
+  /** FS-071 · The data sheet. */
+  readonly sheet: DataSheetDraft;
 }
 
 export type DealerField = keyof DealerApplicationFieldsRequest;
-export type DealerFieldProblems = Partial<Record<DealerField, string>>;
+export type DealerFieldProblems = Partial<Record<DealerField | DataSheetProblemKey, string>>;
 
 export const GSTIN_PATTERN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const PAN_PATTERN = /^[A-Z]{5}\d{4}[A-Z]$/;
@@ -70,6 +85,7 @@ export function draftOf(
     | "bankAccountName"
     | "bankAccountNo"
     | "bankIfsc"
+    | "dataSheet"
   >,
 ): DealerFieldsDraft {
   return {
@@ -92,12 +108,16 @@ export function draftOf(
       ? ""
       : (application.bankAccountNo ?? ""),
     bankIfsc: application.bankIfsc ?? "",
+    sheet: dataSheetDraftOf(application.dataSheet),
   };
 }
 
 /** What a field reads as, before the backend sees it; the backend checks again. */
-export function fieldProblems(draft: DealerFieldsDraft): DealerFieldProblems {
-  const problems: DealerFieldProblems = {};
+export function fieldProblems(
+  draft: DealerFieldsDraft,
+  today: string = todayInIndia(),
+): DealerFieldProblems {
+  const problems: DealerFieldProblems = { ...dataSheetProblems(draft.sheet, today) };
   const gstin = draft.gstin.trim().toUpperCase();
   const pan = draft.pan.trim().toUpperCase();
   if (draft.firmName.trim() === "") problems.firm_name = "Enter the firm's name.";
@@ -131,6 +151,20 @@ export function fieldProblems(draft: DealerFieldsDraft): DealerFieldProblems {
   const ifsc = draft.bankIfsc.trim().toUpperCase();
   if (ifsc !== "" && !IFSC_PATTERN.test(ifsc))
     problems.bank_ifsc = "An IFSC is 11 characters, like SBIN0001234.";
+  return problems;
+}
+
+/**
+ * A 422's `fields` as the form shows them: a row's field ("working_capital.1.amount_lakhs")
+ * lands on its table, with the backend's words.
+ */
+export function problemsFromServer(fields: Readonly<Record<string, string>>): DealerFieldProblems {
+  const mapped: Record<string, string> = {};
+  for (const [key, message] of Object.entries(fields)) {
+    const field = key.split(".")[0] ?? key;
+    mapped[field] ??= message;
+  }
+  const problems: DealerFieldProblems = mapped;
   return problems;
 }
 
@@ -173,12 +207,16 @@ export function changedFields(
     body.bank_account_no = draft.bankAccountNo.trim();
   }
   text("bank_ifsc", draft.bankIfsc, initial.bankIfsc, true);
-  const result: DealerApplicationFieldsRequest = body;
+  const result: DealerApplicationFieldsRequest = {
+    ...body,
+    ...changedDataSheet(draft.sheet, initial.sheet),
+  };
   return result;
 }
 
 /**
- * The fields, in three groups: the firm and its tax numbers, the address, and the bank.
+ * The fields, in groups: the firm and its tax numbers, the address, the bank, then the data
+ * sheet's working capital, premises, people and installations (FS-071).
  * `gstinCheck` renders under a well-formed GSTIN (staff: the GST record; the applicant: its own
  * check).
  */
@@ -189,6 +227,7 @@ export function DealerFieldsEditor({
   problems,
   gstinCheck,
   maskedAccount = null,
+  workingCapitalTotal = null,
 }: {
   idPrefix: string;
   draft: DealerFieldsDraft;
@@ -197,6 +236,8 @@ export function DealerFieldsEditor({
   gstinCheck?: (gstin: string) => React.ReactNode;
   /** The stored account number, masked, when the reader can't see it. */
   maskedAccount?: string | null;
+  /** The backend's working-capital total for what is saved. */
+  workingCapitalTotal?: string | null;
 }): React.JSX.Element {
   const set = <TKey extends keyof DealerFieldsDraft>(
     key: TKey,
@@ -206,6 +247,14 @@ export function DealerFieldsEditor({
   };
   const gstin = draft.gstin.trim().toUpperCase();
   const id = (name: string): string => `${idPrefix}-${name}`;
+  const sheetProps = {
+    idPrefix,
+    draft: draft.sheet,
+    problems,
+    onChange: (sheet: DataSheetDraft): void => {
+      set("sheet", sheet);
+    },
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -306,6 +355,7 @@ export function DealerFieldsEditor({
             }}
           />
         </div>
+        <DataSheetBusinessFields {...sheetProps} today={todayInIndia()} />
       </fieldset>
 
       <fieldset className="flex flex-col gap-4">
@@ -389,7 +439,10 @@ export function DealerFieldsEditor({
             }}
           />
         </div>
+        <DataSheetBankFields {...sheetProps} />
       </fieldset>
+
+      <DataSheetSections {...sheetProps} totalLakhs={workingCapitalTotal} />
 
       <TextArea
         id={id("notes")}
@@ -402,93 +455,5 @@ export function DealerFieldsEditor({
         }}
       />
     </div>
-  );
-}
-
-function TextField({
-  id,
-  label,
-  value,
-  error,
-  optional = false,
-  mono = false,
-  inputMode,
-  placeholder,
-  description,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  error: string | undefined;
-  optional?: boolean;
-  mono?: boolean;
-  inputMode?: "numeric" | "email";
-  placeholder?: string | undefined;
-  description?: string;
-  onChange: (next: string) => void;
-}): React.JSX.Element {
-  const describedBy = error !== undefined ? `${id}-error` : description ? `${id}-hint` : undefined;
-  return (
-    <Field data-invalid={error === undefined ? undefined : true}>
-      <FieldLabel htmlFor={id}>
-        {label}
-        {optional ? <span className="font-normal text-muted-foreground">(optional)</span> : null}
-      </FieldLabel>
-      <Input
-        id={id}
-        value={value}
-        inputMode={inputMode}
-        placeholder={placeholder}
-        autoComplete="off"
-        className={mono ? "font-mono" : undefined}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={describedBy}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      />
-      {description !== undefined && error === undefined ? (
-        <FieldDescription id={`${id}-hint`}>{description}</FieldDescription>
-      ) : null}
-      <FieldError id={`${id}-error`}>{error}</FieldError>
-    </Field>
-  );
-}
-
-function TextArea({
-  id,
-  label,
-  value,
-  error,
-  optional = false,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  error: string | undefined;
-  optional?: boolean;
-  onChange: (next: string) => void;
-}): React.JSX.Element {
-  return (
-    <Field data-invalid={error === undefined ? undefined : true}>
-      <FieldLabel htmlFor={id}>
-        {label}
-        {optional ? <span className="font-normal text-muted-foreground">(optional)</span> : null}
-      </FieldLabel>
-      <Textarea
-        id={id}
-        rows={2}
-        maxLength={500}
-        value={value}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : `${id}-error`}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      />
-      <FieldError id={`${id}-error`}>{error}</FieldError>
-    </Field>
   );
 }

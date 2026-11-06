@@ -13,6 +13,7 @@ import {
   Note01Icon,
   PlusSignCircleIcon,
   RotateLeft01Icon,
+  Undo02Icon,
   UserSwitchIcon,
 } from "@hugeicons/core-free-icons";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -220,6 +221,8 @@ function appearanceOf(entry: TimelineEntry): { icon: IconGlyph; tone: Tone } {
       return { icon: Copy01Icon, tone: "warning" };
     case "deleted":
       return { icon: Delete02Icon, tone: "danger" };
+    case "restored":
+      return { icon: Undo02Icon, tone: "success" };
     case "approval":
       return {
         icon: CheckmarkBadge01Icon,
@@ -382,6 +385,17 @@ function EntrySentence({ entry }: { entry: TimelineEntry }): React.JSX.Element {
       );
     case "deleted":
       return <>deleted the lead</>;
+    case "restored":
+      return (
+        <>
+          restored the lead
+          {entry.duplicatesReopened === null || entry.duplicatesReopened === 0
+            ? null
+            : entry.duplicatesReopened === 1
+              ? ", and its possible duplicate is open again"
+              : `, and its ${String(entry.duplicatesReopened)} possible duplicates are open again`}
+        </>
+      );
     case "approval":
       return <>{approvalSentence(entry.decision, entry.role)}</>;
     case "document":

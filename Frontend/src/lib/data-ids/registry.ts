@@ -145,6 +145,24 @@ export const DATA_IDS = {
     notes:
       "From the logo on the quotation PDFs (backend/worker/templates/assets/polysil-logo.png); mobile/scripts/make-brand-assets.mjs redraws every size.",
   },
+  "APP-011": {
+    domain: "APP",
+    title: "Downloads as Excel, CSV or PDF — every list's file in CSV too, and a report as PDF",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /…/export?format=", "GET /reports/{name}?format="],
+    notes:
+      "FS-077. A list asked for PDF is 422 format_not_available; a busy PDF maker is 503 busy.",
+  },
+  "APP-012": {
+    domain: "APP",
+    title: "Downloads on 24 more lists — masters, stock, payments, schemes, rewards and the rest",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /products/export", "GET /stock/export", "GET /{list}/export"],
+    notes:
+      "FS-081. The same Download Excel button and filters as the list; more than 5,000 rows is 422 export_too_large.",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",
@@ -212,6 +230,14 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     endpoints: ["POST /auth/password"],
+  },
+  "AUTH-008": {
+    domain: "AUTH",
+    title: "Email preferences — unseen updates and the morning summary by email",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["PUT /me/email-preferences"],
+    notes: "FS-078. Shown only while `email_available` on GET /auth/me is true.",
   },
   "LEAD-001": {
     domain: "LEAD",
@@ -630,6 +656,16 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     endpoints: ["GET /lookups/partners", "GET /partners/{partnerId}", "POST /orders"],
+  },
+  "SO-013": {
+    domain: "SO",
+    title:
+      "An order from a lead goes through the dealer or distributor staff pick: it starts at the lead's channel partner (`POST /orders` with `lead_id` and `partner_id`)",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lookups/partners", "POST /orders"],
+    notes:
+      "The farmer stays the party; only the rates follow the partner. Who can be found is BE-043.",
   },
   "APPR-001": {
     domain: "APPR",
@@ -1289,6 +1325,31 @@ export const DATA_IDS = {
     endpoints: ["GET /leads/{id}/360"],
     notes: "Needs leads.view and reports.view. The timeline below it is LEAD-005's.",
   },
+  "RPT-004": {
+    domain: "RPT",
+    title: "Sales forecast — the open pipeline weighted by each stage's win rate, by month",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /reports/sales-forecast"],
+    notes: "FS-079. Staff only. With too little history the weighted figures are null, never 0.",
+  },
+  "RPT-005": {
+    domain: "RPT",
+    title: "Insights — plain sentences about the period against the one before",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /reports/insights"],
+    notes: "FS-079. Staff only. A missing row means too little data, not a problem.",
+  },
+  "RPT-006": {
+    domain: "RPT",
+    title: "Team and role filters on the reports, and every team member on salesperson performance",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /reports/{name}"],
+    notes:
+      "FS-082. team_of is a person and everyone below them; 404 not_in_your_line outside the caller's line. Not with owner_id.",
+  },
   "SUBS-001": {
     domain: "SUBS",
     title: "Subsidy forms and case status",
@@ -1603,6 +1664,22 @@ export const DATA_IDS = {
     owner: "shared",
     status: "in-progress",
     endpoints: ["GET /settings", "PATCH /settings"],
+  },
+  "ADMN-008": {
+    domain: "ADMN",
+    title: "Org chart — who reports to whom, my team, or the whole company",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /users/org-chart"],
+  },
+  "ADMN-009": {
+    domain: "ADMN",
+    title: "Setup check — people and partners set up so that leads, dealers or approvals go astray",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /users/setup-check"],
+    notes:
+      "FS-082. users.edit at global scope, else 403. Also the user form's 422 office_has_no_area (ADMN-002, ADMN-003).",
   },
   "SITE-001": {
     domain: "SITE",

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
@@ -10,6 +10,7 @@ import {
   passwordSetResultSchema,
   revokeResultSchema,
   roleListSchema,
+  setupReportSchema,
   unlockResultSchema,
   userDetailSchema,
   userPageSchema,
@@ -22,6 +23,7 @@ import {
   type UserDetail,
   type UserListParams,
   type UserPage,
+  type SetupReport,
 } from "./users.schemas";
 
 const log = createLogger({ file: "features/users/api/users.api.ts", dataId: "ADMN-001" });
@@ -74,13 +76,16 @@ export async function listUsers(params: UserListParams, signal?: AbortSignal): P
  * ADMN-001 · GET /users/export — the list as an Excel file, with the same filters: every
  * page, nothing outside the caller's scope. More than 5,000 rows is `422 export_too_large`.
  */
-export function exportUsers(params: UserListParams): Promise<DownloadedFile> {
+export function exportUsers(
+  params: UserListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "ADMN-001",
     logger: log,
     fn: "exportUsers",
     path: "/users/export",
-    query: filterQuery(params),
+    query: { ...filterQuery(params), format },
   });
 }
 
@@ -271,4 +276,20 @@ export async function searchOpenOffices(q: string, signal?: AbortSignal): Promis
     signal,
   });
   return [...page.items];
+}
+
+/**
+ * ADMN-009 · GET /users/setup-check (FS-082): what is set up wrong, each check with its count,
+ * why it matters and the first 100 to fix. Read-only; `403 insufficient_permission` without
+ * users.edit at global scope (Admin-Sales, MD/CEO).
+ */
+export function getSetupCheck(signal?: AbortSignal): Promise<SetupReport> {
+  return apiRequest({
+    dataId: "ADMN-009",
+    logger: log,
+    fn: "getSetupCheck",
+    path: "/users/setup-check",
+    schema: setupReportSchema,
+    signal,
+  });
 }

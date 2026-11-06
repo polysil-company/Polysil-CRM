@@ -6,6 +6,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { QueryView } from "@/components/patterns/query-view";
 import { SearchField } from "@/components/patterns/search-field";
@@ -34,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PRODUCT_PAGE_SIZE } from "@/features/products/api/products.api";
+import { PRODUCT_PAGE_SIZE, exportTaxRates } from "@/features/products/api/products.api";
 import { useSetTaxRate } from "@/features/products/api/products.mutations";
 import { taxRateListQueryOptions } from "@/features/products/api/products.queries";
 import { GST_SLABS, type TaxRate } from "@/features/products/api/products.schemas";
@@ -92,17 +93,25 @@ export function TaxRatesPanel({ canEdit }: { canEdit: boolean }): React.JSX.Elem
             In force today only
           </Label>
         </div>
-        {canEdit ? (
-          <Button
-            className="md:ml-auto"
-            onClick={() => {
-              setSetting(hsnFilter ?? "");
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            Set a rate
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+          <DownloadExcelButton
+            download={(format) => exportTaxRates({ hsnCode: hsnFilter, inForce }, format)}
+            fallbackName="tax-rates.xlsx"
+            what="rates"
+            logger={log}
+            dataId="MSTR-005"
+          />
+          {canEdit ? (
+            <Button
+              onClick={() => {
+                setSetting(hsnFilter ?? "");
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              Set a rate
+            </Button>
+          ) : null}
+        </div>
       </div>
       {hsn !== "" && hsnFilter === null ? (
         <p role="status" className="text-sm text-warning">
