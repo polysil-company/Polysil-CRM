@@ -1056,7 +1056,7 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `full_name` | string | yes |  |
-| `is_active` | boolean \| null |  | False when the owner has left (switched off or deleted): offer Assign. Set by GET /leads/{id} and the restore; null on the list (BE-042). |
+| `is_active` | boolean \| null |  | False when the owner has left (switched off or deleted): offer Assign. Set by GET /leads/{id} and the restore, for staff; null on the list and for a dealer (BE-042). |
 
 **`PageMeta`**
 

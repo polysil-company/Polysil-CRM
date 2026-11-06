@@ -95,7 +95,8 @@ class OwnerRef(UserRef):
     is_active: bool | None = Field(
         default=None,
         description="False when the owner has left (switched off or deleted): offer Assign. "
-        "Set by GET /leads/{id} and the restore; null on the list (BE-042).")
+        "Set by GET /leads/{id} and the restore, for staff; null on the list and for a "
+        "dealer (BE-042).")
 
 
 class TerritoryRef(BaseModel):

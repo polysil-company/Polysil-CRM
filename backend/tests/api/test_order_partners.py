@@ -291,3 +291,27 @@ async def test_a_draft_follows_the_leads_new_partner_and_the_dealer_then_sees_it
         assert (await client.get(f"{V1}/quotations/{draft['id']}", headers=hd)).status_code == 200
     finally:
         await _forget(sessions, mobile)
+
+
+async def test_a_dealer_is_not_told_whether_the_staff_owner_has_left(
+        client: httpx.AsyncClient, shop: Shop, sessions: Sessions) -> None:
+    """BE-042, code review F-5: owner.is_active is for staff only."""
+    ho = await endpoints._as(client, shop, "field_officer")
+    q = await endpoints._accepted_quotation(client, shop, ho, shop.partner)
+    lead_id = q["lead"]["id"]
+    owner = sessions()
+    try:
+        await owner.execute(text("UPDATE lead SET assigned_partner_id = CAST(:p AS uuid) "
+                                 "WHERE id = CAST(:l AS uuid)"), {"p": shop.partner, "l": lead_id})
+        await owner.commit()
+    finally:
+        await owner.close()
+    staff_view = (await client.get(f"{V1}/leads/{lead_id}", headers=ho)).json()["data"]
+    assert staff_view["owner"]["is_active"] is True
+    s, dealer = await _as_dealer(sessions, shop)
+    try:
+        seen = await lead_service.get_lead(s, dealer, lead_id)
+        assert seen.owner is None or seen.owner.is_active is None
+    finally:
+        await s.rollback()
+        await s.close()

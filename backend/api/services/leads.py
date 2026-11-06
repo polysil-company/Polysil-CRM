@@ -500,9 +500,11 @@ async def get_lead(db: AsyncSession, caller: Caller, lead_id: str) -> Lead:
         text("SELECT kind, id, name, detail FROM lead_people(:id)"), {"id": lead_id})).all()
     for p in people:
         if p.kind == "owner":
-            # BE-042: 086 says whether the owner still works here
-            lead.owner = OwnerRef(id=str(p.id), full_name=p.name,
-                                 is_active=p.detail == "active" if p.detail else None)
+            # BE-042: 086 says whether the owner still works here. Staff only: who
+            # has left Polysil is not a dealer's business (code review F-5)
+            active = (p.detail == "active" if p.detail else None
+                      ) if caller.partner_id is None else None
+            lead.owner = OwnerRef(id=str(p.id), full_name=p.name, is_active=active)
         elif p.kind == "created_by":
             lead.created_by = UserRef(id=str(p.id), full_name=p.name)
         elif p.kind == "assigned_partner":
