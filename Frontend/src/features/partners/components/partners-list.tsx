@@ -83,7 +83,7 @@ export function PartnersList(): React.JSX.Element {
         />
         <div className="flex flex-wrap items-center gap-2">
           <DownloadExcelButton
-            download={() => exportPartners({ ...params, cursor: null })}
+            download={(format) => exportPartners({ ...params, cursor: null }, format)}
             fallbackName="partners.xlsx"
             what="partners"
             logger={log}

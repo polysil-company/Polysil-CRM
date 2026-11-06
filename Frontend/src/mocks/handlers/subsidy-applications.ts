@@ -608,7 +608,7 @@ export const subsidyApplicationHandlers = [
     });
   }),
 
-  http.get(base("/export"), async () => {
+  http.get(base("/export"), async ({ request }) => {
     const { failure } = await applyScenario();
     if (failure) return failure;
     if (!caller().view) return forbidden();
@@ -623,6 +623,7 @@ export const subsidyApplicationHandlers = [
         String(row.ageing.days_in_stage),
         row.status,
       ]),
+      request,
     );
   }),
 

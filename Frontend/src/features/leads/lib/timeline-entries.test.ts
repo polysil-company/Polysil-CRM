@@ -217,6 +217,17 @@ describe("[LEAD-005] toTimelineEntry", () => {
     expect(toTimelineEntry(event("lead.deleted"), LEAD_ID)).toEqual({ type: "deleted" });
   });
 
+  it("[LEAD-020] reads a restore, with the duplicate pairs it opened again", () => {
+    expect(toTimelineEntry(event("lead.restored", { duplicates_reopened: 2 }), LEAD_ID)).toEqual({
+      type: "restored",
+      duplicatesReopened: 2,
+    });
+    expect(toTimelineEntry(event("lead.restored"), LEAD_ID)).toEqual({
+      type: "restored",
+      duplicatesReopened: null,
+    });
+  });
+
   it("labels quotation, order and unknown events instead of hiding them", () => {
     expect(toTimelineEntry(event("quotation.sent"), LEAD_ID)).toEqual({
       type: "document",

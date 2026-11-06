@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -112,5 +112,24 @@ export function patchCustomer({
     body,
     idempotencyKey,
     schema: customerDetailSchema,
+  });
+}
+
+/** LEAD-016 · GET /customers/export (FS-081) — the customers as Excel or CSV, with the filters. */
+export function exportCustomers(
+  params: CustomerListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  const q = params.q.trim();
+  return apiDownload({
+    dataId: "LEAD-016",
+    logger: log,
+    fn: "exportCustomers",
+    path: "/customers/export",
+    query: {
+      q: q.length >= CUSTOMER_SEARCH_MIN_LENGTH ? q : null,
+      territory_id: params.territoryId,
+      format,
+    },
   });
 }

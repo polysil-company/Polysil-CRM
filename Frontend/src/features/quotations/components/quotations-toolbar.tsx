@@ -88,7 +88,7 @@ export function QuotationsToolbar(): React.JSX.Element {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <DownloadExcelButton
-          download={() => exportQuotations(params)}
+          download={(format) => exportQuotations(params, format)}
           fallbackName="quotations.xlsx"
           what="quotations"
           logger={log}

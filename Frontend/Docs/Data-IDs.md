@@ -133,6 +133,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | APP-008 | Partner portal — what a dealer, distributor or sub-dealer sees: their own leads and dashboard, and no staff screens | frontend | in-progress |
 | APP-009 | Fixes from the live test of 22–23 Oct: the frontend's share of `Live-Test-Report.md` | frontend | in-progress |
 | APP-010 | Polysil's logo everywhere: sign-in, sidebar, portal, public pages, browser tab, Android icon and splash | frontend | in-progress |
+| APP-011 | Downloads as Excel, CSV or PDF — every list's file in CSV too, and a report as PDF (`format` on every export and report) | shared | in-progress |
+| APP-012 | Downloads on 24 more lists — masters, stock, payments, schemes, rewards and the rest (`GET <list>/export`, FS-081) | shared | in-progress |
 | OBS-001 | Logger utility with runtime log level | frontend | in-progress |
 | OBS-002 | API client — request IDs, error normalisation, response contract validation | shared | in-progress |
 | DS-001 | Design tokens and component library | frontend | in-progress |
@@ -143,6 +145,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | AUTH-005 | Sign out (`POST /auth/logout`) | shared | mocked |
 | AUTH-006 | Signed-in routing — sign-in redirects, return path and session end | frontend | in-progress |
 | AUTH-007 | Change your own password — forced while a temporary password is in force (`POST /auth/password`) | shared | in-progress |
+| AUTH-008 | Email preferences — unseen updates and the morning summary by email (`PUT /me/email-preferences`) | shared | in-progress |
 | FARM-001 | The farmers' portal: their details, enquiries, quotations, orders and complaints (`GET /portal/me` and the four lists) | shared | in-progress |
 | FARM-002 | A farmer records or withdraws their own consent (`PATCH /portal/me`) | shared | in-progress |
 | FARM-003 | A farmer rates an installation or a service (`GET /portal/ratings`, `POST /portal/ratings`) | shared | in-progress |
@@ -173,6 +176,9 @@ The registry file is the source of truth; this snapshot helps reading.
 | RPT-001 | Dashboard overview (`GET /dashboard/overview`) | shared | in-progress |
 | RPT-002 | Reports — conversion, people, lost leads, follow-ups, dealers, campaigns, areas, complaints (`GET /reports/*`) | shared | in-progress |
 | RPT-003 | A lead's 360° view (`GET /leads/{id}/360`) | shared | in-progress |
+| RPT-004 | Sales forecast — the open pipeline weighted by each stage's win rate, by month (`GET /reports/sales-forecast`) | shared | in-progress |
+| RPT-005 | Insights — plain sentences about the period against the one before (`GET /reports/insights`) | shared | in-progress |
+| RPT-006 | Team and role filters on the reports, and every team member on salesperson performance (`team_of`, `roles` on `GET /reports/{name}`, FS-082) | shared | in-progress |
 | TGT-001 | Targets — the month's achievement, yours and your team's (`GET /targets/achievement`) | shared | in-progress |
 | TGT-002 | Set a person's monthly targets, with their history (`GET /targets`, `PUT /targets`) | shared | in-progress |
 | TRK-001 | The team map: where each person on duty was last seen (`GET /tracking/team/latest`) | shared | in-progress |
@@ -314,6 +320,8 @@ The registry file is the source of truth; this snapshot helps reading.
 | ADMN-005 | Account actions — a new temporary password, sign out everywhere, unlock (`POST /users/{id}/password`, `/sessions/revoke`, `/unlock`) | shared | in-progress |
 | ADMN-006 | A leaver — hand over their open leads and tasks, then deactivate or delete (`POST /users/{id}/handover`, `DELETE /users/{id}`) | shared | in-progress |
 | ADMN-007 | Company settings — how amended orders are re-approved, and complaint reopening (`GET /settings`, `PATCH /settings`) | shared | in-progress |
+| ADMN-008 | Org chart — who reports to whom, my team, or the whole company (`GET /users/org-chart`) | shared | in-progress |
+| ADMN-009 | Setup check — people and partners set up so that leads, dealers or approvals go astray (`GET /users/setup-check`, FS-082) | shared | in-progress |
 | SITE-001 | Public website — information, Product Master, phone-number entry | shared | planned |
 | NOTIF-001 | In-app notifications — bell, latest notifications and unread count | shared | in-progress |
 | NOTIF-002 | Mark notifications as read — one or all | shared | in-progress |

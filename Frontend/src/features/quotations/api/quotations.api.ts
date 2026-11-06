@@ -7,7 +7,7 @@ import {
   calculateResponseSchema,
   type SubsidyCalculation,
 } from "@/features/subsidy/api/subsidy.schemas";
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -84,13 +84,17 @@ export async function listQuotations(
 }
 
 /** QUOT-013 · GET /quotations/export — the list as an Excel file, with the list's filters. */
-export function exportQuotations(params: QuotationListParams): Promise<DownloadedFile> {
+export function exportQuotations(
+  params: QuotationListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "QUOT-013",
     logger: log,
     fn: "exportQuotations",
     path: "/quotations/export",
     query: {
+      format,
       q: params.q,
       status: params.status.join(","),
       sales_type: params.salesType,

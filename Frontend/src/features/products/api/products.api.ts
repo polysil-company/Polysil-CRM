@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
@@ -70,6 +70,23 @@ export function listProducts(
     query: { ...productQuery(params), page: params.page, limit: PRODUCT_PAGE_SIZE },
     schema: productPageSchema,
     signal,
+  });
+}
+
+/**
+ * MSTR-004 · GET /products/export (FS-081) — the catalogue as Excel or CSV, with the list's
+ * filters, every page. More than 5,000 rows is `422 export_too_large`.
+ */
+export function exportProducts(
+  params: ProductListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-004",
+    logger: log,
+    fn: "exportProducts",
+    path: "/products/export",
+    query: { ...productQuery(params), format },
   });
 }
 
@@ -202,6 +219,24 @@ export function listTaxRates(
   });
 }
 
+/** MSTR-005 · GET /tax-rates/export (FS-081) — the rates as Excel or CSV, with the filters. */
+export function exportTaxRates(
+  params: { hsnCode: string | null; inForce: boolean },
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-005",
+    logger: log,
+    fn: "exportTaxRates",
+    path: "/tax-rates/export",
+    query: {
+      hsn_code: params.hsnCode ?? undefined,
+      in_force: params.inForce ? true : undefined,
+      format,
+    },
+  });
+}
+
 /**
  * MSTR-005 · PUT /tax-rates/{hsn} — a slab from a date, for every product under the code. Only
  * the slabs in force are accepted.
@@ -252,6 +287,24 @@ export function listPriceLists(
     },
     schema: priceListPageSchema,
     signal,
+  });
+}
+
+/** MSTR-006 · GET /price-lists/export (FS-081) — the lists as Excel or CSV, with the filters. */
+export function exportPriceLists(
+  params: { status: "draft" | "published" | null; salesType: PriceListSalesTypeFilter | null },
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-006",
+    logger: log,
+    fn: "exportPriceLists",
+    path: "/price-lists/export",
+    query: {
+      status: params.status ?? undefined,
+      sales_type: params.salesType ?? undefined,
+      format,
+    },
   });
 }
 
@@ -327,6 +380,24 @@ export function listPriceListItems(
     },
     schema: priceListItemsPageSchema,
     signal,
+  });
+}
+
+/** MSTR-006 · GET /price-lists/{id}/items/export (FS-081) — one list's rates, every page. */
+export function exportPriceListItems(
+  params: { listId: string; q: string; unpriced: boolean },
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-006",
+    logger: log,
+    fn: "exportPriceListItems",
+    path: listPath(params.listId, "/items/export"),
+    query: {
+      q: params.q.trim() === "" ? undefined : params.q.trim(),
+      unpriced: params.unpriced ? true : undefined,
+      format,
+    },
   });
 }
 

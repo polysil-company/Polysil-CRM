@@ -179,7 +179,7 @@ export function ComplaintsList(): React.JSX.Element {
 function ExportComplaintsButton({ params }: { params: ComplaintListParams }): React.JSX.Element {
   return (
     <DownloadExcelButton
-      download={() => exportComplaints(params)}
+      download={(format) => exportComplaints(params, format)}
       fallbackName="complaints.xlsx"
       what="complaints"
       logger={log}

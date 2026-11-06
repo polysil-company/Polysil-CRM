@@ -1,4 +1,4 @@
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -96,13 +96,16 @@ export function listCommissions(
 }
 
 /** SUBS-017 · The same rows as an Excel workbook. */
-export function exportCommissions(params: CommissionListParams): Promise<DownloadedFile> {
+export function exportCommissions(
+  params: CommissionListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "SUBS-017",
     logger: log,
     fn: "exportCommissions",
     path: "/dealer-commissions/export",
-    query: listQuery(params),
+    query: { ...listQuery(params), format },
   });
 }
 

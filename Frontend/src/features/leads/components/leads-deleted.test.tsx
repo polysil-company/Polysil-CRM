@@ -166,6 +166,29 @@ describe("[LEAD-020] Restoring a deleted lead", () => {
     expect(screen.getAllByRole("button", { name: /^Restore / })).toHaveLength(2);
   });
 
+  it("says when the restored lead's owner has left, so it gets assigned (BE-042)", async () => {
+    signInAs("admin");
+    const first = mockDb.deletedLeads[0];
+    if (first === undefined) throw new Error("No seeded deleted lead.");
+    server.use(
+      http.post(buildApiUrl("/leads/:leadId/restore"), () =>
+        HttpResponse.json({
+          data: {
+            ...first,
+            deleted_at: null,
+            deleted_by: null,
+            owner: { id: "u-left", full_name: "Hiren Mehta", is_active: false },
+          },
+        }),
+      ),
+    );
+    const user = showLeads("deleted=true");
+    await user.click(await screen.findByRole("button", { name: `Restore ${first.farmer_name}` }));
+    expect(
+      await screen.findByText(/Its owner, Hiren Mehta, has left: open it and assign it/),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the lead deleted and says why when the restore is refused", async () => {
     signInAs("admin");
     const first = mockDb.deletedLeads[0];

@@ -6,6 +6,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { SearchField } from "@/components/patterns/search-field";
@@ -16,6 +17,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { exportOffices } from "@/features/masters/api/masters.api";
 import { useSetOfficeOpen } from "@/features/masters/api/masters.mutations";
 import { officeListQueryOptions } from "@/features/masters/api/masters.queries";
 import {
@@ -84,18 +86,27 @@ export function OfficesPanel({ canEdit }: { canEdit: boolean }): React.JSX.Eleme
             Where people work from, and the territory each office covers.
           </CardDescription>
         </div>
-        {canEdit ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setEditing("new");
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            New office
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadExcelButton
+            download={(format) => exportOffices({ q, state }, format)}
+            fallbackName="offices.xlsx"
+            what="offices"
+            logger={log}
+            dataId="MSTR-011"
+          />
+          {canEdit ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditing("new");
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              New office
+            </Button>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

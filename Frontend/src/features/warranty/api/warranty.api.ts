@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -55,5 +55,16 @@ export function setWarrantyTerm({
     body,
     idempotencyKey,
     schema: warrantyTermsSchema,
+  });
+}
+
+/** MSTR-017 · GET /warranty-terms/export (FS-081) — the warranty periods as Excel or CSV. */
+export function exportWarrantyTerms(format: ExportFormat = "xlsx"): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-017",
+    logger: log,
+    fn: "exportWarrantyTerms",
+    path: "/warranty-terms/export",
+    query: { format },
   });
 }

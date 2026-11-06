@@ -97,3 +97,15 @@ export interface OtpVerifyRequest {
   readonly mobile: string;
   readonly code: string;
 }
+
+/** AUTH-008 · PUT /me/email-preferences: both switches, every time. */
+export interface EmailPreferencesRequest {
+  /** A notice still unread 10 minutes after it arrived is emailed, several in one email. */
+  readonly notices: boolean;
+  /** At 08:00 IST, Monday to Saturday, when there are tasks due today or overdue. */
+  readonly morning_summary: boolean;
+}
+
+export const emailPreferencesSchema = z
+  .object({ data: z.object({ notices: z.boolean(), morning_summary: z.boolean() }) })
+  .transform(({ data }) => ({ notices: data.notices, morningSummary: data.morning_summary }));

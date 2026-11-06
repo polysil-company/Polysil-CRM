@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -98,5 +98,26 @@ export function getDealerRating(partnerId: string, signal?: AbortSignal): Promis
     path: `/partners/${encodeURIComponent(partnerId)}/dealer-rating`,
     schema: dealerRatingSchema,
     signal,
+  });
+}
+
+/** RATE-002 · GET /ratings/export (FS-081) — the ratings as Excel or CSV, with the filters. */
+export function exportRatings(
+  params: RatingListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "RATE-002",
+    logger: log,
+    fn: "exportRatings",
+    path: "/ratings/export",
+    query: {
+      target: params.target,
+      sales_order_id: params.salesOrderId,
+      complaint_id: params.complaintId,
+      partner_id: params.partnerId,
+      max_score: params.maxScore,
+      format,
+    },
   });
 }

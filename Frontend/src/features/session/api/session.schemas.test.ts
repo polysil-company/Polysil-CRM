@@ -25,6 +25,8 @@ describe("[AUTH-002] GET /auth/me contract", () => {
       permissions: [{ module: "leads", actions: ["view", "create"], scope: "org_subtree" }],
       mustChangePassword: false,
       features: { tasksForDealers: false },
+      // AUTH-008 · a backend before 082 sends no email fields: unavailable, both switches on
+      email: { available: false, notices: true, morningSummary: true },
     });
   });
 

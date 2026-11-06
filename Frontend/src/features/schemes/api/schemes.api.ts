@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -127,5 +127,42 @@ export function listEntitlements(
     },
     schema: entitlementPageSchema,
     signal,
+  });
+}
+
+/** SCHM-001 · GET /schemes/export (FS-081) — the schemes as Excel or CSV, with the filters. */
+export function exportSchemes(
+  params: SchemeListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "SCHM-001",
+    logger: log,
+    fn: "exportSchemes",
+    path: "/schemes/export",
+    query: {
+      status: params.status ?? undefined,
+      scheme_type: params.type ?? undefined,
+      q: params.q === "" ? undefined : params.q,
+      format,
+    },
+  });
+}
+
+/** SCHM-004 · GET /scheme-entitlements/export (FS-081) — what partners earned, with the filters. */
+export function exportEntitlements(
+  params: EntitlementListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "SCHM-004",
+    logger: log,
+    fn: "exportEntitlements",
+    path: "/scheme-entitlements/export",
+    query: {
+      status: params.status ?? undefined,
+      partner_id: params.partnerId ?? undefined,
+      format,
+    },
   });
 }

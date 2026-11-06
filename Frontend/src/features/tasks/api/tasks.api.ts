@@ -1,4 +1,4 @@
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -101,13 +101,16 @@ export async function listTasks(
  * TASK-008 · GET /tasks/export — the list as an Excel file, with the same filters: every
  * page, nothing outside the user's scope. More than 5,000 rows is `422 export_too_large`.
  */
-export function exportTasks(params: TaskListParams): Promise<DownloadedFile> {
+export function exportTasks(
+  params: TaskListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "TASK-008",
     logger: log,
     fn: "exportTasks",
     path: "/tasks/export",
-    query: taskFilterQuery(params),
+    query: { ...taskFilterQuery(params), format },
   });
 }
 

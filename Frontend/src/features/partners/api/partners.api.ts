@@ -1,4 +1,4 @@
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
@@ -99,13 +99,16 @@ export async function searchParents(
  * CHNL-001 · GET /partners/export — the list as an Excel file, with the same filters: every
  * page, nothing outside the caller's scope. More than 5,000 rows is `422 export_too_large`.
  */
-export function exportPartners(params: PartnerListParams): Promise<DownloadedFile> {
+export function exportPartners(
+  params: PartnerListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "CHNL-001",
     logger: log,
     fn: "exportPartners",
     path: "/partners/export",
-    query: filterQuery(params),
+    query: { ...filterQuery(params), format },
   });
 }
 

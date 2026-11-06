@@ -5,6 +5,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { SearchField } from "@/components/patterns/search-field";
@@ -15,6 +16,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { exportTerritories } from "@/features/masters/api/masters.api";
 import { territoryListQueryOptions } from "@/features/masters/api/masters.queries";
 import {
   TERRITORY_LEVELS,
@@ -22,8 +24,14 @@ import {
   type TerritoryLevel,
 } from "@/features/masters/api/masters.schemas";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { createLogger } from "@/lib/logger";
 
 import { TerritoryForm } from "./territory-dialog";
+
+const log = createLogger({
+  file: "features/masters/components/territories-panel.tsx",
+  dataId: "MSTR-012",
+});
 
 export const TERRITORY_LEVEL_LABELS: Readonly<Record<TerritoryLevel, string>> = {
   state: "State",
@@ -77,18 +85,32 @@ export function TerritoriesPanel({ canEdit }: { canEdit: boolean }): React.JSX.E
             like POL/GJ/2026-27/00001.
           </CardDescription>
         </div>
-        {canEdit ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setEditing("new");
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            New territory
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadExcelButton
+            download={(format) =>
+              exportTerritories(
+                { level: level === "all" ? null : level, parentId: parent?.id ?? null, q },
+                format,
+              )
+            }
+            fallbackName="territories.xlsx"
+            what="territories"
+            logger={log}
+            dataId="MSTR-012"
+          />
+          {canEdit ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditing("new");
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              New territory
+            </Button>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">

@@ -6,6 +6,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadFileButton } from "@/components/patterns/download-file-button";
 import { Notice } from "@/components/patterns/notice";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
@@ -27,6 +28,7 @@ import {
   removeApplicantDocument,
   submitApplicantApplication,
   uploadApplicantDocument,
+  downloadApplicantPdf,
 } from "@/features/dealer-applications/api/dealer-apply.api";
 import {
   APPLICANT_DOCUMENT_TYPES,
@@ -45,6 +47,7 @@ import { createLogger } from "@/lib/logger";
 import {
   changedFields,
   DealerFieldsEditor,
+  problemsFromServer,
   draftOf,
   fieldProblems,
   type DealerFieldProblems,
@@ -126,9 +129,7 @@ export function DealerApplyForm({
       }
       const fieldErrors = readFieldErrors(error);
       if (fieldErrors !== null) {
-        const mapped: Record<string, string> = { ...fieldErrors };
-        const next: DealerFieldProblems = mapped;
-        setServer(next);
+        setServer(problemsFromServer(fieldErrors));
         return;
       }
       const { refusal } = refusalOf(error);
@@ -206,6 +207,7 @@ export function DealerApplyForm({
             setServer({});
           }}
           problems={problems}
+          workingCapitalTotal={fields?.dataSheet.workingCapitalTotalLakhs ?? null}
           gstinCheck={(gstin) => (
             <ApplicantGstinCheck token={token} session={session} gstin={gstin} />
           )}
@@ -232,6 +234,21 @@ export function DealerApplyForm({
       />
 
       <div className="flex flex-col gap-2 border-t border-border pt-4">
+        <div className="flex flex-col gap-1.5">
+          <DownloadFileButton
+            download={() => downloadApplicantPdf(applicant)}
+            fallbackName="application.pdf"
+            logger={log}
+            dataId="CHNL-008"
+            size="sm"
+          >
+            Download to print and sign
+          </DownloadFileButton>
+          <p className="text-xs text-muted-foreground">
+            Your details as saved so far, on Polysil&apos;s printed form. Save first to include what
+            you just typed.
+          </p>
+        </div>
         <Button
           className="self-start"
           disabled={blocker !== null && submit.state === "idle"}

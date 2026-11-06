@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -95,5 +95,24 @@ export function deleteCampaign(campaignId: string, idempotencyKey: string): Prom
     path: `/campaigns/${encodeURIComponent(campaignId)}`,
     idempotencyKey,
     schema: z.undefined(),
+  });
+}
+
+/** MKT-005 · GET /campaigns/export (FS-081) — the campaigns as Excel or CSV, with the filters. */
+export function exportCampaigns(
+  params: CampaignListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MKT-005",
+    logger: log,
+    fn: "exportCampaigns",
+    path: "/campaigns/export",
+    query: {
+      active: params.active === null ? undefined : String(params.active),
+      type: params.type ?? undefined,
+      q: params.q === "" ? undefined : params.q,
+      format,
+    },
   });
 }

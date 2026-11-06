@@ -5,6 +5,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { Button } from "@/components/ui/button";
@@ -14,11 +15,15 @@ import { Icon } from "@/components/ui/icon";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductSearchPicker } from "@/features/schemes/components/record-pickers";
+import { exportStock } from "@/features/stock/api/stock.api";
 import { stockListQueryOptions } from "@/features/stock/api/stock.queries";
 import { isNegative, quantityText } from "@/features/stock/lib/stock-labels";
+import { createLogger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 
 import { WarehouseSelect } from "./warehouse-select";
+
+const log = createLogger({ file: "features/stock/components/stock-list.tsx", dataId: "MSTR-014" });
 
 /**
  * MSTR-014 · What each warehouse holds of each product: on hand, committed to open orders, and
@@ -80,6 +85,17 @@ export function StockList(): React.JSX.Element {
             }}
           />
           <Label htmlFor="stock-short-only">Short only</Label>
+        </div>
+        <div className="md:ml-auto">
+          <DownloadExcelButton
+            download={(format) =>
+              exportStock({ warehouseId, productId: product?.id ?? null, shortOnly }, format)
+            }
+            fallbackName="stock.xlsx"
+            what="stock rows"
+            logger={log}
+            dataId="MSTR-014"
+          />
         </div>
       </div>
 
