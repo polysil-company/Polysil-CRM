@@ -1554,6 +1554,19 @@ def f_admin() -> None:
               "Regional Manager reports to Admin-Sales and the MD both\n"
               "(GAP-553). Account, Dispatch, QC/QA and State\n"
               "Co-ordinators sit outside the line (GAP-554).", w=520, colour=YELLOW)
+    e += note("nRed082", 0, 1260,
+              "FIELD STAFF NEED AN OFFICE WITH AN AREA (FS-082)\n\n"
+              "Field Officer or District Manager into an office with no\n"
+              "territory: 422 office_has_no_area, on create and on a\n"
+              "role or office change. Prod had all 30 in HQ (ISS-233):\n"
+              "no dealers visible, a DM there read the whole company.\n"
+              "Which roles is assumed (37.4, GAP-556).", w=520, colour=RED)
+    e += note("nGreen3", 620, 1260,
+              "SETUP CHECK  GET /users/setup-check\n\n"
+              "users.edit global (Admin-Sales, MD). Read-only. Field\n"
+              "staff with no area; area roles with no territory; staff\n"
+              "with no manager one level up (GAP-559); staff on the\n"
+              "System office; partners with no area. Count + first 100.", w=420, colour=GREEN)
     write("10-administration", e)
 
 
@@ -2073,6 +2086,27 @@ def f_reports() -> None:
               "Paid day = earliest receipt day whose running total of live\n"
               "allocations covers payable; a day, not an amount.\n"
               "Ordered value counts, not shipped (GAP-234 to GAP-239).", w=420, colour=YELLOW)
+    e += note("nGreen1", 0, 760,
+              "TEAM FILTERS (FS-082)  ?team_of=<person>&roles=a,b\n\n"
+              "team_of: that person and everyone below them on the org\n"
+              "chart. You, someone below you, or anyone for users.view\n"
+              "global; else 404 not_in_your_line. Not with owner_id.\n"
+              "roles: people holding those roles now. Both become one\n"
+              "owner set; an empty set is an empty report, never all.\n"
+              "Not on complaints: its owner is the handler (GAP-558).", w=520, colour=GREEN)
+    e += note("nGreen2", 620, 760,
+              "THE ROSTER  salesperson-performance\n\n"
+              "Everyone in your team gets a row, zeros included, with\n"
+              "role and office: yourself (own scope), the people below\n"
+              "you (org_subtree), everyone (leads and users global).\n"
+              "Territory-scoped callers get activity rows only: their\n"
+              "leads are found by area, so a zero could be false.", w=520, colour=GREEN)
+    e += note("nRed3", 1240, 760,
+              "A ZERO CAN STILL BE WRONG AFTER A MOVE\n\n"
+              "084 moves a person's open leads (and their quotations)\n"
+              "with them to a new office. Won and lost leads stay where\n"
+              "they closed, and orders stay too (GAP-557). So a moved\n"
+              "person's past wins can read 0 to their new manager.", w=420, colour=RED)
     write("32-reports", e)
 
 

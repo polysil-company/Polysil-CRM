@@ -205,6 +205,9 @@ def _team_view(role: str) -> bool:
 
 BEYOND_THE_MATRIX: dict[str, tuple[Any, str]] = {
     "GET /api/v1/planner/team": (_team_view, "the team view is for managers (FS-014)"),
+    "GET /api/v1/users/setup-check": (
+        lambda role: VIEW_SCOPE.get((role, "users")) == "global" and (role, "users", "edit") in GRANTED,
+        "the setup check needs users.edit at global scope (FS-082)"),
     **{f"GET /api/v1/reports/{name}": (
         lambda role, mods=mods: all((role, m) in VIEW_SCOPE for m in mods),
         f"the report also needs view on {', '.join(mods)}") for name, mods in REPORT_NEEDS.items()},
