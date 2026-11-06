@@ -129,6 +129,7 @@ in the same shape. Never renumber or reuse a number.
 - [ ] **BE-039** · A quotation for a dealer or distributor, with no farmer's lead · QUOT-004, QUOT-006 · high · **can start now**
 - [ ] **BE-040** · The employee(s) who look after a dealer or distributor · CHNL-001 · high · **the link can start now; what it grants waits on the client**
 - [ ] **BE-041** · An employee's leads go to their dealer when the employee leaves · ADMN-004, LEAD-008 · normal · **waits on the client**
+- [ ] **BE-043** · Which distributors a field officer can find when ordering · SO-012, SO-013 · high · **a decision**
 
 ---
 
@@ -849,5 +850,24 @@ in the same shape. Never renumber or reuse a number.
     - does the dealer become the owner, or do the leads wait for a new employee;
     - automatic on deactivation, or the admin's choice each time.
 - **Done when:** the client answers, and the rule is in `users.md`.
+- **Done in:** —
+- **Backend notes:** —
+
+
+### BE-043 · Which distributors a field officer can find when ordering
+
+- **Status:** ⬜ Open · **a decision**
+- **Asked:** 6 Nov 2026 · SO-012, SO-013 · the client reported that a field officer couldn't choose a distributor on a new sales order
+- **What:**
+  - The order screens search `GET /lookups/partners`, which lists only the partners in the caller's own scope (`channel_partner`'s row policies; RBAC.md §6.1 gives a field officer `partners V:org`).
+  - A distributor usually serves a wider area than one field officer's office, for example a whole state. If its territory is above the office's districts, the field officer never finds it.
+  - The frontend now offers the picker on orders from a lead as well (SO-013), but it can only list what this endpoint returns.
+  - Please decide, with the client if needed, which partners a field officer may order through:
+    - the partners whose own area overlaps the officer's;
+    - also the distributors above the dealers in that area;
+    - or every active distributor.
+  - Then make `/lookups/partners`, or a variant for orders such as `?for=order`, return them.
+- **Why:** a field officer selling to a farmer must be able to route the order through the distributor who will supply it.
+- **Done when:** a field officer can find the distributors the rule allows, and the rule is in `lookups.md`.
 - **Done in:** —
 - **Backend notes:** —

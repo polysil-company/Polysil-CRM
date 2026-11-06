@@ -211,6 +211,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SO-010 | Export and sample orders: the buyer's country, the tax treatment and LUT, and free or charged samples, on orders and quotations (FS-042) | shared | in-progress |
 | SO-011 | A consolidated order: one draft from several accepted quotations of one dealer (`POST /orders` with several `quotation_ids`) | shared | in-progress |
 | SO-012 | An order for a dealer or distributor, typed in by staff: the dealer picked, their rates and details (`POST /orders` with `partner_id`) | shared | in-progress |
+| SO-013 | An order from a lead goes through the dealer or distributor staff pick, starting at the lead's channel partner (`POST /orders` with `lead_id` and `partner_id`) | shared | in-progress |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
 | CMPL-001 | Complaints list — filters, waiting on me, counts (`GET /complaints`, `GET /complaints/stats`) | shared | in-progress |

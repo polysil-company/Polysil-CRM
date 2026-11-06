@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-121 changes, newest first. Each title opens its entry.
+122 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-11-06 | [A field officer picks the distributor on an order from a lead](changelog/entries/2026-11-06--fix--SO-013--a-field-officer-picks-the-distributor-on-an-order-from-a.md) | `fix` | `SO-013` `SO-012` |
 | 2026-11-05 | [Company settings read the application settings and any kind added later](changelog/entries/2026-11-05--fix--ADMN-007--company-settings-read-the-application-settings-and-any-kind.md) | `fix` | `ADMN-007` |
 | 2026-10-30 | [Visits take the location by themselves once allowed](changelog/entries/2026-10-30--feature--TRK-003--visits-take-the-location-by-themselves-once-allowed.md) | `feature` | `TRK-003` `TRK-004` |
 | 2026-10-30 | [Duty on Android, and the map under the menu](changelog/entries/2026-10-30--fix--TRK-008--duty-on-android-and-the-map-under-the-menu.md) | `fix` | `TRK-008` `TRK-001` |
@@ -132,6 +133,40 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 6 November 2026
+
+### A field officer picks the distributor on an order from a lead
+
+`fix` · `SO-013` `SO-012` · Nakul Srivastava · [entry](changelog/entries/2026-11-06--fix--SO-013--a-field-officer-picks-the-distributor-on-an-order-from-a.md)
+
+#### Before
+
+A field officer starting a sales order from a lead couldn't choose the distributor. The order builder showed no dealer or distributor field on an order from a lead, and silently sent the lead's own channel partner, or none.
+
+#### Now
+
+- **From a lead:** staff get **Through a dealer or distributor**, set to the lead's channel partner. They can pick another dealer or distributor, or clear it.
+- **The farmer stays the party:** picking a partner only changes the rates; the farmer's name and details stay. `partner_id` is sent with `lead_id`.
+- **Help text:** both partner fields now say only partners in your area are listed, so a missing distributor isn't a mystery.
+- Dealer users and edits are unchanged.
+
+#### Discussion
+
+- The client reported that a field officer couldn't choose a distributor on a new sales order (6 Nov). The frontend gap was the order from a lead; it is fixed here.
+- The search only lists partners in the officer's own area (`GET /lookups/partners` row scope), so a distributor serving a wider area may still not show. That rule is the backend's and the client's to decide: **BE-043**.
+
+#### Files changed
+
+- `src/features/orders/components/order-builder.tsx` — the partner field on orders from a lead, starting at the lead's partner; the farmer stays the party.
+- `src/features/orders/components/order-builder.test.tsx` — two SO-013 tests.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`, `Docs/Tested-Features.md` — SO-013.
+- `../docs/Backend-Tasks.md` — BE-043.
+
+#### Tests
+
+- `order-builder.test.tsx`: "[SO-013] on an order from a lead, picks the distributor it goes through, keeping the farmer as the party" and "[SO-013] starts an order from a lead at the lead's own channel partner".
+- By hand: sign in as a field officer, open a lead, **Create sales order**, pick a distributor, save, and check the order shows the farmer as the party and the distributor's rates.
 
 ## 5 November 2026
 

@@ -631,6 +631,16 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /lookups/partners", "GET /partners/{partnerId}", "POST /orders"],
   },
+  "SO-013": {
+    domain: "SO",
+    title:
+      "An order from a lead goes through the dealer or distributor staff pick: it starts at the lead's channel partner (`POST /orders` with `lead_id` and `partner_id`)",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /lookups/partners", "POST /orders"],
+    notes:
+      "The farmer stays the party; only the rates follow the partner. Who can be found is BE-043.",
+  },
   "APPR-001": {
     domain: "APPR",
     title: "Approval inbox — amount-based escalation",

@@ -386,11 +386,65 @@ describe("[SO-012] An order for a dealer or distributor, typed in by staff", () 
     },
   );
 
-  it("isn't offered on an order from a lead, which brings its own partner", async () => {
+  it(
+    "[SO-013] on an order from a lead, picks the distributor it goes through, keeping the farmer as the party",
+    PRICING_TEST,
+    async () => {
+      signInAs("employee");
+      const leadId = leadAt("qualified");
+      const lead = mockDb.leads.find((item) => item.id === leadId);
+      const distributor = mockDb.partners.find((partner) => partner.partner_type === "distributor");
+      if (lead === undefined || distributor === undefined) {
+        throw new Error("No qualified lead or distributor in the mock");
+      }
+      const sent: unknown[] = [];
+      server.events.on("request:start", ({ request }) => {
+        if (request.method === "POST" && new URL(request.url).pathname.endsWith("/orders")) {
+          void request
+            .clone()
+            .json()
+            .then((body: unknown) => sent.push(body));
+        }
+      });
+      const user = show(<NewDirectOrder leadId={leadId} />);
+      await screen.findByRole("form", { name: "New order" });
+
+      const field = await screen.findByLabelText("Through a dealer or distributor");
+      await user.clear(field);
+      await user.type(field, distributor.name.slice(0, 6));
+      await user.click(await screen.findByRole("option", { name: new RegExp(distributor.name) }));
+      // The farmer stays the party: only the rates follow the distributor.
+      expect(screen.getByLabelText("Party")).toHaveValue(lead.farmer_name);
+
+      await addPipe(user, "10");
+      const save = screen.getByRole("button", { name: "Save draft order" });
+      await waitFor(() => {
+        expect(save).toBeEnabled();
+      }, PRICED);
+      await user.click(save);
+      await waitFor(() => {
+        expect(push).toHaveBeenCalledTimes(1);
+      });
+      expect(sent[0]).toMatchObject({
+        lead_id: leadId,
+        partner_id: distributor.id,
+        party: { name: lead.farmer_name },
+      });
+    },
+  );
+
+  it("[SO-013] starts an order from a lead at the lead's own channel partner", async () => {
     signInAs("admin");
-    show(<NewDirectOrder leadId={leadAt("qualified")} />);
-    await screen.findByRole("form", { name: "New order" });
-    expect(screen.queryByLabelText("For a dealer or distributor")).not.toBeInTheDocument();
+    const lead = mockDb.leads.find(
+      (item) => item.stage === "qualified" && item.assigned_partner !== null,
+    );
+    if (lead === undefined || lead.assigned_partner === null) {
+      throw new Error("No qualified lead with a partner in the mock");
+    }
+    show(<NewDirectOrder leadId={lead.id} />);
+    expect(await screen.findByLabelText("Through a dealer or distributor")).toHaveValue(
+      lead.assigned_partner.name,
+    );
   });
 
   it("isn't offered to a dealer's own users, who order for themselves", async () => {
