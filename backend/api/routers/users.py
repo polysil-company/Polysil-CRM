@@ -28,6 +28,7 @@ from api.schemas.users import (
     PasswordSetResult,
     RevokeResult,
     RoleItem,
+    SetupReport,
     UnlockResult,
     UserCreate,
     UserDetail,
@@ -36,6 +37,7 @@ from api.schemas.users import (
 )
 from api.services import exports
 from api.services import org_chart as org_chart_service
+from api.services import setup_check as setup_service
 from api.services import users as service
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -145,6 +147,26 @@ async def org_chart(
         raise ValidationFailed(fields={"view": "Send either view or user_id, not both."})
     return Envelope(data=await org_chart_service.org_chart(
         db, caller, user_id=user_id, company=view == "company"))
+
+
+@router.get("/setup-check", response_model=Envelope[SetupReport], responses={
+    **_ERRORS,
+    403: {"model": ErrorResponse,
+          "description": "`insufficient_permission`: you need `users.edit` at global scope "
+                         "(Admin-Sales, MD/CEO)."}},
+            dependencies=[Depends(require("users", "view"))])
+async def setup_check(db: DbSession, caller: CallerDep) -> Envelope[SetupReport]:
+    """What is set up wrong, for the admin dashboard (FS-082).
+
+    Each check has a count, a one-line title, why it matters, and the first 100
+    people or partners to fix, sorted by name. Every check is always listed, with
+    `count` 0 when clean; `ok` is true when all are 0. Read-only.
+
+    The checks: field staff in an office that covers no area; staff whose role
+    works by area but who have none; staff with no manager one level above them;
+    staff on the System office; partners with no area.
+    """
+    return Envelope(data=await setup_service.setup_check(db, caller))
 
 
 @router.get("/{user_id}", response_model=Envelope[UserDetail],
