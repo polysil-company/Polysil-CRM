@@ -301,8 +301,10 @@ class Loader:
     def lock(self) -> None:
         """Wait for a product import that is saving (FS-083 rule 13), and keep it out
         until this transaction ends. Namespace 5, the singleton masters. ISS-234."""
+        from api.db import locks  # after the sys.path line above
+
         with self.conn.cursor() as cur:
-            cur.execute("SELECT pg_advisory_xact_lock(5, hashtext('product_import'))")
+            cur.execute(locks.PRODUCT_CATALOGUE)
 
     def _staff_made(self) -> set[str]:
         """Descriptions (casefolded) of products staff created, by hand or by import.

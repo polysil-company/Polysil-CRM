@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from api.authz.predicate import Caller
+from api.db import locks
 from api.domain.imports import fields as import_fields
 from api.domain.imports import products as product_rows
 from api.domain.imports import template as import_template
@@ -556,10 +557,9 @@ async def commit(db: AsyncSession, caller: Caller, batch_id: str,
             await _raw_list(db, row.target_id, for_update=True)).status != "draft":
         raise PUBLISHED_LIST
     if row.kind == "products":
-        # EC-11: one product import commits at a time. Transaction-scoped, so it
-        # holds behind PgBouncer
-        # namespace 5, the singleton masters (019, 053; plan review N-1)
-        await db.execute(text("SELECT pg_advisory_xact_lock(5, hashtext('product_import'))"))
+        # EC-11: one product import commits at a time, and the product page's
+        # edits wait for it (code review F-1). Taken before the re-read below
+        await db.execute(text(locks.PRODUCT_CATALOGUE))
     ev = await _evaluate(db, row.kind, _sheet_rows(row), mapping, at_commit=True)
     if row.kind == "products":
         _same_as_checked(row.check_result, ev)
@@ -767,10 +767,12 @@ UPDATE product p SET
     pack_multiple = COALESCE(x.pack_multiple, p.pack_multiple),
     is_subsidy_eligible = COALESCE(x.is_subsidy_eligible, p.is_subsidy_eligible),
     is_active = COALESCE(x.is_active, p.is_active),
-    -- untouched unless something is cleared: EXCEPT reorders the array, and the
-    -- audit row would show a change that did not happen (plan review N-3)
-    provisional_fields = CASE WHEN cardinality(x.cleared) = 0 THEN p.provisional_fields
-        ELSE ARRAY(SELECT unnest(p.provisional_fields) EXCEPT SELECT unnest(x.cleared)) END,
+    -- untouched unless a mark it holds is cleared, and in its own order: the audit
+    -- row must not show a change that did not happen (plan review N-3, review F-3)
+    provisional_fields = CASE WHEN p.provisional_fields && x.cleared
+        THEN ARRAY(SELECT f FROM unnest(p.provisional_fields) WITH ORDINALITY AS u(f, n)
+                   WHERE f <> ALL(x.cleared) ORDER BY n)
+        ELSE p.provisional_fields END,
     updated_by = app_current_user_id()
 FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS x(id uuid, description text, item_code text,
     category_id uuid, quotation_category text, uom_id uuid, mrp numeric, pack_multiple numeric,

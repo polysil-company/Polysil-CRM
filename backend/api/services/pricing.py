@@ -40,6 +40,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.db import locks
 from api.domain.money import round2
 from api.domain.pricing.resolve import applicable, mixed_list_warning, pick
 from api.domain.pricing.tax import (
@@ -854,6 +855,8 @@ async def patch_product(db: AsyncSession, product_id: str, body: sch.ProductPatc
     sent = body.model_dump(exclude_unset=True)
     if not sent:
         return await get_product(db, product_id)
+    # takes turns with a product import's commit (FS-083 rule 13, code review F-1)
+    await db.execute(text(locks.PRODUCT_CATALOGUE))
 
     sets: list[str] = []
     params: dict[str, Any] = {"id": product_id}
@@ -947,6 +950,7 @@ async def assign_hsn(db: AsyncSession, product_id: str, body: sch.HsnAssign) -> 
     Its own endpoint because it is its own dated fact: a tariff heading changes
     for tariff reasons, not because anything about the product did.
     """
+    await db.execute(text(locks.PRODUCT_CATALOGUE))  # code review F-1
     exists = (await db.execute(text(
         "SELECT id FROM product WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL"),
         {"id": product_id})).scalar_one_or_none()
