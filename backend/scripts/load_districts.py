@@ -9,9 +9,14 @@ What it does, in one transaction:
   rows are skipped (seed_prod and load_seller_gstins create the states);
 - inserts each district that is not under its state yet, with its LGD code.
 
-**Idempotent.** A district already present (same name under the same state, any
-case) is left as it is. Nothing is renamed or removed: a district dropped from the
-official list stays, because leads and users may point at it.
+**Idempotent.** A district already present is left as it is. "Present" is FS-085
+rule 2 (`api/domain/district_offices.py` `match_districts`): the same LGD code, the
+same name ignoring case, spaces and punctuation, a known renaming (Kutch is
+Kachchh), or one close spelling. Before 6 Nov it was the exact name only, so a
+rerun on a database spelling a district differently added a second copy. Two
+candidates for one row stop the load before any write. Nothing is renamed or
+removed: a district dropped from the official list stays, because leads and users
+may point at it.
 
     python scripts/load_districts.py --csv data/masters/districts.csv --dry-run
 """
@@ -45,9 +50,12 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 
 
 def load(conn: Any, rows: list[dict[str, str]]) -> list[str]:
+    from api.domain.district_offices import HeldDistrict, ListedDistrict, match_districts
+
     out: list[str] = []
-    added: Counter[str] = Counter()
     cur = conn.cursor()
+    plans = []
+    problems: list[str] = []
     for code in sorted({r["state_code"].upper() for r in rows}):
         cur.execute("SELECT id FROM territory WHERE level = 'state' AND code = %s "
                     "AND deleted_at IS NULL", (code,))
@@ -56,18 +64,28 @@ def load(conn: Any, rows: list[dict[str, str]]) -> list[str]:
             out.append(f"skipped   {code}: no such state")
             continue
         state_id = found[0]
-        for r in rows:
-            if r["state_code"].upper() != code:
-                continue
-            cur.execute(
-                "INSERT INTO territory (parent_id, level, name, lgd_code) "
-                "SELECT %s, 'district', %s, nullif(%s, '') WHERE NOT EXISTS ("
-                "SELECT 1 FROM territory WHERE parent_id = %s AND deleted_at IS NULL "
-                "AND lower(btrim(name)) = lower(btrim(%s)))",
-                (state_id, r["district"], r["lgd_code"], state_id, r["district"]))
-            added[code] += cur.rowcount
-        total = sum(r["state_code"].upper() == code for r in rows)
-        out.append(f"{code:<9} {added[code]} added, {total - added[code]} already there")
+        cur.execute("SELECT id, name, lgd_code FROM territory WHERE parent_id = %s "
+                    "AND level = 'district' AND deleted_at IS NULL", (state_id,))
+        held = [HeldDistrict(str(i), n, lgd) for i, n, lgd in cur.fetchall()]
+        listed = [ListedDistrict(r["district"], r["lgd_code"]) for r in rows
+                  if r["state_code"].upper() == code]
+        result = match_districts(code, listed, held)
+        problems.extend(result.problems)
+        plans.append((code, state_id, result))
+    if problems:
+        raise SystemExit("nothing loaded; the list and the database disagree:\n  "
+                         + "\n  ".join(problems))
+    for code, state_id, result in plans:
+        for m in result.new:
+            cur.execute("INSERT INTO territory (parent_id, level, name, lgd_code) "
+                        "VALUES (%s, 'district', %s, nullif(%s, ''))",
+                        (state_id, m.listed.name, m.listed.lgd_code))
+        how = Counter(m.how for m in result.matches if m.existing is not None)
+        found_by = ", ".join(f"{n} by {k}" for k, n in sorted(how.items())) or "none"
+        out.append(f"{code:<9} {len(result.new)} added; already there: {found_by}")
+        for m in result.matches:
+            if m.how in ("alias", "close") and m.existing is not None:
+                out.append(f"          {m.listed.name!r} is {m.existing.name!r} ({m.how})")
     return out
 
 

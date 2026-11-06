@@ -1562,7 +1562,10 @@ def f_admin() -> None:
               "territory: 422 office_has_no_area, on create and on a\n"
               "role or office change. Prod had all 30 in HQ (ISS-233):\n"
               "no dealers visible, a DM there read the whole company.\n"
-              "Which roles is assumed (37.4, GAP-556).", w=520, colour=RED)
+              "Which roles is assumed (37.4, GAP-556). FS-085: a DM may\n"
+              "also sit in an AREA office (level 2, no territory, over\n"
+              "district offices). Never an FO: 056 and 084 read only\n"
+              "the office's own territory (GAP-580).", w=520, colour=RED)
     e += note("nGreen3", 620, 1260,
               "SETUP CHECK  GET /users/setup-check\n\n"
               "users.edit global (Admin-Sales, MD). Read-only. Field\n"
@@ -2695,6 +2698,26 @@ def f_email_notices() -> None:
          ("n4", "Not yet: an account (GAP-536), bounces (GAP-539),\nlinks beyond five record types (GAP-551),\nwhat may leave by email (GAP-549, Q 36.3).", YELLOW)])
 
 
+def f_district_offices() -> None:
+    _columns(
+        "85-district-offices", "District offices: placing field staff out of Polysil HQ",
+        "A workbook the client marks, then one transaction: districts, offices, moves.",
+        "BUILT. FS-085: scripts/load_district_offices.py sheet | apply; no migration.",
+        [("s1", "deploy_staging.py --target prod staff-facts --out facts.csv\nread only, as the superuser, COPY ... TO STDOUT", BLUE),
+         ("s2", "load_district_offices.py sheet: People + Groups tabs\nheld areas first, work as a cross-check; unsure rows on top", VIOLET),
+         ("s3", "the client marks Decision: OK, another office, or blank\nGroups: Yes for each area or region", YELLOW),
+         ("s4", "district-offices --sheet marked.xlsx --dry-run\neverything done, every guard run, rolled back", GREEN),
+         ("s5", "district-offices --sheet marked.xlsx\none transaction, as ADMIN_EMAIL, through the services", GREEN)],
+        [("d1", "check first: matching, duplicates, groups, every row\nany problem: nothing written", GREEN),
+         ("d2", "districts > state offices > regions > areas\n> district offices only where needed", BLUE),
+         ("d3", "patch_user per person, one savepoint each\n084 moves their open leads", BLUE),
+         ("d4", "unowned open leads at HQ > covering office\nlead.rehomed each (rule 24)", BLUE)],
+        [("n1", "AN EMPTY DISTRICT OFFICE TAKES NEW LEADS\n\n_covering_org_unit files a lead under the nearest\noffice on its district. So district offices are made\nonly where someone sits or an approved area needs one,\nand in the same run as the moves.", RED),
+         ("n2", "AN FO NEVER SITS IN AN AREA OFFICE\n\nlead_auto_owner (056) and the 084 move read the office's\nown territory. A multi-district FO sits in the district\nwith most dealers; the rest are not visible (GAP-585).", RED),
+         ("n3", "RERUNS ARE SAFE, AND RESPECT THE ADMIN\n\nAn office moves into an area or region only from its\ndefault place. A renamed or rearranged group is left\nalone. People already placed get no suggestion.", GREEN),
+         ("n4", "PROD IS ON 082: apply --sheet REFUSES\n\nNo trg_app_user_lead_office means leads would stay\nbehind. Deploy 084 and FS-085's code first. Leads of a\nDM moved into an area stay put (GAP-582).", YELLOW)])
+
+
 def f_forecast_insights() -> None:
     _columns(
         "74-forecast-insights", "Sales forecast and insights",
@@ -2728,4 +2751,5 @@ if __name__ == "__main__":
     f_subsidised_orders(); f_subsidy_completion(); f_state_formulas(); f_subsidised_quotations()
     f_price_lists_by_sale_type(); f_excel_import(); f_ap_subsidy(); f_live_checks()
     f_partner_recruitment(); f_report_exports(); f_email_notices(); f_forecast_insights()
+    f_district_offices()
     print(f"\nwrote to {OUT}")

@@ -9,7 +9,7 @@ written under the partners permissions and scoped by the database underneath.
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
@@ -73,11 +73,23 @@ async def list_org_units(
         description="true for open offices only, false for closed.")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: Annotated[str | None, Query(description="From a previous page's next_cursor.")] = None,
+    sort: Annotated[Literal["created", "name"], Query(
+        description="created: newest first (the default). name: A to Z, for a picker. "
+                    "A cursor belongs to the sort that produced it.")] = "created",
+    territory_id: Annotated[str | None, Query(
+        pattern=UUID_RE,
+        description="Offices inside this area: their territory is at or under it, or they "
+                    "are an area office whose offices below are all inside it. Pass a state "
+                    "to list that state's offices. Polysil HQ is never included.")] = None,
 ) -> OrgUnitPage:
-    """The office tree, newest first, with active user counts. Readable by anyone
-    signed in. Keyset-paged: pass `meta.next_cursor` back as `cursor`."""
+    """The office tree, newest first or A to Z, with active user counts. Readable by
+    anyone signed in. Keyset-paged: pass `meta.next_cursor` back as `cursor`.
+
+    For an office picker: `sort=name&territory_id=<state>` lists one state's offices
+    alphabetically. Office names carry the state code ("Pratapgarh District, UP")."""
     return await service.list_org_units(db, q=q, parent_id=parent_id, is_open=is_open,
-                                        limit=limit, cursor=cursor)
+                                        limit=limit, cursor=cursor, sort=sort,
+                                        territory_id=territory_id)
 
 
 @org_units.get("/{item_id}", response_model=Envelope[OrgUnit],

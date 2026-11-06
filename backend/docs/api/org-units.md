@@ -29,8 +29,11 @@ Conventions for every endpoint in this file:
 
 **List Org Units**
 
-The office tree, newest first, with active user counts. Readable by anyone
-signed in. Keyset-paged: pass `meta.next_cursor` back as `cursor`.
+The office tree, newest first or A to Z, with active user counts. Readable by
+anyone signed in. Keyset-paged: pass `meta.next_cursor` back as `cursor`.
+
+For an office picker: `sort=name&territory_id=<state>` lists one state's offices
+alphabetically. Office names carry the state code ("Pratapgarh District, UP").
 
 **Parameters**
 
@@ -41,6 +44,8 @@ signed in. Keyset-paged: pass `meta.next_cursor` back as `cursor`.
 | `is_open` | query | boolean \| null |  | true for open offices only, false for closed. |
 | `limit` | query | integer |  |  |
 | `cursor` | query | string \| null |  | From a previous page's next_cursor. |
+| `sort` | query | `created` \| `name` |  | created: newest first (the default). name: A to Z, for a picker. A cursor belongs to the sort that produced it. |
+| `territory_id` | query | string \| null |  | Offices inside this area: their territory is at or under it, or they are an area office whose offices below are all inside it. Pass a state to list that state's offices. Polysil HQ is never included. |
 
 **Responses**
 
@@ -105,6 +110,8 @@ Download the offices as Excel (`format=xlsx`, the default) or CSV, with the same
 | `q` | query | string \| null |  | Name substring. |
 | `parent_id` | query | string \| null |  | Children of this office. |
 | `is_open` | query | boolean \| null |  | true for open offices only, false for closed. |
+| `sort` | query | `created` \| `name` |  | created: newest first (the default). name: A to Z, for a picker. A cursor belongs to the sort that produced it. |
+| `territory_id` | query | string \| null |  | Offices inside this area: their territory is at or under it, or they are an area office whose offices below are all inside it. Pass a state to list that state's offices. Polysil HQ is never included. |
 
 **Responses**
 

@@ -9,6 +9,8 @@ details, and is refused on credit terms and on close.
 
 from __future__ import annotations
 
+import base64
+import json
 import uuid
 from collections.abc import Callable
 
@@ -255,3 +257,76 @@ async def test_staff_manage_partners_and_a_dealer_edits_only_its_contact_details
     back = await client.patch(f"{V1}/users/{dealer_user['id']}", json={"is_active": True},
                               headers={**h, **_key()})
     assert back.status_code == 200 and back.json()["data"]["is_active"] is True
+
+
+# ── FS-085: the office picker's sort and area filter, a territory's LGD code ──
+
+async def test_org_units_sort_by_name_and_filter_by_area(
+        client: httpx.AsyncClient, admin: Admin, sessions: Callable[[], AsyncSession]) -> None:
+    h = await _auth(client, admin.user)
+    tag = uuid.uuid4().hex[:6]
+    code = "Y" + tag[:4].upper()
+    state = (await _post(client, h, "/territories", {
+        "name": f"fs85 state {tag}", "level": "state", "code": code}))["data"]
+    d1, d2 = [(await _post(client, h, "/territories", {
+        "name": f"fs85 {n} {tag}", "level": "district", "parent_id": state["id"],
+        "lgd_code": lgd}))["data"] for n, lgd in (("one", "9101"), ("two", None))]
+    s = sessions()
+    assert (await s.execute(text("SELECT lgd_code FROM territory WHERE id = CAST(:t AS uuid)"),
+                            {"t": d1["id"]})).scalar() == "9101", "POST /territories keeps lgd_code"
+    await s.rollback()
+    await s.close()
+
+    async def office(name: str, level: int, parent: str, territory: str | None) -> str:
+        body = {"name": f"fs85 {tag} {name}", "role_level": level, "parent_id": parent,
+                "territory_id": territory}
+        return str((await _post(client, h, "/org-units", body))["data"]["id"])
+    region = await office("e region", 4, admin.user.org_unit_id, None)
+    st = await office("d state", 3, region, state["id"])
+    area = await office("A area", 2, st, None)
+    one = await office("c one", 2, area, d1["id"])
+    two = await office("B two", 2, st, d2["id"])
+
+    async def page(params: dict[str, str]) -> dict:
+        r = await client.get(f"{V1}/org-units", params={"q": tag, **params}, headers=h)
+        assert r.status_code == 200, r.text
+        return dict(r.json())
+
+    # A to Z, case-insensitively, paged by name
+    first = await page({"sort": "name", "territory_id": state["id"], "limit": "2"})
+    assert [o["id"] for o in first["data"]] == [area, two]
+    rest = await page({"sort": "name", "territory_id": state["id"], "limit": "2",
+                       "cursor": first["meta"]["next_cursor"]})
+    assert [o["id"] for o in rest["data"]] == [one, st]
+    last = await page({"sort": "name", "territory_id": state["id"], "limit": "2",
+                       "cursor": rest["meta"]["next_cursor"]})
+    assert [o["id"] for o in last["data"]] == [region], "a region over this one state is inside it"
+    assert last["meta"]["next_cursor"] is None
+    # one district: its office only; the area holds the other district, so it is out
+    assert [o["id"] for o in (await page({"territory_id": d2["id"]}))["data"]] == [two]
+    # Polysil HQ and the admin's own office are never inside the new state
+    everything = await client.get(f"{V1}/org-units", headers=h,
+                                  params={"territory_id": state["id"], "limit": "100"})
+    ids = {o["id"] for o in everything.json()["data"]}
+    assert identity.SYSTEM_ORG_UNIT_ID not in ids and admin.user.org_unit_id not in ids
+    from api.config import get_settings
+    assert get_settings().root_org_unit_id not in ids
+    # the default order is unchanged: newest first
+    assert [o["id"] for o in (await page({}))["data"]][:2] == [two, one]
+    bad = await client.get(f"{V1}/org-units", params={"sort": "name", "cursor": "%%%"}, headers=h)
+    assert bad.status_code == 422, bad.text
+    # a cursor that decodes but carries no uuid is a 422 too, not a 500
+    forged = base64.urlsafe_b64encode(json.dumps(["a", "not-a-uuid"]).encode()).decode()
+    bad = await client.get(f"{V1}/org-units", params={"sort": "name", "cursor": forged}, headers=h)
+    assert bad.status_code == 422, bad.text
+
+    # a region spanning two states is inside neither (code review F-6)
+    other = (await _post(client, h, "/territories", {
+        "name": f"fs85 other {tag}", "level": "state", "code": "Z" + tag[:4].upper()}))["data"]
+    wide = await office("f wide", 4, admin.user.org_unit_id, None)
+    await office("g in first", 2, wide, d2["id"])
+    await office("h in other", 3, wide, other["id"])
+    for t in (state["id"], other["id"]):
+        r = await client.get(f"{V1}/org-units", headers=h,
+                             params={"territory_id": t, "limit": "100"})
+        assert wide not in {o["id"] for o in r.json()["data"]}

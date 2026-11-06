@@ -95,6 +95,11 @@ PASSWORD_MIN = 12
 # FS-082 rule 4: roles that must sit in an office covering an area.
 # GAP-556: unconfirmed (client question 37.4); State Managers may belong here too.
 AREA_ROLES: frozenset[str] = frozenset({"field_officer", "district_manager"})
+# FS-085 rule 10: of those, the roles an area office also satisfies (an office with
+# no territory of its own over district offices). Not a Field Officer: lead
+# auto-assignment (056) and the 084 lead move read only the office's own territory.
+# GAP-580: the area-office shape is unconfirmed (client question 39.1).
+AREA_OFFICE_ROLES: frozenset[str] = frozenset({"district_manager"})
 PASSWORD_MAX = 128   # Argon2 is deliberately slow; an unbounded input is a lever
 
 
