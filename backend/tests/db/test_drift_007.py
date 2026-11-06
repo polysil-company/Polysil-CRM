@@ -79,6 +79,13 @@ def _statements() -> dict[str, str]:
     if m56 is not None:
         stmt = next(s for s in m56.FUNCTIONS if "FUNCTION lead_auto_owner" in s)
         out["lead_auto_owner"] = stmt.replace("CREATE OR REPLACE FUNCTION", "CREATE FUNCTION", 1)
+    # 088 adds the assigned districts (FS-086): the partner counts and the auto owner
+    m88 = _load("088_held_districts")
+    if m88 is not None:
+        out["channel_partner_user_counts"] = out["channel_partner_user_counts"].replace(
+            m88.OFFICE, m88.AREA)
+        out["lead_auto_owner"] = m88.AUTO_OWNER.replace(
+            "CREATE OR REPLACE FUNCTION", "CREATE FUNCTION", 1)
     return out
 
 

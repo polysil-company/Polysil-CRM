@@ -45,7 +45,10 @@ async def test_the_pasted_partners_guard_is_the_generators(db: AsyncSession) -> 
     m = _load("028_dealer_area_access")
     assert m is not None
     guard = _norm(guard_sql(SPECS["partners"]))
-    assert _norm(m.PARTNERS_GUARD) == guard
+    # 088 (FS-086) adds the assigned districts to 028's office text
+    m88 = _load("088_held_districts")
+    assert m88 is not None
+    assert _norm(m.PARTNERS_GUARD.replace(m88.OFFICE, m88.AREA)) == guard
     for fn in ("minutes_visible(uuid)", "channel_partner_user_counts(uuid[])",
                "task_link_visible_as(uuid, uuid, uuid, uuid)"):
         body = (await db.execute(text("SELECT pg_get_functiondef(CAST(:f AS regprocedure))"),
