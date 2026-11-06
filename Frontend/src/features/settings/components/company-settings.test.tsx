@@ -224,3 +224,111 @@ describe("[QUOT-015] The GST slabs on offer", () => {
     expect(await screen.findByText("Choose at least one slab.")).toBeInTheDocument();
   });
 });
+
+describe("[ADMN-007] The application settings (FS-071): some of a list, and staff roles", () => {
+  afterEach(reset);
+
+  it("checks a set against its list and staff roles for at least one", async () => {
+    signInAs("admin");
+    const settings = await listSettings();
+    expect(settings.find((item) => item.key === "dealer_application_required")).toMatchObject({
+      kind: "set",
+      value: [],
+    });
+    expect(settings.find((item) => item.key === "deposit_relaxation_roles")).toMatchObject({
+      kind: "staff_roles",
+      value: ["regional_manager", "md_ceo"],
+    });
+    await expect(
+      patchSettings({ values: { dealer_application_required: ["email", "pan_number"] } }),
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(patchSettings({ values: { deposit_relaxation_roles: [] } })).rejects.toMatchObject(
+      { status: 422 },
+    );
+    await expect(
+      patchSettings({ values: { deposit_relaxation_roles: ["dealer"] } }),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it("ticks the fields an application needs, and who decides, under their own section", async () => {
+    signInAs("admin");
+    const user = show(<CompanySettings />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Dealer and distributor applications",
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+    const required = await screen.findByRole("group", {
+      name: "What a dealer application must have",
+    });
+    await user.click(within(required).getByRole("checkbox", { name: "Shop photo" }));
+    await user.click(within(required).getByRole("checkbox", { name: "Telephone" }));
+    const deciders = await screen.findByRole("group", {
+      name: "Who decides a distributor application",
+    });
+    await user.click(await within(deciders).findByRole("checkbox", { name: "State Manager" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+    // In the list's own order, whatever order they were ticked in.
+    expect(valueOf("dealer_application_required")).toEqual(["telephone", "shop_photo"]);
+    expect(valueOf("distributor_application_deciders")).toEqual([
+      "regional_manager",
+      "md_ceo",
+      "admin_sales",
+      "state_manager",
+    ]);
+  });
+
+  it("needs at least one role to decide", async () => {
+    signInAs("admin");
+    const user = show(<CompanySettings />);
+
+    const relaxers = await screen.findByRole("group", {
+      name: "Who may lower or waive a deposit",
+    });
+    await user.click(await within(relaxers).findByRole("checkbox", { name: "Regional Manager" }));
+    await user.click(within(relaxers).getByRole("checkbox", { name: "MD / CEO" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Choose at least one role.")).toBeInTheDocument();
+  });
+
+  it("shows a kind it doesn't know as text, and the rest of the page still works", async () => {
+    signInAs("admin");
+    server.use(
+      http.get(buildApiUrl("/settings"), () =>
+        HttpResponse.json({
+          data: [
+            {
+              key: "holiday_calendar",
+              kind: "calendar",
+              value: { from: "2026-11-01" },
+              allowed: null,
+              min: null,
+              max: null,
+              description: "A kind added after this screen.",
+              updated_at: "2026-10-01T04:30:00.000Z",
+            },
+            {
+              key: "complaint_reopen_max",
+              kind: "int",
+              value: 2,
+              allowed: null,
+              min: 1,
+              max: 10,
+              description: "How many times one complaint may be reopened.",
+              updated_at: "2026-10-01T04:30:00.000Z",
+            },
+          ],
+        }),
+      ),
+    );
+    show(<CompanySettings />);
+
+    expect(await screen.findByText("Holiday calendar")).toBeInTheDocument();
+    expect(screen.getByText('{"from":"2026-11-01"}')).toBeInTheDocument();
+    expect(await screen.findByLabelText("Times a complaint can be reopened")).toHaveValue("2");
+  });
+});
