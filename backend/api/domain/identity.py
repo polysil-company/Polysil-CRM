@@ -91,6 +91,10 @@ def normalise_email(raw: str) -> str:
 SYSTEM_ORG_UNIT_ID = "a1c3b0dd-6f0c-5f0e-8c1c-1b4f2f6a9e51"
 
 PASSWORD_MIN = 12
+
+# FS-082 rule 4: roles that must sit in an office covering an area.
+# GAP-556: unconfirmed (client question 37.4); State Managers may belong here too.
+AREA_ROLES: frozenset[str] = frozenset({"field_officer", "district_manager"})
 PASSWORD_MAX = 128   # Argon2 is deliberately slow; an unbounded input is a lever
 
 
