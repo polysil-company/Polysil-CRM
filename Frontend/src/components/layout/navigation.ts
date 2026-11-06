@@ -114,6 +114,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         countSource: "messages",
       },
       {
+        id: "org-chart",
+        label: "Org chart",
+        description: "Whom you report to, and everyone below you.",
+        icon: UserMultiple02Icon,
+        module: null,
+        audience: "staff",
+        dataId: "ADMN-008",
+        href: "/org-chart",
+      },
+      {
         id: "help",
         label: "Help",
         description: "Everything you can do here, and how to find it fast.",

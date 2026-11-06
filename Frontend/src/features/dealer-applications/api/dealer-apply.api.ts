@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { gstinLookupSchema, type GstinLookup } from "@/features/partners/api/partners.schemas";
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
@@ -171,5 +171,20 @@ export async function submitApplicantApplication(applicant: Applicant): Promise<
     auth: "none",
     applicantSession: applicant.session,
     schema: submittedSchema,
+  });
+}
+
+/**
+ * CHNL-008 · GET …/{token}/pdf (FS-071): the applicant's data sheet as filled so far, to print
+ * and sign. Only with a session, so only while it is with them or returned.
+ */
+export function downloadApplicantPdf({ token, session }: Applicant): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "CHNL-008",
+    logger: log,
+    fn: "downloadApplicantPdf",
+    path: applyPath(token, "/pdf"),
+    auth: "none",
+    applicantSession: session,
   });
 }

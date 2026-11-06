@@ -1629,6 +1629,13 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["GET /settings", "PATCH /settings"],
   },
+  "ADMN-008": {
+    domain: "ADMN",
+    title: "Org chart — who reports to whom, my team, or the whole company",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /users/org-chart"],
+  },
   "ADMN-009": {
     domain: "ADMN",
     title: "Setup check — people and partners set up so that leads, dealers or approvals go astray",

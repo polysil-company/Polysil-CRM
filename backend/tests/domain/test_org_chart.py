@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import time
 
-from api.domain.org_chart import Person, build
+from api.domain.org_chart import Person, build, team
 
 
 def _p(pid: str, name: str, level: int, managers: tuple[str, ...] = (), relation: str = "other",
@@ -94,3 +94,16 @@ def test_three_thousand_people_build_quickly() -> None:
     chart = build(rows, None)
     assert time.perf_counter() - start < 1.0
     assert next(n for n in chart.people if n.person.id == "md").team_size == len(rows) - 1
+
+
+def test_a_team_is_the_person_and_everyone_below_them() -> None:
+    """FS-082 rule 1: shared reports belong to both managers' teams."""
+    assert team(ROWS, "dma") == {"dma", "fo1"}
+    assert team(ROWS, "dmb") == {"dmb", "fo1", "fo2"}
+    assert team(ROWS, "sm") == {"sm", "dma", "dmb", "fo1", "fo2"}
+    assert team(ROWS, "fo2") == {"fo2"}
+
+
+def test_an_unplaced_person_is_in_nobodys_team() -> None:
+    rows = [*ROWS, _p("lost", "Lost", 1, ("dma",), relation="unplaced")]
+    assert "lost" not in team(rows, "dma")

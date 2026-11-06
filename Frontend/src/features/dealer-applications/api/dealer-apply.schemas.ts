@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { PARTNER_TYPES, dataSheetWireShape, toDataSheet } from "./data-sheet.schemas";
 import {
   DEALER_APPLICATION_STATUSES,
   FIRM_TYPES,
@@ -56,6 +57,9 @@ const applicantViewWireSchema = z.object({
   bank_account_name: z.string().nullish(),
   bank_account_no: z.string().nullish(),
   bank_ifsc: z.string().nullish(),
+  ...dataSheetWireShape,
+  /** FS-071: what the application makes. A backend before 078 sends none: a dealer. */
+  partner_type: z.enum(PARTNER_TYPES).nullish(),
   documents: z.array(documentWireSchema).optional(),
 });
 
@@ -68,6 +72,7 @@ export const applicantViewSchema = z
   .transform(({ data }) => ({
     firmName: data.firm_name,
     status: data.status,
+    partnerType: data.partner_type ?? "dealer",
     mobileMasked: data.mobile_masked,
     missing: data.missing,
     verified: data.session,
@@ -90,6 +95,7 @@ export const applicantViewSchema = z
           bankAccountName: data.bank_account_name ?? null,
           bankAccountNo: data.bank_account_no ?? null,
           bankIfsc: data.bank_ifsc ?? null,
+          dataSheet: toDataSheet(data),
         }
       : null,
     documents: (data.documents ?? []).map((document) => ({
