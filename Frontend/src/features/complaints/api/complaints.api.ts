@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { timelinePageSchema, type TimelinePage } from "@/features/leads/api/leads.schemas";
 import { pdfLinkResponseSchema, type PdfLink } from "@/features/quotations/api/quotations.schemas";
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import type { DataId } from "@/lib/data-ids";
 import { createLogger } from "@/lib/logger";
 
@@ -350,13 +350,16 @@ export function deleteAttachment(
 }
 
 /** CMPL-009 · GET /complaints/export — the list as an Excel file, with the same filters. */
-export function exportComplaints(params: ComplaintListParams): Promise<DownloadedFile> {
+export function exportComplaints(
+  params: ComplaintListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "CMPL-009",
     logger: log,
     fn: "exportComplaints",
     path: "/complaints/export",
-    query: complaintFilterQuery(params),
+    query: { ...complaintFilterQuery(params), format },
   });
 }
 

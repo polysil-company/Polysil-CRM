@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -108,13 +108,17 @@ export function getReport<N extends ReportName>(
 }
 
 /** RPT-002 · The same report as Excel (`format=xlsx`), with the same filters. */
-export function downloadReport(name: ReportName, params: ReportParams): Promise<DownloadedFile> {
+export function downloadReport(
+  name: ReportName,
+  params: ReportParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "RPT-002",
     logger: log,
     fn: "downloadReport",
     path: `/reports/${name}`,
-    query: { ...reportQuery(name, params), format: "xlsx" },
+    query: { ...reportQuery(name, params), format },
   });
 }
 

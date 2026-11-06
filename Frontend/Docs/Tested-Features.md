@@ -61,6 +61,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
 | [Dealer commission](#dealer-commission) | 3 | 🧪 👀 | PR #157 |
+| [Downloads](#downloads) | 1 | 🧪 👀 | CSV and PDF in APP-011 |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -821,6 +822,10 @@ Sales → **Targets** (`/targets`), on the backend's contract (handover `targets
   - Only what changed is sent; an emptied measure is sent as 0, which clears it, and says so first. A count that isn't whole, or rupees with more than two decimal places, is named on its field.
   - A past month warns first that only an administrator changes it, and the backend's refusal (`month_closed`) is shown; so are `not_your_team`, `user_inactive` and `no_targets`.
   - Screens: [the dialog](screenshots/targets/targets-set-desktop-light.jpg), [saved](screenshots/targets/targets-saved-desktop-light.jpg), [a past month, phone dark](screenshots/targets/targets-past-month-phone-dark.jpg). 🧪 👀
+
+## Downloads
+
+- **APP-011 · Excel, CSV or PDF** (FS-077; screens: [a report's formats](screenshots/downloads/report-other-formats-desktop-light.jpg), [the leads list on a phone, dark](screenshots/downloads/leads-other-formats-phone-dark.jpg)): every **Download Excel** button has **Other formats** beside it with **Download CSV**; reports also offer **Download PDF**. The file is saved under the backend's name. More than 5,000 rows says to narrow the filters; a busy PDF maker says to try again. 🧪 👀
 
 ## Not built yet
 

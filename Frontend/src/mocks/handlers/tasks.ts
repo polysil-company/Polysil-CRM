@@ -29,7 +29,7 @@ import { mockDb } from "@/mocks/db";
 
 import { applyScenario } from "./scenario";
 import { mockSettings } from "./settings";
-import { decodeCursor, encodeCursor, errorResponse } from "./shared";
+import { decodeCursor, encodeCursor, errorResponse, mockWorkbook } from "./shared";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const OVERDUE_LOOKBACK_DAYS = 90;
@@ -506,25 +506,18 @@ export const taskHandlers = [
     if (rows.length > EXPORT_MAX_ROWS) {
       return errorResponse(422, "export_too_large", "More than 5000 rows: narrow the filters.");
     }
-    // A stand-in for the workbook: one line per task, with the real file's headers.
-    const lines = [
-      "Title\tKind\tStatus\tDue\tFor",
-      ...rows.map((task) =>
-        [
-          task.title,
-          task.task_type,
-          task.status,
-          task.due_at,
-          task.assigned_to?.full_name ?? "",
-        ].join("\t"),
-      ),
-    ];
-    return new HttpResponse(lines.join("\n"), {
-      headers: {
-        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "content-disposition": `attachment; filename="tasks-${todayInIndia()}.xlsx"`,
-      },
-    });
+    return mockWorkbook(
+      "tasks",
+      ["Title", "Kind", "Status", "Due", "For"],
+      rows.map((task) => [
+        task.title,
+        task.task_type,
+        task.status,
+        task.due_at,
+        task.assigned_to?.full_name ?? "",
+      ]),
+      request,
+    );
   }),
 
   /** TASK-006 · An open task's title, due time or notes, or who does it. */

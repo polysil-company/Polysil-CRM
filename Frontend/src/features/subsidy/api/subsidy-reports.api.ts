@@ -1,4 +1,4 @@
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import type { ApplicationStatus } from "./subsidy-applications.schemas";
@@ -43,13 +43,16 @@ export function getAgeing(
 }
 
 /** SUBS-009 · GET /subsidy-reports/ageing/export */
-export function exportAgeing(params: AgeingParams): Promise<DownloadedFile> {
+export function exportAgeing(
+  params: AgeingParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "SUBS-009",
     logger: log,
     fn: "exportAgeing",
     path: "/subsidy-reports/ageing/export",
-    query: ageingQuery(params),
+    query: { ...ageingQuery(params), format },
   });
 }
 
@@ -73,13 +76,16 @@ export function getStageReport(
 }
 
 /** SUBS-010 · GET /subsidy-reports/stages/export */
-export function exportStageReport(status: ApplicationStatus): Promise<DownloadedFile> {
+export function exportStageReport(
+  status: ApplicationStatus,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "SUBS-010",
     logger: log,
     fn: "exportStageReport",
     path: "/subsidy-reports/stages/export",
-    query: { status },
+    query: { ...{ status }, format },
   });
 }
 
@@ -100,12 +106,15 @@ export function getSupplyReport(
 }
 
 /** SUBS-011 · GET /subsidy-reports/supply/export */
-export function exportSupplyReport(status: ApplicationStatus | null): Promise<DownloadedFile> {
+export function exportSupplyReport(
+  status: ApplicationStatus | null,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "SUBS-011",
     logger: log,
     fn: "exportSupplyReport",
     path: "/subsidy-reports/supply/export",
-    query: { status: status ?? undefined },
+    query: { ...{ status: status ?? undefined }, format },
   });
 }

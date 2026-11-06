@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
@@ -76,13 +76,16 @@ export async function listUsers(params: UserListParams, signal?: AbortSignal): P
  * ADMN-001 · GET /users/export — the list as an Excel file, with the same filters: every
  * page, nothing outside the caller's scope. More than 5,000 rows is `422 export_too_large`.
  */
-export function exportUsers(params: UserListParams): Promise<DownloadedFile> {
+export function exportUsers(
+  params: UserListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "ADMN-001",
     logger: log,
     fn: "exportUsers",
     path: "/users/export",
-    query: filterQuery(params),
+    query: { ...filterQuery(params), format },
   });
 }
 

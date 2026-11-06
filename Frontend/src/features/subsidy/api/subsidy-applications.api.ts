@@ -1,4 +1,4 @@
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import type { ApiPath } from "@/lib/api/url";
 import { createLogger } from "@/lib/logger";
 
@@ -105,13 +105,16 @@ export function listApplications(
 }
 
 /** SUBS-005 · GET /subsidy-applications/export — the list as Excel, with the same filters. */
-export function exportApplications(params: ApplicationListParams): Promise<DownloadedFile> {
+export function exportApplications(
+  params: ApplicationListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "SUBS-005",
     logger: log,
     fn: "exportApplications",
     path: `${BASE}/export`,
-    query: filterQuery(params),
+    query: { ...filterQuery(params), format },
   });
 }
 

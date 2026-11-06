@@ -125,7 +125,8 @@ export function ReportView({ name }: { name: ReportName }): React.JSX.Element {
           </div>
           {problem === null ? (
             <DownloadExcelButton
-              download={() => downloadReport(name, params)}
+              otherFormats={["csv", "pdf"]}
+              download={(format) => downloadReport(name, params, format)}
               fallbackName={`report-${name}.xlsx`}
               what={`the ${entry.title.toLowerCase()} report`}
               logger={log}

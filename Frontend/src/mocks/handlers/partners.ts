@@ -327,6 +327,7 @@ export const partnerHandlers = [
         partner.gstin ?? "",
         partner.is_active ? "yes" : "no",
       ]),
+      request,
     );
   }),
 

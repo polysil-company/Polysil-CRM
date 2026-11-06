@@ -4,7 +4,7 @@ import {
   type TimelinePage,
 } from "@/features/leads/api/leads.schemas";
 import { pdfLinkResponseSchema, type PdfLink } from "@/features/quotations/api/quotations.schemas";
-import { apiDownload, apiRequest, type DownloadedFile } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -220,13 +220,17 @@ export function setOrderSubsidy(
 }
 
 /** SO-006 · GET /orders/export — the list as an Excel file, with the list's filters. */
-export function exportOrders(params: OrderListParams): Promise<DownloadedFile> {
+export function exportOrders(
+  params: OrderListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
   return apiDownload({
     dataId: "SO-006",
     logger: log,
     fn: "exportOrders",
     path: "/orders/export",
     query: {
+      format,
       q: params.q,
       status: params.status.join(","),
       order_type: params.orderType,

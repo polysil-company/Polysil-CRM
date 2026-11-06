@@ -110,7 +110,7 @@ export function OrdersToolbar(): React.JSX.Element {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <DownloadExcelButton
-          download={() => exportOrders(params)}
+          download={(format) => exportOrders(params, format)}
           fallbackName="orders.xlsx"
           what="orders"
           logger={log}

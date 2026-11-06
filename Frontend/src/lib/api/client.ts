@@ -139,6 +139,12 @@ export function apiRequest<TSchema extends z.ZodType>(
 }
 
 /** A file the backend sent: its bytes, and the name it suggested. */
+/**
+ * FS-077 · What a download comes as: Excel (the default) or CSV for a list, and PDF too for a
+ * report. A list asked for PDF answers `422 format_not_available`.
+ */
+export type ExportFormat = "xlsx" | "csv" | "pdf";
+
 export interface DownloadedFile {
   readonly blob: Blob;
   /** From `Content-Disposition`; null when the backend gave none. */
