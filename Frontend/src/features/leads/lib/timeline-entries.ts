@@ -44,6 +44,8 @@ export type TimelineEntry =
   | { readonly type: "duplicate-flagged"; readonly matches: readonly LeadRef[] }
   | { readonly type: "duplicate-dismissed"; readonly other: LeadRef | null }
   | { readonly type: "deleted" }
+  /** LEAD-020 · Brought back; the duplicate pairs the delete had closed are open again. */
+  | { readonly type: "restored"; readonly duplicatesReopened: number | null }
   | {
       readonly type: "approval";
       readonly decision: "approve" | "reject" | null;
@@ -307,6 +309,14 @@ export function toTimelineEntry(event: TimelineEvent, leadId: string): TimelineE
 
     case "lead.deleted":
       return { type: "deleted" };
+
+    case "lead.restored":
+      return {
+        type: "restored",
+        duplicatesReopened:
+          z.number().int().nonnegative().nullish().catch(null).parse(payload.duplicates_reopened) ??
+          null,
+      };
 
     case "approval.decided": {
       const decision =

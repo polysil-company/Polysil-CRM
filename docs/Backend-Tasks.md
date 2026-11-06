@@ -130,6 +130,10 @@ in the same shape. Never renumber or reuse a number.
 - [ ] **BE-040** · The employee(s) who look after a dealer or distributor · CHNL-001 · high · **the link can start now; what it grants waits on the client**
 - [ ] **BE-041** · An employee's leads go to their dealer when the employee leaves · ADMN-004, LEAD-008 · normal · **waits on the client**
 
+**From the 3 Nov pick-up** — what the frontend found while building the backend's changes of 23 Oct to 3 Nov.
+
+- [ ] **BE-042** · Say on a lead's `owner` whether that person is still active, so a restored lead can offer Assign · LEAD-020, LEAD-008 · low
+
 ---
 
 ## Details
@@ -849,5 +853,18 @@ in the same shape. Never renumber or reuse a number.
     - does the dealer become the owner, or do the leads wait for a new employee;
     - automatic on deactivation, or the admin's choice each time.
 - **Done when:** the client answers, and the rule is in `users.md`.
+- **Done in:** —
+- **Backend notes:** —
+
+### BE-042 · Say on a lead's `owner` whether that person is still active, so a restored lead can offer Assign
+
+- **Status:** ⬜ Open
+- **Asked:** 4 Nov 2026 · LEAD-020 · `leads.md`, `POST /leads/{id}/restore`
+- **What:**
+  - The restore's notes say: "The owner is kept, even one who has since left: offer Assign when `owner` is inactive."
+  - But a lead's `owner` is a `UserRef` (`id`, `full_name`), with nothing saying whether that person is still active. The frontend can't tell who has left without guessing from `GET /leads/assignees`, which only lists the people the caller may assign to.
+  - Proposed: `is_active` on the lead's `owner`, at least on the restore's answer and `GET /leads/{id}`.
+- **Why:** a lead restored to someone who has left sits with nobody working it. The frontend already reads `owner.is_active` when it comes, and then says on the restore "Its owner, …, has left: open it and assign it to someone."
+- **Done when:** it is in `leads.md`.
 - **Done in:** —
 - **Backend notes:** —

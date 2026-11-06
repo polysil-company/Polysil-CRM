@@ -7,7 +7,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-129 changes, newest first. Each title opens its entry.
+130 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
@@ -17,6 +17,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-11-05 | [Distributor applications and the data sheet](changelog/entries/2026-11-05--feature--CHNL-007--distributor-applications-and-the-data-sheet.md) | `feature` | `CHNL-007` `CHNL-008` |
 | 2026-11-05 | [The deposit on dealer and distributor applications](changelog/entries/2026-11-05--feature--CHNL-007--the-deposit-on-dealer-and-distributor-applications.md) | `feature` | `CHNL-007` |
 | 2026-11-05 | [The printed data sheets: blank, filled and the applicant's](changelog/entries/2026-11-05--feature--CHNL-007--the-printed-data-sheets-blank-filled-and-the-applicant-s.md) | `feature` | `CHNL-007` `CHNL-008` |
+| 2026-11-05 | [A restore in the lead's history, and an owner who has left](changelog/entries/2026-11-05--feature--LEAD-020--a-restore-in-the-lead-s-history-and-an-owner-who-has-left.md) | `feature` | `LEAD-020` |
 | 2026-11-05 | [Sales forecast and insights](changelog/entries/2026-11-05--feature--RPT-004--sales-forecast-and-insights.md) | `feature` | `RPT-004` `RPT-005` |
 | 2026-11-05 | [Team and role filters on the reports](changelog/entries/2026-11-05--feature--RPT-006--team-and-role-filters-on-the-reports.md) | `feature` | `RPT-006` |
 | 2026-11-05 | [Company settings read the application settings and any kind added later](changelog/entries/2026-11-05--fix--ADMN-007--company-settings-read-the-application-settings-and-any-kind.md) | `fix` | `ADMN-007` |
@@ -501,6 +502,45 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 - **`[CHNL-007] The printed sheets (FS-071), through the API`:** the blank form for each type and an application's own, by name. The applicant's only once their mobile is verified (`no_session` before).
 - **`[CHNL-007] The printed sheets on the screens`:** Download PDF saves the application's sheet, then a busy PDF maker is said in words; Blank form → "For a new distributor" saves that type's form.
+
+### A restore in the lead's history, and an owner who has left
+
+`feature` · `LEAD-020` · Claude · [entry](changelog/entries/2026-11-05--feature--LEAD-020--a-restore-in-the-lead-s-history-and-an-owner-who-has-left.md)
+
+#### Before
+
+Restoring a deleted lead (LEAD-020, PR #210) left two gaps against `leads.md`:
+
+- **The history:** the backend adds `lead.restored` to a lead's history, with `duplicates_reopened`. The history had no line of its own for it, so it showed a generic "Lead restored" label and dropped the reopened pairs.
+- **An owner who has left:** the restore keeps the owner, even one who has since left, and the backend says to "offer Assign when `owner` is inactive". A lead's `owner` carries no active flag, so the screen couldn't tell.
+
+#### Now
+
+- **The history** reads "<name> restored the lead", with ", and its possible duplicate is open again" or ", and its 2 possible duplicates are open again" when the restore reopened them. It has an undo icon in the success tone.
+- **The restore's toast**, when the lead's owner has left, adds "Its owner, Hiren Mehta, has left: open it and assign it to someone." beside the link to the lead.
+- **BE-042** asks the backend for `is_active` on a lead's `owner`. Until it comes, the lead is restored as before and nothing more is said.
+- **The mock** records `lead.restored` on a restore. Its second deleted lead belongs to Vijay Chaudhary, a field officer who has left, so restoring it shows the toast's line.
+
+#### Discussion
+
+- **Why not work out "has left" on the frontend.** `GET /leads/assignees` lists only the people the caller may assign to. An owner missing from it may simply be in another area, so "has left" would sometimes be wrong. Asking the backend for the flag gives the right answer every time, and the frontend reads it as soon as it arrives.
+- **Assign isn't opened from the toast.** Assign is a dialog on the lead's page, with no address of its own. The toast links to the lead and says to assign it.
+
+#### Files changed
+
+- `src/features/leads/lib/timeline-entries.ts`, `src/features/leads/components/lead-timeline.tsx`: the `restored` entry, its sentence and icon.
+- `src/features/leads/api/leads.schemas.ts`: the owner's `is_active`, read when sent.
+- `src/features/leads/components/restore-lead-button.tsx`: the toast for an owner who has left.
+- `src/mocks/data/leads.ts`, `src/mocks/handlers/leads.ts`: the leaver's deleted lead, and the restore in the history.
+- `docs/Backend-Tasks.md`: BE-042.
+- `Docs/plan-13oct-2026.md`, `Docs/Tested-Features.md`: records.
+
+#### Tests
+
+- `[LEAD-005] toTimelineEntry › [LEAD-020] reads a restore`: with the reopened count, and without it.
+- `[LEAD-019]` Deleted leads: a restored lead whose owner has left gets the toast's line.
+- `[LEAD-020] restoreLead in the mock`: the leaver's lead comes back with `active: false`, and its history starts with `lead.restored`.
+- `[LEAD-008] assignment`: the owner is matched on id and name, since it now also carries `active`.
 
 ### Sales forecast and insights
 
