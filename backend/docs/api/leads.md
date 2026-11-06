@@ -695,7 +695,7 @@ lead can be reopened; anything else is `422 stage_terminal`.
 Bring a deleted lead back (FS-073). Needs `leads.delete` and `leads.edit`. The
 duplicate pairs a delete closed are reopened, and the duplicate check runs again. A lead that
 is not deleted comes back unchanged. The owner is kept, even one who has since
-left: offer Assign when `owner` is inactive. `404` out of scope.
+left: offer Assign when `owner.is_active` is false. `404` out of scope.
 
 **Parameters**
 
@@ -907,7 +907,7 @@ with the current stage in `fields.stage`.
 | `email` | string \| null | yes |  |
 | `territory` | TerritoryRef | yes |  |
 | `village` | string \| null | yes |  |
-| `owner` | UserRef \| null | yes | The staff owner, or null if unassigned. |
+| `owner` | OwnerRef \| null | yes | The staff owner, or null if unassigned. |
 | `owner_org_unit` | OrgUnitRef | yes |  |
 | `assigned_partner` | api__schemas__leads__PartnerRef \| null | yes |  |
 | `score` | string \| null | yes | Decimal string, or null before scoring. |
@@ -1049,6 +1049,14 @@ with the current stage in `fields.stage`.
 |---|---|---|---|
 | `id` | string | yes |  |
 | `name` | string | yes |  |
+
+**`OwnerRef`**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes |  |
+| `full_name` | string | yes |  |
+| `is_active` | boolean \| null |  | False when the owner has left (switched off or deleted): offer Assign. Set by GET /leads/{id} and the restore; null on the list (BE-042). |
 
 **`PageMeta`**
 

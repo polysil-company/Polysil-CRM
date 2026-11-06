@@ -132,7 +132,7 @@ in the same shape. Never renumber or reuse a number.
 
 **From the 3 Nov pick-up** — what the frontend found while building the backend's changes of 23 Oct to 3 Nov.
 
-- [ ] **BE-042** · Say on a lead's `owner` whether that person is still active, so a restored lead can offer Assign · LEAD-020, LEAD-008 · low
+- [x] **BE-042** · Say on a lead's `owner` whether that person is still active, so a restored lead can offer Assign · LEAD-020, LEAD-008 · low
 
 **From the client's report of 6 Nov** — a field officer couldn't choose the distributor on a new sales order
 
@@ -862,7 +862,7 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-042 · Say on a lead's `owner` whether that person is still active, so a restored lead can offer Assign
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 4 Nov 2026 · LEAD-020 · `leads.md`, `POST /leads/{id}/restore`
 - **What:**
   - The restore's notes say: "The owner is kept, even one who has since left: offer Assign when `owner` is inactive."
@@ -870,8 +870,12 @@ in the same shape. Never renumber or reuse a number.
   - Proposed: `is_active` on the lead's `owner`, at least on the restore's answer and `GET /leads/{id}`.
 - **Why:** a lead restored to someone who has left sits with nobody working it. The frontend already reads `owner.is_active` when it comes, and then says on the restore "Its owner, …, has left: open it and assign it to someone."
 - **Done when:** it is in `leads.md`.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** branch `fix/be-042-owner-active`, stacked on #241 (migration 086)
+- **Backend notes:**
+  - `owner.is_active` on `GET /leads/{id}` and on the restore's answer. `false` when the owner is switched off or deleted.
+  - Null on `GET /leads`, the list: it is set only where the restore's screen needs it.
+  - Only `owner` carries it (a new `OwnerRef`). `created_by`, `deleted_by` and the timeline's actors are unchanged.
+  - The value comes from `lead_people()`, a definer, so a manager who can't read the owner's user row still gets it.
 
 ### BE-043 · Which distributors a field officer can find when ordering
 

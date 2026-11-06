@@ -452,7 +452,7 @@ async def restore(
     """Bring a deleted lead back (FS-073). Needs `leads.delete` and `leads.edit`. The
     duplicate pairs a delete closed are reopened, and the duplicate check runs again. A lead that
     is not deleted comes back unchanged. The owner is kept, even one who has since
-    left: offer Assign when `owner` is inactive. `404` out of scope."""
+    left: offer Assign when `owner.is_active` is false. `404` out of scope."""
     async def work() -> tuple[int, dict]:
         lead = await service.restore_lead(db, caller, lead_id)
         return status.HTTP_200_OK, {"data": lead.model_dump(mode="json")}
