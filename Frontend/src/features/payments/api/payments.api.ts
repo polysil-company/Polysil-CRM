@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -144,5 +144,24 @@ export function getPartnerCredit(partnerId: string, signal?: AbortSignal): Promi
     path: `/partners/${encodeURIComponent(partnerId)}/credit`,
     schema: partnerCreditSchema,
     signal,
+  });
+}
+
+/** ACCT-003 · GET /payments/export (FS-081) — the receipts as Excel or CSV, with the filters. */
+export function exportPayments(
+  params: PaymentListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "ACCT-003",
+    logger: log,
+    fn: "exportPayments",
+    path: "/payments/export",
+    query: {
+      partner_id: params.partnerId ?? undefined,
+      sales_order_id: params.orderId ?? undefined,
+      include_voided: params.includeVoided ? "true" : undefined,
+      format,
+    },
   });
 }

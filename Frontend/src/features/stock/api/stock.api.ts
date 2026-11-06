@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -158,5 +158,56 @@ export function getAvailability(
     query: { warehouse_id: warehouseId, product_ids: productIds.join(",") },
     schema: availabilitySchema,
     signal,
+  });
+}
+
+/** MSTR-016 · GET /warehouses/export (FS-081) — the warehouses as Excel or CSV. */
+export function exportWarehouses(
+  includeInactive: boolean,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-016",
+    logger: log,
+    fn: "exportWarehouses",
+    path: "/warehouses/export",
+    query: { include_inactive: includeInactive ? "true" : undefined, format },
+  });
+}
+
+/** MSTR-014 · GET /stock/export (FS-081) — stock by warehouse and product, with the filters. */
+export function exportStock(
+  params: StockListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-014",
+    logger: log,
+    fn: "exportStock",
+    path: "/stock/export",
+    query: {
+      warehouse_id: params.warehouseId ?? undefined,
+      product_id: params.productId ?? undefined,
+      short_only: params.shortOnly ? "true" : undefined,
+      format,
+    },
+  });
+}
+
+/** MSTR-014 · GET /stock/movements/export (FS-081) — the stock ledger, with the filters. */
+export function exportMovements(
+  params: MovementListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "MSTR-014",
+    logger: log,
+    fn: "exportMovements",
+    path: "/stock/movements/export",
+    query: {
+      warehouse_id: params.warehouseId ?? undefined,
+      product_id: params.productId ?? undefined,
+      format,
+    },
   });
 }

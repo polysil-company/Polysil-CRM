@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
@@ -14,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PRODUCT_PAGE_SIZE } from "@/features/products/api/products.api";
+import { PRODUCT_PAGE_SIZE, exportProducts } from "@/features/products/api/products.api";
 import {
   productCategoriesQueryOptions,
   productListQueryOptions,
@@ -29,6 +30,12 @@ import {
 } from "@/features/products/hooks/use-product-master-params";
 import { QUOTATION_CATEGORY_LABELS, slabText } from "@/features/products/lib/product-labels";
 import { formatCount, formatInr } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({
+  file: "features/products/components/product-catalogue.tsx",
+  dataId: "MSTR-004",
+});
 
 const SKELETON_ROWS = 6;
 
@@ -115,17 +122,25 @@ export function ProductCatalogue({ canEdit }: { canEdit: boolean }): React.JSX.E
             </Button>
           ) : null}
         </div>
-        {canEdit ? (
-          <Button
-            className="md:ml-auto"
-            onClick={() => {
-              setEditing({ mode: "new" });
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            New product
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+          <DownloadExcelButton
+            download={(format) => exportProducts(params, format)}
+            fallbackName="products.xlsx"
+            what="products"
+            logger={log}
+            dataId="MSTR-004"
+          />
+          {canEdit ? (
+            <Button
+              onClick={() => {
+                setEditing({ mode: "new" });
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              New product
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <QueryView

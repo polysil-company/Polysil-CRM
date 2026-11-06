@@ -61,7 +61,7 @@ Each story says who can do what, then the cases that were checked, then how:
 | [Reports and the lead's 360° view](#reports-and-the-leads-360-view) | 3 | 🧪 👀 | PR #149 |
 | [Targets](#targets) | 2 | 🧪 👀 | PR #150 |
 | [Dealer commission](#dealer-commission) | 3 | 🧪 👀 | PR #157 |
-| [Downloads](#downloads) | 1 | 🧪 👀 | CSV and PDF in APP-011 |
+| [Downloads](#downloads) | 2 | 🧪 👀 | CSV and PDF in APP-011; 24 more lists in APP-012 (stacked on APP-011) |
 
 Roles in the mock are switched from the account menu ("Preview as role"). The demo sign-in is `asha@polysil.in` / `polysil-demo`; partners use the code `123456`.
 
@@ -826,6 +826,14 @@ Sales → **Targets** (`/targets`), on the backend's contract (handover `targets
 ## Downloads
 
 - **APP-011 · Excel, CSV or PDF** (FS-077; screens: [a report's formats](screenshots/downloads/report-other-formats-desktop-light.jpg), [the leads list on a phone, dark](screenshots/downloads/leads-other-formats-phone-dark.jpg)): every **Download Excel** button has **Other formats** beside it with **Download CSV**; reports also offer **Download PDF**. The file is saved under the backend's name. More than 5,000 rows says to narrow the filters; a busy PDF maker says to try again. 🧪 👀
+- **APP-012 · Downloads on 24 more lists** (FS-081; screens: [stock, with CSV open](screenshots/downloads/stock-download-desktop-light.jpg), [products](screenshots/downloads/products-download-desktop-light.jpg), [the gift desk on a phone, dark](screenshots/downloads/gift-desk-download-phone-dark.jpg)): the same button, with the filters on screen, on:
+  - Products: the catalogue, tax rates, price lists and one list's rates, seller GSTINs;
+  - Stock: the stock list, the stock ledger, warehouses;
+  - Sales and accounts: customers, receipts (payments), ratings, dealer applications;
+  - Masters: offices, territories, holidays, warranty periods, subsidy schemes;
+  - Schemes and rewards: schemes, scheme credits, the points history, gifts, gift requests (the gift desk), earning rules;
+  - Campaigns.
+  - Checked: each of the 24 calls downloads Excel and CSV under the backend's file name with its column headings; the list's filters are sent and the page or cursor is not; `export_too_large` is refused; the stock list and ledger buttons save the file. In the mock each file holds the headings and one sample row. 🧪 👀
 
 ## Not built yet
 

@@ -6,6 +6,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportWarehouses } from "@/features/stock/api/stock.api";
 import { useCreateWarehouse, usePatchWarehouse } from "@/features/stock/api/stock.mutations";
 import { warehousesQueryOptions } from "@/features/stock/api/stock.queries";
 import type { Warehouse } from "@/features/stock/api/stock.schemas";
@@ -55,14 +57,23 @@ export function WarehousesAdmin(): React.JSX.Element {
         <p className="text-sm text-muted-foreground">
           An order without a choice is served from the default warehouse.
         </p>
-        <Button
-          onClick={() => {
-            setEditing("new");
-          }}
-        >
-          <Icon icon={Add01Icon} />
-          Add a warehouse
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadExcelButton
+            download={(format) => exportWarehouses(true, format)}
+            fallbackName="warehouses.xlsx"
+            what="warehouses"
+            logger={log}
+            dataId="MSTR-016"
+          />
+          <Button
+            onClick={() => {
+              setEditing("new");
+            }}
+          >
+            <Icon icon={Add01Icon} />
+            Add a warehouse
+          </Button>
+        </div>
       </div>
       {query.status === "pending" ? (
         <div aria-busy="true" aria-label="Loading warehouses" className="flex flex-col gap-2">

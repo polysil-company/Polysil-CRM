@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { apiDownload, apiRequest, type DownloadedFile, type ExportFormat } from "@/lib/api/client";
 import { createLogger } from "@/lib/logger";
 
 import {
@@ -300,5 +300,58 @@ export function adjustPoints({
     body,
     idempotencyKey,
     schema: ledgerRowResponseSchema,
+  });
+}
+
+/** RWD-001 · GET /rewards/ledger/export (FS-081) — one holder's points ledger, every page. */
+export function exportLedger(
+  holder: HolderQuery,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "RWD-001",
+    logger: log,
+    fn: "exportLedger",
+    path: "/rewards/ledger/export",
+    query: { ...holderParams(holder), format },
+  });
+}
+
+/** RWD-001 · GET /gifts/export (FS-081) — the gift catalogue as Excel or CSV. */
+export function exportGifts(
+  activeOnly: boolean,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "RWD-001",
+    logger: log,
+    fn: "exportGifts",
+    path: "/gifts/export",
+    query: { active: activeOnly ? "true" : undefined, format },
+  });
+}
+
+/** RWD-001 · GET /rewards/gift-redemptions/export (FS-081) — the redemptions, with the filters. */
+export function exportRedemptions(
+  params: RedemptionListParams,
+  format: ExportFormat = "xlsx",
+): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "RWD-001",
+    logger: log,
+    fn: "exportRedemptions",
+    path: "/rewards/gift-redemptions/export",
+    query: { status: params.status ?? undefined, kind: params.kind ?? undefined, format },
+  });
+}
+
+/** RWD-003 · GET /reward-rules/export (FS-081) — the earning rules as Excel or CSV. */
+export function exportRules(format: ExportFormat = "xlsx"): Promise<DownloadedFile> {
+  return apiDownload({
+    dataId: "RWD-003",
+    logger: log,
+    fn: "exportRules",
+    path: "/reward-rules/export",
+    query: { format },
   });
 }

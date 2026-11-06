@@ -154,6 +154,15 @@ export const DATA_IDS = {
     notes:
       "FS-077. A list asked for PDF is 422 format_not_available; a busy PDF maker is 503 busy.",
   },
+  "APP-012": {
+    domain: "APP",
+    title: "Downloads on 24 more lists — masters, stock, payments, schemes, rewards and the rest",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["GET /products/export", "GET /stock/export", "GET /{list}/export"],
+    notes:
+      "FS-081. The same Download Excel button and filters as the list; more than 5,000 rows is 422 export_too_large.",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",

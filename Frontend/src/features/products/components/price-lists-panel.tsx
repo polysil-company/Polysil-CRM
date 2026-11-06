@@ -8,6 +8,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
@@ -38,7 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { TerritoryChoice } from "@/features/lookups/api/lookups.schemas";
 import { TerritoryPicker } from "@/features/lookups/components/territory-picker";
-import { PRODUCT_PAGE_SIZE } from "@/features/products/api/products.api";
+import { PRODUCT_PAGE_SIZE, exportPriceLists } from "@/features/products/api/products.api";
 import { useCopyPriceList, useCreatePriceList } from "@/features/products/api/products.mutations";
 import { priceListListQueryOptions } from "@/features/products/api/products.queries";
 import {
@@ -167,27 +168,38 @@ export function PriceListsPanel({ canEdit }: { canEdit: boolean }): React.JSX.El
             }}
           />
         </div>
-        {canEdit ? (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCreating("import");
-              }}
-            >
-              <Icon icon={FileImportIcon} />
-              Import from Excel
-            </Button>
-            <Button
-              onClick={() => {
-                setCreating("blank");
-              }}
-            >
-              <Icon icon={Add01Icon} />
-              New price list
-            </Button>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <DownloadExcelButton
+            download={(format) =>
+              exportPriceLists({ status: status === "all" ? null : status, salesType }, format)
+            }
+            fallbackName="price-lists.xlsx"
+            what="price lists"
+            logger={log}
+            dataId="MSTR-006"
+          />
+          {canEdit ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCreating("import");
+                }}
+              >
+                <Icon icon={FileImportIcon} />
+                Import from Excel
+              </Button>
+              <Button
+                onClick={() => {
+                  setCreating("blank");
+                }}
+              >
+                <Icon icon={Add01Icon} />
+                New price list
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <QueryView

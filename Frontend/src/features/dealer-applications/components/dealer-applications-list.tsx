@@ -7,6 +7,7 @@ import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { toastDownloadError } from "@/components/patterns/download-file-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { SingleFilterPill } from "@/components/patterns/filter-pill";
@@ -28,7 +29,10 @@ import {
   PARTNER_TYPES,
   type PartnerType,
 } from "@/features/dealer-applications/api/data-sheet.schemas";
-import { downloadBlankApplicationForm } from "@/features/dealer-applications/api/dealer-applications.api";
+import {
+  downloadBlankApplicationForm,
+  exportDealerApplications,
+} from "@/features/dealer-applications/api/dealer-applications.api";
 import { dealerApplicationListQueryOptions } from "@/features/dealer-applications/api/dealer-applications.queries";
 import {
   DEALER_APPLICATION_STATUSES,
@@ -163,6 +167,15 @@ export function DealerApplicationsList(): React.JSX.Element {
               Reset filters
             </Button>
           ) : null}
+        </div>
+        <div className="md:ml-auto">
+          <DownloadExcelButton
+            download={(format) => exportDealerApplications(params, format)}
+            fallbackName="dealer-applications.xlsx"
+            what="applications"
+            logger={log}
+            dataId="CHNL-007"
+          />
         </div>
       </div>
 

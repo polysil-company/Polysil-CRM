@@ -6,6 +6,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { RelativeDate } from "@/components/patterns/relative-date";
@@ -29,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { exportGifts } from "@/features/rewards/api/rewards.api";
 import { useRequestGift, useSaveGift } from "@/features/rewards/api/rewards.mutations";
 import {
   balanceQueryOptions,
@@ -88,17 +90,26 @@ export function GiftsPanel(): React.JSX.Element {
                   : "What dealers can ask for with their points, cheapest first. Staff can't redeem points yet."}
             </CardDescription>
           </div>
-          {canEdit ? (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditing("new");
-              }}
-            >
-              <Icon icon={Add01Icon} />
-              Add a gift
-            </Button>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <DownloadExcelButton
+              download={(format) => exportGifts(!canEdit, format)}
+              fallbackName="gifts.xlsx"
+              what="gifts"
+              logger={log}
+              dataId="RWD-001"
+            />
+            {canEdit ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditing("new");
+                }}
+              >
+                <Icon icon={Add01Icon} />
+                Add a gift
+              </Button>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent>
           {gifts.status === "pending" ? (

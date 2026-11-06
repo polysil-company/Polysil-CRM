@@ -5,6 +5,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { RelativeDate } from "@/components/patterns/relative-date";
@@ -12,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportMovements } from "@/features/stock/api/stock.api";
 import { movementsQueryOptions } from "@/features/stock/api/stock.queries";
 import {
   MOVEMENT_KIND_BADGE,
@@ -19,9 +21,15 @@ import {
   isNegative,
   signedQuantity,
 } from "@/features/stock/lib/stock-labels";
+import { createLogger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 
 import { WarehouseSelect } from "./warehouse-select";
+
+const log = createLogger({
+  file: "features/stock/components/stock-ledger.tsx",
+  dataId: "MSTR-014",
+});
 
 /**
  * MSTR-014 · The stock ledger, newest first: every receipt, correction and dispatch, with the
@@ -34,15 +42,24 @@ export function StockLedger(): React.JSX.Element {
 
   return (
     <div className="flex flex-col gap-4">
-      <Field className="md:w-60">
-        <FieldLabel htmlFor="ledger-warehouse">Warehouse</FieldLabel>
-        <WarehouseSelect
-          id="ledger-warehouse"
-          value={warehouseId}
-          anyLabel="Every warehouse"
-          onValueChange={setWarehouseId}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <Field className="md:w-60">
+          <FieldLabel htmlFor="ledger-warehouse">Warehouse</FieldLabel>
+          <WarehouseSelect
+            id="ledger-warehouse"
+            value={warehouseId}
+            anyLabel="Every warehouse"
+            onValueChange={setWarehouseId}
+          />
+        </Field>
+        <DownloadExcelButton
+          download={(format) => exportMovements({ warehouseId, productId: null }, format)}
+          fallbackName="stock-movements.xlsx"
+          what="movements"
+          logger={log}
+          dataId="MSTR-014"
         />
-      </Field>
+      </div>
 
       {query.status === "pending" ? (
         <div aria-busy="true" aria-label="Loading the stock ledger" className="flex flex-col gap-2">

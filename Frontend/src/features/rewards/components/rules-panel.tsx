@@ -6,6 +6,7 @@ import { useState } from "react";
 import type * as React from "react";
 import { toast } from "sonner";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { QueryView } from "@/components/patterns/query-view";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportRules } from "@/features/rewards/api/rewards.api";
 import { useSaveRule } from "@/features/rewards/api/rewards.mutations";
 import { rulesQueryOptions } from "@/features/rewards/api/rewards.queries";
 import {
@@ -85,18 +87,26 @@ export function RulesPanel({ canEdit }: { canEdit: boolean }): React.JSX.Element
           Points arrive by these rules: on a delivered order&apos;s value before GST, or on a lead
           won. A voided dispatch takes them back.
         </p>
-        {canEdit ? (
-          <Button
-            variant="outline"
-            className="shrink-0"
-            onClick={() => {
-              setEditing("new");
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            Add a rule
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <DownloadExcelButton
+            download={(format) => exportRules(format)}
+            fallbackName="reward-rules.xlsx"
+            what="rules"
+            logger={log}
+            dataId="RWD-003"
+          />
+          {canEdit ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditing("new");
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              Add a rule
+            </Button>
+          ) : null}
+        </div>
       </div>
       <QueryView
         query={query}

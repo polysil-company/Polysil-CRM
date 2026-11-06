@@ -7,6 +7,7 @@ import { parseAsStringLiteral, useQueryStates } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { SingleFilterPill } from "@/components/patterns/filter-pill";
 import { QueryView } from "@/components/patterns/query-view";
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportEntitlements } from "@/features/schemes/api/schemes.api";
 import { creditListQueryOptions } from "@/features/schemes/api/schemes.queries";
 import {
   ENTITLEMENT_STATUSES,
@@ -24,8 +26,14 @@ import {
 import { ENTITLEMENT_STATUS_LABELS } from "@/features/schemes/lib/scheme-labels";
 import { useIsStaff } from "@/features/session/hooks/use-session";
 import { formatCalendarDay, formatDate, formatInr, formatNumber } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
 
 import { PartnerSearchPicker, type PickedRecord } from "./record-pickers";
+
+const log = createLogger({
+  file: "features/schemes/components/credits-list.tsx",
+  dataId: "SCHM-004",
+});
 
 const STATUS_OPTIONS = ENTITLEMENT_STATUSES.map((status) => ({
   value: status,
@@ -110,6 +118,20 @@ export function CreditsList(): React.JSX.Element {
             </span>
           )
         ) : null}
+        <div className="md:ml-auto">
+          <DownloadExcelButton
+            download={(format) =>
+              exportEntitlements(
+                { status, partnerId: staff ? (partner?.id ?? null) : null },
+                format,
+              )
+            }
+            fallbackName="scheme-entitlements.xlsx"
+            what="credits"
+            logger={log}
+            dataId="SCHM-004"
+          />
+        </div>
       </div>
       <QueryView
         query={query}

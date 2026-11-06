@@ -6,6 +6,7 @@ import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useState } from "react";
 import type * as React from "react";
 
+import { DownloadExcelButton } from "@/components/patterns/download-excel-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
 import { SingleFilterPill } from "@/components/patterns/filter-pill";
@@ -15,15 +16,22 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportCampaigns } from "@/features/campaigns/api/campaigns.api";
 import { campaignListQueryOptions } from "@/features/campaigns/api/campaigns.queries";
 import { CAMPAIGN_TYPES, type Campaign } from "@/features/campaigns/api/campaigns.schemas";
 import { CAMPAIGN_TYPE_LABELS, campaignDates } from "@/features/campaigns/lib/campaign-labels";
 import { useCan } from "@/features/session/hooks/use-session";
 import { formatCount, formatInr } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 
 import { CampaignDialog } from "./campaign-dialog";
 import { CampaignForm } from "./campaign-form";
+
+const log = createLogger({
+  file: "features/campaigns/components/campaigns-page.tsx",
+  dataId: "MKT-005",
+});
 
 const STATES = ["active", "off", "all"] as const;
 const STATE_OPTIONS = [
@@ -106,16 +114,30 @@ export function CampaignsPage(): React.JSX.Element {
             ) : null}
           </div>
         </div>
-        {canCreate ? (
-          <Button
-            onClick={() => {
-              setAdding(true);
-            }}
-          >
-            <Icon icon={Add01Icon} />
-            New campaign
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadExcelButton
+            download={(format) =>
+              exportCampaigns(
+                { active: state === "all" ? null : state === "active", type, q: q.trim() },
+                format,
+              )
+            }
+            fallbackName="campaigns.xlsx"
+            what="campaigns"
+            logger={log}
+            dataId="MKT-005"
+          />
+          {canCreate ? (
+            <Button
+              onClick={() => {
+                setAdding(true);
+              }}
+            >
+              <Icon icon={Add01Icon} />
+              New campaign
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {query.status === "pending" ? (
