@@ -321,8 +321,34 @@ export const authHandlers = [
           tasks_for_dealers:
             mockSettings().find((setting) => setting.key === "tasks_for_dealers")?.value === "on",
         },
+        // FS-078 · the mock can "send" email to anyone signed in, so the switches can be tried
+        email_preferences: mockDb.emailPreferences,
+        email_available: true,
       },
     });
+  }),
+
+  // AUTH-008 · your own two email switches; a consumer may not
+  http.put(buildApiUrl("/me/email-preferences"), async ({ request }) => {
+    const { failure } = await applyScenario();
+    if (failure) return failure;
+    if (mockConsumerMe() !== null) {
+      return errorResponse(403, "consumer_not_allowed", "Not for the farmers' portal.");
+    }
+    if (request.headers.get("idempotency-key") === null) {
+      return errorResponse(400, "idempotency_key_required", "Send an Idempotency-Key.");
+    }
+    const parsed = z
+      .object({ notices: z.boolean(), morning_summary: z.boolean() })
+      .safeParse(await request.json());
+    if (!parsed.success) {
+      return errorResponse(422, "validation_error", "Both switches are required.", {
+        notices: "true or false",
+        morning_summary: "true or false",
+      });
+    }
+    mockDb.emailPreferences = parsed.data;
+    return HttpResponse.json({ data: mockDb.emailPreferences });
   }),
 
   http.post(buildApiUrl("/auth/password"), async ({ request }) => {

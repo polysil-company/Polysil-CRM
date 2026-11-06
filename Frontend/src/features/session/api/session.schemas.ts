@@ -37,6 +37,10 @@ export const meResponseSchema = z
       must_change_password: z.boolean().nullish(),
       /** AUTH-002 · Admin switches that change the screens (FS-070, BE-030). */
       features: z.object({ tasks_for_dealers: z.boolean().nullish() }).nullish(),
+      /** AUTH-008 · Your two email switches (FS-078); a backend before 082 sends neither. */
+      email_preferences: z.object({ notices: z.boolean(), morning_summary: z.boolean() }).nullish(),
+      /** False while the CRM sends no email, or you have no usable address: hide the switches. */
+      email_available: z.boolean().nullish(),
     }),
   })
   .transform(({ data }) => ({
@@ -54,6 +58,11 @@ export const meResponseSchema = z
     features: {
       /** TASK-009 · Partner users get the Tasks screens only while this is on. */
       tasksForDealers: data.features?.tasks_for_dealers === true,
+    },
+    email: {
+      available: data.email_available === true,
+      notices: data.email_preferences?.notices ?? true,
+      morningSummary: data.email_preferences?.morning_summary ?? true,
     },
   }));
 

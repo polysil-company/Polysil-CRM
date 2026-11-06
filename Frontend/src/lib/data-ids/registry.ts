@@ -213,6 +213,14 @@ export const DATA_IDS = {
     status: "in-progress",
     endpoints: ["POST /auth/password"],
   },
+  "AUTH-008": {
+    domain: "AUTH",
+    title: "Email preferences — unseen updates and the morning summary by email",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["PUT /me/email-preferences"],
+    notes: "FS-078. Shown only while `email_available` on GET /auth/me is true.",
+  },
   "LEAD-001": {
     domain: "LEAD",
     title: "List leads with filters, sorting and pagination",
