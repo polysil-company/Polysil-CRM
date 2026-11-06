@@ -69,6 +69,8 @@ Cost figures need campaigns.view; sales need sales_orders. Staff only.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
+| `team_of` | query | string \| null |  | FS-082: this person and everyone below them on the org chart. You, someone below you, or anyone with users.view at global scope; `404 not_in_your_line` otherwise. Not with `owner_id`. Leads with no owner, or an owner who has left, are outside every team. |
+| `roles` | query | string \| null |  | FS-082: up to 10 role codes, comma-separated (`field_officer,district_manager`). Only people holding one of these roles now. Staff only. |
 | `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
@@ -152,6 +154,8 @@ Open tasks per person, as of now: due today and overdue by age. Staff only.
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `owner_id` | query | string \| null |  | One person. |
+| `team_of` | query | string \| null |  | FS-082: this person and everyone below them on the org chart. You, someone below you, or anyone with users.view at global scope; `404 not_in_your_line` otherwise. Not with `owner_id`. Leads with no owner, or an owner who has left, are outside every team. |
+| `roles` | query | string \| null |  | FS-082: up to 10 role codes, comma-separated (`field_officer,district_manager`). Only people holding one of these roles now. Staff only. |
 | `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
@@ -184,6 +188,8 @@ not that something is wrong. `link` names the report behind a row. Staff only.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
+| `team_of` | query | string \| null |  | FS-082: this person and everyone below them on the org chart. You, someone below you, or anyone with users.view at global scope; `404 not_in_your_line` otherwise. Not with `owner_id`. Leads with no owner, or an owner who has left, are outside every team. |
+| `roles` | query | string \| null |  | FS-082: up to 10 role codes, comma-separated (`field_officer,district_manager`). Only people holding one of these roles now. Staff only. |
 | `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
@@ -213,6 +219,8 @@ each stage, won, lost and are open, and the conversion rate.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
+| `team_of` | query | string \| null |  | FS-082: this person and everyone below them on the org chart. You, someone below you, or anyone with users.view at global scope; `404 not_in_your_line` otherwise. Not with `owner_id`. Leads with no owner, or an owner who has left, are outside every team. |
+| `roles` | query | string \| null |  | FS-082: up to 10 role codes, comma-separated (`field_officer,district_manager`). Only people holding one of these roles now. Staff only. |
 | `group_by` | query | `source` \| `owner` \| `territory` |  |  |
 | `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
@@ -243,6 +251,8 @@ stage they dropped off at.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
+| `team_of` | query | string \| null |  | FS-082: this person and everyone below them on the org chart. You, someone below you, or anyone with users.view at global scope; `404 not_in_your_line` otherwise. Not with `owner_id`. Leads with no owner, or an owner who has left, are outside every team. |
+| `roles` | query | string \| null |  | FS-082: up to 10 role codes, comma-separated (`field_officer,district_manager`). Only people holding one of these roles now. Staff only. |
 | `group_by` | query | `reason` \| `owner` |  |  |
 | `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
@@ -280,6 +290,8 @@ With too little history, every weighted figure is null and `reason` is
 |---|---|---|---|---|
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
+| `team_of` | query | string \| null |  | FS-082: this person and everyone below them on the org chart. You, someone below you, or anyone with users.view at global scope; `404 not_in_your_line` otherwise. Not with `owner_id`. Leads with no owner, or an owner who has left, are outside every team. |
+| `roles` | query | string \| null |  | FS-082: up to 10 role codes, comma-separated (`field_officer,district_manager`). Only people holding one of these roles now. Staff only. |
 | `group_by` | query | `owner` \| `territory` \| `source` |  |  |
 | `level` | query | `district` \| `taluka` |  | With `group_by=territory`: the level rows roll up to. |
 | `history_days` | query | integer |  | How far back the win rates look: leads won or lost in these days. |
@@ -312,6 +324,8 @@ and overdue. A figure you may not see is null. Staff only.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `owner_id` | query | string \| null |  | One person. |
+| `team_of` | query | string \| null |  | FS-082: this person and everyone below them on the org chart. You, someone below you, or anyone with users.view at global scope; `404 not_in_your_line` otherwise. Not with `owner_id`. Leads with no owner, or an owner who has left, are outside every team. |
+| `roles` | query | string \| null |  | FS-082: up to 10 role codes, comma-separated (`field_officer,district_manager`). Only people holding one of these roles now. Staff only. |
 | `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**
@@ -340,6 +354,8 @@ Per district or taluka: leads, won, conversion, orders and value. Staff only.
 | `to` | query | date \| null |  | IST date, inclusive. Default: today. |
 | `territory_id` | query | string \| null |  | Up to 20 territory ids, comma-separated; in or under any. |
 | `level` | query | `district` \| `taluka` |  |  |
+| `team_of` | query | string \| null |  | FS-082: this person and everyone below them on the org chart. You, someone below you, or anyone with users.view at global scope; `404 not_in_your_line` otherwise. Not with `owner_id`. Leads with no owner, or an owner who has left, are outside every team. |
+| `roles` | query | string \| null |  | FS-082: up to 10 role codes, comma-separated (`field_officer,district_manager`). Only people holding one of these roles now. Staff only. |
 | `format` | query | `json` \| `xlsx` \| `csv` \| `pdf` |  | `xlsx`, `csv` or `pdf`: the same rows as a file, with a Total line and a note when only the first 1,000 rows were kept. A figure you may not see is an empty cell. `pdf` answers `503 busy` while two PDFs are being made. Lower case. |
 
 **Responses**

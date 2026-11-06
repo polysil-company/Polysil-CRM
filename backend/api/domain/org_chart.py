@@ -130,3 +130,14 @@ def _counts(members: list[Person], member_ids: set[str]) -> tuple[dict[str, int]
                 below[m].add(p.id)
                 below[m] |= below[p.id]
     return direct, {i: len(s) for i, s in below.items()}
+
+
+def team(rows: Sequence[Person], subject_id: str) -> set[str]:
+    """FS-082 rule 1: the subject and everyone below them, over the manager edges.
+    Unplaced people are in nobody's team."""
+    children: dict[str, list[str]] = {}
+    for p in rows:
+        if p.relation != "unplaced":
+            for m in p.manager_ids:
+                children.setdefault(m, []).append(p.id)
+    return {subject_id} | _below([subject_id], children)
