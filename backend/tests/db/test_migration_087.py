@@ -42,7 +42,10 @@ def test_the_pasted_area_predicates_are_the_generators() -> None:
     m = _load("087_order_distributors")
     assert m is not None
     spec = SPECS["partners"]
-    assert branch_predicate(spec, "org_subtree", write=True) == m.UNDER_OFFICES
+    # 088 (FS-086) adds the assigned districts to the office text
+    m88 = _load("088_held_districts")
+    assert m88 is not None
+    assert branch_predicate(spec, "org_subtree", write=True) == m.UNDER_OFFICES.replace(m88.OFFICE, m88.AREA)
     assert branch_predicate(spec, "territory") == m.UNDER_TERRITORIES
 
 

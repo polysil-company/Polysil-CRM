@@ -12,6 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 from api.authz.modules import SPECS
 from api.authz.policy_sql import (
+    AREA_TERRITORIES,
     drop_policies_for,
     guard_sql,
     has_bare_helper_call,
@@ -122,9 +123,9 @@ def test_org_via_territory_reads_up_and_down_and_writes_only_down() -> None:
     territories; a write only at or under them."""
     stmts = {s.split(" ON ")[0].split("CREATE POLICY ")[1]: s
              for s in policies_for(SPECS["partners"]) if s.startswith("CREATE POLICY")}
-    offices = ("(SELECT ou.territory_id FROM org_unit ou WHERE ou.id IN "
-               "(SELECT descendant_id FROM org_closure WHERE ancestor_id = "
-               "(SELECT app_current_org_unit())))")
+    # FS-086: the offices' territories and the caller's assigned districts
+    offices = f"({AREA_TERRITORIES})"
+    assert "user_territory" in offices and "t.level <> 'state'" in offices
     under = ("territory_id IN (SELECT tc.descendant_id FROM territory_closure tc "
              f"WHERE tc.ancestor_id IN {offices})")
     above = ("territory_id IN (SELECT tc.ancestor_id FROM territory_closure tc "

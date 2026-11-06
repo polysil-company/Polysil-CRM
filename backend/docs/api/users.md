@@ -96,7 +96,7 @@ counts) is `409`.
 | `role` | string \| null |  | Staff only: a code from GET /lookups/roles that is not a portal role. A partner user's role is its partner's type and is never sent. |
 | `org_unit_id` | string \| null |  | Staff only: an open office. |
 | `partner_id` | string \| null |  | Partner users only: an active partner. |
-| `territory_ids` | string[] |  | Staff only. A role that reads any module at territory scope needs at least one, or the person sees nothing there. |
+| `territory_ids` | string[] |  | Staff only. The districts this person works: they add to their office's area for dealers and automatic leads (FS-086). A state adds nothing; put the person in the state office instead. |
 | `password` | string \| null |  | Staff only. A temporary password of at least 12 characters, told to the person out of band; they must change it at first sign-in. |
 
 **Responses**
@@ -293,7 +293,7 @@ administrator cannot be deactivated or demoted (`422 fields.id`).
 | `role` | string \| null |  | Staff only, and never your own. A partner user's role follows its partner. |
 | `org_unit_id` | string \| null |  | Staff only: an open office. Never your own. |
 | `partner_id` | string \| null |  | Partner users only: an active partner. Never your own. |
-| `territory_ids` | string[] \| null |  | Staff only. Replaces the whole set. Never your own. |
+| `territory_ids` | string[] \| null |  | Staff only. The districts this person works (FS-086). Replaces the whole set. Never your own. |
 | `is_active` | boolean \| null |  | false deactivates (every session is signed out first), true reactivates into an open office or active partner. Never your own. |
 
 **Responses**
@@ -662,7 +662,7 @@ failed attempts stay on record. A partner user has nothing to unlock
 | `role` | string \| null |  | Staff only: a code from GET /lookups/roles that is not a portal role. A partner user's role is its partner's type and is never sent. |
 | `org_unit_id` | string \| null |  | Staff only: an open office. |
 | `partner_id` | string \| null |  | Partner users only: an active partner. |
-| `territory_ids` | string[] |  | Staff only. A role that reads any module at territory scope needs at least one, or the person sees nothing there. |
+| `territory_ids` | string[] |  | Staff only. The districts this person works: they add to their office's area for dealers and automatic leads (FS-086). A state adds nothing; put the person in the state office instead. |
 | `password` | string \| null |  | Staff only. A temporary password of at least 12 characters, told to the person out of band; they must change it at first sign-in. |
 
 **`UserDetail`**
@@ -681,7 +681,7 @@ failed attempts stay on record. A partner user has nothing to unlock
 | `must_change_password` | boolean | yes | A temporary password set by an administrator is still in force. |
 | `last_login_at` | string \| null | yes |  |
 | `open_leads` | integer \| null | yes | Leads this staff member owns that are not won, lost or merged. Null for a partner user, who owns no leads. |
-| `territories` | TerritoryRef[] | yes | The territories a staff member reads at territory scope. |
+| `territories` | TerritoryRef[] | yes | The districts this person works. They add to their office's area for dealers and automatic leads; a state adds nothing (FS-086). |
 | `locked_until` | string \| null |  | Staff only, and only when you hold users.edit: the end of a live sign-in lockout (five failed passwords in fifteen minutes), else null. |
 | `active_sessions` | integer \| null |  | Live sessions, when you hold users.edit; null otherwise. |
 | `password_changed_at` | string \| null | yes |  |
@@ -706,7 +706,7 @@ failed attempts stay on record. A partner user has nothing to unlock
 | `role` | string \| null |  | Staff only, and never your own. A partner user's role follows its partner. |
 | `org_unit_id` | string \| null |  | Staff only: an open office. Never your own. |
 | `partner_id` | string \| null |  | Partner users only: an active partner. Never your own. |
-| `territory_ids` | string[] \| null |  | Staff only. Replaces the whole set. Never your own. |
+| `territory_ids` | string[] \| null |  | Staff only. The districts this person works (FS-086). Replaces the whole set. Never your own. |
 | `is_active` | boolean \| null |  | false deactivates (every session is signed out first), true reactivates into an open office or active partner. Never your own. |
 
 **`UserRef`**
