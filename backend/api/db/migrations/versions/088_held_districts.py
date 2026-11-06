@@ -118,7 +118,8 @@ BEGIN
     END IF;
     -- GAP-379: an officer whose territory covers the lead, nearest first; failing that, one
     -- whose territory lies inside the lead's (a district-only lead, walk F-6). FS-086: the
-    -- office's own territory or an assigned district, never a state; the office wins a tie.
+    -- office's own territory or an assigned district, never a state. Nearest first, then
+    -- fewest open leads, then the office match (code review F-3).
     -- Not the office subtree: at HQ that covers everything (EC-6)
     SELECT u.id INTO v_owner
       FROM app_user u
@@ -140,11 +141,11 @@ BEGIN
        AND r.level = 1
      ORDER BY (tc.descendant_id <> p_territory_id) ASC,
               tc.depth ASC,
-              a.via ASC,
               (SELECT count(*) FROM lead l
                 WHERE l.owner_user_id = u.id
                   AND l.deleted_at IS NULL
                   AND l.stage NOT IN ('won', 'lost', 'merged', 'dormant')) ASC,
+              a.via ASC,
               u.id ASC
      LIMIT 1
        FOR SHARE OF u;

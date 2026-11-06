@@ -14,9 +14,12 @@ from collections.abc import AsyncIterator, Callable
 import httpx
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.authz.modules import SPECS
+from api.authz.predicate import Caller, scope_predicate
 from api.db.session import enter_role
 from tests.api.test_dealer_area_access import Area, _officer, _picker, area
 from tests.api.test_order_endpoints import Shop, shop
@@ -31,6 +34,23 @@ async def _officer_id(sessions: Callable[[], AsyncSession], area: Area) -> str:
                                {"e": area.officer})).scalar_one())
     await s.close()
     return uid
+
+
+async def _python_reach(sessions: Callable[[], AsyncSession], area: Area) -> set[str]:
+    """The partners the Python enforcer alone lets the officer reach. The test role
+    owns the table, so RLS does not filter this read: only the predicate does
+    (code review F-1)."""
+    uid = await _officer_id(sessions, area)
+    caller = Caller(uid, area.office, None, scopes={"partners": "org_subtree"})
+    table = sa.table("channel_partner", sa.column("id", sa.Uuid()),
+                     sa.column("territory_id", sa.Uuid()), sa.column("deleted_at"))
+    s = sessions()
+    try:
+        rows = (await s.execute(sa.select(table.c.id).where(
+            scope_predicate(SPECS["partners"], caller, table)))).scalars().all()
+        return {str(r) for r in rows}
+    finally:
+        await s.close()
 
 
 @pytest_asyncio.fixture
@@ -65,12 +85,10 @@ async def test_an_assigned_district_brings_its_dealers_in(
     seen = await _picker(client, ho)
     assert {area.far_dealer, area.stray_dealer, area.taluka_dealer, shop.partner} <= seen
     r = await client.get("/api/v1/partners", params={"limit": 100}, headers=ho)
-    if r.status_code == 200:  # an officer may lack the list route; the read rule is what counts
-        assert area.far_dealer in {p["id"] for p in r.json()["data"]}
+    assert r.status_code == 200, r.text
+    assert area.far_dealer in {p["id"] for p in r.json()["data"]}
     r = await client.get(f"/api/v1/partners/{area.far_dealer}", headers=ho)
-    assert r.status_code in (200, 403), r.text
-    if r.status_code == 200:
-        assert r.json()["data"]["id"] == area.far_dealer
+    assert r.status_code == 200 and r.json()["data"]["id"] == area.far_dealer, r.text
 
 
 async def test_a_state_assigned_adds_nothing(
@@ -92,11 +110,17 @@ async def test_a_state_assigned_adds_nothing(
         await held(state)  # type: ignore[misc]
         ho = await _officer(client, area)
         assert dealer not in await _picker(client, ho), "a state assignment widened the area"
+        assert dealer not in await _python_reach(sessions, area), "the Python arm counts a state"
         # a deleted territory adds nothing either (EC-8)
         await s.execute(text("UPDATE territory SET deleted_at = now() WHERE id = CAST(:t AS uuid)"), {"t": district})
         await s.commit()
         await held(district)  # type: ignore[misc]
         assert dealer not in await _picker(client, ho), "a deleted district widened the area"
+        assert dealer not in await _python_reach(sessions, area), "the Python arm counts a deleted district"
+        # and a live one does count, so the two negatives above are not vacuous
+        await s.execute(text("UPDATE territory SET deleted_at = NULL WHERE id = CAST(:t AS uuid)"), {"t": district})
+        await s.commit()
+        assert dealer in await _python_reach(sessions, area)
     finally:
         await s.execute(text("DELETE FROM user_territory WHERE territory_id = ANY(CAST(:t AS uuid[]))"), {"t": [state, district]})
         await s.execute(text("DELETE FROM channel_partner WHERE id = CAST(:p AS uuid)"), {"p": dealer})
