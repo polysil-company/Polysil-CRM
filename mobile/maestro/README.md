@@ -86,6 +86,7 @@ If a step can't find something on screen, run `maestro studio` (or `maestro hier
 | `01-launch`        | smoke | Opens on sign-in with the Polysil logo and "CRM & DMS"                                               |
 | `02-sign-in`       | smoke | Staff email sign-in lands on the Dashboard                                                           |
 | `03-menu-pages`    | smoke | Leads, Quotations, Sales orders, Tasks and Visits open from the menu                                 |
+| `03b-back-button`  | smoke | The phone's back button returns to the previous screen and keeps the app open (needs APK 0.1.2)      |
 | `04-duty-setup`    | duty  | Consent, then location "Allow all the time", battery unrestricted, notifications; no setup card left |
 | `05-duty-on`       | duty  | **Go on duty** shows "On duty since …"; the app goes to the background                               |
 | `06-duty-uploaded` | duty  | After 10 minutes closed: a last upload exists, and nothing waits for sign-in (TRK-009 device token)  |

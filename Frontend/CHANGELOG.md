@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-134 changes, newest first. Each title opens its entry.
+135 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-11-11 | [The phone's back button goes to the previous screen](changelog/entries/2026-11-11--fix--TRK-008--the-phone-s-back-button-goes-to-the-previous-screen.md) | `fix` | `TRK-008` |
 | 2026-11-06 | [The client's menu adds Org chart, Reports, Company settings and Tracking settings](changelog/entries/2026-11-06--chore--APP-007--the-client-s-menu-adds-org-chart-reports-company-settings.md) | `chore` | `APP-007` `ADMN-008` `RPT-002` `ADMN-007` `TRK-006` |
 | 2026-11-06 | [The setup check, and an office that covers no area](changelog/entries/2026-11-06--feature--ADMN-009--the-setup-check-and-an-office-that-covers-no-area.md) | `feature` | `ADMN-009` |
 | 2026-11-06 | [A field officer picks the distributor on an order from a lead](changelog/entries/2026-11-06--fix--SO-013--a-field-officer-picks-the-distributor-on-an-order-from-a.md) | `fix` | `SO-013` `SO-012` |
@@ -145,6 +146,45 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 11 November 2026
+
+### The phone's back button goes to the previous screen
+
+`fix` · `TRK-008` · Claude · [entry](changelog/entries/2026-11-11--fix--TRK-008--the-phone-s-back-button-goes-to-the-previous-screen.md)
+
+#### Before
+
+- **The client reported it:** in the Android app, the phone's back button (or the back gesture) closed the app instead of going to the previous screen.
+- **Why:** the app is a Capacitor shell around the web app. Capacitor handles back only through its App plugin (`@capacitor/app`), and this app doesn't use it. With nothing handling back, Android closed the app on the first press, whatever screen was open.
+
+#### Now
+
+- **Back goes to the previous screen,** like a browser's back:
+  - Leads → a lead → back returns to Leads;
+  - Tasks → back returns to the screen before it.
+- **The app closes only when there is no screen to go back to.** On the first screen, Android does what it does for any app: it leaves the app.
+- **APK 0.1.2** (`versionCode` 3) carries the fix. It is a change in the Android shell, so it reaches a phone only when that phone installs the new APK. A web change alone wouldn't need one.
+
+#### Discussion
+
+- **How it works:** `MainActivity` adds a callback to Android's back dispatcher. When the web view has history, it goes back in it; when it hasn't, it steps aside and lets Android handle back.
+- **Each screen is a history entry** because Next.js pushes each navigation, so going back in the web view returns to the screen before.
+- **Why a callback rather than the App plugin:** the plugin would do the same and add a dependency to the APK. The callback is a few lines in the activity the app already has.
+- **Why a callback rather than `onBackPressed`:** the APK targets Android 16 (SDK 36). There, the predictive back gesture is on and `onBackPressed` is no longer called; dispatcher callbacks still are.
+- **Not changed:** an open dialog or menu still closes with its own close button or a tap outside. Back closes it only where the screen keeps it in the address (a dialog opened with `?…=` in the URL).
+
+#### Files changed
+
+- `mobile/android/app/src/main/java/com/polysil/crm/MainActivity.java`: the back callback.
+- `mobile/android/app/build.gradle`: `versionCode` 3, `versionName` 0.1.2.
+- `mobile/maestro/flows/03b-back-button.yaml`, `mobile/maestro/README.md`: a smoke flow for back.
+
+#### Tests
+
+- **CI:** the Android APK workflow compiles and lints the app (`./gradlew lint test assembleDebug`) on this pull request.
+- **On a phone:** `03b-back-button` (smoke) opens Leads, then Tasks, then presses back. It checks the app is on Leads, and after a second back that it is still open. Run it with the other smoke flows on APK 0.1.2.
+- **Not run here:** there is no Android SDK or phone in this environment, so neither a local build nor the Maestro flow ran before this change went up.
 
 ## 6 November 2026
 
