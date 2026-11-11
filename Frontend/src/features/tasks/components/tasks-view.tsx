@@ -147,6 +147,7 @@ function DayNavigator({
       <Button
         variant="ghost"
         size="icon-sm"
+        className="pointer-coarse:size-control-lg"
         aria-label="Previous day"
         onClick={() => {
           onChange(shiftCalendarDay(date, -1));
@@ -168,6 +169,7 @@ function DayNavigator({
       <Button
         variant="ghost"
         size="icon-sm"
+        className="pointer-coarse:size-control-lg"
         aria-label="Next day"
         onClick={() => {
           onChange(shiftCalendarDay(date, 1));
