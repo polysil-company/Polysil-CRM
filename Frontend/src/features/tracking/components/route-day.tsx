@@ -68,6 +68,7 @@ export function RouteDay({ userId }: { userId: string }): React.JSX.Element {
           <Button
             variant="outline"
             size="icon-md"
+            className="pointer-coarse:size-control-lg"
             aria-label="The day before"
             onClick={() => {
               setDay(shiftCalendarDay(day, -1));
@@ -91,6 +92,7 @@ export function RouteDay({ userId }: { userId: string }): React.JSX.Element {
           <Button
             variant="outline"
             size="icon-md"
+            className="pointer-coarse:size-control-lg"
             aria-label="The day after"
             disabled={day >= today}
             onClick={() => {
