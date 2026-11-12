@@ -193,6 +193,7 @@ class FreightTax:
     slab: Decimal
     chosen: bool
     money: LineTax
+    kind: str = "freight"
 
 
 @dataclass(frozen=True)
@@ -213,3 +214,10 @@ class PricedDocument:
     intra_state: bool
     warnings: tuple[str, ...]
     freight: FreightTax | None = None
+    # FS-088: every charge but freight, by kind
+    extra_charges: tuple[FreightTax, ...] = ()
+
+    def charge(self, kind: str) -> FreightTax | None:
+        if kind == "freight":
+            return self.freight
+        return next((c for c in self.extra_charges if c.kind == kind), None)

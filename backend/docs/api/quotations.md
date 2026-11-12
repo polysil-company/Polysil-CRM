@@ -107,6 +107,8 @@ that blocks them.
 | `terms` | string \| null |  | Free text printed at the foot. |
 | `lines` | QuotationLineIn[] |  | One to 200. None is 422 no_lines (FS-073). |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. Only with at least one line. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. Only with at least one line. |
 
 **Responses**
 
@@ -256,6 +258,8 @@ anything but a draft with `409 quotation_not_draft`.
 | `party` | Party \| null |  |  |
 | `terms` | string \| null |  |  |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. A change to a type other than commercial or industrial clears the freight and every GST choice (warning gst_choice_cleared); sending freight with such a change is 422 freight_not_allowed. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. Only with at least one line. Omit to keep; null to remove. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. Only with at least one line. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
 
 **Responses**
@@ -295,6 +299,8 @@ allowed on a draft; sending needs at least one.
 |---|---|---|---|
 | `lines` | QuotationLineIn[] | yes | The whole basket, in order. Empty is 422 no_lines (FS-073). |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. Only with at least one line. Omit to keep; null to remove. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. Only with at least one line. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |
 
 **Responses**
@@ -875,6 +881,8 @@ Every version of the number, oldest first. Any version's id works.
 | `price_list_ids` | string[] | yes |  |
 | `lines` | QuotationLine[] | yes |  |
 | `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `installation` | FreightOut \| null |  | FS-088: installation charges, or null. |
+| `fittings` | FreightOut \| null |  | FS-088: fittings material charges, or null. |
 | `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
@@ -915,6 +923,8 @@ Every version of the number, oldest first. Any version's id works.
 | `terms` | string \| null |  | Free text printed at the foot. |
 | `lines` | QuotationLineIn[] |  | One to 200. None is 422 no_lines (FS-073). |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. Only with at least one line. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. Only with at least one line. |
 
 **`QuotationLine`**
 
@@ -986,6 +996,8 @@ Every version of the number, oldest first. Any version's id works.
 | `party` | Party \| null |  |  |
 | `terms` | string \| null |  |  |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. A change to a type other than commercial or industrial clears the freight and every GST choice (warning gst_choice_cleared); sending freight with such a change is 422 freight_not_allowed. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. Only with at least one line. Omit to keep; null to remove. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. Only with at least one line. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  | Act only if the quotation is still in this status; otherwise 409 status_changed. |
 
 **`QuotationSubsidy`**
@@ -1104,6 +1116,8 @@ Every version of the number, oldest first. Any version's id works.
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
 | `freight` | string |  | FS-069: the freight before tax; 0.00 without freight. Default `0.00`. |
+| `installation` | string |  | FS-088: installation charges before tax; 0.00 without. Default `0.00`. |
+| `fittings` | string |  | FS-088: fittings material charges before tax; 0.00 without. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |
@@ -1146,4 +1160,6 @@ Every version of the number, oldest first. Any version's id works.
 |---|---|---|---|
 | `lines` | QuotationLineIn[] | yes | The whole basket, in order. Empty is 422 no_lines (FS-073). |
 | `freight` | FreightIn \| null |  | FS-069: one freight or transport charge, before tax. Commercial and industrial only, and only with at least one line. Omit to keep; null to remove. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. Only with at least one line. Omit to keep; null to remove. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. Only with at least one line. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `sent` \| `viewed` \| `accepted` \| `rejected` \| `negotiation` \| `expired` \| null |  |  |

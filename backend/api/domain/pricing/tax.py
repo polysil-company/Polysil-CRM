@@ -136,50 +136,76 @@ def compute_line(*, rate: Decimal, qty: Decimal, discount_pct: Decimal = ZERO,
                    total=taxable + igst, steps=tuple(steps))
 
 
+# FS-088: the document charges, in print order. `freight` prints as "Transportation".
+CHARGE_KINDS: tuple[str, ...] = ("freight", "installation", "fittings")
+CHARGE_LABELS = {"freight": "Transportation", "installation": "Installation Charges",
+                 "fittings": "Fittings Material Charges"}
+# FS-088 rule 3, GAP-591: a charge with a fixed default slab. Installation is a
+# service (SAC 9987, unconfirmed). Every other charge defaults to the highest goods slab.
+CHARGE_DEFAULT_SLAB: dict[str, Decimal] = {"installation": Decimal("18")}
+_CHARGE_NAMES = {"freight": "Freight", "installation": "Installation", "fittings": "Fittings"}
+
+
 def default_freight_slab(slabs: Sequence[Decimal]) -> Decimal:
     """FS-069 rule 7: the highest slab among the goods lines, each line's own slab,
     chosen or not, a zero-taxable line included. The owner's rule; the legal rule
     for a composite supply is the principal supply's rate (GAP-510)."""
+    return default_charge_slab("freight", slabs)
+
+
+def default_charge_slab(kind: str, slabs: Sequence[Decimal]) -> Decimal:
+    """FS-088 rule 3: the charge's fixed default, else the highest goods slab. A
+    charge needs a goods line either way (rule 2)."""
     if not slabs:
-        raise PricingError("freight_without_lines",
-                           "Freight needs at least one goods line.", "freight")
-    return max(slabs)
+        raise PricingError(f"{kind}_without_lines" if kind == "freight" else "charge_without_lines",
+                           f"{_CHARGE_NAMES[kind]} needs at least one goods line.", kind)
+    return CHARGE_DEFAULT_SLAB.get(kind, max(slabs))
 
 
 def compute_freight(*, amount: Decimal, slab: Decimal, chosen: bool,
                     intra_state: bool) -> FreightTax:
     """FS-069 rules 5, 6 and 8: freight is taxed as a line of quantity one, with no
     discount, so it rounds and splits CGST and SGST exactly as a line does."""
+    return compute_charge("freight", amount=amount, slab=slab, chosen=chosen,
+                          intra_state=intra_state)
+
+
+def compute_charge(kind: str, *, amount: Decimal, slab: Decimal, chosen: bool,
+                   intra_state: bool) -> FreightTax:
+    """FS-088: any document charge, taxed as freight is (FS-069 rules 5, 6, 8)."""
+    if kind not in CHARGE_KINDS:
+        raise ValueError(f"unknown charge {kind!r}")
     if amount <= 0 or amount != amount.quantize(CENT) or amount > MAX_LINE_TOTAL:
         raise PricingError(
-            "freight_amount_invalid",
-            f"Freight must be above zero, at most {MAX_LINE_TOTAL:f}, in rupees and paise.",
-            "freight.amount")
+            "freight_amount_invalid" if kind == "freight" else "charge_amount_invalid",
+            f"{_CHARGE_NAMES[kind]} must be above zero, at most {MAX_LINE_TOTAL:f}, in "
+            f"rupees and paise.", f"{kind}.amount")
     if slab not in GST_SLABS:
         raise PricingError("gst_slab_not_offered", f"{slab:f} % is not a GST slab.",
-                           "freight.gst_slab")
+                           f"{kind}.gst_slab")
     money = compute_line(rate=amount, qty=Decimal("1"), slab=slab, intra_state=intra_state)
-    return FreightTax(amount=amount, slab=slab, chosen=chosen, money=money)
+    return FreightTax(amount=amount, slab=slab, chosen=chosen, money=money, kind=kind)
 
 
 def document_totals(lines: tuple[LineTax, ...],
-                    freight: FreightTax | None = None) -> DocumentTotals:
+                    *charges: FreightTax | None) -> DocumentTotals:
     """The sum of rounded lines. Not a recomputation on the summed taxable value:
     those differ by paise, and a hundred-line document diverges by rupees.
 
     Freight (FS-069 rule 8) joins taxable, the taxes and the total, never gross or
     discount: the discount approval reads `discount / gross` (017), and freight in
     `gross` would dilute a discount past its limit. So on the header
-    `taxable = gross - discount + freight`."""
-    extra = freight.money if freight is not None else None
+    `taxable = gross - discount + freight`. FS-088: every charge joins the same way,
+    each rounded on its own as a line is."""
+    rows = (*lines, *(c.money for c in charges if c is not None))
     totals = DocumentTotals(
         gross=sum((ln.gross for ln in lines), ZERO),
         discount=sum((ln.discount for ln in lines), ZERO),
-        taxable=sum((ln.taxable for ln in lines), ZERO) + (extra.taxable if extra else ZERO),
-        cgst=sum((ln.cgst for ln in lines), ZERO) + (extra.cgst if extra else ZERO),
-        sgst=sum((ln.sgst for ln in lines), ZERO) + (extra.sgst if extra else ZERO),
-        igst=sum((ln.igst for ln in lines), ZERO) + (extra.igst if extra else ZERO),
-        total=sum((ln.total for ln in lines), ZERO) + (extra.total if extra else ZERO),
+        taxable=sum((ln.taxable for ln in rows), ZERO),
+        cgst=sum((ln.cgst for ln in rows), ZERO),
+        sgst=sum((ln.sgst for ln in rows), ZERO),
+        igst=sum((ln.igst for ln in rows), ZERO),
+        total=sum((ln.total for ln in rows), ZERO),
     )
     if totals.total > MAX_DOCUMENT_TOTAL:
         raise PricingError("document_total_too_large",

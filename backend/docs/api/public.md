@@ -349,6 +349,8 @@ The children of one territory, name and id only, at most 200.
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
 | `freight` | string |  | FS-069: the freight before tax; 0.00 without freight. Default `0.00`. |
+| `installation` | string |  | FS-088: installation charges before tax; 0.00 without. Default `0.00`. |
+| `fittings` | string |  | FS-088: fittings material charges before tax; 0.00 without. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |
