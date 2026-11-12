@@ -520,6 +520,19 @@ def district_offices(env: dict[str, str], *, sheet: Path | None, dry_run: bool,
         sys.exit(got.returncode)
 
 
+def talukas(env: dict[str, str], *, csv_path: Path, dry_run: bool) -> None:
+    """FS-087: `load_talukas.py` in the tools container. The CSV goes in on stdin,
+    so the box never reads a copy synced earlier."""
+    guard(env)
+    args = ["run", "--rm", "-T", "tools", "python", "scripts/load_talukas.py", "--csv", "-"]
+    if dry_run:
+        args.append("--dry-run")
+    got = run_remote(env, compose(env, *args, profile="tools"),
+                     stdin=csv_path.read_bytes(), check=False)
+    if got.returncode != 0:
+        sys.exit(got.returncode)
+
+
 def health(env: dict[str, str], *, attempts: int = 30) -> bool:
     """Ask the box, not the container: this is the path an SSH tunnel takes."""
     port = env["API_HOST_PORT"]
@@ -657,7 +670,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("step", nargs="?", default="deploy",
                         choices=["provision", "deploy", "sync", "build", "up", "migrate",
                                  "seed", "seed-prod", "load-states", "templates", "requeue-pdfs",
-                                 "staff-facts", "district-offices",
+                                 "staff-facts", "district-offices", "talukas",
                                  "status", "verify", "load", "logs", "down", "frontend-prod",
                                  "frontend-provision", "frontend", "frontend-caddy"])
     parser.add_argument("service", nargs="?", default=None, help="which service, for logs")
@@ -677,7 +690,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--all-districts", action="store_true",
                         help="district-offices: an office for every district")
     parser.add_argument("--dry-run", action="store_true",
-                        help="district-offices: do it all, report, roll back")
+                        help="district-offices, talukas: do it all, report, roll back")
+    parser.add_argument("--csv", type=Path, default=Path("data/masters/talukas.csv"),
+                        help="talukas: the cleaned taluka list (FS-087)")
     parser.add_argument("--target", choices=["staging", "prod"], default="staging",
                         help="prod: the Hostinger box, infra/.env.prod and docker-compose.prod.yml")
     parser.add_argument("--source", type=Path, default=None,
@@ -737,6 +752,10 @@ def main(argv: list[str] | None = None) -> int:
             die(f"{args.sheet} not found")
         district_offices(env, sheet=args.sheet, dry_run=args.dry_run, actor=args.actor,
                          all_districts=args.all_districts)
+    elif args.step == "talukas":
+        if not args.csv.exists():
+            die(f"{args.csv} not found")
+        talukas(env, csv_path=args.csv, dry_run=args.dry_run)
     elif args.step == "templates":
         sync_templates(env)
     elif args.step == "requeue-pdfs":
