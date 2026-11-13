@@ -274,12 +274,16 @@ class DispatchCreate(BaseModel):
 class ThresholdPut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    doc_type: Literal["sales_order", "quotation", "complaint"] = "sales_order"
+    doc_type: Literal["sales_order", "quotation", "complaint", "industrial_order"] = Field(
+        default="sales_order",
+        description="`industrial_order` (FS-089): the ladder an industrial order climbs.")
     role: Literal["field_officer", "district_manager", "state_manager", "regional_manager",
-                  "admin_sales"] = Field(
+                  "admin_sales", "md_ceo"] = Field(
         description="An order's rows are for the three managers, and so are a refund's "
                     "(`complaint`, rupees). A quotation's are for any of the five: the field "
-                    "officer's is the officer's own limit.")
+                    "officer's is the officer's own limit. An industrial order's are for the "
+                    "State Manager, the Regional Manager and the MD (`md_ceo`); only the MD "
+                    "may have no limit.")
     territory_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE, description="Null for the company-wide row.")]
     max_amount: Annotated[Decimal | None, Field(

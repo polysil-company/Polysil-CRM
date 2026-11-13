@@ -206,6 +206,19 @@ def main() -> None:
             """
         )
 
+        # FS-089: an industrial order's ladder (GAP-593). Migration 090 inserts the same
+        # where roles exist; a fresh database seeds its roles after migrating.
+        cur.execute(
+            """
+            INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount)
+            SELECT 'industrial_order', r.id, NULL, v.amount
+              FROM (VALUES ('state_manager', 500000.00::numeric),
+                           ('regional_manager', 2500000.00), ('md_ceo', NULL)) v(code, amount)
+              JOIN role r ON r.code = v.code
+            ON CONFLICT (doc_type, role_id, territory_id) DO NOTHING
+            """
+        )
+
         territories = _tree(
             cur, "territory",
             [("Gujarat", "state", None), ("Rajkot", "district", "Gujarat"),
